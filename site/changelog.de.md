@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.3.0]
 
+### Neu
+
+- Auf dem Telefon zeigt die Agenda heute jede Checkliste ohne Routine oder Erinnerung, die offene Zeilen hat, in einer Reihe nach den Einkaufslisten, etwa „Vor der Reise: 3 von 7 offen“, die die Liste öffnet, und „Auf der Agenda zeigen“ im ⋮ ihrer Karte und ihres Editors, für jede Checkliste eingeschaltet, nimmt sie nur für diese Person aus der Agenda, gehalten auf ihren eigenen Geräten, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet.
+
 ### Geändert
 
 - Die Schnellnotiz, auf dem Telefon der Bildschirm zum Erfassen von Text und auf dem Desktop das Erfassungsfeld und das Fenster „Notiz erfassen“, zeigt nur noch den Text, die Knöpfe, die eine Aufnahme, ein Bild oder eine Datei hinzufügen, die Stupser-Knöpfe und „Zum vollen Editor“, das die Notiz unsortiert mit einem Stupser in 1 Std. speichert und im Notiz-Editor öffnet, und die Einstellungen schalten unter „Schnellnotiz“ Ablegen in …, Routine, Erinnerung, Frosch, Einheit oder Strichliste, was „Zur Strichliste machen“ hinzufügt, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit und die Formatleiste für sie ein und die Stupser-Knöpfe für ein einziges Speichern aus.

@@ -6818,6 +6818,24 @@ abstract class AppLocalizations {
   /// **'Private Shopping List'**
   String get maskedShoppingList;
 
+  /// An Agenda row of a Checklist without a Routine: its title and how many of its Lines are not checked of all its Lines, such as 'Before the trip: 3 of 7 open'.
+  ///
+  /// In en, this message translates to:
+  /// **'{list}: {open} of {count} open'**
+  String checklistRowOpen(String list, int open, int count);
+
+  /// A Checklist from a locked Area set to Masked, on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Checklist'**
+  String get maskedChecklist;
+
+  /// Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The person's own choice, kept on their own Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on the Agenda'**
+  String get checklistShowOnAgenda;
+
   /// Menu entry at a status mark at the start of a line of a Note's text: changes it to ✅.
   ///
   /// In en, this message translates to:

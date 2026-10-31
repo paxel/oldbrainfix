@@ -139,7 +139,8 @@ class NoteActions {
 
   /// What the menu offers of a Checklist (#120), read as the menu opens:
   /// whether the Note is one, and making it one, turning it back into a
-  /// plain Note and unchecking all of its Lines, each left out when null.
+  /// plain Note, unchecking all of its Lines and its "Show on the Agenda"
+  /// (#143), each left out when null.
   final ChecklistMenu Function()? checklist;
 
   /// Picks a Shopping List for the lines of a Note being captured
@@ -174,13 +175,16 @@ class NoteActions {
 }
 
 /// The Checklist and Shopping List entries of a card's ⋮ as the menu
-/// opens (#120, #122): [isList] while the Note is either.
+/// opens (#120, #122): [isList] while the Note is either; [showOnAgenda]
+/// whether a Checklist without a Routine shows on this person's Agenda,
+/// and switching that (#143).
 typedef ChecklistMenu = ({
   bool isList,
   VoidCallback? make,
   VoidCallback? makeShopping,
   VoidCallback? toPlain,
   VoidCallback? uncheckAll,
+  ({bool on, VoidCallback toggle})? showOnAgenda,
 });
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
@@ -640,8 +644,8 @@ class NoteActionRow extends StatelessWidget {
 /// leads with Edit, then the Note's Importance as radio buttons, the one it has
 /// marked, then Show ticks while it has boxes, then sending, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
-/// Shopping List" or, for one, "Uncheck all" (a Checklist's) and "Back to
-/// a plain Note", removing a photo or recording while its
+/// Shopping List" or, for one, "Show on the Agenda" and "Uncheck all" (a
+/// Checklist's) and "Back to a plain Note", removing a photo or recording while its
 /// text stays, one entry each with the start of that text under it, and
 /// deleting.
 class _MoreButton extends StatelessWidget {
@@ -763,6 +767,8 @@ class _MoreButton extends StatelessWidget {
               t.makeShoppingList,
               make,
             ),
+          if (list?.showOnAgenda case final agenda?)
+            showOnAgendaItem(button, agenda),
           if (list?.uncheckAll case final uncheck?)
             item(
               'note-uncheck-all',
@@ -825,24 +831,49 @@ class _MoreButton extends StatelessWidget {
 PopupMenuItem<VoidCallback> showTicksItem(
   BuildContext context,
   ({bool on, VoidCallback toggle}) ticks,
+) => _switchItem(
+  const ValueKey('note-show-ticks'),
+  Icons.history_toggle_off,
+  context.t.boxShowTicks,
+  ticks,
+);
+
+/// The menu entry that switches "Show on the Agenda" of a Checklist on
+/// and off for this person (#143), [agenda] telling whether it is on.
+PopupMenuItem<VoidCallback> showOnAgendaItem(
+  BuildContext context,
+  ({bool on, VoidCallback toggle}) agenda,
+) => _switchItem(
+  const ValueKey('note-show-on-agenda'),
+  Icons.today_outlined,
+  context.t.checklistShowOnAgenda,
+  agenda,
+);
+
+/// A menu entry with its icon and words, and the switch below them.
+PopupMenuItem<VoidCallback> _switchItem(
+  Key key,
+  IconData icon,
+  String label,
+  ({bool on, VoidCallback toggle}) state,
 ) => PopupMenuItem(
-  key: const ValueKey('note-show-ticks'),
-  value: ticks.toggle,
+  key: key,
+  value: state.toggle,
   child: Semantics(
-    toggled: ticks.on,
+    toggled: state.on,
     child: Row(
       children: [
-        const Icon(Icons.history_toggle_off),
+        Icon(icon),
         const SizedBox(width: 12),
         Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(context.t.boxShowTicks),
+              Text(label),
               ExcludeSemantics(
                 child: IgnorePointer(
-                  child: Switch(value: ticks.on, onChanged: (_) {}),
+                  child: Switch(value: state.on, onChanged: (_) {}),
                 ),
               ),
             ],

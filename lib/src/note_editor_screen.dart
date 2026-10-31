@@ -321,6 +321,7 @@ NoteActions noteActions(
                 changed();
               }
             : null,
+        showOnAgenda: showOnAgendaEntry(lists, id, changed),
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
@@ -351,6 +352,25 @@ BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
     mayTick: !trashed && store.mayWriteIn(entity),
     showTicks: shows,
     changed: changed,
+  );
+}
+
+/// The "Show on the Agenda" entry of the menu of the Note [noteId]
+/// (#143): on or off for this person, and switching it; null unless it
+/// is a Checklist without a Routine. [changed] runs after a switch.
+({bool on, VoidCallback toggle})? showOnAgendaEntry(
+  Checklists lists,
+  String noteId,
+  VoidCallback changed,
+) {
+  if (!lists.mayShowOnAgenda(noteId)) return null;
+  final on = lists.showsOnAgenda(noteId);
+  return (
+    on: on,
+    toggle: () {
+      lists.setShowOnAgenda(noteId, !on);
+      changed();
+    },
   );
 }
 
@@ -512,6 +532,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _makesShopping = false;
   bool _isShopping = false;
 
+  /// The "Show on the Agenda" switch of a Checklist without a Routine
+  /// (#143); null for any other Note.
+  ({bool on, VoidCallback toggle})? _onAgenda;
+
   @override
   void initState() {
     super.initState();
@@ -583,6 +607,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final lists = Checklists(widget.notes.store);
     _makesList = lists.mayMake(widget.noteId);
     _isList = lists.isChecklist(widget.noteId);
+    _onAgenda = showOnAgendaEntry(lists, widget.noteId, _reload);
     final shopping = ShoppingLists(widget.notes.store);
     _makesShopping = shopping.mayMake(widget.noteId);
     _isShopping = shopping.isShoppingList(widget.noteId);
@@ -1115,17 +1140,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
             ],
             // Only while there is something in it (UI laws, "The bar").
-            if (_hasBoxes)
+            if (_hasBoxes || _onAgenda != null)
               PopupMenuButton<VoidCallback>(
                 key: const ValueKey('editor-menu'),
                 tooltip: t.more,
                 icon: const Icon(Icons.more_vert),
                 onSelected: (run) => run(),
                 itemBuilder: (button) => [
-                  showTicksItem(button, (
-                    on: showsTicks(widget.notes.store, widget.noteId),
-                    toggle: _toggleTicks,
-                  )),
+                  if (_hasBoxes)
+                    showTicksItem(button, (
+                      on: showsTicks(widget.notes.store, widget.noteId),
+                      toggle: _toggleTicks,
+                    )),
+                  if (_onAgenda case final agenda?)
+                    showOnAgendaItem(button, agenda),
                 ],
               ),
           ],

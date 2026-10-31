@@ -81,15 +81,21 @@ typedef _ShoppingRow = ({
   bool checks,
 });
 
+/// A Checklist's row on today's Agenda (#143): the list with how many of
+/// its Lines are open, with where its Note is filed and whether it shows
+/// Masked.
+typedef _ChecklistRow = ({Note note, Area? area, bool masked, Checklist list});
+
 /// What the menu of an Occurrence's row does.
 enum _RowChoice { history, share }
 
 /// One row of a day on the Agenda: an Occurrence, a part of a calendar
-/// appointment, or a Shopping List's.
+/// appointment, a Shopping List's or a Checklist's.
 typedef _DayEntry = ({
   _PlacedRow? row,
   AppointmentPiece? piece,
   _ShoppingRow? shopping,
+  _ChecklistRow? checklist,
 });
 
 /// A Frog of the "Eat a frog" section with its Note and Area, and
@@ -148,6 +154,11 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// with its box, or one row per list with how many came back or are
 /// open, or none. A tap opens the list; a Masked one is one row that
 /// names no Line.
+///
+/// After them today shows each Checklist without a Routine or Reminder
+/// that has open Lines and that the user did not switch off for their
+/// own Agenda (#143), as one row with how many of its Lines are open; a
+/// tap opens it, and a Masked one names nothing of it.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -355,13 +366,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   /// The rows of [day]: its all-day Occurrences [rows] and all-day
-  /// appointments, then the rows of the Shopping Lists [shopping], then
-  /// the timed ones of both by time, an Occurrence before an appointment
-  /// at the same time.
+  /// appointments, then the rows of the Shopping Lists [shopping] and of
+  /// the Checklists [checklists], then the timed ones of both by time, an
+  /// Occurrence before an appointment at the same time.
   List<_DayEntry> _entries(
     Day day,
     List<_PlacedRow> rows, {
     List<_ShoppingRow> shopping = const [],
+    List<_ChecklistRow> checklists = const [],
   }) {
     final pieces = appointmentsOn(day, _appointments, deviceWallClock);
     final timedRows = [
@@ -381,18 +393,32 @@ class _AgendaScreenState extends State<AgendaScreen> {
           : null;
       final pieceAt = p < timedPieces.length ? timedPieces[p].at : null;
       if (rowAt != null && (pieceAt == null || rowAt.compareTo(pieceAt) <= 0)) {
-        timed.add((row: timedRows[r++], piece: null, shopping: null));
+        timed.add((
+          row: timedRows[r++],
+          piece: null,
+          shopping: null,
+          checklist: null,
+        ));
       } else {
-        timed.add((row: null, piece: timedPieces[p++], shopping: null));
+        timed.add((
+          row: null,
+          piece: timedPieces[p++],
+          shopping: null,
+          checklist: null,
+        ));
       }
     }
     return [
       for (final placed in rows)
         if (placed.row.occurrence.allDay)
-          (row: placed, piece: null, shopping: null),
+          (row: placed, piece: null, shopping: null, checklist: null),
       for (final piece in pieces)
-        if (piece.allDay) (row: null, piece: piece, shopping: null),
-      for (final row in shopping) (row: null, piece: null, shopping: row),
+        if (piece.allDay)
+          (row: null, piece: piece, shopping: null, checklist: null),
+      for (final row in shopping)
+        (row: null, piece: null, shopping: row, checklist: null),
+      for (final row in checklists)
+        (row: null, piece: null, shopping: null, checklist: row),
       ...timed,
     ];
   }
@@ -419,9 +445,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
         .keys
         .toSet();
     _shoppingWay = widget.notes.store.shoppingAgenda;
-    _today = _entries(agenda.today, [
-      for (final row in agenda.todayRows) _place(row),
-    ], shopping: _shoppingRows());
+    _today = _entries(
+      agenda.today,
+      [for (final row in agenda.todayRows) _place(row)],
+      shopping: _shoppingRows(),
+      checklists: _checklistRows(),
+    );
     _tomorrow = _entries(agenda.tomorrow, [
       for (final row in agenda.tomorrowRows) _place(row),
     ]);
@@ -500,6 +529,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
     }
     return rows;
   }
+
+  /// Today's rows of the Checklists without a Routine that show on this
+  /// person's Agenda, oldest capture first; one of a Masked Area tells
+  /// nothing of it.
+  List<_ChecklistRow> _checklistRows() => [
+    for (final list in _checklists.agenda())
+      if (widget.notes.byId(list.noteId) case final note?)
+        (
+          note: note,
+          area: placeNote(widget.places, note).area,
+          masked: _masksNote(note),
+          list: list,
+        ),
+  ];
 
   static String _sessionKey(String id, Occurrence occurrence) =>
       '$id@${occurrence.key}';
@@ -778,9 +821,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  /// Opens the Shopping List of [note] in its editor, its locked Area
-  /// first.
-  Future<void> _openShopping(Note note) async {
+  /// Opens the Shopping List or Checklist of [note] in its editor, its
+  /// locked Area first.
+  Future<void> _openList(Note note) async {
     if (!await _openAreaOfNote(note) || !mounted) return;
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -965,6 +1008,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     };
     final shown = masked ? t.maskedShoppingList : title;
     return _ShoppingListRow(
+      icon: Icons.shopping_cart_outlined,
       key: ValueKey(
         line == null ? 'shopping-row-${note.id}' : 'shopping-line-${line.id}',
       ),
@@ -980,7 +1024,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
       list: line == null ? null : title,
       checkKey: line == null ? null : ValueKey('shopping-check-${line.id}'),
       onCheck: line != null && checks ? () => _checkShopping(line.id) : null,
-      onTap: () => _openShopping(note),
+      onTap: () => _openList(note),
+    );
+  }
+
+  /// A Checklist's row today: its title with how many of its Lines are
+  /// open, "Before the trip: 3 of 7 open". A tap opens the list.
+  Widget _checklistRow(AppLocalizations t, _ChecklistRow row) {
+    final (:note, :area, :masked, :list) = row;
+    final title = masked
+        ? t.maskedChecklist
+        : switch (noteText(t, note).trim().split('\n').first.trim()) {
+            '' => t.checklistHeading,
+            final title => title,
+          };
+    return _ShoppingListRow(
+      key: ValueKey('checklist-row-${note.id}'),
+      icon: Icons.checklist,
+      area: masked ? null : area,
+      text: t.checklistRowOpen(title, list.openCount, list.count),
+      list: null,
+      checkKey: null,
+      onCheck: null,
+      onTap: () => _openList(note),
     );
   }
 
@@ -1123,7 +1189,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
         else if (entry.row case final placed?)
           _occurrenceRow(t, locale, placed)
         else if (entry.shopping case final shopping?)
-          _shoppingRow(t, shopping),
+          _shoppingRow(t, shopping)
+        else if (entry.checklist case final checklist?)
+          _checklistRow(t, checklist),
     ];
     // Swipe left opens the notes browser, as the magnifier does.
     return BrowserSwipes(
@@ -1644,11 +1712,13 @@ class _OccurrenceRow extends StatelessWidget {
   }
 }
 
-/// A Shopping List's row today as an embossed row, its Area's colour
-/// and icon on it: a Line that came back today with its box and the
-/// list's title under it, or the list with the cart. Tapping it opens
-/// the list.
+/// A Shopping List's or Checklist's row today as an embossed row, its
+/// Area's colour and icon on it: a Line that came back today with its box
+/// and the list's title under it, or the list with its [icon]. Tapping it
+/// opens the list.
 class _ShoppingListRow extends StatelessWidget {
+  /// What leads a row of the list, which has no box.
+  final IconData icon;
   final Area? area;
   final String text;
 
@@ -1665,6 +1735,7 @@ class _ShoppingListRow extends StatelessWidget {
 
   const _ShoppingListRow({
     super.key,
+    required this.icon,
     required this.area,
     required this.text,
     required this.list,
@@ -1713,10 +1784,7 @@ class _ShoppingListRow extends StatelessWidget {
                     else
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.shopping_cart_outlined,
-                          color: scheme.onSurfaceVariant,
-                        ),
+                        child: Icon(icon, color: scheme.onSurfaceVariant),
                       ),
                     const SizedBox(width: 4),
                     Expanded(

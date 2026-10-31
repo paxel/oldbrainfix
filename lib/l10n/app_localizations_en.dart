@@ -4173,6 +4173,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get maskedShoppingList => 'Private Shopping List';
 
   @override
+  String checklistRowOpen(String list, int open, int count) {
+    return '$list: $open of $count open';
+  }
+
+  @override
+  String get maskedChecklist => 'Private Checklist';
+
+  @override
+  String get checklistShowOnAgenda => 'Show on the Agenda';
+
+  @override
   String get textMarkCheck => 'Check';
 
   @override

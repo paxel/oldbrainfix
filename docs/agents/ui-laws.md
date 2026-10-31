@@ -156,7 +156,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
-  rows as Settings of this Device choose (today only), then today's timed
+  rows as Settings of this Device choose (today only), then the
+  Checklists' rows (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
   while today's pick holds a Frog (never above what is due). Every later
@@ -189,6 +190,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note of its title, time, place and description and shows its card on
   top. The calendar mirror's own entries never show as appointments.
   Nothing of an appointment is kept or synced.
+- **A Checklist without a Routine or Reminder is one row today** while
+  it has open Lines, "Before the trip: 3 of 7 open", unless the user
+  switched **Show on the Agenda** off in the ⋮ of its card or editor; the
+  switch is there only for such a Checklist. The row has no box; a tap
+  opens the list. A Masked one says "Private Checklist" and its counts.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
