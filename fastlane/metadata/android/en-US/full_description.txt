@@ -12,6 +12,7 @@ Old Brain Fix is a note and reminder app for Android. A desktop app for Linux, W
 • New Notes are kept in Unsorted. A notification (Nudge) reports Unsorted Notes at a set interval; Quiet Hours suppress it at night.
 • Notes are filed into Areas and Topics (two levels), each with a colour and an icon. A starter set of Areas is offered at first start.
 • Notes can be edited, amended and merged. Deleted items stay in the trash for 30 days.
+• A Note can become a Checklist, a Shopping List whose items come back after a set number of weeks, or a Tally with entries and charts. Its text can be formatted with headings, lists, tables and boxes to tick.
 
 <b>Routines and Reminders</b>
 • Any Note can have Reminders (one time) and Routines (repeating by a recurrence rule, several times a day if needed).

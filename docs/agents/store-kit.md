@@ -42,10 +42,10 @@ and F-Droid both take them. `docs/screenshots/play` links to
 | # | File             | What is on it                                              |
 |---|------------------|------------------------------------------------------------|
 | 1 | `1-agenda.png`   | Agenda: today's Routines, two Frogs, the Unsorted banner   |
-| 2 | `2-capture.png`  | Capture with Photo, Voice, Gallery, action row and chips   |
+| 2 | `2-capture.png`  | Capture with Photo, Voice, Gallery, Paste, the action row  |
 | 3 | `3-diary.png`    | An Area's diary of Note cards in full                      |
 | 4 | `4-editor.png`   | Note editor with dated parts and Importance                |
-| 5 | `5-fan.png`      | The Agenda's "+" fanned out: Text, Voice, Photo, Gallery   |
+| 5 | `5-fan.png`      | The "+" fanned out: Text, Voice, Photo, Gallery, Paste     |
 | 6 | `6-alarm.png`    | Alarm ring screen with Done and Snooze                     |
 | 7 | `7-history.png`  | Routine history with Streak and Adherence                  |
 | 8 | `8-dark.png`     | Agenda in the dark theme, scrolled to the rest of the week |
