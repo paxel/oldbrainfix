@@ -1,0 +1,80 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Müller\nHerr Müller € 12,50",
+      "shown": "Müller\nHerr Müller € 12,50",
+      "visible": "Müller\nHerr Müller € 12,50",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "dentist\nTuesday 9:00\nbring the X-ray",
+      "shown": "dentist\nTuesday 9:00\nbring the X-ray",
+      "visible": "dentist\nTuesday 9:00\nbring the X-ray",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "～\ntilde",
+      "shown": "～\ntilde",
+      "visible": "～\ntilde",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "😀\nemoji",
+      "shown": "😀\nemoji",
+      "visible": "😀\nemoji",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "# Empty",
+      "shown": "# Empty",
+      "visible": "Empty",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000008",
+      "text": "# Shopping\n- **milk** and ~~bread~~\n- ☐󠀸󠁸󠁮󠁲󠁿 eggs",
+      "shown": "# Shopping\n- **milk** and ~~bread~~\n- ☐ eggs",
+      "visible": "Shopping\nmilk and bread\n☐ eggs",
+      "boxes": [
+        {
+          "id": "8xnr",
+          "state": "open",
+          "starting": "open",
+          "start": 38,
+          "end": 39,
+          "sourceStart": 38,
+          "idStart": 39,
+          "sourceEnd": 44,
+          "last": null,
+          "history": []
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "text": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+      "shown": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+      "visible": "Ideas 2*3\nquoted\ncode link",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "text": "later\nWritten later",
+      "shown": "later\nWritten later",
+      "visible": "later\nWritten later",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "dentist\nTuesday 9:00\nbring the X-ray",
+      "shown": "dentist\nTuesday 9:00\nbring the X-ray",
+      "visible": "dentist\nTuesday 9:00\nbring the X-ray",
+      "boxes": []
+    }
+  ]
+}

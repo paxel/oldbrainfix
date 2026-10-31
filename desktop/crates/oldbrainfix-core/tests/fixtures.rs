@@ -17,6 +17,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
 use oldbrainfix_core::history::{Adherence, DoneTiming, RoutineHistory, schedule_spans};
 use oldbrainfix_core::ics::routines_ics;
+use oldbrainfix_core::imports::MAX_FILE_BYTES;
 use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
@@ -28,18 +29,18 @@ use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
-    Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear,
-    Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
-    Section, SessionRule, Sessions, ShoppingAgenda, ShoppingList, ShoppingLists, SigningKey,
-    SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry,
-    dart_iso, parse_time,
+    Frogs, ImportFile, ImportSummary, Importance, Imports, Note, Notes, NotesGo, Occurrence,
+    PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines,
+    STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, ShoppingAgenda, ShoppingList,
+    ShoppingLists, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule,
+    UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 19] = [
+const SCENARIOS: [&str; 20] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -48,6 +49,7 @@ const SCENARIOS: [&str; 19] = [
     "formats",
     "frogs",
     "history",
+    "import",
     "markdown",
     "markers",
     "media",
@@ -929,14 +931,21 @@ fn tick_json(t: &oldbrainfix_core::text_boxes::BoxTick) -> Value {
 
 #[test]
 fn boxes_show_and_tick_as_the_dart_core_does() -> TestResult {
+    for scenario in ["boxes", "import"] {
+        boxes_come_to_what_the_dart_core_says(scenario)?;
+    }
+    Ok(())
+}
+
+fn boxes_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
     use oldbrainfix_core::boxes::Boxes;
     use oldbrainfix_core::text_boxes::ShownBox;
-    let dir = fixtures().join("boxes");
+    let dir = fixtures().join(scenario);
     let now = read_json(&dir.join("expected.json"))?["now"]
         .as_str()
         .ok_or("expected.json names now")?
         .to_string();
-    let store = load("boxes", &now)?;
+    let store = load(scenario, &now)?;
     let notes = Notes::new(&store);
     let boxes = Boxes::new(&store);
     let text = |id: &str, source: &str, shown: &str, visible: &str, list: &[ShownBox]| {
@@ -1498,6 +1507,93 @@ fn write_edits(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `_importFolder`: the folder the `import` scenario
+/// imports, as an app hands it over.
+fn import_folder() -> Result<Vec<ImportFile>, Box<dyn std::error::Error>> {
+    let file = |name: &str, modified: Option<DateTime<Utc>>, bytes: Vec<u8>| ImportFile {
+        name: name.into(),
+        modified,
+        bytes,
+    };
+    let text = |name: &str, modified: Option<DateTime<Utc>>, text: &str| {
+        file(name, modified, text.as_bytes().to_vec())
+    };
+    let evening = Utc
+        .with_ymd_and_hms(2024, 11, 5, 17, 30, 0)
+        .single()
+        .ok_or("a valid date")?
+        + Duration::milliseconds(123);
+    let new_year = Some(utc(2025, 1, 1, 0)?);
+    let mut shopping = vec![0xef, 0xbb, 0xbf];
+    shopping.extend("# Shopping\r\n- **milk** and ~~bread~~\r\n- ☐ eggs\r\n".as_bytes());
+    let mut muller = b"Herr M".to_vec();
+    muller.push(0xfc);
+    muller.extend(b"ller ");
+    muller.push(0x80);
+    muller.extend(b" 12,50\r\n");
+    Ok(vec![
+        file("Shopping.md", Some(utc(2025, 3, 1, 8)?), shopping),
+        text(
+            "dentist.txt",
+            Some(evening),
+            "Tuesday 9:00\nbring the X-ray\n",
+        ),
+        file("Müller.txt", Some(evening), muller),
+        text("😀.txt", new_year, "emoji"),
+        text("～.txt", new_year, "tilde"),
+        text(
+            "notes/Ideas 2*3.md",
+            None,
+            "> *quoted*\n`code` [link](https://x.org)",
+        ),
+        text("later.txt", Some(utc(2030, 1, 1, 0)?), "Written later"),
+        text("Empty.md", Some(utc(2025, 2, 1, 0)?), ""),
+        text(".hidden.md", new_year, "hidden"),
+        file("photo.png", new_year, vec![0x89, 0x50, 0x4e, 0x47]),
+        file("wide.txt", new_year, vec![0xff, 0xfe, 0x41, 0x00]),
+        file("big.txt", new_year, vec![0x61; MAX_FILE_BYTES + 1]),
+    ])
+}
+
+/// The Imports of the generator's `import` scenario, with what each came
+/// to.
+fn import_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
+    Places::new(store).add_area("From Notes")?;
+    let imports = Imports::new(store);
+    let folder = import_folder()?;
+    Ok(vec![
+        imports.folder("From Notes", &folder)?,
+        imports.folder("From Notes", &folder[8..10])?,
+        imports.folder("From Notes", &folder[1..2])?,
+    ])
+}
+
+/// The generator's `import` scenario.
+fn write_import(store: &Store) -> Built {
+    import_into(store)?;
+    Ok(())
+}
+
+#[test]
+fn imports_come_to_what_the_dart_core_says() -> TestResult {
+    let store = writer_store()?;
+    let summaries: Vec<Value> = import_into(&store)?
+        .iter()
+        .map(|s| {
+            json!({
+                "areaId": s.area_id,
+                "notes": s.notes,
+                "notText": s.not_text,
+                "tooLarge": s.too_large,
+                "skipped": s.skipped(),
+            })
+        })
+        .collect();
+    let expected = read_json(&fixtures().join("import").join("import.json"))?;
+    assert_eq!(json!({ "imports": summaries }), expected);
+    Ok(())
+}
+
 /// The generator's `_photo`: a small JPEG, different for every `n`, with
 /// an APP0, an Exif APP1, an ICC APP2 and a comment before its tables and
 /// scan.
@@ -1610,7 +1706,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 19] = [
+    let writers: [(&str, Writer); 20] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1619,6 +1715,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("formats", write_formats),
         ("frogs", write_frogs),
         ("history", write_history),
+        ("import", write_import),
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),

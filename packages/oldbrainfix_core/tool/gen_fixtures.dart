@@ -177,6 +177,29 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'import',
+    about:
+        'Imports (ADR 0036): a folder into a new Area beside one of the '
+        'same name: Markdown with a byte order mark, Windows line breaks '
+        'and a box, titled by its first line; texts titled by their file '
+        'names, one in Windows-1252, two of one date ordered by name as '
+        'code points; a file in a subfolder of no date and one of a later '
+        'date, dated now; an empty one; a hidden file, a photo, one with a '
+        'zero byte and one too large, skipped; a folder of nothing usable, '
+        'which makes no Area; a file of the folder again, into a third '
+        'Area.',
+    build: (store) {
+      Places(store).addArea('From Notes');
+      final imports = Imports(store);
+      final folder = _importFolder();
+      _imported = [
+        imports.folder('From Notes', folder),
+        imports.folder('From Notes', [folder[8], folder[9]]),
+        imports.folder('From Notes', [folder[1]]),
+      ];
+    },
+  ),
+  (
     name: 'markdown',
     about:
         'Formatted texts: one captured so and edited, a plain one formatted '
@@ -3284,6 +3307,56 @@ Map<String, Object?> _ics() {
       for (final r in routinesByName(listed, (r) => named[r.id] ?? '')) r.id,
     ],
   };
+}
+
+/// What the Imports of the `import` scenario came to.
+var _imported = <ImportSummary>[];
+
+Map<String, Object?> _summary(ImportSummary s) => {
+  'areaId': s.areaId,
+  'notes': s.notes,
+  'notText': s.notText,
+  'tooLarge': s.tooLarge,
+  'skipped': s.skipped,
+};
+
+/// The folder the `import` scenario imports, as an app hands it over.
+List<ImportFile> _importFolder() {
+  ImportFile file(String name, DateTime? at, List<int> bytes) =>
+      ImportFile(name, at, Uint8List.fromList(bytes));
+  ImportFile text(String name, DateTime? at, String text) =>
+      file(name, at, utf8.encode(text));
+  final evening = DateTime.utc(2024, 11, 5, 17, 30, 0, 123);
+  final newYear = DateTime.utc(2025);
+  return [
+    file('Shopping.md', DateTime.utc(2025, 3, 1, 8), [
+      0xef,
+      0xbb,
+      0xbf,
+      ...utf8.encode('# Shopping\r\n- **milk** and ~~bread~~\r\n- ☐ eggs\r\n'),
+    ]),
+    text('dentist.txt', evening, 'Tuesday 9:00\nbring the X-ray\n'),
+    file('Müller.txt', evening, [
+      ...utf8.encode('Herr M'),
+      0xfc,
+      ...utf8.encode('ller '),
+      0x80,
+      ...utf8.encode(' 12,50\r\n'),
+    ]),
+    text('😀.txt', newYear, 'emoji'),
+    text('～.txt', newYear, 'tilde'),
+    text(
+      'notes/Ideas 2*3.md',
+      null,
+      '> *quoted*\n`code` [link](https://x.org)',
+    ),
+    text('later.txt', DateTime.utc(2030), 'Written later'),
+    text('Empty.md', DateTime.utc(2025, 2, 1), ''),
+    text('.hidden.md', newYear, 'hidden'),
+    file('photo.png', newYear, [0x89, 0x50, 0x4e, 0x47]),
+    file('wide.txt', newYear, [0xff, 0xfe, 0x41, 0x00]),
+    file('big.txt', newYear, List.filled(Imports.maxFileBytes + 1, 0x61)),
+  ];
 }
 
 Store _store() {
@@ -7449,6 +7522,8 @@ Future<void> main(List<String> args) async {
     'late, and snoozed, the Streaks, the last seven days and the Adherence '
     'of this week, this month, the last 30 days and January, on the same '
     'clock.\n'
+    '- `import/import.json`: what each Import of the `import` log came to '
+    '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `later_formats.json`: what files and values of a later version '
@@ -7787,6 +7862,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/boxes.json'),
           '${_json.convert(_boxesOf(store))}\n',
+        );
+      }
+      if (scenario.name == 'import') {
+        _write(
+          File('${out.path}/import.json'),
+          '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
         );
       }
       if (scenario.name == 'markers') {

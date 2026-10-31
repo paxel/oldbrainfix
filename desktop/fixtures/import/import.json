@@ -1,0 +1,25 @@
+{
+  "imports": [
+    {
+      "areaId": "area:00000000000000000000000000000002",
+      "notes": 8,
+      "notText": 3,
+      "tooLarge": 1,
+      "skipped": 4
+    },
+    {
+      "areaId": null,
+      "notes": 0,
+      "notText": 2,
+      "tooLarge": 0,
+      "skipped": 2
+    },
+    {
+      "areaId": "area:0000000000000000000000000000000c",
+      "notes": 1,
+      "notText": 0,
+      "tooLarge": 0,
+      "skipped": 0
+    }
+  ]
+}

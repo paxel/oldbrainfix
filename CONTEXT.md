@@ -53,6 +53,10 @@ _Avoid_: priority, star
 Capturing what the clipboard holds: on the phone "Paste" on the text capture screen and in the fan of "+", which reads the clipboard only when tapped and fills the capture with its text and with its picture as the Note's photo, both into one Note; on the desktop the capture's Paste button and Ctrl+V in the empty capture window. German: Einfügen.
 _Avoid_: import, clipboard capture
 
+**Import**:
+Making Notes from files another app or a folder holds: on the phone under Settings, on the desktop in the File menu, the files picked with the system's picker. Each Markdown or text file of a folder becomes one Note, formatted from Markdown, with the file's name as its first line unless its text begins with it, captured when the file was last changed; they all land in a new Area named after the source, beside an Area of that name rather than in it, and none of them is Unsorted or Nudged. Other files are skipped and counted. German: Import.
+_Avoid_: Pack (a Pack brings copies of Old Brain Fix Notes), Paste, bundle (a bundle is a sync transport), upload
+
 ### Text
 
 **Formatted text**:

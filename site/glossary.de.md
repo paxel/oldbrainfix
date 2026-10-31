@@ -51,6 +51,10 @@ _Avoid_: Priorität, Stern
 Erfassen, was in der Zwischenablage liegt: auf dem Handy „Einfügen“ auf dem Text-Erfassen-Bildschirm und im Fächer von „+“, das die Zwischenablage erst beim Tippen liest und das Erfassen mit ihrem Text und ihrem Bild als Foto der Notiz füllt, beides in eine Notiz; am Computer der Knopf Einfügen des Erfassens und Strg+V im leeren Erfassen-Fenster.
 _Avoid_: Importieren, Aus der Zwischenablage erfassen
 
+**Import** [Import]:
+Notizen aus Dateien machen, die eine andere App oder ein Ordner hält: auf dem Handy in den Einstellungen, am Computer im Menü Datei, die Dateien mit der Dateiauswahl des Systems gewählt. Jede Markdown- oder Textdatei eines Ordners wird eine Notiz, aus Markdown formatiert, mit dem Namen der Datei als erster Zeile, wenn ihr Text nicht schon damit beginnt, erfasst zu der Zeit, zu der die Datei zuletzt geändert wurde; alle landen in einem neuen Bereich, der nach der Quelle benannt ist, neben einem Bereich dieses Namens statt darin, und keine ist unsortiert oder bekommt einen Stupser. Andere Dateien werden übersprungen und gezählt.
+_Avoid_: Paket (ein Paket bringt Kopien von Old-Brain-Fix-Notizen), Einfügen, Bündel (ein Bündel ist ein Weg der Synchronisierung), Hochladen
+
 ## Text
 
 **Formatierter Text** [Formatted text]:
