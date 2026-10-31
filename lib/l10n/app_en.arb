@@ -1631,8 +1631,6 @@
   "@profileCardShowQr": {"description": "On the Profile page: shows the own Profile card as a QR code."},
   "profileCardShowQrDetail": "For someone next to you to scan.",
   "@profileCardShowQrDetail": {"description": "Under 'Show my QR'."},
-  "profileCardText": "My Profile for Old Brain Fix:\n{link}",
-  "@profileCardText": {"description": "The text shared with the Profile card. The link must stay last, with nothing after it.", "placeholders": {"link": {"type": "String"}}},
   "profileCardNotYet": "Sync with your other Device first, then try again.",
   "@profileCardNotYet": {"description": "The fix in the dialog behind 'profileCardNotMade': this Device's key is not bound to the Profile until it synced with another of the user's Devices."},
   "profileCardNoApp": "No app here can take the file.",

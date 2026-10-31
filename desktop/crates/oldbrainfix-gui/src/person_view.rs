@@ -34,8 +34,8 @@ pub enum PersonAction {
     /// Ask whether to block them, or to end their block (#90).
     Block,
     Unblock,
-    /// Put the own Profile card, as the answer to theirs, on the clipboard
-    /// (#107).
+    /// Save the own Profile card, as the answer to theirs, as a file to
+    /// send (#107, #144).
     SendBack,
     /// Save a bundle of what is new for them in the Areas shared with
     /// them, to send (#108).
@@ -48,8 +48,8 @@ pub enum SendBack {
     /// Not offered: they were not just added from a card asking for it.
     No,
     Offered,
-    /// The card went to the clipboard; what to do with it shows instead.
-    Copied,
+    /// The card file was saved; what to do with it shows instead.
+    Saved,
 }
 
 /// Where comparing a person's short code stands.
@@ -191,8 +191,8 @@ pub fn form(
                     actions.push(PersonAction::SendBack);
                 }
             }
-            SendBack::Copied => {
-                ui.label(RichText::new(t.person_send_back_copied(shown)).color(text));
+            SendBack::Saved => {
+                ui.label(RichText::new(t.person_send_back_saved(shown)).color(text));
             }
         }
     }

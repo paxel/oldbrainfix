@@ -6,7 +6,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Geändert
 
-- Auf dem Telefon schicken „Mein Profil senden“ und „Deins zurückschicken“ die Profilkarte als kleine Datei mit dem Bild, etwa `Ann.obfcard`, statt als Link, und eine Kartendatei, die in einem Messenger, in der App „Dateien“ oder bei den Downloads angetippt wird, öffnet sich in der App und fügt die Person nach denselben Regeln hinzu; Kartenlinks öffnen die App nicht mehr, und der QR-Code und eingefügte Links funktionieren wie bisher.
+- „Mein Profil senden“ und „Deins zurückschicken“ schicken die Profilkarte als kleine Datei mit dem Bild, etwa `Ann.obfcard`, statt als Link, auf dem Telefon über die gewählte App und auf dem Desktop dort gespeichert, wo du sagst, anstelle von „Meinen Profil-Link kopieren“, und eine Kartendatei, die auf dem Telefon in einem Messenger, in der App „Dateien“ oder bei den Downloads angetippt oder auf dem Desktop auf das Fenster gezogen, unter „Bündel importieren …“ gewählt oder `oldbrainfix open` übergeben wird, öffnet sich in der App und fügt die Person nach denselben Regeln hinzu; Kartenlinks öffnen die App nicht mehr, und der QR-Code und eingefügte Links funktionieren wie bisher.
 
 ### Behoben
 

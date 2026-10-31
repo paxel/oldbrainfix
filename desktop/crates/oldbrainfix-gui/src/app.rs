@@ -64,6 +64,7 @@ use egui::{
 use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
+use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
@@ -1170,6 +1171,8 @@ pub struct App {
     bundle_opener: FolderPicker,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
+    /// Asks where to save the own Profile card file (#144).
+    card_saver: FileSaver,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
     /// Asks where to save a Note as Markdown (#129).
@@ -1190,8 +1193,8 @@ pub struct App {
     updates: std::collections::VecDeque<UpdateNotice>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
-    /// The own Profile card copied, and another person's being pasted
-    /// (#107).
+    /// The own Profile card saved (#144), and another person's being
+    /// pasted (#107).
     card_form: CardForm,
     /// Text to put on the clipboard at the end of this frame.
     copy: Option<String>,
@@ -1272,11 +1275,12 @@ fn changes_file_name(day: chrono::NaiveDate, person: &str, name: &str) -> String
     }
 }
 
-/// The dialogs' filter for bundle files, and Sent Items to open.
+/// The dialogs' filter for bundle files, and Sent Items and Profile
+/// card files to open.
 fn bundle_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new().set_title(title).add_filter(
         oldbrainfix_core::APP_NAME,
-        &[bundle::EXTENSION, sent::EXTENSION],
+        &[bundle::EXTENSION, sent::EXTENSION, cards::EXTENSION],
     )
 }
 
@@ -1325,6 +1329,13 @@ fn item_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(oldbrainfix_core::APP_NAME, &[sent::EXTENSION])
+}
+
+/// The save dialog's filter for a Profile card file (#144).
+fn card_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(oldbrainfix_core::APP_NAME, &[cards::EXTENSION])
 }
 
 /// What a Note saved as Markdown ends in (#129).
@@ -1433,6 +1444,7 @@ impl App {
             }),
             bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
+            card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
             }),
@@ -1773,6 +1785,12 @@ impl App {
         self.item_saver = saver;
     }
 
+    /// Hands in the dialog asking where to save the own Profile card
+    /// file (#144).
+    pub fn set_card_saver(&mut self, saver: FileSaver) {
+        self.card_saver = saver;
+    }
+
     /// Hands in the dialog asking where to save a calendar file.
     pub fn set_calendar_saver(&mut self, saver: FileSaver) {
         self.calendar_saver = saver;
@@ -2097,16 +2115,29 @@ impl App {
         Ok(())
     }
 
-    /// Opens the file at `path`: a Sent Item shows its preview, a
-    /// stranger's held and hidden until "Show" (#91); anything else is
-    /// imported as a bundle.
+    /// Opens the file at `path`: a Profile card file (#144) opens the
+    /// person's Profile or says why nobody was added, a Sent Item shows
+    /// its preview, a stranger's held and hidden until "Show" (#91);
+    /// anything else is imported as a bundle. A card file is JSON as a
+    /// Sent Item is, so it is asked for first.
     fn open_file(&mut self, path: &std::path::Path) {
-        let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= sent::MAX_BYTES as u64);
+        let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
+        let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= most);
         let bytes = if small {
             std::fs::read(path).unwrap_or_default()
         } else {
             Vec::new()
         };
+        if cards::looks_like_profile_card(&bytes) {
+            let shown = self
+                .store
+                .open_profile_card_file(&bytes)
+                .and_then(|opened| self.card_opened(opened));
+            if let Err(e) = shown {
+                self.announce_card_not_added(CardTaken::Unreadable, e.to_string());
+            }
+            return;
+        }
         if !sent::looks_like_sent_item(&bytes) {
             self.import_bundle(path);
             return;
@@ -2130,6 +2161,90 @@ impl App {
                 );
             }
         }
+    }
+
+    /// Shows what opening a Profile card file came to: the person's
+    /// Profile when they are in People now, offering "Send yours back"
+    /// when the card asks for it, else that nobody was added, why behind
+    /// the click.
+    fn card_opened(&mut self, opened: CardOpened) -> oldbrainfix_core::Result<()> {
+        match (opened.taken, opened.id) {
+            (CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged, Some(id)) => {
+                let back = if opened.offer_back {
+                    SendBack::Offered
+                } else {
+                    SendBack::No
+                };
+                self.open_person(id, back)
+            }
+            (taken, _) => {
+                self.announce_card_not_added(taken, format!("profile card: {}", taken.name()));
+                Ok(())
+            }
+        }
+    }
+
+    /// Announces that a Profile card file added nobody, as `taken` says;
+    /// the click opens why and what to do.
+    fn announce_card_not_added(&mut self, taken: CardTaken, details: String) {
+        let t = self.t;
+        let why = match taken {
+            CardTaken::Own => (t.card_own(), t.card_own_fix()),
+            CardTaken::Blocked => (t.card_blocked(), t.blocked_fix()),
+            CardTaken::Refused => (t.card_refused(), t.card_refused_fix()),
+            CardTaken::NeedsUpdate => (t.sent_item_needs_update(), t.update_open_again_fix()),
+            CardTaken::Added
+            | CardTaken::Updated
+            | CardTaken::Unchanged
+            | CardTaken::Unreadable => (t.card_unreadable_cause(), t.card_ask_again_fix()),
+        };
+        self.announce_failure(t.card_not_added(), t.card_not_added_title(), why, details);
+    }
+
+    /// Saves the own Profile card as a file where the user says (#144),
+    /// answering a card the user opened when `back`; true once saved.
+    /// Nothing asked when no card can be made yet, which is announced.
+    fn save_card(&mut self, back: bool) -> oldbrainfix_core::Result<bool> {
+        let Some(bytes) = self.store.profile_card_file(back)? else {
+            self.announce_card_not_made();
+            return Ok(false);
+        };
+        let t = self.t;
+        let name = OwnProfile::new(&self.store)
+            .get()?
+            .map(|p| p.name)
+            .unwrap_or_default();
+        let file = cards::file_name(profile_view::display_name(&t, &name));
+        let Some(mut path) = (self.card_saver)(t.profile_card_save_title(), &file) else {
+            return Ok(false);
+        };
+        if path.extension().is_none_or(|e| e != cards::EXTENSION) {
+            path.set_extension(cards::EXTENSION);
+        }
+        match std::fs::write(&path, bytes) {
+            Ok(()) => Ok(true),
+            Err(e) => {
+                self.announce_failure(
+                    t.profile_card_not_sent(),
+                    t.profile_card_not_sent_title(),
+                    (t.profile_card_not_written_cause(), t.nothing_lost_fix()),
+                    format!("profile card: {e}"),
+                );
+                Ok(false)
+            }
+        }
+    }
+
+    /// "Send yours back" on the person's Profile the dialog shows: the
+    /// own card file, answering theirs; once saved, what to do with it
+    /// shows instead.
+    fn send_back(&mut self) -> oldbrainfix_core::Result<()> {
+        if self.save_card(true)?
+            && let Some(Dialog::Person { back, .. }) = &mut self.dialog
+        {
+            *back = SendBack::Saved;
+        }
+        Ok(())
     }
 
     /// Shows the preview of `opened`, held as the pending set `held` when
@@ -5721,13 +5836,15 @@ impl App {
             }
         }
         // Pictures and sound files dropped onto the window become a
-        // Note; a bundle file is imported, a Sent Item previewed, as are
-        // the files handed over from outside.
+        // Note; a bundle file is imported, a Sent Item previewed, a
+        // Profile card file opened, as are the files handed over from
+        // outside.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
         let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
             file.path.as_ref().is_some_and(|p| {
-                p.extension()
-                    .is_some_and(|e| e == bundle::EXTENSION || e == sent::EXTENSION)
+                p.extension().is_some_and(|e| {
+                    e == bundle::EXTENSION || e == sent::EXTENSION || e == cards::EXTENSION
+                })
             })
         });
         for file in files {
@@ -7978,7 +8095,7 @@ impl App {
                 });
                 if profile.is_some() {
                     embossed(ui, tones, false, None, |ui| {
-                        profile_view::card_section(ui, &t, card_form.copied, &mut asked);
+                        profile_view::card_section(ui, &t, card_form.saved, &mut asked);
                     });
                 }
                 if question {
@@ -8223,6 +8340,7 @@ impl App {
             PersonAction::CancelSquare => return self.person_square_done(false),
             PersonAction::TheirNotes => return self.their_notes(),
             PersonAction::SendChanges => return self.send_changes(),
+            PersonAction::SendBack => return self.send_back(),
             _ => {}
         }
         let Some(Dialog::Person {
@@ -8230,7 +8348,7 @@ impl App {
             comparing,
             name,
             asking,
-            back,
+            ..
         }) = &mut self.dialog
         else {
             return Ok(());
@@ -8265,20 +8383,14 @@ impl App {
             PersonAction::UseSquare
             | PersonAction::CancelSquare
             | PersonAction::TheirNotes
-            | PersonAction::SendChanges => {}
+            | PersonAction::SendChanges
+            | PersonAction::SendBack => {}
             PersonAction::Block => {
                 *asking = Some(Asking::Block(self.store.areas_to_leave_for_blocking(id)?));
             }
             PersonAction::Unblock => *asking = Some(Asking::Unblock),
             PersonAction::CompareCodes => *comparing = Comparing::Asking,
             PersonAction::CodesCompared(false) => *comparing = Comparing::Differ,
-            PersonAction::SendBack => match self.store.profile_card(true)? {
-                Some(link) => {
-                    self.copy = Some(self.t.profile_card_text(&link));
-                    *back = SendBack::Copied;
-                }
-                None => self.announce_card_not_made(),
-            },
             PersonAction::CodesCompared(true) => {
                 *comparing = Comparing::Not;
                 if let Some(code) = self.store.person_code(id)? {
@@ -8386,13 +8498,11 @@ impl App {
                 self.dialog = None;
                 self.question_later = true;
             }
-            ProfileAction::CopyCard => match self.store.profile_card(false)? {
-                Some(link) => {
-                    self.copy = Some(self.t.profile_card_text(&link));
-                    self.card_form.copied = true;
+            ProfileAction::SendCard => {
+                if self.save_card(false)? {
+                    self.card_form.saved = true;
                 }
-                None => self.announce_card_not_made(),
-            },
+            }
             ProfileAction::ShowQr => match self.store.profile_card(false)? {
                 Some(link) => self.dialog = Some(Dialog::ProfileQr { link }),
                 None => self.announce_card_not_made(),

@@ -2983,11 +2983,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileCardShowQrDetail => 'Zum Scannen für jemanden neben dir.';
 
   @override
-  String profileCardText(String link) {
-    return 'Mein Profil für Old Brain Fix:\n$link';
-  }
-
-  @override
   String get profileCardNotYet =>
       'Synchronisiere zuerst mit deinem anderen Gerät und versuche es dann noch einmal.';
 

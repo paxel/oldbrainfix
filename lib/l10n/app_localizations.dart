@@ -4760,12 +4760,6 @@ abstract class AppLocalizations {
   /// **'For someone next to you to scan.'**
   String get profileCardShowQrDetail;
 
-  /// The text shared with the Profile card. The link must stay last, with nothing after it.
-  ///
-  /// In en, this message translates to:
-  /// **'My Profile for Old Brain Fix:\n{link}'**
-  String profileCardText(String link);
-
   /// The fix in the dialog behind 'profileCardNotMade': this Device's key is not bound to the Profile until it synced with another of the user's Devices.
   ///
   /// In en, this message translates to:

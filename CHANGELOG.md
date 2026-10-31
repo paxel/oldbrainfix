@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Changed
 
-- On the phone, "Send my Profile" and "Send yours back" send the Profile card as a small file with the picture, such as `Ann.obfcard`, instead of a link, and a card file tapped in a messenger, the Files app or a download opens in the app and adds the person by the same rules; card links no longer open the app, and the QR and pasted links work as before.
+- "Send my Profile" and "Send yours back" send the Profile card as a small file with the picture, such as `Ann.obfcard`, instead of a link, on the phone through the app picked and on the desktop saved where the user says in place of "Copy my Profile link", and a card file tapped in a messenger, the Files app or a download on the phone, or dropped onto the desktop's window, picked under "Import bundle…" or given to `oldbrainfix open`, opens in the app and adds the person by the same rules; card links no longer open the app, and the QR and pasted links work as before.
 
 ### Fixed
 

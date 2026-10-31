@@ -786,7 +786,6 @@
   "profileCardSendDetail": "Als kleine Datei, über einen beliebigen Messenger.",
   "profileCardShowQr": "Meinen QR-Code zeigen",
   "profileCardShowQrDetail": "Zum Scannen für jemanden neben dir.",
-  "profileCardText": "Mein Profil für Old Brain Fix:\n{link}",
   "profileCardNotYet": "Synchronisiere zuerst mit deinem anderen Gerät und versuche es dann noch einmal.",
   "profileCardNoApp": "Keine App hier kann die Datei annehmen.",
   "profileQrTitle": "Mein Profil als QR-Code",

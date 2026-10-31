@@ -2,8 +2,8 @@
 //! picture, or the initials on a circle coloured by its id, where the
 //! settings gear was; and the top of the Profile page with the picture,
 //! the name and the short code, and the square the user picks of a new
-//! picture; the own Profile card as a link or a QR, and a person added
-//! from theirs (#107).
+//! picture; the own Profile card as a file or a QR, and a person added
+//! from theirs (#107, #144).
 
 use egui::{
     Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit,
@@ -35,8 +35,8 @@ pub enum ProfileAction {
     Answer(bool),
     /// "Which one is you?" waits on the Profile page.
     Later,
-    /// Put the own Profile card's link on the clipboard (#107).
-    CopyCard,
+    /// Save the own Profile card as a file to send (#144).
+    SendCard,
     /// Show the own Profile card as a QR.
     ShowQr,
     /// Open the Profile card link pasted into the field.
@@ -44,11 +44,11 @@ pub enum ProfileAction {
 }
 
 /// The Profile cards on the Profile page (#107): whether the own card's
-/// link was copied, the link of another person's being pasted, and what
-/// opening the last one came to when it added nobody.
+/// file was saved (#144), the link of another person's being pasted, and
+/// what opening the last one came to when it added nobody.
 #[derive(Debug, Default)]
 pub struct CardForm {
-    pub copied: bool,
+    pub saved: bool,
     pub link: String,
     pub answer: Option<CardTaken>,
 }
@@ -362,9 +362,9 @@ pub fn header(
     }
 }
 
-/// The own Profile card (#107): "Copy my Profile link", with what to do
-/// with it once copied, and "Show my QR".
-pub fn card_section(ui: &mut Ui, t: &L10n, copied: bool, actions: &mut Vec<ProfileAction>) {
+/// The own Profile card (#107): "Send my Profile", which saves it as a
+/// file (#144), with what to do with it once saved, and "Show my QR".
+pub fn card_section(ui: &mut Ui, t: &L10n, saved: bool, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.label(RichText::new(t.profile_card_title()).strong().color(text));
@@ -374,13 +374,13 @@ pub fn card_section(ui: &mut Ui, t: &L10n, copied: bool, actions: &mut Vec<Profi
             .color(weak),
     );
     if ui
-        .button(RichText::new(t.profile_card_copy()).color(text))
+        .button(RichText::new(t.profile_card_send()).color(text))
         .clicked()
     {
-        actions.push(ProfileAction::CopyCard);
+        actions.push(ProfileAction::SendCard);
     }
-    if copied {
-        ui.label(RichText::new(t.profile_card_copied()).small().color(weak));
+    if saved {
+        ui.label(RichText::new(t.profile_card_saved()).small().color(weak));
     }
     ui.label(
         RichText::new(t.profile_card_show_qr_detail())
@@ -396,8 +396,10 @@ pub fn card_section(ui: &mut Ui, t: &L10n, copied: bool, actions: &mut Vec<Profi
 }
 
 /// "Add a person from a link" (#107): the field the link is pasted into,
-/// what opening it came to under it when it added nobody, red for a link
-/// that holds no card, and the button. Enter in the field opens it too.
+/// as one from an earlier version or a QR's text, what opening it came
+/// to under it when it added nobody, red for a link that holds no card,
+/// the button, and that a card file dropped onto the window adds the
+/// person too (#144). Enter in the field opens it too.
 pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     ui.label(RichText::new(t.person_add_link()).color(text));
@@ -423,10 +425,13 @@ pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<
     if ui.add_enabled(typed, open).clicked() {
         actions.push(ProfileAction::OpenCard);
     }
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.person_add_file_hint()).small().color(weak));
 }
 
 /// What a card that added nobody says under the field; none for one that
-/// added, updated or found the person, whose Profile opens instead.
+/// added, updated or found the person, whose Profile opens instead. Only
+/// a card file is of a later format, never a pasted link.
 pub fn card_answer(t: &L10n, taken: CardTaken) -> Option<&str> {
     match taken {
         CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged => None,
