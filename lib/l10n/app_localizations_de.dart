@@ -4449,4 +4449,66 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get quickNoteSchedule =>
       'Routine, Erinnerung, Frosch, Einheit oder Strichliste';
+
+  @override
+  String get copyPhoto => 'Kopieren';
+
+  @override
+  String get savePhoto => 'Speichern';
+
+  @override
+  String get sharePhoto => 'Teilen';
+
+  @override
+  String get photoSaveFailed => 'Das Foto wurde nicht gespeichert.';
+
+  @override
+  String get photoSaveFailedTitle => 'Foto nicht gespeichert';
+
+  @override
+  String get photoSaveFailedCause =>
+      'Das Foto konnte nicht in die Bilder des Telefons geschrieben werden.';
+
+  @override
+  String get photoSaveFailedFix =>
+      'Nichts ging verloren; schaffe etwas Platz auf dem Telefon und speichere es erneut.';
+
+  @override
+  String get photoSaveTooOldCause =>
+      'Das Speichern in die Bilder des Telefons braucht Android 10 oder neuer.';
+
+  @override
+  String get photoSaveTooOldFix =>
+      'Tippe auf Teilen und wähle eine App, die Dateien aufbewahrt.';
+
+  @override
+  String get photoCopyFailed => 'Das Foto wurde nicht kopiert.';
+
+  @override
+  String get photoCopyFailedTitle => 'Foto nicht kopiert';
+
+  @override
+  String get photoCopyFailedCause =>
+      'Die Zwischenablage des Telefons hat das Bild nicht angenommen.';
+
+  @override
+  String get photoCopyFailedFix =>
+      'Gib es stattdessen mit Teilen an die andere App.';
+
+  @override
+  String get photoShareFailed => 'Das Foto wurde nicht geteilt.';
+
+  @override
+  String get photoShareFailedTitle => 'Foto nicht geteilt';
+
+  @override
+  String get photoShareNoAppCause => 'Keine App hier kann das Foto annehmen.';
+
+  @override
+  String get photoShareNoAppFix =>
+      'Installiere einen Messenger oder eine Galerie-App und teile es dann noch einmal.';
+
+  @override
+  String get photoNotWrittenCause =>
+      'Die Datei des Fotos konnte auf diesem Telefon nicht geschrieben werden.';
 }

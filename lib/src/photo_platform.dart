@@ -56,10 +56,24 @@ String sharedText(String? subject, String? text) {
   return '$s\n$t';
 }
 
+/// What became of a photo saved into the Device's Pictures (#149).
+enum PhotoSaved {
+  /// It is in the Device's Pictures.
+  saved,
+
+  /// This Android is older than 10, where saving there needs a storage
+  /// permission the app does not ask for.
+  tooOld,
+
+  /// It could not be written there.
+  failed,
+}
+
 /// The platform seam for photos: the camera, the system's picture picker,
-/// what other apps share in, sound files included, and the clipboard for
-/// Paste (android/…/Photos.kt, ShareActivity.kt, Clipboards.kt). Widget
-/// tests hand in a fake.
+/// what other apps share in, sound files included, the clipboard for
+/// Paste, and a photo handed out of its Note (android/…/Photos.kt,
+/// ShareActivity.kt, Clipboards.kt, PhotoOut.kt). Widget tests hand in a
+/// fake.
 abstract interface class PhotoPlatform {
   /// Whether this Device has a camera to take photos with; the camera
   /// button only shows where it has.
@@ -92,6 +106,15 @@ abstract interface class PhotoPlatform {
 
   /// Something was shared in while the app runs.
   Stream<void> get sharedArrived;
+
+  /// Saves the photo file at [path], written where
+  /// [BundlePlatform.exportPath] said, into the Device's Pictures as
+  /// [name] of MIME [type] (#149).
+  Future<PhotoSaved> savePhoto(String path, String name, String type);
+
+  /// Puts the photo file at [path], written as for [savePhoto], of MIME
+  /// [type] on the clipboard as a picture (#149); whether it is there.
+  Future<bool> copyPhoto(String path, String type);
 }
 
 /// No camera and no shares: the default where none is handed in.
@@ -121,6 +144,13 @@ class NoPhotos implements PhotoPlatform {
 
   @override
   Stream<void> get sharedArrived => const Stream.empty();
+
+  @override
+  Future<PhotoSaved> savePhoto(String path, String name, String type) async =>
+      PhotoSaved.failed;
+
+  @override
+  Future<bool> copyPhoto(String path, String type) async => false;
 }
 
 /// Android's own camera intent, picture picker and share target behind the
@@ -220,6 +250,38 @@ class AndroidPhotos implements PhotoPlatform {
 
   @override
   Stream<void> get sharedArrived => _shared.stream;
+
+  @override
+  Future<PhotoSaved> savePhoto(String path, String name, String type) async {
+    final String? saved;
+    try {
+      saved = await _channel.invokeMethod<String>('save', {
+        'path': path,
+        'name': name,
+        'type': type,
+      });
+    } on PlatformException {
+      return PhotoSaved.failed;
+    }
+    return switch (saved) {
+      'saved' => PhotoSaved.saved,
+      'old' => PhotoSaved.tooOld,
+      _ => PhotoSaved.failed,
+    };
+  }
+
+  @override
+  Future<bool> copyPhoto(String path, String type) async {
+    try {
+      return await _channel.invokeMethod<bool>('copy', {
+            'path': path,
+            'type': type,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }
 
 /// Hands the app's [PhotoPlatform] and the stored photo bytes down to

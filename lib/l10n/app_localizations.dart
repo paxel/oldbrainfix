@@ -7219,6 +7219,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Routine, Reminder, Frog, Session or Tally'**
   String get quickNoteSchedule;
+
+  /// In the ⋮ of the phone's full-screen photo: puts the picture on the clipboard (#149).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyPhoto;
+
+  /// In the ⋮ of the phone's full-screen photo: saves it into the phone's Pictures, in the album 'Old Brain Fix' (#149).
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get savePhoto;
+
+  /// In the ⋮ of the phone's full-screen photo: hands it to the app picked on the share sheet (#149).
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get sharePhoto;
+
+  /// Announced at the top of the phone when Save in the full-screen photo's ⋮ failed; the tap opens the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo was not saved.'**
+  String get photoSaveFailed;
+
+  /// Title of the dialog behind 'photoSaveFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo not saved'**
+  String get photoSaveFailedTitle;
+
+  /// The cause in the dialog behind 'photoSaveFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo could not be written into the phone\'s Pictures.'**
+  String get photoSaveFailedCause;
+
+  /// The fix in the dialog behind 'photoSaveFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was lost; free some space on the phone and save it again.'**
+  String get photoSaveFailedFix;
+
+  /// The cause in the dialog behind 'photoSaveFailed' on Android 7 to 9.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving into the phone\'s Pictures needs Android 10 or later.'**
+  String get photoSaveTooOldCause;
+
+  /// The fix that goes with 'photoSaveTooOldCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Share and pick an app that keeps files.'**
+  String get photoSaveTooOldFix;
+
+  /// Announced at the top of the phone when Copy in the full-screen photo's ⋮ failed; the tap opens the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo was not copied.'**
+  String get photoCopyFailed;
+
+  /// Title of the dialog behind 'photoCopyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo not copied'**
+  String get photoCopyFailedTitle;
+
+  /// The cause in the dialog behind 'photoCopyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The phone\'s clipboard did not take the picture.'**
+  String get photoCopyFailedCause;
+
+  /// The fix in the dialog behind 'photoCopyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Share to hand it to the other app instead.'**
+  String get photoCopyFailedFix;
+
+  /// Announced at the top of the phone when Share in the full-screen photo's ⋮ failed; the tap opens the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo was not shared.'**
+  String get photoShareFailed;
+
+  /// Title of the dialog behind 'photoShareFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo not shared'**
+  String get photoShareFailedTitle;
+
+  /// The cause in the dialog behind 'photoShareFailed' when no app takes a picture.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the photo.'**
+  String get photoShareNoAppCause;
+
+  /// The fix that goes with 'photoShareNoAppCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a messenger or a gallery app, then share it again.'**
+  String get photoShareNoAppFix;
+
+  /// The cause in the dialogs behind 'photoSaveFailed', 'photoCopyFailed' and 'photoShareFailed' when the file handed on could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo\'s file could not be written on this phone.'**
+  String get photoNotWrittenCause;
 }
 
 class _AppLocalizationsDelegate

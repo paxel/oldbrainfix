@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix/src/photo_platform.dart';
@@ -82,7 +83,8 @@ final Uint8List onePixelPng = Uint8List.fromList(const [
 final Uint8List otherPng = Uint8List.fromList([...onePixelPng, 0]);
 
 /// A [PhotoPlatform] the test drives: what the camera hands back, what
-/// the clipboard holds, and what other apps share in.
+/// the clipboard holds, what other apps share in, and what becomes of a
+/// photo saved or copied out of its Note.
 class FakePhotos implements PhotoPlatform {
   /// What the next photo taken is; null as if the user backed out.
   Uint8List? nextPhoto;
@@ -115,6 +117,19 @@ class FakePhotos implements PhotoPlatform {
   final waiting = <SharedItem>[];
 
   final _arrived = StreamController<void>.broadcast();
+
+  /// What saving a photo into the Device's Pictures answers.
+  PhotoSaved saves = PhotoSaved.saved;
+
+  /// The photos saved, by the name each went as, with their bytes as
+  /// they were when saved; also those that failed.
+  final saved = <String, List<int>>{};
+
+  /// Whether the clipboard takes a picture.
+  bool copies = true;
+
+  /// The photo files put on the clipboard, with their types.
+  final copied = <({String path, String type})>[];
 
   FakePhotos({this.nextPhoto, this.nextPicked = const []});
 
@@ -157,4 +172,16 @@ class FakePhotos implements PhotoPlatform {
 
   @override
   Stream<void> get sharedArrived => _arrived.stream;
+
+  @override
+  Future<PhotoSaved> savePhoto(String path, String name, String type) async {
+    saved[name] = File(path).readAsBytesSync();
+    return saves;
+  }
+
+  @override
+  Future<bool> copyPhoto(String path, String type) async {
+    copied.add((path: path, type: type));
+    return copies;
+  }
 }

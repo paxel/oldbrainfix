@@ -4389,4 +4389,66 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickNoteSchedule => 'Routine, Reminder, Frog, Session or Tally';
+
+  @override
+  String get copyPhoto => 'Copy';
+
+  @override
+  String get savePhoto => 'Save';
+
+  @override
+  String get sharePhoto => 'Share';
+
+  @override
+  String get photoSaveFailed => 'The photo was not saved.';
+
+  @override
+  String get photoSaveFailedTitle => 'Photo not saved';
+
+  @override
+  String get photoSaveFailedCause =>
+      'The photo could not be written into the phone\'s Pictures.';
+
+  @override
+  String get photoSaveFailedFix =>
+      'Nothing was lost; free some space on the phone and save it again.';
+
+  @override
+  String get photoSaveTooOldCause =>
+      'Saving into the phone\'s Pictures needs Android 10 or later.';
+
+  @override
+  String get photoSaveTooOldFix =>
+      'Use Share and pick an app that keeps files.';
+
+  @override
+  String get photoCopyFailed => 'The photo was not copied.';
+
+  @override
+  String get photoCopyFailedTitle => 'Photo not copied';
+
+  @override
+  String get photoCopyFailedCause =>
+      'The phone\'s clipboard did not take the picture.';
+
+  @override
+  String get photoCopyFailedFix =>
+      'Use Share to hand it to the other app instead.';
+
+  @override
+  String get photoShareFailed => 'The photo was not shared.';
+
+  @override
+  String get photoShareFailedTitle => 'Photo not shared';
+
+  @override
+  String get photoShareNoAppCause => 'No app here can take the photo.';
+
+  @override
+  String get photoShareNoAppFix =>
+      'Install a messenger or a gallery app, then share it again.';
+
+  @override
+  String get photoNotWrittenCause =>
+      'The photo\'s file could not be written on this phone.';
 }

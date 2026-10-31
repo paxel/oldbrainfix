@@ -245,10 +245,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   extreme picture (12 × 34,000 px) cannot break the card; a tap opens it
   full screen with zoom.
 - **A photo gets out of the Note** (#149): full screen its ⋮ offers
-  Save, Copy and Share on the phone; on the desktop a right-click on a
-  photo in the Note editor or full screen offers "Save image as…",
-  "Copy image" and "Open in another program". Saved and copied say
-  nothing; a failure is announced.
+  Save, Copy and Share on the phone, Save putting it into the phone's
+  Pictures in the album "Old Brain Fix" (Android 10 and later; before
+  it, Save is announced as failed with Share as the fix), and only while
+  its file is on the phone; on the desktop a right-click on a photo in
+  the Note editor or full screen offers "Save image as…", "Copy image"
+  and "Open in another program". Saved and copied say nothing, nor does
+  a share sheet left without an app; a failure is announced.
 - A compact card shows date, time and, when known, the Named Place or
   location, plus a Capture Context icon when there is more to see, the
   Note's first line, its media and the action row.

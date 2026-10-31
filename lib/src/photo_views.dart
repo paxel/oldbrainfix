@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 import 'page_bar.dart';
+import 'photo_out.dart';
 import 'photo_platform.dart';
 
 /// One stored photo, by its hash: square-cropped at [size] for a
@@ -240,20 +242,70 @@ Future<void> viewPhoto(BuildContext context, String hash) => Navigator.of(
   context,
 ).push(MaterialPageRoute<void>(builder: (_) => PhotoViewerScreen(hash: hash)));
 
-/// One photo over the whole screen, to zoom and pan.
-class PhotoViewerScreen extends StatelessWidget {
+/// One photo over the whole screen, to zoom and pan. Its ⋮ saves it
+/// into the Device's Pictures, copies it or shares it (#149), while its
+/// file is on this Device.
+class PhotoViewerScreen extends StatefulWidget {
   final String hash;
 
   const PhotoViewerScreen({super.key, required this.hash});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: pageBar(context, title: context.t.photo),
-    body: SafeArea(
-      child: InteractiveViewer(
-        maxScale: 6,
-        child: Center(child: NotePhoto(hash: hash)),
+  State<PhotoViewerScreen> createState() => _PhotoViewerScreenState();
+}
+
+class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
+  /// Whether the photo's file is on this Device, read once, never while
+  /// building.
+  bool _here = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _here = PhotoScope.bytesOf(context, widget.hash) != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    PopupMenuItem<PhotoOut> item(PhotoOut out, IconData icon, String label) =>
+        PopupMenuItem(
+          key: ValueKey('photo-${out.name}'),
+          value: out,
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        );
+    return Scaffold(
+      appBar: pageBar(
+        context,
+        title: t.photo,
+        actions: [
+          if (_here)
+            PopupMenuButton<PhotoOut>(
+              key: const ValueKey('photo-menu'),
+              tooltip: t.more,
+              icon: const Icon(Icons.more_vert),
+              onSelected: (out) =>
+                  unawaited(photoOut(context, widget.hash, out)),
+              itemBuilder: (_) => [
+                item(PhotoOut.save, Icons.download_outlined, t.savePhoto),
+                item(PhotoOut.copy, Icons.copy_outlined, t.copyPhoto),
+                item(PhotoOut.share, Icons.share_outlined, t.sharePhoto),
+              ],
+            ),
+        ],
       ),
-    ),
-  );
+      body: SafeArea(
+        child: InteractiveViewer(
+          maxScale: 6,
+          child: Center(child: NotePhoto(hash: widget.hash)),
+        ),
+      ),
+    );
+  }
 }

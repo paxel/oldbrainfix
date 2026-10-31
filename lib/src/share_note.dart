@@ -49,7 +49,7 @@ Future<void> shareNoteToApp(
   final shared = <SharedFile>[];
   try {
     for (final (hashes, name, read, kind) in [
-      (share.photos, 'photo', store.photo, _photoKind),
+      (share.photos, 'photo', store.photo, photoKind),
       (share.recordings, 'recording', store.audio, _recordingKind),
     ]) {
       for (final hash in hashes) {
@@ -97,7 +97,7 @@ Future<void> shareNoteToApp(
 
 /// The file extension and MIME type of the photo [bytes]: PNG, GIF or
 /// WebP by their signatures, else JPEG, as the phone writes them.
-(String, String) _photoKind(List<int> bytes) {
+(String, String) photoKind(List<int> bytes) {
   String tag(int at) => bytes.length < at + 4
       ? ''
       : String.fromCharCodes(bytes.sublist(at, at + 4));

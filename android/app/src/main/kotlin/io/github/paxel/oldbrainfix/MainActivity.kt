@@ -174,6 +174,27 @@ class MainActivity : FlutterActivity() {
                     "pick" -> pickPhotos(result)
                     "paste" -> paste(result)
                     "shared" -> inBackground(result) { Shares.take() }
+                    "save" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        inBackground(result) {
+                            PhotoOut.save(
+                                this@MainActivity,
+                                args["path"] as? String ?: "",
+                                args["name"] as? String ?: "",
+                                args["type"] as? String ?: "image/jpeg",
+                            )
+                        }
+                    }
+                    "copy" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        result.success(
+                            PhotoOut.copy(
+                                this@MainActivity,
+                                args["path"] as? String ?: "",
+                                args["type"] as? String ?: "image/jpeg",
+                            ),
+                        )
+                    }
                     else -> result.notImplemented()
                 }
             }
