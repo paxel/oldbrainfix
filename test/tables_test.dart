@@ -606,6 +606,132 @@ void main() {
       expect(find.text('oats'), findsOneWidget);
     });
 
+    /// Opens the Note editor on [card] with the keyboard up, the bar of
+    /// formats shown in full.
+    Future<TagTextController> openEditor(
+      WidgetTester tester,
+      String card,
+    ) async {
+      tester.view.physicalSize = const Size(1000, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.textContaining(card).first);
+      await tester.pumpAndSettle();
+      await tester.showKeyboard(find.byType(TextField));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 600);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      return tester.widget<TextField>(find.byType(TextField)).controller!
+          as TagTextController;
+    }
+
+    /// The table button with the cursor at [cursor]: the table it opens
+    /// is the one in the text there, [cell] being edited.
+    Future<void> tableButton(
+      WidgetTester tester,
+      TagTextController field,
+      int cursor, {
+      bool editing = true,
+    }) async {
+      field.selection = TextSelection.collapsed(offset: cursor);
+      await tester.pumpAndSettle();
+      await tester.tap(key('format-table'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsOneWidget);
+      expect(key('cell-0-0'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: key('cell-0-0'),
+          matching: find.byType(TwoRowTextField),
+        ),
+        editing ? findsOneWidget : findsNothing,
+      );
+    }
+
+    testWidgets('the table button opens the table it put in, also where '
+        'keeping the first format gives a new box its id (#154)', (
+      tester,
+    ) async {
+      final id = notes.capture('Milk').id;
+      final field = await openEditor(tester, 'Milk');
+      field.selection = const TextSelection.collapsed(offset: 4);
+      await tester.pumpAndSettle();
+      await tester.tap(key('two-row-insert-box'));
+      await tester.pumpAndSettle();
+      expect(field.text, 'Milk☐');
+
+      await tableButton(tester, field, field.text.length);
+      await tester.enterText(find.byType(TextField).last, 'Item');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsNothing);
+      expect(field.markdown, isTrue);
+      expect(field.text, contains('| Item |  |'));
+
+      // In that table the button opens it, the words there.
+      await tableButton(
+        tester,
+        field,
+        field.text.indexOf('Item'),
+        editing: false,
+      );
+      expect(find.text('Item'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final note = notes.byId(id)!;
+      expect(note.textFormat, TextFormats.markdown);
+      expect(note.boxes, hasLength(1));
+      expect(note.shownText, contains('Milk☐'));
+      expect(note.shownText, contains('| Item |  |'));
+    });
+
+    testWidgets('in a formatted Note the table button opens the table it '
+        'put in after a new box, and a second one beside the first', (
+      tester,
+    ) async {
+      final id = notes
+          .capture('$shop\n\nBread', format: TextFormats.markdown)
+          .id;
+      final field = await openEditor(tester, 'Bread');
+      field.selection = TextSelection.collapsed(offset: field.text.length);
+      await tester.pumpAndSettle();
+      await tester.tap(key('two-row-insert-box'));
+      await tester.pumpAndSettle();
+
+      await tableButton(tester, field, field.text.length);
+      await tester.enterText(find.byType(TextField).last, 'Second');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(field.text, contains('| Second |  |'));
+
+      // The first table opens on itself.
+      await tableButton(
+        tester,
+        field,
+        field.text.indexOf('Item'),
+        editing: false,
+      );
+      expect(find.text('Qty'), findsOneWidget);
+      expect(find.text('Second'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final note = notes.byId(id)!;
+      expect(note.boxes, hasLength(2));
+      expect(note.shownText, contains('| Second |  |'));
+    });
+
     testWidgets('a box ticked on the card keeps its tick when a cell is '
         'written; one typed into a cell becomes a box', (tester) async {
       tester.view.physicalSize = const Size(800, 2400);

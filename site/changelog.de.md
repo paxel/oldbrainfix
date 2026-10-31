@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Behoben
 
 - Im Zwei-Zeilen-Editor des Telefons zeigt die Zeile über der Tastatur die Zeile mit dem Cursor von ihrem Anfang an, den Cursor direkt hinter dem Text davor, und rückt nur dann seitwärts weiter, wenn die Zeile breiter ist als der Platz über der Tastatur, damit der Cursor sichtbar bleibt.
+- Auf dem Telefon öffnet die Tabellen-Schaltfläche des Notiz-Editors die Tabelle, die sie gerade eingefügt hat, mit ihrer ersten Zelle in Bearbeitung, auch wenn der Text der Notiz unformatiert war und ein seit dem letzten Speichern getipptes Statuskästchen enthält; bisher zeigte die Vollbildansicht dann nichts.
 
 ## [0.2.0] - 2026-10-31
 

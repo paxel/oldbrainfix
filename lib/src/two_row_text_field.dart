@@ -643,7 +643,16 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
     final change = MarkdownTables.insert(text, cursor);
     _format((_, _, _) => change);
-    unawaited(_openTable(change.start, cell: (row: 0, column: 0)));
+    // The first format keeps the text at once, its new boxes with their
+    // ids (ADR 0035), which moves the table: it is found again as the
+    // same one of the tables of the text now.
+    final index = MarkdownTables.all(change.text)
+        .indexWhere((table) => table.start == change.start);
+    final now = MarkdownTables.all(controller.text);
+    final at = index >= 0 && index < now.length
+        ? now[index].start
+        : change.start;
+    unawaited(_openTable(at, cell: (row: 0, column: 0)));
   }
 
   /// Opens the table at [at] full screen, [cell] being edited; what it
