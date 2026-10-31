@@ -817,8 +817,9 @@ enum Action {
         note: Option<String>,
         reminder: bool,
     },
-    /// A new Session from the Note with this id (#104).
-    NewSession(String),
+    /// A new Session from the Note with this id (#104), or with its Note
+    /// made behind the scenes.
+    NewSession(Option<String>),
     /// Something asked of a Session's row on the Agenda.
     Session(SessionAction),
     Editor(Intent),
@@ -4056,9 +4057,14 @@ impl App {
             }
             Action::NewSession(id) => {
                 self.save_text()?;
-                let note = Notes::new(&self.store).by_id(&id)?;
+                let note = match &id {
+                    Some(id) => Notes::new(&self.store).by_id(id)?,
+                    None => None,
+                };
                 let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                let draft = SessionDraft::of(&self.store, &self.t, &id, None)?;
+                // Without a Note yet, any of the user's Tallies.
+                let entity = id.as_deref().unwrap_or("");
+                let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
                 self.tally_form = None;
                 let editor = RoutineEditor::new(note, false, self.store.now(), &*self.wall, renag);
                 self.editor = Some(editor.with_session(draft, None));
@@ -6306,6 +6312,7 @@ impl App {
                 actions.extend(asked.into_iter().map(|asked| match asked {
                     AllRoutinesAction::Open(id) => Action::OpenRoutine(id),
                     AllRoutinesAction::OpenNote(id) => Action::SelectNote(id),
+                    AllRoutinesAction::NewSession => Action::NewSession(None),
                     AllRoutinesAction::Export => Action::ExportRoutines,
                 }));
                 return;
@@ -7199,7 +7206,7 @@ impl App {
                             actions.push(Action::SpawnFrog(note.id.clone()));
                         }
                         if ui.button(RichText::new(t.session()).color(text)).clicked() {
-                            actions.push(Action::NewSession(note.id.clone()));
+                            actions.push(Action::NewSession(Some(note.id.clone())));
                         }
                     });
                 });

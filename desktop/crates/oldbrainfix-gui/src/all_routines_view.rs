@@ -1,7 +1,9 @@
 //! The All Routines and Reminders page (#115): every Routine and
 //! Reminder in alphabetical order of its name, also those beyond the
-//! Agenda's week; a click opens its editor, and Export saves one
-//! calendar file of all of them, as the phone's `AllRoutinesScreen`.
+//! Agenda's week; a click opens its editor, New Session opens the editor
+//! of a Session whose Note is made from the text typed there, and Export
+//! saves one calendar file of all of them, as the phone's
+//! `AllRoutinesScreen`.
 //! Each card carries its Area's colour and icon, as on the Agenda. Those
 //! whose schedule a newer version of the app saved follow, saying so, a
 //! click opening their Note (ADR 0034); they are in no file.
@@ -24,6 +26,8 @@ pub enum AllRoutinesAction {
     Open(String),
     /// The Note with this id, that of a Routine a newer version saved.
     OpenNote(String),
+    /// The editor of a new Session, its Note made behind the scenes.
+    NewSession,
     /// One calendar file of every Routine and Reminder listed.
     Export,
 }
@@ -68,7 +72,7 @@ pub fn names(
     Ok(names)
 }
 
-/// The page: its heading with Export, and each of `rows`, a Routine with
+/// The page: its heading with New Session and Export, and each of `rows`, a Routine with
 /// its name and its Note's Area, as a card with its schedule, the Area's
 /// colour down its side and its icon at the end, then each of `newer`
 /// saying a newer version is needed; a plain line while there is none.
@@ -84,13 +88,21 @@ pub fn page(
     let weak = ui.visuals().weak_text_color();
     ui.horizontal(|ui| {
         ui.heading(RichText::new(t.all_routines_title()).color(text));
-        ui.add_space((ui.available_width() - 28.0).max(0.0));
-        let export = ui.add_enabled_ui(!rows.is_empty(), |ui| {
-            icon_button(ui, icons::EXPORT, t.export_calendar_file(), text)
+        // Export in the corner, New Session before it.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let export = ui.add_enabled_ui(!rows.is_empty(), |ui| {
+                icon_button(ui, icons::EXPORT, t.export_calendar_file(), text)
+            });
+            if export.inner.clicked() {
+                actions.push(AllRoutinesAction::Export);
+            }
+            if ui
+                .button(RichText::new(t.new_session()).color(text))
+                .clicked()
+            {
+                actions.push(AllRoutinesAction::NewSession);
+            }
         });
-        if export.inner.clicked() {
-            actions.push(AllRoutinesAction::Export);
-        }
     });
     ui.add_space(8.0);
     if rows.is_empty() && newer.is_empty() {

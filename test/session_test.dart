@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/session_editor.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
@@ -85,6 +90,114 @@ void main() {
   bool struck(WidgetTester tester, String text) =>
       tester.widget<Text>(find.text(text)).style?.decoration ==
       TextDecoration.lineThrough;
+
+  /// Opens the editor of the Note [id] from the Agenda.
+  Future<void> edit(WidgetTester tester, String id) async {
+    final agenda = tester.element(find.byType(AgendaScreen));
+    unawaited(openNote(agenda, notes, Places(store), notes.byId(id)!));
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
+  }
+
+  group('where a Session starts', () {
+    testWidgets('the Note editor offers Routine, Reminder, Frog and Session; '
+        'Session opens the editor the card\'s menu opens', (tester) async {
+      final pushUps = tally('Push-ups');
+      final id = notes.capture('Sport').id;
+      await start(tester);
+      await edit(tester, id);
+      for (final item in ['Routine', 'Reminder', 'Frog', 'Session']) {
+        expect(find.widgetWithText(FilledButton, item), findsOneWidget);
+      }
+
+      await tap(tester, key('spawn-session'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Session'), findsOneWidget);
+      await tap(tester, key('session-pool-$pushUps'));
+      await tap(tester, find.text('Save'));
+
+      final made = sessions.all().single;
+      expect(routinesNote(store, made)?.id, id);
+      expect(made.pool, [pushUps]);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('with no Tally, the Note editor and All Routines and '
+        'Reminders offer a Session, whose editor says to make a Tally and '
+        'saves nothing', (tester) async {
+      const hint =
+          'No Tallies yet. "Make it a Tally" in a Note\'s ⋮ makes one.';
+      final id = notes.capture('Sport').id;
+      await start(tester);
+      await edit(tester, id);
+      await tap(tester, key('spawn-session'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Session'), findsOneWidget);
+      expect(find.text(hint), findsOneWidget);
+      await tap(tester, find.text('Save'));
+      expect(key('session-pool-error'), findsOneWidget);
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(sessions.all(), isEmpty);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tap(tester, key('allRoutines'));
+      expect(find.byType(AllRoutinesScreen), findsOneWidget);
+      await tap(tester, key('new-session'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text(hint), findsOneWidget);
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Morning sport',
+      );
+      await tester.pumpAndSettle();
+      final before = notes.unsorted().length;
+      await tap(tester, find.text('Save'));
+      expect(key('session-pool-error'), findsOneWidget);
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(sessions.all(), isEmpty);
+      expect(notes.unsorted(), hasLength(before), reason: 'no stray Note');
+    });
+
+    testWidgets('"New Session" on All Routines and Reminders makes the '
+        'Session with its Note from the text typed', (tester) async {
+      final pushUps = tally('Push-ups');
+      await start(tester);
+      await tap(tester, key('allRoutines'));
+      await tap(tester, key('new-session'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Session'), findsOneWidget);
+
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Morning sport',
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, key('session-pool-$pushUps'));
+      await tap(tester, find.text('Save'));
+
+      final made = sessions.all().single;
+      final note = routinesNote(store, made);
+      expect(note?.text, 'Morning sport');
+      expect(made.pool, [pushUps]);
+      // Its Note is no Unsorted one, as a new Routine's is not.
+      expect(notes.unsorted().map((n) => n.id), isNot(contains(note?.id)));
+      expect(find.byType(AllRoutinesScreen), findsOneWidget);
+      expect(find.text('Morning sport'), findsOneWidget);
+    });
+  });
 
   group('the Session editor', () {
     testWidgets('"Session" in the card\'s menu opens the Routine editor with '

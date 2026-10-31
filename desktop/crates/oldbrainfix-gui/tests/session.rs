@@ -6,7 +6,9 @@
 //! pick has an entry the box stays checked. "Session" in a Note's editor
 //! opens the Routine editor with the pool, the count, the weekdays' counts
 //! and the rule on top, which say under each field what to fix and write
-//! only what changed.
+//! only what changed; "New Session" on All Routines and Reminders makes
+//! one with its Note from the text typed. Without a Tally both still
+//! offer it, the editor says how to make one, and Save makes nothing.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -431,5 +433,96 @@ fn saving_a_session_writes_only_what_changed() -> TestResult {
         .by_id(&id)?
         .ok_or("a Session")?;
     assert_eq!(session.rule, SessionRule::Least);
+    Ok(())
+}
+
+#[test]
+fn new_session_on_all_routines_makes_one_with_its_note_from_the_text() -> TestResult {
+    let device = device()?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, None);
+    harness
+        .get_by_label(t.all_routines_title())
+        .click_accesskit();
+    harness.run();
+    click_button(&mut harness, t.new_session());
+    assert!(shows(&harness, t.new_session()));
+    harness
+        .get_by(|n| n.placeholder() == Some(t.routine_what_hint()))
+        .click();
+    harness.run();
+    harness
+        .get_by(|n| n.is_focused())
+        .type_text("Morning sport");
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Push-ups")
+        .click_accesskit();
+    harness.run();
+    click_button(&mut harness, t.save());
+
+    let sessions = Sessions::new(&device.store).all()?;
+    let [session] = sessions.as_slice() else {
+        return Err(format!("one Session: {sessions:?}").into());
+    };
+    let note = Notes::new(&device.store)
+        .by_id(&session.routine.note_id)?
+        .ok_or("its Note")?;
+    assert_eq!(note.text, "Morning sport");
+    assert_eq!(session.pool, vec![device.tallies[0].clone()]);
+    // Its Note is no Unsorted one, as a new Routine's is not.
+    let unsorted = Notes::new(&device.store).unsorted()?;
+    assert!(unsorted.iter().all(|n| n.id != note.id));
+    Ok(())
+}
+
+#[test]
+fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() -> TestResult {
+    let start = DateTime::parse_from_rfc3339("2026-03-02T12:00:00Z")?.with_timezone(&Utc);
+    let store = Store::in_memory(Box::new(move || start), || {
+        Ok(SigningKey::from_seed([7; 32]))
+    })?;
+    OwnProfile::new(&store).apply_defaults("Desk", None)?;
+    let legs = Notes::new(&store).capture("Leg day", None, None)?.id;
+    let store = Arc::new(store);
+    let t = L10n::new("en");
+    let mut harness = window(&store, Some(&legs));
+    for offered in [t.routine(), t.reminder(), t.frog(), t.session()] {
+        assert!(
+            harness
+                .query_all_by_role_and_label(Role::Button, offered)
+                .next()
+                .is_some(),
+            "{offered}"
+        );
+    }
+    click_button(&mut harness, t.session());
+    assert!(shows(&harness, t.new_session()));
+    assert!(shows(&harness, t.session_pool_none_desk()));
+    click_button(&mut harness, t.save());
+    assert!(shows(&harness, t.session_pool_missing()));
+    assert!(Sessions::new(&store).all()?.is_empty());
+    assert!(harness.state().routine_editor().is_some());
+
+    let mut harness = window(&store, None);
+    harness
+        .get_by_label(t.all_routines_title())
+        .click_accesskit();
+    harness.run();
+    click_button(&mut harness, t.new_session());
+    assert!(shows(&harness, t.session_pool_none_desk()));
+    harness
+        .get_by(|n| n.placeholder() == Some(t.routine_what_hint()))
+        .click();
+    harness.run();
+    harness
+        .get_by(|n| n.is_focused())
+        .type_text("Morning sport");
+    harness.run();
+    click_button(&mut harness, t.save());
+    assert!(shows(&harness, t.session_pool_missing()));
+    assert!(Sessions::new(&store).all()?.is_empty());
+    let notes = Notes::new(&store);
+    assert!(notes.all()?.iter().all(|n| n.text != "Morning sport"));
     Ok(())
 }

@@ -21,8 +21,8 @@ use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
 use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::{
-    ClockTime, Day, Note, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Routine,
-    Routines, Schedule, Session, SimpleRepeat, Store,
+    ClockTime, Day, Note, Notes, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit,
+    Routine, Routines, Schedule, Session, SimpleRepeat, Store,
 };
 
 use crate::app::{embossed, icon_button, pill, radio_column};
@@ -476,7 +476,19 @@ impl RoutineEditor {
             }
             (None, Some(note), Some((draft, _))) => draft.spawn(store, &note.id, schedule)?,
             (None, Some(note), None) => routines.spawn(&note.id, schedule)?.id,
-            (None, None, _) => routines.create(&self.text, schedule)?.id,
+            // A new Session without a Note: its Note is made from the text,
+            // as a new Routine's is.
+            (None, None, Some((draft, _))) => {
+                let text = self.text.trim();
+                if text.is_empty() {
+                    return Err(oldbrainfix_core::Error::Invalid(
+                        "the text must not be empty".into(),
+                    ));
+                }
+                let note = Notes::new(store).capture(text, None, None)?;
+                draft.spawn(store, &note.id, schedule)?
+            }
+            (None, None, None) => routines.create(&self.text, schedule)?.id,
         };
         routines.set_renag(&id, self.renag.map(Duration::minutes))?;
         routines.set_escalation(&id, self.escalation)?;

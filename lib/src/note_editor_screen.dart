@@ -13,6 +13,7 @@ import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
+import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
@@ -411,8 +412,9 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// recordings removed while their texts stay, its Importance, its Capture
 /// Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
-/// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
-/// spawn one from it; the calendar button adds it, or its Routines and
+/// Capture Context. "Add to Note" amends it; "Routine", "Reminder",
+/// "Frog" and "Session" spawn one from it, as the card's menu does; the
+/// calendar button adds it, or its Routines and
 /// Reminders, to the calendar; the send button sends it as a Sent Item;
 /// "merge into…" merges it into another Note; the trash button deletes
 /// it. A photo or recording with a text, of the Note or a Section, has a
@@ -777,7 +779,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
-  Future<void> _spawn({required bool reminder}) async {
+  /// Spawns [spawn] from the Note, through the same flow as the card's
+  /// menu.
+  Future<void> _spawn(Spawn spawn) async {
     final note = _placed?.note;
     if (note == null) return;
     _saveText();
@@ -786,7 +790,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       widget.notes,
       widget.places,
       note,
-      spawn: reminder ? Spawn.reminder : Spawn.routine,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();
@@ -1328,16 +1332,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     else
                       Wrap(
                         spacing: 8,
+                        runSpacing: 8,
                         children: [
                           FilledButton.tonalIcon(
-                            onPressed: () => _spawn(reminder: false),
+                            onPressed: () => _spawn(Spawn.routine),
                             icon: const Icon(Icons.repeat),
                             label: Text(t.routine),
                           ),
                           FilledButton.tonalIcon(
-                            onPressed: () => _spawn(reminder: true),
+                            onPressed: () => _spawn(Spawn.reminder),
                             icon: const Icon(Icons.notifications_outlined),
                             label: Text(t.reminder),
+                          ),
+                          FilledButton.tonalIcon(
+                            key: const ValueKey('spawn-frog'),
+                            onPressed: () => _spawn(Spawn.frog),
+                            icon: const FrogIcon(size: 18),
+                            label: Text(t.frog),
+                          ),
+                          FilledButton.tonalIcon(
+                            key: const ValueKey('spawn-session'),
+                            onPressed: () => _spawn(Spawn.session),
+                            icon: const Icon(Icons.event_repeat),
+                            label: Text(t.session),
                           ),
                         ],
                       ),

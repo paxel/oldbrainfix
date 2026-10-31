@@ -95,6 +95,23 @@ void main() {
     });
   });
 
+  testWidgets('"Frog" in the Note editor spawns one, as the card\'s menu '
+      'does', (tester) async {
+    final id = notes.capture('wash the windows').id;
+    await start(tester);
+    final agenda = tester.element(find.byType(AgendaScreen));
+    unawaited(openNote(agenda, notes, places, notes.byId(id)!));
+    await tester.pumpAndSettle();
+    final button = find.byKey(const ValueKey('spawn-frog'));
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    await tap(tester, button);
+
+    expect(frogs.note(frogs.open().single)?.id, id);
+    expect(notes.unsorted(), isEmpty);
+    expect(find.byType(NoteEditorScreen), findsOneWidget, reason: 'opens none');
+  });
+
   group('the "Eat a frog" section', () {
     testWidgets('shows two Frogs under today\'s timed Occurrences, before '
         'tomorrow, and keeps the pick for the own Devices', (tester) async {

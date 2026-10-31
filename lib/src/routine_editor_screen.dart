@@ -70,6 +70,14 @@ Future<ScheduleChoice?> chooseSchedule(
 Future<bool> newRoutine(BuildContext context, Notes notes, Places places) =>
     _push(context, RoutineEditorScreen(notes: notes, places: places));
 
+/// Opens the editor for a new Session whose Note is made behind the
+/// scenes from the text typed there; true when one was made.
+Future<bool> newSession(BuildContext context, Notes notes, Places places) =>
+    _push(
+      context,
+      RoutineEditorScreen(notes: notes, places: places, session: true),
+    );
+
 /// Opens the editor of [routine]; true when it changed or went.
 Future<bool> openRoutine(
   BuildContext context,
@@ -121,7 +129,8 @@ class RoutineEditorScreen extends StatefulWidget {
   /// A new one starts as a Reminder: once, at the next full hour.
   final bool reminder;
 
-  /// A new one is a Session, spawned from [noteId] or [capture].
+  /// A new one is a Session, spawned from [noteId] or [capture], or with
+  /// its Note made from the text typed here.
   final bool session;
 
   /// The Note being captured, not written yet, that a new one is for
@@ -227,8 +236,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       final noteId = widget.noteId;
       _note = noteId == null ? null : widget.notes.byId(noteId);
       // A Note being captured offers the Tallies of where it goes; while
-      // Unsorted, any of the user's.
-      if (widget.session && (noteId != null || widget.capture != null)) {
+      // Unsorted, any of the user's, as does one made from the text here.
+      if (widget.session) {
         _draft = SessionDraft.of(
           widget.notes.store,
           noteId ?? widget.capture?.place ?? '',
@@ -463,7 +472,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     } else {
       final text = _text.text.trim();
       if (text.isEmpty) return;
-      id = _routines.create(text, schedule).id;
+      id = draft == null
+          ? _routines.create(text, schedule).id
+          : draft.spawn(widget.notes.capture(text).id, schedule);
     }
     _routines.setRenag(id, _renag);
     _routines.setEscalation(id, _escalation);

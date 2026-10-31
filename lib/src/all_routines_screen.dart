@@ -26,7 +26,9 @@ Future<void> openAllRoutines(
 );
 
 /// Every Routine and Reminder in alphabetical order of its name, also
-/// those beyond the Agenda's week; a tap opens its editor. Export hands
+/// those beyond the Agenda's week; a tap opens its editor. New Session
+/// opens the editor of a Session whose Note is made from the text typed
+/// there. Export hands
 /// one calendar file of all of them to the app the user chooses. Those
 /// of closed locked Areas stay out, of the file too. Each card carries
 /// its Area's colour and icon, as on the Agenda. Those whose schedule a
@@ -102,6 +104,12 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
     setState(_load);
   }
 
+  Future<void> _newSession() async {
+    await newSession(context, widget.notes, widget.places);
+    if (!mounted) return;
+    setState(_load);
+  }
+
   Future<void> _export(List<(Routine, String, Area?)> rows) =>
       shareRoutinesFile(context, _routines, [
         for (final (routine, _, _) in rows) routine,
@@ -116,6 +124,12 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
       appBar: AppBar(
         title: Text(t.allRoutinesTitle),
         actions: [
+          IconButton(
+            key: const ValueKey('new-session'),
+            tooltip: t.newSession,
+            onPressed: _newSession,
+            icon: const Icon(Icons.event_repeat),
+          ),
           if (CalendarScope.of(context).available)
             IconButton(
               key: const ValueKey('export'),

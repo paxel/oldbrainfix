@@ -142,8 +142,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **The Agenda's bar**, in this order: All Routines and Reminders,
   Calendar, new Routine, then the Profile picture in the corner. All
   Routines and Reminders lists every one alphabetically by name, also
-  those beyond the week, and a tap opens its editor; its bar's Export
-  writes one calendar file of all of them. Calendar opens the Calendar
+  those beyond the week, and a tap opens its editor; its bar's New
+  Session opens the editor of a new Session whose Note is the text typed
+  there, and its Export writes one calendar file of all of them. Calendar opens the Calendar
   page: "Read from your calendar" (the appointment running at Capture,
   and the switch that shows the calendar's appointments on the Agenda,
   whose calendars are picked on a page of checkboxes, none at first) and
