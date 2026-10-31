@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Added
 
-- On the phone, today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row after the Shopping Lists, such as "Before the trip: 3 of 7 open", which opens the list, and "Show on the Agenda" in the ⋮ of its card and editor, on for every Checklist, takes it off the Agenda for this person alone, kept on their own Devices, so in a Shared Area each person decides for their own Agenda.
+- On the phone and the desktop, today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row after the Shopping Lists, such as "Before the trip: 3 of 7 open", which opens the list, and "Show on the Agenda" in the ⋮ of its card and in its editor, on for every Checklist, takes it off the Agenda for this person alone, kept on their own Devices, so in a Shared Area each person decides for their own Agenda.
 
 ### Changed
 

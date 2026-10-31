@@ -107,6 +107,9 @@ pub enum ChecklistAction {
     ToPlain(String),
     /// Unchecks every Line of the Note's Checklist as it shows now.
     UncheckAll(String),
+    /// Switches "Show on the Agenda" of the Note's Checklist on or off
+    /// for this person (#143).
+    ShowOnAgenda(String, bool),
     /// Checks the Line with this id, or unchecks it: for the Occurrence
     /// given, or by its own checks without one.
     Check(String, bool, Option<RoutineOccurrence>),
@@ -133,6 +136,9 @@ pub struct ChecklistShown {
     pub editable: HashSet<String>,
     /// Whether it may turn it back into a plain Note.
     pub plain: bool,
+    /// Whether it shows on this person's Agenda, while "Show on the
+    /// Agenda" applies to it: a Checklist without a Routine (#143).
+    pub on_agenda: Option<bool>,
 }
 
 /// Whether this Device may check the Lines of `list` as it shows: for
@@ -169,18 +175,32 @@ pub fn read(
         adds: lists.may_check(&note.id)?,
         editable,
         plain: changes && note.text_editable,
+        on_agenda: on_agenda(&lists, &note.id)?,
         list,
     }))
 }
 
+/// Whether the Checklist of `note` shows on this person's Agenda, or
+/// `None` while "Show on the Agenda" does not apply to it (#143).
+fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<bool>> {
+    if !lists.may_show_on_agenda(note)? {
+        return Ok(None);
+    }
+    Ok(Some(lists.shows_on_agenda(note)?))
+}
+
 /// What the menu of a Note's card offers of a Checklist (#120) and a
-/// Shopping List (#122), read as it opens: making it one, unchecking all
-/// of a Checklist's Lines and turning either back into a plain Note.
+/// Shopping List (#122), read as it opens: making it one, a Checklist's
+/// "Show on the Agenda" (#143), unchecking all of its Lines and turning
+/// either back into a plain Note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardMenu {
     pub note: String,
     pub make: bool,
     pub make_shopping: bool,
+    /// Whether the Checklist shows on this person's Agenda, while the
+    /// switch applies to it.
+    pub on_agenda: Option<bool>,
     pub uncheck_all: bool,
     pub to_plain: bool,
 }
@@ -205,6 +225,7 @@ pub fn card_menu(
         note: note.id.clone(),
         make: list.is_none() && lists.may_make(&note.id)?,
         make_shopping: shopping.may_make(&note.id)?,
+        on_agenda: on_agenda(&lists, &note.id)?,
         uncheck_all,
         to_plain,
     })
@@ -690,8 +711,20 @@ pub fn section(
             actions.push(ChecklistAction::AddLine(note.clone()));
         }
         let uncheck = shown.checks && list.checked_count() > 0;
-        if uncheck || shown.plain {
+        if uncheck || shown.plain || shown.on_agenda.is_some() {
             ui.horizontal_wrapped(|ui| {
+                // The desktop editor has no ⋮: the switch sits with the
+                // list's other entries (#143).
+                if let Some(mut on) = shown.on_agenda
+                    && ui
+                        .checkbox(
+                            &mut on,
+                            RichText::new(t.checklist_show_on_agenda()).color(text),
+                        )
+                        .clicked()
+                {
+                    actions.push(ChecklistAction::ShowOnAgenda(note.clone(), on));
+                }
                 if uncheck
                     && ui
                         .button(RichText::new(t.checklist_uncheck_all()).color(text))
@@ -734,7 +767,19 @@ pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Check
         ),
     ];
     let mut picked = None;
-    for (shown, label, action) in entries {
+    for (i, (shown, label, action)) in entries.into_iter().enumerate() {
+        // "Show on the Agenda" before "Uncheck all", as on the phone.
+        if i == 1
+            && let Some(mut on) = menu.on_agenda
+            && ui
+                .checkbox(
+                    &mut on,
+                    RichText::new(t.checklist_show_on_agenda()).color(text),
+                )
+                .clicked()
+        {
+            picked = Some(ChecklistAction::ShowOnAgenda(note.clone(), on));
+        }
         if shown && ui.button(RichText::new(label).color(text)).clicked() {
             picked = Some(action);
         }

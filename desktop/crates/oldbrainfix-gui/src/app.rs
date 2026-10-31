@@ -238,6 +238,15 @@ struct ShoppingRow {
     checks: bool,
 }
 
+/// A Checklist's row on today's Agenda (#143): its Note, Area and what
+/// it says, "Before the trip: 3 of 7 open".
+#[derive(Debug, Clone)]
+struct ChecklistRow {
+    note_id: String,
+    area: Option<Area>,
+    text: String,
+}
+
 /// What the Agenda shows.
 #[derive(Debug, Clone, Default)]
 struct AgendaView {
@@ -245,6 +254,9 @@ struct AgendaView {
     /// Today's rows of the Shopping Lists, as Settings of this Device
     /// choose (#123).
     shopping: Vec<ShoppingRow>,
+    /// Today's rows of the Checklists without a Routine that show on this
+    /// person's Agenda and have open Lines, oldest capture first (#143).
+    checklists: Vec<ChecklistRow>,
     tomorrow: Vec<Row>,
     /// The days after tomorrow, each with its rows.
     later: Vec<(Day, Vec<Row>)>,
@@ -3579,9 +3591,26 @@ impl App {
                         }
                     }
                 }
+                let mut checklist_rows = Vec::new();
+                for list in lists.agenda()? {
+                    let Some(note) = notes.by_id(&list.note_id)? else {
+                        continue;
+                    };
+                    let title = match row_title(&self.t, Some(&note)).lines().next() {
+                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+                        _ => self.t.checklist_heading().to_string(),
+                    };
+                    let (open, count) = (list.open_count() as i64, list.count() as i64);
+                    checklist_rows.push(ChecklistRow {
+                        area: place(note.clone())?.area,
+                        text: self.t.checklist_row_open(&title, open, count),
+                        note_id: note.id,
+                    });
+                }
                 Some(AgendaView {
                     later,
                     shopping: shopping_rows,
+                    checklists: checklist_rows,
                     today: agenda
                         .today_rows
                         .into_iter()
@@ -4851,6 +4880,13 @@ impl App {
                         Some(on) => lists.uncheck_all_for(&note, on)?,
                         None => lists.uncheck_all(&note)?,
                     }
+                }
+            }
+            ChecklistAction::ShowOnAgenda(note, on) => {
+                let lists = Checklists::new(&self.store);
+                // A Routine may have come meanwhile.
+                if lists.may_show_on_agenda(&note)? {
+                    lists.set_show_on_agenda(&note, on)?;
                 }
             }
             ChecklistAction::Check(line, checked, on) => {
@@ -7958,7 +7994,8 @@ impl App {
     /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
     /// Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
     /// waiting" line opening their list, the "x shared Areas waiting" line
-    /// opening theirs, today's Occurrences, a gap, and tomorrow's dimmed, then the five days after
+    /// opening theirs, today's Occurrences with the Shopping Lists' and
+    /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. The Profile picture in the
     /// corner, where the settings gear was, leads to the Profile page.
@@ -8028,13 +8065,16 @@ impl App {
                         .size(16.0)
                         .color(text),
                 );
-                if agenda.today.is_empty() && agenda.shopping.is_empty() {
+                if agenda.today.is_empty()
+                    && agenda.shopping.is_empty()
+                    && agenda.checklists.is_empty()
+                {
                     ui.label(
                         RichText::new(t.nothing_today()).color(ui.visuals().weak_text_color()),
                     );
                 }
                 // The Shopping Lists' rows after the all-day Occurrences,
-                // before the timed ones (#123).
+                // then the Checklists', before the timed ones (#123, #143).
                 let timed = agenda
                     .today
                     .iter()
@@ -8046,6 +8086,9 @@ impl App {
                 }
                 for row in &agenda.shopping {
                     shopping_row(ui, tones, row, actions);
+                }
+                for row in &agenda.checklists {
+                    checklist_row(ui, tones, row, actions);
                 }
                 for row in timed {
                     agenda_row(ui, &t, tones, row, actions);
@@ -10722,6 +10765,52 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
                 None => row.text.clone(),
             };
             open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+            if open.clicked() {
+                actions.push(Action::SelectNote(row.note_id.clone()));
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(icon) = row
+                    .area
+                    .as_ref()
+                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
+                {
+                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
+                }
+            });
+        });
+    });
+}
+
+/// A Checklist's row today as an embossed row with its Area's colour and
+/// icon (#143): the list with how many of its Lines are open, "Before the
+/// trip: 3 of 7 open". A click on its text opens the Note.
+fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let colour = row
+        .area
+        .as_ref()
+        .and_then(|a| area_colour(a.colour.as_deref()));
+    embossed(ui, tones, false, colour, |ui| {
+        ui.horizontal(|ui| {
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+            icons::paint(ui.painter(), rect.shrink(4.0), icons::CHECKLIST, weak);
+            ui.add_space(4.0);
+            let width = (ui.available_width() - 32.0).max(40.0);
+            let body = ui.vertical(|ui| {
+                ui.set_max_width(width);
+                ui.add(
+                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
+                );
+            });
+            let open = ui
+                .interact(
+                    body.response.rect,
+                    Id::new(("checklist row", row.note_id.as_str())),
+                    Sense::click(),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &row.text));
             if open.clicked() {
                 actions.push(Action::SelectNote(row.note_id.clone()));
             }

@@ -80,6 +80,9 @@ pub const EXPORT: char = '\u{f05d}';
 /// `shopping_cart_outlined`, as the phone marks a Shopping List's row on
 /// the Agenda (#123).
 pub const SHOPPING_CART: char = '\u{f37f}';
+/// `checklist`, as the phone marks a Checklist's row on the Agenda
+/// (#143).
+pub const CHECKLIST: char = '\u{e15b}';
 /// The format bar's, as the phone's (#127): `format_bold`,
 /// `format_italic`, `format_strikethrough`, `format_list_bulleted`,
 /// `format_list_numbered`, `format_quote`, `link`, `code`,
