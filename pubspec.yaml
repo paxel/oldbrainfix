@@ -3,7 +3,7 @@ description: "Old Brain Fix — capture a thought in one tap, get nagged until i
 publish_to: 'none'
 
 # App version. Keep in sync with CHANGELOG.md.
-version: 0.2.0+3
+version: 0.3.0+4
 
 environment:
   sdk: ^3.13.4

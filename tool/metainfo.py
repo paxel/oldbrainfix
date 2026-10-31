@@ -48,6 +48,10 @@ def release(version, date, lines):
         if line.startswith("- ")
     ]
     items = "".join(f"\n          <li>{escape(e)}</li>" for e in entries)
+    if not entries:
+        # A version just bumped to has no entries yet; an empty list is
+        # invalid AppStream markup.
+        return f'<release version="{version}" date="{date}" type="stable"/>'
     return (
         f'<release version="{version}" date="{date}" type="stable">\n'
         "      <description>\n"

@@ -17,9 +17,9 @@ name = "oldbrainfix"
 path = "src/bin/oldbrainfix.rs"
 
 [dependencies]
-oldbrainfix-core = { path = "../oldbrainfix-core", version = "0.2.0" }
-oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.2.0" }
-oldbrainfix-whisper = { path = "../oldbrainfix-whisper", version = "0.2.0" }
+oldbrainfix-core = { path = "../oldbrainfix-core", version = "0.3.0" }
+oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.3.0" }
+oldbrainfix-whisper = { path = "../oldbrainfix-whisper", version = "0.3.0" }
 eframe = "0.35"
 egui = "0.35"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
@@ -82,7 +82,7 @@ windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Ide
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
 
 [build-dependencies]
-oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.2.0" }
+oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.3.0" }
 
 [dev-dependencies]
 # wgpu draws the desktop screenshots (tests/screenshots.rs).

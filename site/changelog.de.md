@@ -2,7 +2,9 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.2.0]
+## [0.3.0]
+
+## [0.2.0] - 2026-10-31
 
 ### Neu
 - Auf dem Telefon und dem Desktop kommt 30 Minuten nach der ersten Änderung, die Personen, mit denen per Datei synchronisiert wird, noch nicht geschickt wurde, eine Benachrichtigung „Änderungen für Bob und Carol“, die wie der Stupser wiederkommt und die Ruhezeit abwartet, bis jede von ihnen ihre Datei bekommen hat, und ein Tippen oder Klicken darauf bietet jeder Person nacheinander ihre Datei an, wobei eine Datei dort und bei „Änderungen an … schicken“ erst als geschickt gilt, wenn auf dem Telefon im Teilen-Menü eine App gewählt oder auf dem Desktop die Datei gespeichert wurde.

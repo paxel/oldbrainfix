@@ -62,6 +62,13 @@ class MetainfoTest(unittest.TestCase):
         items = [li.text for li in root.findall("./releases/release[1]/description/ul/li")]
         self.assertEqual(items, ["Runs oldbrainfix capture & more.", "A <bug>."])
 
+    def test_a_version_without_entries_has_no_empty_notes(self):
+        changelog = ["## [0.4.0]\n", "\n"] + CHANGELOG[2:]
+        out = render(TEMPLATE, changelog, "0.4.0", "2026-12-01", dated=TAGS.get)
+        release = ET.fromstring(out).find("./releases/release[1]")
+        self.assertEqual(release.get("version"), "0.4.0")
+        self.assertIsNone(release.find("description"))
+
     def test_a_version_without_a_section_is_refused(self):
         with self.assertRaises(SystemExit):
             self.render("0.2.5")
