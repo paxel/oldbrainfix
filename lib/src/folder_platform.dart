@@ -6,8 +6,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// The platform seam for the shared folder (android/…/FolderChannel.kt):
 /// picking it, its name for people, and the folder itself; the Backup
-/// folder, and the directory Auto Backup takes the newest Backup from
-/// (android/…/AutoBackup.kt). Widget tests hand in a fake.
+/// folder; the files of a folder to import (ADR 0036); and the directory
+/// Auto Backup takes the newest Backup from (android/…/AutoBackup.kt).
+/// Widget tests hand in a fake.
 abstract interface class FolderPlatform {
   /// Whether a folder can be picked here.
   bool get available;
@@ -25,6 +26,19 @@ abstract interface class FolderPlatform {
   /// The [folder] kept by [pick], as Backups go into it (ADR 0016).
   BackupFolder openBackups(String folder);
 
+  /// Every file of the [folder] picked by [pick] and of its folders, but
+  /// not of hidden ones (`.git`, `.obsidian`), for an Import.
+  Future<List<FolderFile>> files(String folder);
+
+  /// The bytes of [file], or null when it holds more than [limit] bytes;
+  /// such a file is not read whole.
+  Future<Uint8List?> readFile(FolderFile file, int limit);
+
+  /// Gives up the lasting access [pick] took to the imported [folder],
+  /// unless it is one of the folders the app keeps, in [keep] (the sync
+  /// and the Backup folder). Never fails.
+  Future<void> release(String folder, List<String> keep);
+
   /// The app's own directory the platform's backup (Android's Auto
   /// Backup to the user's Google account, ADR 0010) takes the newest
   /// Backup from, and where one lies after a restore from there; null
@@ -34,6 +48,24 @@ abstract interface class FolderPlatform {
   /// Tells the platform's backup whether the user opted in; until then
   /// it takes nothing at all.
   Future<void> setAutoBackup(bool on);
+}
+
+/// One file of a folder to import: its [path] inside the folder,
+/// folders separated by `/`; when it was last changed, null when the
+/// platform cannot tell; its [size] in bytes, -1 when unknown; and the
+/// platform's own [ref] to read it by.
+class FolderFile {
+  final String path;
+  final DateTime? modified;
+  final int size;
+  final String ref;
+
+  const FolderFile({
+    required this.path,
+    required this.modified,
+    required this.size,
+    required this.ref,
+  });
 }
 
 /// The directory of [folders]'s Auto Backup as Backups go into it; null
@@ -62,6 +94,15 @@ class NoFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
+
+  @override
+  Future<List<FolderFile>> files(String folder) async => const [];
+
+  @override
+  Future<Uint8List?> readFile(FolderFile file, int limit) async => null;
+
+  @override
+  Future<void> release(String folder, List<String> keep) async {}
 
   @override
   Future<String?> autoBackupDir() async => null;
@@ -110,6 +151,63 @@ class AndroidFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => SafBackupFolder(folder);
+
+  @override
+  Future<List<FolderFile>> files(String folder) async {
+    final found = await _call<List<Object?>>('files', {'tree': folder}, folder);
+    return [
+      for (final f in found ?? const [])
+        if (f case {
+          'path': final String path,
+          'doc': final String doc,
+          'modified': final int modified,
+          'size': final int size,
+        })
+          FolderFile(
+            path: path,
+            // 0 is what Android says for a time it does not know.
+            modified: modified > 0
+                ? DateTime.fromMillisecondsSinceEpoch(modified, isUtc: true)
+                : null,
+            size: size,
+            ref: doc,
+          ),
+    ];
+  }
+
+  @override
+  Future<Uint8List?> readFile(FolderFile file, int limit) =>
+      _call<Uint8List>('readDoc', {'doc': file.ref, 'limit': limit}, file.path);
+
+  @override
+  Future<void> release(String folder, List<String> keep) async {
+    try {
+      await channel.invokeMethod<void>('release', {
+        'tree': folder,
+        'keep': keep,
+      });
+    } on PlatformException {
+      // The grant stays; it gives no access beyond the folder picked.
+    } on MissingPluginException {
+      // No grants here.
+    }
+  }
+
+  /// [method] on the folder channel; a platform error becomes a
+  /// [FileSystemException] about [path].
+  static Future<T?> _call<T>(
+    String method,
+    Map<String, Object> args,
+    String path,
+  ) async {
+    try {
+      return await channel.invokeMethod<T>(method, args);
+    } on PlatformException catch (e) {
+      throw FileSystemException(e.message ?? method, path);
+    } on MissingPluginException {
+      throw FileSystemException('No folder access here', path);
+    }
+  }
 
   @override
   Future<String?> autoBackupDir() async {

@@ -521,6 +521,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       widget.alarms,
       widget.profile,
       onThemeChanged: widget.onThemeChanged,
+      trail: widget.trail,
     );
     if (!mounted) return;
     _reload();

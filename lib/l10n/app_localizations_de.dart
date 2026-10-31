@@ -4511,4 +4511,83 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get photoNotWrittenCause =>
       'Die Datei des Fotos konnte auf diesem Telefon nicht geschrieben werden.';
+
+  @override
+  String get settingsImport => 'Import';
+
+  @override
+  String get importFolder => 'Ordner importieren';
+
+  @override
+  String get importFolderDetail =>
+      'Jede Markdown- oder Textdatei darin wird eine Notiz in einem neuen Bereich, datiert auf die letzte Änderung der Datei.';
+
+  @override
+  String get importReading => 'Der Ordner wird gelesen …';
+
+  @override
+  String importAreaName(String folder) {
+    return 'Aus $folder';
+  }
+
+  @override
+  String get importFinished => 'Import abgeschlossen.';
+
+  @override
+  String importFinishedNotes(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen kamen in den neuen Bereich $area.',
+      one: '1 Notiz kam in den neuen Bereich $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importFinishedSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien wurden übersprungen:',
+      one: '1 Datei wurde übersprungen:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importOpenArea => 'Bereich öffnen';
+
+  @override
+  String get importNothing => 'Keine Markdown- oder Textdatei gefunden.';
+
+  @override
+  String get importNothingTitle => 'Nichts importiert';
+
+  @override
+  String get importNothingCause =>
+      'Der Ordner und seine Unterordner enthalten keine Markdown-Datei (.md, .markdown) und keine Textdatei (.txt), die sich übernehmen ließ; andere Dateien und zu große werden übersprungen.';
+
+  @override
+  String get importNothingFix =>
+      'Wähle den Ordner, in dem die Notizen liegen. Es wurde nichts geändert.';
+
+  @override
+  String importSkippedDetails(String folder, int notText, int tooLarge) {
+    return 'Ordner: $folder\nKein Markdown oder Text: $notText\nZu groß: $tooLarge';
+  }
+
+  @override
+  String get importFailed => 'Der Ordner konnte nicht importiert werden.';
+
+  @override
+  String get importFailedTitle => 'Import fehlgeschlagen';
+
+  @override
+  String get importFailedCause =>
+      'Der Ordner oder eine seiner Dateien ließ sich nicht lesen.';
+
+  @override
+  String get importFailedFix =>
+      'Es wurde nichts importiert. Kopiere den Ordner auf das Telefon und importiere ihn von dort.';
 }

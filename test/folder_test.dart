@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +42,15 @@ class FakeFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
+
+  @override
+  Future<List<FolderFile>> files(String folder) async => const [];
+
+  @override
+  Future<Uint8List?> readFile(FolderFile file, int limit) async => null;
+
+  @override
+  Future<void> release(String folder, List<String> keep) async {}
 
   @override
   Future<String?> autoBackupDir() async => null;

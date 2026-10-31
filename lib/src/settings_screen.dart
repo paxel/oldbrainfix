@@ -5,15 +5,22 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'about_screen.dart';
 import 'alarm_sync.dart';
+import 'announcements.dart';
 import 'app_lock.dart';
+import 'areas_screen.dart';
+import 'browser.dart';
 import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
+import 'failure_dialog.dart';
+import 'folder_import.dart';
+import 'folder_platform.dart';
 import 'l10n.dart';
 import 'lock_settings.dart';
 import 'look.dart';
 import 'named_places_screen.dart';
 import 'page_bar.dart';
+import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
@@ -31,9 +38,9 @@ enum _UnitChoice { region, metric, imperial }
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
-/// the Area Locks; whether Streaks show; and About. Each is a local
-/// setting, never synced, and applies at once; the alarms are armed
-/// again after each change.
+/// the Area Locks; whether Streaks show; the Import of a folder; and
+/// About. Each is a local setting, never synced, and applies at once;
+/// the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
@@ -41,11 +48,16 @@ class SettingsScreen extends StatefulWidget {
   /// Called after the theme was changed, to show it at once.
   final VoidCallback? onThemeChanged;
 
+  /// The notes browser's way back in, which the Area an Import made
+  /// opens as the last selected one.
+  final BrowserTrail? trail;
+
   const SettingsScreen({
     super.key,
     required this.store,
     required this.alarms,
     this.onThemeChanged,
+    this.trail,
   });
 
   @override
@@ -116,6 +128,144 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setTwoRows(bool on) {
     widget.store.twoRowEditorOn = on;
     setState(() => _twoRows = on);
+  }
+
+  /// Whether an Import is reading its folder.
+  var _importing = false;
+
+  /// Picks a folder with the system's picker and makes Notes of its
+  /// Markdown and text files in a new Area (ADR 0036), announced at the
+  /// top once done, even after this page closed, without values (UI
+  /// laws); its tap shows what went where, with a way into the Area.
+  Future<void> _import() async {
+    if (_importing) return;
+    final t = context.t;
+    final folders = FolderScope.of(context);
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final store = widget.store;
+    final trail = widget.trail ?? BrowserTrail();
+    final folder = await folders.pick();
+    if (folder == null) return;
+    if (mounted) setState(() => _importing = true);
+    try {
+      final name = await folders.displayName(folder);
+      final summary = await importFolder(
+        store,
+        folders,
+        folder,
+        t.importAreaName(name),
+      );
+      final area = switch (summary.areaId) {
+        final id? => Places(store).areaById(id),
+        null => null,
+      };
+      if (area == null) {
+        announceFailureWith(
+          announcements,
+          navigator,
+          t.importNothing,
+          title: t.importNothingTitle,
+          cause: t.importNothingCause,
+          fix: t.importNothingFix,
+          details: t.importSkippedDetails(
+            name,
+            summary.notText,
+            summary.tooLarge,
+          ),
+        );
+        return;
+      }
+      final shown = areaName(t, area);
+      final details = [
+        t.importFinishedNotes(summary.notes, shown),
+        if (summary.skipped > 0) ...[
+          '',
+          t.importFinishedSkipped(summary.skipped),
+          t.importSkippedDetails(name, summary.notText, summary.tooLarge),
+        ],
+      ].join('\n');
+      announcements?.announce(
+        t.importFinished,
+        onTap: () => unawaited(
+          showDialog<void>(
+            context: navigator.context,
+            builder: (context) => AlertDialog(
+              title: Text(context.t.importFinished),
+              content: SingleChildScrollView(child: Text(details)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(context.t.close),
+                ),
+                TextButton(
+                  key: const ValueKey('importOpenArea'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _openImported(navigator, store, trail, area);
+                  },
+                  child: Text(context.t.importOpenArea),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } on Exception catch (e) {
+      announceFailureWith(
+        announcements,
+        navigator,
+        t.importFailed,
+        title: t.importFailedTitle,
+        cause: t.importFailedCause,
+        fix: t.importFailedFix,
+        details: '$e',
+      );
+    } finally {
+      // The folder was picked for this Import alone: its lasting access
+      // goes, unless the app syncs or backs up through it.
+      unawaited(
+        folders.release(folder, [?store.syncFolder, ?store.backupFolder]),
+      );
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  /// The notes browser on top, the Areas list and in it the imported
+  /// [area], chosen as the last selected one; the Areas list alone while
+  /// [area] was locked and is closed meanwhile.
+  static void _openImported(
+    NavigatorState navigator,
+    Store store,
+    BrowserTrail trail,
+    Area area,
+  ) {
+    final notes = Notes(store);
+    final places = Places(store);
+    trail.choseArea(area);
+    unawaited(
+      navigator.push(
+        BrowserRoute<void>(
+          builder: (_) =>
+              AreasScreen(notes: notes, places: places, trail: trail),
+        ),
+      ),
+    );
+    final closed =
+        LockScope.of(navigator.context)?.isAreaClosed(area.id) ?? false;
+    if (closed) return;
+    unawaited(
+      navigator.push(
+        BrowserRoute<void>(
+          builder: (_) => AreaScreen(
+            notes: notes,
+            places: places,
+            trail: trail,
+            areaId: area.id,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _push(Widget screen) =>
@@ -354,6 +504,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+            if (FolderScope.of(context).available) ...[
+              SettingsHeading(t.settingsImport),
+              SettingsSection(
+                children: [
+                  ListTile(
+                    key: const ValueKey('importFolder'),
+                    leading: const Icon(Icons.drive_folder_upload_outlined),
+                    title: Text(t.importFolder),
+                    subtitle: Text(
+                      _importing ? t.importReading : t.importFolderDetail,
+                    ),
+                    trailing: _importing
+                        ? const SizedBox.square(
+                            dimension: 24,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          )
+                        : null,
+                    enabled: !_importing,
+                    onTap: _import,
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             SettingsSection(
               children: [

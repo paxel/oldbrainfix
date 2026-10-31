@@ -7327,6 +7327,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The photo\'s file could not be written on this phone.'**
   String get photoNotWrittenCause;
+
+  /// Section title in Settings for the Import of a folder (CONTEXT.md: Import).
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get settingsImport;
+
+  /// Settings row that opens the system's folder picker for an Import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a folder'**
+  String get importFolder;
+
+  /// Subtitle of 'importFolder'.
+  ///
+  /// In en, this message translates to:
+  /// **'Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.'**
+  String get importFolderDetail;
+
+  /// Subtitle of 'importFolder' while the picked folder's files are read and imported.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the folder…'**
+  String get importReading;
+
+  /// Name of the new Area an Import makes, after the picked folder's name. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'From {folder}'**
+  String importAreaName(String folder);
+
+  /// Announced after an Import that made Notes; the tap opens the dialog with what went where. Carries no values (UI laws). Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Import finished.'**
+  String get importFinished;
+
+  /// First line in the dialog behind 'importFinished'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note went into the new Area {area}.} other{{count} Notes went into the new Area {area}.}}'**
+  String importFinishedNotes(int count, String area);
+
+  /// In the dialog behind 'importFinished' when files were skipped, above 'importSkippedDetails'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file was skipped:} other{{count} files were skipped:}}'**
+  String importFinishedSkipped(int count);
+
+  /// Button in the dialog behind 'importFinished' that opens the new Area. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Area'**
+  String get importOpenArea;
+
+  /// Announced when an Import found nothing to make Notes of; the tap opens the dialog with the cause and the fix. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'No Markdown or text file found.'**
+  String get importNothing;
+
+  /// Title of the dialog behind 'importNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing imported'**
+  String get importNothingTitle;
+
+  /// The cause in the dialog behind 'importNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.'**
+  String get importNothingCause;
+
+  /// The fix in the dialog behind 'importNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the folder the notes lie in. Nothing was changed.'**
+  String get importNothingFix;
+
+  /// The details in the dialog behind 'importNothing': the folder and the files skipped. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder: {folder}\nNot Markdown or text: {notText}\nToo large: {tooLarge}'**
+  String importSkippedDetails(String folder, int notText, int tooLarge);
+
+  /// Announced when the picked folder or one of its files could not be read; the tap opens the dialog with the cause and the fix. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder could not be imported.'**
+  String get importFailed;
+
+  /// Title of the dialog behind 'importFailed'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed'**
+  String get importFailedTitle;
+
+  /// The cause in the dialog behind 'importFailed'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder or one of its files could not be read.'**
+  String get importFailedCause;
+
+  /// The fix in the dialog behind 'importFailed' on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was imported. Copy the folder onto the phone and import it from there.'**
+  String get importFailedFix;
 }
 
 class _AppLocalizationsDelegate

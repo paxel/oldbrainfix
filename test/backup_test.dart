@@ -68,6 +68,27 @@ class DirFolders implements FolderPlatform {
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
 
   @override
+  Future<List<FolderFile>> files(String folder) async => [
+    for (final file in Directory(folder).listSync(recursive: true))
+      if (file is File)
+        FolderFile(
+          path: file.path.substring(folder.length + 1),
+          modified: file.lastModifiedSync().toUtc(),
+          size: file.lengthSync(),
+          ref: file.path,
+        ),
+  ];
+
+  @override
+  Future<Uint8List?> readFile(FolderFile file, int limit) async {
+    final bytes = File(file.ref).readAsBytesSync();
+    return bytes.length > limit ? null : bytes;
+  }
+
+  @override
+  Future<void> release(String folder, List<String> keep) async {}
+
+  @override
   Future<String?> autoBackupDir() async => auto;
 
   @override

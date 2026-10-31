@@ -4451,4 +4451,83 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get photoNotWrittenCause =>
       'The photo\'s file could not be written on this phone.';
+
+  @override
+  String get settingsImport => 'Import';
+
+  @override
+  String get importFolder => 'Import a folder';
+
+  @override
+  String get importFolderDetail =>
+      'Each Markdown or text file in it becomes a Note in a new Area, dated when the file was last changed.';
+
+  @override
+  String get importReading => 'Reading the folder…';
+
+  @override
+  String importAreaName(String folder) {
+    return 'From $folder';
+  }
+
+  @override
+  String get importFinished => 'Import finished.';
+
+  @override
+  String importFinishedNotes(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes went into the new Area $area.',
+      one: '1 Note went into the new Area $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importFinishedSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files were skipped:',
+      one: '1 file was skipped:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importOpenArea => 'Open the Area';
+
+  @override
+  String get importNothing => 'No Markdown or text file found.';
+
+  @override
+  String get importNothingTitle => 'Nothing imported';
+
+  @override
+  String get importNothingCause =>
+      'The folder and its folders hold no Markdown file (.md, .markdown) or text file (.txt) that could be taken; other files and files that are too large are skipped.';
+
+  @override
+  String get importNothingFix =>
+      'Pick the folder the notes lie in. Nothing was changed.';
+
+  @override
+  String importSkippedDetails(String folder, int notText, int tooLarge) {
+    return 'Folder: $folder\nNot Markdown or text: $notText\nToo large: $tooLarge';
+  }
+
+  @override
+  String get importFailed => 'The folder could not be imported.';
+
+  @override
+  String get importFailedTitle => 'Import failed';
+
+  @override
+  String get importFailedCause =>
+      'The folder or one of its files could not be read.';
+
+  @override
+  String get importFailedFix =>
+      'Nothing was imported. Copy the folder onto the phone and import it from there.';
 }

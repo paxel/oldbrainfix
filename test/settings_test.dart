@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/about_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
@@ -11,7 +15,9 @@ import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'announced.dart';
 import 'fake_alarms.dart';
+import 'fake_import.dart';
 import 'open_settings.dart';
 
 void main() {
@@ -655,6 +661,199 @@ void main() {
         );
         expect(find.text(name), findsOneWidget);
       }
+    });
+  });
+
+  group('Settings ▸ Import', () {
+    late FakeImportFolders folders;
+    late Announcements announcements;
+    final march = DateTime.utc(2025, 3, 1, 8);
+
+    setUp(() {
+      folders = FakeImportFolders();
+      announcements = Announcements();
+    });
+    tearDown(() => announcements.dispose());
+
+    Future<void> importFrom(WidgetTester tester) async {
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: store,
+          alarms: alarms,
+          folders: folders,
+          announcements: announcements,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openDeviceSettings(tester);
+      await tap(tester, find.byKey(const ValueKey('importFolder')));
+    }
+
+    testWidgets('is offered only where a folder can be picked', (tester) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      expect(find.text('Import a folder'), findsNothing);
+    });
+
+    testWidgets('makes Notes of the Markdown and text files of a folder and '
+        'its folders in a new Area, dated by their files, none Unsorted; '
+        'the announcement opens the Area', (tester) async {
+      folders
+        ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'))
+        ..put('Shopping.MD', march, utf8.encode('# Shopping\n- Milk'))
+        ..put('Work/Plan.md', null, utf8.encode('Ship it'))
+        ..put('photo.jpg', march, const [0xff, 0xd8])
+        ..put('Huge.txt', march, const [0x41], size: Imports.maxFileBytes + 1);
+      await importFrom(tester);
+
+      // No values in the announcement (UI laws).
+      expect(announcements.visible, 'Import finished.');
+      // Neither the photo nor the file too large is read.
+      expect(folders.read, ['Dentist.txt', 'Shopping.MD', 'Work/Plan.md']);
+      final area = Places(store)
+          .areas()
+          .singleWhere((a) => a.name == 'From Notes');
+      final notes = Notes(store);
+      final inside = notes.inside(area.id);
+      expect(
+        inside.map((n) => n.text),
+        unorderedEquals([
+          'Dentist\nTuesday 9:00',
+          '# Shopping\n- Milk',
+          '# Plan\nShip it',
+        ]),
+      );
+      expect(
+        inside.firstWhere((n) => n.text.startsWith('Dentist')).captured,
+        march,
+      );
+      expect(notes.unsorted(), isEmpty);
+      expect(find.text('Import a folder'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // The picked folder's lasting access goes after the Import.
+      expect(folders.released, ['content://tree/primary%3ANotes']);
+      expect(folders.kept, [<String>[]]);
+
+      await tapVisible(tester, announcements);
+      expect(
+        find.text(
+          '3 Notes went into the new Area From Notes.\n\n'
+          '2 files were skipped:\n'
+          'Folder: Notes\nNot Markdown or text: 1\nToo large: 1',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('importOpenArea')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(AreaScreen), findsOneWidget);
+      expect(find.text('From Notes'), findsWidgets);
+      // Back goes to the Areas list, the imported Area chosen there.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+    });
+
+    testWidgets('shows that the folder is read and takes no second tap '
+        'meanwhile', (tester) async {
+      folders
+        ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'))
+        ..hold = Completer<void>();
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: store,
+          alarms: alarms,
+          folders: folders,
+          announcements: announcements,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openDeviceSettings(tester);
+      final row = find.byKey(const ValueKey('importFolder'));
+      await tester.scrollUntilVisible(
+        row,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(row);
+      await tester.pump();
+      expect(find.text('Reading the folder…'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(tester.widget<ListTile>(row).enabled, isFalse);
+
+      folders.hold!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Reading the folder…'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(announcements.visible, 'Import finished.');
+    });
+
+    testWidgets('a second Import of the folder makes a second Area, and a '
+        'folder without skipped files says only what came in; the sync '
+        'folder keeps its access', (tester) async {
+      Places(store).addArea('From Notes');
+      store.chooseSyncFolder('content://tree/primary%3ANotes');
+      folders.put('Dentist.txt', march, utf8.encode('Tuesday 9:00'));
+      await importFrom(tester);
+      expect(folders.kept, [
+        ['content://tree/primary%3ANotes'],
+      ]);
+      expect(announcements.visible, 'Import finished.');
+      await tapVisible(tester, announcements);
+      expect(
+        find.text('1 Note went into the new Area From Notes (2).'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('a folder of nothing usable makes no Area and says why', (
+      tester,
+    ) async {
+      folders.put('photo.jpg', march, const [0xff, 0xd8]);
+      final before = Places(store).areas().length;
+      await importFrom(tester);
+      expect(Places(store).areas(), hasLength(before));
+      expect(folders.released, hasLength(1));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'No Markdown or text file found.',
+        title: 'Nothing imported',
+        cause:
+            'The folder and its folders hold no Markdown file (.md, '
+            '.markdown) or text file (.txt) that could be taken; other files '
+            'and files that are too large are skipped.',
+        fix: 'Pick the folder the notes lie in. Nothing was changed.',
+      );
+    });
+
+    testWidgets('a folder that cannot be read is announced as failed, and '
+        'backing out of the picker does nothing', (tester) async {
+      folders.picks = null;
+      await importFrom(tester);
+      expect(announcements.visible, isNull);
+
+      folders
+        ..picks = 'content://tree/primary%3ANotes'
+        ..fails = true;
+      await tap(tester, find.byKey(const ValueKey('importFolder')));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The folder could not be imported.',
+        title: 'Import failed',
+        cause: 'The folder or one of its files could not be read.',
+        fix:
+            'Nothing was imported. Copy the folder onto the phone and import '
+            'it from there.',
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      // Backing out took no access; the failed Import gives its up.
+      expect(folders.released, hasLength(1));
     });
   });
 }

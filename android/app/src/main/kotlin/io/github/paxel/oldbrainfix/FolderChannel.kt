@@ -1,12 +1,16 @@
 package io.github.paxel.oldbrainfix
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.concurrent.Executors
 
 /**
@@ -17,7 +21,9 @@ import java.util.concurrent.Executors
  * as `oldbrainfix-sync` with `keys` and `blobs` inside, addressed by
  * name; Backups go straight into the folder picked for them ([put]),
  * and the one Auto Backup may take lies in the app's own files
- * ([AutoBackup]).
+ * ([AutoBackup]). An Import lists every file of the picked folder and
+ * its folders ([files]), reads them one by one ([readDoc]) and gives up
+ * the folder's lasting grant afterwards ([releases]).
  * Everything here needs only a [Context], so the background
  * sync's engine (SyncWorker) answers it as the app does; picking the
  * tree is the Activity's ([MainActivity]). The files are read and
@@ -32,7 +38,7 @@ object FolderChannel {
 
     /** Answers [call] and returns true, or false when it is not one of these. */
     fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup")) {
+        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup", "files", "readDoc", "release")) {
             return false
         }
         val app = context.applicationContext
@@ -61,6 +67,30 @@ object FolderChannel {
             null
         }
         "name" -> tree(context, call)?.name
+        "files" -> files(context, call)
+        "release" -> {
+            val tree = call.argument<String>("tree") ?: throw IllegalArgumentException("no tree")
+            if (releases(tree, call.argument<List<String>>("keep") ?: emptyList())) {
+                try {
+                    context.contentResolver.releasePersistableUriPermission(
+                        Uri.parse(tree),
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                } catch (_: SecurityException) {
+                    // Nothing persisted for it: nothing to give up.
+                }
+            }
+            null
+        }
+        "readDoc" -> {
+            val doc = Uri.parse(call.argument<String>("doc") ?: throw IllegalArgumentException("no doc"))
+            val limit = call.argument<Int>("limit") ?: throw IllegalArgumentException("no limit")
+            // Null only for a file larger than the limit; one that cannot
+            // be opened fails the Import.
+            val input = context.contentResolver.openInputStream(doc)
+                ?: throw IllegalStateException("cannot read $doc")
+            input.use { readAtMost(it, limit) }
+        }
         "list" -> dir(context, call, create = false)?.listFiles()
             ?.filter { it.isFile }?.mapNotNull { it.name } ?: emptyList<String>()
         "read" -> dir(context, call, create = false)?.findFile(name(call))
@@ -123,6 +153,73 @@ object FolderChannel {
         val out = context.contentResolver.openOutputStream(to.uri, "wt")
             ?: throw IllegalStateException("cannot write ${to.name}")
         out.use { sink -> from.inputStream().use { it.copyTo(sink) } }
+    }
+
+    /**
+     * Every file of the tree and of its folders but hidden ones, for an
+     * Import: its path inside the tree, its document to read it by, when
+     * it was last changed (0 when the provider cannot tell) and its size
+     * (-1 when it cannot). One query per folder, not one per file.
+     */
+    private fun files(context: Context, call: MethodCall): List<Map<String, Any>> {
+        val tree = Uri.parse(call.argument<String>("tree") ?: throw IllegalArgumentException("no tree"))
+        val found = mutableListOf<Map<String, Any>>()
+        val folders = ArrayDeque(listOf(DocumentsContract.getTreeDocumentId(tree) to ""))
+        while (folders.isNotEmpty()) {
+            val (id, path) = folders.removeFirst()
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id)
+            context.contentResolver.query(children, columns, null, null, null)?.use { row ->
+                while (row.moveToNext()) {
+                    val child = row.getString(0) ?: continue
+                    val name = row.getString(1) ?: continue
+                    val inside = path(path, name)
+                    if (row.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (descends(name)) folders.addLast(child to inside)
+                        continue
+                    }
+                    found += mapOf(
+                        "path" to inside,
+                        "doc" to DocumentsContract.buildDocumentUriUsingTree(tree, child).toString(),
+                        "modified" to (if (row.isNull(3)) 0L else row.getLong(3)),
+                        "size" to (if (row.isNull(4)) -1L else row.getLong(4)),
+                    )
+                }
+            }
+        }
+        return found
+    }
+
+    private val columns = arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        DocumentsContract.Document.COLUMN_SIZE,
+    )
+
+    /**
+     * Whether the lasting grant of the imported [tree] is given up: always,
+     * unless it is a folder the app keeps, the sync or the Backup folder in
+     * [keep], which the picker granted the same way.
+     */
+    fun releases(tree: String, keep: List<String>): Boolean = tree !in keep
+
+    /** The path of [name] in the folder at [parent], "" for the tree itself. */
+    fun path(parent: String, name: String): String = if (parent.isEmpty()) name else "$parent/$name"
+
+    /** Whether an Import takes the files of the folder [name]: not of a hidden one, such as `.git` or `.obsidian`. */
+    fun descends(name: String): Boolean = !name.startsWith(".")
+
+    /** The bytes of [input], or null as soon as there are more than [limit]: a larger file is never read whole. */
+    fun readAtMost(input: InputStream, limit: Int): ByteArray? {
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return out.toByteArray()
+            if (out.size() + read > limit) return null
+            out.write(buffer, 0, read)
+        }
     }
 
     private fun tree(context: Context, call: MethodCall): DocumentFile? {

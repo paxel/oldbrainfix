@@ -8,6 +8,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'alarm_sync.dart';
 import 'backup_screen.dart';
+import 'browser.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'page_bar.dart';
@@ -26,6 +27,7 @@ Future<void> openProfile(
   AlarmSync alarms,
   OwnProfileModel model, {
   VoidCallback? onThemeChanged,
+  BrowserTrail? trail,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => ProfileScreen(
@@ -33,6 +35,7 @@ Future<void> openProfile(
       alarms: alarms,
       model: model,
       onThemeChanged: onThemeChanged,
+      trail: trail,
     ),
   ),
 );
@@ -84,6 +87,10 @@ class ProfileScreen extends StatefulWidget {
   /// Called after the theme was changed in the settings, to show it.
   final VoidCallback? onThemeChanged;
 
+  /// The notes browser's way back in, for the Area an Import in the
+  /// settings made.
+  final BrowserTrail? trail;
+
   const ProfileScreen({
     super.key,
     required this.store,
@@ -91,6 +98,7 @@ class ProfileScreen extends StatefulWidget {
     required this.model,
     this.work = PictureWork.isolated,
     this.onThemeChanged,
+    this.trail,
   });
 
   @override
@@ -329,6 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           store: widget.store,
                           alarms: widget.alarms,
                           onThemeChanged: widget.onThemeChanged,
+                          trail: widget.trail,
                         ),
                       ),
                     ),
