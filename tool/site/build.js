@@ -447,31 +447,6 @@ export function renderRoot() {
 `;
 }
 
-/** Where a Profile card link points (#107): `p` at the site's root, the card after the #. */
-export const CARD_PAGE = "reference/profile-card.html";
-
-/**
- * The address of Profile card links, `p.html` at the root, which GitHub Pages serves for `p`: it
- * goes on to the Profile card page in the browser's language and keeps the card after the #, which
- * no browser sends to the server; without script the links are there, without the card.
- */
-export function renderCardRoot() {
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Profile card — Old Brain Fix</title>
-<script>var l=(navigator.language||"").toLowerCase().slice(0,2)==="de"?"de":"en";location.replace(l+"/${CARD_PAGE}"+location.hash)</script>
-<link rel="icon" href="assets/icon.png" type="image/png">
-</head>
-<body>
-<p><a href="en/${CARD_PAGE}">Profile card</a> · <a href="de/${CARD_PAGE}" lang="de">Profilkarte</a></p>
-</body>
-</html>
-`;
-}
-
 // ---------------------------------------------------------------------------
 // Link check
 
@@ -635,7 +610,6 @@ export function buildSite({
   }
   files.set("404.html", render404(ctx));
   files.set("index.html", renderRoot());
-  if (pages.some((p) => p.path === CARD_PAGE)) files.set("p.html", renderCardRoot());
 
   const copied = [];
   if (fs.existsSync(assetsDir)) copyDir(assetsDir, path.join(outDir, "assets"), copied);

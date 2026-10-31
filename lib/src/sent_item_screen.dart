@@ -13,6 +13,7 @@ import 'l10n.dart';
 import 'note_editor_screen.dart';
 import 'person_screen.dart';
 import 'profile.dart';
+import 'profile_card.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
@@ -156,8 +157,10 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
   }
 }
 
-/// Opens a file another app handed over, or the user picked: a Sent
-/// Item shows its preview, anything else is imported as a bundle. The
+/// Opens a file another app handed over, or the user picked: a Profile
+/// card file (#144) shows the person's Profile or why nobody was added,
+/// a Sent Item shows its preview, anything else is imported as a bundle.
+/// A card file is JSON as a Sent Item is, so it is asked for first. The
 /// copy is removed either way. Returns how many Conflicts a bundle
 /// brought, for the caller to announce.
 Future<int> openReceivedFile(
@@ -169,13 +172,22 @@ Future<int> openReceivedFile(
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context);
   final bytes = _small(path);
-  if (!looksLikeSentItem(bytes)) {
+  final card = looksLikeProfileCard(bytes);
+  if (!card && !looksLikeSentItem(bytes)) {
     return importBundleFile(context, store, path);
   }
   try {
     File(path).deleteSync();
   } on FileSystemException {
     // Gone already.
+  }
+  if (card) {
+    await showCardOpened(
+      context,
+      store.openProfileCardFile(bytes),
+      replace: false,
+    );
+    return 0;
   }
   try {
     // A stranger's is held, and shows nothing of it until "Show" (#91).
@@ -210,7 +222,8 @@ Future<int> openReceivedFile(
 }
 
 /// The bytes of the file at [path]; none when it cannot be read or is
-/// larger than a Sent Item can be, as only bundles are.
+/// larger than a Sent Item or a Profile card file can be, as only
+/// bundles are.
 List<int> _small(String path) {
   try {
     final file = File(path);
@@ -224,6 +237,9 @@ List<int> _small(String path) {
 
 /// Whether the file at [path] is a Sent Item rather than a bundle.
 bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
+
+/// Whether the file at [path] is a Profile card file (#144).
+bool isProfileCardFile(String path) => looksLikeProfileCard(_small(path));
 
 /// The preview of a Sent Item: who sent it, with their Profile's picture
 /// and name, verified or not with its short code, whether it came

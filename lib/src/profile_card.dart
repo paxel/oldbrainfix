@@ -1,52 +1,80 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:qr/qr.dart';
 
+import 'announcements.dart';
+import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
-import 'profile_platform.dart';
+import 'profile.dart';
 import 'system_bars.dart';
 
-/// Profile cards on the phone (ADR 0017, #107): the own card sent as a
-/// link through the app the user picks or shown as a QR, and another
-/// person's card opened from a scan, a picture, a pasted link or a link
-/// tapped in another app.
+/// Profile cards on the phone (ADR 0017, #107, #144): the own card sent
+/// as a small file through the app the user picks or shown as a QR, and
+/// another person's card opened from a file, a scan, a picture or a
+/// pasted link.
 
-/// Shares the own Profile card through the app the user picks, the link
-/// last so nothing after it joins the card; [back] when it answers a card
-/// the user opened. Announces a failure when there is no card yet or no
-/// app takes it, why behind the tap; returns whether it was handed over.
+/// Shares the own Profile card as a file named after the own Profile
+/// through the app the user picks; [back] when it answers a card the
+/// user opened. Announces a failure when there is no card yet, no file
+/// could be written or no app takes it, why behind the tap; returns
+/// whether an app took it.
 Future<bool> sendProfileCard(
   BuildContext context,
-  Store store,
-  ProfilePlatform platform, {
+  Store store, {
   bool back = false,
 }) async {
   final t = context.t;
-  final link = store.profileCard(back: back);
-  if (link == null) {
+  final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final files = BundleScope.of(context);
+  void notSent(String cause, String fix, String details) => announceFailureWith(
+    announcements,
+    navigator,
+    t.profileCardNotSent,
+    title: t.profileCardNotSentTitle,
+    cause: cause,
+    fix: fix,
+    details: details,
+  );
+  final bytes = store.profileCardFile(back: back);
+  if (bytes == null) {
     _announceNoCard(context);
     return false;
   }
-  final shared = await platform.shareText(t.profileCardText(link));
-  if (!shared && context.mounted) {
-    announceFailure(
-      context,
-      t.profileCardNotSent,
-      title: t.profileCardNotSentTitle,
-      cause: t.profileCardNoApp,
-      fix: t.profileCardNoAppFix,
-      details: 'profile card: no app took the link',
+  final name = profileDisplayName(t, store.ownProfile?.name ?? '');
+  final path = await files.exportPath(profileCardFileName(name));
+  if (path == null) {
+    notSent(
+      t.profileCardNotWrittenCause,
+      t.nothingLostFix,
+      'profile card: no path to write the file to',
+    );
+    return false;
+  }
+  try {
+    File(path).writeAsBytesSync(bytes);
+  } on FileSystemException catch (e) {
+    notSent(t.profileCardNotWrittenCause, t.nothingLostFix, '$e');
+    return false;
+  }
+  final shared = await files.share(path, type: profileCardMimeType);
+  if (shared == ShareOutcome.noApp) {
+    notSent(
+      t.profileCardNoApp,
+      t.profileCardNoAppFix,
+      'profile card: no app took the file',
     );
   }
-  return shared;
+  return shared == ShareOutcome.taken;
 }
 
 /// Announces that no Profile card could be made yet, why behind the tap.
@@ -95,23 +123,10 @@ List<List<bool>>? profileCardQr(String link) {
   }
 }
 
-/// Opens the card in [text] and shows what it did: the person's Profile
-/// when they are in People now, with "Send yours back" when they were
-/// new here, else that nobody was added, why behind the tap. [inPerson]
-/// only for a QR the camera just scanned.
-Future<void> openCardText(
-  BuildContext context,
-  Store store,
-  String text, {
-  required bool inPerson,
-}) => showCardOpened(
-  context,
-  store.openProfileCard(text, inPerson: inPerson),
-  replace: false,
-);
-
-/// Shows what opening a card did ([openCardText]); with [replace] the
-/// person's Profile takes the place of the page it was opened on.
+/// Shows what opening a card did: the person's Profile when they are in
+/// People now, with "Send yours back" when they were new here, else that
+/// nobody was added, why behind the tap; with [replace] the person's
+/// Profile takes the place of the page it was opened on.
 Future<void> showCardOpened(
   BuildContext context,
   CardOpened opened, {

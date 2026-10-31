@@ -312,12 +312,7 @@ class _PersonScreenState extends State<PersonScreen> {
   /// Shares the own Profile card back, marked as the answer, so the two
   /// do not ask each other again; once handed over, the offer goes.
   Future<void> _sendBack() async {
-    final sent = await sendProfileCard(
-      context,
-      widget.store,
-      widget.platform,
-      back: true,
-    );
+    final sent = await sendProfileCard(context, widget.store, back: true);
     if (!mounted || !sent) return;
     setState(() => _offerBack = false);
   }

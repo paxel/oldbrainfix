@@ -4745,7 +4745,7 @@ abstract class AppLocalizations {
   /// Under 'Send my Profile'.
   ///
   /// In en, this message translates to:
-  /// **'As a link, through any messenger.'**
+  /// **'As a small file, through any messenger.'**
   String get profileCardSendDetail;
 
   /// On the Profile page: shows the own Profile card as a QR code.
@@ -4775,7 +4775,7 @@ abstract class AppLocalizations {
   /// The cause in the dialog behind 'profileCardNotSent': no app took the shared Profile card.
   ///
   /// In en, this message translates to:
-  /// **'No app here can take the link.'**
+  /// **'No app here can take the file.'**
   String get profileCardNoApp;
 
   /// Title of the page showing the own Profile card as a QR code.
@@ -4811,7 +4811,7 @@ abstract class AppLocalizations {
   /// At the top of the 'Add a person' page.
   ///
   /// In en, this message translates to:
-  /// **'Ask the person for their Profile: as a link through a messenger, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.'**
+  /// **'Ask the person for their Profile: as a file through a messenger, which opens in Old Brain Fix, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.'**
   String get personAddIntro;
 
   /// Takes a photo of the other person's Profile QR with the camera.
@@ -6008,6 +6008,12 @@ abstract class AppLocalizations {
   /// **'Profile card not sent'**
   String get profileCardNotSentTitle;
 
+  /// The cause in the dialog behind 'profileCardNotSent': the card file could not be written before sharing.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for your Profile card could not be written.'**
+  String get profileCardNotWrittenCause;
+
   /// The fix in the dialog behind 'profileCardNotSent'.
   ///
   /// In en, this message translates to:
@@ -6044,10 +6050,10 @@ abstract class AppLocalizations {
   /// **'This is not a Profile card, or it was changed on the way.'**
   String get cardUnreadableCause;
 
-  /// The fix in the dialog when an opened text is no Profile card.
+  /// The fix in the dialog when an opened file or text is no Profile card.
   ///
   /// In en, this message translates to:
-  /// **'Ask for the link again.'**
+  /// **'Ask the person to send their Profile again.'**
   String get cardAskAgainFix;
 
   /// Announced when no QR code is found in a photo or picture; the tap opens the dialog with the cause and the fix.
@@ -6065,7 +6071,7 @@ abstract class AppLocalizations {
   /// The fix in the dialog behind 'cardNotRead'.
   ///
   /// In en, this message translates to:
-  /// **'Try a picture taken a little closer, or ask for the link.'**
+  /// **'Try a picture taken a little closer, or ask the person to send their Profile.'**
   String get cardNoQrFix;
 
   /// The fix in a failure dialog when something comes from a person the user blocked.

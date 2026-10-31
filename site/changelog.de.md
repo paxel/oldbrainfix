@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.3.0]
 
+### Geändert
+
+- Auf dem Telefon schicken „Mein Profil senden“ und „Deins zurückschicken“ die Profilkarte als kleine Datei mit dem Bild, etwa `Ann.obfcard`, statt als Link, und eine Kartendatei, die in einem Messenger, in der App „Dateien“ oder bei den Downloads angetippt wird, öffnet sich in der App und fügt die Person nach denselben Regeln hinzu; Kartenlinks öffnen die App nicht mehr, und der QR-Code und eingefügte Links funktionieren wie bisher.
+
 ### Behoben
 
 - Im Zwei-Zeilen-Editor des Telefons zeigt die Zeile über der Tastatur die Zeile mit dem Cursor von ihrem Anfang an, den Cursor direkt hinter dem Text davor, und rückt nur dann seitwärts weiter, wenn die Zeile breiter ist als der Platz über der Tastatur, damit der Cursor sichtbar bleibt.

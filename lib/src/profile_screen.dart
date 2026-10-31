@@ -276,9 +276,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       leading: const Icon(Icons.share_outlined),
                       title: Text(t.profileCardSend),
                       subtitle: Text(t.profileCardSendDetail),
-                      onTap: () => unawaited(
-                        sendProfileCard(context, widget.store, model.platform),
-                      ),
+                      onTap: () =>
+                          unawaited(sendProfileCard(context, widget.store)),
                     ),
                     ListTile(
                       key: const ValueKey('showProfileQr'),

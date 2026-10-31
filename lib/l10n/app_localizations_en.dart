@@ -2942,7 +2942,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileCardSend => 'Send my Profile';
 
   @override
-  String get profileCardSendDetail => 'As a link, through any messenger.';
+  String get profileCardSendDetail => 'As a small file, through any messenger.';
 
   @override
   String get profileCardShowQr => 'Show my QR';
@@ -2960,7 +2960,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Sync with your other Device first, then try again.';
 
   @override
-  String get profileCardNoApp => 'No app here can take the link.';
+  String get profileCardNoApp => 'No app here can take the file.';
 
   @override
   String get profileQrTitle => 'My Profile QR';
@@ -2981,7 +2981,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personAddIntro =>
-      'Ask the person for their Profile: as a link through a messenger, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.';
+      'Ask the person for their Profile: as a file through a messenger, which opens in Old Brain Fix, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.';
 
   @override
   String get personAddScan => 'Scan their QR';
@@ -3694,6 +3694,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileCardNotSentTitle => 'Profile card not sent';
 
   @override
+  String get profileCardNotWrittenCause =>
+      'The file for your Profile card could not be written.';
+
+  @override
   String get profileCardNoAppFix =>
       'Show your QR for them to scan instead, or install a messenger and send it again.';
 
@@ -3715,7 +3719,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is not a Profile card, or it was changed on the way.';
 
   @override
-  String get cardAskAgainFix => 'Ask for the link again.';
+  String get cardAskAgainFix => 'Ask the person to send their Profile again.';
 
   @override
   String get cardNotRead => 'The picture could not be read.';
@@ -3725,7 +3729,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cardNoQrFix =>
-      'Try a picture taken a little closer, or ask for the link.';
+      'Try a picture taken a little closer, or ask the person to send their Profile.';
 
   @override
   String get blockedFix =>

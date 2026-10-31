@@ -129,13 +129,14 @@
                 <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>
-        <!-- Sync bundles (ADR 0003) and Sent Items (ADR 0009) opened with
-             the app or shared to it from a messenger or a file manager.
+        <!-- Sync bundles (ADR 0003), Sent Items (ADR 0009) and Profile
+             card files (#144) opened with the app or shared to it from a
+             messenger or a file manager.
              Messengers rarely keep their own types, so files and zips are
              taken too; the app tells them apart by what is in them, and
-             one that is neither is announced as such. It only copies the
-             file and hands over to MainActivity, which imports a bundle
-             and shows a Sent Item's preview. -->
+             one that is none of them is announced as such. It only copies
+             the file and hands over to MainActivity, which imports a
+             bundle, shows a Sent Item's preview and opens a card. -->
         <activity
             android:name=".BundleActivity"
             android:exported="true"
@@ -149,29 +150,10 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.oldbrainfix.sync" />
                 <data android:mimeType="application/vnd.oldbrainfix.item" />
+                <data android:mimeType="application/vnd.oldbrainfix.card" />
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="application/zip" />
                 <data android:mimeType="application/x-zip-compressed" />
-            </intent-filter>
-        </activity>
-        <!-- Profile card links (#107), https://paxel.github.io/oldbrainfix/p
-             with the card after the #, opened with the app as an App Link.
-             The path is exact, so the site's other pages stay in the
-             browser. It only hands the link over to MainActivity, which
-             opens the card. -->
-        <activity
-            android:name=".CardActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" />
-                <data android:host="paxel.github.io" />
-                <data android:path="/oldbrainfix/p" />
             </intent-filter>
         </activity>
         <!-- Voice, text and photo Capture for app shortcuts and

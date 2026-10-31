@@ -2974,7 +2974,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileCardSendDetail =>
-      'Als Link, über einen beliebigen Messenger.';
+      'Als kleine Datei, über einen beliebigen Messenger.';
 
   @override
   String get profileCardShowQr => 'Meinen QR-Code zeigen';
@@ -2992,7 +2992,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Synchronisiere zuerst mit deinem anderen Gerät und versuche es dann noch einmal.';
 
   @override
-  String get profileCardNoApp => 'Keine App hier kann den Link annehmen.';
+  String get profileCardNoApp => 'Keine App hier kann die Datei annehmen.';
 
   @override
   String get profileQrTitle => 'Mein Profil als QR-Code';
@@ -3013,7 +3013,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get personAddIntro =>
-      'Bitte die Person um ihr Profil: als Link über einen Messenger oder als QR-Code auf ihrem Handy neben dir. Ein vor Ort gescannter QR-Code bestätigt sie sofort.';
+      'Bitte die Person um ihr Profil: als Datei über einen Messenger, die sich in Old Brain Fix öffnet, oder als QR-Code auf ihrem Handy neben dir. Ein vor Ort gescannter QR-Code bestätigt sie sofort.';
 
   @override
   String get personAddScan => 'QR-Code der Person scannen';
@@ -3733,6 +3733,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileCardNotSentTitle => 'Profilkarte nicht gesendet';
 
   @override
+  String get profileCardNotWrittenCause =>
+      'Die Datei für deine Profilkarte konnte nicht geschrieben werden.';
+
+  @override
   String get profileCardNoAppFix =>
       'Zeig stattdessen deinen QR-Code zum Scannen, oder installiere einen Messenger und sende sie noch einmal.';
 
@@ -3755,7 +3759,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Das ist keine Profilkarte, oder sie wurde unterwegs verändert.';
 
   @override
-  String get cardAskAgainFix => 'Lass dir den Link noch einmal schicken.';
+  String get cardAskAgainFix =>
+      'Bitte die Person, dir ihr Profil noch einmal zu schicken.';
 
   @override
   String get cardNotRead => 'Das Bild konnte nicht gelesen werden.';
@@ -3765,7 +3770,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cardNoQrFix =>
-      'Versuch es mit einem Bild aus etwas größerer Nähe oder lass dir den Link schicken.';
+      'Versuch es mit einem Bild aus etwas größerer Nähe oder bitte die Person, dir ihr Profil zu schicken.';
 
   @override
   String get blockedFix =>

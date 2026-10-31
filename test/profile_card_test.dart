@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,8 +13,10 @@ import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/profile_screen.dart';
+import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
 import 'fake_lock.dart';
 import 'fake_photos.dart';
@@ -40,6 +44,8 @@ void main() {
   late FakeProfilePlatform platform;
   late FakePhotos photos;
   late FakePairing pairing;
+  late Directory dir;
+  late FakeBundles bundles;
 
   setUp(() {
     store = Store.inMemory()
@@ -55,11 +61,26 @@ void main() {
       ],
     );
     pairing = FakePairing();
+    dir = Directory.systemTemp.createTempSync('profile_card_');
+    bundles = FakeBundles(dir);
   });
   tearDown(() {
     store.close();
     ann.close();
+    dir.deleteSync(recursive: true);
   });
+
+  /// [bytes] as the copy the platform makes of a file opened with the
+  /// app, which never keeps the file's own name.
+  var copies = 0;
+  String copyOf(List<int> bytes) {
+    final path = '${dir.path}/in-${copies++}.obfsync';
+    File(path).writeAsBytesSync(bytes);
+    return path;
+  }
+
+  /// The bytes of the one file shared.
+  List<int> sharedBytes() => File(bundles.shared.single).readAsBytesSync();
 
   String annId() => ann.ownProfile!.id;
 
@@ -74,6 +95,7 @@ void main() {
         profile: platform,
         photos: photos,
         pairing: pairing,
+        bundles: bundles,
         lock: lock ?? const NoBiometrics(),
       ),
     );
@@ -121,35 +143,51 @@ void main() {
       tester.widget<PersonScreen>(find.byType(PersonScreen));
 
   group('the own card', () {
-    testWidgets('"Send my Profile" shares the link last, nothing after it', (
-      tester,
-    ) async {
+    testWidgets('"Send my Profile" shares a card file named after the '
+        'Profile, with the picture', (tester) async {
+      store.setOwnProfilePicture(squareProfilePicture(halvesPng)!);
       await start(tester);
       await openProfilePage(tester);
       await tap(tester, find.byKey(const ValueKey('sendProfile')));
-      expect(platform.shared, hasLength(1));
-      final shared = platform.shared.single;
-      expect(shared, endsWith(store.profileCard()!));
-      expect(shared, startsWith('My Profile for Old Brain Fix:\n'));
-      expect(ann.openProfileCard(shared).taken, CardTaken.added);
+      expect(bundles.shared.single, '${dir.path}/Ben.obfcard');
+      expect(bundles.types.single, profileCardMimeType);
+      final bytes = sharedBytes();
+      expect(bytes, store.profileCardFile());
+      expect(looksLikeProfileCard(bytes), isTrue);
+      final opened = ann.openProfileCardFile(bytes);
+      expect(opened.taken, CardTaken.added);
+      expect(ann.personVerified(opened.id!), isFalse);
+      expect(ann.personShown(opened.id!).picture, isNotNull);
+      expect(find.text('Your Profile card was not sent.'), findsNothing);
     });
 
     testWidgets('no app to take it is announced, why and what to do '
         'behind the tap', (tester) async {
-      platform.shares = false;
+      bundles.shares = false;
       await start(tester);
       await openProfilePage(tester);
       await tap(tester, find.byKey(const ValueKey('sendProfile')));
-      expect(find.text('No app here can take the link.'), findsNothing);
+      expect(find.text('No app here can take the file.'), findsNothing);
       await expectFailure(
         tester,
         'Your Profile card was not sent.',
         title: 'Profile card not sent',
-        cause: 'No app here can take the link.',
+        cause: 'No app here can take the file.',
         fix:
             'Show your QR for them to scan instead, or install a messenger '
             'and send it again.',
       );
+    });
+
+    testWidgets('the share sheet left without an app says nothing', (
+      tester,
+    ) async {
+      bundles.dismisses = true;
+      await start(tester);
+      await openProfilePage(tester);
+      await tap(tester, find.byKey(const ValueKey('sendProfile')));
+      expect(bundles.shared, hasLength(1));
+      expect(find.text('Your Profile card was not sent.'), findsNothing);
     });
 
     testWidgets('"Show my QR" shows the link as a QR that holds it', (
@@ -206,17 +244,16 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: TextButton(
-                onPressed: () => sendProfileCard(context, store, platform),
+                onPressed: () => sendProfileCard(context, store),
                 child: const Text('send'),
               ),
             ),
           ),
         ),
       );
-      expect(store.profileCard(), isNull);
+      expect(store.profileCardFile(), isNull);
       await tester.tap(find.text('send'));
       await tester.pumpAndSettle();
-      expect(platform.shared, isEmpty);
       expect(announcements.visible, 'Your Profile card could not be made.');
       await tester.tap(find.text('Your Profile card could not be made.'));
       await tester.pumpAndSettle();
@@ -235,7 +272,7 @@ void main() {
 
   group('adding a person', () {
     testWidgets('a pasted link adds them, not verified, and offers "Send '
-        'yours back", which shares the answer', (tester) async {
+        'yours back", which shares the answer as a file', (tester) async {
       await start(tester);
       await openAddPerson(tester);
       await paste(tester, 'Here: ${ann.profileCard()!}');
@@ -249,12 +286,26 @@ void main() {
       );
       expect(find.byKey(const ValueKey('compare-codes')), findsOneWidget);
       await tap(tester, find.byKey(const ValueKey('send-back')));
-      expect(platform.shared.single, endsWith(store.profileCard(back: true)!));
+      expect(bundles.shared.single, '${dir.path}/Ben.obfcard');
+      expect(bundles.types.single, profileCardMimeType);
+      expect(sharedBytes(), store.profileCardFile(back: true));
       expect(find.byKey(const ValueKey('send-back')), findsNothing);
       // The answer adds Ben on Ann's side and asks nothing back.
-      final back = ann.openProfileCard(platform.shared.single);
+      final back = ann.openProfileCardFile(sharedBytes());
       expect(back.taken, CardTaken.added);
       expect(back.offerBack, isFalse);
+    });
+
+    testWidgets('"Send yours back" stays offered while no app took it', (
+      tester,
+    ) async {
+      bundles.dismisses = true;
+      await start(tester);
+      await openAddPerson(tester);
+      await paste(tester, ann.profileCard()!);
+      await tap(tester, find.byKey(const ValueKey('send-back')));
+      expect(bundles.shared, hasLength(1));
+      expect(find.byKey(const ValueKey('send-back')), findsOneWidget);
     });
 
     testWidgets('a QR scanned with the camera adds them verified', (
@@ -289,7 +340,9 @@ void main() {
         'The picture could not be read.',
         title: 'No QR code found',
         cause: 'No QR code was found in the picture.',
-        fix: 'Try a picture taken a little closer, or ask for the link.',
+        fix:
+            'Try a picture taken a little closer, or ask the person to send '
+            'their Profile.',
       );
       expect(find.byType(AddPersonScreen), findsOneWidget);
     });
@@ -395,33 +448,87 @@ void main() {
     });
   });
 
-  group('a link tapped in another app', () {
-    testWidgets('opens the person\'s Profile, not verified', (tester) async {
+  group('a card file opened from another app', () {
+    testWidgets('opens the person\'s Profile, not verified, with the '
+        'picture, and the copy goes', (tester) async {
+      ann.setOwnProfilePicture(squareProfilePicture(halvesPng)!);
       await start(tester);
-      platform.tapCard(ann.profileCard()!);
+      final path = copyOf(ann.profileCardFile()!);
+      bundles.open(path);
       await tester.pumpAndSettle();
       expect(shownPerson(tester).id, annId());
       expect(shownPerson(tester).offerBack, isTrue);
       expect(store.personVerified(annId()), isFalse);
+      expect(store.personShown(annId()).picture, isNotNull);
+      expect(File(path).existsSync(), isFalse);
+    });
+
+    testWidgets('is asked for before a Sent Item and a bundle', (tester) async {
+      final bytes = ann.profileCardFile()!;
+      // A card file is JSON as a Sent Item is.
+      expect(looksLikeSentItem(bytes), isTrue);
+      await start(tester);
+      bundles.open(copyOf(bytes));
+      await tester.pumpAndSettle();
+      expect(find.byType(PersonScreen), findsOneWidget);
+      expect(find.byType(SentItemScreen), findsNothing);
+      expect(find.byType(HeldSentItemScreen), findsNothing);
+      expect(find.text('The bundle was not imported.'), findsNothing);
+      expect(find.text('Nobody was added from the card.'), findsNothing);
     });
 
     testWidgets('that started the app opens once it shows', (tester) async {
-      platform.tappedBefore(ann.profileCard()!);
+      bundles.waiting.add(copyOf(ann.profileCardFile()!));
       await start(tester);
       expect(shownPerson(tester).id, annId());
     });
 
-    testWidgets('that is no card says so', (tester) async {
+    testWidgets('one of a newer version says to update', (tester) async {
       await start(tester);
-      platform.tapCard('$profileCardLink.');
+      bundles.open(
+        copyOf(
+          utf8.encode('{"card":"x.y","format":2,"type":"oldbrainfix-card"}'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This file comes from a newer Old Brain Fix.',
+        fix: 'Update Old Brain Fix on this Device, then open it again.',
+      );
+      expect(find.byType(PersonScreen), findsNothing);
+    });
+
+    testWidgets('one that is no card says so', (tester) async {
+      await start(tester);
+      final card = utf8.decode(ann.profileCardFile()!);
+      bundles.open(copyOf(utf8.encode(card.replaceFirst('.', '.AAAA'))));
       await tester.pumpAndSettle();
       await expectFailure(
         tester,
         'Nobody was added from the card.',
         title: 'Nobody added',
         cause: 'This is not a Profile card, or it was changed on the way.',
-        fix: 'Ask for the link again.',
+        fix: 'Ask the person to send their Profile again.',
       );
+      expect(store.peopleShown, isEmpty);
+    });
+
+    testWidgets('the own one adds nothing and says so', (tester) async {
+      await start(tester);
+      bundles.open(copyOf(store.profileCardFile()!));
+      await tester.pumpAndSettle();
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This is your own Profile card.',
+        fix: 'To add someone, open their card, not yours.',
+      );
+      expect(find.byType(PersonScreen), findsNothing);
+      expect(store.peopleShown, isEmpty);
     });
 
     testWidgets('waits for the first start to make the own Profile', (
@@ -429,7 +536,7 @@ void main() {
     ) async {
       store.close();
       store = Store.inMemory();
-      platform.tappedBefore(ann.profileCard()!);
+      bundles.waiting.add(copyOf(ann.profileCardFile()!));
       await start(tester);
       expect(find.byType(FirstStartScreen), findsOneWidget);
       expect(find.byType(PersonScreen), findsNothing);
@@ -446,7 +553,7 @@ void main() {
         ..setPin('2468', iterations: 10)
         ..appLockOn = true;
       await start(tester, lock: FakeBiometrics(can: false));
-      platform.tapCard(ann.profileCard()!);
+      bundles.open(copyOf(ann.profileCardFile()!));
       await tester.pumpAndSettle();
       expect(find.byType(PersonScreen), findsNothing);
       expect(store.peopleShown, isEmpty);

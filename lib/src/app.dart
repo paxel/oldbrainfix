@@ -38,7 +38,6 @@ import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
-import 'profile_card.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
@@ -513,23 +512,16 @@ class _HomeState extends State<_Home> {
 
   late final StreamSubscription<void> _bundlesOpened;
 
-  /// Sent Items other apps opened with this one while it was locked.
+  /// Sent Items and Profile card files other apps opened with this one
+  /// while it was locked, and card files opened before the first start
+  /// made the own Profile.
   final _openedWaiting = <String>[];
-
-  late final StreamSubscription<void> _cardsOpened;
-
-  /// Profile card links tapped in other apps while the app was locked,
-  /// or before the first start made the own Profile.
-  final _cardsWaiting = <String>[];
 
   @override
   void initState() {
     super.initState();
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
-    );
-    _cardsOpened = widget.profile.platform.cardOpened.listen(
-      (_) => unawaited(_openCards()),
     );
     widget.profile.addListener(_profileMade);
     widget.alarms.addListener(_ringChanged);
@@ -545,10 +537,8 @@ class _HomeState extends State<_Home> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       widget.autoSync.shown();
-      // A bundle that opened the app.
+      // A bundle, Sent Item or Profile card file that opened the app.
       unawaited(_importOpened());
-      // A Profile card link that opened the app.
-      unawaited(_openCards());
       unawaited(_autoBackupStart());
     });
     // Back from the background, or from a settings page: apply what was
@@ -653,7 +643,6 @@ class _HomeState extends State<_Home> {
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
     unawaited(_bundlesOpened.cancel());
-    unawaited(_cardsOpened.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
     super.dispose();
@@ -662,7 +651,10 @@ class _HomeState extends State<_Home> {
   /// Imports the bundles other apps opened with this one, announcing
   /// what each brought; Conflicts as an automatic sync's, not past the
   /// App Lock. A Sent Item among them opens its preview, behind the App
-  /// Lock once it is unlocked.
+  /// Lock once it is unlocked. A Profile card file (#144) opens the
+  /// person's Profile, which is browsing, so it waits for the unlock as
+  /// well; nor before the first start made the own Profile, so nothing is
+  /// kept before the user chose to restore or add a Device of theirs.
   Future<void> _importOpened() async {
     _openedWaiting.addAll(await widget.bundles.takeOpened());
     final paths = [..._openedWaiting];
@@ -670,8 +662,10 @@ class _HomeState extends State<_Home> {
     var conflicts = 0;
     for (final path in paths) {
       if (!mounted) return;
-      // A Sent Item shows what is in it: not past the App Lock.
-      if (widget.lock.locked && isSentItemFile(path)) {
+      final card = isProfileCardFile(path);
+      // A Sent Item or a card shows what is in it: not past the App Lock.
+      if ((widget.lock.locked && (card || isSentItemFile(path))) ||
+          (card && widget.profile.profile == null)) {
         _openedWaiting.add(path);
         continue;
       }
@@ -685,29 +679,11 @@ class _HomeState extends State<_Home> {
     _announceConflicts();
   }
 
-  /// Opens the Profile card links tapped in other apps (#107), each
-  /// showing the person's Profile or why nothing was added; a person's
-  /// Profile is browsing, so not past the App Lock: they wait for the
-  /// unlock. Nor before the first start made the own Profile, so nothing
-  /// is kept before the user chose to restore or add a Device of theirs.
-  Future<void> _openCards() async {
-    _cardsWaiting.addAll(await widget.profile.platform.takeCards());
-    if (!mounted || widget.lock.locked || widget.profile.profile == null) {
-      return;
-    }
-    final links = [..._cardsWaiting];
-    _cardsWaiting.clear();
-    for (final link in links) {
-      if (!mounted) return;
-      await openCardText(context, widget.store, link, inPerson: false);
-    }
-  }
-
-  /// The first start made the own Profile: the card links that waited
+  /// The first start made the own Profile: the card files that waited
   /// for it open.
   void _profileMade() {
-    if (_cardsWaiting.isEmpty || widget.profile.profile == null) return;
-    unawaited(_openCards());
+    if (_openedWaiting.isEmpty || widget.profile.profile == null) return;
+    unawaited(_importOpened());
   }
 
   /// Opens the full-screen alarm when one starts ringing, and closes it
@@ -746,7 +722,6 @@ class _HomeState extends State<_Home> {
     if (_changesWaiting) unawaited(_sendWaitingChanges());
     if (_conflictsWaiting) _announceConflicts();
     if (_openedWaiting.isNotEmpty) unawaited(_importOpened());
-    if (_cardsWaiting.isNotEmpty) unawaited(_openCards());
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));

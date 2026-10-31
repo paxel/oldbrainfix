@@ -181,17 +181,6 @@ test("the repository's own site builds and links, generated pages included", () 
   assert.match(policy, /There is no server, no account and no analytics/);
   const de = fs.readFileSync(path.join(out, "de", "reference", "privacy-policy.html"), "utf8");
   assert.match(de, /Es gibt keinen Server, kein Konto und keine Analyse/);
-  // Profile card links (#107): p at the root goes on to the card page in the browser's
-  // language with the card after the #, and the page reads the card in the browser only.
-  for (const lang of ["en", "de"]) {
-    assert.ok(fs.existsSync(path.join(out, lang, "reference", "profile-card.html")), `${lang}/profile-card`);
-  }
-  const card = fs.readFileSync(path.join(out, "p.html"), "utf8");
-  assert.match(card, /location\.replace\(l\+"\/reference\/profile-card\.html"\+location\.hash\)/);
-  assert.match(card, /href="en\/reference\/profile-card\.html"/);
-  const cardPage = fs.readFileSync(path.join(out, "en", "reference", "profile-card.html"), "utf8");
-  assert.match(cardPage, /<div id="profile-card" hidden>/);
-  assert.match(cardPage, /<textarea id="profile-card-text"/);
   // Every term of CONTEXT.md is on both glossary pages, the German one in German.
   const glossary = fs.readFileSync(path.join(out, "en", "reference", "glossary.html"), "utf8");
   assert.match(glossary, /<dt id="recovery-sheet">Recovery Sheet<\/dt>/);
