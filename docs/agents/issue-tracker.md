@@ -11,6 +11,12 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
+## Ticket body
+
+Every ticket's "Everywhere" section names what each change must reach besides its screen. It always holds this line:
+
+- AI port tools (read and set up) for anything new: a new kind, field or setting gets its tools in `desktop/crates/oldbrainfix-core/src/ai_tools.rs` (ADR 0026), and the user's own data (entries, ticks, check-offs, picks) stays read-only there.
+
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
 ## Pull requests as a triage surface
