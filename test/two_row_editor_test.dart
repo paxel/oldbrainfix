@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
@@ -71,6 +72,38 @@ void main() {
     await finger.up();
     await tester.pumpAndSettle();
   }
+
+  String shownOf(WidgetTester tester, String key) => tester
+      .widget<RichText>(
+        find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.byType(RichText),
+        ),
+      )
+      .text
+      .toPlainText();
+
+  /// Where the caret before [offset] of the bottom row's text [key] is
+  /// drawn, on screen: where its letters are, not its box.
+  double edge(WidgetTester tester, String key, int offset) {
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(RichText),
+      ),
+    );
+    final caret = paragraph.getOffsetForCaret(
+      TextPosition(offset: offset),
+      Rect.zero,
+    );
+    return paragraph.localToGlobal(caret).dx;
+  }
+
+  final cursor = find.byKey(const ValueKey('two-row-cursor'));
+  double cursorLeft(WidgetTester tester) => tester.getTopLeft(cursor).dx;
+  double cursorRight(WidgetTester tester) => tester.getTopRight(cursor).dx;
+  double lineLeft(WidgetTester tester) => tester.getTopLeft(line).dx;
+  double lineRight(WidgetTester tester) => tester.getTopRight(line).dx;
 
   TextSelection selectionOf(TextEditingController controller) =>
       controller.selection;
@@ -167,6 +200,107 @@ void main() {
       await tester.pump();
       expect(shown('two-row-before'), 'one,');
       expect(shown('two-row-after'), ' two');
+    });
+
+    testWidgets('a short line reads from its start, the text before the '
+        'cursor ending right at it', (tester) async {
+      final controller = await pumpField(tester, text: 'Halloween');
+      await openKeyboard(tester);
+      controller.selection = const TextSelection.collapsed(offset: 6);
+      await tester.pump();
+
+      expect(
+        edge(tester, 'two-row-before', 6),
+        closeTo(cursorLeft(tester), 0.5),
+      );
+      expect(edge(tester, 'two-row-before', 0), closeTo(lineLeft(tester), 0.5));
+      expect(
+        edge(tester, 'two-row-after', 0),
+        closeTo(cursorRight(tester), 0.5),
+      );
+    });
+
+    testWidgets('◀ and ▶ move the cursor, not the letters', (tester) async {
+      final controller = await pumpField(tester, text: 'Halloween');
+      await openKeyboard(tester);
+      controller.selection = const TextSelection.collapsed(offset: 6);
+      await tester.pump();
+      final start = edge(tester, 'two-row-before', 0);
+      final cursor = cursorLeft(tester);
+
+      await press(tester, back);
+      expect(edge(tester, 'two-row-before', 0), closeTo(start, 0.5));
+      expect(cursorLeft(tester), lessThan(cursor - 4));
+      expect(
+        edge(tester, 'two-row-before', 5),
+        closeTo(cursorLeft(tester), 0.5),
+      );
+
+      await press(tester, forward);
+      await press(tester, forward);
+      expect(controller.selection.baseOffset, 7);
+      expect(edge(tester, 'two-row-before', 0), closeTo(start, 0.5));
+      expect(cursorLeft(tester), greaterThan(cursor + 4));
+      expect(
+        edge(tester, 'two-row-before', 7),
+        closeTo(cursorLeft(tester), 0.5),
+      );
+    });
+
+    testWidgets('a line wider than the row scrolls to keep the cursor in '
+        'view, and only then', (tester) async {
+      final words = List.filled(30, 'word').join(' ');
+      final controller = await pumpField(tester, text: words);
+      await openKeyboard(tester);
+      controller.selection = TextSelection.collapsed(offset: words.length);
+      await tester.pump();
+      // At the end the line is scrolled: its end at the row's end.
+      expect(cursorRight(tester), closeTo(lineRight(tester), 0.5));
+      expect(edge(tester, 'two-row-before', 0), lessThan(lineLeft(tester)));
+      expect(
+        edge(tester, 'two-row-before', words.length),
+        closeTo(cursorLeft(tester), 0.5),
+      );
+
+      // Inside the row the cursor moves and the letters stay.
+      final scrolled = edge(tester, 'two-row-before', 0);
+      await press(tester, back);
+      await press(tester, back);
+      expect(edge(tester, 'two-row-before', 0), closeTo(scrolled, 0.5));
+      expect(cursorRight(tester), lessThan(lineRight(tester)));
+
+      // At the start the line reads from its start again.
+      controller.selection = const TextSelection.collapsed(offset: 0);
+      await tester.pump();
+      expect(cursorLeft(tester), closeTo(lineLeft(tester), 0.5));
+      expect(
+        edge(tester, 'two-row-after', 0),
+        closeTo(cursorRight(tester), 0.5),
+      );
+
+      // Stepping on scrolls only when the cursor reaches the row's end.
+      await press(tester, forward);
+      expect(cursorLeft(tester), greaterThan(lineLeft(tester)));
+      expect(edge(tester, 'two-row-before', 0), closeTo(lineLeft(tester), 0.5));
+      for (var i = 0; i < 120; i++) {
+        await press(tester, forward);
+        expect(
+          cursorLeft(tester),
+          greaterThanOrEqualTo(lineLeft(tester) - 0.5),
+        );
+        expect(cursorRight(tester), lessThanOrEqualTo(lineRight(tester) + 0.5));
+      }
+      expect(edge(tester, 'two-row-before', 0), lessThan(lineLeft(tester)));
+    });
+
+    testWidgets('shows only the cursor\'s line', (tester) async {
+      final controller = await pumpField(tester, text: 'first\nsecond');
+      await openKeyboard(tester);
+      controller.selection = const TextSelection.collapsed(offset: 9);
+      await tester.pump();
+      expect(shownOf(tester, 'two-row-before'), 'sec');
+      expect(shownOf(tester, 'two-row-after'), 'ond');
+      expect(edge(tester, 'two-row-before', 0), closeTo(lineLeft(tester), 0.5));
     });
 
     testWidgets('repeats while held, faster the longer it is held', (

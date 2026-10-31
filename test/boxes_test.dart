@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -375,6 +376,57 @@ void main() {
       ].join();
       expect(withoutIds(shown), contains('✅ Book'));
       expect(shown, isNot(contains('☐')));
+    });
+
+    testWidgets('the row above the keyboard reads a line with a box from '
+        'its start, the cursor right after the box and its id', (tester) async {
+      notes.capture('Plan\n☐ Book');
+      await startAtNotes(tester);
+      await openEditor(tester);
+      await showKeyboard(tester);
+      final controller = field(tester);
+      final box = TextBoxes.find(controller.text).single;
+      controller.selection = TextSelection.collapsed(offset: box.end);
+      await tester.pumpAndSettle();
+      double edge(String of, int offset) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: key(of), matching: find.byType(RichText)),
+        );
+        final caret = paragraph.getOffsetForCaret(
+          TextPosition(offset: offset),
+          Rect.zero,
+        );
+        return paragraph.localToGlobal(caret).dx;
+      }
+
+      String shown(String of) => tester
+          .widget<RichText>(
+            find.descendant(of: key(of), matching: find.byType(RichText)),
+          )
+          .text
+          .toPlainText();
+      final cursor = key('two-row-cursor');
+      final start = tester.getTopLeft(key('two-row-line')).dx;
+      expect(withoutIds(shown('two-row-before')), '☐');
+      expect(shown('two-row-after'), ' Book');
+      expect(edge('two-row-before', 0), closeTo(start, 0.5));
+      final before = shown('two-row-before').length;
+      expect(
+        edge('two-row-before', before),
+        closeTo(tester.getTopLeft(cursor).dx, 0.5),
+      );
+
+      // ◀ steps over the box and its id at once; the letters stay.
+      final was = tester.getTopLeft(cursor).dx;
+      await tester.tap(key('two-row-back'));
+      await tester.pumpAndSettle();
+      expect(controller.selection.baseOffset, box.start);
+      expect(tester.getTopLeft(cursor).dx, closeTo(start, 0.5));
+      expect(tester.getTopLeft(cursor).dx, lessThan(was));
+      expect(
+        edge('two-row-after', 0),
+        closeTo(tester.getTopRight(cursor).dx, 0.5),
+      );
     });
 
     testWidgets('the system\'s text field, with two rows off, ticks them '

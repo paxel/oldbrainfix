@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
@@ -79,8 +79,8 @@ int wordEdgeNear(String text, int offset) {
 /// The text field of the Note editor and of Amend on the phone: the whole
 /// text on top, as a system text field without magnifier and without
 /// dragging the cursor, whose tap puts the cursor at the nearest word
-/// boundary, and, while the keyboard is open, one line of the text around
-/// the cursor directly above it, with ◀ and ▶ stepping the cursor one
+/// boundary, and, while the keyboard is open, the cursor's line directly
+/// above it, as a text field shows it, with ◀ and ▶ stepping the cursor one
 /// character at a time (UI laws, "Text editor"). [twoRows] false gives the
 /// plain system text field.
 ///
@@ -102,7 +102,7 @@ int wordEdgeNear(String text, int offset) {
 /// first format makes a plain text formatted for good, and so do a
 /// format typed as Markdown (`Markdown.shortcutAt`) and a pasted text
 /// that uses one; [onFormatted] runs then. In two rows, the bottom row
-/// of a formatted text shows the source of the cursor's line only.
+/// of a formatted text shows the source of the cursor's line.
 ///
 /// With [lineFormats], the bar also has the formats of whole lines and
 /// the table button, which puts a new table at the cursor or opens the
@@ -122,9 +122,6 @@ class TwoRowTextField extends StatefulWidget {
   /// to [fastestRepeat].
   static const firstRepeat = Duration(milliseconds: 160);
   static const fastestRepeat = Duration(milliseconds: 30);
-
-  /// How many characters the bottom row shows on each side of the cursor.
-  static const reach = 13;
 
   final TextEditingController controller;
   final bool twoRows;
@@ -1052,8 +1049,6 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
                     final TagTextController controller => controller.boxes,
                     _ => null,
                   },
-                  // The source of the formatted line being typed.
-                  lineOnly: _formatting?.markdown ?? false,
                 ),
               ),
             ),
@@ -1431,8 +1426,9 @@ class _LinkDialogState extends State<_LinkDialog> {
   }
 }
 
-/// The text around the cursor on one line, the cursor in the middle and
-/// a selection highlighted; a long press starts or ends selecting.
+/// The cursor's line as a text field shows it: from its start, the
+/// cursor right after the text before it, a selection highlighted; a long
+/// press starts or ends selecting. Of a formatted text it is the source.
 class _CursorLine extends StatelessWidget {
   final TextEditingValue value;
   final bool selecting;
@@ -1441,18 +1437,14 @@ class _CursorLine extends StatelessWidget {
   /// The ticks of the text's boxes, each drawn in its state.
   final BoxTicking? boxes;
 
-  /// Whether it shows only the cursor's line, not across line breaks.
-  final bool lineOnly;
-
   const _CursorLine({
     required this.value,
     required this.selecting,
     required this.onLongPress,
     this.boxes,
-    this.lineOnly = false,
   });
 
-  /// [text] from [from] to [to] as one line, the selection highlighted.
+  /// [text] from [from] to [to], the selection highlighted.
   static List<TextSpan> _spans(
     String text,
     int from,
@@ -1460,11 +1452,7 @@ class _CursorLine extends StatelessWidget {
     TextSelection selection,
     TextStyle marked,
   ) {
-    String line(int a, int b) => text
-        .substring(a, b)
-        .replaceAll('\r\n', '↵')
-        .replaceAll('\n', '↵')
-        .replaceAll('\t', ' ');
+    String line(int a, int b) => text.substring(a, b).replaceAll('\t', ' ');
     final start = selection.start.clamp(from, to);
     final end = selection.end.clamp(from, to);
     return [
@@ -1485,25 +1473,15 @@ class _CursorLine extends StatelessWidget {
     final selection = value.selection.isValid
         ? value.selection
         : TextSelection.collapsed(offset: text.length);
-    final cursor = selection.extentOffset;
+    final cursor = math.min(selection.extentOffset, text.length);
+    bool breaks(int i) => text[i] == '\n' || text[i] == '\r';
     var from = cursor;
-    var to = cursor;
-    for (var i = 0; i < TwoRowTextField.reach; i++) {
-      from = graphemeBefore(text, from);
-      to = graphemeAfter(text, to);
+    while (from > 0 && !breaks(from - 1)) {
+      from--;
     }
-    if (lineOnly) {
-      bool breaks(int i) => text[i] == '\n' || text[i] == '\r';
-      var start = math.min(cursor, text.length);
-      while (start > from && !breaks(start - 1)) {
-        start--;
-      }
-      var end = math.min(cursor, text.length);
-      while (end < to && !breaks(end)) {
-        end++;
-      }
-      from = start;
-      to = end;
+    var to = cursor;
+    while (to < text.length && !breaks(to)) {
+      to++;
     }
     final style = theme.textTheme.titleMedium;
     final marked = TextStyle(
@@ -1526,22 +1504,14 @@ class _CursorLine extends StatelessWidget {
         key: const ValueKey('two-row-line'),
         behavior: HitTestBehavior.opaque,
         onLongPress: onLongPress,
-        child: Row(
+        child: _CursorStrip(
           children: [
-            Expanded(
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: AlignmentDirectional.centerEnd,
-                  maxWidth: double.infinity,
-                  child: Text.rich(
-                    TextSpan(children: before),
-                    key: const ValueKey('two-row-before'),
-                    style: style,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                ),
-              ),
+            Text.rich(
+              TextSpan(children: before),
+              key: const ValueKey('two-row-before'),
+              style: style,
+              maxLines: 1,
+              softWrap: false,
             ),
             Container(
               key: const ValueKey('two-row-cursor'),
@@ -1549,24 +1519,100 @@ class _CursorLine extends StatelessWidget {
               height: 28,
               color: scheme.primary,
             ),
-            Expanded(
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: AlignmentDirectional.centerStart,
-                  maxWidth: double.infinity,
-                  child: Text.rich(
-                    TextSpan(children: after),
-                    key: const ValueKey('two-row-after'),
-                    style: style,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                ),
-              ),
+            Text.rich(
+              TextSpan(children: after),
+              key: const ValueKey('two-row-after'),
+              style: style,
+              maxLines: 1,
+              softWrap: false,
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// The text before the cursor, the cursor and the text after it, side by
+/// side from the row's start. A line wider than the row scrolls sideways,
+/// only as far as keeps the cursor in view, so the letters stay where
+/// they are while the cursor moves among them.
+class _CursorStrip extends MultiChildRenderObjectWidget {
+  const _CursorStrip({required super.children});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderCursorStrip();
+}
+
+class _StripParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderCursorStrip extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _StripParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _StripParentData> {
+  /// How far the line is scrolled; kept from one layout to the next, as
+  /// a text field keeps it.
+  double _scroll = 0;
+
+  final _clip = LayerHandle<ClipRectLayer>();
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _StripParentData) {
+      child.parentData = _StripParentData();
+    }
+  }
+
+  @override
+  void performLayout() {
+    final children = getChildrenAsList();
+    final loose = BoxConstraints(maxHeight: constraints.maxHeight);
+    var width = 0.0;
+    var height = 0.0;
+    for (final child in children) {
+      child.layout(loose, parentUsesSize: true);
+      width += child.size.width;
+      height = math.max(height, child.size.height);
+    }
+    size = constraints.constrain(Size(double.infinity, height));
+    if (width <= size.width) {
+      _scroll = 0;
+    } else {
+      // The cursor is the second child: its edges stay inside the row.
+      final left = children.first.size.width;
+      final right = left + (children.length > 1 ? children[1].size.width : 0);
+      if (left < _scroll) _scroll = left;
+      if (right > _scroll + size.width) _scroll = right - size.width;
+      _scroll = _scroll.clamp(0, width - size.width);
+    }
+    var x = -_scroll;
+    for (final child in children) {
+      (child.parentData! as _StripParentData).offset = Offset(
+        x,
+        (size.height - child.size.height) / 2,
+      );
+      x += child.size.width;
+    }
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      defaultHitTestChildren(result, position: position);
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    _clip.layer = context.pushClipRect(
+      needsCompositing,
+      offset,
+      Offset.zero & size,
+      defaultPaint,
+      oldLayer: _clip.layer,
+    );
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
   }
 }

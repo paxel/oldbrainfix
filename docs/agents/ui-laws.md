@@ -240,7 +240,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   work. A tap puts the cursor at the nearest word boundary; there is no
   magnifier and no dragging the cursor. A long press selects as usual,
   with Copy, Cut and Delete in the system's menu.
-- The bottom row shows one line of the text around the cursor, directly
+- The bottom row shows the cursor's line as a text field does: from
+  its start, the cursor right after the text before it; a line wider
+  than the row scrolls sideways only as far as keeps the cursor in
+  view, so ◀ and ▶ move the cursor, not the letters. It sits directly
   above the keyboard, only while the keyboard is open; it is a bar of
   the field, not a sheet, and never takes the keyboard's focus. It
   rides on the keyboard and never sits on the screen's bottom edge, so

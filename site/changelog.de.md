@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.3.0]
 
+### Behoben
+
+- Im Zwei-Zeilen-Editor des Telefons zeigt die Zeile über der Tastatur die Zeile mit dem Cursor von ihrem Anfang an, den Cursor direkt hinter dem Text davor, und rückt nur dann seitwärts weiter, wenn die Zeile breiter ist als der Platz über der Tastatur, damit der Cursor sichtbar bleibt.
+
 ## [0.2.0] - 2026-10-31
 
 ### Neu

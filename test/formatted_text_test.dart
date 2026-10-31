@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -609,6 +610,46 @@ void main() {
       );
       expect(before.text.toPlainText(), 'buy **');
       expect(after.text.toPlainText(), 'milk** today');
+    });
+
+    testWidgets('the bottom row reads the formatted line from its start, '
+        'its marks right before the cursor, and ▶ moves the cursor, not the '
+        'letters', (tester) async {
+      final controller = await pumpField(
+        tester,
+        text: 'first line\nbuy **milk** today',
+        markdown: true,
+      );
+      controller.selection = const TextSelection.collapsed(offset: 17);
+      await tester.pump();
+      double edge(String of, int offset) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: key(of), matching: find.byType(RichText)),
+        );
+        final caret = paragraph.getOffsetForCaret(
+          TextPosition(offset: offset),
+          Rect.zero,
+        );
+        return paragraph.localToGlobal(caret).dx;
+      }
+
+      final cursor = key('two-row-cursor');
+      final start = tester.getTopLeft(key('two-row-line')).dx;
+      expect(edge('two-row-before', 0), closeTo(start, 0.5));
+      expect(
+        edge('two-row-before', 'buy **'.length),
+        closeTo(tester.getTopLeft(cursor).dx, 0.5),
+      );
+
+      final was = tester.getTopLeft(cursor).dx;
+      await press(tester, 'two-row-forward');
+      expect(controller.selection, const TextSelection.collapsed(offset: 18));
+      expect(edge('two-row-before', 0), closeTo(start, 0.5));
+      expect(tester.getTopLeft(cursor).dx, greaterThan(was + 4));
+      expect(
+        edge('two-row-before', 'buy **m'.length),
+        closeTo(tester.getTopLeft(cursor).dx, 0.5),
+      );
     });
 
     testWidgets('with two rows off the marks are dimmed, and the bar is '
