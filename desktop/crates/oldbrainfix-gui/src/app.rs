@@ -99,6 +99,7 @@ use crate::capture_choices::{
 };
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
+use crate::folder_import::{FolderImport, Imported, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
@@ -643,6 +644,12 @@ enum Dialog {
     Done {
         title: String,
         details: String,
+    },
+    /// What an Import announced as finished made (ADR 0036): its
+    /// `details`, with Close and a way into the new Area `area`.
+    Imported {
+        details: String,
+        area: String,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -1198,6 +1205,10 @@ pub struct App {
     /// import.
     bundle_saver: FileSaver,
     bundle_opener: FolderPicker,
+    /// Asks the system's dialog for a folder to import (ADR 0036), and
+    /// the Import reading it off the window's thread.
+    import_picker: FolderPicker,
+    import: FolderImport,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
     /// Asks where to save the own Profile card file (#144).
@@ -1494,6 +1505,8 @@ impl App {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
             bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
+            import_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
+            import: FolderImport::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             calendar_saver: Box::new(|title, name| {
@@ -1614,6 +1627,17 @@ impl App {
     pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.bundle_saver = saver;
         self.bundle_opener = opener;
+    }
+
+    /// Asks `picker` for the folder to import instead of the system's
+    /// dialog; tests hand in a path.
+    pub fn set_import_picker(&mut self, picker: FolderPicker) {
+        self.import_picker = picker;
+    }
+
+    /// Whether an Import is reading its folder.
+    pub fn importing(&self) -> bool {
+        self.import.running()
     }
 
     /// Hands in the dialogs asking where to save the Recovery Sheet and
@@ -2824,6 +2848,55 @@ impl App {
         } else {
             self.announce_done(t.bundle_imported(), bundle_result_text(&t, result));
         }
+    }
+
+    /// Announces how the Import of the folder `name` ended (UI laws,
+    /// "Announcements"): that it finished, what went where behind the
+    /// click with a way into the new Area; that nothing in it was
+    /// usable; or that it failed, each with the cause and the fix.
+    fn announce_folder_imported(&mut self, name: &str, imported: Imported) {
+        let t = self.t;
+        let summary = match imported {
+            Ok(summary) => summary,
+            Err(details) => {
+                self.announce_failure(
+                    t.import_failed(),
+                    t.import_failed_title(),
+                    (t.import_failed_cause(), t.import_failed_fix()),
+                    details,
+                );
+                return;
+            }
+        };
+        let skipped =
+            t.import_skipped_details(name, summary.not_text as i64, summary.too_large as i64);
+        let Some(area) = summary.area_id.clone() else {
+            self.announce_failure(
+                t.import_nothing(),
+                t.import_nothing_title(),
+                (t.import_nothing_cause(), t.import_nothing_fix()),
+                skipped,
+            );
+            return;
+        };
+        // The Area just made, by the name it shows under; the name asked
+        // for should it not be read.
+        let shown = match Places::new(&self.store).area_by_id(&area) {
+            Ok(Some(made)) => area_name(&t, &made),
+            _ => t.import_area_name(name),
+        };
+        let mut details = t.import_finished_notes(summary.notes as i64, &shown);
+        if summary.skipped() > 0 {
+            details.push_str("\n\n");
+            details.push_str(&t.import_finished_skipped(summary.skipped() as i64));
+            details.push('\n');
+            details.push_str(&skipped);
+        }
+        self.notice = Some(t.import_finished().to_string());
+        self.notice_dialog = Some((
+            t.import_finished().to_string(),
+            Dialog::Imported { details, area },
+        ));
     }
 
     /// Leaves folder syncs to the thread that `wanted` wakes.
@@ -4525,6 +4598,16 @@ impl App {
                     self.open_file(&path);
                 }
             }
+            Action::Sync(SyncAction::ImportFolder) => {
+                // One Import at a time; its button is greyed meanwhile.
+                if !self.import.running()
+                    && let Some(folder) = (self.import_picker)(self.t.import_folder_title())
+                {
+                    let name = folder_name(&folder);
+                    let area = self.t.import_area_name(&name);
+                    self.import.start(self.store.clone(), folder, name, area);
+                }
+            }
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
@@ -5907,7 +5990,7 @@ impl App {
         let mut closed = Vec::new();
         if matches!(
             self.dialog,
-            Some(Dialog::Failure { .. } | Dialog::Done { .. })
+            Some(Dialog::Failure { .. } | Dialog::Done { .. } | Dialog::Imported { .. })
         ) {
             self.dialog(ui.ctx(), tones, &mut closed);
         }
@@ -6002,6 +6085,26 @@ impl App {
                     self.refresh();
                     if changed && let Some(wake) = &self.wake {
                         drop(wake.send(Event::Wake));
+                    }
+                    ui.ctx().request_repaint();
+                }
+                None => ui
+                    .ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100)),
+            }
+        }
+        // An Import reading its folder, also after leaving the Sync view:
+        // its answer is announced when it comes.
+        if self.import.running() {
+            match self.import.finished() {
+                Some((name, imported)) => {
+                    let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
+                    self.announce_folder_imported(&name, imported);
+                    if made {
+                        self.refresh();
+                        if let Some(wake) = &self.wake {
+                            drop(wake.send(Event::Wake));
+                        }
                     }
                     ui.ctx().request_repaint();
                 }
@@ -6658,6 +6761,7 @@ impl App {
             }
             Selection::Sync => {
                 let wall = self.wall.clone();
+                self.sync.importing = self.import.running();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
                     actions.push(Action::Sync(asked));
                 }
@@ -8047,6 +8151,15 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
+                    Dialog::Imported { details, area } => {
+                        let (close, open) = imported_form(ui, &t, details);
+                        if close || open {
+                            actions.push(Action::CloseDialog);
+                        }
+                        if open {
+                            actions.push(Action::Select(Selection::Place(area.clone())));
+                        }
+                    }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
                         profile_view::qr_page(ui, &t, link);
@@ -9265,6 +9378,22 @@ pub(crate) fn done_form(ui: &mut Ui, t: &L10n, heading: &str, details: &str) -> 
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
     ui.button(RichText::new(t.close()).color(text)).clicked()
+}
+
+/// What an Import made, `details` under "Import finished.", with Close
+/// and "Open the Area"; returns whether each was clicked.
+fn imported_form(ui: &mut Ui, t: &L10n, details: &str) -> (bool, bool) {
+    title(ui, t.import_finished());
+    let text = ui.visuals().text_color();
+    ui.label(RichText::new(details).color(text));
+    ui.horizontal(|ui| {
+        let close = ui.button(RichText::new(t.close()).color(text)).clicked();
+        let open = ui
+            .button(RichText::new(t.import_open_area()).color(text))
+            .clicked();
+        (close, open)
+    })
+    .inner
 }
 
 /// A `mailto:` link to [`REPORT_MAIL`] carrying `details` and this

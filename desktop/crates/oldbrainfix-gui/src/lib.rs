@@ -7,7 +7,8 @@
 //! command line, the capture popup and its hotkey, voice recordings and
 //! photos, Paste in the capture, the Transcripts and Photo Texts made of
 //! them, the LAN sync it hosts, for pairing in the Sync view and for paired Devices on their
-//! own, the shared folder it syncs through, the Backups it writes and
+//! own, the shared folder it syncs through, the folders it imports
+//! Notes from, the Backups it writes and
 //! restores, the About view with every third-party component's
 //! licence, and the view in place of the window for a database of a
 //! newer version.
@@ -26,6 +27,7 @@ pub mod capture_choices;
 pub mod checklist_view;
 pub mod cli;
 pub mod enrich;
+pub mod folder_import;
 pub mod folder_sync;
 pub mod format_bar;
 pub mod frogs_view;

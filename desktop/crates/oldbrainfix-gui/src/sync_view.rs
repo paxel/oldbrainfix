@@ -9,7 +9,8 @@
 //! each version a button that keeps it, and the shared folder is chosen,
 //! synced and forgotten here, with how its last sync went. A bundle file
 //! for a paired Device, or of everything, is saved and one imported here
-//! too.
+//! too, and so is a folder of Markdown or text files (ADR 0036) until the
+//! desktop has its File menu (#145).
 
 use std::net::IpAddr;
 use std::path::Path;
@@ -67,6 +68,9 @@ pub enum SyncAction {
     SaveBundle(Option<String>),
     /// Import a bundle chosen with the system's dialog.
     OpenBundle,
+    /// Import a folder of Markdown or text files chosen with the
+    /// system's dialog (ADR 0036).
+    ImportFolder,
     /// End the invite to a Shared Area; hosting goes on with a fresh
     /// code.
     StopInviting,
@@ -107,6 +111,8 @@ pub struct SyncHost {
     pub bind: Option<IpAddr>,
     /// The paired Device the next bundle is for; everything when none.
     pub bundle_for: Option<String>,
+    /// Whether an Import is reading its folder, as the window says.
+    pub importing: bool,
     /// The invite to a Shared Area this host hands out while it shows
     /// (ADR 0013): whoever joins with its code gets that Area only.
     pub inviting: Option<Invite>,
@@ -578,6 +584,9 @@ impl SyncHost {
                 if let Some(asked) = bundle_section(ui, t, tones, store, &mut self.bundle_for) {
                     action = Some(asked);
                 }
+                if import_section(ui, t, tones, self.importing) {
+                    action = Some(SyncAction::ImportFolder);
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
                     let devices = store.paired_devices().unwrap_or_default();
@@ -939,6 +948,30 @@ fn bundle_section(
         ui.label(RichText::new(t.bundle_drop()).small().color(weak));
     });
     action
+}
+
+/// The Import of a folder: what it does and its button, or that it reads
+/// the folder meanwhile. Returns whether the user asked for one.
+fn import_section(ui: &mut Ui, t: &L10n, tones: Tones, importing: bool) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let mut asked = false;
+    embossed(ui, tones, false, None, |ui| {
+        ui.label(RichText::new(t.settings_import()).strong().color(text));
+        let said = if importing {
+            t.import_reading()
+        } else {
+            t.import_folder_detail()
+        };
+        ui.label(RichText::new(said).small().color(weak));
+        asked = ui
+            .add_enabled(
+                !importing,
+                egui::Button::new(RichText::new(t.import_folder_open()).color(text)),
+            )
+            .clicked();
+    });
+    asked
 }
 
 /// Imports the bundle at `path` into `store` and says what came in, or

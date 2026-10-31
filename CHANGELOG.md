@@ -10,7 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row after the Shopping Lists, such as "Before the trip: 3 of 7 open", which opens the list, and "Show on the Agenda" in the ⋮ of its card and in its editor, on for every Checklist, takes it off the Agenda for this person alone, kept on their own Devices, so in a Shared Area each person decides for their own Agenda.
 
 - On the phone, the ⋮ of a photo shown full screen offers Save, which puts it into the phone's Pictures in the album "Old Brain Fix" from Android 10 on, Copy, which puts the picture on the clipboard, and Share, which hands it to the app picked on the share sheet, and on the desktop a right-click on a photo in the Note editor or shown full screen offers "Save image as…", which saves its file where the user says, "Copy image", which puts the picture on the clipboard, and "Open in another program", which opens it in the computer's program for pictures.
-- On the phone under Settings ▸ Import, a folder of Markdown and text files becomes Notes, each dated when its file was last changed, in a new Area named after the folder, none of them Nudged.
+- On the phone under Settings ▸ Import and on the desktop with "Import a folder…" in Sync, a folder of Markdown and text files becomes Notes, each dated when its file was last changed, in a new Area named after the folder, none of them Nudged.
 
 ### Changed
 
