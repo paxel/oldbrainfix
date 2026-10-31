@@ -44,6 +44,7 @@ pub mod names;
 pub mod notify;
 pub mod paste;
 pub mod person_view;
+pub mod photo_out;
 pub mod popup;
 pub mod profile_view;
 pub mod ring;

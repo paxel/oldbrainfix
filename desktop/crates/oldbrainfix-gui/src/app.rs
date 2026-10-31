@@ -45,7 +45,8 @@
 //! bundle when they travel as files.
 //! A Note is sent from its editor, saved where the user says.
 //! The editor shows a Note's photos and plays its recordings, with their
-//! Transcripts. Transcripts and Photo Texts are made in the background
+//! Transcripts; a right-click on a photo there or full screen saves it
+//! where the user says, copies it or opens it in another program (#149). Transcripts and Photo Texts are made in the background
 //! and found by the search over All Notes, an Area or a Topic.
 
 use std::cell::RefCell;
@@ -109,14 +110,15 @@ use crate::line_editing::TypedLines;
 use crate::login;
 use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
-    photo_from_file,
+    photo_extension, photo_from_file,
 };
 use crate::media_view::{
-    self, Generated, Offers, Photo, PhotoCache, Recording, Speech, Viewer, Voice,
+    self, Generated, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
+use crate::photo_out;
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
@@ -732,6 +734,8 @@ enum Action {
     ViewPhoto(String),
     /// Closes the photo shown full screen.
     ClosePhoto,
+    /// Hands this photo out of the Note (#149).
+    PhotoOut(String, Out),
     /// Shows a table of a formatted text full screen (#128).
     OpenTable(Opening),
     /// Something asked of the table shown full screen.
@@ -1202,6 +1206,11 @@ pub struct App {
     calendar_saver: FileSaver,
     /// Asks where to save a Note as Markdown (#129).
     markdown_saver: FileSaver,
+    /// Asks where to save a photo (#149).
+    photo_saver: FileSaver,
+    /// Opens a file in the system's program for it, and the folder the
+    /// copies of photos to open are written to (#149).
+    photo_opener: (FileOpener, std::path::PathBuf),
     /// Files handed over from outside the window, to open.
     handed: Option<Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>>,
     /// What a bundle saved or imported did, announced at the top until
@@ -1277,6 +1286,9 @@ pub type FilesPicker = Box<dyn Fn(&str) -> Vec<std::path::PathBuf>>;
 /// Asks where to save a file, with the dialog's title and the name it
 /// proposes.
 pub type FileSaver = Box<dyn Fn(&str, &str) -> Option<std::path::PathBuf>>;
+
+/// Opens a file in another program; an error when none opened it.
+pub type FileOpener = Box<dyn Fn(&std::path::Path) -> std::io::Result<()>>;
 
 /// The name a bundle for the person `person`, whose own Profile name is
 /// `name`, is proposed under on `day`: the day's bundle name with theirs
@@ -1361,6 +1373,19 @@ fn card_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(oldbrainfix_core::APP_NAME, &[cards::EXTENSION])
+}
+
+/// The save dialog for the photo to be saved as `name`, filtered by its
+/// ending (#149).
+fn photo_dialog(title: &str, name: &str) -> rfd::FileDialog {
+    let dialog = rfd::FileDialog::new().set_title(title).set_file_name(name);
+    match std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
+        Some(ending) => dialog.add_filter(ending.to_uppercase(), &[ending]),
+        None => dialog,
+    }
 }
 
 /// What a Note saved as Markdown ends in (#129).
@@ -1481,6 +1506,14 @@ impl App {
                     .set_file_name(name)
                     .save_file()
             }),
+            photo_saver: Box::new(|title, name| photo_dialog(title, name).save_file()),
+            photo_opener: (
+                Box::new(photo_out::open_with_system),
+                directories::ProjectDirs::from("io.github", "paxel", "oldbrainfix").map_or_else(
+                    || std::env::temp_dir().join("oldbrainfix-opened"),
+                    |d| d.cache_dir().join("opened"),
+                ),
+            ),
             handed: None,
             notice: None,
             notice_dialog: None,
@@ -1825,6 +1858,80 @@ impl App {
     /// Hands in the dialog asking where to save a Note as Markdown.
     pub fn set_markdown_saver(&mut self, saver: FileSaver) {
         self.markdown_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save a photo (#149).
+    pub fn set_photo_saver(&mut self, saver: FileSaver) {
+        self.photo_saver = saver;
+    }
+
+    /// Opens photos with `opener` instead of the system's program, their
+    /// copies written to `dir` (#149).
+    pub fn set_photo_opener(&mut self, dir: std::path::PathBuf, opener: FileOpener) {
+        self.photo_opener = (opener, dir);
+    }
+
+    /// Hands the photo `hash` out of the Note as `out` asks (#149): saved
+    /// where the user says, as its file is; on the clipboard as a
+    /// picture; or a copy of it opened in another program. Done says
+    /// nothing (UI laws); a failure, or a photo not here, is announced,
+    /// the latter before the dialog.
+    fn photo_out(&mut self, hash: &str, out: Out) {
+        let t = self.t;
+        let (said, title) = match out {
+            Out::SaveAs => (t.photo_not_saved(), t.photo_not_saved_title()),
+            Out::Copy => (t.photo_not_copied(), t.photo_not_copied_title()),
+            Out::Open => (t.photo_not_opened(), t.photo_not_opened_title()),
+        };
+        let Some(bytes) = self.store.photo(hash) else {
+            self.announce_failure(
+                said,
+                title,
+                (t.photo_out_missing_cause(), t.photo_out_missing_fix()),
+                format!("photo {hash}: not on this device"),
+            );
+            return;
+        };
+        let name = share_note::photo_file_name(hash, &bytes);
+        let failed = match out {
+            Out::SaveAs => {
+                let Some(mut path) = (self.photo_saver)(t.save_image_title(), &name) else {
+                    return;
+                };
+                if path.extension().is_none() {
+                    path.set_extension(photo_extension(&bytes));
+                }
+                std::fs::write(&path, &bytes).err().map(|e| {
+                    (
+                        (t.photo_not_saved_cause(), t.photo_not_saved_fix()),
+                        format!("save photo: {e}"),
+                    )
+                })
+            }
+            Out::Copy => {
+                let put = self.clipboard.as_mut().is_some_and(|c| c.put_photo(&bytes));
+                (!put).then(|| {
+                    (
+                        (t.photo_not_copied_cause(), t.photo_not_copied_fix()),
+                        "copy photo: the system clipboard took no picture".to_string(),
+                    )
+                })
+            }
+            Out::Open => {
+                let (opener, dir) = &self.photo_opener;
+                let opened =
+                    photo_out::copy_to_open(dir, &name, &bytes).and_then(|path| opener(&path));
+                opened.err().map(|e| {
+                    (
+                        (t.photo_not_opened_cause(), t.photo_not_opened_fix()),
+                        format!("open photo: {e}"),
+                    )
+                })
+            }
+        };
+        if let Some((why, details)) = failed {
+            self.announce_failure(said, title, why, details);
+        }
     }
 
     /// What the Note `id` hands to another app (#129), its Sections'
@@ -3972,6 +4079,7 @@ impl App {
             Action::FilterPeople(people) => self.people = people,
             Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
             Action::ClosePhoto => self.viewer = None,
+            Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
             Action::OpenTable(opening) => self.open_table(opening)?,
             Action::Table(asked) => self.table_asked(asked)?,
             Action::Unfold(id) => {
@@ -6186,10 +6294,17 @@ impl App {
             self.dialog(ui.ctx(), tones, &mut actions);
         }
         // The photo full screen, over everything else.
-        if let Some(viewer) = &mut self.viewer
-            && media_view::photo_viewer(ui.ctx(), &self.t, (&mut self.photos, &self.store), viewer)
-        {
-            actions.push(Action::ClosePhoto);
+        if let Some(viewer) = &mut self.viewer {
+            match media_view::photo_viewer(
+                ui.ctx(),
+                &self.t,
+                (&mut self.photos, &self.store),
+                viewer,
+            ) {
+                Some(Viewed::Close) => actions.push(Action::ClosePhoto),
+                Some(Viewed::Out(out)) => actions.push(Action::PhotoOut(viewer.hash.clone(), out)),
+                None => {}
+            }
         }
         self.dragged(ui.ctx(), tones);
         for action in actions {
@@ -11215,6 +11330,7 @@ fn editor_media(
         Some(Photo::View(hash)) => actions.push(Action::ViewPhoto(hash)),
         Some(Photo::Remove(hash)) => actions.push(ask(hash, true)),
         Some(Photo::Text(asked)) => actions.push(text(asked, true)),
+        Some(Photo::Out(hash, out)) => actions.push(Action::PhotoOut(hash, out)),
         None => {}
     }
     let asked = media_view::recordings(

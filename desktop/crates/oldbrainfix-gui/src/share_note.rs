@@ -136,7 +136,7 @@ pub fn save_markdown(path: &Path, share: &NoteShare, notes: &Notes) -> std::io::
         };
         files.push((
             Beside {
-                name: format!("photo-{}.{}", short(hash), media::photo_extension(&bytes)),
+                name: photo_file_name(hash, &bytes),
                 photo: true,
             },
             bytes,
@@ -170,6 +170,13 @@ pub fn save_markdown(path: &Path, share: &NoteShare, notes: &Notes) -> std::io::
     let beside: Vec<Beside> = files.into_iter().map(|(file, _)| file).collect();
     std::fs::write(path, markdown(&share.markdown, &stem, &beside))?;
     Ok(true)
+}
+
+/// What the photo `hash` with the `bytes` is named as a file of its
+/// own, as the phone names it: `photo-<12 hex>.jpg`, or the ending of
+/// its kind (#129, #149).
+pub fn photo_file_name(hash: &str, bytes: &[u8]) -> String {
+    format!("photo-{}.{}", short(hash), media::photo_extension(bytes))
 }
 
 /// The first 12 characters of `hash`, as the phone shortens it.

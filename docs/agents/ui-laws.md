@@ -244,6 +244,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   its height capped, and is decoded no larger than it shows, so an
   extreme picture (12 × 34,000 px) cannot break the card; a tap opens it
   full screen with zoom.
+- **A photo gets out of the Note** (#149): full screen its ⋮ offers
+  Save, Copy and Share on the phone; on the desktop a right-click on a
+  photo in the Note editor or full screen offers "Save image as…",
+  "Copy image" and "Open in another program". Saved and copied say
+  nothing; a failure is announced.
 - A compact card shows date, time and, when known, the Named Place or
   location, plus a Capture Context icon when there is more to see, the
   Note's first line, its media and the action row.

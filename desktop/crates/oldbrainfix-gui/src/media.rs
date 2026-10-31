@@ -99,6 +99,13 @@ pub trait Clipboard {
     fn put_text(&mut self, _text: &str, _html: Option<&str>) -> bool {
         false
     }
+
+    /// Puts the photo `bytes` on the clipboard as a picture (#149);
+    /// whether it is there. The window's own clipboard takes no
+    /// pictures, so one that cannot says so.
+    fn put_photo(&mut self, _bytes: &[u8]) -> bool {
+        false
+    }
 }
 
 /// `samples` of one channel at [`SAMPLE_RATE`], from -1 to 1, as a WAV
@@ -547,7 +554,7 @@ impl<S: rodio::Source> rodio::Source for Stretch<S> {
 /// The system's clipboard, through arboard. Device-only. It is kept
 /// once opened: on X11 what this app put there lasts only while it is.
 /// Without X11 on Wayland it does not open, and text goes through the
-/// window's clipboard, without HTML.
+/// window's clipboard, without HTML, while a photo is not copied.
 #[derive(Default)]
 pub struct SystemClipboard {
     open: Option<arboard::Clipboard>,
@@ -576,6 +583,28 @@ impl Clipboard for SystemClipboard {
     fn text(&mut self) -> Option<String> {
         let text = self.open()?.get_text().ok()?;
         (!text.trim().is_empty()).then(|| text.replace("\r\n", "\n"))
+    }
+
+    fn put_photo(&mut self, bytes: &[u8]) -> bool {
+        let Ok(image) = image::load_from_memory(bytes) else {
+            return false;
+        };
+        let rgba = image.to_rgba8();
+        let (Ok(width), Ok(height)) = (
+            usize::try_from(rgba.width()),
+            usize::try_from(rgba.height()),
+        ) else {
+            return false;
+        };
+        let Some(clipboard) = self.open() else {
+            return false;
+        };
+        let image = arboard::ImageData {
+            width,
+            height,
+            bytes: rgba.into_raw().into(),
+        };
+        clipboard.set_image(image).is_ok()
     }
 
     fn photo(&mut self) -> Option<Vec<u8>> {

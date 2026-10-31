@@ -4,7 +4,7 @@
 //! with its Transcript under it, the texts of those removed while their
 //! texts stay (ADR 0020), the buttons under each Transcript and Photo
 //! Text that take it over, remove it or make it again (ADR 0025), the
-//! microphone's
+//! right-click menu that gets a photo out (#149), the microphone's
 //! button and the one big stop button (UI laws, "Capture"), and the
 //! speech model's card in the Settings.
 
@@ -224,13 +224,14 @@ impl Viewer {
 /// fitting the window up to [`MOST_ZOOM`] times or until its short side
 /// fills the window, and a drag moves it. Decoded once, no larger than
 /// [`LARGEST_EDGE`] either way, so one of 12 × 34,000 pixels shows too.
-/// Whether it is to close: Esc or the close button.
+/// A right-click offers what [`out_menu`] offers. What was asked: to
+/// close, by Esc or the close button, or to hand the photo out.
 pub fn photo_viewer(
     ctx: &egui::Context,
     t: &L10n,
     (cache, store): (&mut PhotoCache, &Store),
     viewer: &mut Viewer,
-) -> bool {
+) -> Option<Viewed> {
     let modal = egui::Modal::new(egui::Id::new("photo viewer"))
         .frame(egui::Frame::NONE)
         .backdrop_color(egui::Color32::from_black_alpha(235))
@@ -251,8 +252,9 @@ pub fn photo_viewer(
                     egui::Rect::from_center_size(rect.center(), egui::vec2(240.0, 24.0)),
                     egui::Label::new(RichText::new(t.photo_missing()).color(weak)),
                 );
-                return close_button(ui, t, rect);
+                return close_button(ui, t, rect).then_some(Viewed::Close);
             };
+            let out = out_menu(&resp, t);
             let fit = (rect.width() / size.x).min(rect.height() / size.y);
             let fill = (rect.width() / size.x).max(rect.height() / size.y);
             let most = (fill / fit).max(MOST_ZOOM);
@@ -282,9 +284,57 @@ pub fn photo_viewer(
                 let at = egui::Rect::from_center_size(rect.center() + viewer.offset, shown);
                 egui::Image::new(&texture).paint_at(ui, at);
             }
-            close_button(ui, t, rect)
+            if close_button(ui, t, rect) {
+                Some(Viewed::Close)
+            } else {
+                out.map(Viewed::Out)
+            }
         });
-    modal.inner || modal.should_close()
+    if modal.should_close() {
+        return Some(Viewed::Close);
+    }
+    modal.inner
+}
+
+/// What was asked of the photo shown full screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Viewed {
+    /// Esc, the close button or a click beside it.
+    Close,
+    /// Handing it out.
+    Out(Out),
+}
+
+/// How a photo is handed out of a Note (#149).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Out {
+    /// "Save image as…": its file where the user says.
+    SaveAs,
+    /// "Copy image": the picture on the clipboard.
+    Copy,
+    /// "Open in another program": the system's program for pictures.
+    Open,
+}
+
+/// The right-click menu of the photo `resp`: "Save image as…", "Copy
+/// image" and "Open in another program" (#149). The one picked comes
+/// back; the menu closes on it, also when picked with the keyboard.
+fn out_menu(resp: &egui::Response, t: &L10n) -> Option<Out> {
+    let mut asked = None;
+    resp.context_menu(|ui| {
+        let text = ui.visuals().text_color();
+        for (out, label) in [
+            (Out::SaveAs, t.save_image_as()),
+            (Out::Copy, t.copy_image()),
+            (Out::Open, t.open_in_another_program()),
+        ] {
+            if ui.button(RichText::new(label).color(text)).clicked() {
+                asked = Some(out);
+                ui.close();
+            }
+        }
+    });
+    asked
 }
 
 /// The full-screen photo's close button in the top right corner of
@@ -466,13 +516,16 @@ pub enum Photo {
     Remove(String),
     /// Something of its Photo Text.
     Text(Generated),
+    /// Handing it out (#149).
+    Out(String, Out),
 }
 
 /// The photos `hashes` one under the other, as wide as there is room,
 /// each with its Photo Text from `photo_texts` under it, as the phone's
 /// editor shows it, the buttons it `offers` for that text, and the
 /// button that removes the photo and keeps its Photo Text (ADR 0020).
-/// A click on a photo shows it full screen. What was clicked comes back.
+/// A click on a photo shows it full screen; a right-click offers what
+/// [`out_menu`] offers. What was clicked comes back.
 pub fn photos(
     ui: &mut Ui,
     t: &L10n,
@@ -497,6 +550,9 @@ pub fn photos(
                         .alt_text(t.photo())
                         .sense(Sense::click()),
                 );
+                if let Some(out) = out_menu(&photo, t) {
+                    clicked = Some(Photo::Out(hash.clone(), out));
+                }
                 if photo.on_hover_cursor(egui::CursorIcon::ZoomIn).clicked() {
                     clicked = Some(Photo::View(hash.clone()));
                 }

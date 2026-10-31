@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Neu
 
 - Auf dem Telefon und dem Desktop zeigt die Agenda heute jede Checkliste ohne Routine oder Erinnerung, die offene Zeilen hat, in einer Reihe nach den Einkaufslisten, etwa „Vor der Reise: 3 von 7 offen“, die die Liste öffnet, und „Auf der Agenda zeigen“ im ⋮ ihrer Karte und in ihrem Editor, für jede Checkliste eingeschaltet, nimmt sie nur für diese Person aus der Agenda, gehalten auf ihren eigenen Geräten, sodass in einem geteilten Bereich jede Person für ihre eigene Agenda entscheidet.
+- Auf dem Desktop bietet ein Rechtsklick auf ein Foto im Notiz-Editor oder im Vollbild „Bild speichern unter …“, das seine Datei dort speichert, wo man es sagt, „Bild kopieren“, das das Bild in die Zwischenablage legt, und „In anderem Programm öffnen“, das es im Bildprogramm des Computers öffnet.
 
 ### Geändert
 

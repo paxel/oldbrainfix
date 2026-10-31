@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - On the phone and the desktop, today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row after the Shopping Lists, such as "Before the trip: 3 of 7 open", which opens the list, and "Show on the Agenda" in the ⋮ of its card and in its editor, on for every Checklist, takes it off the Agenda for this person alone, kept on their own Devices, so in a Shared Area each person decides for their own Agenda.
 
+- On the desktop, a right-click on a photo in the Note editor or shown full screen offers "Save image as…", which saves its file where the user says, "Copy image", which puts the picture on the clipboard, and "Open in another program", which opens it in the computer's program for pictures.
+
 ### Changed
 
 - The quick note, the phone's text capture screen and the desktop's capture field and popup, shows only the text, the buttons that add a recording, a picture or a file, the Nudge buttons and "To full editor", which saves the Note Unsorted with a Nudge in 1 h and opens it in the Note editor, and Settings under "Quick note" switch File into…, Routine, Reminder, Frog, Session or Tally, which adds "Make it a Tally", Add to a Shopping List, the Importance and the format bar on for it, and the Nudge buttons off for a single Save.
