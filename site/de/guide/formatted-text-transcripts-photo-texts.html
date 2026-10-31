@@ -97,11 +97,21 @@
   <li>Eine Zeile oder Spalte zu löschen, die Wörter enthält, fragt einmal nach: „Die Wörter in ihren Zellen werden aus der Notiz gelöscht.“ Die letzte Zeile oder Spalte zu löschen, löscht die Tabelle.</li>
 </ul>
 <p>
+  Auf dem Handy zeigen die Felder mit der Formatleiste eine Tabelle als dasselbe Raster, nie als
+  ihr Markdown; ein Tippen darauf öffnet sie im Vollbild, und was sich dort ändert, kommt
+  zurück ins Feld. Der Cursor überspringt eine Tabelle als einen Block: ◀, ▶ und die Pfeiltasten
+  gehen von direkt vor ihr nach direkt hinter sie, und die Zeile über der Tastatur zeigt sie als
+  Tabellenzeichen. Was direkt vor einer Tabelle getippt wird, kommt auf eine eigene Zeile, und was
+  direkt nach ihr getippt wird, kommt unter sie, mit einer Leerzeile dazwischen. Die Rücktaste
+  direkt nach einer Tabelle oder das Löschen einer Auswahl, die eine enthält, löscht die ganze
+  Tabelle und fragt vorher nach, solange ihre Zellen Wörter enthalten.
+</p>
+<p>
   Tabellen werden als GFM-Tabellen geschrieben: Jede Änderung schreibt die ganze Tabelle neu, jede
-  Zeile als <code>| a | b |</code>, und lässt die Wörter in ihren Zellen, wie sie waren. Eine Zeile,
-  die direkt unter einer Tabelle getippt wird, ohne Leerzeile dazwischen, wird eine Zeile von ihr.
-  Eingefügte Markdown-Tabellen werden zu Tabellen. Wo du die Notiz nur lesen darfst, öffnet sich die
-  Tabelle zum Lesen.
+  Zeile als <code>| a | b |</code>, und lässt die Wörter in ihren Zellen, wie sie waren. Auf dem
+  Desktop wird eine Zeile, die direkt unter das Markdown einer Tabelle getippt wird, ohne Leerzeile
+  dazwischen, eine Zeile von ihr. Eingefügte Markdown-Tabellen werden zu Tabellen. Wo du die Notiz
+  nur lesen darfst, öffnet sich die Tabelle zum Lesen.
 </p>
 
 <figure class="frame phone">

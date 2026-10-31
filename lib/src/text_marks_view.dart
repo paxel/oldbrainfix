@@ -361,6 +361,10 @@ TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
 /// in the state its [boxes] tick it to, with Show ticks who ticked it
 /// last and when after it, and its id is never seen; the cursor and a
 /// selection never end inside a box ([snapSelection]).
+///
+/// A table of a formatted text is drawn as the grid [MarkedText] draws,
+/// its source never seen (#152): the cursor and a selection pass it as
+/// one block, never ending inside it ([snapOutOfTables]).
 class TagTextController extends TextEditingController {
   final bool hideMarks;
 
@@ -370,11 +374,32 @@ class TagTextController extends TextEditingController {
 
   /// Whether the text is formatted; it is drawn anew when this changes.
   bool get markdown => _markdown;
-  set markdown(bool value) {
-    if (value == _markdown) return;
-    _markdown = value;
+  set markdown(bool formatted) {
+    if (formatted == _markdown) return;
+    _markdown = formatted;
+    final selection = snapOutOfTables(tables, value.selection);
+    if (selection != value.selection) {
+      super.value = value.copyWith(selection: selection);
+      return;
+    }
     notifyListeners();
   }
+
+  String? _tablesText;
+  List<MarkdownTable> _tablesOf = const [];
+
+  /// The tables of [text], read once for each text.
+  List<MarkdownTable> _tablesIn(String text) {
+    if (text != _tablesText) {
+      _tablesOf = MarkdownTables.all(text);
+      _tablesText = text;
+    }
+    return _tablesOf;
+  }
+
+  /// The tables drawn as grids: those of a formatted text, top first.
+  List<MarkdownTable> get tables =>
+      _markdown ? _tablesIn(text) : const <MarkdownTable>[];
 
   BoxTicking? _boxes;
 
@@ -388,11 +413,19 @@ class TagTextController extends TextEditingController {
 
   @override
   set value(TextEditingValue newValue) {
-    final selection = snapSelection(
+    final before = super.value.selection;
+    var selection = snapSelection(
       newValue.text,
       newValue.selection,
-      before: super.value.selection,
+      before: before,
     );
+    if (_markdown) {
+      selection = snapOutOfTables(
+        _tablesIn(newValue.text),
+        selection,
+        before: before,
+      );
+    }
     super.value = identical(selection, newValue.selection)
         ? newValue
         : newValue.copyWith(selection: selection);
@@ -464,11 +497,13 @@ class TagTextController extends TextEditingController {
   static const _sign = 1024;
   static const _composing = 2048;
   static const _id = 4096;
+  static const _grid = 8192;
 
   /// The text formatted, character for character: each one gets the bits
   /// of what it is, and neighbours with the same bits share a span. A
   /// plain text is drawn so too when it has boxes ([runs]): each glyph in
-  /// its state, its id as nothing.
+  /// its state, its id as nothing. A table is its grid in place of its
+  /// first character, the others nothing that never breaks the line.
   TextSpan _formatted(
     BuildContext context,
     TextStyle? style,
@@ -590,6 +625,17 @@ class TagTextController extends TextEditingController {
       }
     }
     if (composing.isValid) set(composing.start, composing.end, _composing);
+    // A table's grid stands for its first character; the others are word
+    // joiners, which take no room and keep the grid on its line.
+    final grids = <int, MarkdownTable>{};
+    for (final table in tables) {
+      grids[table.start] = table;
+      labels.removeWhere((at, _) => at >= table.start && at < table.end);
+      for (var i = table.start; i < table.end; i++) {
+        bits[i] = _grid;
+        shown[i] = 0x2060;
+      }
+    }
     final drawn = String.fromCharCodes(shown);
     final styles = <int, TextStyle>{};
     TextStyle styleOf(int b) =>
@@ -601,11 +647,31 @@ class TagTextController extends TextEditingController {
       if (i < text.length &&
           bits[i] == bits[from] &&
           !labels.containsKey(i) &&
-          !labels.containsKey(from)) {
+          !labels.containsKey(from) &&
+          !grids.containsKey(from) &&
+          !grids.containsKey(i)) {
         continue;
       }
       final b = bits[from];
-      if (labels[from] case final label?) {
+      if (grids[from] case final table?) {
+        children.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            // The field takes the taps: one on the grid opens the table.
+            child: ExcludeSemantics(
+              child: IgnorePointer(
+                child: MarkedText(
+                  text.substring(table.start, table.end),
+                  key: ValueKey('field-table-${table.start}'),
+                  format: TextFormats.markdown,
+                  style: style,
+                  ticking: _boxes,
+                ),
+              ),
+            ),
+          ),
+        );
+      } else if (labels[from] case final label?) {
         children.add(
           WidgetSpan(
             alignment: PlaceholderAlignment.baseline,
@@ -632,6 +698,13 @@ class TagTextController extends TextEditingController {
     final scheme = Theme.of(context).colorScheme;
     final size = base?.fontSize ?? 16;
     bool has(int bit) => bits & bit != 0;
+    if (has(_grid)) {
+      return const TextStyle(
+        fontSize: 0.01,
+        color: Colors.transparent,
+        backgroundColor: Colors.transparent,
+      );
+    }
     final lines = [
       if (has(_strike)) TextDecoration.lineThrough,
       if (has(_link) || has(_composing)) TextDecoration.underline,
@@ -671,6 +744,34 @@ class TagTextController extends TextEditingController {
           )
         : style.copyWith(color: scheme.outline);
   }
+}
+
+/// [selection] with its ends out of each of [tables], drawn as one block
+/// each: an end inside one goes to its end, or to its start when it came
+/// back from further on ([before]); without [before], to the nearer one.
+TextSelection snapOutOfTables(
+  List<MarkdownTable> tables,
+  TextSelection selection, {
+  TextSelection? before,
+}) {
+  if (!selection.isValid || tables.isEmpty) return selection;
+  int snap(int offset, int? was) {
+    for (final table in tables) {
+      if (offset <= table.start || offset >= table.end) continue;
+      final back = was == null
+          ? offset - table.start < table.end - offset
+          : was > offset;
+      return back ? table.start : table.end;
+    }
+    return offset;
+  }
+
+  final base = snap(selection.baseOffset, before?.baseOffset);
+  final extent = snap(selection.extentOffset, before?.extentOffset);
+  if (base == selection.baseOffset && extent == selection.extentOffset) {
+    return selection;
+  }
+  return selection.copyWith(baseOffset: base, extentOffset: extent);
 }
 
 /// A box where a text is drawn: its glyph from [start] to [end] of that

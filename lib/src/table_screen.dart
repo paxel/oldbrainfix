@@ -57,6 +57,46 @@ Future<void> openTable(
   );
 }
 
+/// Asks once whether to delete the words of a row, of a [column] or,
+/// when it is [gone], of the whole table; whether that was confirmed.
+Future<bool> confirmTableDelete(
+  BuildContext context, {
+  bool gone = true,
+  bool column = false,
+}) async {
+  final sure = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      final t = context.t;
+      return AlertDialog(
+        title: Text(
+          gone
+              ? t.tableDeleteTableQuestion
+              : column
+              ? t.tableDeleteColumnQuestion
+              : t.tableDeleteRowQuestion,
+        ),
+        content: Text(t.tableDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('table-delete-confirm'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.delete),
+          ),
+        ],
+      );
+    },
+  );
+  return sure ?? false;
+}
+
 /// A table of a formatted text full screen (ADR 0033): its header row
 /// stays on screen while the rows scroll up and down, and so does its
 /// first column when it holds headings. Sideways the table moves by the
@@ -450,7 +490,10 @@ class _TableScreenState extends State<TableScreen> {
         ? [for (final row in table.rows) row.cells[index]]
         : table.rows[index].cells;
     final holds = cells.any((cell) => cell.end > cell.start);
-    if (holds && !await _confirmDelete(gone: gone, column: column)) return;
+    if (holds &&
+        !await confirmTableDelete(context, gone: gone, column: column)) {
+      return;
+    }
     if (!mounted) return;
     _apply(
       column
@@ -458,43 +501,6 @@ class _TableScreenState extends State<TableScreen> {
           : MarkdownTables.deleteRow(_text, _at, index),
       gone: gone,
     );
-  }
-
-  Future<bool> _confirmDelete({
-    required bool gone,
-    required bool column,
-  }) async {
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final t = context.t;
-        return AlertDialog(
-          title: Text(
-            gone
-                ? t.tableDeleteTableQuestion
-                : column
-                ? t.tableDeleteColumnQuestion
-                : t.tableDeleteRowQuestion,
-          ),
-          content: Text(t.tableDeleteBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(t.cancel),
-            ),
-            TextButton(
-              key: const ValueKey('table-delete-confirm'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(t.delete),
-            ),
-          ],
-        );
-      },
-    );
-    return sure ?? false;
   }
 
   @override

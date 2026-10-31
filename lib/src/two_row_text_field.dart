@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
@@ -76,6 +77,174 @@ int wordEdgeNear(String text, int offset) {
   return offset - before <= text.length - offset ? before : text.length;
 }
 
+/// What an edit of a formatted text leaves of its tables, each drawn as
+/// one block (#152): [value] is what the field holds now; [asked], when
+/// the edit deletes a table with words in its cells, what it holds once
+/// that is confirmed.
+typedef TablesKept = ({TextEditingValue value, TextEditingValue? asked});
+
+/// The line break at [at] of [text], `\r\n`, `\n` or `\r`; empty when
+/// there is none.
+String _breakAt(String text, int at) {
+  if (at >= text.length) return '';
+  final c = text.codeUnitAt(at);
+  if (c == 0x0D) {
+    return at + 1 < text.length && text.codeUnitAt(at + 1) == 0x0A
+        ? '\r\n'
+        : '\r';
+  }
+  return c == 0x0A ? '\n' : '';
+}
+
+/// What [before] lost from where to where, and what took its place, in
+/// [after]: the selection or the composing word replaced when that is
+/// what happened, else the part the two texts do not share.
+(int, int, String) _editOf(TextEditingValue before, TextEditingValue after) {
+  final old = before.text;
+  final text = after.text;
+  for (final range in [before.selection, before.composing]) {
+    if (!range.isValid) continue;
+    final (a, b) = (range.start, range.end);
+    final end = text.length - (old.length - b);
+    if (end >= a &&
+        text.startsWith(old.substring(0, a)) &&
+        text.endsWith(old.substring(b))) {
+      return (a, b, text.substring(a, end));
+    }
+  }
+  final most = math.min(old.length, text.length);
+  var head = 0;
+  while (head < most && old.codeUnitAt(head) == text.codeUnitAt(head)) {
+    head++;
+  }
+  var tail = 0;
+  while (tail < most - head &&
+      old.codeUnitAt(old.length - 1 - tail) ==
+          text.codeUnitAt(text.length - 1 - tail)) {
+    tail++;
+  }
+  return (head, old.length - tail, text.substring(head, text.length - tail));
+}
+
+/// [after], the edit of [before] a formatted text's field was given, so
+/// that each table of [before] stays whole: what is typed right before or
+/// after one goes on a line of its own, a line break the table needs is
+/// kept, and an edit that takes part of a table takes all of it, its line
+/// with it, after asking when its cells hold words.
+TablesKept keepTables(TextEditingValue before, TextEditingValue after) {
+  final old = before.text;
+  if (old == after.text) return (value: after, asked: null);
+  final tables = MarkdownTables.all(old);
+  if (tables.isEmpty) return (value: after, asked: null);
+  final (a, b, typed) = _editOf(before, after);
+  final inside = [
+    for (final table in tables)
+      if (a < table.end && b > table.start) table,
+  ];
+  if (inside.isNotEmpty) {
+    // Nothing is typed into a table's source.
+    if (a == b) return (value: before, asked: null);
+    var from = math.min(a, inside.first.start);
+    var to = math.max(b, inside.last.end);
+    final part = inside.any((t) => a > t.start || b < t.end);
+    // A table deleted by a key takes its line with it.
+    if (part && typed.isEmpty) {
+      final next = _breakAt(old, to);
+      if (next.isNotEmpty) {
+        to += next.length;
+      } else if (from > 0 && _breakAt(old, from - 1).isNotEmpty) {
+        from -= from >= 2 && _breakAt(old, from - 2) == '\r\n' ? 2 : 1;
+      }
+    }
+    final whole = TextEditingValue(
+      text: old.replaceRange(from, to, typed),
+      selection: TextSelection.collapsed(offset: from + typed.length),
+    );
+    final words = inside.any(
+      (t) => t.rows.any((row) => row.cells.any((c) => c.end > c.start)),
+    );
+    return words ? (value: before, asked: whole) : (value: whole, asked: null);
+  }
+  // Whether each table is still one where it went, [put] in [text] in
+  // the place of a to b.
+  bool kept(String text, String put) {
+    final now = MarkdownTables.all(text);
+    final grew = put.length - (b - a);
+    return tables.every((t) {
+      final start = t.start >= b ? t.start + grew : t.start;
+      final end = start + t.end - t.start;
+      return now.any((n) => n.start == start && n.end == end);
+    });
+  }
+
+  if (kept(after.text, typed)) return (value: after, asked: null);
+  // A line break a table needs is not taken: the cursor goes where it
+  // was taken from.
+  if (typed.isEmpty) {
+    return (
+      value: before.copyWith(
+        selection: TextSelection.collapsed(offset: a),
+        composing: TextRange.empty,
+      ),
+      asked: null,
+    );
+  }
+  final br = RegExp(r'\r\n|\n|\r').firstMatch(old)?.group(0) ?? '\n';
+  for (final (lead, trail) in [('', br), (br, ''), ('$br$br', '')]) {
+    final put = '$lead$typed$trail';
+    final text = old.replaceRange(a, b, put);
+    if (!kept(text, put)) continue;
+    int moved(int offset) => offset < a
+        ? offset
+        : offset <= a + typed.length
+        ? offset + lead.length
+        : offset + lead.length + trail.length;
+    final selection = after.selection;
+    final composing = after.composing;
+    return (
+      value: TextEditingValue(
+        text: text,
+        selection: selection.isValid
+            ? selection.copyWith(
+                baseOffset: moved(selection.baseOffset),
+                extentOffset: moved(selection.extentOffset),
+              )
+            : selection,
+        composing: composing.isValid
+            ? TextRange(
+                start: moved(composing.start),
+                end: moved(composing.end),
+              )
+            : composing,
+      ),
+      asked: null,
+    );
+  }
+  return (value: after, asked: null);
+}
+
+/// Keeps the tables of a formatted text whole while it is typed in
+/// ([keepTables]); deleting one with words asks first ([ask]).
+class _KeepTables extends TextInputFormatter {
+  final TextEditingController controller;
+  final void Function(TextEditingValue whole) ask;
+
+  _KeepTables(this.controller, this.ask);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (controller case TagTextController(markdown: true)) {
+      final kept = keepTables(oldValue, newValue);
+      if (kept.asked case final whole?) ask(whole);
+      return kept.value;
+    }
+    return newValue;
+  }
+}
+
 /// A button a field puts on the bar above the keyboard: [key] for its
 /// widget, [label] for its tooltip and a screen reader, [run] null while
 /// it can do nothing.
@@ -118,6 +287,9 @@ typedef FieldAction = ({
 /// the table button, which puts a new table at the cursor or opens the
 /// table the cursor is in full screen ([openTable]); a tap on a table of
 /// a formatted text opens it too. A table's cell is edited without them.
+/// A table of a formatted text shows as its grid, one block the cursor
+/// passes and an edit keeps whole ([keepTables]); in two rows the bottom
+/// row shows it as a table's sign.
 ///
 /// [actions] put buttons of the field's own on the same bar, first, such
 /// as a Line's "in" and "out" (#141). With [focusNode] the field takes
@@ -196,6 +368,15 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   late final _handles = _NoCaretHandle(widget.controller);
   late final _gestures = _TopRowGestures(this);
   late final _editableKey = _FoundEditable(_editable);
+  late var _formatters = _formattersOf(widget.controller);
+
+  List<TextInputFormatter> _formattersOf(TextEditingController controller) => [
+    const BoxIdsFormatter(),
+    _KeepTables(controller, _askDeleteTable),
+  ];
+
+  /// Whether the field asks whether to delete a table now.
+  bool _askingDelete = false;
 
   /// How high the keyboard covers the screen now, in logical pixels.
   double _keyboard = 0;
@@ -246,6 +427,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
+      _formatters = _formattersOf(widget.controller);
       _before = '';
       _now = widget.controller.text;
     }
@@ -513,17 +695,25 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       next = TextSelection.collapsed(offset: to);
       passed = forward ? at : to;
     }
+    final was = selection.extentOffset;
     _select(next);
-    if (passed >= 0) _announce(text, passed);
+    // A table is passed as one block.
+    final now = widget.controller.selection.extentOffset;
+    final table = _tables.any(
+      (t) => t.start == math.min(was, now) && t.end == math.max(was, now),
+    );
+    if (table || passed >= 0) _announce(text, passed, table: table);
     return true;
   }
 
-  /// Tells a screen reader the character the cursor passed.
-  void _announce(String text, int at) {
+  /// Tells a screen reader the character the cursor passed, or that it
+  /// passed a [table].
+  void _announce(String text, int at, {bool table = false}) {
     if (!MediaQuery.accessibleNavigationOf(context)) return;
     final t = context.t;
-    final grapheme = text.substring(at, graphemeAfter(text, at));
+    final grapheme = table ? '' : text.substring(at, graphemeAfter(text, at));
     final spoken = switch (grapheme) {
+      _ when table => t.formatTable,
       '\n' => t.cursorNewLine,
       ' ' || '\t' => t.cursorSpace,
       _ => grapheme,
@@ -619,7 +809,12 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     final editable = _editable()?.renderEditable;
     if (editable == null) return false;
     final local = editable.globalToLocal(at);
+    final tables = _tables;
     for (final box in TextBoxes.find(widget.controller.text)) {
+      // A table's boxes are ticked full screen.
+      if (tables.any((t) => box.start >= t.start && box.end <= t.end)) {
+        continue;
+      }
       final rects = editable.getBoxesForSelection(
         TextSelection(baseOffset: box.start, extentOffset: box.end),
       );
@@ -629,6 +824,36 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       }
     }
     return false;
+  }
+
+  /// The tables the field draws as grids.
+  List<MarkdownTable> get _tables => switch (widget.controller) {
+    final TagTextController controller => controller.tables,
+    _ => const <MarkdownTable>[],
+  };
+
+  /// An edit deletes a table with words in its cells: once confirmed,
+  /// the field holds [whole], the table gone.
+  void _askDeleteTable(TextEditingValue whole) {
+    if (_askingDelete) return;
+    _askingDelete = true;
+    final before = widget.controller.text;
+    unawaited(
+      Future(() async {
+        final bool sure;
+        try {
+          if (!mounted) return;
+          sure = await confirmTableDelete(context);
+        } finally {
+          _askingDelete = false;
+        }
+        if (!mounted || !sure) return;
+        // A text changed meanwhile is not the one it was asked for.
+        if (widget.controller.text != before) return;
+        widget.controller.value = whole;
+        _focus.requestFocus();
+      }),
+    );
   }
 
   /// Opens the table of a formatted text at [at] (global) full screen,
@@ -801,7 +1026,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         strutStyle: strut,
         decoration: widget.decoration,
         onChanged: _userChanged,
-        inputFormatters: const [BoxIdsFormatter()],
+        inputFormatters: _formatters,
         scrollPadding: scrollPadding,
         onTap: widget.onBox != null || _formatting != null
             ? () {
@@ -837,7 +1062,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       strutStyle: strut,
       decoration: widget.decoration,
       onChanged: _userChanged,
-      inputFormatters: const [BoxIdsFormatter()],
+      inputFormatters: _formatters,
       magnifierConfiguration: TextMagnifierConfiguration.disabled,
       selectionControls: _handles,
       contextMenuBuilder: _menu,
@@ -1093,6 +1318,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
                     final TagTextController controller => controller.boxes,
                     _ => null,
                   },
+                  tables: _tables,
                 ),
               ),
             ),
@@ -1473,7 +1699,9 @@ class _LinkDialogState extends State<_LinkDialog> {
 
 /// The cursor's line as a text field shows it: from its start, the
 /// cursor right after the text before it, a selection highlighted; a long
-/// press starts or ends selecting. Of a formatted text it is the source.
+/// press starts or ends selecting. Of a formatted text it is the source,
+/// but a table, which the cursor is only ever before or after, is a
+/// table's sign.
 class _CursorLine extends StatelessWidget {
   final TextEditingValue value;
   final bool selecting;
@@ -1482,11 +1710,15 @@ class _CursorLine extends StatelessWidget {
   /// The ticks of the text's boxes, each drawn in its state.
   final BoxTicking? boxes;
 
+  /// The tables of the text drawn as grids.
+  final List<MarkdownTable> tables;
+
   const _CursorLine({
     required this.value,
     required this.selecting,
     required this.onLongPress,
     this.boxes,
+    this.tables = const [],
   });
 
   /// [text] from [from] to [to], the selection highlighted.
@@ -1533,9 +1765,28 @@ class _CursorLine extends StatelessWidget {
       backgroundColor: scheme.primaryContainer,
       color: scheme.onPrimaryContainer,
     );
-    final before = _spans(text, from, cursor, selection, marked);
-    final after = _spans(text, cursor, to, selection, marked);
-    String plain(List<TextSpan> spans) => spans.map((s) => s.text).join();
+    List<InlineSpan> before = _spans(text, from, cursor, selection, marked);
+    List<InlineSpan> after = _spans(text, cursor, to, selection, marked);
+    String plain(List<InlineSpan> spans) =>
+        spans.map((s) => s is TextSpan ? s.text : t.formatTable).join();
+    // A table is the whole of its lines: the cursor is at its start or
+    // its end.
+    for (final table in tables) {
+      if (table.start != cursor && table.end != cursor) continue;
+      final sign = [
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Icon(
+            Icons.table_chart_outlined,
+            key: const ValueKey('two-row-table'),
+            color: scheme.primary,
+          ),
+        ),
+      ];
+      before = table.end == cursor ? sign : const [];
+      after = table.start == cursor ? sign : const [];
+      break;
+    }
     return Semantics(
       container: true,
       label: t.cursorLine,

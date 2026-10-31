@@ -94,10 +94,19 @@
   <li>Deleting a row or column that holds words asks once: "The words in its cells are deleted from the Note." Deleting the last row or column deletes the table.</li>
 </ul>
 <p>
+  On the phone, the fields with the format bar show a table as the same grid, never as its
+  Markdown; a tap on it opens it full screen, and what changes there comes back into the field. The
+  cursor passes a table as one block: ◀, ▶ and the arrow keys go from right before it to right after
+  it, and the row above the keyboard shows it as a table sign. What is typed right before a table
+  goes on a line of its own, and what is typed right after it goes under it with a blank line
+  between. Backspace right after a table, or deleting a selection that holds one, deletes the whole
+  table, and asks first while its cells hold words.
+</p>
+<p>
   Tables are written as GFM tables: each edit writes the whole table anew, every row as
-  <code>| a | b |</code>, and leaves the words in its cells as they were. A line typed right under a
-  table, without a blank line between, becomes a row of it. Markdown tables pasted in become
-  tables. Where you may only read the Note, the table opens to read.
+  <code>| a | b |</code>, and leaves the words in its cells as they were. On the desktop, a line
+  typed right under a table's Markdown, without a blank line between, becomes a row of it. Markdown
+  tables pasted in become tables. Where you may only read the Note, the table opens to read.
 </p>
 
 <figure class="frame phone">

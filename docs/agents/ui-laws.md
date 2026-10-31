@@ -306,6 +306,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   On the desktop it sits above the field, which shows a formatted text's
   Markdown while it is edited and the text as it reads otherwise. Its ☐
   puts ☐ in at the cursor, also in the middle of a word.
+- **On the phone a table in the field is its grid**, the same as on the
+  card, never its Markdown; a tap opens it full screen. It is one block:
+  the cursor and a selection never end inside it, the bottom row shows
+  it as a table's sign, what is typed right before or after it goes on
+  a line of its own, and deleting any of it deletes all of it, asking
+  first while its cells hold words. The desktop's field shows its
+  Markdown.
 
 ## Boxes
 

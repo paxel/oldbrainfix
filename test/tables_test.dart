@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
@@ -522,22 +523,15 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(controller.text, 'Shop\n\n| Item |  |\n| --- | --- |\n|  |  |');
-      // In the field its pipes and delimiter row are marks, drawn as
-      // nothing in two rows.
-      final spans = <TextSpan>[];
-      tester
-          .state<EditableTextState>(find.byType(EditableText).first)
-          .buildTextSpan()
-          .visitChildren((span) {
-            if (span is TextSpan) spans.add(span);
-            return true;
-          });
+      // In the field it is drawn as its grid, its source as nothing.
       expect(
-        spans.firstWhere((s) => s.text == '| --- | --- |').style?.fontSize,
-        0.01,
+        find.descendant(
+          of: find.byType(EditableText),
+          matching: find.byType(Table),
+        ),
+        findsOneWidget,
       );
-
-      // In a table the button opens it.
+      // At a table the button opens it.
       controller.selection = const TextSelection.collapsed(offset: 8);
       await tester.pumpAndSettle();
       await tester.tap(key('format-table'));
@@ -549,20 +543,302 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.byType(TableScreen), findsNothing);
-      final editable = tester
-          .state<EditableTextState>(find.byType(EditableText))
-          .renderEditable;
-      final word = editable
-          .getBoxesForSelection(
-            const TextSelection(baseOffset: 8, extentOffset: 12),
-          )
-          .first
-          .toRect();
       final cursor = controller.selection;
-      await tester.tapAt(editable.localToGlobal(word.center));
+      await tester.tap(find.text('Item').first, warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.byType(TableScreen), findsOneWidget);
       expect(controller.selection, cursor);
+    });
+  });
+
+  group('in the edit field (#152)', () {
+    /// A formatted field holding [text] in two rows or plain, the
+    /// keyboard up.
+    Future<TagTextController> pumpField(
+      WidgetTester tester,
+      String text, {
+      bool twoRows = true,
+      double width = 400,
+    }) async {
+      tester.view.physicalSize = const Size(1000, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = TagTextController(text: text, hideMarks: twoRows)
+        ..markdown = true;
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: width,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    TwoRowTextField(
+                      controller: controller,
+                      twoRows: twoRows,
+                      boxes: true,
+                      formats: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.showKeyboard(find.byType(TextField));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 600);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      return controller;
+    }
+
+    MarkdownTable tableOf(TagTextController controller) =>
+        MarkdownTables.all(controller.text).single;
+
+    /// The spans the field draws visibly: none of a table's source.
+    List<String> drawn(WidgetTester tester) {
+      final out = <String>[];
+      tester
+          .state<EditableTextState>(find.byType(EditableText).first)
+          .buildTextSpan()
+          .visitChildren((span) {
+            if (span is TextSpan &&
+                span.text != null &&
+                span.style?.fontSize != 0.01) {
+              out.add(span.text!);
+            }
+            return true;
+          });
+      return out;
+    }
+
+    for (final twoRows in [true, false]) {
+      testWidgets('a table is its grid, scaled to the field, its source '
+          'never drawn (${twoRows ? 'two rows' : 'plain'})', (tester) async {
+        await pumpField(
+          tester,
+          'Readings\n\n${wide(headings: true)}\n\nDone',
+          twoRows: twoRows,
+          width: 300,
+        );
+        final grid = find.descendant(
+          of: find.byType(EditableText),
+          matching: find.byType(Table),
+        );
+        expect(grid, findsOneWidget);
+        expect(tester.widget<Table>(grid).border, isNotNull);
+        expect(
+          tester.getSize(find.byType(FittedBox).first).width,
+          lessThanOrEqualTo(300),
+        );
+        final shown = drawn(tester).join();
+        expect(shown, contains('Readings'));
+        expect(shown, contains('Done'));
+        expect(shown, isNot(contains('|')));
+        expect(shown, isNot(contains('column1')));
+        expect(shown, isNot(contains('<!--')));
+      });
+    }
+
+    testWidgets('a tap on it in the plain field opens it full screen and '
+        'its change comes back into the field', (tester) async {
+      final controller = await pumpField(tester, shop, twoRows: false);
+      await tester.tap(find.text('oat').first, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsOneWidget);
+      await tester.tap(key('cell-2-0'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'oats');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsNothing);
+      expect(controller.text, contains('| oats | 1 |'));
+      expect(
+        find.descendant(
+          of: find.byType(EditableText),
+          matching: find.text('oats'),
+        ),
+        findsOneWidget,
+      );
+      final table = tableOf(controller);
+      expect(controller.selection.isCollapsed, isTrue);
+      expect([
+        table.start,
+        table.end,
+      ], contains(controller.selection.baseOffset));
+    });
+
+    testWidgets('the cursor and a selection pass the table as one block', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, '$shop\n\nBread');
+      final table = tableOf(controller);
+      controller.selection = TextSelection.collapsed(offset: table.start);
+      await tester.pump();
+      // The bottom row shows the table as its sign.
+      expect(key('two-row-table'), findsOneWidget);
+      expect(
+        tester
+            .widget<RichText>(
+              find.descendant(
+                of: key('two-row-before'),
+                matching: find.byType(RichText),
+              ),
+            )
+            .text
+            .toPlainText(),
+        isEmpty,
+      );
+
+      await tester.tap(key('two-row-forward'));
+      await tester.pump();
+      expect(controller.selection.baseOffset, table.end);
+      expect(key('two-row-table'), findsOneWidget);
+      await tester.tap(key('two-row-back'));
+      await tester.pump();
+      expect(controller.selection.baseOffset, table.start);
+      await tester.tap(key('two-row-back'));
+      await tester.pump();
+      expect(controller.selection.baseOffset, table.start - 1);
+      expect(key('two-row-table'), findsNothing);
+
+      // Set inside it, an end goes on in the way it moved.
+      controller.selection = TextSelection.collapsed(offset: table.start + 3);
+      expect(controller.selection.baseOffset, table.end);
+      controller.selection = TextSelection.collapsed(offset: table.end - 3);
+      expect(controller.selection.baseOffset, table.start);
+      controller.selection = TextSelection(
+        baseOffset: 2,
+        extentOffset: table.start + 5,
+      );
+      expect(controller.selection.baseOffset, 2);
+      expect(controller.selection.extentOffset, table.end);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the arrow keys pass it as one block', (tester) async {
+      final controller = await pumpField(
+        tester,
+        '$shop\n\nBread',
+        twoRows: false,
+      );
+      final table = tableOf(controller);
+      controller.selection = TextSelection.collapsed(offset: table.end);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(controller.selection.baseOffset, table.start);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(controller.selection.baseOffset, table.end);
+    });
+
+    testWidgets('typing right before or after it goes on a line of its own', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, shop);
+      var table = tableOf(controller);
+      controller.selection = TextSelection.collapsed(offset: table.start);
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        TextEditingValue(
+          text: shop.replaceRange(table.start, table.start, 'x'),
+          selection: TextSelection.collapsed(offset: table.start + 1),
+        ),
+      );
+      await tester.pump();
+      expect(
+        controller.text,
+        shop.replaceRange(table.start, table.start, 'x\n'),
+      );
+      expect(controller.selection.baseOffset, table.start + 1);
+      final before = controller.text;
+      table = tableOf(controller);
+      controller.selection = TextSelection.collapsed(offset: table.end);
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        TextEditingValue(
+          text: '${before}y',
+          selection: TextSelection.collapsed(offset: before.length + 1),
+        ),
+      );
+      await tester.pump();
+      expect(controller.text, '$before\n\ny');
+      expect(controller.selection.baseOffset, controller.text.length);
+      expect(tableOf(controller).end, table.end);
+
+      // A line break it needs is not taken; the cursor goes on.
+      final text = controller.text;
+      controller.selection = TextSelection.collapsed(offset: table.start);
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        TextEditingValue(
+          text: text.replaceRange(table.start - 1, table.start, ''),
+          selection: TextSelection.collapsed(offset: table.start - 1),
+        ),
+      );
+      await tester.pump();
+      expect(controller.text, text);
+      expect(controller.selection.baseOffset, table.start - 1);
+    });
+
+    testWidgets('deleting it takes it whole, asking when it holds words', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, '$shop\n\nBread');
+      final table = tableOf(controller);
+      final text = controller.text;
+      Future<void> backspace() async {
+        controller.selection = TextSelection.collapsed(offset: table.end);
+        await tester.pump();
+        tester.testTextInput.updateEditingValue(
+          TextEditingValue(
+            text: text.replaceRange(table.end - 1, table.end, ''),
+            selection: TextSelection.collapsed(offset: table.end - 1),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await backspace();
+      expect(find.text('Delete the table?'), findsOneWidget);
+      expect(controller.text, text);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(controller.text, text);
+
+      await backspace();
+      await tester.tap(key('table-delete-confirm'));
+      await tester.pumpAndSettle();
+      expect(
+        controller.text,
+        text.replaceRange(table.start, table.end + 1, ''),
+      );
+      expect(controller.text, '# Shop\n\n\nBread');
+      expect(controller.selection.baseOffset, table.start);
+      expect(find.byType(Table), findsNothing);
+    });
+
+    testWidgets('an empty table goes without asking', (tester) async {
+      const empty = 'Shop\n\n|  |  |\n| --- | --- |\n|  |  |';
+      final controller = await pumpField(tester, empty);
+      final table = tableOf(controller);
+      controller.selection = TextSelection.collapsed(offset: table.end);
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        TextEditingValue(
+          text: empty.substring(0, empty.length - 1),
+          selection: TextSelection.collapsed(offset: empty.length - 1),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(controller.text, 'Shop\n');
     });
   });
 
