@@ -85,16 +85,26 @@ void main() {
       '${l.struck ? '[x] ' : ''}${l.text}',
   ];
 
-  bool struck(WidgetTester tester, String lineId) =>
-      tester
-          .widget<Text>(key('checklist-line-$lineId'))
-          .style
-          ?.decoration
-          ?.contains(TextDecoration.lineThrough) ??
-      false;
+  /// The field the Line [lineId] is renamed in, in the editor.
+  Finder field(String lineId) => find.descendant(
+    of: key('shopping-field-$lineId'),
+    matching: find.byType(TextField),
+  );
+
+  /// The Line [lineId] as drawn: its text, or in the editor its field.
+  Finder drawn(String lineId) => field(lineId).evaluate().isEmpty
+      ? key('checklist-line-$lineId')
+      : field(lineId);
+
+  bool struck(WidgetTester tester, String lineId) {
+    final style = field(lineId).evaluate().isEmpty
+        ? tester.widget<Text>(key('checklist-line-$lineId')).style
+        : tester.widget<TextField>(field(lineId)).style;
+    return style?.decoration?.contains(TextDecoration.lineThrough) ?? false;
+  }
 
   double top(WidgetTester tester, String lineId) =>
-      tester.getTopLeft(key('checklist-line-$lineId')).dy;
+      tester.getTopLeft(drawn(lineId)).dy;
 
   /// "back Sat, Oct 31" as the card shows it for [line].
   String back(ShoppingLine line) =>
@@ -234,8 +244,9 @@ void main() {
         lessThan(top(tester, milk)),
       );
 
-      await tester.enterText(key('shopping-add-text'), 'Tea\nBread');
-      await tap(tester, key('shopping-add'));
+      // Lines pasted, each with its Return.
+      await tester.enterText(key('shopping-add-text'), 'Tea\nBread\n');
+      await tester.pumpAndSettle();
       // In the order typed, above the Lines there were.
       expect(shown(note), ['Tea', 'Bread', 'Milk', 'Eggs']);
       expect(addField(tester).controller!.text, isEmpty);
@@ -252,8 +263,8 @@ void main() {
       expect(find.byType(Checkbox), findsNWidgets(4));
     });
 
-    testWidgets('a Line\'s ⋮ renames it, picks its reappear time as radio '
-        'buttons and deletes it for good', (tester) async {
+    testWidgets('a Line\'s ⋮ picks its reappear time as radio buttons and '
+        'deletes it for good', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs').id;
       lists.make(note);
       await openEditor(tester, 'Shop');
@@ -302,28 +313,78 @@ void main() {
       await tap(tester, key('shopping-reappear-once'));
       await tap(tester, key('checklist-check-$eggs'));
       expect(shown(note), ['[x] Milk']);
-      expect(key('checklist-line-$eggs'), findsNothing);
-
+      expect(drawn(eggs), findsNothing);
+      // Renaming is typed in place.
       await lineMenu(tester, milk);
-      await tap(tester, key('shopping-rename'));
-      await tester.enterText(
-        find.descendant(
-          of: key('checklist-rename-text'),
-          matching: find.byType(TextField),
-        ),
-        'Oat milk',
-      );
-      await tap(tester, key('checklist-rename-save'));
-      expect(shown(note), ['[x] Oat milk']);
-
-      // A long press opens the same menu where the finger is.
-      await tester.longPress(key('checklist-line-$milk'));
-      await tester.pumpAndSettle();
+      expect(key('shopping-rename'), findsNothing);
       await tap(tester, key('shopping-delete'));
       expect(find.byType(AlertDialog), findsOneWidget);
       await tap(tester, key('checklist-delete-confirm'));
       expect(shown(note), isEmpty);
       expect(find.byType(BottomSheet), findsNothing);
+    });
+
+    testWidgets('Return in the field adds what was typed and leaves it ready '
+        'for the next; what is left there is added on leaving', (tester) async {
+      final note = notes.capture('Shop\nMilk').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final add = find.descendant(
+        of: key('shopping-add-text'),
+        matching: find.byType(TextField),
+      );
+      await tester.showKeyboard(add);
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'Tea\n',
+          selection: TextSelection.collapsed(offset: 4),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(shown(note), ['Tea', 'Milk']);
+      expect(addField(tester).controller!.text, isEmpty);
+      expect(addField(tester).focusNode?.hasFocus, isTrue);
+
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'Bread',
+          selection: TextSelection.collapsed(offset: 5),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(shown(note), ['Tea', 'Milk']);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(shown(note), ['Bread', 'Tea', 'Milk']);
+    });
+
+    testWidgets('a Line is renamed in place, kept on leaving; one emptied '
+        'goes', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs\nTea').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      await tap(tester, key('checklist-check-$milk'));
+      expect(struck(tester, milk), isTrue);
+
+      // Return ends the rename; no Line is added under it.
+      await tester.enterText(field(milk), 'Oat milk\n');
+      await tester.pumpAndSettle();
+      expect(shown(note), ['Eggs', 'Tea', '[x] Oat milk']);
+      expect(
+        tester.widget<TextField>(field(milk)).controller!.text,
+        'Oat milk',
+      );
+
+      await tester.enterText(field(eggs), 'Brown eggs');
+      await tester.enterText(field(tea), '');
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(shown(note), ['Brown eggs', '[x] Oat milk']);
+      expect(store.current(tea, ChecklistKeys.trashed), isNotNull);
     });
 
     testWidgets('"Back to a plain Note" there too; the field then holds the '
@@ -397,17 +458,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(key('checklist-menu-$milk'), findsNothing);
       expect(key('shopping-to-plain'), findsNothing);
-      await tester.longPress(key('checklist-line-$milk'));
-      await tester.pumpAndSettle();
-      expect(key('shopping-rename'), findsNothing);
+      // Ann's Lines are no fields of his.
+      expect(field(milk), findsNothing);
+      expect(key('checklist-line-$milk'), findsOneWidget);
 
       await tester.enterText(key('shopping-add-text'), 'Bread');
       await tap(tester, key('shopping-add'));
       expect(shown(note, ben), ['Bread', 'Eggs', '[x] Milk']);
       // His own Line is his to change.
       final bread = idOf(note, 'Bread', ben);
+      expect(field(bread), findsOneWidget);
       await tap(tester, key('checklist-menu-$bread'));
-      expect(key('shopping-rename'), findsOneWidget);
       expect(key('shopping-reappear-2w'), findsOneWidget);
       expect(key('shopping-delete'), findsOneWidget);
     });

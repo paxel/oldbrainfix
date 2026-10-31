@@ -293,6 +293,29 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **History** opens a dialog listing every change of the box, the oldest
   first: the state, who and when.
 
+## Checklist and Shopping List Lines
+
+- **The Lines of a Checklist and a Shopping List are typed in place** in
+  the Note editor: each Line is a text row beside its box, and the
+  cursor moves between them. Cards only check them.
+- On a Checklist, **Return** splits the Line at the cursor; at its end
+  it starts a new empty Line with an open box under it, in the group of
+  a Line with one; **Add Line** starts one at the end. **Backspace at
+  the start** of a Line joins it with the Line above: its text goes to
+  the end of that Line, which keeps its box and state; an empty Line
+  simply goes.
+- **In and out** sit on the bar above the keyboard, as the format bar
+  does, and put the Line with the cursor under the Line above or back
+  at the top.
+- **Nothing typed is lost on leaving**: what was typed is stored when
+  the cursor leaves a Line and when the editor saves or is left; Lines
+  left empty are dropped on leaving.
+- A Shopping List keeps its field at the top: **Return adds** what was
+  typed and leaves the field ready for the next; text left there is
+  added on leaving. Its Lines are renamed in place.
+- ⋮ of a Line holds the rest (moving it, its reappear time, Delete); a
+  long press in a Line's text selects, as in any field.
+
 ## The bar
 
 - **One bar on every phone page.** On a phone the buttons sit on their

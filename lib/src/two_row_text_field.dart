@@ -76,6 +76,16 @@ int wordEdgeNear(String text, int offset) {
   return offset - before <= text.length - offset ? before : text.length;
 }
 
+/// A button a field puts on the bar above the keyboard: [key] for its
+/// widget, [label] for its tooltip and a screen reader, [run] null while
+/// it can do nothing.
+typedef FieldAction = ({
+  String key,
+  String label,
+  IconData icon,
+  VoidCallback? run,
+});
+
 /// The text field of the Note editor and of Amend on the phone: the whole
 /// text on top, as a system text field without magnifier and without
 /// dragging the cursor, whose tap puts the cursor at the nearest word
@@ -108,6 +118,10 @@ int wordEdgeNear(String text, int offset) {
 /// the table button, which puts a new table at the cursor or opens the
 /// table the cursor is in full screen ([openTable]); a tap on a table of
 /// a formatted text opens it too. A table's cell is edited without them.
+///
+/// [actions] put buttons of the field's own on the same bar, first, such
+/// as a Line's "in" and "out" (#141). With [focusNode] the field takes
+/// the focus its owner moves; it stays the owner's to dispose.
 class TwoRowTextField extends StatefulWidget {
   /// The height of the bottom row.
   static const rowHeight = 56.0;
@@ -134,6 +148,8 @@ class TwoRowTextField extends StatefulWidget {
   final bool formats;
   final bool lineFormats;
   final VoidCallback? onFormatted;
+  final List<FieldAction> actions;
+  final FocusNode? focusNode;
 
   const TwoRowTextField({
     super.key,
@@ -148,6 +164,8 @@ class TwoRowTextField extends StatefulWidget {
     this.formats = false,
     this.lineFormats = true,
     this.onFormatted,
+    this.actions = const [],
+    this.focusNode,
   });
 
   /// The height of what rides on the keyboard above a field that types
@@ -171,7 +189,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   @override
   bool get selectionEnabled => true;
 
-  final _focus = FocusNode();
+  final _ownFocus = FocusNode();
+  FocusNode get _focus => widget.focusNode ?? _ownFocus;
   final _field = GlobalKey();
   final _row = OverlayPortalController();
   late final _handles = _NoCaretHandle(widget.controller);
@@ -220,6 +239,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   @override
   void didUpdateWidget(TwoRowTextField oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      (oldWidget.focusNode ?? _ownFocus).removeListener(_focusChanged);
+      _focus.addListener(_focusChanged);
+    }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
@@ -234,7 +257,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     _repeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_changed);
-    _focus.dispose();
+    _focus.removeListener(_focusChanged);
+    _ownFocus.dispose();
     super.dispose();
   }
 
@@ -281,8 +305,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   bool get _rowShown => widget.twoRows && _keyboardOpen;
 
-  /// Whether the field has the bar of formats or ☐.
-  bool get _hasBar => _formatting != null || _inserts;
+  /// Whether the field has the bar of formats, ☐ or its own buttons.
+  bool get _hasBar =>
+      _formatting != null ||
+      _inserts ||
+      (widget.actions.isNotEmpty && !widget.readOnly);
 
   bool get _barShown => _hasBar && _keyboardOpen;
 
@@ -395,6 +422,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           PopupMenuItem(
             key: ValueKey('${format.key}-more'),
             value: format,
+            enabled: format.run != null,
             child: Row(
               children: [
                 SizedBox(width: 32, child: format.icon(context)),
@@ -411,7 +439,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     );
     if (!mounted || picked == null) return;
     _focus.requestFocus();
-    picked.run();
+    picked.run?.call();
   }
 
   /// The field's own editable text, which tells the keyboard of a moved
@@ -880,6 +908,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
     );
     final formats = [
+      for (final action in widget.actions)
+        _Format(
+          key: action.key,
+          label: action.label,
+          icon: (_) => Icon(action.icon),
+          run: action.run,
+        ),
       if (_inserts)
         _Format(
           key: 'two-row-insert-box',
@@ -1211,7 +1246,9 @@ class _Format {
   /// Whether it is a format the cursor can be in, [active] or not.
   final bool toggles;
   final bool active;
-  final VoidCallback run;
+
+  /// Null while it can do nothing; it shows dimmed then.
+  final VoidCallback? run;
 
   const _Format({
     required this.key,
@@ -1286,8 +1323,14 @@ class _FormatButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final active = format.active;
+    final colour = format.run == null
+        ? scheme.onSurface.withValues(alpha: 0.38)
+        : active
+        ? scheme.onPrimaryContainer
+        : scheme.primary;
     return Semantics(
       button: true,
+      enabled: format.run != null,
       label: format.label,
       toggled: format.toggles ? active : null,
       onTap: format.run,
@@ -1308,16 +1351,9 @@ class _FormatButton extends StatelessWidget {
               height: double.infinity,
               child: Center(
                 child: IconTheme.merge(
-                  data: IconThemeData(
-                    size: 24,
-                    color: active ? scheme.onPrimaryContainer : scheme.primary,
-                  ),
+                  data: IconThemeData(size: 24, color: colour),
                   child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: active
-                          ? scheme.onPrimaryContainer
-                          : scheme.primary,
-                    ),
+                    style: TextStyle(color: colour),
                     child: format.icon(context),
                   ),
                 ),

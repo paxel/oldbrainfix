@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'browser.dart';
 import 'l10n.dart';
+import 'line_editing.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'two_row_text_field.dart';
@@ -48,12 +52,16 @@ typedef NoteChecklist = ({Checklist? Function() read, Checklists lists});
 /// through in place once checked; the group of a Line is drawn as one
 /// frame under it. A checkbox checks with [onCheck] and is disabled while
 /// it is null. With [onMenu] a Line whose id [editable] holds has ⋮, and
-/// a long press on it opens the same menu where the finger is.
+/// a long press on it opens the same menu where the finger is. A Line
+/// [field] gives a field for is typed in that field, in place of its
+/// text (#141), and its ⋮ is the only way to its menu: a long press in
+/// the field selects.
 class ChecklistLines extends StatelessWidget {
   final List<ShownLine> lines;
   final void Function(String id, bool checked)? onCheck;
   final void Function(String id, Offset at)? onMenu;
   final Set<String> editable;
+  final Widget? Function(ShownLine line)? field;
 
   const ChecklistLines({
     super.key,
@@ -61,6 +69,7 @@ class ChecklistLines extends StatelessWidget {
     this.onCheck,
     this.onMenu,
     this.editable = const {},
+    this.field,
   });
 
   @override
@@ -93,6 +102,7 @@ class ChecklistLines extends StatelessWidget {
         line: line,
         onCheck: onCheck,
         onMenu: editable.contains(line.id) ? onMenu : null,
+        field: field?.call(line),
       );
       if (line.inGroup) {
         group.add(row);
@@ -110,65 +120,70 @@ class ChecklistLines extends StatelessWidget {
   }
 }
 
-/// One Line: its checkbox, its text and, with [onMenu], ⋮.
+/// The style of a Line's text: struck through once [checked].
+TextStyle? lineStyle(BuildContext context, {required bool checked}) {
+  final theme = Theme.of(context);
+  final style = theme.textTheme.bodyLarge;
+  return checked
+      ? style?.copyWith(
+          decoration: TextDecoration.lineThrough,
+          color: theme.colorScheme.onSurfaceVariant,
+        )
+      : style;
+}
+
+/// One Line: its checkbox, its text or [field] and, with [onMenu], ⋮.
 class _LineRow extends StatelessWidget {
   final ShownLine line;
   final void Function(String id, bool checked)? onCheck;
   final void Function(String id, Offset at)? onMenu;
+  final Widget? field;
 
-  const _LineRow({required this.line, this.onCheck, this.onMenu});
+  const _LineRow({required this.line, this.onCheck, this.onMenu, this.field});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.textTheme.bodyLarge;
     final check = onCheck;
     final menu = onMenu;
-    // The checkbox reads with its text; ⋮ stays a button of its own.
+    final field = this.field;
+    final box = Checkbox(
+      key: ValueKey('checklist-check-${line.id}'),
+      value: line.checked,
+      onChanged: check == null ? null : (on) => check(line.id, on ?? false),
+    );
+    final text = Expanded(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: field == null ? 8 : 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            field ??
+                Text(
+                  line.text,
+                  key: ValueKey('checklist-line-${line.id}'),
+                  style: lineStyle(context, checked: line.checked),
+                ),
+            if (line.below case final below?)
+              Text(
+                below,
+                key: ValueKey('checklist-below-${line.id}'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    // The checkbox reads with its text; ⋮ stays a button of its own, and
+    // so does a field.
     final row = Row(
       children: [
         Expanded(
-          child: MergeSemantics(
-            child: Row(
-              children: [
-                Checkbox(
-                  key: ValueKey('checklist-check-${line.id}'),
-                  value: line.checked,
-                  onChanged: check == null
-                      ? null
-                      : (on) => check(line.id, on ?? false),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          line.text,
-                          key: ValueKey('checklist-line-${line.id}'),
-                          style: line.checked
-                              ? style?.copyWith(
-                                  decoration: TextDecoration.lineThrough,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                )
-                              : style,
-                        ),
-                        if (line.below case final below?)
-                          Text(
-                            below,
-                            key: ValueKey('checklist-below-${line.id}'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: field == null
+              ? MergeSemantics(child: Row(children: [box, text]))
+              : Row(children: [box, text]),
         ),
         if (menu != null)
           Builder(
@@ -185,7 +200,7 @@ class _LineRow extends StatelessWidget {
           ),
       ],
     );
-    if (menu == null) return row;
+    if (menu == null || field != null) return row;
     return GestureDetector(
       onLongPressStart: (details) => menu(line.id, details.globalPosition),
       child: row,
@@ -272,15 +287,24 @@ class _CardChecklistState extends State<CardChecklist> {
 }
 
 /// The Checklist part of a Note's editor (#120), nothing while the Note
-/// is none: its Lines to check; for who may change a Line, ⋮ and a long
-/// press with Rename, Move up, Move down, putting it under the Line above
-/// or back to the top level, and Delete; a field and "Add Line" for
-/// anyone with a role in its Area; "Uncheck all" while one is checked;
-/// and, with [onToPlain], "Back to a plain Note". It follows the log as it
-/// changes.
+/// is none: its Lines with their boxes, each typed in place where this
+/// Device may change it (#141). Return splits a Line at the cursor, or at
+/// its end starts a new empty one under it; Backspace at its start joins
+/// it with the Line above, whose box stays, and an empty one goes; "in"
+/// and "out" on the bar above the keyboard put it under the Line above
+/// or back at the top. "Add Line" starts an empty one at the end for
+/// anyone with a role in its Area. ⋮ of a Line it may change has Move
+/// up, Move down, putting it under the Line above or back to the top
+/// level, and Delete; "Uncheck all" shows while one is checked; and, with
+/// [onToPlain], "Back to a plain Note". What is typed is stored as the
+/// cursor leaves a Line and whenever [typed] says so; a Line left empty
+/// goes as the editor is left. It follows the log as it changes.
 class ChecklistSection extends StatefulWidget {
   final Notes notes;
   final String noteId;
+
+  /// Tells it when the editor saves and when it is left.
+  final TypedLines? typed;
 
   /// Turns the Note back into a plain Note; no button when null.
   final VoidCallback? onToPlain;
@@ -289,6 +313,7 @@ class ChecklistSection extends StatefulWidget {
     super.key,
     required this.notes,
     required this.noteId,
+    this.typed,
     this.onToPlain,
   });
 
@@ -297,17 +322,23 @@ class ChecklistSection extends StatefulWidget {
 }
 
 /// What the menu of a Line does.
-enum _LineStep { rename, up, down, indent, outdent, delete }
+enum _LineStep { up, down, indent, outdent, delete }
 
 class _ChecklistSectionState extends State<ChecklistSection>
-    with ReloadsOnLogChange {
+    with ReloadsOnLogChange, AutomaticKeepAliveClientMixin {
   late final _lists = Checklists(widget.notes.store);
   late final _twoRows = widget.notes.store.twoRowEditorOn;
-  final _add = TextEditingController();
   Checklist? _list;
   var _checks = false;
   var _adds = false;
   Set<String> _editable = const {};
+
+  /// The Lines as they are typed, in the order they show, the new ones
+  /// not stored yet among them.
+  List<TypedLine> _rows = const [];
+
+  /// How many new Lines were started, to tell them apart.
+  var _started = 0;
 
   @override
   Store get log => widget.notes.store;
@@ -315,15 +346,32 @@ class _ChecklistSectionState extends State<ChecklistSection>
   @override
   void reloadLog() => setState(_load);
 
+  /// Kept while scrolled away, so nothing typed goes with it.
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
     _load();
+    widget.typed?.listen(_keepTyped);
+  }
+
+  @override
+  void didUpdateWidget(ChecklistSection old) {
+    super.didUpdateWidget(old);
+    if (old.typed != widget.typed) {
+      old.typed?.forget(_keepTyped);
+      widget.typed?.listen(_keepTyped);
+    }
   }
 
   @override
   void dispose() {
-    _add.dispose();
+    widget.typed?.forget(_keepTyped);
+    for (final row in _rows) {
+      row.dispose();
+    }
     super.dispose();
   }
 
@@ -335,35 +383,433 @@ class _ChecklistSectionState extends State<ChecklistSection>
       for (final line in list?.lines ?? const <Line>[])
         if (_lists.mayEdit(line.id)) line.id,
     };
+    _rows = _arrange(list);
+  }
+
+  /// The rows for the Lines of [list]: those there already kept with what
+  /// is typed in them, a new one after the Line it was started under, a
+  /// row whose Line went while typed in kept as a new one.
+  List<TypedLine> _arrange(Checklist? list) {
+    final old = _rows;
+    final stored = {for (final row in old) ?row.id: row};
+    final after = <String?, List<TypedLine>>{};
+    String? above;
+    for (final row in old) {
+      final id = row.id;
+      if (id != null && list?.line(id) != null) {
+        above = id;
+        continue;
+      }
+      if (id != null) {
+        stored.remove(id);
+        if (!row.changed || row.typed.isEmpty) {
+          _retire(row);
+          continue;
+        }
+        row
+          ..id = null
+          ..kept = '';
+      }
+      after.putIfAbsent(above, () => []).add(row);
+    }
+    if (list == null) {
+      for (final row in [...stored.values, ...after.values.expand((r) => r)]) {
+        _retire(row);
+      }
+      return const [];
+    }
+    final rows = <TypedLine>[...?after.remove(null)];
+    for (final line in list.lines) {
+      final row = stored.remove(line.id) ?? _row(id: line.id, text: line.text);
+      row
+        ..inGroup = line.inGroup
+        ..take(line.text);
+      rows
+        ..add(row)
+        ..addAll(after.remove(line.id) ?? const []);
+    }
+    // Started under a Line that went: at the end.
+    for (final rest in after.values) {
+      rows.addAll(rest);
+    }
+    for (final row in stored.values) {
+      _retire(row);
+    }
+    return rows;
+  }
+
+  /// A row for the Line [id] holding [text], or a new one.
+  TypedLine _row({String? id, String text = '', bool inGroup = false}) {
+    final row = TypedLine(
+      id: id,
+      kept: text,
+      inGroup: inGroup,
+      marked: true,
+      started: id == null ? ++_started : 0,
+    );
+    row.text.addListener(() => _changed(row));
+    row.focus.addListener(() {
+      if (!row.focus.hasFocus) scheduleMicrotask(() => _left(row));
+    });
+    return row;
+  }
+
+  /// Disposes [row] once its field is gone.
+  void _retire(TypedLine row) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => row.dispose());
+  }
+
+  /// The id [row] shows under: its Line's, or one of its own while new.
+  static String _shownId(TypedLine row) => row.id ?? 'new-${row.started}';
+
+  TypedLine? _rowShown(String id) {
+    for (final row in _rows) {
+      if (_shownId(row) == id) return row;
+    }
+    return null;
+  }
+
+  /// Whether the Note is a Checklist out of the trash, to write to.
+  bool get _open =>
+      !(widget.notes.byId(widget.noteId)?.isTrashed ?? true) &&
+      _lists.isChecklist(widget.noteId);
+
+  /// Whether the Line [id] still shows on the list.
+  bool _shows(String id) => _lists.byNote(widget.noteId)?.line(id) != null;
+
+  /// How many stored Lines show before [row]: where it is added.
+  int _storedBefore(TypedLine row) {
+    var count = 0;
+    for (final r in _rows) {
+      if (identical(r, row)) break;
+      if (r.id != null) count++;
+    }
+    return count;
+  }
+
+  /// Whether [row] is a Line with a group under it.
+  bool _hasGroup(TypedLine row) => switch (row.id) {
+    final id? => _list?.groupOf(id).isNotEmpty ?? false,
+    null => false,
+  };
+
+  /// Stores what was typed into [row]: a new Line once it holds text, a
+  /// Line renamed once its text changed. An empty one waits.
+  void _store(TypedLine row) {
+    final typed = row.typed;
+    if (typed.isEmpty || !row.changed || !_open) return;
+    switch (row.id) {
+      case null:
+        if (!_lists.mayCheck(widget.noteId)) return;
+        row.id = _lists.add(
+          widget.noteId,
+          typed,
+          at: _storedBefore(row),
+          indent: row.inGroup,
+        );
+      case final id:
+        if (!_shows(id) || !_lists.mayEdit(id)) return;
+        _lists.rename(id, typed);
+    }
+    row.kept = typed;
+  }
+
+  /// The cursor left [row].
+  void _left(TypedLine row) {
+    if (!mounted || !_rows.contains(row) || !row.changed) return;
+    _store(row);
+  }
+
+  /// Stores what was typed; [leaving], the Lines left empty go too.
+  void _keepTyped({required bool leaving}) {
+    if (!mounted) return;
+    final typed = [
+      for (final row in _rows)
+        if (row.changed && row.typed.isNotEmpty) row,
+    ];
+    if (typed.isNotEmpty) {
+      widget.notes.store.batch(() {
+        for (final row in typed) {
+          _store(row);
+        }
+      });
+    }
+    if (!leaving) return;
+    final empty = [
+      for (final row in _rows)
+        if (row.typed.isEmpty) row,
+    ];
+    if (empty.isEmpty) return;
+    final gone = [
+      for (final row in empty)
+        if (row.id case final id? when _shows(id) && _lists.mayEdit(id)) id,
+    ];
+    if (gone.isNotEmpty && _open) {
+      widget.notes.store.batch(() {
+        for (final id in gone) {
+          _lists.delete(id);
+        }
+      });
+    }
+    setState(() {
+      _rows = [
+        for (final row in _rows)
+          if (!empty.contains(row)) row,
+      ];
+    });
+    empty.forEach(_retire);
+  }
+
+  /// Keeps the text of [row] after [lineStart], and the cursor there;
+  /// takes a Return as a split and a Backspace at its start as a join.
+  void _changed(TypedLine row) {
+    if (row.setting) return;
+    final value = row.text.value;
+    final before = row.last;
+    row.last = value;
+    final text = value.text;
+    if (!text.startsWith(lineStart)) {
+      final selection = before.selection;
+      if (before.text == '$lineStart$text' &&
+          selection.isCollapsed &&
+          selection.baseOffset <= 1) {
+        scheduleMicrotask(() => _join(row));
+        return;
+      }
+      // Set as a whole, by a paste over all or the system.
+      int moved(int offset) => offset < 0 ? offset : offset + 1;
+      final now = value.selection;
+      row.set(
+        TextEditingValue(
+          text: '$lineStart$text',
+          selection: now.isValid
+              ? now.copyWith(
+                  baseOffset: moved(now.baseOffset),
+                  extentOffset: moved(now.extentOffset),
+                )
+              : TextSelection.collapsed(offset: text.length + 1),
+          composing: value.composing.isValid
+              ? TextRange(
+                  start: value.composing.start + 1,
+                  end: value.composing.end + 1,
+                )
+              : TextRange.empty,
+        ),
+      );
+    }
+    if (text.contains('\n') || text.contains('\r')) {
+      scheduleMicrotask(() => _split(row));
+      return;
+    }
+    final selection = value.selection;
+    if (text.startsWith(lineStart) &&
+        selection.isValid &&
+        (selection.baseOffset < 1 || selection.extentOffset < 1)) {
+      row.set(
+        value.copyWith(
+          selection: selection.copyWith(
+            baseOffset: math.max(1, selection.baseOffset),
+            extentOffset: math.max(1, selection.extentOffset),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Splits [row] at the Return typed: the text before stays, the text
+  /// after becomes a new Line under it, an empty one at its end; a Line
+  /// with a group gets it as the first of its group. At its start, an
+  /// empty Line goes in above and the cursor stays. Pasted lines become
+  /// a Line each.
+  void _split(TypedLine row) {
+    if (!mounted || !_rows.contains(row)) return;
+    final parts = row.text.text
+        .replaceAll(lineStart, '')
+        .split(RegExp('\r\n|\r|\n'));
+    final filled = [
+      for (final part in parts)
+        if (part.trim().isNotEmpty) part.trim(),
+    ];
+    if (filled.isEmpty) {
+      // Return in an empty Line: it is the new one already.
+      row.set(
+        const TextEditingValue(
+          text: lineStart,
+          selection: TextSelection.collapsed(offset: 1),
+        ),
+      );
+      return;
+    }
+    final at = _rows.indexOf(row);
+    if (parts.length == 2 && parts.first.trim().isEmpty) {
+      row.set(
+        TextEditingValue(
+          text: '$lineStart${parts.last}',
+          selection: const TextSelection.collapsed(offset: 1),
+        ),
+      );
+      setState(() {
+        _rows = [..._rows]..insert(at, _row(inGroup: row.inGroup));
+      });
+      return;
+    }
+    final group = row.inGroup || _hasGroup(row);
+    final first = filled.first;
+    row.set(
+      TextEditingValue(
+        text: '$lineStart$first',
+        selection: TextSelection.collapsed(offset: 1 + first.length),
+      ),
+    );
+    final added = <TypedLine>[];
+    widget.notes.store.batch(() {
+      _store(row);
+      if (row.id == null) return;
+      var index = _storedBefore(row) + 1;
+      for (final text in filled.skip(1)) {
+        final id = _lists.add(widget.noteId, text, at: index++, indent: group);
+        added.add(_row(id: id, text: text, inGroup: group));
+      }
+    });
+    if (row.id == null) return;
+    final ends = parts.last.trim().isEmpty;
+    if (ends) added.add(_row(inGroup: group));
+    if (added.isEmpty) return;
+    setState(() {
+      _rows = [..._rows]..insertAll(at + 1, added);
+    });
+    final target = added.last;
+    _focusOn(target, parts.length == 2 || ends ? 0 : target.typed.length);
+  }
+
+  /// Joins [row] with the Line above at a Backspace at its start: its
+  /// text goes to the end of the Line above, which keeps its box and
+  /// state, and the Line [row] is deleted, its checks staying in the
+  /// log; its group stays a group. An empty Line simply goes.
+  void _join(TypedLine row) {
+    if (!mounted || !_rows.contains(row)) return;
+    final at = _rows.indexOf(row);
+    final text = row.typed;
+    void restore() => row.set(
+      TextEditingValue(
+        text: '$lineStart${row.text.text}',
+        selection: const TextSelection.collapsed(offset: 1),
+      ),
+    );
+    if (text.isEmpty) {
+      _drop(row);
+      return;
+    }
+    final upper = at > 0 ? _rows[at - 1] : null;
+    final upperId = upper?.id;
+    if (upper == null || (upperId != null && !_editable.contains(upperId))) {
+      restore();
+      return;
+    }
+    final head = upper.typed;
+    final group = switch (row.id) {
+      final id? => [
+        for (final line in _list?.groupOf(id) ?? const <Line>[])
+          if (_lists.mayEdit(line.id)) line.id,
+      ],
+      null => const <String>[],
+    };
+    upper.set(
+      TextEditingValue(
+        text: '$lineStart$head$text',
+        selection: TextSelection.collapsed(offset: 1 + head.length),
+      ),
+    );
+    widget.notes.store.batch(() {
+      _store(upper);
+      if (row.id case final id? when _open && _shows(id)) {
+        _lists.delete(id);
+        for (final line in group) {
+          _lists.indent(line);
+        }
+      }
+    });
+    setState(() {
+      _rows = [..._rows]..remove(row);
+    });
+    _retire(row);
+    _focusOn(upper, head.length);
+  }
+
+  /// Takes the empty [row] away, deleting its Line; the cursor goes to
+  /// the end of the Line above, or to the start of the next.
+  void _drop(TypedLine row) {
+    final at = _rows.indexOf(row);
+    if (row.id case final id? when _open && _shows(id)) {
+      if (!_lists.mayEdit(id)) return;
+      _lists.delete(id);
+    }
+    setState(() {
+      _rows = [..._rows]..remove(row);
+    });
+    _retire(row);
+    if (at > 0) {
+      final above = _rows[at - 1];
+      _focusOn(above, above.text.text.length);
+    } else if (_rows.isNotEmpty) {
+      _focusOn(_rows.first, 0);
+    }
+  }
+
+  /// Puts the cursor into [row] at [offset] of its text.
+  void _focusOn(TypedLine row, int offset) {
+    row.cursorAt(offset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _rows.contains(row)) row.focus.requestFocus();
+    });
+  }
+
+  /// "Add Line": an empty Line at the end, the cursor in it.
+  void _addEmpty() {
+    final last = _rows.lastOrNull;
+    if (last != null && last.id == null && last.typed.isEmpty) {
+      _focusOn(last, 0);
+      return;
+    }
+    final row = _row();
+    setState(() => _rows = [..._rows, row]);
+    _focusOn(row, 0);
+  }
+
+  /// Puts [row] under the Line above, or with [under] false back at the
+  /// top.
+  void _indent(TypedLine row, {required bool under}) {
+    final at = _rows.indexOf(row);
+    if (at < 0) return;
+    switch (row.id) {
+      case null:
+        setState(() => row.inGroup = under && at > 0);
+      case final id:
+        if (!_open || !_shows(id) || !_lists.mayEdit(id)) return;
+        if (under && _lists.byNote(widget.noteId)?.lines.first.id == id) {
+          return;
+        }
+        _lists.indent(id, under: under);
+        setState(_load);
+    }
   }
 
   void _check(String id, bool checked) {
+    var line = id;
+    if (_rowShown(id) case final row? when row.id == null) {
+      // A new Line is stored first; an empty one has nothing to check.
+      _store(row);
+      final stored = row.id;
+      if (stored == null) return;
+      line = stored;
+    }
     final on = _list?.on;
-    checked ? _lists.check(id, on: on) : _lists.uncheck(id, on: on);
+    checked ? _lists.check(line, on: on) : _lists.uncheck(line, on: on);
     setState(_load);
   }
 
   void _uncheckAll() {
     _lists.uncheckAll(widget.noteId, on: _list?.on);
-    setState(_load);
-  }
-
-  /// Adds a Line for every line typed that is not blank, one that starts
-  /// with a space or a tab under the Line above.
-  void _addTyped() {
-    final rows = [
-      for (final row in splitLines(_add.text))
-        if (row.trim().isNotEmpty) row,
-    ];
-    if (rows.isEmpty) return;
-    for (final row in rows) {
-      _lists.add(
-        widget.noteId,
-        row,
-        indent: row.startsWith(' ') || row.startsWith('\t'),
-      );
-    }
-    _add.clear();
     setState(_load);
   }
 
@@ -373,7 +819,6 @@ class _ChecklistSectionState extends State<ChecklistSection>
     final at = lines.indexWhere((l) => l.id == line.id);
     final (before, after) = _neighbours(list, line);
     return [
-      _LineStep.rename,
       if (before != null) _LineStep.up,
       if (after) _LineStep.down,
       if (!line.inGroup && at > 0) _LineStep.indent,
@@ -422,7 +867,9 @@ class _ChecklistSectionState extends State<ChecklistSection>
   }
 
   Future<void> _menu(String id, Offset at) async {
-    final list = _list;
+    // What was typed is stored first, so the menu sees the list as shown.
+    _keepTyped(leaving: false);
+    final list = _lists.shownNow(widget.noteId, deviceWallClock);
     final line = list?.line(id);
     if (list == null || line == null) return;
     final t = context.t;
@@ -443,7 +890,6 @@ class _ChecklistSectionState extends State<ChecklistSection>
             child: Row(
               children: [
                 Icon(switch (step) {
-                  _LineStep.rename => Icons.edit_outlined,
                   _LineStep.up => Icons.arrow_upward,
                   _LineStep.down => Icons.arrow_downward,
                   _LineStep.indent => Icons.format_indent_increase,
@@ -453,7 +899,6 @@ class _ChecklistSectionState extends State<ChecklistSection>
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(switch (step) {
-                    _LineStep.rename => t.rename,
                     _LineStep.up => t.checklistMoveUp,
                     _LineStep.down => t.checklistMoveDown,
                     _LineStep.indent => t.checklistIndent,
@@ -467,17 +912,9 @@ class _ChecklistSectionState extends State<ChecklistSection>
       ],
     );
     if (step == null || !mounted) return;
+    // A sync while the menu was open may have taken it away.
+    if (!_open || !_shows(id)) return;
     switch (step) {
-      case _LineStep.rename:
-        final text = await showDialog<String>(
-          context: context,
-          builder: (_) => LineRenameDialog(text: line.text, twoRows: _twoRows),
-        );
-        final named = text?.replaceAll(RegExp('[\r\n]+'), ' ').trim();
-        if (!mounted || named == null || named.isEmpty) return;
-        // A sync while the dialog was open may have taken it away.
-        if (_lists.byNote(widget.noteId)?.line(id) == null) return;
-        _lists.rename(id, named);
       case _LineStep.up:
         if (_neighbours(list, line).$1 case final before?) {
           _lists.move(id, before: before);
@@ -491,14 +928,59 @@ class _ChecklistSectionState extends State<ChecklistSection>
       case _LineStep.delete:
         if (!await confirmLineDelete(context)) return;
         if (!mounted) return;
-        if (_lists.byNote(widget.noteId)?.line(id) == null) return;
+        if (!_open || !_shows(id)) return;
         _lists.delete(id);
     }
     setState(_load);
   }
 
+  /// The field of [shown] where it is typed in place: a new Line, or one
+  /// this Device may change.
+  Widget? _field(ShownLine shown) {
+    final row = _rowShown(shown.id);
+    if (row == null) return null;
+    final id = row.id;
+    if (id != null && !_editable.contains(id)) return null;
+    final t = context.t;
+    final at = _rows.indexOf(row);
+    return KeyedSubtree(
+      key: ValueKey('checklist-field-${shown.id}'),
+      child: TwoRowTextField(
+        // The same field while the Line moves, in a group or out.
+        key: GlobalObjectKey(row),
+        controller: row.text,
+        focusNode: row.focus,
+        twoRows: _twoRows,
+        style: lineStyle(context, checked: shown.checked),
+        decoration: const InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(vertical: 12),
+        ),
+        actions: [
+          (
+            key: 'line-indent',
+            label: t.checklistIndent,
+            icon: Icons.format_indent_increase,
+            run: at > 0 && !row.inGroup
+                ? () => _indent(row, under: true)
+                : null,
+          ),
+          (
+            key: 'line-outdent',
+            label: t.checklistOutdent,
+            icon: Icons.format_indent_decrease,
+            run: row.inGroup ? () => _indent(row, under: false) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
@@ -514,25 +996,31 @@ class _ChecklistSectionState extends State<ChecklistSection>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ChecklistLines(
-              lines: shownLines(list),
+              lines: [
+                for (final row in _rows)
+                  (
+                    id: _shownId(row),
+                    text: row.kept,
+                    inGroup: row.inGroup,
+                    checked: switch (row.id) {
+                      final id? => list.line(id)?.checked ?? false,
+                      null => false,
+                    },
+                    below: null,
+                  ),
+              ],
               onCheck: _checks ? _check : null,
               onMenu: _menu,
               editable: _editable,
+              field: _adds ? _field : null,
             ),
             if (_adds) ...[
-              const SizedBox(height: 8),
-              TwoRowTextField(
-                key: const ValueKey('checklist-add-text'),
-                controller: _add,
-                twoRows: _twoRows,
-                decoration: InputDecoration(hintText: t.checklistNewLine),
-              ),
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
                 child: FilledButton.tonalIcon(
                   key: const ValueKey('checklist-add'),
-                  onPressed: _addTyped,
+                  onPressed: _addEmpty,
                   icon: const Icon(Icons.add),
                   label: Text(t.checklistAddLine),
                 ),
@@ -563,69 +1051,6 @@ class _ChecklistSectionState extends State<ChecklistSection>
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Asks for a Line's new text, starting from [text].
-class LineRenameDialog extends StatefulWidget {
-  final String text;
-
-  /// Whether the text is typed in two rows (UI laws, "Text editor").
-  final bool twoRows;
-
-  const LineRenameDialog({
-    super.key,
-    required this.text,
-    required this.twoRows,
-  });
-
-  @override
-  State<LineRenameDialog> createState() => _LineRenameDialogState();
-}
-
-class _LineRenameDialogState extends State<LineRenameDialog> {
-  late final _text = TextEditingController(text: widget.text);
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final media = MediaQuery.of(context);
-    final keyboard = media.viewInsets.bottom;
-    // The dialog stays clear of the bottom row above the keyboard.
-    final below = widget.twoRows && keyboard > 0
-        ? keyboard + TwoRowTextField.rowHeight
-        : keyboard;
-    return MediaQuery(
-      data: media.copyWith(
-        viewInsets: media.viewInsets.copyWith(bottom: below),
-      ),
-      child: AlertDialog(
-        title: Text(t.checklistRenameTitle),
-        content: TwoRowTextField(
-          key: const ValueKey('checklist-rename-text'),
-          controller: _text,
-          twoRows: widget.twoRows,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('checklist-rename-save'),
-            onPressed: () => Navigator.of(context).pop(_text.text),
-            child: Text(t.save),
-          ),
-        ],
       ),
     );
   }

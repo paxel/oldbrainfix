@@ -15,6 +15,7 @@ import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'frogs_screen.dart';
 import 'l10n.dart';
+import 'line_editing.dart';
 import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
@@ -464,6 +465,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   late final AppLifecycleListener _lifecycle;
   Timer? _draftTimer;
+
+  /// What is typed into the Lines of a Checklist or Shopping List (#141).
+  final _lines = TypedLines();
   PlacedNote? _placed;
   List<Section> _sections = const [];
   List<Routine> _routines = const [];
@@ -655,9 +659,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Writes the text when it changed; a blank text keeps the old one.
-  /// The draft goes either way: the log now holds what counts.
+  /// The draft goes either way: the log now holds what counts. What was
+  /// typed into the Lines is stored first, by anyone who may add them.
   void _saveText() {
     _draftTimer?.cancel();
+    _lines.keep();
     final note = _placed?.note;
     if (note == null || !(_placed?.changes ?? false)) return;
     unawaited(widget.drafts.delete(note.id));
@@ -1066,7 +1072,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ].join(' / ');
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) _saveText();
+        if (!didPop) return;
+        // Leaving drops the Lines left empty (#141).
+        _lines.leave();
+        _saveText();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -1155,6 +1164,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ChecklistSection(
               notes: widget.notes,
               noteId: widget.noteId,
+              typed: _lines,
               onToPlain: _isList && changes && note.textEditable
                   ? _toPlain
                   : null,
@@ -1163,6 +1173,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ShoppingSection(
               notes: widget.notes,
               noteId: widget.noteId,
+              typed: _lines,
               onToPlain: _isShopping && changes && note.textEditable
                   ? _toPlain
                   : null,
