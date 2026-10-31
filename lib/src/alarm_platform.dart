@@ -118,7 +118,8 @@ class AlarmLabels {
   };
 }
 
-/// Done or a snooze tapped on a notification, waiting to be applied.
+/// Done or a snooze tapped on a notification, or a box checked in the
+/// Agenda widget, waiting to be applied.
 sealed class AlarmAction {
   /// Counts up; acknowledging one acknowledges everything before it.
   final int seq;
@@ -151,6 +152,36 @@ class SnoozeTapped extends AlarmAction {
     DateTime at,
     this.until,
   ) : super(seq, at);
+}
+
+/// A Line of a Checklist Routine's Occurrence checked in the Agenda
+/// widget, for that Occurrence only (#153).
+class LineTapped extends AlarmAction {
+  final String routineId;
+  final String occurrenceKey;
+  final String lineId;
+
+  const LineTapped(
+    int seq,
+    this.routineId,
+    this.occurrenceKey,
+    this.lineId,
+    DateTime at,
+  ) : super(seq, at);
+}
+
+/// A Frog checked off in the Agenda widget (#153).
+class FrogTapped extends AlarmAction {
+  final String frogId;
+
+  const FrogTapped(int seq, this.frogId, DateTime at) : super(seq, at);
+}
+
+/// A Shopping List's Line checked in the Agenda widget (#153).
+class ShoppingTapped extends AlarmAction {
+  final String lineId;
+
+  const ShoppingTapped(int seq, this.lineId, DateTime at) : super(seq, at);
 }
 
 /// A snooze tapped on the Nudge: the Notes Unsorted then wait until
@@ -518,6 +549,25 @@ class AndroidAlarms implements AlarmPlatform {
         DateTime.fromMillisecondsSinceEpoch(until, isUtc: true),
       ),
       ('done', _) => DoneTapped(seq, routine, occurrence, tapped),
+      ('line', _) => switch (m['line']) {
+        final String line when line.isNotEmpty => LineTapped(
+          seq,
+          routine,
+          occurrence,
+          line,
+          tapped,
+        ),
+        _ => null,
+      },
+      ('frog', _) when routine.isNotEmpty => FrogTapped(seq, routine, tapped),
+      ('shopping', _) => switch (m['line']) {
+        final String line when line.isNotEmpty => ShoppingTapped(
+          seq,
+          line,
+          tapped,
+        ),
+        _ => null,
+      },
       ('snooze', final int until) => SnoozeTapped(
         seq,
         routine,

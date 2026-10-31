@@ -2,6 +2,7 @@ package io.github.paxel.oldbrainfix
 
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,6 +39,20 @@ class ManifestTest {
         assertTrue(types.contains("application/vnd.oldbrainfix.sync"))
         // Messengers often hand a file over without its own type.
         assertTrue(types.contains("application/octet-stream"))
+    }
+
+    @Test
+    fun theAgendaWidgetsTapsLandOnAnActivityNoOtherAppStarts() {
+        val tap = activity(".AgendaTapActivity")
+        assertEquals("false", tap.getAttributeNS(android, "exported"))
+        assertEquals("true", tap.getAttributeNS(android, "excludeFromRecents"))
+        assertEquals("true", tap.getAttributeNS(android, "noHistory"))
+        assertEquals("@android:style/Theme.NoDisplay", tap.getAttributeNS(android, "theme"))
+        assertTrue(elements(tap, "intent-filter").isEmpty())
+        val service = elements(manifest.documentElement, "service")
+            .single { it.getAttributeNS(android, "name") == ".AgendaWidgetService" }
+        assertEquals("false", service.getAttributeNS(android, "exported"))
+        assertEquals("android.permission.BIND_REMOTEVIEWS", service.getAttributeNS(android, "permission"))
     }
 
     @Test

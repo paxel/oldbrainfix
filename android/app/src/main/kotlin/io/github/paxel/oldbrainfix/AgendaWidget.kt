@@ -7,31 +7,37 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
-import android.os.Bundle
+import android.os.Binder
+import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.StrikethroughSpan
+import android.text.style.StyleSpan
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
 import java.util.TimeZone
 
 /**
- * The home-screen Agenda widget: today's Occurrences in Agenda order,
- * each checked off as Done with its box, and the Unsorted count, which
- * opens the Unsorted list. It never reads the log: it shows the snapshot
- * the app hands over whenever it syncs the alarms ([replace]), and a Done
- * tapped here goes the way of one tapped on a notification, into the
- * [EventQueue] for the app to apply. The snapshot holds tomorrow too, so
- * the widget moves on at local midnight without the app.
+ * The home-screen Agenda widget: what the Agenda shows for today, in its
+ * order (#153), as a list that scrolls when it is taller than the
+ * widget. A row's box checks it as the Agenda's does, the rest of a row
+ * opens the app, and the Unsorted count opens the Unsorted list; every
+ * tap on the list goes through [AgendaTapActivity]. It
+ * never reads the log: it shows the snapshot the app hands over whenever
+ * it syncs the alarms ([replace]), and a box checked here goes the way of
+ * a Done tapped on a notification, into the [EventQueue] for the app to
+ * apply. The calendar's appointments it reads itself as it shows, as
+ * nothing of them is kept. The snapshot holds tomorrow too, so the
+ * widget moves on at local midnight without the app.
  */
 class AgendaWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) =
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         render(context, manager, ids)
-
-    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) =
-        render(context, manager, intArrayOf(id))
+        manager.notifyAppWidgetViewDataChanged(ids, R.id.agenda_list)
+    }
 
     override fun onDisabled(context: Context) {
         context.getSystemService(AlarmManager::class.java).cancel(midnight(context))
@@ -39,18 +45,6 @@ class AgendaWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ACTION_DONE -> AlarmReceiver.done(
-                context,
-                Alarm(
-                    id = "",
-                    routine = intent.getStringExtra(AlarmReceiver.EXTRA_ROUTINE) ?: return,
-                    occurrence = intent.getStringExtra(AlarmReceiver.EXTRA_OCCURRENCE) ?: return,
-                    local = null,
-                    at = null,
-                    title = intent.getStringExtra(AlarmReceiver.EXTRA_TITLE) ?: "",
-                    body = intent.getStringExtra(AlarmReceiver.EXTRA_BODY) ?: "",
-                ),
-            )
             ACTION_MIDNIGHT -> update(context)
             else -> super.onReceive(context, intent)
         }
@@ -59,12 +53,14 @@ class AgendaWidget : AppWidgetProvider() {
     companion object {
         private const val PREFS = "oldbrainfix_widget"
         private const val KEY_SNAPSHOT = "agenda"
-        private const val ACTION_DONE = "io.github.paxel.oldbrainfix.WIDGET_DONE"
         private const val ACTION_MIDNIGHT = "io.github.paxel.oldbrainfix.WIDGET_MIDNIGHT"
 
-        /** Request codes of the widget's taps that open the app; apart from Capture's 0 to 2. */
+        /** Request codes of the widget's taps; apart from Capture's 0 to 2. */
         private const val REQUEST_OPEN = 100
-        private const val REQUEST_UNSORTED = 101
+        private const val REQUEST_ROWS = 102
+
+        /** How far a row moves in per [WidgetRow.indent], in dp. */
+        private const val INDENT_DP = 24
 
         /** Keeps the app's new [snapshot] and shows it. */
         fun replace(context: Context, snapshot: JSONObject) {
@@ -73,119 +69,191 @@ class AgendaWidget : AppWidgetProvider() {
         }
 
         /**
-         * Shows the snapshot again, as of now and with the Done tapped
+         * Shows the snapshot again, as of now and with the boxes checked
          * meanwhile; nothing when no Agenda widget is on the home screen.
          */
         fun update(context: Context) {
             val manager = AppWidgetManager.getInstance(context) ?: return
             val ids = manager.getAppWidgetIds(ComponentName(context, AgendaWidget::class.java))
-            if (ids.isNotEmpty()) render(context, manager, ids)
+            if (ids.isEmpty()) return
+            render(context, manager, ids)
+            manager.notifyAppWidgetViewDataChanged(ids, R.id.agenda_list)
         }
 
         private fun render(context: Context, manager: AppWidgetManager, ids: IntArray) {
-            val now = System.currentTimeMillis()
-            val zone = TimeZone.getDefault()
-            val snapshot = snapshot(context)
-            val today = AgendaWidgetPlan.dayKey(now, zone)
-            val pending = EventQueue.pending(context)
-            for (id in ids) {
-                val height = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
-                val view = AgendaWidgetPlan.view(snapshot, today, pending, AgendaWidgetPlan.room(height))
-                manager.updateAppWidget(id, views(context, snapshot, view))
-            }
+            for (id in ids) manager.updateAppWidget(id, views(context, id))
             // Inexact is enough: the day moves on soon after midnight.
+            val now = System.currentTimeMillis()
             context.getSystemService(AlarmManager::class.java)
-                .set(AlarmManager.RTC, AgendaWidgetPlan.nextMidnight(now, zone), midnight(context))
+                .set(AlarmManager.RTC, AgendaWidgetPlan.nextMidnight(now, TimeZone.getDefault()), midnight(context))
         }
 
-        private fun views(context: Context, snapshot: AgendaSnapshot?, view: AgendaView): RemoteViews {
+        /** The widget [id]: the list of rows, filled by [AgendaWidgetService]. */
+        @Suppress("DEPRECATION")
+        private fun views(context: Context, id: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_agenda)
             val open = PendingIntent.getActivity(
-                context, REQUEST_OPEN,
-                Intent(context, MainActivity::class.java)
-                    .setAction(Intent.ACTION_MAIN)
-                    .addCategory(Intent.CATEGORY_LAUNCHER)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                context, REQUEST_OPEN, openIntent(context),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             views.setOnClickPendingIntent(R.id.agenda, open)
-            if (snapshot != null) views.setTextViewText(R.id.agenda_heading, snapshot.today)
-            if (snapshot != null && snapshot.unsorted > 0) {
-                views.setViewVisibility(R.id.agenda_unsorted, View.VISIBLE)
-                views.setTextViewText(R.id.agenda_unsorted, snapshot.unsortedText)
-                views.setOnClickPendingIntent(
-                    R.id.agenda_unsorted,
-                    PendingIntent.getActivity(
-                        context, REQUEST_UNSORTED,
-                        Intent(context, MainActivity::class.java)
-                            .putExtra(MainActivity.EXTRA_UNSORTED, true)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                    ),
-                )
-            } else {
-                views.setViewVisibility(R.id.agenda_unsorted, View.GONE)
-            }
-            views.removeAllViews(R.id.agenda_rows)
-            for (row in view.rows) views.addView(R.id.agenda_rows, row(context, snapshot, row, open))
-            val message = when {
-                view.stale -> context.getString(R.string.agenda_widget_open_app)
-                view.rows.isEmpty() -> snapshot?.empty
-                else -> null
-            }
-            views.setViewVisibility(R.id.agenda_message, if (message == null) View.GONE else View.VISIBLE)
-            if (message != null) views.setTextViewText(R.id.agenda_message, message)
-            views.setViewVisibility(R.id.agenda_more, if (view.more > 0) View.VISIBLE else View.GONE)
-            if (snapshot != null && view.more > 0) {
-                views.setTextViewText(R.id.agenda_more, AgendaWidgetPlan.moreText(snapshot.more, view.more))
-            }
-            return views
-        }
-
-        /**
-         * One Occurrence; its box checks it off, the rest opens the app.
-         * A Done one is struck through and has nothing to tap: it is
-         * unchecked in the app.
-         */
-        private fun row(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow, open: PendingIntent): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.widget_agenda_row)
-            views.setTextViewText(R.id.agenda_time, row.time)
-            views.setOnClickPendingIntent(R.id.agenda_row, open)
-            views.setContentDescription(R.id.agenda_check, snapshot?.done ?: "")
-            if (row.done) {
-                views.setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_checked)
-                views.setTextViewText(
-                    R.id.agenda_title,
-                    SpannableString(row.title).apply {
-                        setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    },
-                )
-                views.setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text_dim))
-                views.setOnClickPendingIntent(R.id.agenda_check, open)
-                return views
-            }
-            views.setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_check)
-            views.setTextViewText(R.id.agenda_title, row.title)
-            val done = Intent(context, AgendaWidget::class.java)
-                .setAction(ACTION_DONE)
-                // Tells the rows' taps apart; extras alone do not.
-                .setData(
-                    Uri.Builder().scheme("oldbrainfix").authority("widget")
-                        .appendPath(row.routine).appendPath(row.occurrence).build(),
-                )
-                .putExtra(AlarmReceiver.EXTRA_ROUTINE, row.routine)
-                .putExtra(AlarmReceiver.EXTRA_OCCURRENCE, row.occurrence)
-                .putExtra(AlarmReceiver.EXTRA_TITLE, row.title)
-                .putExtra(AlarmReceiver.EXTRA_BODY, row.time)
-            views.setOnClickPendingIntent(
-                R.id.agenda_check,
-                PendingIntent.getBroadcast(
-                    context, 0, done,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            views.setOnClickPendingIntent(R.id.agenda_message, open)
+            val adapter = Intent(context, AgendaWidgetService::class.java)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+            // One adapter per widget; extras alone do not tell them apart.
+            adapter.data = Uri.parse(adapter.toUri(Intent.URI_INTENT_SCHEME))
+            views.setRemoteAdapter(R.id.agenda_list, adapter)
+            views.setEmptyView(R.id.agenda_list, R.id.agenda_message)
+            // The rows fill in what each tap does. An activity, started by
+            // the tap itself, may open the app where a receiver may not.
+            val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+            views.setPendingIntentTemplate(
+                R.id.agenda_list,
+                PendingIntent.getActivity(
+                    context, REQUEST_ROWS,
+                    Intent(context, AgendaTapActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                    mutable or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
             return views
         }
+
+        /** The rows the widget shows now, with the calendar's appointments of today. */
+        fun rows(context: Context): Pair<AgendaSnapshot?, List<WidgetRow>> {
+            val now = System.currentTimeMillis()
+            val zone = TimeZone.getDefault()
+            val snapshot = snapshot(context)
+            val today = AgendaWidgetPlan.dayKey(now, zone)
+            val appointments = if (snapshot == null) emptyList() else appointments(context, snapshot, today, now, zone)
+            val view = AgendaWidgetPlan.view(
+                snapshot, today, EventQueue.pending(context), appointments,
+                context.getString(R.string.agenda_widget_open_app),
+            )
+            return snapshot to view.rows
+        }
+
+        /**
+         * Today's appointments of the calendars the Agenda shows, read now
+         * and kept nowhere; none while that is off or not allowed.
+         */
+        private fun appointments(
+            context: Context,
+            snapshot: AgendaSnapshot,
+            today: String,
+            now: Long,
+            zone: TimeZone,
+        ): List<WidgetRow> {
+            if (snapshot.calendars.isEmpty()) return emptyList()
+            // Read as this app, not as the launcher asking for the rows.
+            val identity = Binder.clearCallingIdentity()
+            try {
+                val start = AgendaWidgetPlan.midnightOf(now, zone)
+                val read = runCatching {
+                    val colours = Appointments.calendars(context).associate { it["id"] as String to it["colour"] as Int }
+                    Appointments.between(context, start - 86_400_000L, start + 2 * 86_400_000L, snapshot.calendars)
+                        ?.map {
+                            CalendarEntry(
+                                title = it["title"] as String,
+                                begin = it["begin"] as Long,
+                                end = it["end"] as Long,
+                                allDay = it["allDay"] as Boolean,
+                                colour = colours[it["calendar"] as String] ?: 0,
+                            )
+                        }
+                }.getOrNull() ?: return emptyList()
+                return AgendaWidgetPlan.appointmentRows(snapshot, read, today, zone)
+            } finally {
+                Binder.restoreCallingIdentity(identity)
+            }
+        }
+
+        /** The views of [row]: its box checks it, the rest opens the app; the Unsorted count opens the Unsorted list. */
+        fun rowViews(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow): RemoteViews = when (row.kind) {
+            WidgetRow.UNSORTED -> RemoteViews(context.packageName, R.layout.widget_agenda_unsorted).apply {
+                setTextViewText(R.id.agenda_unsorted, row.title)
+                setOnClickFillInIntent(R.id.agenda_unsorted, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_UNSORTED))
+            }
+            WidgetRow.HEADING, WidgetRow.TEXT, WidgetRow.MESSAGE ->
+                RemoteViews(context.packageName, R.layout.widget_agenda_text).apply {
+                    val text = SpannableString(row.title)
+                    if (row.kind == WidgetRow.HEADING) {
+                        text.setSpan(StyleSpan(Typeface.BOLD), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                    if (row.done) strike(text)
+                    setTextViewText(R.id.agenda_text, text)
+                    setTextColor(
+                        R.id.agenda_text,
+                        context.getColor(if (row.kind == WidgetRow.HEADING) R.color.agenda_widget_text else R.color.agenda_widget_text_dim),
+                    )
+                    setViewPadding(R.id.agenda_text, dp(context, 8 + INDENT_DP * row.indent), dp(context, 4), dp(context, 8), dp(context, 4))
+                    setOnClickFillInIntent(R.id.agenda_text, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN))
+                }
+            else -> RemoteViews(context.packageName, R.layout.widget_agenda_row).apply {
+                setViewPadding(R.id.agenda_row, dp(context, INDENT_DP * row.indent), 0, 0, dp(context, 4))
+                setTextViewText(R.id.agenda_time, row.time)
+                setViewVisibility(R.id.agenda_time, if (row.time.isEmpty()) View.GONE else View.VISIBLE)
+                setOnClickFillInIntent(R.id.agenda_row, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN))
+                if (row.kind == WidgetRow.APPOINTMENT) {
+                    setViewVisibility(R.id.agenda_strip, View.VISIBLE)
+                    if (row.colour != 0) setInt(R.id.agenda_strip, "setBackgroundColor", row.colour or 0xFF000000.toInt())
+                } else {
+                    setViewVisibility(R.id.agenda_strip, View.GONE)
+                }
+                setViewVisibility(R.id.agenda_check, if (row.box) View.VISIBLE else View.GONE)
+                setViewPadding(R.id.agenda_time, dp(context, if (row.box) 0 else 12), 0, dp(context, 8), 0)
+                setContentDescription(R.id.agenda_check, snapshot?.done ?: "")
+                val title = SpannableString(row.title)
+                if (row.done) {
+                    strike(title)
+                    setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_checked)
+                    setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text_dim))
+                } else {
+                    setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_check)
+                    setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text))
+                }
+                setTextViewText(R.id.agenda_title, title)
+                setViewPadding(R.id.agenda_title, dp(context, if (row.box || row.time.isNotEmpty()) 0 else 12), 0, dp(context, 8), 0)
+                val tap = row.tap
+                setOnClickFillInIntent(
+                    R.id.agenda_check,
+                    if (tap == null) {
+                        Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN)
+                    } else {
+                        Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_CHECK)
+                            .putExtra(AgendaTap.EXTRA_KIND, tap.kind)
+                            .putExtra(AlarmReceiver.EXTRA_ROUTINE, tap.routine)
+                            .putExtra(AlarmReceiver.EXTRA_OCCURRENCE, tap.occurrence)
+                            .putExtra(AgendaTap.EXTRA_LINE, tap.line)
+                            .putExtra(AlarmReceiver.EXTRA_TITLE, row.title)
+                            .putExtra(AlarmReceiver.EXTRA_BODY, row.time)
+                    },
+                )
+            }
+        }
+
+        private fun strike(text: SpannableString) =
+            text.setSpan(StrikethroughSpan(), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        private fun dp(context: Context, dp: Int): Int = (dp * context.resources.displayMetrics.density).toInt()
+
+        /**
+         * A box checked in the widget ([AgendaTapActivity]): it goes into
+         * the queue as the Agenda's box would change the log, a Done the
+         * way of a notification's, and shows checked at once.
+         */
+        fun check(context: Context, tap: AgendaTap.Check) {
+            if (tap.kind == "done") return AlarmReceiver.done(context, tap.alarm)
+            EventQueue.add(context, tap.kind, tap.alarm, line = tap.line)
+            update(context)
+            MainActivity.actionsArrived()
+        }
+
+        /** Opens the app on the Agenda. */
+        fun openIntent(context: Context): Intent = Intent(context, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         /** The snapshot the app handed over last, or null before the first. */
         private fun snapshot(context: Context): AgendaSnapshot? =

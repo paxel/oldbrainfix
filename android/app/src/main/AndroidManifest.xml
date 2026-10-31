@@ -261,9 +261,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_capture_bar" />
         </receiver>
-        <!-- The Agenda widget: today's Occurrences to check off and the
-             Unsorted count. It shows what the app hands over and queues a
-             Done like a notification's. -->
+        <!-- The Agenda widget: what the Agenda shows for today, its boxes
+             to check. It shows what the app hands over and queues what is
+             checked like a notification's Done. -->
         <receiver
             android:name=".AgendaWidget"
             android:label="@string/agenda_widget"
@@ -275,6 +275,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_agenda" />
         </receiver>
+        <!-- Where every tap on the Agenda widget's list lands: a box is
+             queued without showing anything, any other tap opens the app.
+             Only the widget's own PendingIntent starts it. -->
+        <activity
+            android:name=".AgendaTapActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+        <!-- Fills the Agenda widget's list, which scrolls. -->
+        <service
+            android:name=".AgendaWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <!-- Lets the camera app write the photo being taken, and the app
              the user picks read a file shared with it, and nothing else. -->
         <provider

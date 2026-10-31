@@ -150,6 +150,12 @@ class AlarmSync extends ChangeNotifier {
           alarms.applySnooze(routineId, occurrenceKey, until);
         case NudgeSnoozed(:final at, :final until):
           alarms.applyNudgeSnooze(at, until);
+        case LineTapped(:final routineId, :final occurrenceKey, :final lineId):
+          _applyLine(routineId, occurrenceKey, lineId);
+        case FrogTapped(:final frogId, :final at):
+          _applyFrog(frogId, at);
+        case ShoppingTapped(:final lineId):
+          _applyShopping(lineId);
       }
     }
     final granted = await platform.permissions();
@@ -183,6 +189,48 @@ class AlarmSync extends ChangeNotifier {
       notifyListeners();
     }
   });
+
+  /// Checks the Line [lineId] for the Occurrence [occurrenceKey] of the
+  /// Routine [routineId], as the Agenda's row does; one gone or no
+  /// longer allowed changes nothing.
+  void _applyLine(String routineId, String occurrenceKey, String lineId) {
+    final occurrence = Occurrence.tryParse(occurrenceKey);
+    if (occurrence == null) return;
+    try {
+      Checklists(store)
+          .check(lineId, on: (routineId: routineId, occurrence: occurrence));
+    } on ArgumentError {
+      return;
+    } on StateError {
+      return;
+    }
+  }
+
+  /// Checks off the Frog [frogId] at [at], as the Agenda's row does.
+  void _applyFrog(String frogId, DateTime at) {
+    final frogs = Frogs(store);
+    final frog = frogs.byId(frogId);
+    if (frog == null || frog.isDone || frog.isTrashed) return;
+    if (!store.mayCheckOff(frogId)) return;
+    try {
+      frogs.markDone(frogId, at: at);
+    } on ArgumentError {
+      return;
+    } on StateError {
+      return;
+    }
+  }
+
+  /// Checks the Shopping List's Line [lineId], as the Agenda's row does.
+  void _applyShopping(String lineId) {
+    try {
+      ShoppingLists(store).check(lineId, wallClock);
+    } on ArgumentError {
+      return;
+    } on StateError {
+      return;
+    }
+  }
 
   /// Asks for [permission]; the answer arrives with the next [refresh]
   /// when the app comes back.

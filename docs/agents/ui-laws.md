@@ -215,6 +215,19 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Done and stays checked, and removing an entry undoes that. Tomorrow
   and later days show only the title and how many it picks: the picks
   are made on the day.
+- **The home-screen Agenda widget shows exactly what the Agenda shows
+  for today** (#153), in the Agenda's order: the Missed Summary with its
+  Missed Occurrences, the "x Unsorted" row, which opens the Unsorted
+  list, then under "Today" the rows of today, a Checklist Routine's
+  Lines and a Session's picks under their Occurrence, and the "Eat a
+  frog" section. It is one list that scrolls when it is taller than
+  the widget. A box there checks what the same box on the Agenda
+  checks, with the same result: an Occurrence, a Line for its
+  Occurrence, a Frog, a Missed Occurrence, a Shopping List's Line;
+  unchecking is done in the app. Appointments, picks, the counts of a
+  Shopping List or a Checklist and headings have no box; every other
+  tap opens the app. Masked rows show as on the Agenda and the lock
+  screen. Nothing of an appointment is kept for the widget either.
 
 ## Cards
 

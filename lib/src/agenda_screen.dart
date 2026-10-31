@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'agenda_rows.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
@@ -42,65 +43,8 @@ import 'system_bars.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
 
-/// An Agenda row with where its Note is filed and whether it shows
-/// Masked, read once per change; for a Session its Session, and today
-/// its picks; for a Routine spawned from a Checklist its Lines as checked
-/// for this Occurrence (#121).
-typedef _PlacedRow = ({
-  AgendaRow row,
-  Area? area,
-  bool masked,
-  Session? session,
-  _ShownPicks? picks,
-  _ShownLines? lines,
-});
-
-/// The Lines of a row's Checklist as checked for its Occurrence, and
-/// whether this Device may check them.
-typedef _ShownLines = ({Checklist list, bool checks});
-
-/// Today's picks of a Session, with whether each shows Masked and opens
-/// its entry form, and whether they swap.
-typedef _ShownPicks = ({
-  SessionOccurrence today,
-  List<bool> masked,
-  List<bool> opens,
-  bool swaps,
-});
-
-/// A Shopping List's row on today's Agenda (#123): one Line that came
-/// back today when [line] is set, else the list with [count] Lines back
-/// or open; with where its Note is filed, whether it shows Masked and
-/// whether this Device may check its Lines.
-typedef _ShoppingRow = ({
-  Note note,
-  Area? area,
-  bool masked,
-  ShoppingLine? line,
-  int count,
-  bool checks,
-});
-
-/// A Checklist's row on today's Agenda (#143): the list with how many of
-/// its Lines are open, with where its Note is filed and whether it shows
-/// Masked.
-typedef _ChecklistRow = ({Note note, Area? area, bool masked, Checklist list});
-
 /// What the menu of an Occurrence's row does.
 enum _RowChoice { history, share }
-
-/// One row of a day on the Agenda: an Occurrence, a part of a calendar
-/// appointment, a Shopping List's or a Checklist's.
-typedef _DayEntry = ({
-  _PlacedRow? row,
-  AppointmentPiece? piece,
-  _ShoppingRow? shopping,
-  _ChecklistRow? checklist,
-});
-
-/// A Frog of the "Eat a frog" section with its Note and Area, and
-/// whether it shows Masked.
-typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours, then
@@ -210,18 +154,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// How this Device shows Shopping Lists today, as read last.
   var _shoppingWay = ShoppingAgenda.standard;
-
-  /// The Notes of the rows that are Checklists, read in one pass so only
-  /// their rows read their Lines for the Occurrence.
-  Set<String> _listNotes = const {};
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
-  List<_DayEntry> _today = const [];
-  List<_DayEntry> _tomorrow = const [];
+  List<DayEntry> _today = const [];
+  List<DayEntry> _tomorrow = const [];
 
   /// The days after tomorrow, each with its rows.
-  List<({Day day, List<_DayEntry> rows})> _later = const [];
+  List<({Day day, List<DayEntry> rows})> _later = const [];
 
   /// The appointments of the calendars picked to show here, as read
   /// last, with those calendars by id; none while that is off (#116).
@@ -235,14 +175,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
   final _unfoldedAppointments = <String>{};
   var _unsorted = 0;
 
-  /// Today's Occurrences of Sessions with their picks, by Session id and
-  /// Occurrence key, and the units their targets show in.
-  Map<String, SessionOccurrence> _sessionsToday = const {};
+  /// The units the targets of a Session's picks show in.
   var _system = UnitSystem.metric;
 
   /// Today's "Eat a frog" section, and its Frogs as they show.
   FrogsToday? _frogsToday;
-  List<_ShownFrog> _frogRows = const [];
+  List<ShownFrog> _frogRows = const [];
 
   /// How many strangers' Sent Items wait (#91).
   var _waiting = 0;
@@ -365,112 +303,26 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  /// The rows of [day]: its all-day Occurrences [rows] and all-day
-  /// appointments, then the rows of the Shopping Lists [shopping] and of
-  /// the Checklists [checklists], then the timed ones of both by time, an
-  /// Occurrence before an appointment at the same time.
-  List<_DayEntry> _entries(
-    Day day,
-    List<_PlacedRow> rows, {
-    List<_ShoppingRow> shopping = const [],
-    List<_ChecklistRow> checklists = const [],
-  }) {
-    final pieces = appointmentsOn(day, _appointments, deviceWallClock);
-    final timedRows = [
-      for (final placed in rows)
-        if (!placed.row.occurrence.allDay) placed,
-    ];
-    final timedPieces = [
-      for (final piece in pieces)
-        if (!piece.allDay) piece,
-    ];
-    final timed = <_DayEntry>[];
-    var r = 0;
-    var p = 0;
-    while (r < timedRows.length || p < timedPieces.length) {
-      final rowAt = r < timedRows.length
-          ? timedRows[r].row.occurrence.time
-          : null;
-      final pieceAt = p < timedPieces.length ? timedPieces[p].at : null;
-      if (rowAt != null && (pieceAt == null || rowAt.compareTo(pieceAt) <= 0)) {
-        timed.add((
-          row: timedRows[r++],
-          piece: null,
-          shopping: null,
-          checklist: null,
-        ));
-      } else {
-        timed.add((
-          row: null,
-          piece: timedPieces[p++],
-          shopping: null,
-          checklist: null,
-        ));
-      }
-    }
-    return [
-      for (final placed in rows)
-        if (placed.row.occurrence.allDay)
-          (row: placed, piece: null, shopping: null, checklist: null),
-      for (final piece in pieces)
-        if (piece.allDay)
-          (row: null, piece: piece, shopping: null, checklist: null),
-      for (final row in shopping)
-        (row: null, piece: null, shopping: row, checklist: null),
-      for (final row in checklists)
-        (row: null, piece: null, shopping: null, checklist: row),
-      ...timed,
-    ];
-  }
-
   void _load() {
     // Writes today's picks when they are new, before the rows read their
     // Done; the reload that follows writes nothing.
-    _sessionsToday = {
-      for (final today in _sessions.pickToday(deviceWallClock))
-        _sessionKey(today.session.id, today.occurrence): today,
-    };
-    _system = deviceUnitSystem(widget.notes.store);
-    final agenda = _routines.agenda(deviceWallClock, days: AgendaScreen.days);
-    _listNotes = _checklists
-        .ofNotes({
-          for (final rows in [
-            agenda.todayRows,
-            agenda.tomorrowRows,
-            ...agenda.laterRows,
-          ])
-            for (final row in rows)
-              if (row.note case final note?) note.id,
-        })
-        .keys
-        .toSet();
-    _shoppingWay = widget.notes.store.shoppingAgenda;
-    _today = _entries(
-      agenda.today,
-      [for (final row in agenda.todayRows) _place(row)],
-      shopping: _shoppingRows(),
-      checklists: _checklistRows(),
-    );
-    _tomorrow = _entries(agenda.tomorrow, [
-      for (final row in agenda.tomorrowRows) _place(row),
-    ]);
-    _later = [
-      for (final (i, rows) in agenda.laterRows.indexed)
-        (
-          day: agenda.later(i),
-          rows: _entries(agenda.later(i), [
-            for (final row in rows) _place(row),
-          ]),
-        ),
-    ];
-    // Writes today's pick when it is new; the reload that follows
-    // writes nothing.
+    final sessions = _sessions.pickToday(deviceWallClock);
     final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
-    _frogRows = [
-      for (final frog in frogs.shown)
-        if (placeFrog(_frogs, widget.places, frog) case final placed?)
-          (placed: placed, masked: _masksNote(placed.note)),
-    ];
+    final days = AgendaDays.read(
+      store: widget.notes.store,
+      places: widget.places,
+      wallClock: deviceWallClock,
+      days: AgendaScreen.days,
+      sessions: sessions,
+      frogsToday: frogs,
+      appointments: _appointments,
+    );
+    _shoppingWay = days.shoppingWay;
+    _system = days.system;
+    _today = days.todayRows;
+    _tomorrow = days.tomorrowRows;
+    _later = days.later;
+    _frogRows = days.frogs;
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
     // Counted from the pending sets, without reading each held file.
@@ -491,110 +343,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
             (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
-  }
-
-  /// Today's rows of the Shopping Lists, the way this Device shows them:
-  /// one per Line that came back today, or one per list. A list of a
-  /// Masked Area is one row that tells nothing of its Lines.
-  List<_ShoppingRow> _shoppingRows() {
-    final way = _shoppingWay;
-    final rows = <_ShoppingRow>[];
-    for (final (:list, :lines) in _shopping.agenda(way, deviceWallClock)) {
-      final note = widget.notes.byId(list.noteId);
-      if (note == null) continue;
-      final masked = _masksNote(note);
-      final area = placeNote(widget.places, note).area;
-      final checks = _shopping.mayCheck(note.id);
-      if (way == ShoppingAgenda.lines && !masked) {
-        for (final line in lines) {
-          rows.add((
-            note: note,
-            area: area,
-            masked: false,
-            line: line,
-            count: 1,
-            checks: checks,
-          ));
-        }
-      } else {
-        rows.add((
-          note: note,
-          area: area,
-          masked: masked,
-          line: null,
-          count: lines.length,
-          checks: checks,
-        ));
-      }
-    }
-    return rows;
-  }
-
-  /// Today's rows of the Checklists without a Routine that show on this
-  /// person's Agenda, oldest capture first; one of a Masked Area tells
-  /// nothing of it.
-  List<_ChecklistRow> _checklistRows() => [
-    for (final list in _checklists.agenda())
-      if (widget.notes.byId(list.noteId) case final note?)
-        (
-          note: note,
-          area: placeNote(widget.places, note).area,
-          masked: _masksNote(note),
-          list: list,
-        ),
-  ];
-
-  static String _sessionKey(String id, Occurrence occurrence) =>
-      '$id@${occurrence.key}';
-
-  _PlacedRow _place(AgendaRow row) {
-    final store = widget.notes.store;
-    final id = row.routine.id;
-    final today = _sessionsToday[_sessionKey(id, row.occurrence)];
-    return (
-      row: row,
-      area: switch (row.note) {
-        final note? => placeNote(widget.places, note).area,
-        null => null,
-      },
-      masked: _locks.masks(row.routine),
-      session: today?.session ?? _sessions.byId(row.routine.id),
-      picks: today == null
-          ? null
-          : (
-              today: today,
-              masked: [
-                for (final pick in today.picks)
-                  switch (pick.note) {
-                    final note? => _masksNote(note),
-                    null => false,
-                  },
-              ],
-              opens: [
-                for (final pick in today.picks) opensPick(store, id, pick),
-              ],
-              swaps: today.canSwap && store.mayCheckOff(id),
-            ),
-      lines: switch (_listNotes.contains(row.note?.id)
-          ? _checklists.forOccurrence((
-              routineId: id,
-              occurrence: row.occurrence,
-            ))
-          : null) {
-        final list? when list.count > 0 => (
-          list: list,
-          checks: store.mayCheckOff(id),
-        ),
-        _ => null,
-      },
-    );
-  }
-
-  /// Whether [note] shows Masked here: it is filed in a locked Area set
-  /// to Masked, as [AreaLocks.masks] says of a Routine.
-  bool _masksNote(Note note) {
-    final area = _locks.lockedAreaOf(note);
-    return area != null && widget.notes.store.isAreaMasked(area);
   }
 
   /// Back on the Agenda: the Areas opened meanwhile close again.
@@ -936,7 +684,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   _OccurrenceRow _occurrenceRow(
     AppLocalizations t,
     String locale,
-    _PlacedRow placed,
+    PlacedRow placed,
   ) {
     final (:row, :area, :masked, :picks, :lines, session: _) = placed;
     // Done from the entries of every pick, or from every Line checked,
@@ -960,7 +708,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// What shows under a Session's title: today its picks, on later days
   /// how many it picks; nothing on a Masked row.
-  Widget? _sessionPart(AppLocalizations t, _PlacedRow placed) {
+  Widget? _sessionPart(AppLocalizations t, PlacedRow placed) {
     final (:row, :masked, :session, :picks, area: _, lines: _) = placed;
     if (masked || session == null) return null;
     if (picks == null) {
@@ -984,7 +732,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// its Lines as checked for this Occurrence, checkable where this
   /// Device may check it off, on every day shown; nothing on a Masked
   /// row.
-  Widget? _checklistPart(_PlacedRow placed) {
+  Widget? _checklistPart(PlacedRow placed) {
     final (:row, :masked, :lines, area: _, session: _, picks: _) = placed;
     if (masked || lines == null) return null;
     final (:list, :checks) = lines;
@@ -1000,7 +748,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// A Shopping List's row today: a Line that came back, with its box
   /// and the list's title under it, or the list with how many Lines came
   /// back or are open. A tap opens the list.
-  Widget _shoppingRow(AppLocalizations t, _ShoppingRow shopping) {
+  Widget _shoppingRow(AppLocalizations t, ShoppingRow shopping) {
     final (:note, :area, :masked, :line, :count, :checks) = shopping;
     final title = switch (noteText(t, note).trim().split('\n').first.trim()) {
       '' => t.shoppingHeading,
@@ -1030,7 +778,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// A Checklist's row today: its title with how many of its Lines are
   /// open, "Before the trip: 3 of 7 open". A tap opens the list.
-  Widget _checklistRow(AppLocalizations t, _ChecklistRow row) {
+  Widget _checklistRow(AppLocalizations t, ChecklistRow row) {
     final (:note, :area, :masked, :list) = row;
     final title = masked
         ? t.maskedChecklist
@@ -1182,7 +930,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
-    List<Widget> rows(List<_DayEntry> entries) => [
+    List<Widget> rows(List<DayEntry> entries) => [
       for (final entry in entries)
         if (entry.piece case final piece?)
           _appointmentRow(t, locale, piece)

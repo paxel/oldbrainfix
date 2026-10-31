@@ -6,7 +6,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Done and snoozes tapped on notifications, kept until the app has
+ * Done and snoozes tapped on notifications, and the boxes checked in the
+ * Agenda widget, kept until the app has
  * applied them to the log (adapted from Chaos Alert). Survives the
  * process dying; the app reads, applies, then acknowledges, so a crash in
  * between loses nothing.
@@ -24,14 +25,23 @@ object EventQueue {
     /** Queues that did not read, one per line, as they were. */
     private const val KEY_UNREAD = "unread"
 
+    /** A Line of a Checklist Routine's Occurrence checked in the Agenda widget. */
+    const val KIND_LINE = "line"
+
+    /** A Frog checked off in the Agenda widget; its id travels as the routine. */
+    const val KIND_FROG = "frog"
+
+    /** A Shopping List's Line checked in the Agenda widget. */
+    const val KIND_SHOPPING = "shopping"
+
     /** The kinds of action this version applies. */
-    private val KINDS = setOf("done", "snooze", NudgePlan.KIND_SNOOZE)
+    private val KINDS = setOf("done", "snooze", NudgePlan.KIND_SNOOZE, KIND_LINE, KIND_FROG, KIND_SHOPPING)
 
     @Synchronized
-    fun add(context: Context, kind: String, alarm: Alarm, until: Long = 0) =
-        add(prefs(context), kind, alarm, until, System.currentTimeMillis())
+    fun add(context: Context, kind: String, alarm: Alarm, until: Long = 0, line: String = "") =
+        add(prefs(context), kind, alarm, until, System.currentTimeMillis(), line)
 
-    internal fun add(prefs: SharedPreferences, kind: String, alarm: Alarm, until: Long, now: Long) {
+    internal fun add(prefs: SharedPreferences, kind: String, alarm: Alarm, until: Long, now: Long, line: String = "") {
         val stored = Stored.text(prefs, KEY)
         val read = Stored.array(stored)
         val edit = prefs.edit()
@@ -52,7 +62,8 @@ object EventQueue {
                 .put("at", now)
                 .put("until", until)
                 .put("title", alarm.title)
-                .put("body", alarm.body),
+                .put("body", alarm.body)
+                .apply { if (line.isNotEmpty()) put("line", line) },
         )
         edit.putString(KEY, actions.toString()).putLong(KEY_SEQ, seq).commit()
     }
@@ -90,6 +101,7 @@ object EventQueue {
             until = json.optLong("until"),
             title = json.optString("title"),
             body = json.optString("body"),
+            line = json.optString("line"),
         )
     }
 

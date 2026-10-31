@@ -1700,12 +1700,6 @@ abstract class AppLocalizations {
   /// **'Nothing due today.'**
   String get widgetNothingToday;
 
-  /// No description provided for @widgetMore.
-  ///
-  /// In en, this message translates to:
-  /// **'and {count} more'**
-  String widgetMore(String count);
-
   /// No description provided for @speechModelTitle.
   ///
   /// In en, this message translates to:

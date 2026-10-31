@@ -1052,11 +1052,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get widgetNothingToday => 'Heute steht nichts an.';
 
   @override
-  String widgetMore(String count) {
-    return 'und $count weitere';
-  }
-
-  @override
   String get speechModelTitle => 'Sprachmodell';
 
   @override

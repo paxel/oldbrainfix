@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A line of text in the Agenda widget: a heading, a Session's pick or
+     count, a Routine of the Missed Summary, or a message. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/agenda_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="8dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="4dp"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:textColor="@color/agenda_widget_text_dim"
+    android:textSize="14sp" />

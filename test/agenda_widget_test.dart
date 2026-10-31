@@ -91,11 +91,15 @@ void main() {
       expect(row?.occurrenceKey, '2026-10-24T08:00');
       expect(row?.done, isTrue);
       expect(row?.toMap(), {
-        'routine': pills.id,
-        'occurrence': '2026-10-24T08:00',
+        'kind': 'occurrence',
         'title': 'pills',
         'time': '08:00',
         'done': true,
+        'checks': true,
+        'routine': pills.id,
+        'occurrence': '2026-10-24T08:00',
+        'block': 'timed',
+        'at': 8 * 60,
       });
     });
 
@@ -155,14 +159,17 @@ void main() {
       expect(s.unsortedText, '2 Unsorted');
       expect(s.today, 'Today');
       expect(s.empty, 'Nothing due today.');
-      expect(s.more, 'and {count} more');
       expect(s.done, 'Done');
+      expect(s.toMap()['v'], 2);
       expect(s.toMap()['labels'], {
         'today': 'Today',
         'empty': 'Nothing due today.',
         'unsorted': '2 Unsorted',
-        'more': 'and {count} more',
         'done': 'Done',
+        'allDay': 'All day',
+        'noTitle': 'Appointment without a title',
+        'since': 'from {time}',
+        'until': 'until {time}',
       });
     });
 
@@ -175,9 +182,289 @@ void main() {
       expect(s.today, 'Heute');
       expect(s.empty, 'Heute steht nichts an.');
       expect(s.unsortedText, '1 unsortiert');
-      expect(s.more, 'und {count} weitere');
       expect(s.done, 'Erledigt');
+      expect(s.since, de.appointmentSince('{time}'));
       expect(s.days['2026-10-24']?.single.time, de.allDay);
+    });
+  });
+
+  group('every row the Agenda shows (#153)', () {
+    List<String> kinds(List<WidgetRow>? rows) => [
+      for (final row in rows ?? const <WidgetRow>[]) row.kind,
+    ];
+
+    /// "Packing" with Bath, Tent and Map, a daily all-day Routine from it.
+    Routine packing({String? place}) {
+      final note = notes.capture('Packing\nBath\nTent\nMap', place: place);
+      Checklists(store).make(note.id);
+      return routines.spawn(note.id, daily(const []));
+    }
+
+    /// Two Tallies, Push-ups and Squats, and "Sport", a Session picking
+    /// both at 07:00 every day.
+    Session sport({String? place}) {
+      final tallies = Tallies(store);
+      final pool = [
+        for (final name in ['Push-ups', 'Squats'])
+          notes.capture(name, place: place).id,
+      ];
+      for (final id in pool) {
+        tallies.addField(id, name: 'Done', unit: 'times', target: 20);
+      }
+      return Sessions(store).spawn(
+        notes.capture('Sport', place: place).id,
+        daily([ClockTime(7, 0)]),
+        pool: pool,
+        count: 2,
+        rule: SessionRule.rolling,
+      );
+    }
+
+    /// "Groceries" with Milk and Eggs checked a week ago, back today, and
+    /// Rice open.
+    String groceries({String? place}) {
+      final lists = ShoppingLists(store);
+      now = DateTime(2026, 10, 17, 10);
+      final id = notes.capture('Groceries\nMilk\nEggs\nRice', place: place).id;
+      lists.make(id);
+      for (final text in ['Milk', 'Eggs']) {
+        lists.check(
+          lists
+              .byNote(id, deviceWallClock)!
+              .lines
+              .firstWhere((l) => l.text == text)
+              .id,
+          deviceWallClock,
+        );
+      }
+      now = DateTime(2026, 10, 24, 9);
+      return id;
+    }
+
+    /// "Before the trip", a Checklist without a Routine: Passport,
+    /// Tickets.
+    String trip({String? place}) {
+      final id = notes
+          .capture('Before the trip\nPassport\nTickets', place: place)
+          .id;
+      Checklists(store).make(id);
+      return id;
+    }
+
+    test('in the Agenda\'s order: all-day Occurrences, the Shopping '
+        'Lists, the Checklists, the timed ones, then the Frogs', () {
+      routines.create('pills', daily([ClockTime(8, 0)]));
+      routines.create('bins out', once(Day(2026, 10, 24)));
+      groceries();
+      trip();
+      final frogs = Frogs(store);
+      frogs.spawn(notes.capture('taxes').id);
+
+      final today = snapshot().days['2026-10-24'];
+
+      expect(titles(today), [
+        'bins out',
+        'Groceries: 2 back',
+        'Before the trip: 2 of 2 open',
+        'pills',
+        'Eat a frog',
+        'taxes',
+      ]);
+      expect(kinds(today), [
+        'occurrence',
+        'shopping',
+        'checklist',
+        'occurrence',
+        'heading',
+        'frog',
+      ]);
+      expect(
+        [for (final row in today ?? const <WidgetRow>[]) row.block],
+        ['allDay', 'lists', 'lists', 'timed', 'frogs', 'frogs'],
+      );
+      // Today only, as on the Agenda.
+      expect(titles(snapshot().days['2026-10-25']), ['pills']);
+    });
+
+    test('a Checklist Routine\'s Lines under its Occurrence, checkable '
+        'for it', () {
+      final routine = packing();
+      final occurrence = Occurrence(Day(2026, 10, 24));
+      final lists = Checklists(store);
+      final bath = lists
+          .forOccurrence((routineId: routine.id, occurrence: occurrence))!
+          .lines
+          .first;
+      lists.check(bath.id, on: (routineId: routine.id, occurrence: occurrence));
+
+      final today = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+
+      expect(titles(today), ['Packing', 'Bath', 'Tent', 'Map']);
+      expect(kinds(today), ['occurrence', 'line', 'line', 'line']);
+      expect([for (final row in today) row.done], [false, true, false, false]);
+      final line = today[1];
+      expect(line.toMap(), {
+        'kind': 'line',
+        'title': 'Bath',
+        'done': true,
+        'checks': true,
+        'indent': 1,
+        'routine': routine.id,
+        'occurrence': '2026-10-24',
+        'line': bath.id,
+        'block': 'allDay',
+      });
+      // Tomorrow's Occurrence starts with none checked.
+      expect([
+        for (final row in snapshot().days['2026-10-25'] ?? const []) row.done,
+      ], everyElement(isFalse));
+    });
+
+    test('a Session\'s picks under it today, how many it picks tomorrow, '
+        'without writing the pick', () {
+      final session = sport();
+      final before = store.history(session.id).length;
+
+      final s = snapshot();
+
+      final today = s.days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(kinds(today), ['occurrence', 'text', 'text']);
+      expect(today[1].title, contains('Push-ups'));
+      expect(today[2].title, contains('Squats'));
+      expect(today[1].indent, 1);
+      expect(titles(s.days['2026-10-25']), ['Sport', 'Picks 2 Tallies']);
+      expect(store.history(session.id).length, before);
+    });
+
+    test('the Frogs as "Eat a frog" shows them: once one is eaten, only '
+        'that one', () {
+      final frogs = Frogs(store);
+      final taxes = frogs.spawn(notes.capture('taxes').id);
+      frogs.spawn(notes.capture('dentist').id);
+      // The Agenda writes today's pick as it shows.
+      frogs.pickToday(deviceWallClock);
+
+      final open = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(titles(open), ['Eat a frog', 'taxes', 'dentist']);
+      expect(open[1].frogId, taxes.id);
+      expect(open[1].checks, isTrue);
+
+      frogs.markDone(taxes.id);
+      final eaten = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(titles(eaten), ['Eat a frog', 'taxes']);
+      expect(eaten[1].done, isTrue);
+    });
+
+    test('Shopping Lists the way this Device shows them', () {
+      final id = groceries();
+
+      expect(titles(snapshot().days['2026-10-24']), ['Groceries: 2 back']);
+      expect(snapshot().days['2026-10-24']?.single.checks, isFalse);
+
+      store.shoppingAgenda = ShoppingAgenda.open;
+      expect(titles(snapshot().days['2026-10-24']), ['Groceries: 3 open']);
+
+      store.shoppingAgenda = ShoppingAgenda.lines;
+      final lines = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(titles(lines), ['Milk · Groceries', 'Eggs · Groceries']);
+      expect(lines.every((row) => row.checks && row.lineId != null), isTrue);
+      expect(
+        lines.first.lineId,
+        ShoppingLists(store)
+            .byNote(id, deviceWallClock)
+            ?.lines
+            .firstWhere((l) => l.text == 'Milk')
+            .id,
+      );
+
+      store.shoppingAgenda = ShoppingAgenda.off;
+      expect(snapshot().days['2026-10-24'], isEmpty);
+    });
+
+    test('the Missed Summary first, as its card shows it', () {
+      now = DateTime(2026, 10, 24, 7);
+      routines.create('pills', daily([ClockTime(8, 0)]));
+      // Each is Missed once the next one is due.
+      now = DateTime(2026, 10, 29, 12);
+      final summary = Alarms(store).missed(deviceWallClock);
+      final missed = summary.routines.single;
+
+      final rows = snapshot().missed;
+
+      expect(rows.first.kind, 'heading');
+      expect(rows.first.title, 'Missed');
+      expect(rows[1].title, 'pills · ${en.missedTimes(missed.count)}');
+      final checkable = [
+        for (final row in rows)
+          if (row.kind == 'missed') row,
+      ];
+      expect(checkable.length, missed.count < 3 ? missed.count : 3);
+      expect(checkable.first.occurrenceKey, missed.missed.first.occurrence.key);
+      expect(checkable.first.checks, isTrue);
+      if (missed.count > 3) {
+        expect(rows.last.title, en.missedMore(missed.count - 3));
+      }
+
+      Alarms(store).markSeen();
+      expect(snapshot().missed, isEmpty);
+    });
+
+    test('names the calendars whose appointments the widget reads, none '
+        'while that is off, and keeps no appointment', () {
+      store.agendaCalendars = {'9', '3'};
+      expect(snapshot().calendars, isEmpty);
+
+      store.agendaCalendarOn = true;
+      expect(snapshot().calendars, ['3', '9']);
+      expect(snapshot().toMap()['calendars'], ['3', '9']);
+    });
+
+    test('a Masked Area tells nothing on the widget either', () {
+      final doctor = Places(store).addArea('Doctor');
+      packing(place: doctor.id);
+      sport(place: doctor.id);
+      groceries(place: doctor.id);
+      trip(place: doctor.id);
+      Frogs(store).spawn(notes.capture('taxes', place: doctor.id).id);
+      routines.spawn(
+        notes.capture('Pills', place: doctor.id).id,
+        daily([ClockTime(8, 0)]),
+      );
+      store.setPin('1234', iterations: 10);
+      store.setAreaLocked(doctor.id, true);
+      store.setAreaMasked(doctor.id, true);
+      store.shoppingAgenda = ShoppingAgenda.lines;
+
+      final s = snapshot();
+
+      expect(titles(s.days['2026-10-24']), [
+        en.maskedRoutineAt(en.allDay),
+        en.shoppingRowBack(en.maskedShoppingList, 2),
+        en.checklistRowOpen(en.maskedChecklist, 2, 2),
+        en.maskedRoutineAt('07:00'),
+        en.maskedRoutineAt('08:00'),
+        'Eat a frog',
+        en.maskedFrog,
+      ]);
+      expect([
+        for (final row in s.missed)
+          if (row.kind == 'text' && row.indent == 0)
+            row.title.split(' · ').first,
+      ], everyElement(en.maskedRoutine));
+      final text = '${s.toMap()}';
+      for (final word in [
+        'Packing',
+        'Bath',
+        'Push-ups',
+        'Groceries',
+        'Milk',
+        'Before the trip',
+        'taxes',
+        'Pills',
+        'Sport',
+      ]) {
+        expect(text, isNot(contains(word)), reason: word);
+      }
     });
   });
 
@@ -262,6 +549,76 @@ void main() {
       );
       expect(alarms.agendas.last.days['2026-10-24']?.single.done, isTrue);
       expect(alarms.acknowledged, 1);
+      expect(alarms.pending, isEmpty);
+    });
+
+    testWidgets('a Line, a Frog and a Shopping List\'s Line checked in the '
+        'widget change the log as the Agenda\'s boxes do', (tester) async {
+      final note = notes.capture('Packing\nBath\nTent');
+      Checklists(store).make(note.id);
+      final packing = routines.spawn(note.id, daily(const []));
+      final frogs = Frogs(store);
+      final taxes = frogs.spawn(notes.capture('taxes').id);
+      final shopping = ShoppingLists(store);
+      final groceries = notes.capture('Groceries\nMilk').id;
+      shopping.make(groceries);
+      store.shoppingAgenda = ShoppingAgenda.open;
+      await start(tester);
+      final today = alarms.agendas.last.days['2026-10-24'] ?? const [];
+      final lines = [
+        for (final row in today)
+          if (row.kind == 'line') row,
+      ];
+      final milk = shopping.byNote(groceries, deviceWallClock)!.lines.single;
+      final tapped = DateTime(2026, 10, 24, 8, 5).toUtc();
+
+      alarms.tap(
+        LineTapped(1, packing.id, '2026-10-24', lines[0].lineId!, tapped),
+      );
+      alarms.tap(FrogTapped(2, taxes.id, tapped));
+      alarms.tap(ShoppingTapped(3, milk.id, tapped));
+      await tester.pumpAndSettle();
+
+      final occurrence = Occurrence(Day(2026, 10, 24));
+      final checked = Checklists(store)
+          .forOccurrence((routineId: packing.id, occurrence: occurrence));
+      expect([for (final l in checked!.lines) l.checked], [true, false]);
+      expect(routines.byId(packing.id)?.doneAt(occurrence), isNull);
+      expect(frogs.byId(taxes.id)?.done, tapped);
+      expect(
+        shopping.byNote(groceries, deviceWallClock)?.lines.single.struck,
+        isTrue,
+      );
+      expect(alarms.acknowledged, 3);
+      final shown = alarms.agendas.last.days['2026-10-24'] ?? const [];
+      expect(
+        [
+          for (final row in shown)
+            if (row.kind != 'shopping') row.done,
+        ],
+        [false, true, false, false, true],
+      );
+
+      // The last Line checks the Occurrence off, as on the Agenda.
+      alarms.tap(
+        LineTapped(4, packing.id, '2026-10-24', lines[1].lineId!, tapped),
+      );
+      await tester.pumpAndSettle();
+      expect(routines.byId(packing.id)?.doneAt(occurrence), isNotNull);
+      expect(alarms.agendas.last.days['2026-10-24']?.first.done, isTrue);
+    });
+
+    testWidgets('a check of something gone changes nothing and is still '
+        'acknowledged', (tester) async {
+      await start(tester);
+
+      final tapped = DateTime(2026, 10, 24, 8, 5).toUtc();
+      alarms.tap(LineTapped(1, 'routine:gone', '2026-10-24', 'line:x', tapped));
+      alarms.tap(FrogTapped(2, 'frog:gone', tapped));
+      alarms.tap(ShoppingTapped(3, 'line:gone', tapped));
+      await tester.pumpAndSettle();
+
+      expect(alarms.acknowledged, 3);
       expect(alarms.pending, isEmpty);
     });
 

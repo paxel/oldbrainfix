@@ -38,6 +38,7 @@ object AlarmChannel {
                         "occurrence" to it.occurrence,
                         "at" to it.at,
                         "until" to it.until,
+                        "line" to it.line,
                     )
                 },
             )

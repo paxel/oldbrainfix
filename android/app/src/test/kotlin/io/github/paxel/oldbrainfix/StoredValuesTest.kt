@@ -163,9 +163,25 @@ class StoredValuesTest {
         assertEquals("Today", read?.today)
         assertNull(AgendaWidgetPlan.snapshotOf(null))
         for (text in garbled) assertNull(text, AgendaWidgetPlan.snapshotOf(text))
-        for (version in later) assertNull(AgendaWidgetPlan.snapshotOf(ofVersion(snapshot, version)))
+        // Version 2 is this version's own (#153); every other one is later.
+        for (version in later.filter { it != "2" } + "3") {
+            assertNull(AgendaWidgetPlan.snapshotOf(ofVersion(snapshot, version)))
+        }
         // Without a snapshot the widget asks to open the app.
-        assertTrue(AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), 3).stale)
+        assertTrue(AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), emptyList(), "Open").stale)
+    }
+
+    @Test
+    fun theWidgetsChecksAreQueuedWithTheirLine() {
+        val prefs = FakePrefs()
+        val tap = Alarm(id = "", routine = "routine:a", occurrence = "2026-10-24T08:00", local = null, at = null, title = "Passport", body = "")
+        EventQueue.add(prefs, EventQueue.KIND_LINE, tap, 0, 1_000, line = "line:passport")
+        EventQueue.add(prefs, EventQueue.KIND_FROG, tap.copy(routine = "frog:taxes", occurrence = ""), 0, 1_000)
+        EventQueue.add(prefs, EventQueue.KIND_SHOPPING, tap.copy(routine = "", occurrence = ""), 0, 1_000, line = "line:milk")
+        val pending = EventQueue.pending(prefs)
+        assertEquals(listOf("line", "frog", "shopping"), pending.map { it.kind })
+        assertEquals(listOf("line:passport", "", "line:milk"), pending.map { it.line })
+        assertEquals("frog:taxes", pending[1].routine)
     }
 
     private val pills = Alarm(id = "a", routine = "routine:a", occurrence = "2026-10-24T08:00", local = null, at = null, title = "Pills", body = "")

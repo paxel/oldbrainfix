@@ -33,8 +33,12 @@ data class Alarm(
 data class Action(
     /** Counts up; the app acknowledges everything up to one it applied. */
     val seq: Long,
-    /** "done" or "snooze". */
+    /**
+     * "done" or "snooze"; from the Agenda widget also "line", "frog" or
+     * "shopping" ([EventQueue.KINDS]).
+     */
     val kind: String,
+    /** The Routine, or the Frog of a "frog". */
     val routine: String,
     val occurrence: String,
     /** When it was tapped, epoch millis. */
@@ -43,6 +47,8 @@ data class Action(
     val until: Long,
     val title: String,
     val body: String,
+    /** The Line a "line" or a "shopping" checks; empty for the others. */
+    val line: String = "",
 )
 
 /**

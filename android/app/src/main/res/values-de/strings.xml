@@ -9,7 +9,7 @@
     <string name="capture_all">Sprache, Text, Foto</string>
     <string name="capture_widget_description">Öffnet die Erfassung mit einem Tipp.</string>
     <string name="agenda_widget">Agenda</string>
-    <string name="agenda_widget_description">Die Routinen und Erinnerungen von heute zum Abhaken und was unsortiert ist.</string>
+    <string name="agenda_widget_description">Alles, was die Agenda für heute zeigt, mit ihren Kästchen zum Abhaken.</string>
     <string name="agenda_widget_open_app">Öffne Old Brain Fix, um zu sehen, was heute ansteht.</string>
     <string name="bundle_import">In Old Brain Fix importieren</string>
     <string name="crash_title">Das hätte nicht passieren dürfen</string>
