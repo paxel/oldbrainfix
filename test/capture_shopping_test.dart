@@ -19,8 +19,9 @@ import 'open_capture.dart';
 /// A recording the fake speech platform transcribes by its last byte.
 final recorded = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
 
-/// Sorting a capture into a Shopping List (#124): each line becomes a
-/// Line of the list, and no Note is kept.
+/// Sorting a capture into a Shopping List (#124), switched on in
+/// Settings ▸ Quick note (#142): each line becomes a Line of the list,
+/// and no Note is kept.
 void main() {
   late Store store;
   late Notes notes;
@@ -40,6 +41,15 @@ void main() {
           )
           ..starterSetOffered = true
           ..alarmSetupDone = true;
+    // The row shows what Settings ▸ Quick note switched on (#142).
+    for (final control in [
+      QuickNoteControl.fileInto,
+      QuickNoteControl.schedule,
+      QuickNoteControl.shopping,
+      QuickNoteControl.importance,
+    ]) {
+      store.setQuickNoteShows(control, true);
+    }
     notes = Notes(store);
     lists = ShoppingLists(store);
     voice = FakeVoice(nextRecording: recorded);

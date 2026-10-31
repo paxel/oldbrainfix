@@ -184,7 +184,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('note-actions')), findsOneWidget);
+      expect(find.byKey(const ValueKey('captureToEditor')), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'plumber');
       await tap(tester, find.text('Save'));
 

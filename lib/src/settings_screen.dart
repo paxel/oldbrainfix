@@ -29,7 +29,7 @@ enum _UnitChoice { region, metric, imperial }
 /// Lists; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
-/// switches and the speech model; the way to the Calendar page; the App Lock and
+/// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; and About. Each is a local
 /// setting, never synced, and applies at once; the alarms are armed
 /// again after each change.
@@ -303,6 +303,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
               ],
             ),
+            SettingsHeading(t.settingsQuickNote),
+            _QuickNoteSettings(store: widget.store),
             if (hasCalendarPage(context)) ...[
               SettingsHeading(t.settingsCalendar),
               SettingsSection(
@@ -501,6 +503,87 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
             onTap: () => _pick(start: false),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// What this Device's quick note shows besides its text field, its
+/// Photo, Voice, Gallery and Paste and "To full editor" (#142): each of
+/// the card's actions and the format bar once switched on, and the Nudge
+/// buttons until switched off.
+class _QuickNoteSettings extends StatefulWidget {
+  final Store store;
+
+  const _QuickNoteSettings({required this.store});
+
+  @override
+  State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
+}
+
+class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
+  late final _shows = {
+    for (final control in QuickNoteControl.values)
+      control: widget.store.quickNoteShows(control),
+  };
+  late bool _nudgeButtons = widget.store.quickNoteNudgeButtonsOn;
+
+  void _set(QuickNoteControl control, bool on) {
+    widget.store.setQuickNoteShows(control, on);
+    setState(() => _shows[control] = on);
+  }
+
+  void _setNudgeButtons(bool on) {
+    widget.store.quickNoteNudgeButtonsOn = on;
+    setState(() => _nudgeButtons = on);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    Widget shows(QuickNoteControl control, IconData icon, String title) =>
+        SwitchBelow(
+          switchKey: ValueKey('quickNote-${control.name}'),
+          leading: Icon(icon),
+          title: Text(title),
+          value: _shows[control] ?? false,
+          onChanged: (on) => _set(control, on),
+        );
+    return SettingsSection(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(t.settingsQuickNoteDetail),
+        ),
+        shows(
+          QuickNoteControl.fileInto,
+          Icons.drive_file_move_outline,
+          t.fileInto,
+        ),
+        shows(
+          QuickNoteControl.schedule,
+          Icons.alarm_add_outlined,
+          t.routineOrReminder,
+        ),
+        shows(
+          QuickNoteControl.shopping,
+          Icons.add_shopping_cart,
+          t.addToShoppingList,
+        ),
+        shows(QuickNoteControl.importance, Icons.priority_high, t.importance),
+        shows(
+          QuickNoteControl.formatBar,
+          Icons.format_bold,
+          t.quickNoteFormatBar,
+        ),
+        SwitchBelow(
+          switchKey: const ValueKey('quickNote-nudgeButtons'),
+          leading: const Icon(Icons.snooze),
+          title: Text(t.quickNoteNudgeButtons),
+          subtitle: Text(t.quickNoteNudgeButtonsDetail),
+          value: _nudgeButtons,
+          onChanged: _setNudgeButtons,
+        ),
       ],
     );
   }

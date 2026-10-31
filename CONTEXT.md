@@ -14,6 +14,10 @@ _Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note 
 The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut (which the phone's own key or gesture settings or a button-mapper app can also start; the app reads no key itself), the desktop hotkey). Capturing never asks for sorting or unlocking.
 _Avoid_: quick add, record
 
+**Quick note**:
+The text capture screen: the text, Photo, Voice, Gallery and Paste, the Nudge buttons and "To full editor", which saves the Note Unsorted and opens it in the Note editor. What sorts the Note (File into…, Routine, Reminder, Frog or Session, Add to a Shopping List, the Importance) and the format bar show only where the Device's settings switch them on; the Nudge buttons can be switched off for a single Save. German: Schnellnotiz.
+_Avoid_: quick add
+
 **Capture Context**:
 What was true when a Note was captured and helps make sense of it days later: time, Named Place or coordinates, source app, the calendar event running, the connected Bluetooth device.
 _Avoid_: metadata (in the UI), tags (a Tag is a #word of the text)

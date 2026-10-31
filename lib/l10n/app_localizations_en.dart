@@ -4363,4 +4363,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsUpdateFix =>
       'Install the latest Old Brain Fix on this Device.';
+
+  @override
+  String get toFullEditor => 'To full editor';
+
+  @override
+  String get settingsQuickNote => 'Quick note';
+
+  @override
+  String get settingsQuickNoteDetail =>
+      'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.';
+
+  @override
+  String get quickNoteFormatBar => 'Format bar';
+
+  @override
+  String get quickNoteNudgeButtons => 'Nudge buttons';
+
+  @override
+  String get quickNoteNudgeButtonsDetail =>
+      'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.';
 }

@@ -2349,5 +2349,17 @@
   "settingsNeedUpdate": "A setting a newer Old Brain Fix saved on this Device is kept as it is.",
   "@settingsNeedUpdate": {"description": "The cause in the update notice when this Device would have changed a setting a later version of the app saved in a form this version does not know (ADR 0034): the setting is not changed."},
   "settingsUpdateFix": "Install the latest Old Brain Fix on this Device.",
-  "@settingsUpdateFix": {"description": "The fix for 'settingsNeedUpdate'."}
+  "@settingsUpdateFix": {"description": "The fix for 'settingsNeedUpdate'."},
+  "toFullEditor": "To full editor",
+  "@toFullEditor": {"description": "Button on the quick note (the text capture screen): saves the Note at once as Unsorted, nudged in 1 h, and opens it in the full Note editor."},
+  "settingsQuickNote": "Quick note",
+  "@settingsQuickNote": {"description": "Section title in Settings for what the quick note (the text capture screen) shows."},
+  "settingsQuickNoteDetail": "The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.",
+  "@settingsQuickNoteDetail": {"description": "Explanation under the Settings section 'Quick note'."},
+  "quickNoteFormatBar": "Format bar",
+  "@quickNoteFormatBar": {"description": "Switch in Settings ▸ Quick note: the format bar above the keyboard."},
+  "quickNoteNudgeButtons": "Nudge buttons",
+  "@quickNoteNudgeButtons": {"description": "Switch in Settings ▸ Quick note for the three buttons 'remind me to sort it in 10 min, 30 min, 1 h'."},
+  "quickNoteNudgeButtonsDetail": "Off: a single Save in their place, with a Nudge in 1 h, as on leaving.",
+  "@quickNoteNudgeButtonsDetail": {"description": "Explanation under the switch 'Nudge buttons'."}
 }

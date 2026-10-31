@@ -12,6 +12,10 @@ _Avoid_: Eintrag, Memo, Element, Karte (eine Karte ist nur, wie eine Notiz gezei
 Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widget, eine Kachel, eine Verknüpfung (die auch die Tasten- oder Gesteneinstellungen des Handys oder eine Tastenbelegungs-App starten können; die App selbst liest keine Taste), das Tastenkürzel am Computer. Erfassen fragt nie nach Sortieren oder Entsperren.
 _Avoid_: Schnell hinzufügen, Aufnehmen
 
+**Schnellnotiz** [Quick note]:
+Der Bildschirm zum Erfassen von Text: der Text, Foto, Sprache, Galerie und Einfügen, die Stupser-Knöpfe und „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet. Was die Notiz einsortiert (Ablegen in …, Routine, Erinnerung, Frosch oder Einheit, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
+_Avoid_: Schnell hinzufügen
+
 **Erfassungskontext** [Capture Context]:
 Was beim Erfassen einer Notiz galt und ihr Tage später Sinn gibt: die Zeit, der benannte Ort oder die Koordinaten, die App, aus der geteilt wurde, der laufende Kalendertermin, das verbundene Bluetooth-Gerät.
 _Avoid_: Metadaten (in der App), Schlagwörter (ein #Wort ist ein Wort des Textes)

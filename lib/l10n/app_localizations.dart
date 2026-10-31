@@ -7171,6 +7171,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the latest Old Brain Fix on this Device.'**
   String get settingsUpdateFix;
+
+  /// Button on the quick note (the text capture screen): saves the Note at once as Unsorted, nudged in 1 h, and opens it in the full Note editor.
+  ///
+  /// In en, this message translates to:
+  /// **'To full editor'**
+  String get toFullEditor;
+
+  /// Section title in Settings for what the quick note (the text capture screen) shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick note'**
+  String get settingsQuickNote;
+
+  /// Explanation under the Settings section 'Quick note'.
+  ///
+  /// In en, this message translates to:
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.'**
+  String get settingsQuickNoteDetail;
+
+  /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Format bar'**
+  String get quickNoteFormatBar;
+
+  /// Switch in Settings ▸ Quick note for the three buttons 'remind me to sort it in 10 min, 30 min, 1 h'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudge buttons'**
+  String get quickNoteNudgeButtons;
+
+  /// Explanation under the switch 'Nudge buttons'.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.'**
+  String get quickNoteNudgeButtonsDetail;
 }
 
 class _AppLocalizationsDelegate

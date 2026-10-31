@@ -4422,4 +4422,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsUpdateFix =>
       'Installiere auf diesem Gerät das neueste Old Brain Fix.';
+
+  @override
+  String get toFullEditor => 'Zum vollen Editor';
+
+  @override
+  String get settingsQuickNote => 'Schnellnotiz';
+
+  @override
+  String get settingsQuickNoteDetail =>
+      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen und „Zum vollen Editor“. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+
+  @override
+  String get quickNoteFormatBar => 'Formatleiste';
+
+  @override
+  String get quickNoteNudgeButtons => 'Stupser-Knöpfe';
+
+  @override
+  String get quickNoteNudgeButtonsDetail =>
+      'Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite.';
 }

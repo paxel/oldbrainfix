@@ -9,6 +9,31 @@ import 'tally_units.dart';
 /// Which theme this Device shows: the system's, or a fixed one.
 enum ThemeChoice { system, light, dark }
 
+/// What the quick note (the text capture screen) shows beyond its text
+/// field, its Photo, Voice, Gallery and Paste, its Nudge buttons and "To
+/// full editor", each once this Device switched it on (#142).
+enum QuickNoteControl {
+  /// "File into…".
+  fileInto('quickNoteFileInto'),
+
+  /// The Routine, Reminder, Frog or Session menu.
+  schedule('quickNoteSchedule'),
+
+  /// "Add to a Shopping List".
+  shopping('quickNoteShopping'),
+
+  /// The Importance.
+  importance('quickNoteImportance'),
+
+  /// The format bar above the keyboard (ADR 0033).
+  formatBar('quickNoteFormatBar');
+
+  /// The local setting that holds "true" while it is switched on.
+  final String key;
+
+  const QuickNoteControl(this.key);
+}
+
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 const playbackSpeeds = [0.5, 0.75, 1.0, 1.5, 2.0];
 
@@ -34,6 +59,7 @@ extension DeviceSettings on Store {
   static const _alarmSound = 'alarmSound';
   static const _unitSystem = 'unitSystem';
   static const _shoppingAgenda = 'shoppingAgenda';
+  static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -194,6 +220,22 @@ extension DeviceSettings on Store {
   bool get twoRowEditorOn => localSetting(_twoRowEditorOff) != 'true';
 
   set twoRowEditorOn(bool on) => setLocalSetting(_twoRowEditorOff, '${!on}');
+
+  /// Whether the quick note on this Device shows [control]; off until
+  /// switched on.
+  bool quickNoteShows(QuickNoteControl control) =>
+      localSetting(control.key) == 'true';
+
+  void setQuickNoteShows(QuickNoteControl control, bool on) =>
+      setLocalSetting(control.key, '$on');
+
+  /// Whether the quick note on this Device shows the three Nudge buttons;
+  /// on unless switched off, which gives a single Save in their place.
+  bool get quickNoteNudgeButtonsOn =>
+      localSetting(_quickNoteNudgeButtonsOff) != 'true';
+
+  set quickNoteNudgeButtonsOn(bool on) =>
+      setLocalSetting(_quickNoteNudgeButtonsOff, '${!on}');
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.

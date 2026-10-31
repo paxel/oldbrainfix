@@ -1187,5 +1187,11 @@
   "updateOpenAgainFix": "Aktualisiere Old Brain Fix auf diesem Gerät und öffne sie dann noch einmal.",
   "settingsUpdateNeeded": "Ein Update von Old Brain Fix ist nötig.",
   "settingsNeedUpdate": "Eine Einstellung, die ein neueres Old Brain Fix auf diesem Gerät gespeichert hat, bleibt, wie sie ist.",
-  "settingsUpdateFix": "Installiere auf diesem Gerät das neueste Old Brain Fix."
+  "settingsUpdateFix": "Installiere auf diesem Gerät das neueste Old Brain Fix.",
+  "toFullEditor": "Zum vollen Editor",
+  "settingsQuickNote": "Schnellnotiz",
+  "settingsQuickNoteDetail": "Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen und „Zum vollen Editor“. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.",
+  "quickNoteFormatBar": "Formatleiste",
+  "quickNoteNudgeButtons": "Stupser-Knöpfe",
+  "quickNoteNudgeButtonsDetail": "Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite."
 }

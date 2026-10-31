@@ -165,6 +165,41 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the quick note shows its extras once this Device switches each '
+      'on, and its Nudge buttons until it switches them off', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    for (final control in QuickNoteControl.values) {
+      expect(store.quickNoteShows(control), isFalse, reason: control.name);
+    }
+    expect(store.quickNoteNudgeButtonsOn, isTrue);
+    store.setQuickNoteShows(QuickNoteControl.fileInto, true);
+    store.setQuickNoteShows(QuickNoteControl.formatBar, true);
+    expect(store.quickNoteShows(QuickNoteControl.fileInto), isTrue);
+    expect(store.quickNoteShows(QuickNoteControl.formatBar), isTrue);
+    expect(store.quickNoteShows(QuickNoteControl.schedule), isFalse);
+    expect(store.localSetting('quickNoteFileInto'), 'true');
+    expect(store.localSetting('quickNoteFormatBar'), 'true');
+    store.setQuickNoteShows(QuickNoteControl.fileInto, false);
+    expect(store.quickNoteShows(QuickNoteControl.fileInto), isFalse);
+    store.quickNoteNudgeButtonsOn = false;
+    expect(store.quickNoteNudgeButtonsOn, isFalse);
+    expect(store.localSetting('quickNoteNudgeButtonsOff'), 'true');
+    store.quickNoteNudgeButtonsOn = true;
+    expect(store.quickNoteNudgeButtonsOn, isTrue);
+    expect(
+      [for (final control in QuickNoteControl.values) control.key],
+      [
+        'quickNoteFileInto',
+        'quickNoteSchedule',
+        'quickNoteShopping',
+        'quickNoteImportance',
+        'quickNoteFormatBar',
+      ],
+    );
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('recordings play at normal speed until this Device chooses one', () {
     final store = Store.inMemory();
     addTearDown(store.close);

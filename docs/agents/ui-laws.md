@@ -92,13 +92,30 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
   The three are actions, not a choice of value: a tap saves the Note
   with that Nudge time, so the radio-button law does not apply to them.
-- **Above them sits the Note card's action row**, on every capture
-  path (text, Voice, Photo, Gallery, Paste, share, widget, tile, shortcut,
-  also one a phone key or gesture starts): File into…, Routine, Reminder, Frog or Session, and
-  ⋮ with the Importance, Make it a Tally and Add to a Shopping List.
-  Each opens its usual page and comes back to the capture screen with
-  the choice shown at the top ("→ Household"), not saved yet; the user
-  can keep typing or add more. All of it is optional.
+  Where the Device switched the Nudge buttons off (Settings ▸ Quick
+  note), one Save takes their place, and it nudges in 1 h as leaving does.
+- **The quick note is uncluttered** (#142): by default it shows the
+  text field, Photo, Voice, Gallery and Paste, the Nudge buttons and
+  **To full editor**, nothing that sorts and no chips. To full editor
+  saves the Note at once, Unsorted with the default Nudge, and opens the
+  Note editor on it in place of the capture screen; leaving the editor
+  returns to where Capture was opened from. It waits while there is
+  nothing to save and is not offered behind the App Lock or while a
+  Shopping List is picked.
+- **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
+  all off by default, for File into…, Routine, Reminder, Frog or
+  Session, Add to a Shopping List, the Importance and the format bar,
+  and the switch Nudge buttons, on by default. What is switched on shows
+  in the Note card's action row beside To full editor, on every capture
+  path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
+  shortcut, also one a phone key or gesture starts): File into… and the
+  alarm clock, and ⋮ with the Importance and Add to a Shopping List.
+  Make it a Tally is not on the capture screen. Each opens its usual
+  page and comes back to the capture screen with the choice shown at the
+  top ("→ Household"), not saved yet; the user can keep typing or add
+  more. All of it is optional. With the format bar on, it rides on the
+  keyboard; where the room is small the buttons under the text scroll
+  and the text keeps two lines.
 - **Add to a Shopping List** makes each line of the capture a Line of
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
@@ -108,10 +125,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   once it is, and without one it stays a Note, announced at the top.
 - **Everything is saved together** when the user leaves the screen or
   taps a save button. Nothing is half-saved: for an empty Note nothing
-  is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
+  is saved, so no Routine, Reminder, Frog or Session ever hangs
   on an empty Note.
 - **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, or
-  a Routine, Reminder, Frog, Session or Tally is set up, the three
+  a Routine, Reminder, Frog or Session is set up, the three
   Nudge buttons become one Save and no Nudge is set; leaving saves too.
 - Behind the App Lock, the row offers neither File into… nor the
   Session, which would show the Areas and the Tallies. File into… lists

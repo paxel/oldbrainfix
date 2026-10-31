@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -8,11 +9,13 @@ import 'app_lock.dart';
 import 'announcements.dart';
 import 'capture_choices.dart';
 import 'context_platform.dart';
+import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'file_into_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'note_card.dart';
+import 'note_editor_screen.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
@@ -20,12 +23,19 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'shopping_pick_screen.dart';
 import 'speech_platform.dart';
-import 'tally_field_screen.dart';
+import 'text_marks_view.dart';
+import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
 /// A Note just captured, and for its location and for the rest of its
-/// Capture Context whether it got attached, each once that is known.
-typedef Captured = ({String noteId, List<Future<bool>> attached});
+/// Capture Context whether it got attached, each once that is known;
+/// with [editing] when "To full editor" opened it, done once the user
+/// left the editor.
+typedef Captured = ({
+  String noteId,
+  List<Future<bool>> attached,
+  Future<void>? editing,
+});
 
 /// Opens text Capture, or voice Capture recording at once when [voice] is
 /// set, or the camera at once when [photo] is set, or filled from the
@@ -34,6 +44,8 @@ typedef Captured = ({String noteId, List<Future<bool>> attached});
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
 /// [onCaptured] gets the new Note's id first, when there is one.
+/// "To full editor" leaves Capture for the Note's editor; leaving that
+/// comes back here, and [onChanged] runs once more.
 ///
 /// A shared sound file this Device cannot transcribe is kept all the
 /// same, and announced at the top ([announceUntranscribable]).
@@ -83,6 +95,12 @@ Future<void> captureNote(
   // Each shows as soon as it arrives, without waiting for the others.
   for (final attached in captured.attached) {
     unawaited(attached.then((attached) => attached ? onChanged() : null));
+  }
+  // The editor first: nothing is asked over it.
+  if (captured.editing case final editing?) {
+    await editing;
+    if (!context.mounted) return;
+    onChanged();
   }
   final store = notes.store;
   if (!location.available || store.locationExplained) return;
@@ -192,7 +210,7 @@ void announceUntranscribable(
   );
 }
 
-/// Text capture: opens with the keyboard up, Save writes the Note. The
+/// Text capture, the quick note: opens with the keyboard up, Save writes the Note. The
 /// position, and the calendar events and Bluetooth devices where they
 /// are switched on, are looked up from the start, without asking, and
 /// attached when they arrive: they never hold the Note back. Leaving by
@@ -201,17 +219,25 @@ void announceUntranscribable(
 /// buttons at the bottom, each of which saves; Save means 1 h (UI laws,
 /// "Capture").
 ///
-/// Above them sits the Note card's action row (#113): "File into…", a
-/// Routine, Reminder, Frog or Session, and ⋮ with the Importance and
-/// "Make it a Tally". Each opens its usual page and comes back here with
-/// the choice shown at the top, not written yet; all of it is written
-/// with the Note when the screen is left, nothing of it while the Note is
-/// empty. A sorted Note, filed into an Area or Topic or with something
-/// spawned from it, needs no Nudge: one Save takes the three buttons'
-/// place. The App Lock keeps the Areas and Tallies out of reach here, so
-/// "File into…" and the Session are not offered behind it.
+/// "To full editor" saves the Note at once, Unsorted and nudged in 1 h,
+/// and opens it in the Note editor in place of this screen (#142); not
+/// offered behind the App Lock, as the editor shows the Areas, and not
+/// while there is nothing to save.
 ///
-/// "Add to a Shopping List" in ⋮ (#124) makes each line typed, and of
+/// Uncluttered by default (#142): what sorts the Note shows only once
+/// this Device switched it on in Settings ▸ Quick note ([QuickNoteControl]),
+/// in the Note card's action row (#113): "File into…", a Routine,
+/// Reminder, Frog or Session, and ⋮ with the Importance and "Add to a
+/// Shopping List"; and so does the format bar. Each opens its usual page
+/// and comes back here with the choice shown at the top, not written yet;
+/// all of it is written with the Note when the screen is left, nothing of
+/// it while the Note is empty. A sorted Note, filed into an Area or Topic
+/// or with something spawned from it, needs no Nudge: one Save takes the
+/// three buttons' place, and so it does where the Nudge buttons are
+/// switched off. The App Lock keeps the Areas and Tallies out of reach
+/// here, so "File into…" and the Session are not offered behind it.
+///
+/// "Add to a Shopping List" (#124) makes each line typed, and of
 /// each recording's Transcript, a Line of the list picked, and keeps no
 /// Note; the other choices wait unshown meanwhile. It is not offered
 /// with a photo, which no Line holds, nor behind the App Lock.
@@ -286,7 +312,26 @@ class CaptureScreen extends StatefulWidget {
 }
 
 class _CaptureScreenState extends State<CaptureScreen> {
-  final _text = TextEditingController();
+  /// The room the text keeps, about two lines, where the buttons under it
+  /// scroll instead.
+  static const _textRoom = 56.0;
+
+  /// What this Device's quick note shows, read once (ADR 0008).
+  late final _shows = {
+    for (final control in QuickNoteControl.values)
+      if (widget.notes.store.quickNoteShows(control)) control,
+  };
+  late final _nudgeButtons = widget.notes.store.quickNoteNudgeButtonsOn;
+
+  /// With the format bar, its tags highlighted and a formatted text
+  /// formatted as typed (ADR 0033).
+  late final TextEditingController _text =
+      _shows.contains(QuickNoteControl.formatBar)
+      ? TagTextController()
+      : TextEditingController();
+
+  /// The text as last seen, to tell when it changed.
+  var _typed = '';
   late final Future<Coordinates?> _here;
   late final Future<ContextExtras> _extras;
   late final AppLifecycleListener _lifecycle;
@@ -358,10 +403,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
   var _frog = false;
   var _frogWritten = false;
 
-  /// The first field of the Tally the Note becomes, and whether written.
-  TallyFieldChoice? _tally;
-  var _tallyWritten = false;
-
   /// The Shopping List the lines go into instead of a Note (#124), with
   /// its title; null while they make a Note. While one is picked the
   /// other choices wait unshown and unwritten, and a Note written
@@ -373,6 +414,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   void initState() {
     super.initState();
+    _text.addListener(_textChanged);
     _placed();
     // The fix may take a while; it starts while the user types.
     _here = currentIfGranted(widget.location);
@@ -440,6 +482,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     _lock?.removeListener(_lockChanged);
     _ticker?.cancel();
     _lifecycle.dispose();
+    _text.removeListener(_textChanged);
     _text.dispose();
     super.dispose();
   }
@@ -451,8 +494,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
       _place != null ||
       _schedules.isNotEmpty ||
       _writtenSchedules.isNotEmpty ||
-      _frog ||
-      _tally != null;
+      _frog;
+
+  /// What is typed or pasted answers "nothing to paste".
+  void _textChanged() {
+    final text = _text.text;
+    if (text == _typed) return;
+    _typed = text;
+    if (_pasteEmpty) setState(() => _pasteEmpty = false);
+  }
 
   /// Writes the text as a Note, or into the one already written, and
   /// what was set up for it; nothing while it is empty and there is no
@@ -505,15 +555,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
     if (note.importance != _importance) {
       notes.setImportance(noteId, _importance);
     }
-    if (_tally case final tally? when !_tallyWritten) {
-      Tallies(store).addField(
-        noteId,
-        name: tally.name,
-        unit: tally.unit,
-        target: tally.target,
-        rule: tally.rule,
-      );
-    }
     for (final choice in _schedules) {
       choice.spawnFrom(store, noteId);
     }
@@ -524,7 +565,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// Marks what [_writeChoices] wrote as written, the Note in [filed].
   void _choicesWritten(String? filed) {
     _filed = filed;
-    if (_tally != null) _tallyWritten = true;
     _writtenSchedules.addAll(_schedules);
     _schedules.clear();
     if (_frog) _frogWritten = true;
@@ -600,7 +640,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// lists out of reach, nor without a list to add to.
   VoidCallback? _shoppingOffer() {
     if ((_lock?.locked ?? false) || _photos.isNotEmpty) return null;
-    if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
+    if (_writtenSchedules.isNotEmpty || _frogWritten) {
       return null;
     }
     if (_recordings.isNotEmpty &&
@@ -628,13 +668,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// Sets up the first field of the Tally the Note becomes.
-  Future<void> _makeTally() async {
-    final field = await chooseTallyField(context, widget.notes);
-    if (!mounted || field == null) return;
-    setState(() => _tally = field);
-  }
-
   /// Captures the new Note with [text], [photos] and [recordings].
   void _create(
     String text, {
@@ -660,10 +693,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
     sourceApp: widget.shared?.sourceApp,
   );
 
-  /// Formatted for a text that uses a format, pasted, shared or typed as
-  /// Markdown (ADR 0033); null leaves it as it is.
-  static String? _formatOf(String text) =>
-      Markdown.uses(text) ? TextFormats.markdown : null;
+  /// Formatted for a text formatted with the format bar, or that uses a
+  /// format, pasted, shared or typed as Markdown (ADR 0033); null leaves
+  /// it as it is.
+  String? _formatOf(String text) {
+    final formatted = switch (_text) {
+      TagTextController(markdown: true) => true,
+      _ => Markdown.uses(text),
+    };
+    return formatted ? TextFormats.markdown : null;
+  }
 
   /// Holds the written [note] as the one being captured, and attaches
   /// where and amid what it was captured once that is known.
@@ -674,6 +713,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         attachLocation(widget.notes, note.id, _here),
         attachExtras(widget.notes, note.id, _extras),
       ],
+      editing: null,
     );
     _filed = note.place;
     _photos = note.photos;
@@ -859,6 +899,53 @@ class _CaptureScreenState extends State<CaptureScreen> {
     Navigator.of(context).pop(_captured);
   }
 
+  /// "To full editor": saves the Note as leaving does, Unsorted and
+  /// nudged in 1 h unless it is sorted, and opens its editor in place of
+  /// this screen, so leaving the editor comes back to where Capture was
+  /// opened from. A recording running is ended and kept first, and
+  /// pictures still being picked are written first. Nothing saved, as
+  /// for an empty Note, the screen stays.
+  Future<void> _toEditor() async {
+    if (_leaving) return;
+    _leaving = true;
+    await _stopRecording();
+    await _picking;
+    if (!mounted) return;
+    try {
+      _write(null);
+    } catch (_) {
+      _leaving = false;
+      rethrow;
+    }
+    final captured = _captured;
+    if (captured == null) {
+      _leaving = false;
+      return;
+    }
+    final notes = widget.notes;
+    final drafts = DraftsScope.of(context);
+    final editing = Completer<void>();
+    unawaited(
+      Navigator.of(context)
+          .pushReplacement<void, Captured>(
+            MaterialPageRoute(
+              builder: (_) => NoteEditorScreen(
+                notes: notes,
+                places: Places(notes.store),
+                drafts: drafts,
+                noteId: captured.noteId,
+              ),
+            ),
+            result: (
+              noteId: captured.noteId,
+              attached: captured.attached,
+              editing: editing.future,
+            ),
+          )
+          .whenComplete(editing.complete),
+    );
+  }
+
   /// Makes each line of the text a Line of the Shopping List [listId],
   /// and the Note written meanwhile goes, with the lines of its
   /// recordings' Transcripts (#124). While a recording has no Transcript
@@ -920,6 +1007,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
     return (
       noteId: captured.noteId,
+      editing: null,
       attached: [
         ...captured.attached,
         intoShoppingLater(
@@ -938,6 +1026,76 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final recording = _voiceMode && !_micMissing;
+    // With the keyboard up the room is small: the photos and recordings
+    // scroll with the text, the buttons stay.
+    final text = Expanded(
+      child: _voiceMode
+          ? Column(
+              children: [
+                ..._attachments(context),
+                Expanded(child: _voice(context)),
+              ],
+            )
+          : CustomScrollView(
+              slivers: [
+                if (_choices(context) case final choices?)
+                  SliverToBoxAdapter(child: choices),
+                for (final attachment in _attachments(context))
+                  SliverToBoxAdapter(child: attachment),
+                if (_pasteEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.pasteEmpty,
+                        key: const ValueKey('paste-empty'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _field(context),
+                ),
+              ],
+            ),
+    );
+    final below = [
+      if (!recording) ...[_captureButtons(context), ?_actionLine(context)],
+      if (_sorted || !_nudgeButtons)
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            key: const ValueKey('captureSave'),
+            onPressed: _save,
+            child: Text(t.save),
+          ),
+        )
+      else
+        NudgeButtons(onPicked: _save),
+      // The format bar rides on the keyboard, over the bottom.
+      if (_shows.contains(QuickNoteControl.formatBar) &&
+          !recording &&
+          MediaQuery.viewInsetsOf(context).bottom > 0)
+        const SizedBox(height: TwoRowTextField.barHeight),
+    ];
+    // The buttons under the text, in at most [room] when given.
+    Widget column(double? room) => Column(
+      children: [
+        text,
+        if (room == null)
+          ...below
+        else
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: room),
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: below),
+            ),
+          ),
+      ],
+    );
     // Leaving by Back saves as well (UI laws, "Capture").
     return PopScope(
       canPop: false,
@@ -954,114 +1112,128 @@ class _CaptureScreenState extends State<CaptureScreen> {
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // With the keyboard up the room is small: the photos and
-                // recordings scroll with the text, the buttons stay.
-                Expanded(
-                  child: _voiceMode
-                      ? Column(
-                          children: [
-                            ..._attachments(context),
-                            Expanded(child: _voice(context)),
-                          ],
-                        )
-                      : CustomScrollView(
-                          slivers: [
-                            if (_choices(context) case final choices?)
-                              SliverToBoxAdapter(child: choices),
-                            for (final attachment in _attachments(context))
-                              SliverToBoxAdapter(child: attachment),
-                            if (_pasteEmpty)
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Text(
-                                    t.pasteEmpty,
-                                    key: const ValueKey('paste-empty'),
-                                    style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: TextField(
-                                controller: _text,
-                                autofocus:
-                                    !widget.startVoice &&
-                                    !widget.startPhoto &&
-                                    !widget.startGallery,
-                                maxLines: null,
-                                // What is typed answers "nothing to paste".
-                                onChanged: _pasteEmpty
-                                    ? (_) => setState(() => _pasteEmpty = false)
-                                    : null,
-                                decoration: InputDecoration(
-                                  hintText:
-                                      _photos.isEmpty && _recordings.isEmpty
-                                      ? t.captureHint
-                                      : t.capturePhotoHint,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-                if (!recording) ...[
-                  _captureButtons(context),
-                  _actions(context),
-                ],
-                if (_sorted)
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      key: const ValueKey('captureSave'),
-                      onPressed: _save,
-                      child: Text(t.save),
+            // The format bar rides on the keyboard: on a small screen the
+            // buttons under the text scroll, and the text keeps two lines.
+            child: _shows.contains(QuickNoteControl.formatBar)
+                ? LayoutBuilder(
+                    builder: (context, constraints) => column(
+                      math.max(0.0, constraints.maxHeight - _textRoom),
                     ),
                   )
-                else
-                  NudgeButtons(onPicked: _save),
-              ],
-            ),
+                : column(null),
           ),
         ),
       ),
     );
   }
 
-  /// The Note card's action row, above the Nudge buttons or Save; what
-  /// it opens comes back here. Behind the App Lock it offers neither
-  /// "File into…" nor the Session, which show Areas and Tallies.
-  Widget _actions(BuildContext context) {
-    final locked = _lock?.locked ?? false;
-    // Lines need none of these: they wait while a Shopping List is picked.
-    final shopping = _shopping != null;
-    return NoteActionRow(
-      importance: _importance,
-      onFile: locked || shopping ? null : _file,
-      onSchedule: _mayManage && !shopping ? _spawn : null,
-      spawns: [
-        for (final spawn in Spawn.values)
-          if (!locked || spawn != Spawn.session) spawn,
+  /// The text field; with the format bar where it is switched on.
+  Widget _field(BuildContext context) {
+    final t = context.t;
+    final autofocus =
+        !widget.startVoice && !widget.startPhoto && !widget.startGallery;
+    final decoration = InputDecoration(
+      hintText: _photos.isEmpty && _recordings.isEmpty
+          ? t.captureHint
+          : t.capturePhotoHint,
+    );
+    if (_shows.contains(QuickNoteControl.formatBar)) {
+      return TwoRowTextField(
+        controller: _text,
+        twoRows: false,
+        autofocus: autofocus,
+        formats: true,
+        decoration: decoration,
+      );
+    }
+    return TextField(
+      controller: _text,
+      autofocus: autofocus,
+      maxLines: null,
+      decoration: decoration,
+    );
+  }
+
+  /// The line above the Nudge buttons or Save: "To full editor", then
+  /// the action row with what Settings ▸ Quick note switched on; null
+  /// while neither shows.
+  Widget? _actionLine(BuildContext context) {
+    final editor = _toEditorButton(context);
+    final actions = _actions(context);
+    if (editor == null) return actions;
+    return Row(
+      children: [
+        Expanded(
+          child: Align(alignment: Alignment.centerLeft, child: editor),
+        ),
+        // The row's icons side by side, at the end.
+        if (actions != null) IntrinsicWidth(child: actions),
       ],
-      actions: NoteActions(
-        onImportance: shopping
-            ? null
-            : (picked) => setState(() => _importance = picked),
-        isTally: () => _tally != null,
-        onMakeTally: shopping ? null : _makeTally,
-        addToShopping: _shoppingOffer,
+    );
+  }
+
+  /// "To full editor": none behind the App Lock or while the lines go
+  /// into a Shopping List, and it waits while there is nothing to save.
+  Widget? _toEditorButton(BuildContext context) {
+    if ((_lock?.locked ?? false) || _shopping != null) return null;
+    return ListenableBuilder(
+      listenable: _text,
+      builder: (context, _) => TextButton.icon(
+        key: const ValueKey('captureToEditor'),
+        onPressed: _captured != null || _text.text.trim().isNotEmpty
+            ? _toEditor
+            : null,
+        icon: const Icon(Icons.open_in_full),
+        // Beside the row's icons: a long word shrinks rather than being
+        // cut.
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(context.t.toFullEditor, maxLines: 1, softWrap: false),
+        ),
       ),
     );
   }
 
+  /// The Note card's action row, after "To full editor", with what
+  /// Settings ▸ Quick note switched on; null while that is nothing.
+  /// What it opens comes back here. Behind the App Lock it offers neither
+  /// "File into…" nor the Session, which show Areas and Tallies.
+  Widget? _actions(BuildContext context) {
+    final locked = _lock?.locked ?? false;
+    // Lines need none of these: they wait while a Shopping List is picked.
+    final shopping = _shopping != null;
+    final importance = _shows.contains(QuickNoteControl.importance);
+    final toShopping = _shows.contains(QuickNoteControl.shopping);
+    final onFile = _shows.contains(QuickNoteControl.fileInto)
+        ? (locked || shopping ? null : _file)
+        : null;
+    final onSchedule = _shows.contains(QuickNoteControl.schedule)
+        ? (_mayManage && !shopping ? _spawn : null)
+        : null;
+    if (onFile == null && onSchedule == null && !importance && !toShopping) {
+      return null;
+    }
+    return NoteActionRow(
+      importance: _importance,
+      onFile: onFile,
+      onSchedule: onSchedule,
+      spawns: [
+        for (final spawn in Spawn.values)
+          if (!locked || spawn != Spawn.session) spawn,
+      ],
+      actions: importance || toShopping
+          ? NoteActions(
+              onImportance: importance && !shopping
+                  ? (picked) => setState(() => _importance = picked)
+                  : null,
+              addToShopping: toShopping ? _shoppingOffer : null,
+            )
+          : null,
+    );
+  }
+
   /// What was set up for the Note, at the top: where it goes, its
-  /// Importance, its Tally, Routines, Reminders, Sessions and Frog, each
+  /// Importance, its Routines, Reminders, Sessions and Frog, each
   /// with a button that drops it again while it is not written; null
   /// while there is nothing.
   Widget? _choices(BuildContext context) {
@@ -1123,12 +1295,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ? t.importanceImportant
               : t.importanceUnimportant,
           null,
-        ),
-      if (_tally case final tally?)
-        chip(
-          'choice-tally',
-          t.captureChoiceTally(tally.name),
-          _tallyWritten ? null : () => setState(() => _tally = null),
         ),
       for (final (i, choice) in _writtenSchedules.indexed)
         chip('choice-written-$i', scheduled(choice), null),
