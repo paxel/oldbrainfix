@@ -67,6 +67,18 @@ abstract final class ChecklistKeys {
 
   /// What a Line of a group starts with in a plain Note's text.
   static const groupIndent = '  ';
+
+  /// The id prefix, before the Note's id, of the user's own "Show on
+  /// the Agenda" choice for a Checklist (#143): `agenda:<note id>`,
+  /// outside every Area like an Override, so it is sealed under the
+  /// personal key and goes only to the user's own Devices.
+  static const agendaPrefix = 'agenda:';
+
+  /// On that entity: [agendaOff] while the Checklist stays off the
+  /// Agenda; absent, null or any other value while it shows.
+  static const agenda = 'agenda';
+
+  static const agendaOff = 'off';
 }
 
 /// The list a Note's `kind` names and the id of its making; null for a
@@ -204,6 +216,9 @@ class Checklist {
   /// How many Lines show checked, and how many there are.
   int get checkedCount => lines.where((l) => l.checked).length;
   int get count => lines.length;
+
+  /// How many Lines do not show checked: "3 of 7 open" on the Agenda.
+  int get openCount => count - checkedCount;
 
   bool get allChecked => lines.every((l) => l.checked);
 }
@@ -375,6 +390,80 @@ class Checklists {
       if (from == start) return null;
     }
     return schedule.between(start, today).lastOrNull?.day;
+  }
+
+  /// The Checklists on today's Agenda (#143): each not in the trash nor
+  /// merged, with no Routine or Reminder out of the trash, that
+  /// [showsOnAgenda] and has a Line open; oldest capture first. One with
+  /// a Routine shows as its Occurrence instead. Each row says how many
+  /// Lines are open of how many ([Checklist.openCount],
+  /// [Checklist.count]); the apps show one of a locked Area set to
+  /// Masked as a row that tells nothing of it, as a Shopping List's.
+  List<Checklist> agenda() {
+    final notes = Notes(store);
+    final routines = Routines(store);
+    final spawned = {for (final r in routines.all()) ?routines.note(r)?.id};
+    final own = <String, bool>{};
+    final shown = <Note>[];
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      if (_making(id) == null || spawned.contains(id)) continue;
+      if (notes.byId(id) case final note?
+          when !note.isTrashed && !note.isMerged && _shows(id, own)) {
+        shown.add(note);
+      }
+    }
+    shown.sort((a, b) {
+      final byCapture = a.captured.compareTo(b.captured);
+      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+    });
+    final lists = ofNotes([for (final n in shown) n.id]);
+    return [
+      for (final note in shown)
+        if (lists[note.id] case final list? when list.openCount > 0) list,
+    ];
+  }
+
+  /// Whether the Checklist of [noteId] shows on today's Agenda for this
+  /// person, as far as it is theirs to say: unless one of the user's own
+  /// Devices switched it off last. What another person's Device wrote
+  /// counts for nothing, so in a Shared Area each person decides for
+  /// their own Agenda.
+  bool showsOnAgenda(String noteId) => _shows(noteId, {});
+
+  bool _shows(String noteId, Map<String, bool> own) =>
+      store.currentByOwn(
+        '${ChecklistKeys.agendaPrefix}$noteId',
+        ChecklistKeys.agenda,
+        own,
+      ) !=
+      ChecklistKeys.agendaOff;
+
+  /// Whether "Show on the Agenda" applies to the Note [noteId]: a
+  /// Checklist not in the trash nor merged, with no Routine or Reminder
+  /// out of the trash; one with a Routine shows as its Occurrence.
+  bool mayShowOnAgenda(String noteId) {
+    final note = Notes(store).byId(noteId);
+    return note != null &&
+        !note.isTrashed &&
+        !note.isMerged &&
+        _making(noteId) != null &&
+        Routines(store).ofNote(noteId).isEmpty;
+  }
+
+  /// Switches "Show on the Agenda" of the Checklist of [noteId] on or
+  /// off for this person alone, kept like an Override: on the user's own
+  /// Devices only, whatever their role in its Area. The same again
+  /// writes nothing.
+  void setShowOnAgenda(String noteId, bool shown) {
+    if (_making(noteId) == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Checklist');
+    }
+    if (showsOnAgenda(noteId) == shown) return;
+    store.append(
+      '${ChecklistKeys.agendaPrefix}$noteId',
+      ChecklistKeys.agenda,
+      shown ? null : ChecklistKeys.agendaOff,
+    );
   }
 
   /// Whether this Device may make the Note [noteId] a Checklist: a Note

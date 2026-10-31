@@ -39,8 +39,9 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 18] = [
+const SCENARIOS: [&str; 19] = [
     "boxes",
+    "checklist-agenda",
     "checklist-routines",
     "checklists",
     "edits",
@@ -1609,8 +1610,9 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 18] = [
+    let writers: [(&str, Writer); 19] = [
         ("boxes", write_boxes),
+        ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
@@ -2594,6 +2596,58 @@ fn write_checklist_routines(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `checklist-agenda` scenario.
+fn write_checklist_agenda(store: &Store) -> Built {
+    use oldbrainfix_core::checklists::keys;
+    let notes = Notes::new(store);
+    let lists = Checklists::new(store);
+    let routines = Routines::new(store);
+    let make = |text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let id = notes.capture(text, None, None)?.id;
+        lists.make(&id)?;
+        Ok(id)
+    };
+    let line = |note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(note)?.ok_or("a Checklist")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let trip = make("Before the trip\nTent\nTorch\n  Batteries\nMap")?;
+    lists.check(&line(&trip, "Batteries")?)?;
+    lists.check(&line(&trip, "Map")?)?;
+    let someday = make("Someday\nPaint the shed")?;
+    lists.set_show_on_agenda(&someday, false)?;
+    let garden = make("Garden\nRake\nSeeds")?;
+    lists.set_show_on_agenda(&garden, false)?;
+    lists.set_show_on_agenda(&garden, true)?;
+    make("Done\n✓ All of it")?;
+    make("Title only")?;
+    let gym = make("Gym bag\nTowel")?;
+    let every_day =
+        Schedule::new(Day::new(2026, 1, 1), &[at(7, 0)?], daily()).ok_or("a schedule")?;
+    routines.spawn(&gym, &every_day)?;
+    let tidy = make("Tidy\nDesk")?;
+    let once = routines.spawn(&tidy, &schedule(Day::new(2026, 1, 2), &[], None)?)?;
+    routines.trash(&once.id)?;
+    let old = make("Old list\nBox")?;
+    notes.trash(&old)?;
+    let merged = make("Merged\nCord")?;
+    let kept = notes.capture("Kept", None, None)?.id;
+    notes.merge(&merged, &kept)?;
+    // As a modified app or a later version would write them.
+    for (note, value) in [(&garden, "OFF"), (&trip, "later")] {
+        let entity = format!("{}{note}", keys::AGENDA_PREFIX);
+        store.append(&entity, keys::AGENDA, Some(value), None)?;
+    }
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
 /// A Checklist as the generator's `_checklist` lists it.
 fn checklist_json(list: &Checklist) -> Value {
     json!({
@@ -2661,7 +2715,12 @@ const MARKDOWN_ROWS: [&str; 23] = [
 
 #[test]
 fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["checklist-routines", "checklists", "history"] {
+    for scenario in [
+        "checklist-agenda",
+        "checklist-routines",
+        "checklists",
+        "history",
+    ] {
         checklists_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
@@ -2698,6 +2757,29 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
     assert_eq!(json!(keys), expected["ofNotes"]);
     assert_eq!(Value::Object(may), expected["mayMake"]);
     assert_eq!(Value::Object(plain), expected["plain"]);
+    // Today's Agenda, and each Note's "Show on the Agenda" choice.
+    let agenda: Vec<Value> = lists
+        .agenda()?
+        .iter()
+        .map(|l| json!({"note": l.note_id, "open": l.open_count(), "count": l.count()}))
+        .collect();
+    assert_eq!(json!(agenda), expected["agenda"], "{scenario}");
+    let mut shows = serde_json::Map::new();
+    let mut applies = serde_json::Map::new();
+    for id in &ids {
+        shows.insert(id.clone(), json!(lists.shows_on_agenda(id)?));
+        applies.insert(id.clone(), json!(lists.may_show_on_agenda(id)?));
+    }
+    assert_eq!(
+        Value::Object(shows),
+        expected["showsOnAgenda"],
+        "{scenario}"
+    );
+    assert_eq!(
+        Value::Object(applies),
+        expected["mayShowOnAgenda"],
+        "{scenario}"
+    );
     let rows: Vec<Value> = ROWS
         .iter()
         .map(|row| match parse_line(row) {
@@ -4286,6 +4368,28 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(json!(ann.person_shown(ben_id)?.name), overridden["shown"]);
     assert_eq!(json!(ann.person_theirs(ben_id)?.name), overridden["theirs"]);
 
+    // Ann makes a Checklist in the Area and takes it off her own Agenda:
+    // the same entries, kept like an Override.
+    *clock.lock() = at("agendaAt")?;
+    let agenda_ids = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(
+        expected["agendaIds"].as_u64().ok_or("agendaIds")?,
+    ));
+    ann.set_id_maker(Box::new(move || {
+        let n = agenda_ids.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        Ok(format!("{n:032x}"))
+    }));
+    let mark = ann.current_seq()?;
+    let trip = Notes::new(&ann)
+        .capture("Trip\nTent\nTorch", Some(&area), None)?
+        .id;
+    assert_eq!(trip, expected["agendaNote"].as_str().ok_or("agendaNote")?);
+    Checklists::new(&ann).make(&trip)?;
+    Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("agenda.jsonl"))?
+    );
+
     // Ann renames herself and syncs through a shared folder: the
     // Household's Profiles go sealed under its key, as the Dart core
     // sealed them, and Ben reads hers.
@@ -4324,6 +4428,12 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
             .all(|e| !e.entity.starts_with(oldbrainfix_core::overrides::PREFIX)),
         "Ann's Override reached Ben"
     );
+    assert!(
+        ben.all_entries()?.iter().all(|e| !e
+            .entity
+            .starts_with(oldbrainfix_core::checklists::keys::AGENDA_PREFIX)),
+        "Ann's Agenda choice reached Ben"
+    );
     let after = &expected["after"];
     let ids: Vec<String> = after["hostRoles"]["mayChange"]
         .as_object()
@@ -4335,6 +4445,14 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(without_device(read(&ben)?), after["joiner"]);
     assert_eq!(roles_json(&ann, &area, &ids)?, after["hostRoles"]);
     assert_eq!(roles_json(&ben, &area, &ids)?, after["joinerRoles"]);
+    for (store, key) in [(&ann, "hostAgenda"), (&ben, "joinerAgenda")] {
+        let shown: Vec<String> = Checklists::new(store)
+            .agenda()?
+            .into_iter()
+            .map(|l| l.note_id)
+            .collect();
+        assert_eq!(json!(shown), after[key], "{key}");
+    }
 
     // Ann makes Ben a Manager, then removes him: the same entries, and
     // nothing more goes to him.

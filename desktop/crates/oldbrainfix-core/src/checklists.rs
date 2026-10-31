@@ -9,7 +9,7 @@
 //! Occurrence, so every new one starts with no Line checked.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
@@ -71,6 +71,16 @@ pub mod keys {
     pub const CHECK_MARK: &str = "✓ ";
     /// What a Line of a group starts with in a plain Note's text.
     pub const GROUP_INDENT: &str = "  ";
+
+    /// The id prefix, before the Note's id, of the user's own "Show on
+    /// the Agenda" choice for a Checklist (#143): `agenda:<note id>`,
+    /// outside every Area like an Override, so it is sealed under the
+    /// personal key and goes only to the user's own Devices.
+    pub const AGENDA_PREFIX: &str = "agenda:";
+    /// On that entity: [`AGENDA_OFF`] while the Checklist stays off the
+    /// Agenda; absent, none or any other value while it shows.
+    pub const AGENDA: &str = "agenda";
+    pub const AGENDA_OFF: &str = "off";
 }
 
 /// The list a Note's `kind` names and the id of its making; `None` for a
@@ -235,6 +245,11 @@ impl Checklist {
 
     pub fn count(&self) -> usize {
         self.lines.len()
+    }
+
+    /// How many Lines do not show checked: "3 of 7 open" on the Agenda.
+    pub fn open_count(&self) -> usize {
+        self.count() - self.checked_count()
     }
 
     pub fn all_checked(&self) -> bool {
@@ -712,6 +727,100 @@ impl<'a> Checklists<'a> {
             out.insert(id, shown);
         }
         Ok(out)
+    }
+
+    /// The Checklists on today's Agenda (#143): each not in the trash nor
+    /// merged, with no Routine or Reminder out of the trash, that
+    /// [`Checklists::shows_on_agenda`] and has a Line open; oldest capture
+    /// first. One with a Routine shows as its Occurrence instead. Each row
+    /// says how many Lines are open of how many
+    /// ([`Checklist::open_count`], [`Checklist::count`]); the apps show one
+    /// of a locked Area set to Masked as a row that tells nothing of it,
+    /// as a Shopping List's.
+    pub fn agenda(&self) -> Result<Vec<Checklist>> {
+        let notes = Notes::new(self.store);
+        let routines = Routines::new(self.store);
+        let mut spawned = HashSet::new();
+        for routine in routines.all()? {
+            if let Some(note) = routines.note(&routine)? {
+                spawned.insert(note.id);
+            }
+        }
+        let mut own = HashMap::new();
+        let mut shown = Vec::new();
+        for id in self.store.entities_of_type(note_keys::TYPE_NOTE)? {
+            if self.making(&id)?.is_none() || spawned.contains(&id) {
+                continue;
+            }
+            if let Some(note) = notes.by_id(&id)?
+                && !note.is_trashed()
+                && !note.is_merged()
+                && self.shows(&id, &mut own)?
+            {
+                shown.push(note);
+            }
+        }
+        shown.sort_by(|a, b| {
+            a.captured
+                .cmp(&b.captured)
+                .then_with(|| utf16_cmp(&a.id, &b.id))
+        });
+        let ids: Vec<String> = shown.iter().map(|n| n.id.clone()).collect();
+        let mut lists = self.of_notes(&ids)?;
+        let mut out = Vec::new();
+        for id in &ids {
+            if let Some(list) = lists.remove(id)
+                && list.open_count() > 0
+            {
+                out.push(list);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Whether the Checklist of `note_id` shows on today's Agenda for
+    /// this person, as far as it is theirs to say: unless one of the
+    /// user's own Devices switched it off last. What another person's
+    /// Device wrote counts for nothing, so in a Shared Area each person
+    /// decides for their own Agenda.
+    pub fn shows_on_agenda(&self, note_id: &str) -> Result<bool> {
+        self.shows(note_id, &mut HashMap::new())
+    }
+
+    fn shows(&self, note_id: &str, own: &mut HashMap<String, bool>) -> Result<bool> {
+        let entity = format!("{}{note_id}", keys::AGENDA_PREFIX);
+        let value = self.store.own_current(&entity, keys::AGENDA, own)?;
+        Ok(value.as_deref() != Some(keys::AGENDA_OFF))
+    }
+
+    /// Whether "Show on the Agenda" applies to the Note `note_id`: a
+    /// Checklist not in the trash nor merged, with no Routine or Reminder
+    /// out of the trash; one with a Routine shows as its Occurrence.
+    pub fn may_show_on_agenda(&self, note_id: &str) -> Result<bool> {
+        let Some(note) = Notes::new(self.store).by_id(note_id)? else {
+            return Ok(false);
+        };
+        Ok(!note.is_trashed()
+            && !note.is_merged()
+            && self.making(note_id)?.is_some()
+            && Routines::new(self.store).of_note(note_id)?.is_empty())
+    }
+
+    /// Switches "Show on the Agenda" of the Checklist of `note_id` on or
+    /// off for this person alone, kept like an Override: on the user's
+    /// own Devices only, whatever their role in its Area. The same again
+    /// writes nothing.
+    pub fn set_show_on_agenda(&self, note_id: &str, shown: bool) -> Result<()> {
+        if self.making(note_id)?.is_none() {
+            return Err(Error::Invalid(format!("not a Checklist: {note_id}")));
+        }
+        if self.shows_on_agenda(note_id)? == shown {
+            return Ok(());
+        }
+        let entity = format!("{}{note_id}", keys::AGENDA_PREFIX);
+        let value = (!shown).then_some(keys::AGENDA_OFF);
+        self.store.append(&entity, keys::AGENDA, value, None)?;
+        Ok(())
     }
 
     /// Whether this Device may make the Note `note_id` a Checklist: a Note
@@ -2475,6 +2584,238 @@ pub(crate) mod tests {
             Checklists::new(&ben).occurrence_now(&note, &on_day(1))?,
             Some(on(&routine, 1, None))
         );
+        Ok(())
+    }
+
+    /// Today's Agenda rows of the Checklists of `store`, as "title: open
+    /// of all".
+    fn agenda_rows(store: &Store) -> Made<Vec<String>> {
+        let notes = Notes::new(store);
+        let mut out = Vec::new();
+        for list in Checklists::new(store).agenda()? {
+            let title = notes.by_id(&list.note_id)?.ok_or("the Note")?.text;
+            out.push(format!(
+                "{title}: {} of {}",
+                list.open_count(),
+                list.count()
+            ));
+        }
+        Ok(out)
+    }
+
+    /// The devices that wrote the "Show on the Agenda" choices `store`
+    /// holds, and how many there are.
+    fn choices(store: &Store) -> Made<(Vec<String>, usize)> {
+        let mut devices = Vec::new();
+        let mut count = 0;
+        for e in store.all_entries()? {
+            if e.entity.starts_with(keys::AGENDA_PREFIX) {
+                count += 1;
+                if !devices.contains(&e.device) {
+                    devices.push(e.device.clone());
+                }
+            }
+        }
+        Ok((devices, count))
+    }
+
+    /// `desk` paired with `ann` as one of her own Devices, everything
+    /// of hers taken in.
+    fn own_exchange(desk: &Store, ann: &Store) -> TestResult {
+        let request = sync_request(desk, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
+        let (answer, _) = answer_sync(ann, &request, "Desk")?.ok_or("an answer")?;
+        crate::lan::apply_answer(desk, &answer)?;
+        for (store, peer) in [(ann, desk), (desk, ann)] {
+            store.remember_device(&crate::PairedDevice {
+                id: peer.device_id()?,
+                name: String::new(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: store.now(),
+                shared: false,
+            })?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_checklist_shows_on_the_agenda_until_switched_off_or_all_checked() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let trip = checklist(&ann, "Before the trip\nTent\nTorch\n  Batteries", None)?;
+        let lists = Checklists::new(&ann);
+        assert!(lists.shows_on_agenda(&trip)?);
+        assert!(lists.may_show_on_agenda(&trip)?);
+        assert_eq!(agenda_rows(&ann)?, ["Before the trip: 3 of 3"]);
+        lists.check(&id_of(&ann, &trip, "Batteries")?)?;
+        assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
+        lists.set_show_on_agenda(&trip, false)?;
+        assert!(!lists.shows_on_agenda(&trip)?);
+        assert!(agenda_rows(&ann)?.is_empty());
+        let count = ann.all_entries()?.len();
+        lists.set_show_on_agenda(&trip, false)?;
+        assert_eq!(ann.all_entries()?.len(), count, "the same again");
+        lists.set_show_on_agenda(&trip, true)?;
+        assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
+        let values: Vec<Option<String>> = ann
+            .all_entries()?
+            .into_iter()
+            .filter(|e| e.entity.starts_with(keys::AGENDA_PREFIX))
+            .map(|e| e.value)
+            .collect();
+        assert_eq!(values, [Some("off".to_string()), None]);
+        lists.check(&id_of(&ann, &trip, "Tent")?)?;
+        assert!(agenda_rows(&ann)?.is_empty(), "every Line checked");
+        lists.uncheck(&id_of(&ann, &trip, "Tent")?)?;
+        assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
+        let count = ann.all_entries()?.len();
+        lists.agenda()?;
+        assert_eq!(ann.all_entries()?.len(), count, "reading writes nothing");
+        Ok(())
+    }
+
+    #[test]
+    fn a_checklist_with_a_routine_shows_only_as_its_occurrence() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let gym = checklist(&ann, "Gym bag\nTowel", None)?;
+        let routine = spawn(&ann, &gym, &daily(&[time(7)?])?)?;
+        let lists = Checklists::new(&ann);
+        assert!(!lists.may_show_on_agenda(&gym)?);
+        assert!(agenda_rows(&ann)?.is_empty());
+        Routines::new(&ann).trash(&routine)?;
+        assert!(lists.may_show_on_agenda(&gym)?);
+        assert_eq!(agenda_rows(&ann)?, ["Gym bag: 1 of 1"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_routine_of_a_later_version_counts_as_none_for_the_agenda() -> TestResult {
+        use crate::routines::keys as routine_keys;
+        let ann = device(1, "Ann")?;
+        let trip = checklist(&ann, "Trip\nTent", None)?;
+        ann.batch(|| {
+            let id = "routine:later";
+            ann.append(
+                id,
+                routine_keys::TYPE,
+                Some(routine_keys::TYPE_ROUTINE),
+                None,
+            )?;
+            ann.append(id, routine_keys::NOTE, Some(&trip), None)?;
+            ann.append(id, routine_keys::START, Some("2026-03-01"), None)?;
+            ann.append(id, routine_keys::SCHEDULE_VERSION, Some("2"), None)?;
+            Ok(())
+        })?;
+        assert_eq!(Routines::new(&ann).newer_of_note(&trip)?.len(), 1);
+        assert!(Checklists::new(&ann).may_show_on_agenda(&trip)?);
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
+        Ok(())
+    }
+
+    #[test]
+    fn other_notes_never_show_on_the_agenda_and_the_oldest_comes_first() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let lists = Checklists::new(&ann);
+        let first = checklist(&ann, "First\nOne", None)?;
+        notes.capture("Plain\nline", None, None)?;
+        let shop = notes.capture("Groceries\nMilk", None, None)?.id;
+        crate::ShoppingLists::new(&ann).make(&shop)?;
+        checklist(&ann, "Empty", None)?;
+        let trashed = checklist(&ann, "Trashed\nOne", None)?;
+        notes.trash(&trashed)?;
+        let merged = checklist(&ann, "Merged\nOne", None)?;
+        let into = notes.capture("Into", None, None)?.id;
+        notes.merge(&merged, &into)?;
+        let second = checklist(&ann, "Second\nOne\nTwo", None)?;
+        assert_eq!(agenda_rows(&ann)?, ["First: 1 of 1", "Second: 2 of 2"]);
+        for id in [&shop, &trashed, &merged, &into] {
+            assert!(!lists.may_show_on_agenda(id)?, "{id}");
+        }
+        assert!(lists.may_show_on_agenda(&first)?);
+        assert!(lists.may_show_on_agenda(&second)?);
+        assert!(lists.set_show_on_agenda(&shop, false).is_err());
+        assert!(lists.set_show_on_agenda(&into, false).is_err());
+        assert_eq!(choices(&ann)?.1, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn an_agenda_choice_no_app_writes_reads_as_on() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let trip = checklist(&ann, "Trip\nTent", None)?;
+        let entity = format!("{}{trip}", keys::AGENDA_PREFIX);
+        for value in ["OFF", "off ", "false", ""] {
+            ann.append(&entity, keys::AGENDA, Some(value), None)?;
+            assert!(Checklists::new(&ann).shows_on_agenda(&trip)?, "{value}");
+        }
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
+        Ok(())
+    }
+
+    #[test]
+    fn in_a_shared_area_each_person_decides_for_their_own_agenda() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let trip = checklist(&ann, "Trip\nTent\nTorch", Some(&area))?;
+        exchange(&ben, &ann)?;
+        assert_eq!(agenda_rows(&ben)?, ["Trip: 2 of 2"]);
+        // Ben, a Member, may switch off a list he did not write.
+        Checklists::new(&ben).set_show_on_agenda(&trip, false)?;
+        assert!(agenda_rows(&ben)?.is_empty());
+        exchange(&ben, &ann)?;
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 2 of 2"]);
+        assert_eq!(choices(&ann)?.1, 0);
+        // And Ann hers: Ben's stays on.
+        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+        Checklists::new(&ben).set_show_on_agenda(&trip, true)?;
+        exchange(&ben, &ann)?;
+        exchange(&ann, &ben)?;
+        assert!(agenda_rows(&ann)?.is_empty());
+        assert_eq!(agenda_rows(&ben)?, ["Trip: 2 of 2"]);
+        assert_eq!(choices(&ann)?.0, [ann.device_id()?]);
+        assert_eq!(choices(&ben)?.0, [ben.device_id()?]);
+        Ok(())
+    }
+
+    #[test]
+    fn ones_own_devices_carry_the_agenda_choice() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let desk = device(3, "Ann at the desk")?;
+        own_exchange(&desk, &ann)?;
+        let trip = checklist(&ann, "Trip\nTent", None)?;
+        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+        own_exchange(&desk, &ann)?;
+        assert!(agenda_rows(&desk)?.is_empty());
+        Checklists::new(&desk).set_show_on_agenda(&trip, true)?;
+        send(&desk, &ann)?;
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_agenda_choice_another_persons_device_wrote_counts_for_nothing() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let trip = checklist(&ann, "Trip\nTent", Some(&area))?;
+        exchange(&ben, &ann)?;
+        // As a modified app would: Ben takes the list off Ann's Agenda.
+        let forged = ben.append(
+            &format!("{}{trip}", keys::AGENDA_PREFIX),
+            keys::AGENDA,
+            Some(keys::AGENDA_OFF),
+            None,
+        )?;
+        ann.apply_entries(
+            &[forged.wire()],
+            &[],
+            Some(&ben.device_id()?),
+            &mut ImportReport::default(),
+        )?;
+        assert_eq!(choices(&ann)?, (vec![ben.device_id()?], 1));
+        assert!(Checklists::new(&ann).shows_on_agenda(&trip)?);
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
+        // Nor does it stop her switching it off herself.
+        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+        assert!(agenda_rows(&ann)?.is_empty());
         Ok(())
     }
 }

@@ -58,6 +58,12 @@ A Routine or Reminder spawned from a Shopping List is a plain one: its Occurrenc
 
 A Sent Item of a Shopping List carries its Lines that show, in format 2 as a Checklist's, under `lines` in the item's `note` with `list` = `shopping` beside them. Each Line has the sender's id for it, its text and its reappear time under `reappear`; it says neither `indent` nor `checked`, since every Line arrives open, and those gone Once stay with the sender. Which Lines show struck depends on the wall clock, so the sender reads its list on UTC for their order alone: both cores send the same Lines in the same order on every Device. A `list` naming anything else, or a `list` without `lines`, makes the file no Sent Item; a Line's reappear time that is missing or not known here reads as `1w`, as on a Line. Accepting one makes the new Note a Shopping List of those Lines, all written at one moment, so they show in the sender's order, each with its reappear time and the sender's id under `received`, not spawned, so it stays in Unsorted. An update follows the rules of a Checklist's: it adds the sender's Lines not there yet, as the latest, so at the top; renames those whose text the sender changed since; takes away those the sender took away, a Line gone Once here too; makes the Note a Shopping List when it is a plain Note here and the sender's became one; and makes it a plain Note again once the sender's is one and no Line of the receiver's own is left. A reappear time the receiver set, and every check, stays as the receiver has it. A list here of the other kind stays as it is: a receiver who made a received Checklist a Shopping List, or a received Shopping List a Checklist, keeps it, and an update changes none of its Lines, as for a Tally.
 
+## On the Agenda, chosen per person
+
+A Checklist without a Routine or Reminder shows on today's Agenda (#143) as one row, such as "Before the trip: 3 of 7 open": the Lines that do not show checked of all its Lines, a parent counted as it shows. It shows while it has a Line open, and while the user has not switched "Show on the Agenda" off for it; once every Line is checked it is gone until one is unchecked or added. Every Checklist starts on, those made before this version too. A Checklist with a Routine or Reminder out of the trash shows only as that Routine's Occurrence, and the switch does not apply to it; one whose Routine is of a later version (ADR 0034) has no Occurrence here and shows as a Checklist without one, its Lines with their own checks, as on its card. The lists show oldest capture first, those in the trash or merged not at all. A Checklist of a locked Area set to Masked shows as a row that tells nothing of it, as a Shopping List's does; the apps decide that from the Note, as they do for Shopping Lists. Both cores read the rows the same way (`Checklists.agenda`), and reading them writes nothing.
+
+The switch is each person's own, kept as an Override is (ADR 0017): the entity `agenda:<note id>` with the field `agenda`, outside every Area, so it is sealed under the personal key and goes to the user's own Devices only, by sync, the shared folder, bundles and Backups, never to another person. Switching it off writes `off`, on again null; any other value reads as on, so no value another version or a modified app writes hides a list. Only what the user's own Devices wrote counts, read from the log alone as an Override's name is: an entry another person's Device slipped into the log changes nothing. Anyone may switch it, whatever their role in the Area, a Member or a Viewer on a Checklist of someone else too, since it changes no one's Agenda but their own; in a Shared Area each person decides for themselves. The same again writes nothing. It carries no version: a later version that needs more than on and off writes a field of its own.
+
 ## Considered Options
 
 - The Lines as fields on the Note, as a Tally's fields are (rejected: a Member may only write on their own Notes, so adding a Line to someone else's Checklist would need a field-level exception the judge cannot tell from a rename).
@@ -83,6 +89,10 @@ A Sent Item of a Shopping List carries its Lines that show, in format 2 as a Che
 - A Shopping List's Lines in a Sent Item struck as the sender sees them (rejected: which are struck depends on the sender's wall clock and changes by itself; open on arrival, the receiver starts from the whole list).
 - The sender's wall clock for the order of a Shopping List's Lines in a Sent Item (rejected: the two cores and every Device would need the same zone to write the same file; UTC is the same everywhere).
 - An update changing the reappear times of the Lines the receiver has (rejected: the receiver may have set their own; a new Line comes with the sender's).
+- "Show on the Agenda" as a field on the Note (rejected: the Note lies in its Area, so every Member's Device would get it, and a Member may not write on another person's Note).
+- The switch as a setting of each Device (rejected: the user's other Devices would show the list again, and a new Device would show every list).
+- Showing a Checklist with a Routine both as its Occurrence and as an "x of y open" row (rejected: the same list twice on one day; the Occurrence already starts with every Line unchecked).
+- A value not known read as off (rejected: a garbled or later value would hide a list nobody chose to hide; on, nothing is lost).
 
 ## Consequences
 
@@ -91,6 +101,7 @@ A Sent Item of a Shopping List carries its Lines that show, in format 2 as a Che
 - A deleted Line stays in the log and can be restored; it is never purged.
 - The Shopping List adds its own list to the kind and a reappear time to the Line; checked Lines sort to the end and come back at read time, with no write.
 - The checks for Occurrences travel as Routines do: Sent Items carry a Routine's schedule only, and the AI port writes none of them (`check@` is not among the Routine's fields it takes).
+- Every Checklist without a Routine and with open Lines shows on the Agenda until switched off; a Sent Item does not carry the switch, so a received Checklist starts on.
 
 ## Changes to earlier decisions
 
@@ -105,3 +116,4 @@ A Sent Item of a Shopping List carries its Lines that show, in format 2 as a Che
 - ADR 0005: making a Note a Shopping List takes it out of Unsorted; a Routine or Reminder spawned from one is Done only when checked off.
 - ADR 0013: any role adds, checks and brings back the Lines of a Shopping List; their reappear time is the Note's author's, the Line's author's and the Managers'.
 - ADR 0019: a Sent Item of a Shopping List is in format 2, with its Lines and `list` = `shopping`.
+- ADR 0017: besides the Override, each person's "Show on the Agenda" choice for a Checklist lies outside every Area and counts only from their own Devices.

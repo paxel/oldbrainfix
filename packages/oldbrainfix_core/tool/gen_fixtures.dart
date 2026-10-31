@@ -15,7 +15,8 @@
 /// pools, picks and what is Done (`sessions.json`); the Checklist
 /// scenario its Lines, what goes back into a plain Note's text, lines of
 /// text read as Lines and the keys that place them, and with a Routine
-/// the Lines checked for each Occurrence (`checklists.json`); the
+/// the Lines checked for each Occurrence and the Checklists on today's
+/// Agenda (`checklists.json`); the
 /// Shopping List scenario its Lines at moments around the days they come
 /// back (`shopping.json`); the History scenario each Routine's history at
 /// held moments with this Device's settings (`history.json`).
@@ -892,6 +893,63 @@ final _scenarios = <Scenario>[
         '2026-01-01T09:00:00.000Z',
       );
       routines.create('Walk the dog', daily([_at(8)]));
+      notes.capture('Unsorted thought');
+    },
+  ),
+  (
+    name: 'checklist-agenda',
+    about:
+        'Checklists on the Agenda (#143): one with open Lines and a group, '
+        'one switched off, one switched off and on again, one with every '
+        'Line checked, one without Lines, one with a Routine and one whose '
+        'Reminder went to the trash, one in the trash and one merged into '
+        'a Note; choices no app writes; a plain Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final lists = Checklists(store);
+      final routines = Routines(store);
+      String make(String text) {
+        final id = notes.capture(text).id;
+        lists.make(id);
+        return id;
+      }
+
+      String line(String note, String text) =>
+          lists.byNote(note)!.lines.firstWhere((l) => l.text == text).id;
+      final trip = make('Before the trip\nTent\nTorch\n  Batteries\nMap');
+      lists.check(line(trip, 'Batteries'));
+      lists.check(line(trip, 'Map'));
+      final someday = make('Someday\nPaint the shed');
+      lists.setShowOnAgenda(someday, false);
+      final garden = make('Garden\nRake\nSeeds');
+      lists.setShowOnAgenda(garden, false);
+      lists.setShowOnAgenda(garden, true);
+      make('Done\n✓ All of it');
+      make('Title only');
+      final gym = make('Gym bag\nTowel');
+      routines.spawn(
+        gym,
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(7)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      final tidy = make('Tidy\nDesk');
+      routines.trash(routines.spawn(tidy, Schedule(start: Day(2026, 1, 2))).id);
+      final old = make('Old list\nBox');
+      notes.trash(old);
+      final merged = make('Merged\nCord');
+      notes.merge(merged, notes.capture('Kept').id);
+      // As a modified app or a later version would write them: neither
+      // is "off", so both show.
+      for (final (note, value) in [(garden, 'OFF'), (trip, 'later')]) {
+        store.append(
+          '${ChecklistKeys.agendaPrefix}$note',
+          ChecklistKeys.agenda,
+          value,
+        );
+      }
       notes.capture('Unsorted thought');
     },
   ),
@@ -1785,6 +1843,12 @@ Map<String, Object?> _checklists(Store store) {
     },
     'ofNotes': [...lists.ofNotes(ids).keys],
     'mayMake': {for (final id in ids) id: lists.mayMake(id)},
+    'agenda': [
+      for (final list in lists.agenda())
+        {'note': list.noteId, 'open': list.openCount, 'count': list.count},
+    ],
+    'showsOnAgenda': {for (final id in ids) id: lists.showsOnAgenda(id)},
+    'mayShowOnAgenda': {for (final id in ids) id: lists.mayShowOnAgenda(id)},
     'plain': {
       for (final id in ids)
         if (lists.byNote(id) case final list?)
@@ -4592,6 +4656,18 @@ Future<void> _sharedFixture(Directory root) async {
       'theirs': ann.personTheirs(benId).name,
     };
 
+    // Ann makes a Checklist in the Area and takes it off her own Agenda
+    // (#143): a choice kept like an Override, so it stays on Ben's.
+    final agendaAt = DateTime.utc(2026, 2, 1, 10, 20);
+    _held = agendaAt;
+    ids = 0x200;
+    mark = ann.currentSeq();
+    final trip = Notes(ann).capture('Trip\nTent\nTorch', place: area).id;
+    Checklists(ann)
+      ..make(trip)
+      ..setShowOnAgenda(trip, false);
+    _writeAfter(ann, mark, File('${out.path}/agenda.jsonl'));
+
     // Ann renames herself and syncs through a shared folder: her Profile
     // and Ben's go sealed under the Household's key, and Ben reads hers.
     final folderAt = DateTime.utc(2026, 2, 1, 10, 30);
@@ -4683,11 +4759,21 @@ Future<void> _sharedFixture(Directory root) async {
       'joiner': _expected(ben)..remove('device'),
       'hostRoles': _roles(ann, area, checked),
       'joinerRoles': _roles(ben, area, checked),
+      'hostAgenda': [for (final l in Checklists(ann).agenda()) l.noteId],
+      'joinerAgenda': [for (final l in Checklists(ben).agenda()) l.noteId],
     };
     // What no role allows of the Topic and the Routine Ben made up lies
     // nowhere for him, so it never even went to Ann.
     if (ben.allEntries().any((e) => e.entity.startsWith(OverrideKeys.prefix))) {
       throw StateError('Ann\'s Override reached Ben');
+    }
+    if (ben.allEntries().any(
+          (e) => e.entity.startsWith(ChecklistKeys.agendaPrefix),
+        ) ||
+        Checklists(ann).showsOnAgenda(trip) ||
+        !Checklists(ben).showsOnAgenda(trip) ||
+        Notes(ben).byId(trip) == null) {
+      throw StateError('Ann\'s Agenda choice reached Ben');
     }
     if (Notes(ben).byId(blood.id) != null ||
         Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
@@ -4767,7 +4853,7 @@ Future<void> _sharedFixture(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -7316,6 +7402,11 @@ Future<void> main(List<String> args) async {
     'Occurrences of its Routines and Reminders with what is Done, the '
     'Occurrence each is on and how it shows from the day before the clock held to three days '
     'after, on the same clock.\n'
+    '- `checklist-agenda/checklists.json`: the same of the '
+    '`checklist-agenda` log; every `checklists.json` also holds the '
+    'Checklists on today\'s Agenda with their open and total Lines, '
+    'whether each Note shows there by the user\'s own choice and whether '
+    'the choice applies to it.\n'
     '- `shopping-lists/shopping.json`: each Shopping List of the '
     '`shopping-lists` log with its Lines in the order they show, their '
     'reappear times, which are struck, the day each comes back and the day '
@@ -7457,7 +7548,9 @@ Future<void> main(List<String> args) async {
     'invite session (`request.json`, `answer.json`) with the Profiles '
     'each then keeps, Ann giving Ben a name and picture for herself alone '
     '(`override.jsonl` with `override.jpg`, an Override that never reaches '
-    'him), Ann renamed and publishing the Area\'s Profiles '
+    'him), Ann making a Checklist in the Area and taking it off her own '
+    'Agenda (`agenda.jsonl`, ids counted from 0x201; a choice that never '
+    'reaches him, so it stays on his), Ann renamed and publishing the Area\'s Profiles '
     'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
     'from 2000) and what Ben keeps after reading it, what Ben wrote, '
     'allowed and not (`member.jsonl`), Ann filing a Note in '

@@ -128,6 +128,28 @@
     "note:0000000000000000000000000000000d": false,
     "note:00000000000000000000000000000016": true
   },
+  "agenda": [
+    {
+      "note": "note:00000000000000000000000000000001",
+      "open": 7,
+      "count": 10
+    },
+    {
+      "note": "note:0000000000000000000000000000000d",
+      "open": 1,
+      "count": 3
+    }
+  ],
+  "showsOnAgenda": {
+    "note:00000000000000000000000000000001": true,
+    "note:0000000000000000000000000000000d": true,
+    "note:00000000000000000000000000000016": true
+  },
+  "mayShowOnAgenda": {
+    "note:00000000000000000000000000000001": true,
+    "note:0000000000000000000000000000000d": true,
+    "note:00000000000000000000000000000016": false
+  },
   "plain": {
     "note:00000000000000000000000000000001": "Packing\nMap\n✓ Passport\nTorch\n✓ Pegs\nSocks\n  Blue\n  Green\n  ✓ Red socks\nLast\nOdd",
     "note:0000000000000000000000000000000d": "Shop\nOat milk\n✓ Eggs\n  ✓ Free range"
