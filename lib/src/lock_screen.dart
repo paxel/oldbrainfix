@@ -67,9 +67,9 @@ class _LockScreenState extends State<LockScreen> {
       appBar: AppBar(title: Text(t.appTitle)),
       body: Center(
         child: SingleChildScrollView(
-          padding: clearOfSystemBars(
+          padding: clearOfFloatingButtons(
             context,
-            const EdgeInsets.fromLTRB(24, 24, 24, 160),
+            const EdgeInsets.fromLTRB(24, 24, 24, 0),
           ),
           child: Embossed(
             child: Padding(

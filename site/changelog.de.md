@@ -20,6 +20,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Im Zwei-Zeilen-Editor des Telefons zeigt die Zeile über der Tastatur die Zeile mit dem Cursor von ihrem Anfang an, den Cursor direkt hinter dem Text davor, und rückt nur dann seitwärts weiter, wenn die Zeile breiter ist als der Platz über der Tastatur, damit der Cursor sichtbar bleibt.
 - Auf dem Telefon öffnet die Tabellen-Schaltfläche des Notiz-Editors die Tabelle, die sie gerade eingefügt hat, mit ihrer ersten Zelle in Bearbeitung, auch wenn der Text der Notiz unformatiert war und ein seit dem letzten Speichern getipptes Statuskästchen enthält; bisher zeigte die Vollbildansicht dann nichts.
 - Auf dem Telefon bietet der Abschnitt „Routinen und Erinnerungen“ im Editor der Notiz neben Routine und Erinnerung auch Frosch und Einheit an, die öffnen, was das Menü der Karte öffnet, und auf dem Telefon und dem Desktop hat Alle Routinen und Erinnerungen „Neue Einheit“, das eine Einheit anlegt, deren Notiz der in ihrem Editor getippte Text ist.
+- Auf dem Telefon lässt jede Seite mit einer schwebenden Schaltfläche, die Agenda, die Liste der Bereiche und ihre Suchergebnisse, ein Bereich, ein Thema, Benannte Orte und der Bildschirm der App-Sperre, ihre letzte Zeile ganz über die Schaltfläche scrollen, sodass ihr ⋮, ihr Kästchen und ihr Text erreichbar sind.
 
 ## [0.2.0] - 2026-10-31
 

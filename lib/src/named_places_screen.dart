@@ -131,7 +131,7 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.namedPlacesTitle)),
       body: ListView(
-        padding: clearOfSystemBars(
+        padding: clearOfFloatingButtons(
           context,
           const EdgeInsets.symmetric(vertical: 8),
         ),

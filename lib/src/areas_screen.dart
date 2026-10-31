@@ -380,7 +380,7 @@ class _AreasScreenState extends State<AreasScreen>
                 ),
               Expanded(
                 child: ListView(
-                  padding: clearOfSystemBars(
+                  padding: clearOfFloatingButtons(
                     context,
                     const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -747,10 +747,16 @@ class _AreaScreenState extends State<AreaScreen>
             ),
             Expanded(
               child: ListView(
-                padding: clearOfSystemBars(
-                  context,
-                  const EdgeInsets.symmetric(vertical: 8),
-                ),
+                // Where this Device may not write, no "+" floats to clear.
+                padding: _writes
+                    ? clearOfFloatingButtons(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      )
+                    : clearOfSystemBars(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      ),
                 children: searching
                     ? _hitCards(
                         context,
@@ -950,10 +956,16 @@ class _TopicScreenState extends State<TopicScreen>
             ),
             Expanded(
               child: ListView(
-                padding: clearOfSystemBars(
-                  context,
-                  const EdgeInsets.symmetric(vertical: 8),
-                ),
+                // Where this Device may not write, no "+" floats to clear.
+                padding: _writes
+                    ? clearOfFloatingButtons(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      )
+                    : clearOfSystemBars(
+                        context,
+                        const EdgeInsets.symmetric(vertical: 8),
+                      ),
                 children: searching
                     ? _hitCards(
                         context,

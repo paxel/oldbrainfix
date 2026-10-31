@@ -1248,10 +1248,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ],
           ),
           body: ListView(
-            // Room under the last row for the floating buttons.
-            padding: clearOfSystemBars(
+            padding: clearOfFloatingButtons(
               context,
-              const EdgeInsets.only(top: 8, bottom: 160),
+              const EdgeInsets.only(top: 8),
+              // "+" with the magnifier above it.
+              buttons: 40 + 16 + floatingButtonHeight,
             ),
             children: [
               if (widget.alarms.missing.isNotEmpty)

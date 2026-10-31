@@ -9,6 +9,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Never a bottom bar**, on any screen. The bottom edge belongs to the
   system's navigation buttons and gestures; app navigation there only
   causes wrong taps.
+- **The end of every page clears the system navigation bar** (#61), on
+  gesture and button navigation alike: the last row scrolls fully above
+  it, and controls anchored at the bottom sit above it. **The end of a
+  page also clears its floating buttons** (#158): the last row scrolls
+  fully above them, their margin and a gap included.
 - The Agenda carries two floating buttons: **"+"** captures a Note and
   **the magnifier** opens the notes browser. Nothing else floats, except
   the ways "+" fans out while it is open (see Capture).
