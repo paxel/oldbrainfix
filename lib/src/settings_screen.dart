@@ -563,7 +563,7 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
         shows(
           QuickNoteControl.schedule,
           Icons.alarm_add_outlined,
-          t.routineOrReminder,
+          t.quickNoteSchedule,
         ),
         shows(
           QuickNoteControl.shopping,

@@ -23,6 +23,7 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'shopping_pick_screen.dart';
 import 'speech_platform.dart';
+import 'tally_field_screen.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
@@ -227,7 +228,8 @@ void announceUntranscribable(
 /// Uncluttered by default (#142): what sorts the Note shows only once
 /// this Device switched it on in Settings ▸ Quick note ([QuickNoteControl]),
 /// in the Note card's action row (#113): "File into…", a Routine,
-/// Reminder, Frog or Session, and ⋮ with the Importance and "Add to a
+/// Reminder, Frog or Session, and ⋮ with the Importance, "Make it a
+/// Tally", which goes with the Routine and the rest (Q481), and "Add to a
 /// Shopping List"; and so does the format bar. Each opens its usual page
 /// and comes back here with the choice shown at the top, not written yet;
 /// all of it is written with the Note when the screen is left, nothing of
@@ -403,6 +405,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   var _frog = false;
   var _frogWritten = false;
 
+  /// The first field of the Tally the Note becomes, and whether written.
+  TallyFieldChoice? _tally;
+  var _tallyWritten = false;
+
   /// The Shopping List the lines go into instead of a Note (#124), with
   /// its title; null while they make a Note. While one is picked the
   /// other choices wait unshown and unwritten, and a Note written
@@ -494,7 +500,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       _place != null ||
       _schedules.isNotEmpty ||
       _writtenSchedules.isNotEmpty ||
-      _frog;
+      _frog ||
+      _tally != null;
 
   /// What is typed or pasted answers "nothing to paste".
   void _textChanged() {
@@ -555,6 +562,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
     if (note.importance != _importance) {
       notes.setImportance(noteId, _importance);
     }
+    if (_tally case final tally? when !_tallyWritten) {
+      Tallies(store).addField(
+        noteId,
+        name: tally.name,
+        unit: tally.unit,
+        target: tally.target,
+        rule: tally.rule,
+      );
+    }
     for (final choice in _schedules) {
       choice.spawnFrom(store, noteId);
     }
@@ -565,6 +581,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// Marks what [_writeChoices] wrote as written, the Note in [filed].
   void _choicesWritten(String? filed) {
     _filed = filed;
+    if (_tally != null) _tallyWritten = true;
     _writtenSchedules.addAll(_schedules);
     _schedules.clear();
     if (_frog) _frogWritten = true;
@@ -640,7 +657,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// lists out of reach, nor without a list to add to.
   VoidCallback? _shoppingOffer() {
     if ((_lock?.locked ?? false) || _photos.isNotEmpty) return null;
-    if (_writtenSchedules.isNotEmpty || _frogWritten) {
+    if (_writtenSchedules.isNotEmpty || _frogWritten || _tallyWritten) {
       return null;
     }
     if (_recordings.isNotEmpty &&
@@ -666,6 +683,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(
       () => _shopping = (id: picked, title: shoppingTitle(context.t, note)),
     );
+  }
+
+  /// Sets up the first field of the Tally the Note becomes.
+  Future<void> _makeTally() async {
+    final field = await chooseTallyField(context, widget.notes);
+    if (!mounted || field == null) return;
+    setState(() => _tally = field);
   }
 
   /// Captures the new Note with [text], [photos] and [recordings].
@@ -1207,10 +1231,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final onFile = _shows.contains(QuickNoteControl.fileInto)
         ? (locked || shopping ? null : _file)
         : null;
-    final onSchedule = _shows.contains(QuickNoteControl.schedule)
+    final schedule = _shows.contains(QuickNoteControl.schedule);
+    final onSchedule = schedule
         ? (_mayManage && !shopping ? _spawn : null)
         : null;
-    if (onFile == null && onSchedule == null && !importance && !toShopping) {
+    // "Make it a Tally" goes with the Routine and the rest (Q481).
+    final onMakeTally = schedule && !shopping ? _makeTally : null;
+    if (onFile == null &&
+        onSchedule == null &&
+        onMakeTally == null &&
+        !importance &&
+        !toShopping) {
       return null;
     }
     return NoteActionRow(
@@ -1221,11 +1252,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
         for (final spawn in Spawn.values)
           if (!locked || spawn != Spawn.session) spawn,
       ],
-      actions: importance || toShopping
+      actions: importance || toShopping || onMakeTally != null
           ? NoteActions(
               onImportance: importance && !shopping
                   ? (picked) => setState(() => _importance = picked)
                   : null,
+              isTally: () => _tally != null,
+              onMakeTally: onMakeTally,
               addToShopping: toShopping ? _shoppingOffer : null,
             )
           : null,
@@ -1233,7 +1266,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// What was set up for the Note, at the top: where it goes, its
-  /// Importance, its Routines, Reminders, Sessions and Frog, each
+  /// Importance, its Tally, Routines, Reminders, Sessions and Frog, each
   /// with a button that drops it again while it is not written; null
   /// while there is nothing.
   Widget? _choices(BuildContext context) {
@@ -1295,6 +1328,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ? t.importanceImportant
               : t.importanceUnimportant,
           null,
+        ),
+      if (_tally case final tally?)
+        chip(
+          'choice-tally',
+          t.captureChoiceTally(tally.name),
+          _tallyWritten ? null : () => setState(() => _tally = null),
         ),
       for (final (i, choice) in _writtenSchedules.indexed)
         chip('choice-written-$i', scheduled(choice), null),

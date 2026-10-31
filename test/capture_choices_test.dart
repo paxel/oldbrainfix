@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/tally_field_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_capture_requests.dart';
@@ -294,8 +295,8 @@ void main() {
       expect(Routines(store).all(), isEmpty);
     });
 
-    testWidgets('a Frog and the Importance are written with the Note, and '
-        'no Tally is offered', (tester) async {
+    testWidgets('a Frog, the Importance and a Tally are written with the '
+        'Note', (tester) async {
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'push-ups');
@@ -307,8 +308,28 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('importance-important')));
       expect(find.text('Important'), findsOneWidget);
 
+      await tap(tester, more);
+      await tap(tester, find.byKey(const ValueKey('note-make-tally')));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(TallyFieldScreen),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Push-ups',
+      );
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(TallyFieldScreen),
+          matching: find.widgetWithText(TextButton, 'Save'),
+        ),
+      );
+      expect(find.text('Tally: Push-ups'), findsOneWidget);
       expect(notes.all(), isEmpty);
-      // "Make it a Tally" waits for the card or the editor (#142).
+      // A Tally takes no second first field.
       await tap(tester, more);
       expect(find.byKey(const ValueKey('note-make-tally')), findsNothing);
       await tester.tapAt(Offset.zero);
@@ -318,7 +339,57 @@ void main() {
       final note = notes.all().single;
       expect(note.importance, Importance.important);
       expect(Frogs(store).ofNote(note.id), hasLength(1));
-      expect(Tallies(store).byNote(note.id), isNull);
+      expect(Tallies(store).byNote(note.id)?.fields.single.name, 'Push-ups');
+    });
+
+    testWidgets('a Tally set up can be dropped again, and none is written', (
+      tester,
+    ) async {
+      await start(tester);
+      await openTextCapture(tester);
+      await tester.enterText(find.byType(TextField), 'push-ups');
+      await tap(tester, more);
+      await tap(tester, find.byKey(const ValueKey('note-make-tally')));
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(TallyFieldScreen),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Push-ups',
+      );
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(TallyFieldScreen),
+          matching: find.widgetWithText(TextButton, 'Save'),
+        ),
+      );
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('choice-tally')),
+          matching: find.byTooltip('Remove'),
+        ),
+      );
+      expect(find.text('Tally: Push-ups'), findsNothing);
+
+      await tap(tester, nudge10);
+      expect(Tallies(store).byNote(notes.all().single.id), isNull);
+    });
+
+    testWidgets('without the Routine switch no Tally is offered (Q481)', (
+      tester,
+    ) async {
+      store.setQuickNoteShows(QuickNoteControl.schedule, false);
+      await start(tester);
+      await openTextCapture(tester);
+      await tester.enterText(find.byType(TextField), 'push-ups');
+      expect(spawnMenu, findsNothing);
+      await tap(tester, more);
+      expect(find.byKey(const ValueKey('importance-important')), findsWidgets);
+      expect(find.byKey(const ValueKey('note-make-tally')), findsNothing);
     });
 
     testWidgets('a Session set up picks from the Tallies and is written with '

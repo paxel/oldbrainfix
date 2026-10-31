@@ -169,6 +169,11 @@ void main() {
         await tap(tester, key);
         expect(store.quickNoteShows(control), isFalse, reason: control.name);
       }
+      // The switch names "Make it a Tally" with the Routine (Q481).
+      expect(
+        find.text('Routine, Reminder, Frog, Session or Tally'),
+        findsOneWidget,
+      );
       final nudges = find.byKey(const ValueKey('quickNote-nudgeButtons'));
       expect(tester.widget<Switch>(nudges).value, isTrue);
       await tap(tester, nudges);
@@ -187,15 +192,17 @@ void main() {
       expect(more, findsNothing);
     });
 
-    testWidgets('"Routine, Reminder, Frog or Session" brings back its menu', (
-      tester,
-    ) async {
+    testWidgets('"Routine, Reminder, Frog, Session or Tally" brings back its '
+        'menu and ⋮ with "Make it a Tally" alone (Q481)', (tester) async {
       store.setQuickNoteShows(QuickNoteControl.schedule, true);
       await start(tester);
       await openTextCapture(tester);
       expect(spawnMenu, findsOneWidget);
       expect(fileInto, findsNothing);
-      expect(more, findsNothing);
+      await tap(tester, more);
+      expect(find.byKey(const ValueKey('note-make-tally')), findsOneWidget);
+      expect(find.byKey(const ValueKey('importance-important')), findsNothing);
+      expect(find.byKey(const ValueKey('note-add-to-shopping')), findsNothing);
     });
 
     testWidgets('the Importance brings back ⋮ with it alone', (tester) async {
