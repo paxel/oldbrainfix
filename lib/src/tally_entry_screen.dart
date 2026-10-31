@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 
@@ -237,8 +238,9 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final store = widget.notes.store;
     final date = DateFormat.yMMMEd(Localizations.localeOf(context).toString());
     return Scaffold(
-      appBar: AppBar(
-        title: Text(entry == null ? t.tallyNewEntry : t.tallyEntry),
+      appBar: pageBar(
+        context,
+        title: entry == null ? t.tallyNewEntry : t.tallyEntry,
         actions: [
           if (entry != null && store.mayChange(entry.id))
             IconButton(

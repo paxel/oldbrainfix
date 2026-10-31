@@ -9,6 +9,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
+import 'page_bar.dart';
 import 'sent_item_screen.dart';
 import 'conflicts_screen.dart';
 import 'failure_dialog.dart';
@@ -491,8 +492,9 @@ class _SyncScreenState extends State<SyncScreen> {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.firstStart ? t.firstStartDevice : t.syncTitle),
+      appBar: pageBar(
+        context,
+        title: widget.firstStart ? t.firstStartDevice : t.syncTitle,
       ),
       body: ListView(
         padding: clearOfSystemBars(

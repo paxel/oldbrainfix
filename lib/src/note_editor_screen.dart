@@ -21,6 +21,7 @@ import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'ocr_platform.dart';
+import 'page_bar.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
@@ -1103,8 +1104,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         _saveText();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(t.noteTitle),
+        appBar: pageBar(
+          context,
+          title: t.noteTitle,
           actions: [
             IconButton(
               key: const ValueKey('send-note-file'),

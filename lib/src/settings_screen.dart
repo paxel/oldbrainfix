@@ -13,6 +13,7 @@ import 'l10n.dart';
 import 'lock_settings.dart';
 import 'look.dart';
 import 'named_places_screen.dart';
+import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
@@ -130,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final renagChoices = {...RoutineEditorScreen.renagChoices, renag}.toList()
       ..sort();
     return Scaffold(
-      appBar: AppBar(title: Text(t.settingsTitle)),
+      appBar: pageBar(context, title: t.settingsTitle),
       // A short page, built whole.
       body: SingleChildScrollView(
         padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 24)),

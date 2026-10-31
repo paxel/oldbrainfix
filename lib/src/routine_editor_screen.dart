@@ -9,6 +9,7 @@ import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 import 'session_editor.dart';
@@ -560,8 +561,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         : (once ? t.reminder : t.routine);
     final note = _note;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
+      appBar: pageBar(
+        context,
+        title: title,
         actions: [
           if (routine != null)
             CalendarButton(choices: () => _calendarChoices(routine)),

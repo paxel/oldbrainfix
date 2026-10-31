@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'system_bars.dart';
 
@@ -78,7 +79,7 @@ class _AreaLookScreenState extends State<AreaLookScreen> {
     final heading = Theme.of(context).textTheme.titleMedium;
     final shown = areaColour(area.colour);
     return Scaffold(
-      appBar: AppBar(title: Text(areaName(t, area))),
+      appBar: pageBar(context, title: areaName(t, area)),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [

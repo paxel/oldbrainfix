@@ -12,6 +12,7 @@ import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'person_screen.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -234,7 +235,7 @@ class _AreaOfferScreenState extends State<AreaOfferScreen> {
       ),
     };
     return Scaffold(
-      appBar: AppBar(title: Text(t.areaOfferTitle)),
+      appBar: pageBar(context, title: t.areaOfferTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
@@ -398,7 +399,7 @@ class _HeldAreaOffersScreenState extends State<HeldAreaOffersScreen> {
     final locale = Localizations.localeOf(context).toString();
     final when = DateFormat.yMd(locale).add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.areaOffersWaitingTitle)),
+      appBar: pageBar(context, title: t.areaOffersWaitingTitle),
       body: _held.isEmpty
           ? BrowserEmpty(text: t.areaOffersNoneWaiting)
           : ListView(

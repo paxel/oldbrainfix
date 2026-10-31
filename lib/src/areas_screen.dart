@@ -14,6 +14,7 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'notes_screen.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
@@ -336,8 +337,9 @@ class _AreasScreenState extends State<AreasScreen>
       child: TagSearchScope(
         onSearch: _searchTag,
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(t.areasTitle),
+          appBar: pageBar(
+            context,
+            title: t.areasTitle,
             actions: [
               // Only the search's hits are Notes on this level.
               if (searching) ...[
@@ -709,8 +711,9 @@ class _AreaScreenState extends State<AreaScreen>
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(areaName(t, area)),
+        appBar: pageBar(
+          context,
+          title: areaName(t, area),
           actions: [
             PersonFilterButton(
               store: widget.places.store,
@@ -918,8 +921,9 @@ class _TopicScreenState extends State<TopicScreen>
     final searching = _query.text.trim().isNotEmpty;
     return BrowserSwipes(
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(topicName(t, topic)),
+        appBar: pageBar(
+          context,
+          title: topicName(t, topic),
           actions: [
             PersonFilterButton(
               store: widget.places.store,

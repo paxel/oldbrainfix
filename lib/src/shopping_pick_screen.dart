@@ -6,6 +6,7 @@ import 'app_lock.dart';
 import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// The Shopping Lists a capture can go into (#124): each one this Device
@@ -60,7 +61,7 @@ class _ShoppingPickScreenState extends State<ShoppingPickScreen> {
       final place => places.areaById(places.topicById(place)?.areaId ?? place),
     };
     return Scaffold(
-      appBar: AppBar(title: Text(t.addToShoppingList)),
+      appBar: pageBar(context, title: t.addToShoppingList),
       body: ListView(
         padding: clearOfSystemBars(
           context,

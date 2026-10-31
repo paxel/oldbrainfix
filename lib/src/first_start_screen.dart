@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// The first start's first screen: new to Old Brain Fix, a Device of
@@ -24,7 +25,7 @@ class FirstStartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.firstStartTitle)),
+      appBar: pageBar(context, title: t.firstStartTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

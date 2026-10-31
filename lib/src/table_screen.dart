@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -512,7 +513,7 @@ class _TableScreenState extends State<TableScreen> {
         if (didPop) _commit();
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(t.tableTitle)),
+        appBar: pageBar(context, title: t.tableTitle),
         body: table == null
             ? const SizedBox.shrink()
             : LayoutBuilder(

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'question_mark_background.dart';
 
 const _repoUrl = 'https://github.com/paxel/oldbrainfix';
@@ -67,7 +68,7 @@ class _AboutScreenState extends State<AboutScreen> {
     final privacy = privacyPolicyUrl(language);
     final accent = LookTones.of(Theme.of(context).brightness).accent;
     return Scaffold(
-      appBar: AppBar(title: Text(t.aboutTitle)),
+      appBar: pageBar(context, title: t.aboutTitle),
       body: ListView(
         children: [
           const SizedBox(height: 24),

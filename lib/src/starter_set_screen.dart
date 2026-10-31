@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'system_bars.dart';
 
@@ -54,8 +55,9 @@ class _StarterSetScreenState extends State<StarterSetScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.starterSetTitle),
+      appBar: pageBar(
+        context,
+        title: t.starterSetTitle,
         actions: [
           TextButton(
             onPressed: () => widget.onDone({..._picked}),

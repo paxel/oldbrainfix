@@ -11,6 +11,7 @@ import 'checklist_view.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'person_screen.dart';
 import 'profile.dart';
 import 'profile_card.dart';
@@ -452,7 +453,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
     final full = state == SentItemState.fresh || state == SentItemState.update;
     String schedule(Schedule s) => scheduleText(t, locale, s);
     return Scaffold(
-      appBar: AppBar(title: Text(t.sentItemTitle)),
+      appBar: pageBar(context, title: t.sentItemTitle),
       // Its tags are shown, not followed: the preview is no place to
       // leave before Accept or Decline.
       body: TagSearchScope(
@@ -890,7 +891,7 @@ class _HeldSentItemScreenState extends State<HeldSentItemScreen> {
     final t = context.t;
     final name = profileDisplayName(t, widget.held.sender.name);
     return Scaffold(
-      appBar: AppBar(title: Text(t.sentItemTitle)),
+      appBar: pageBar(context, title: t.sentItemTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [

@@ -10,6 +10,7 @@ import 'auto_sync.dart';
 import 'conflicts_screen.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'profile.dart';
 import 'share_area_screen.dart';
@@ -352,7 +353,7 @@ class _HostScreenState extends State<HostScreen> {
     }
     final onContinue = widget.onContinue;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: pageBar(context, title: widget.title),
       body: ListView(
         padding: clearOfSystemBars(
           context,

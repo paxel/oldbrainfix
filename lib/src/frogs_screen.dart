@@ -8,6 +8,7 @@ import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// The frog that marks Frogs, silent: there is none among the Material
@@ -305,7 +306,7 @@ class _FrogsScreenState extends State<FrogsScreen> with ReloadsOnLogChange {
     final t = context.t;
     final date = DateFormat.yMd(Localizations.localeOf(context).toString());
     return Scaffold(
-      appBar: AppBar(title: Text(t.frogsTitle)),
+      appBar: pageBar(context, title: t.frogsTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

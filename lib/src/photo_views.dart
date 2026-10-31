@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'photo_platform.dart';
 
 /// One stored photo, by its hash: square-cropped at [size] for a
@@ -247,7 +248,7 @@ class PhotoViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(context.t.photo)),
+    appBar: pageBar(context, title: context.t.photo),
     body: SafeArea(
       child: InteractiveViewer(
         maxScale: 6,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 
@@ -45,7 +46,7 @@ class _SpeechOfferScreenState extends State<SpeechOfferScreen> {
     final t = context.t;
     final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: Text(t.speechModelTitle)),
+      appBar: pageBar(context, title: t.speechModelTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(24)),
         children: [

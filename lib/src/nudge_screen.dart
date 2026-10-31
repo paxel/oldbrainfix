@@ -9,6 +9,7 @@ import 'l10n.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'system_bars.dart';
 
@@ -61,8 +62,9 @@ class _NudgeScreenState extends State<NudgeScreen>
     final t = context.t;
     final more = _unsorted.length - nudgeCards;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.nudgeScreenTitle),
+      appBar: pageBar(
+        context,
+        title: t.nudgeScreenTitle,
         actions: [CompactNotesButton(compact: compact, onChanged: setCompact)],
       ),
       body: ListView(
@@ -158,8 +160,9 @@ class _UnsortedScreenState extends State<UnsortedScreen>
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.unsorted),
+      appBar: pageBar(
+        context,
+        title: t.unsorted,
         actions: [
           PersonFilterButton(
             store: widget.notes.store,

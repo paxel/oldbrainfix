@@ -14,6 +14,7 @@ import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// [backupPassKey] in an isolate of its own, so the screen keeps
@@ -466,7 +467,7 @@ class _BackupScreenState extends State<BackupScreen> {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.backupsTitle)),
+      appBar: pageBar(context, title: t.backupsTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

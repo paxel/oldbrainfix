@@ -8,6 +8,7 @@ import 'app_lock.dart';
 import 'calendar_mirror.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'system_bars.dart';
 
@@ -313,7 +314,7 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
     final t = context.t;
     final areas = _areas;
     return Scaffold(
-      appBar: AppBar(title: Text(t.areaLocksTitle)),
+      appBar: pageBar(context, title: t.areaLocksTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

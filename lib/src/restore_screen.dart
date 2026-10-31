@@ -10,6 +10,7 @@ import 'backup_screen.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'system_bars.dart';
@@ -346,7 +347,10 @@ class _RestoreScreenState extends State<RestoreScreen> {
       label: Text(t.restorePick),
     );
     return Scaffold(
-      appBar: AppBar(title: Text(found ? t.restoreFoundTitle : t.restoreOffer)),
+      appBar: pageBar(
+        context,
+        title: found ? t.restoreFoundTitle : t.restoreOffer,
+      ),
       body: ListView(
         padding: clearOfSystemBars(
           context,

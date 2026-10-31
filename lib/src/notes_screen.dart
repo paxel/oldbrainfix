@@ -8,6 +8,7 @@ import 'l10n.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'system_bars.dart';
 
@@ -104,8 +105,9 @@ class _AllNotesScreenState extends State<AllNotesScreen>
     final t = context.t;
     return BrowserSwipes(
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(t.allNotesTitle),
+        appBar: pageBar(
+          context,
+          title: t.allNotesTitle,
           actions: [
             PersonFilterButton(
               store: widget.notes.store,

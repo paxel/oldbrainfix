@@ -6,6 +6,7 @@ import 'app_lock.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'note_card.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
 
@@ -76,7 +77,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.mergeInto)),
+      appBar: pageBar(context, title: t.mergeInto),
       body: Column(
         children: [
           BrowserSearchField(

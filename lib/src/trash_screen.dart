@@ -8,6 +8,7 @@ import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'page_bar.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
 
@@ -210,7 +211,7 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.trashTitle)),
+      appBar: pageBar(context, title: t.trashTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

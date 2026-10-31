@@ -8,6 +8,7 @@ import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'l10n.dart';
 import 'notes_screen.dart';
+import 'page_bar.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -458,8 +459,9 @@ class _PersonScreenState extends State<PersonScreen> {
       // The name typed last is kept when the page is left.
       onPopInvokedWithResult: (_, _) => _saveName(),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(shownName),
+        appBar: pageBar(
+          context,
+          title: shownName,
           actions: [
             if (blocked)
               IconButton(

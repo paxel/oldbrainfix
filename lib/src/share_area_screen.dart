@@ -8,6 +8,7 @@ import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
@@ -303,8 +304,9 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     final canScan = PhotoScope.of(context).available;
     final canSend = BundleScope.of(context).available;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.shareTitle(area == null ? '' : areaName(t, area))),
+      appBar: pageBar(
+        context,
+        title: t.shareTitle(area == null ? '' : areaName(t, area)),
       ),
       body: ListView(
         padding: clearOfSystemBars(
@@ -446,7 +448,7 @@ class SharePersonScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: pageBar(context, title: title),
       body: ListView(
         padding: clearOfSystemBars(context, EdgeInsets.zero),
         children: [
@@ -711,7 +713,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.peopleTitle)),
+      appBar: pageBar(context, title: t.peopleTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

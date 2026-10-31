@@ -5,6 +5,7 @@ import 'app_lock.dart';
 import 'capture_fan.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// What stands in front of the Agenda while the App Lock is locked: the
@@ -64,7 +65,7 @@ class _LockScreenState extends State<LockScreen> {
     final t = context.t;
     final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: Text(t.appTitle)),
+      appBar: pageBar(context, title: t.appTitle),
       body: Center(
         child: SingleChildScrollView(
           padding: clearOfFloatingButtons(

@@ -5,6 +5,7 @@ import 'app_lock.dart';
 import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'system_bars.dart';
 
@@ -59,7 +60,7 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
     Widget? marked(String id) =>
         id == widget.current ? Icon(Icons.check, color: scheme.primary) : null;
     return Scaffold(
-      appBar: AppBar(title: Text(t.fileInto)),
+      appBar: pageBar(context, title: t.fileInto),
       body: _tree.isEmpty
           ? Center(
               child: Padding(

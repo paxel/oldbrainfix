@@ -45,6 +45,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// A phone-tall page at the test's width: the title's own line under
+  /// the bar's buttons leaves the default 600 too short for an editor.
+  void tall(WidgetTester tester) {
+    tester.view
+      ..physicalSize = const Size(2400, 3600)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
+
   /// The Agenda's rows from top to bottom as "time text", with [x] when
   /// Done.
   List<String> agendaRows(WidgetTester tester) => [
@@ -380,6 +389,7 @@ void main() {
       tester,
     ) async {
       final dentist = notes.capture('dentist');
+      tall(tester);
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
@@ -452,6 +462,7 @@ void main() {
 
   group('schedule editor', () {
     Future<void> openNew(WidgetTester tester) async {
+      tall(tester);
       await start(tester);
       await tap(tester, find.byTooltip('New Routine or Reminder'));
       await tester.enterText(find.byType(TextField), 'pills');

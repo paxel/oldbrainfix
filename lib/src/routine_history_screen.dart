@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -103,7 +104,7 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
         ),
     ];
     return Scaffold(
-      appBar: AppBar(title: Text(t.historyTitle)),
+      appBar: pageBar(context, title: t.historyTitle),
       body: ListView.builder(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         itemCount: header.length + _log.length,

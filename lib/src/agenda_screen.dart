@@ -29,6 +29,7 @@ import 'merge_into_screen.dart';
 import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'place_names.dart';
 import 'nudge_screen.dart';
 import 'photo_platform.dart';
@@ -948,23 +949,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
       child: TagSearchScope(
         onSearch: _searchTag,
         child: Scaffold(
-          appBar: AppBar(
+          appBar: pageBar(
+            context,
             // The band-aid brain of the feature graphic, title-high and
             // silent: the title is still read as the app's name.
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/brain.png',
-                  key: const ValueKey('brain'),
-                  height: 28,
-                  excludeFromSemantics: true,
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(t.appTitle, overflow: TextOverflow.ellipsis),
-                ),
-              ],
+            title: t.appTitle,
+            titleIcon: Image.asset(
+              'assets/brain.png',
+              key: const ValueKey('brain'),
+              height: 28,
+              excludeFromSemantics: true,
             ),
             actions: [
               IconButton(

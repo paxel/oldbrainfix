@@ -6,6 +6,7 @@ import 'context_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// The switch for the part of the Capture Context that needs its own
@@ -22,7 +23,7 @@ class CaptureContextScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.captureContextTitle)),
+      appBar: pageBar(context, title: t.captureContextTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [

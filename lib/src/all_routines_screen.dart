@@ -9,6 +9,7 @@ import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -121,8 +122,9 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
     final locale = Localizations.localeOf(context).toString();
     final rows = _rows ?? const <(Routine, String, Area?)>[];
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.allRoutinesTitle),
+      appBar: pageBar(
+        context,
+        title: t.allRoutinesTitle,
         actions: [
           IconButton(
             key: const ValueKey('new-session'),

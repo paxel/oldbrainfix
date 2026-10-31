@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'browser.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'profile.dart';
 import 'sent_item_screen.dart';
 import 'system_bars.dart';
@@ -68,7 +69,7 @@ class _HeldSentItemsScreenState extends State<HeldSentItemsScreen> {
     final locale = Localizations.localeOf(context).toString();
     final when = DateFormat.yMd(locale).add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.sentItemsWaitingTitle)),
+      appBar: pageBar(context, title: t.sentItemsWaitingTitle),
       body: _held.isEmpty
           ? BrowserEmpty(text: t.sentItemsNoneWaiting)
           : ListView(

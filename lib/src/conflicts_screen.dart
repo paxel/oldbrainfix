@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
 
@@ -60,7 +61,7 @@ class _ConflictsScreenState extends State<ConflictsScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.conflictsTitle)),
+      appBar: pageBar(context, title: t.conflictsTitle),
       body: ListView(
         padding: clearOfSystemBars(
           context,

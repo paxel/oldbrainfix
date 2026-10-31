@@ -10,6 +10,7 @@ import 'alarm_sync.dart';
 import 'backup_screen.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
@@ -197,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // The name typed last is kept when the page is left.
       onPopInvokedWithResult: (_, _) => _saveName(),
       child: Scaffold(
-        appBar: AppBar(title: Text(t.profileTitle)),
+        appBar: pageBar(context, title: t.profileTitle),
         body: ListenableBuilder(
           listenable: model,
           builder: (context, _) => SingleChildScrollView(
@@ -432,7 +433,7 @@ class _ProfileCropScreenState extends State<ProfileCropScreen> {
     final t = context.t;
     final size = _size;
     return Scaffold(
-      appBar: AppBar(title: Text(t.profileCropTitle)),
+      appBar: pageBar(context, title: t.profileCropTitle),
       body: size == null
           ? const Center(child: CircularProgressIndicator())
           : Column(

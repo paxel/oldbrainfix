@@ -4,6 +4,7 @@ import 'announcements.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 
@@ -52,7 +53,7 @@ class SpeechModelScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.speechModelTitle)),
+      appBar: pageBar(context, title: t.speechModelTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [

@@ -8,6 +8,7 @@ import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 
 /// The radii a Named Place can have, in metres.
@@ -129,7 +130,7 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.namedPlacesTitle)),
+      appBar: pageBar(context, title: t.namedPlacesTitle),
       body: ListView(
         padding: clearOfFloatingButtons(
           context,

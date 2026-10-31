@@ -10,6 +10,7 @@ import 'context_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'page_bar.dart';
 import 'settings_screen.dart';
 import 'system_bars.dart';
 
@@ -43,7 +44,7 @@ class CalendarScreen extends StatelessWidget {
     final t = context.t;
     final mirror = CalendarMirrorScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(t.calendarPageTitle)),
+      appBar: pageBar(context, title: t.calendarPageTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 24)),
         children: [
@@ -443,7 +444,7 @@ class _AgendaCalendarsScreenState extends State<AgendaCalendarsScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.agendaCalendarsTitle)),
+      appBar: pageBar(context, title: t.agendaCalendarsTitle),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 24)),
         children: [

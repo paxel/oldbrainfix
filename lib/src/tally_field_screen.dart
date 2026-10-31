@@ -5,6 +5,7 @@ import 'capture_choices.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
+import 'page_bar.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 
@@ -238,8 +239,9 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
     // Once entries hold values, only units of the field's kind are left.
     final fixed = field != null && field.hasEntries ? field.kind : null;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(field == null ? t.tallyNewField : t.tallyField),
+      appBar: pageBar(
+        context,
+        title: field == null ? t.tallyNewField : t.tallyField,
         actions: [
           TextButton(
             key: const ValueKey('tally-field-save'),

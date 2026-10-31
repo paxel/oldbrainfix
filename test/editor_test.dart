@@ -158,6 +158,12 @@ void main() {
       notes.capture('pills');
       notes.capture('plants');
       notes.capture('socks');
+      // A phone-tall page: the title's own line under the bar's buttons
+      // leaves the default 600 too short for the third card.
+      tester.view
+        ..physicalSize = const Size(2400, 3600)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
       await startAtNotes(tester);
       expect(emboss(tester, 'pills').strong, isFalse);
       expect(dimming(tester, 'pills'), isEmpty);

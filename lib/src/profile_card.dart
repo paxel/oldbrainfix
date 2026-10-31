@@ -11,6 +11,7 @@ import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
@@ -193,7 +194,7 @@ class _ProfileQrScreenState extends State<ProfileQrScreen> {
     final t = context.t;
     final modules = _modules;
     return Scaffold(
-      appBar: AppBar(title: Text(t.profileQrTitle)),
+      appBar: pageBar(context, title: t.profileQrTitle),
       body: SingleChildScrollView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         child: Column(
@@ -301,7 +302,7 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
     final t = context.t;
     final photos = PhotoScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(t.personAdd)),
+      appBar: pageBar(context, title: t.personAdd),
       body: SingleChildScrollView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(24)),
         child: Column(

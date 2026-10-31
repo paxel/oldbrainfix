@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'l10n.dart';
+import 'page_bar.dart';
 
 /// The name of [permission] and why the app wants it.
 (String, String) permissionText(
@@ -53,7 +54,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final (title, why) = permissionText(t, permission);
     final last = _step == _steps.length - 1;
     return Scaffold(
-      appBar: AppBar(title: Text(t.setupTitle)),
+      appBar: pageBar(context, title: t.setupTitle),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
