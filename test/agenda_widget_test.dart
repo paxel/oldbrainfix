@@ -340,6 +340,8 @@ void main() {
         'that one', () {
       final frogs = Frogs(store);
       final taxes = frogs.spawn(notes.capture('taxes').id);
+      // Spawned at the same moment, two Frogs go by their random ids.
+      now = now.add(const Duration(minutes: 1));
       frogs.spawn(notes.capture('dentist').id);
       // The Agenda writes today's pick as it shows.
       frogs.pickToday(deviceWallClock);
