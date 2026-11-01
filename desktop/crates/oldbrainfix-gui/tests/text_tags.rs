@@ -160,12 +160,13 @@ fn a_compact_cards_tag_searches_for_it() -> TestResult {
 }
 
 #[test]
-fn a_sections_tag_searches_for_it_on_the_card_and_in_the_editor() -> TestResult {
+fn a_sections_tag_searches_for_it_from_the_card() -> TestResult {
     let g = garden()?;
     Notes::new(&g.store).amend(&g.word, "Later: #Balkon")?;
     let mut harness = window(&g.store, Selection::All, Some(&g.word));
-    // The card's Section and the editor's.
-    assert_eq!(links(&harness, "Search for #Balkon"), 2);
+    // The card's Section links it; in the editor an own Section is a
+    // field, where a tag is text as in the Note's own field (#183).
+    assert_eq!(links(&harness, "Search for #Balkon"), 1);
     click_link(&mut harness, "Search for #Balkon")?;
     assert!(searched(&harness, "#Balkon"));
     assert_eq!(harness.state().shown_notes(), vec![g.word.clone()]);
