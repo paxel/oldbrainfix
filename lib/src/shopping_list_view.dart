@@ -164,10 +164,10 @@ enum _ShopStep { delete }
 /// The Shopping List part of a Note's editor (#122), nothing while the
 /// Note is none: its Lines with their boxes, typed in place as one block
 /// of text as a Checklist's are (#141, #184, [TypedRows]); a new list
-/// starts with one empty Line. A Line stays where it was typed while the
-/// editor is open, checked or not; the list shows it at the top, open
-/// ones first, the next time. A name the list has already brings its Line
-/// back instead. ⋮ of a Line this Device may change has its reappear time
+/// starts with one empty Line. A Line stays where it was typed, also the
+/// next time; one checked while the editor is open stays in its row until
+/// the list is read anew, then it shows below the open ones. A name the
+/// list has already brings its Line back instead. ⋮ of a Line this Device may change has its reappear time
 /// as radio buttons and Delete. "Back to a plain Note" is in the editor's
 /// kind badge (#160). What is typed is stored as the cursor leaves a Line
 /// and whenever [typed] says so; a Line left empty goes as the editor is
@@ -297,11 +297,19 @@ class _ShoppingSectionState extends State<ShoppingSection>
   bool showsLine(String id) =>
       _lists.byNote(widget.noteId, deviceWallClock)?.line(id) != null;
 
-  /// At the top of the list, where it shows the next time; a name it has
-  /// already brings that Line back.
+  /// A Line checked while the editor is open keeps its row, but the list
+  /// places a new one among the open Lines.
+  @override
+  bool placesAmong(TypedLine row) => switch (row.id) {
+    final id? => !(_list?.line(id)?.struck ?? false),
+    null => false,
+  };
+
+  /// Where it was typed among the open Lines; a name it has already
+  /// brings that Line back.
   @override
   String addLine(String text, {required int at, required bool inGroup}) =>
-      _lists.add(widget.noteId, text, deviceWallClock);
+      _lists.add(widget.noteId, text, deviceWallClock, at: at);
 
   @override
   void renameLine(String id, String text) => _lists.rename(id, text);

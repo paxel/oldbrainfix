@@ -205,27 +205,44 @@ void main() {
       expect(ann.current(once, ChecklistKeys.trashed), isNull);
       expect(() => lists.check(once, _wall), throwsArgumentError);
       clock.set(DateTime.utc(2026, 3, 25, 23));
-      expect(shown(ann, note), ['Three', 'Two', 'One', '~Four']);
+      expect(shown(ann, note), ['One', 'Two', 'Three', '~Four']);
     });
 
-    test('the open Line that came last is at the top, the struck one '
-        'checked last at the end; unchecking brings one back now', () {
+    test('the open Lines keep their order, the struck one checked last at '
+        'the end; unchecking brings one back now, in its place', () {
       final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice');
       final lists = ShoppingLists(ann);
       lists.check(idOf(ann, note, 'Eggs'), _wall);
       lists.check(idOf(ann, note, 'Milk'), _wall);
       lists.check(idOf(ann, note, 'Rice'), _wall);
       expect(shown(ann, note), ['Tea', '~Eggs', '~Milk', '~Rice']);
-      lists.uncheck(idOf(ann, note, 'Milk'), _wall);
-      expect(shown(ann, note), ['Milk', 'Tea', '~Eggs', '~Rice']);
+      lists.uncheck(idOf(ann, note, 'Rice'), _wall);
+      expect(shown(ann, note), ['Tea', 'Rice', '~Eggs', '~Milk']);
       // Checking again, or unchecking an open one, writes nothing.
       final before = ann.allEntries().length;
       lists.check(idOf(ann, note, 'Eggs'), _wall);
       lists.uncheck(idOf(ann, note, 'Tea'), _wall);
       expect(ann.allEntries().length, before);
-      // Eggs and Rice come back on the same day: as checked.
+      // Eggs and Milk come back on the same day, each in its place.
       clock.set(DateTime.utc(2026, 3, 11, 23));
-      expect(shown(ann, note), ['Eggs', 'Rice', 'Milk', 'Tea']);
+      expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', 'Rice']);
+    });
+
+    test('a Line without a valid key, which no app writes, shows after the '
+        'others, the one added last first', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs');
+      final making = ShoppingLists(ann).byNote(note, _wall)!.making;
+      // As a modified app would.
+      for (final (text, order) in [('Old', null), ('Odd', 'é'), ('New', '')]) {
+        final id = 'line:${Store.newId()}';
+        ann.append(id, ChecklistKeys.type, ChecklistKeys.typeLine);
+        ann.append(id, ChecklistKeys.note, note);
+        ann.append(id, ChecklistKeys.made, making);
+        ann.append(id, ChecklistKeys.text, StoredText.plain(text).encode());
+        if (order != null) ann.append(id, ChecklistKeys.order, order);
+      }
+      ShoppingLists(ann).add(note, 'Tea', _wall);
+      expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', 'New', 'Odd', 'Old']);
     });
 
     test('two Devices show the same order after a Line came back', () {
@@ -240,7 +257,7 @@ void main() {
       ShoppingLists(desk).add(note, 'Bread', _wall);
       own.exchange(phone, desk);
       clock.set(DateTime.utc(2026, 3, 11, 23, 30));
-      expect(shown(phone, note), ['Milk', 'Tea', 'Bread', 'Eggs']);
+      expect(shown(phone, note), ['Milk', 'Eggs', 'Tea', 'Bread']);
       expect(shown(desk, note), shown(phone, note));
     });
   });
@@ -313,18 +330,54 @@ void main() {
   });
 
   group('adding', () {
-    test('a new name comes in at the top with a week', () {
+    test('a new name comes in at the end with a week', () {
       final note = shopping(ann, 'Shop\nMilk');
       final lists = ShoppingLists(ann);
       final tea = lists.add(note, '  Tea\n', _wall);
-      expect(shown(ann, note), ['Tea', 'Milk']);
+      expect(shown(ann, note), ['Milk', 'Tea']);
       expect(lineOf(ann, note, 'Tea').id, tea);
       expect(lineOf(ann, note, 'Tea').reappear, Reappear.week1);
       expect(() => lists.add(note, '  ', _wall), throwsArgumentError);
     });
 
-    test('a name it has adds nothing: a struck or gone one comes back at '
-        'the top, an open one stays', () {
+    test('a new name comes in where it is told among the open Lines, before '
+        'the struck ones after the Line above as they come back', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nHam\nJam\nTea');
+      final lists = ShoppingLists(ann);
+      for (final text in ['Eggs', 'Ham', 'Jam']) {
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      lists.add(note, 'Bread', _wall, at: 1);
+      lists.add(note, 'Rice', _wall, at: 0);
+      lists.add(note, 'Salt', _wall, at: 9);
+      expect(shown(ann, note), [
+        'Rice',
+        'Milk',
+        'Bread',
+        'Tea',
+        'Salt',
+        '~Eggs',
+        '~Ham',
+        '~Jam',
+      ]);
+      // A name it has stays where it is.
+      lists.add(note, 'tea', _wall, at: 0);
+      expect(() => lists.add(note, 'Soap', _wall, at: -1), throwsRangeError);
+      clock.set(DateTime.utc(2026, 3, 11, 23));
+      expect(shown(ann, note), [
+        'Rice',
+        'Milk',
+        'Bread',
+        'Eggs',
+        'Ham',
+        'Jam',
+        'Tea',
+        'Salt',
+      ]);
+    });
+
+    test('a name it has adds nothing: a struck or gone one comes back in '
+        'its place, an open one stays', () {
       final note = shopping(ann, 'Shop\nMilk\nEggs\nÄpfel\nTea');
       final lists = ShoppingLists(ann);
       final milk = idOf(ann, note, 'Milk');
@@ -340,7 +393,7 @@ void main() {
       expect(lists.add(note, 'MILK', _wall), milk);
       expect(shown(ann, note), ['Milk', 'Eggs', 'Äpfel']);
       expect(lists.add(note, 'tea', _wall), tea);
-      expect(shown(ann, note), ['Tea', 'Milk', 'Eggs', 'Äpfel']);
+      expect(shown(ann, note), ['Milk', 'Eggs', 'Äpfel', 'Tea']);
       expect(lineOf(ann, note, 'Tea').reappear, Reappear.once);
       before = ann.allEntries().length;
       expect(lists.add(note, 'Milk', _wall), milk);
@@ -348,8 +401,8 @@ void main() {
       expect(ann.entitiesOfType(ChecklistKeys.typeLine), hasLength(4));
     });
 
-    test('the lines of a text come in at once, the first at the top, a '
-        'name it has coming back instead', () {
+    test('the lines of a text come in at once, in their order at the end, '
+        'a name it has coming back instead', () {
       final note = shopping(ann, 'Shop\nMilk\nTea');
       final lists = ShoppingLists(ann);
       final milk = idOf(ann, note, 'Milk');
@@ -357,10 +410,10 @@ void main() {
       lists.check(milk, _wall);
       final ids = lists.addLines(note, 'Eggs\r\n  milk \n\n Tea\rbread', _wall);
       expect(shown(ann, note), [
-        'Eggs',
         'Milk',
-        'bread',
         'Tea',
+        'Eggs',
+        'bread',
       ], reason: 'an open one stays');
       expect(ids, [
         idOf(ann, note, 'Eggs'),
@@ -470,7 +523,7 @@ void main() {
       lists.add(note, 'milk', _wall);
       final bread = lists.add(note, 'Bread', _wall);
       exchange(ben, ann);
-      expect(shown(ann, note), ['Bread', 'Milk', '~Eggs']);
+      expect(shown(ann, note), ['Milk', 'Bread', '~Eggs']);
       expect(lists.mayEdit(bread), isTrue);
       expect(lists.mayEdit(milk), isFalse);
       expect(() => lists.rename(milk, 'Beer'), throwsStateError);
@@ -486,7 +539,7 @@ void main() {
       final held = ann.allEntries().map((e) => e.id).toSet();
       expect(held.containsAll([for (final e in forged) e.id]), isTrue);
       expect(lineOf(ann, note, 'Milk').reappear, Reappear.week1);
-      expect(shown(ann, note), ['Bread', 'Milk', '~Eggs']);
+      expect(shown(ann, note), ['Milk', 'Bread', '~Eggs']);
       ann.setRole(
         area,
         ann.grantsOf(area)!.personOf(ben.deviceId)!,
@@ -526,7 +579,7 @@ void main() {
       expect(conflict.entity, milk);
       expect(conflict.type, ChecklistKeys.typeLine);
       expect(desk.mayResolve(milk, conflict.type), isTrue);
-      expect(shown(desk, note).first, 'Eggs', reason: 'back at the top');
+      expect(shown(desk, note).last, 'Eggs', reason: 'back in its place');
       expect(shown(phone, note), shown(desk, note));
     });
   });
@@ -624,7 +677,7 @@ void main() {
       );
       expect([for (final l in changes.linesRemoved) l.text], ['Milk']);
       acceptSentItem(ben, opened.item);
-      expect(shown(ben, got), ['Tea', 'Coffee', '~Free-range eggs']);
+      expect(shown(ben, got), ['Coffee', 'Tea', '~Free-range eggs']);
     });
 
     test('a Line gone here is not added again', () {

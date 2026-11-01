@@ -156,7 +156,7 @@ void main() {
     await tap(tester, save);
 
     expect(find.byType(CaptureScreen), findsNothing);
-    expect(shown(groceries), ['Eggs', 'Milk', 'bread', 'Tea']);
+    expect(shown(groceries), ['Milk', 'Tea', 'Eggs', 'bread']);
     expect(shown(hardware), ['Nails']);
     expect(store.entitiesOfType(ChecklistKeys.typeLine), hasLength(5));
     expect(notes.all().map((n) => n.id).toSet(), {groceries, hardware});
@@ -353,7 +353,7 @@ void main() {
       await pick(tester, groceries);
       await tap(tester, save);
 
-      expect(shown(groceries), ['Sugar', 'Butter', 'Flour']);
+      expect(shown(groceries), ['Flour', 'Sugar', 'Butter']);
       expect(notes.all().map((n) => n.id), [groceries]);
       expect(notes.trashed(), isEmpty);
     });

@@ -3185,6 +3185,8 @@ fn write_shopping_lists(store: &Store) -> Built {
     lists.add(&week, " MILK ", &wall)?;
     lists.add(&week, "tea", &wall)?;
     lists.add(&week, "Oat milk", &wall)?;
+    lists.add_at(&week, "Butter", &wall, Some(1))?;
+    lists.add_lines(&week, "Pasta\n\nFlour", &wall)?;
     lists.add(&week, "eggs", &wall)?;
     lists.check(&line(&week, "Eggs")?, &wall)?;
     lists.rename(&line(&week, "Oat milk")?, "Soy milk")?;

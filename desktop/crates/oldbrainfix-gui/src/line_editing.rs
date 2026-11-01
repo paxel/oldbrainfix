@@ -552,7 +552,7 @@ impl TypedLines {
     }
 
     /// Adds what the Shopping List's field holds, every line not blank a
-    /// Line, the first ending at the top; the field is empty again.
+    /// Line, in their order at the end; the field is empty again.
     pub fn add_typed(&mut self, store: &Store, wall: &WallClock) -> oldbrainfix_core::Result<()> {
         let Some(note) = self.note.clone() else {
             return Ok(());

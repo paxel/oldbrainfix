@@ -270,6 +270,21 @@ void main() {
     Future<void> lineMenu(WidgetTester tester, String id) =>
         tap(tester, key('checklist-menu-$id'));
 
+    /// Opens the editor of [text] again after [leave].
+    Future<void> reopen(WidgetTester tester, String text) async {
+      await tester.longPress(find.text(text).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    }
+
+    /// Whether the rows of [ids] show from the top down in that order.
+    bool inOrder(WidgetTester tester, List<String> ids) {
+      for (var i = 1; i < ids.length; i++) {
+        if (top(tester, ids[i - 1]) >= top(tester, ids[i])) return false;
+      }
+      return true;
+    }
+
     testWidgets('"Make it a Shopping List" makes the text as typed one; the '
         'field keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
@@ -317,11 +332,9 @@ void main() {
       final bread = idOf(note, 'Bread');
       expect(cursor(tester), ('Bread', 0));
       expect(typedIn(tester, tea), 'Tea');
-      // Where they were typed, while the list puts the latest on top.
-      expect(top(tester, milk), lessThan(top(tester, tea)));
-      expect(top(tester, tea), lessThan(top(tester, bread)));
-      expect(top(tester, bread), lessThan(top(tester, eggs)));
-      expect(shown(note), ['Bread', 'Tea', 'Milk', 'Eggs']);
+      // Where they were typed, and the list keeps them there.
+      expect(inOrder(tester, [milk, tea, bread, eggs]), isTrue);
+      expect(shown(note), ['Milk', 'Tea', 'Bread', 'Eggs']);
 
       // Backspace at the start: its text goes to the end of the Line
       // above, and its Line goes, its checks staying in the log.
@@ -331,7 +344,7 @@ void main() {
       expect(cursor(tester), ('TeaBread', 3));
       expect(store.current(bread, ChecklistKeys.checked), isNotNull);
       expect(store.current(bread, ChecklistKeys.trashed), isNotNull);
-      expect(shown(note), ['TeaBread', 'Milk', 'Eggs']);
+      expect(shown(note), ['Milk', 'TeaBread', 'Eggs']);
 
       // Return in the middle of a stored Line: the rest goes below it.
       await type(tester, milk, 'Mi\nlk', 3);
@@ -346,12 +359,15 @@ void main() {
       await tap(tester, key('shopping-reappear-2w'));
       expect(lineOf(note, 'TeaBread').reappear, Reappear.week2);
       await leave(tester);
-      expect(shown(note), ['lk', 'TeaBread', 'Mi', 'Eggs']);
+      expect(shown(note), ['Mi', 'lk', 'TeaBread', 'Eggs']);
+      // Opened again, in the order typed.
+      await reopen(tester, 'Shop');
+      expect(inOrder(tester, [milk, lk, tea, eggs]), isTrue);
     });
 
     testWidgets('a new list starts with one empty Line, the cursor in it; '
-        'the Lines stay in the order typed and checked while the editor is '
-        'open, the list shows the latest on top', (tester) async {
+        'the Lines stay in the order typed, one checked in its row until the '
+        'editor is opened again, then below the open ones', (tester) async {
       final note = notes.capture('Trip').id;
       await openEditor(tester, 'Trip');
       await tap(tester, key('shopping-make'));
@@ -372,11 +388,19 @@ void main() {
       final bread = idOf(note, 'Bread');
       expect(top(tester, milk), lessThan(top(tester, eggs)));
       expect(top(tester, eggs), lessThan(top(tester, bread)));
-      expect(shown(note), ['Bread', 'Eggs', '[x] Milk']);
+      expect(shown(note), ['Eggs', 'Bread', '[x] Milk']);
       // One block: rows 40 high, no gaps.
       expect(top(tester, bread) - top(tester, eggs), 40);
+
+      // A Line typed under the one checked here goes before the open
+      // ones below it.
+      await type(tester, milk, 'Milk\n', 5);
+      await type(tester, 'new-4', 'Tea', 3);
       await leave(tester);
-      expect(shown(note), ['Bread', 'Eggs', '[x] Milk']);
+      final tea = idOf(note, 'Tea');
+      expect(shown(note), ['Tea', 'Eggs', 'Bread', '[x] Milk']);
+      await reopen(tester, 'Trip');
+      expect(inOrder(tester, [tea, eggs, bread, milk]), isTrue);
     });
 
     testWidgets('a name the list has already brings its struck Line back '
@@ -578,7 +602,7 @@ void main() {
       // Under Ann's Lines an empty one of his own to type in.
       await type(tester, 'new-1', 'Bread', 5);
       await leave(tester);
-      expect(shown(note, ben), ['Bread', 'Eggs', '[x] Milk']);
+      expect(shown(note, ben), ['Eggs', 'Bread', '[x] Milk']);
       await tester.longPress(find.text('Shop'));
       await tester.pumpAndSettle();
       // His own Line is his to change.

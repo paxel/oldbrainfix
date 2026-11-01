@@ -1,11 +1,11 @@
 //! Shopping Lists in the window (#122, ADR 0030): "Make it a Shopping
 //! List" in a Note's editor and in its card's ⋮ turns its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
-//! it comes back, and at the start of that day it is open at the top
-//! again; the field at the top adds Lines on Enter and on leaving, a name
-//! already there bringing its Line back, and the Lines are renamed in
-//! place (#141); the Line menu sets the reappear time and deletes for
-//! good after asking once; full cards check, compact cards
+//! it comes back, and at the start of that day it is open in its place
+//! again; the field at the top adds Lines at the end on Enter and on
+//! leaving, a name already there bringing its Line back, and the Lines
+//! are renamed in place (#141); the Line menu sets the reappear time and
+//! deletes for good after asking once; full cards check, compact cards
 //! count the open Lines; a Member checks and adds but changes only their
 //! own Lines; and a Line Conflict is named as a Shopping List's. Today's
 //! Agenda shows the Shopping Lists the way Settings of this Device choose
@@ -255,7 +255,7 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
 }
 
 #[test]
-fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_to_the_top() -> TestResult {
+fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
@@ -272,7 +272,7 @@ fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_to_the_top() -
 }
 
 #[test]
-fn a_struck_line_is_open_again_at_the_top_from_the_start_of_its_day() -> TestResult {
+fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestResult {
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
@@ -292,12 +292,12 @@ fn a_struck_line_is_open_again_at_the_top_from_the_start_of_its_day() -> TestRes
     harness.run();
     assert!(!checked(&harness, "Bread")?);
     assert!(!shows_part(&harness, "back Sat"));
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Milk", "Apples"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     Ok(())
 }
 
 #[test]
-fn the_add_field_adds_at_the_top_and_a_name_there_brings_its_line_back() -> TestResult {
+fn the_add_field_adds_at_the_end_and_a_name_there_brings_its_line_back() -> TestResult {
     let (store, note, _) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
@@ -316,17 +316,17 @@ fn the_add_field_adds_at_the_top_and_a_name_there_brings_its_line_back() -> Test
     press(&mut harness, egui::Key::Enter);
     assert_eq!(
         texts(&harness, &note)?,
-        ["Eggs", "Milk", "Apples", "✓ Bread"]
+        ["Milk", "Apples", "Eggs", "✓ Bread"]
     );
     assert_eq!(focused(&harness).as_deref(), Some(""));
-    // Bread comes back, at the top, not twice.
+    // Bread comes back, in its place, not twice.
     type_line(&mut harness, "  bread ");
     press(&mut harness, egui::Key::Enter);
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
     // An open name stays as it is; so does "Add".
     type_line(&mut harness, "MILK");
     click(&mut harness, "Add")?;
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
     assert!(
         harness
             .query_all_by(|n| n.role() == Role::MultilineTextInput
@@ -362,7 +362,7 @@ fn text_left_in_the_field_is_added_and_lines_are_renamed_in_place() -> TestResul
     type_line(&mut harness, "Butter");
     harness.state_mut().select_note(&other);
     harness.run();
-    assert_eq!(texts(&harness, &note)?, ["Butter", "Oat milk", "Rye bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Oat milk", "Rye bread", "Butter"]);
     Ok(())
 }
 

@@ -504,7 +504,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "add_line",
-            "Adds a Line to a Checklist, at the end or at a place, or to the top of a Shopping List. On a Shopping List a name it holds already adds nothing; one that is checked is refused, as adding it would bring it back.",
+            "Adds a Line to a Checklist, at the end or at a place, or to the end of a Shopping List. On a Shopping List a name it holds already adds nothing; one that is checked is refused, as adding it would bring it back.",
             false,
             json!({
                 "at": {"description": "Checklist only: its place among the Lines, from 0; at the end when left out", "type": "integer"},

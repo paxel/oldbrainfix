@@ -1184,8 +1184,8 @@ impl Store {
 
     /// Writes `lines` into the making `making` of the Shopping List
     /// `note_id`, open, with their reappear times, placed after the key
-    /// `after` in their order. All are written at `at`, so they show in
-    /// that order, at the top as the latest.
+    /// `after` in their order, so they show in that order after the
+    /// Lines there were. All are written at `at`.
     fn write_shopping_lines(
         &self,
         note_id: &str,

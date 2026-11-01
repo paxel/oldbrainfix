@@ -7,7 +7,7 @@
 //!
 //! The editor's part has at the top a field and "Add" for anyone with a
 //! role in its Area, where Enter adds what was typed and leaves the field
-//! ready for the next, every line pasted one Line, the first at the top;
+//! ready for the next, every line pasted one Line, in their order at the end;
 //! then the Lines to check, each renamed in place where this Device may
 //! change it (#141, `line_editing`); for those, ⋮ and a right-click on
 //! its box's row with its reappear time as radio buttons and "Delete for
@@ -152,7 +152,7 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
 }
 
 /// The Shopping List part of a Note's editor (#122), under its text: the
-/// field and "Add" at the top, where a new Line shows, its Lines, each
+/// field and "Add" at the top, then its Lines, a new one at the end, each
 /// renamed in place in `typed` where this Device may (#141).
 pub fn section(
     ui: &mut Ui,

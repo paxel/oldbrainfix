@@ -185,8 +185,9 @@ pub struct ShoppingList {
     pub note_id: String,
     /// The id of its making, as the Note's `kind` names it.
     pub making: String,
-    /// Every Line that shows: the open ones first, the one that came last
-    /// at the top, then the struck ones, the one checked last at the end.
+    /// Every Line that shows: the open ones first, in the order they were
+    /// placed in, then the struck ones, the one
+    /// checked last at the end.
     pub lines: Vec<ShoppingLine>,
     /// The Lines checked Once: gone, but a name added again brings them
     /// back.
@@ -234,8 +235,9 @@ impl ShoppingList {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one by
-/// when it came to the top, on the wall clock.
+/// moment it sorts by: a struck or gone one by its check, an open one
+/// without a valid key by when it came back or was added, on the wall
+/// clock.
 struct Read {
     line: ShoppingLine,
     gone: bool,
@@ -324,6 +326,37 @@ fn by_order(a: &ShoppingLine, b: &ShoppingLine) -> Ordering {
         .then_with(|| utf16_cmp(&a.id, &b.id))
 }
 
+/// The key for a new Line at the place `at` of the open Lines of `list`,
+/// or after every key with none or one past them: between the last valid
+/// key above it and the first valid key of any Line after that one, a
+/// struck or gone Line too.
+fn key_at(list: &ShoppingList, at: Option<usize>) -> String {
+    let open = list.open();
+    let keys = || {
+        list.lines
+            .iter()
+            .chain(&list.gone)
+            .filter_map(|l| l.order.as_deref())
+            .filter(|key| order::is_valid(Some(key)))
+    };
+    let at = match at {
+        Some(at) if at < open.len() => at,
+        _ => {
+            let last = keys().max_by(|a, b| utf16_cmp(a, b));
+            return order::place(last, None);
+        }
+    };
+    let a = open[..at]
+        .iter()
+        .rev()
+        .find(|l| order::is_valid(l.order.as_deref()))
+        .and_then(|l| l.order.as_deref());
+    let b = keys()
+        .filter(|key| a.is_none_or(|a| utf16_cmp(key, a) == Ordering::Greater))
+        .min_by(|a, b| utf16_cmp(a, b));
+    order::place(a, b)
+}
+
 /// `lines` as they show, the gone ones kept apart.
 fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
     let mut open = Vec::new();
@@ -338,7 +371,24 @@ fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
             open.push(r);
         }
     }
-    open.sort_by(|a, b| b.came.cmp(&a.came).then_with(|| by_order(&a.line, &b.line)));
+    // In the order of their keys; one without a valid key, which no app
+    // writes, after them, the one that came last first.
+    open.sort_by(|a, b| {
+        let valid = order::is_valid(a.line.order.as_deref());
+        if valid != order::is_valid(b.line.order.as_deref()) {
+            return if valid {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            };
+        }
+        let by_came = if valid {
+            Ordering::Equal
+        } else {
+            b.came.cmp(&a.came)
+        };
+        by_came.then_with(|| by_order(&a.line, &b.line))
+    });
     let by_check = |a: &Read, b: &Read| {
         a.checked
             .cmp(&b.checked)
@@ -622,12 +672,25 @@ impl<'a> ShoppingLists<'a> {
         Checklists::new(self.store).may_edit(line_id)
     }
 
-    /// Adds `text` to the Shopping List of `note_id`, at the top. A name it
-    /// has already, in another case or with spaces around it, adds
-    /// nothing: a struck or gone Line of that name comes back now, at the
-    /// top, an open one stays. Anyone with a role in its Area may. Returns
-    /// the id of the Line added, brought back or found.
+    /// Adds `text` to the Shopping List of `note_id` after every other Line,
+    /// as [`ShoppingLists::add_at`] does.
     pub fn add(&self, note_id: &str, text: &str, wall: &WallClock) -> Result<String> {
+        self.add_at(note_id, text, wall, None)
+    }
+
+    /// Adds `text` to the Shopping List of `note_id` at `at`, an index in
+    /// the order its open Lines show, or after every other. A name it has
+    /// already, in another case or with spaces around it, adds nothing: a
+    /// struck or gone Line of that name comes back now, in its place, an
+    /// open one stays. Anyone with a role in its Area may. Returns the id
+    /// of the Line added, brought back or found.
+    pub fn add_at(
+        &self,
+        note_id: &str,
+        text: &str,
+        wall: &WallClock,
+        at: Option<usize>,
+    ) -> Result<String> {
         let (_, list) = self.require_list(note_id, wall)?;
         if !self.may_check(note_id)? {
             return Err(Error::Invalid(format!(
@@ -656,16 +719,7 @@ impl<'a> ShoppingLists<'a> {
                 .append(&line.id, checklist_keys::CHECKED, None, None)?;
             return Ok(line.id.clone());
         }
-        let mut last: Option<&str> = None;
-        for line in list.lines.iter().chain(&list.gone) {
-            if let Some(key) = line.order.as_deref()
-                && order::is_valid(Some(key))
-                && last.is_none_or(|last| utf16_cmp(key, last) == Ordering::Greater)
-            {
-                last = Some(key);
-            }
-        }
-        let key = order::place(last, None);
+        let key = key_at(&list, at);
         self.store
             .batch(|| self.write_line(note_id, &list.making, &named, &key, false, None))
     }
@@ -696,10 +750,10 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// Adds every line of `text` that is not blank to the Shopping List of
-    /// `note_id` as [`ShoppingLists::add`] does, all in one batch, the first
-    /// line ending at the top: what a capture sorted into the list becomes
-    /// (#124). Returns the ids of the Lines added, brought back or found,
-    /// in the order of the lines; none for a blank `text`.
+    /// `note_id` as [`ShoppingLists::add`] does, all in one batch, in the
+    /// order of the lines after every other: what a capture sorted into the
+    /// list becomes (#124). Returns the ids of the Lines added, brought back
+    /// or found, in the order of the lines; none for a blank `text`.
     pub fn add_lines(&self, note_id: &str, text: &str, wall: &WallClock) -> Result<Vec<String>> {
         let rows: Vec<String> = split_lines(text)
             .into_iter()
@@ -709,13 +763,9 @@ impl<'a> ShoppingLists<'a> {
             return Ok(Vec::new());
         }
         self.store.batch(|| {
-            let mut ids = rows
-                .iter()
-                .rev()
+            rows.iter()
                 .map(|row| self.add(note_id, row, wall))
-                .collect::<Result<Vec<String>>>()?;
-            ids.reverse();
-            Ok(ids)
+                .collect::<Result<Vec<String>>>()
         })
     }
 
@@ -795,7 +845,7 @@ impl<'a> ShoppingLists<'a> {
             .map(drop)
     }
 
-    /// Brings the struck Line `line_id` back now, at the top. An open one
+    /// Brings the struck Line `line_id` back now, in its place. An open one
     /// stays as it is.
     pub fn uncheck(&self, line_id: &str, wall: &WallClock) -> Result<()> {
         let (list, line) = self.require_shown(line_id, wall)?;
@@ -1101,7 +1151,7 @@ mod tests {
         assert_eq!(
             agenda(ShoppingAgenda::Open)?,
             [
-                format!("{week}: Tea, Eggs, Rice"),
+                format!("{week}: Eggs, Tea, Rice"),
                 format!("{hardware}: Glue")
             ]
         );
@@ -1253,13 +1303,13 @@ mod tests {
         assert_eq!(ann.current(&once, checklist_keys::TRASHED)?, None);
         assert!(lists.check(&once, &wall).is_err());
         clock.set(utc(25, 23, 0, 0)?);
-        assert_eq!(shown(&ann, &note)?, ["Three", "Two", "One", "~Four"]);
+        assert_eq!(shown(&ann, &note)?, ["One", "Two", "Three", "~Four"]);
         Ok(())
     }
 
     #[test]
-    fn the_open_line_that_came_last_is_at_the_top_and_the_struck_one_checked_last_at_the_end()
-    -> TestResult {
+    fn the_open_lines_keep_their_order_and_the_struck_one_checked_last_is_at_the_end() -> TestResult
+    {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nEggs\nTea\nRice", None)?;
@@ -1268,14 +1318,80 @@ mod tests {
         lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
         lists.check(&id_of(&ann, &note, "Rice")?, &wall)?;
         assert_eq!(shown(&ann, &note)?, ["Tea", "~Eggs", "~Milk", "~Rice"]);
-        lists.uncheck(&id_of(&ann, &note, "Milk")?, &wall)?;
-        assert_eq!(shown(&ann, &note)?, ["Milk", "Tea", "~Eggs", "~Rice"]);
+        // Unchecked, it comes back now, in its place.
+        lists.uncheck(&id_of(&ann, &note, "Rice")?, &wall)?;
+        assert_eq!(shown(&ann, &note)?, ["Tea", "Rice", "~Eggs", "~Milk"]);
         let before = ann.all_entries()?.len();
         lists.check(&id_of(&ann, &note, "Eggs")?, &wall)?;
         lists.uncheck(&id_of(&ann, &note, "Tea")?, &wall)?;
         assert_eq!(ann.all_entries()?.len(), before);
+        // Eggs and Milk come back on the same day, each in its place.
         clock.set(utc(11, 23, 0, 0)?);
-        assert_eq!(shown(&ann, &note)?, ["Eggs", "Rice", "Milk", "Tea"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Tea", "Rice"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_without_a_valid_key_shows_after_the_others_the_one_added_last_first() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let making = lists
+            .by_note(&note, &wall)?
+            .ok_or("a Shopping List")?
+            .making;
+        // As a modified app would.
+        for (text, order) in [("Old", None), ("Odd", Some("é")), ("New", Some(""))] {
+            let id = format!("line:{}", ann.new_id()?);
+            ann.append(
+                &id,
+                checklist_keys::TYPE,
+                Some(checklist_keys::TYPE_LINE),
+                None,
+            )?;
+            ann.append(&id, checklist_keys::NOTE, Some(&note), None)?;
+            ann.append(&id, checklist_keys::MADE, Some(&making), None)?;
+            let text = StoredText::plain(text).encode();
+            ann.append(&id, checklist_keys::TEXT, Some(&text), None)?;
+            if let Some(order) = order {
+                ann.append(&id, checklist_keys::ORDER, Some(order), None)?;
+            }
+        }
+        lists.add(&note, "Tea", &wall)?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Milk", "Eggs", "Tea", "New", "Odd", "Old"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_new_name_comes_in_where_it_is_told_before_the_struck_ones_after_the_line_above()
+    -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nHam\nJam\nTea", None)?;
+        let lists = ShoppingLists::new(&ann);
+        for text in ["Eggs", "Ham", "Jam"] {
+            lists.check(&id_of(&ann, &note, text)?, &wall)?;
+        }
+        lists.add_at(&note, "Bread", &wall, Some(1))?;
+        lists.add_at(&note, "Rice", &wall, Some(0))?;
+        lists.add_at(&note, "Salt", &wall, Some(9))?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            [
+                "Rice", "Milk", "Bread", "Tea", "Salt", "~Eggs", "~Ham", "~Jam"
+            ]
+        );
+        // A name it has stays where it is.
+        lists.add_at(&note, "tea", &wall, Some(0))?;
+        clock.set(utc(11, 23, 0, 0)?);
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Rice", "Milk", "Bread", "Eggs", "Ham", "Jam", "Tea", "Salt"]
+        );
         Ok(())
     }
 
@@ -1304,14 +1420,11 @@ mod tests {
         assert_eq!(lists.add(&note, "MILK", &wall)?, milk);
         assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Äpfel"]);
         assert_eq!(lists.add(&note, "tea", &wall)?, tea);
-        assert_eq!(shown(&ann, &note)?, ["Tea", "Milk", "Eggs", "Äpfel"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Äpfel", "Tea"]);
         assert_eq!(line_of(&ann, &note, "Tea")?.reappear, Reappear::Once);
-        // A new name comes in at the top; a deleted one is not brought back.
+        // A new name comes in at the end; a deleted one is not brought back.
         let rice = lists.add(&note, "  Rice\n", &wall)?;
-        assert_eq!(
-            shown(&ann, &note)?.first().map(String::as_str),
-            Some("Rice")
-        );
+        assert_eq!(shown(&ann, &note)?.last().map(String::as_str), Some("Rice"));
         lists.delete(&rice)?;
         assert_ne!(lists.add(&note, "rice", &wall)?, rice);
         assert!(lists.add(&note, "  ", &wall).is_err());
@@ -1340,7 +1453,7 @@ mod tests {
     }
 
     #[test]
-    fn the_lines_of_a_text_come_in_at_once_the_first_at_the_top() -> TestResult {
+    fn the_lines_of_a_text_come_in_at_once_in_their_order_at_the_end() -> TestResult {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nTea", None)?;
@@ -1351,7 +1464,7 @@ mod tests {
         let ids = lists.add_lines(&note, "Eggs\r\n  milk \n\n Tea\rbread", &wall)?;
         assert_eq!(
             shown(&ann, &note)?,
-            ["Eggs", "Milk", "bread", "Tea"],
+            ["Milk", "Tea", "Eggs", "bread"],
             "an open one stays"
         );
         assert_eq!(
@@ -1423,7 +1536,7 @@ mod tests {
         lists.add(&note, "milk", &wall)?;
         let bread = lists.add(&note, "Bread", &wall)?;
         exchange(&ben, &ann)?;
-        assert_eq!(shown(&ann, &note)?, ["Bread", "Milk", "~Eggs"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Bread", "~Eggs"]);
         assert!(lists.may_edit(&bread)?);
         assert!(!lists.may_edit(&milk)?);
         assert!(lists.rename(&milk, "Beer").is_err());
@@ -1444,7 +1557,7 @@ mod tests {
         let held: Vec<String> = ann.all_entries()?.iter().map(Entry::id).collect();
         assert!(forged.iter().all(|e| held.contains(&e.id())));
         assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Week1);
-        assert_eq!(shown(&ann, &note)?, ["Bread", "Milk", "~Eggs"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Bread", "~Eggs"]);
         let grants = ann.grants_of(&area)?.ok_or("the grants")?;
         let person = grants
             .person_of(&ben.device_id()?)
@@ -1479,8 +1592,9 @@ mod tests {
         assert_eq!(conflicts[0].entity, milk);
         assert_eq!(conflicts[0].entity_type, checklist_keys::TYPE_LINE);
         assert!(desk.may_resolve(&milk, &conflicts[0].entity_type)?);
+        // Back in its place.
         assert_eq!(
-            shown(&desk, &note)?.first().map(String::as_str),
+            shown(&desk, &note)?.last().map(String::as_str),
             Some("Eggs")
         );
         assert_eq!(shown(&phone, &note)?, shown(&desk, &note)?);
@@ -1620,7 +1734,7 @@ mod tests {
             .collect();
         assert_eq!(removed, ["Milk"]);
         ben.accept_sent_item(&opened.item, false)?;
-        assert_eq!(shown(&ben, &got)?, ["Tea", "Coffee", "~Free-range eggs"]);
+        assert_eq!(shown(&ben, &got)?, ["Coffee", "Tea", "~Free-range eggs"]);
         Ok(())
     }
 

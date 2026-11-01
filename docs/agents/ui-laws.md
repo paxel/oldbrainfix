@@ -444,9 +444,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.
-- On a Shopping List a Line stays where it was typed or checked while
-  the editor is open; the list shows the latest on top the next time. A
-  name the list has already brings its Line back instead of a second.
+- On a Shopping List the open Lines keep the order they were typed in,
+  also the next time; a Line checked while the editor is open stays in
+  its row, and shows below the open ones the next time. A name the list
+  has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, its reappear time, Delete); a
   long press in a Line's text selects, as in any field.
 

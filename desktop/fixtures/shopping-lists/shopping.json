@@ -7,14 +7,34 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
-              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "text": "Odd key",
-              "reappear": "2w",
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
               "cameBackOn": null,
-              "order": "é"
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
             },
             {
               "id": "line:0000000000000000000000000000000b",
@@ -27,24 +47,34 @@
               "order": "d"
             },
             {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
               "reappear": "1w",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
               "cameBackOn": null,
-              "order": "V"
+              "order": "e"
             },
             {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
               "reappear": "1w",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
               "cameBackOn": null,
-              "order": "c"
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
             },
             {
               "id": "line:00000000000000000000000000000007",
@@ -71,7 +101,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -81,7 +111,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": "2026-01-08",
               "cameBackOn": null,
               "order": "z1"
@@ -91,7 +121,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": "2026-01-08",
               "cameBackOn": null,
               "order": "z2"
@@ -111,7 +141,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": "2026-01-01T23:32:56.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -121,35 +151,35 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
             }
           ],
-          "count": 12,
-          "openCount": 4,
+          "count": 15,
+          "openCount": 7,
           "struckCount": 8
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "W"
@@ -161,8 +191,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Odd five\n✓ Odd blank\n✓ Odd garbled\n✓ Tea\n✓ Bread",
-        "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nSalt\nSoy milk\nPasta\nFlour\nOdd key\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Odd five\n✓ Odd blank\n✓ Odd garbled\n✓ Tea\n✓ Bread",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails"
       },
       "agenda": {
         "lines": [],
@@ -171,10 +201,13 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
               "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:0000000000000000000000000000000c",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           }
         ],
@@ -188,11 +221,71 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -202,7 +295,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -226,36 +319,6 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             },
             {
               "id": "line:00000000000000000000000000000007",
@@ -282,7 +345,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -292,7 +355,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": "2026-01-01T23:32:56.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -302,35 +365,35 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
             }
           ],
-          "count": 12,
-          "openCount": 7,
+          "count": 15,
+          "openCount": 10,
           "struckCount": 5
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "W"
@@ -342,8 +405,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
-        "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails"
       },
       "agenda": {
         "lines": [
@@ -370,13 +433,16 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           }
         ],
@@ -390,11 +456,71 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -404,7 +530,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -428,36 +554,6 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             },
             {
               "id": "line:00000000000000000000000000000007",
@@ -484,7 +580,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -494,7 +590,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": "2026-01-01T23:32:56.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -504,35 +600,35 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
             }
           ],
-          "count": 12,
-          "openCount": 7,
+          "count": 15,
+          "openCount": 10,
           "struckCount": 5
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "W"
@@ -544,8 +640,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
-        "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails"
       },
       "agenda": {
         "lines": [
@@ -572,13 +668,16 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           }
         ],
@@ -592,21 +691,81 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
               "id": "line:00000000000000000000000000000005",
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": "2026-01-01T23:32:56.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
             },
             {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -616,7 +775,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -640,36 +799,6 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             },
             {
               "id": "line:00000000000000000000000000000007",
@@ -696,7 +825,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -706,35 +835,35 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
             }
           ],
-          "count": 12,
-          "openCount": 8,
+          "count": 15,
+          "openCount": 11,
           "struckCount": 4
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "W"
@@ -746,8 +875,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
-        "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails"
       },
       "agenda": {
         "lines": [
@@ -770,14 +899,17 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
               "line:00000000000000000000000000000005",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           }
         ],
@@ -791,21 +923,81 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
               "id": "line:00000000000000000000000000000005",
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": "2026-01-01T23:32:56.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
             },
             {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -815,7 +1007,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -839,36 +1031,6 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             },
             {
               "id": "line:00000000000000000000000000000007",
@@ -895,7 +1057,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -905,35 +1067,35 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
             }
           ],
-          "count": 12,
-          "openCount": 8,
+          "count": 15,
+          "openCount": 11,
           "struckCount": 4
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "W"
@@ -945,8 +1107,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
-        "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails"
       },
       "agenda": {
         "lines": [],
@@ -955,14 +1117,17 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
               "line:00000000000000000000000000000005",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           }
         ],
@@ -976,11 +1141,41 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
               "id": "line:00000000000000000000000000000006",
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -996,21 +1191,51 @@
               "order": "Z"
             },
             {
-              "id": "line:00000000000000000000000000000005",
-              "text": "Tea",
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-09",
-              "order": "X"
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
             },
             {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -1020,7 +1245,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -1044,36 +1269,6 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             },
             {
               "id": "line:00000000000000000000000000000008",
@@ -1090,35 +1285,35 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
             }
           ],
-          "count": 12,
-          "openCount": 10,
+          "count": 15,
+          "openCount": 13,
           "struckCount": 2
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "W"
@@ -1130,8 +1325,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Coffee\n✓ Rice",
-        "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Coffee\n✓ Rice",
+        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails"
       },
       "agenda": {
         "lines": [
@@ -1143,10 +1338,10 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000c",
+            "note": "note:0000000000000000000000000000000f",
             "lines": [
-              "line:00000000000000000000000000000011",
-              "line:00000000000000000000000000000012"
+              "line:00000000000000000000000000000014",
+              "line:00000000000000000000000000000015"
             ]
           }
         ],
@@ -1159,10 +1354,10 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000c",
+            "note": "note:0000000000000000000000000000000f",
             "lines": [
-              "line:00000000000000000000000000000011",
-              "line:00000000000000000000000000000012"
+              "line:00000000000000000000000000000014",
+              "line:00000000000000000000000000000015"
             ]
           }
         ],
@@ -1170,23 +1365,26 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
               "line:00000000000000000000000000000006",
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000005",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000c",
+            "note": "note:0000000000000000000000000000000f",
             "lines": [
-              "line:00000000000000000000000000000011",
-              "line:00000000000000000000000000000012"
+              "line:00000000000000000000000000000014",
+              "line:00000000000000000000000000000015"
             ]
           }
         ],
@@ -1200,21 +1398,41 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000008",
-              "text": "Coffee",
-              "reappear": "3w",
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-22",
-              "order": "a"
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
             },
             {
               "id": "line:00000000000000000000000000000006",
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -1230,21 +1448,61 @@
               "order": "Z"
             },
             {
-              "id": "line:00000000000000000000000000000005",
-              "text": "Tea",
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-09",
-              "order": "X"
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
             },
             {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -1254,7 +1512,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -1280,69 +1538,39 @@
               "order": "é"
             },
             {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
-            },
-            {
               "id": "line:00000000000000000000000000000009",
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": "2026-01-01T10:02:20.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
             }
           ],
-          "count": 12,
-          "openCount": 11,
+          "count": 15,
+          "openCount": 14,
           "struckCount": 1
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "W"
@@ -1354,8 +1582,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nCoffee\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Rice",
-        "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Rice",
+        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails"
       },
       "agenda": {
         "lines": [
@@ -1378,24 +1606,27 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
-              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
               "line:00000000000000000000000000000006",
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000008",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000c",
+            "note": "note:0000000000000000000000000000000f",
             "lines": [
-              "line:00000000000000000000000000000011",
-              "line:00000000000000000000000000000012"
+              "line:00000000000000000000000000000014",
+              "line:00000000000000000000000000000015"
             ]
           }
         ],
@@ -1409,31 +1640,41 @@
           "making": "00000000000000000000000000000002",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000009",
-              "text": "Rice",
-              "reappear": "4w",
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:56.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-29",
-              "order": "b"
+              "cameBackOn": null,
+              "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000008",
-              "text": "Coffee",
-              "reappear": "3w",
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-22",
-              "order": "a"
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
             },
             {
               "id": "line:00000000000000000000000000000006",
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:32:37.000Z",
+              "checkedAt": "2026-01-08T11:33:01.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -1449,21 +1690,71 @@
               "order": "Z"
             },
             {
-              "id": "line:00000000000000000000000000000005",
-              "text": "Tea",
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:32.000Z",
+              "checkedAt": null,
               "backOn": null,
-              "cameBackOn": "2026-01-09",
-              "order": "X"
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
             },
             {
               "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:06.000Z",
+              "checkedAt": "2026-01-01T10:02:30.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -1473,7 +1764,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:15.000Z",
+              "checkedAt": "2026-01-01T10:02:39.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -1497,61 +1788,31 @@
               "backOn": null,
               "cameBackOn": null,
               "order": "é"
-            },
-            {
-              "id": "line:0000000000000000000000000000000b",
-              "text": "Soy milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "d"
-            },
-            {
-              "id": "line:00000000000000000000000000000003",
-              "text": "Milk",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "V"
-            },
-            {
-              "id": "line:0000000000000000000000000000000a",
-              "text": "Salt",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": null,
-              "backOn": null,
-              "cameBackOn": null,
-              "order": "c"
             }
           ],
-          "count": 12,
-          "openCount": 12,
+          "count": 15,
+          "openCount": 15,
           "struckCount": 0
         },
-        "note:0000000000000000000000000000000c": {
-          "making": "00000000000000000000000000000010",
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
           "lines": [
             {
-              "id": "line:00000000000000000000000000000011",
+              "id": "line:00000000000000000000000000000014",
               "text": "Glue",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
-              "id": "line:00000000000000000000000000000012",
+              "id": "line:00000000000000000000000000000015",
               "text": "Nails",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:10.000Z",
+              "checkedAt": "2026-01-08T11:33:34.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "W"
@@ -1563,8 +1824,8 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Groceries\nRice\nCoffee\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt",
-        "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails"
       },
       "agenda": {
         "lines": [
@@ -1587,25 +1848,28 @@
           {
             "note": "note:00000000000000000000000000000001",
             "lines": [
-              "line:00000000000000000000000000000009",
-              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
               "line:00000000000000000000000000000006",
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
-              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
-              "line:0000000000000000000000000000000b",
-              "line:00000000000000000000000000000003",
-              "line:0000000000000000000000000000000a"
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000c",
+            "note": "note:0000000000000000000000000000000f",
             "lines": [
-              "line:00000000000000000000000000000011",
-              "line:00000000000000000000000000000012"
+              "line:00000000000000000000000000000014",
+              "line:00000000000000000000000000000015"
             ]
           }
         ],
@@ -1615,19 +1879,19 @@
   ],
   "isShoppingList": {
     "note:00000000000000000000000000000001": true,
-    "note:0000000000000000000000000000000c": true,
-    "note:00000000000000000000000000000013": false,
-    "note:00000000000000000000000000000015": false
+    "note:0000000000000000000000000000000f": true,
+    "note:00000000000000000000000000000016": false,
+    "note:00000000000000000000000000000018": false
   },
   "mayMake": {
     "note:00000000000000000000000000000001": false,
-    "note:0000000000000000000000000000000c": false,
-    "note:00000000000000000000000000000013": true,
-    "note:00000000000000000000000000000015": true
+    "note:0000000000000000000000000000000f": false,
+    "note:00000000000000000000000000000016": true,
+    "note:00000000000000000000000000000018": true
   },
   "routines": [
     {
-      "id": "routine:00000000000000000000000000000014",
+      "id": "routine:00000000000000000000000000000017",
       "noteId": "note:00000000000000000000000000000001",
       "start": "2026-01-09",
       "times": [],
@@ -1635,7 +1899,7 @@
       "done": {},
       "renag": null,
       "escalation": null,
-      "scheduledAt": "2026-01-08T11:33:34.000Z",
+      "scheduledAt": "2026-01-08T11:33:58.000Z",
       "trashed": null,
       "trashedWith": null,
       "reminder": true

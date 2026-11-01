@@ -244,9 +244,9 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
   }
 
   /// The rows for [lines] with the rows there already where they are, so
-  /// a Line stays where it was typed while the editor is open; a Line new
-  /// to the list from elsewhere comes in at the top, where the list shows
-  /// it. A row whose Line went while typed in is kept as a new one.
+  /// a Line stays where it was, checked or not, while the editor is open;
+  /// a Line new to the list from elsewhere comes in at the end. A row
+  /// whose Line went while typed in is kept as a new one.
   List<TypedLine> rowsInPlace(List<RowLine>? lines) {
     if (lines == null) {
       rows.forEach(retire);
@@ -254,11 +254,7 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     }
     final byId = {for (final line in lines) line.id: line};
     final known = {for (final row in rows) ?row.id};
-    final next = <TypedLine>[
-      for (final line in lines)
-        if (!known.contains(line.id))
-          newRow(id: line.id, text: line.text, inGroup: line.inGroup),
-    ];
+    final next = <TypedLine>[];
     for (final row in rows) {
       final id = row.id;
       if (id == null) {
@@ -271,6 +267,11 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
         );
       } else if (_keptAsNew(row)) {
         next.add(row);
+      }
+    }
+    for (final line in lines) {
+      if (!known.contains(line.id)) {
+        next.add(newRow(id: line.id, text: line.text, inGroup: line.inGroup));
       }
     }
     return _withRow(next);
@@ -344,10 +345,14 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     var count = 0;
     for (final r in rows) {
       if (identical(r, row)) break;
-      if (r.id != null) count++;
+      if (placesAmong(r)) count++;
     }
     return count;
   }
+
+  /// Whether the Line of [row] counts for the place a new Line is added
+  /// at: every stored one; on a Shopping List the open ones alone.
+  bool placesAmong(TypedLine row) => row.id != null;
 
   /// Stores what was typed into [row]: a new Line once it holds text, a
   /// Line renamed once its text changed. An empty one waits. Gives the
@@ -543,7 +548,7 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
     linesLog.batch(() {
       holder = storeRow(row);
       if (holder.id == null) return;
-      var index = storedBefore(holder) + 1;
+      var index = storedBefore(holder) + (placesAmong(holder) ? 1 : 0);
       for (final text in filled.skip(1)) {
         final id = addLine(text, at: index++, inGroup: group);
         // A name a Shopping List has already keeps its row.

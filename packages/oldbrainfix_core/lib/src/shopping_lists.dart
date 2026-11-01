@@ -132,8 +132,8 @@ class ShoppingList {
   /// The id of its making, as the Note's `kind` names it.
   final String making;
 
-  /// Every Line that shows: the open ones first, the one that came last
-  /// at the top, then the struck ones, the one checked last at the end.
+  /// Every Line that shows: the open ones first, in the order they were
+  /// placed in, then the struck ones, the one checked last at the end.
   final List<ShoppingLine> lines;
 
   /// The Lines checked Once: gone, but a name added again brings them
@@ -404,12 +404,14 @@ class ShoppingLists {
   /// its reappear time: as for a Checklist's Line.
   bool mayEdit(String lineId) => Checklists(store).mayEdit(lineId);
 
-  /// Adds [text] to the Shopping List of [noteId], at the top. A name it
-  /// has already, in another case or with spaces around it, adds
-  /// nothing: a struck or gone Line of that name comes back now, at the
-  /// top, an open one stays. Anyone with a role in its Area may. Returns
-  /// the id of the Line added, brought back or found.
-  String add(String noteId, String text, WallClock wallClock) {
+  /// Adds [text] to the Shopping List of [noteId] at [at], an index in
+  /// the order its open Lines show, or after every other. A name it has
+  /// already, in another case or with spaces around it, adds nothing: a
+  /// struck or gone Line of that name comes back now, in its place, an
+  /// open one stays. Anyone with a role in its Area may. Returns the id
+  /// of the Line added, brought back or found.
+  String add(String noteId, String text, WallClock wallClock, {int? at}) {
+    if (at != null && at < 0) throw RangeError.value(at, 'at');
     final (_, list) = _requireList(noteId, wallClock);
     if (!mayCheck(noteId)) {
       throw StateError('no role in the Shared Area of $noteId');
@@ -426,36 +428,61 @@ class ShoppingLists {
       store.append(line.id, ChecklistKeys.checked, null);
       return line.id;
     }
-    String? last;
+    final key = _keyAt(list, at);
+    return store.batch(() => _writeLine(noteId, list.making, named, key));
+  }
+
+  /// The key for a new Line at the place [at] of the open Lines of
+  /// [list], or after every key with none or one past them: between the
+  /// last valid key above it and the first valid key of any Line after
+  /// that one, a struck or gone Line too.
+  static String _keyAt(ShoppingList list, int? at) {
+    final open = list.open;
+    String? a;
+    if (at == null || at >= open.length) {
+      for (final line in [...list.lines, ...list._gone]) {
+        final key = line.order;
+        if (key != null &&
+            LineOrder.isValid(key) &&
+            (a == null || key.compareTo(a) > 0)) {
+          a = key;
+        }
+      }
+      return LineOrder.place(a, null);
+    }
+    for (var i = at - 1; i >= 0; i--) {
+      if (LineOrder.isValid(open[i].order)) {
+        a = open[i].order;
+        break;
+      }
+    }
+    String? b;
     for (final line in [...list.lines, ...list._gone]) {
       final key = line.order;
       if (key != null &&
           LineOrder.isValid(key) &&
-          (last == null || key.compareTo(last) > 0)) {
-        last = key;
+          (a == null || key.compareTo(a) > 0) &&
+          (b == null || key.compareTo(b) < 0)) {
+        b = key;
       }
     }
-    final key = LineOrder.place(last, null);
-    return store.batch(() => _writeLine(noteId, list.making, named, key));
+    return LineOrder.place(a, b);
   }
 
   /// Adds every line of [text] that is not blank to the Shopping List of
-  /// [noteId] as [add] does, all in one batch, the first line ending at
-  /// the top: what a capture sorted into the list becomes (#124). Returns
-  /// the ids of the Lines added, brought back or found, in the order of
-  /// the lines; none for a blank [text].
+  /// [noteId] as [add] does, all in one batch, in the order of the lines
+  /// after every other: what a capture sorted into the list becomes
+  /// (#124). Returns the ids of the Lines added, brought back or found,
+  /// in the order of the lines; none for a blank [text].
   List<String> addLines(String noteId, String text, WallClock wallClock) {
     final rows = [
       for (final row in splitLines(text))
         if (row.trim().isNotEmpty) row,
     ];
     if (rows.isEmpty) return const [];
-    return store.batch(() {
-      final ids = [
-        for (final row in rows.reversed) add(noteId, row, wallClock),
-      ];
-      return ids.reversed.toList();
-    });
+    return store.batch(
+      () => [for (final row in rows) add(noteId, row, wallClock)],
+    );
   }
 
   /// Renames the Line [lineId].
@@ -514,7 +541,7 @@ class ShoppingLists {
     );
   }
 
-  /// Brings the struck Line [lineId] back now, at the top. An open one
+  /// Brings the struck Line [lineId] back now, in its place. An open one
   /// stays as it is.
   void uncheck(String lineId, WallClock wallClock) {
     final (list, line) = _requireShown(lineId, wallClock);
@@ -547,8 +574,12 @@ class ShoppingLists {
       for (final r in lines)
         if (r.gone) r,
     ];
+    // In the order of their keys; one without a valid key, which no app
+    // writes, after them, the one that came last first.
     open.sort((a, b) {
-      final byAt = b.at.compareTo(a.at);
+      final valid = LineOrder.isValid(a.line.order);
+      if (valid != LineOrder.isValid(b.line.order)) return valid ? -1 : 1;
+      final byAt = valid ? 0 : b.at.compareTo(a.at);
       return byAt != 0 ? byAt : byOrder(a, b);
     });
     int byCheck(_Read a, _Read b) {
@@ -643,8 +674,9 @@ class ShoppingLists {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one by
-/// when it came to the top, on the wall clock.
+/// moment it sorts by: a struck or gone one by its check, an open one
+/// without a valid key by when it came back or was added, on the wall
+/// clock.
 class _Read {
   final ShoppingLine line;
   final bool gone;

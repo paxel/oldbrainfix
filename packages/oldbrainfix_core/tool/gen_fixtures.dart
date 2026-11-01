@@ -997,12 +997,13 @@ final _scenarios = <Scenario>[
     about:
         'Shopping Lists made from Notes: every line not blank a Line, '
         'indented or not, a marked one struck; reappear times of Once and one '
-        'to four weeks; Lines checked to the end and back at the top at the '
-        'start of the same weekday as many weeks on on the European wall '
+        'to four weeks; Lines checked to the end and back in their places at '
+        'the start of the same weekday as many weeks on on the European wall '
         'clock, one checked late on a UTC evening that is the next day there; '
         'names added again in another case bringing a struck and a gone Line '
         'back, an open one and one back by its time staying, a new one at '
-        'the top; a Line renamed, one deleted and restored, one checked again '
+        'the end, one second from the top and two lines of a text after them; '
+        'a Line renamed, one deleted and restored, one checked again '
         'after it came back, reappear times, a check and a key no app '
         'writes; back to a plain Note and made again, a kind no app writes; a '
         'Reminder spawned from one with a check for its Occurrence no app '
@@ -1031,6 +1032,8 @@ final _scenarios = <Scenario>[
       lists.add(week, ' MILK ', wall);
       lists.add(week, 'tea', wall);
       lists.add(week, 'Oat milk', wall);
+      lists.add(week, 'Butter', wall, at: 1);
+      lists.addLines(week, 'Pasta\n\nFlour', wall);
       lists.add(week, 'eggs', wall);
       lists.check(line(week, 'Eggs'), wall);
       lists.rename(line(week, 'Oat milk'), 'Soy milk');
