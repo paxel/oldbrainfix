@@ -309,12 +309,25 @@
 <h3>Die KI-Aufgabe</h3>
 <p>
   Auf dem Desktop kann ein KI-Modell deiner Wahl für eine Aufgabe an deinen Notizen arbeiten, etwa
-  Tippfehler beheben. Einstellungen, <strong>KI-Port öffnen</strong> öffnet einen Port, den nur dieser
-  Computer mit seinem Token erreicht, und zeigt seine Adresse mit Wegen, zu kopieren, was ein Client
+  Tippfehler beheben. Einstellungen, <strong>KI-Port öffnen</strong> öffnet einen Port, der nur mit
+  seinem Token erreichbar ist, und zeigt seine Adresse mit Wegen, zu kopieren, was ein Client
   braucht: <strong>Client-Konfiguration kopieren</strong> für MCP-Clients, die über HTTP verbinden,
   <strong>Befehl für Claude Code kopieren</strong> und <strong>Konfiguration für Claude Desktop
   kopieren</strong>. Solange der Port offen ist und bis zur Prüfung ist der Abgleich pausiert, und ein
   Banner sagt es.
+</p>
+<p>
+  Über dem Knopf legt <strong>Wer sich verbinden darf</strong> fest, wer den Port beim nächsten Öffnen
+  erreicht, gespeichert auf diesem Computer; der Port selbst bleibt bei jedem Start geschlossen.
+  <strong>Nur dieser Computer</strong>, die Voreinstellung, lässt Programme auf diesem Computer über
+  127.0.0.1 herein. <strong>Docker-Container auf diesem Computer</strong> lässt einen KI-Client in einem
+  Container herein, der sich als <code>host.docker.internal</code> verbindet; die Adresse und alles
+  Kopierte verwenden dann <code>http://host.docker.internal:&lt;port&gt;/mcp</code>. Jeder Container an
+  der Docker-Bridge erreicht den Port, solange er offen ist, und nur sein Token hält sie fern. Unter
+  Linux lauscht der Port allein an der Docker-Bridge (<code>docker0</code>), und der Container muss mit
+  <code>--add-host=host.docker.internal:host-gateway</code> gestartet werden; ohne Docker-Bridge sagt
+  die Karte es, und der Port öffnet sich nicht. Mit Docker Desktop unter macOS und Windows bleibt der
+  Port auf 127.0.0.1, wohin Docker Desktop den Namen weiterleitet.
 </p>
 <p>
   <strong>Fertig, prüfen</strong> schließt den Port und öffnet „KI-Aufgabe prüfen“: jede Änderung,

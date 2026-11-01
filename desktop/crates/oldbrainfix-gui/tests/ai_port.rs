@@ -7,6 +7,9 @@
 //! all asks once and keeps nothing; a task that changed nothing is
 //! declined without a review. A task left waiting shows its review on
 //! start, and a bundle is refused meanwhile with words that say why.
+//! Who may connect (#167) is chosen on the card while the port is
+//! closed, this computer only until then, and kept for the next start;
+//! the Docker choice without a Docker bridge says so and does not open.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -16,7 +19,9 @@ use std::time::{Duration as StdDuration, Instant};
 use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use oldbrainfix_core::ai_port::{Reach, docker_bridge};
 use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_gui::ai_view::{AiAction, PortShown, port_card};
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Page, Selection};
 use serde_json::{Value, json};
@@ -243,4 +248,74 @@ fn a_bundle_is_refused_while_a_task_waits_and_says_why() -> TestResult {
     click(&mut harness, t.sync_paused_error());
     assert!(shows(&harness, t.ai_review_banner()));
     Ok(())
+}
+
+#[test]
+fn who_may_connect_is_chosen_on_the_card_and_kept() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let mut harness = settings(&store);
+    assert!(shows(&harness, t.ai_reach_heading()));
+    assert!(shows(&harness, t.ai_reach_local()));
+    assert_eq!(store.ai_reach()?, Reach::Local);
+    assert!(!shows(&harness, t.ai_reach_docker_detail()));
+
+    click(&mut harness, t.ai_reach_docker());
+    assert_eq!(store.ai_reach()?, Reach::Docker);
+    assert!(shows(&harness, t.ai_reach_docker_detail()));
+    let no_bridge = cfg!(target_os = "linux") && docker_bridge().is_none();
+    assert_eq!(shows(&harness, t.ai_reach_no_bridge()), no_bridge);
+
+    // Kept, and the port closed at the next start.
+    let mut harness = settings(&store);
+    assert!(harness.state().ai_port().is_none());
+    assert!(shows(&harness, t.ai_reach_docker_detail()));
+    click(&mut harness, t.ai_reach_local());
+    assert_eq!(store.ai_reach()?, Reach::Local);
+    assert!(!shows(&harness, t.ai_reach_docker_detail()));
+    assert!(!shows(&harness, t.ai_reach_no_bridge()));
+
+    // Open, the choice is not offered: it holds until the port closes.
+    click(&mut harness, t.ai_port_open());
+    let url = harness.state().ai_port().ok_or("the port is open")?.url();
+    assert!(url.starts_with("http://127.0.0.1:"));
+    assert!(!shows(&harness, t.ai_reach_heading()));
+    Ok(())
+}
+
+#[test]
+fn the_docker_choice_without_a_bridge_says_so_and_does_not_open() {
+    let t = L10n::new("en");
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(800.0, 600.0))
+        .build_ui_state(
+            |ui, asked: &mut Option<AiAction>| {
+                oldbrainfix_gui::theme::install(ui.ctx());
+                let tones = oldbrainfix_gui::theme::tones(ui.visuals());
+                let shown = PortShown {
+                    url: None,
+                    waiting: false,
+                    copied: None,
+                    reach: Reach::Docker,
+                    no_bridge: true,
+                };
+                if let Some(action) = port_card(ui, &L10n::new("en"), tones, shown) {
+                    *asked = Some(action);
+                }
+            },
+            None,
+        );
+    harness.run();
+    assert!(shows_in(&harness, t.ai_reach_no_bridge()));
+    assert!(shows_in(&harness, t.ai_reach_docker_detail()));
+    match harness.get_all_by_label(t.ai_port_open()).last() {
+        Some(node) => node.click_accesskit(),
+        None => panic!("no {}", t.ai_port_open()),
+    }
+    harness.run();
+    assert_eq!(*harness.state(), None, "the port was not asked to open");
+}
+
+fn shows_in<S>(harness: &Harness<'_, S>, label: &str) -> bool {
+    harness.query_all_by_label_contains(label).next().is_some()
 }

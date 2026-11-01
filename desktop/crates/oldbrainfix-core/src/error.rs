@@ -36,6 +36,10 @@ pub enum Error {
     /// (ADR 0022, 0026): nothing goes out or comes in until it is decided.
     #[error("sync is paused until the pending changes are decided")]
     SyncPaused,
+    /// The AI port was to let Docker containers connect, and this
+    /// computer has no Docker bridge (`docker0`, #167): it stays closed.
+    #[error("no Docker bridge (docker0) found")]
+    NoDockerBridge,
     /// A database a newer version of the app saved, with the
     /// `user_version` it holds, as the Dart core's `StoreNeedsUpdate`
     /// (ADR 0034): it is not opened, and nothing in it changed.

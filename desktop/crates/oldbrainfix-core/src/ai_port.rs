@@ -1,10 +1,11 @@
 //! The AI port (#112, ADR 0026): an MCP server for one AI Task at a time,
-//! opened by the user, off otherwise. Plain HTTP on the loopback only,
-//! `POST /mcp` with one JSON-RPC message per request and the answer as
-//! JSON (MCP's Streamable HTTP without a stream), every request with the
-//! port's token as `Authorization: Bearer`. A request without it, or from
-//! a web page's origin, is refused before anything is read from the
-//! store.
+//! opened by the user, off otherwise. Plain HTTP on the loopback, or for
+//! AI clients in Docker containers on the Docker bridge (#167), `POST
+//! /mcp` with one JSON-RPC message per request and the answer as JSON
+//! (MCP's Streamable HTTP without a stream), every request with the
+//! port's token as `Authorization: Bearer`. A request without it, from a
+//! web page's origin or naming a `Host` the choice does not accept, is
+//! refused before anything is read from the store.
 //!
 //! As the LAN host does, the network runs on its own threads and never
 //! touches the store: `initialize`, `ping` and `tools/list` are answered
@@ -33,6 +34,12 @@ use crate::{Error, Result};
 pub const TOKEN_KEY: &str = "ai:token";
 /// The local setting holding the port number last bound, tried first.
 pub const PORT_KEY: &str = "ai:port";
+/// The local setting holding who may connect ([`Reach`]).
+pub const REACH_KEY: &str = "ai:reach";
+/// What containers call the computer they run on.
+pub const DOCKER_HOST: &str = "host.docker.internal";
+/// The `Host` names the loopback answers to.
+const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "::1"];
 /// The one path the port answers on.
 pub const MCP_PATH: &str = "/mcp";
 /// The MCP versions this port speaks, the newest first.
@@ -69,10 +76,132 @@ impl AiCall {
     }
 }
 
+/// Who may connect to the port, a local setting of this Device (#167).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Reach {
+    /// Programs on this computer, through 127.0.0.1.
+    #[default]
+    Local,
+    /// AI clients in Docker containers on this computer, as
+    /// `host.docker.internal`.
+    Docker,
+}
+
+impl Reach {
+    /// The name the setting stores.
+    pub fn name(self) -> &'static str {
+        match self {
+            Reach::Local => "local",
+            Reach::Docker => "docker",
+        }
+    }
+
+    /// The choice a stored name stands for; anything else is
+    /// [`Reach::Local`].
+    pub fn from_name(name: Option<&str>) -> Reach {
+        match name {
+            Some("docker") => Reach::Docker,
+            _ => Reach::Local,
+        }
+    }
+
+    /// What the port binds and accepts for this choice, `bridge` being
+    /// this computer's address on the Docker bridge, if it has one.
+    pub fn endpoint(self, bridge: Option<Ipv4Addr>) -> Result<Endpoint> {
+        match self {
+            Reach::Local => Ok(Endpoint::local()),
+            Reach::Docker => Endpoint::docker(bridge),
+        }
+    }
+}
+
+/// How a [`Reach`] turns into a server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Endpoint {
+    /// The address the port binds.
+    pub bind: IpAddr,
+    /// The `Host` names the port accepts (any port number); every other
+    /// one is refused, against DNS rebinding.
+    pub hosts: Vec<String>,
+    /// The host a client puts into the URL.
+    pub client_host: String,
+}
+
+impl Endpoint {
+    /// The loopback: `localhost`, `127.0.0.1` and `::1`, and no
+    /// container's `host.docker.internal`.
+    pub fn local() -> Endpoint {
+        Endpoint {
+            bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            hosts: LOOPBACK_HOSTS.iter().map(|h| (*h).to_string()).collect(),
+            client_host: "127.0.0.1".into(),
+        }
+    }
+
+    /// On Linux containers reach the computer through the bridge
+    /// (`docker0`), which alone is bound; Docker Desktop on macOS and
+    /// Windows forwards `host.docker.internal` to 127.0.0.1.
+    pub fn docker(bridge: Option<Ipv4Addr>) -> Result<Endpoint> {
+        let ip = if cfg!(target_os = "linux") {
+            bridge.ok_or(Error::NoDockerBridge)?
+        } else {
+            Ipv4Addr::LOCALHOST
+        };
+        Ok(Endpoint {
+            bind: IpAddr::V4(ip),
+            hosts: vec![ip.to_string(), DOCKER_HOST.to_string()],
+            client_host: DOCKER_HOST.into(),
+        })
+    }
+
+    /// Where a client reaches the port at `port`.
+    pub fn url(&self, port: u16) -> String {
+        format!("http://{}:{port}{MCP_PATH}", self.client_host)
+    }
+}
+
+/// This computer's address on the Docker bridge, read from `/proc`
+/// (Linux only; elsewhere none).
+pub fn docker_bridge() -> Option<Ipv4Addr> {
+    let route = std::fs::read_to_string("/proc/net/route").ok()?;
+    let trie = std::fs::read_to_string("/proc/net/fib_trie").ok()?;
+    bridge_address(&route, &trie, "docker0")
+}
+
+/// The local address that lies in the network routed through `iface`:
+/// `route` is `/proc/net/route` (little-endian hex), `trie` is
+/// `/proc/net/fib_trie`.
+pub fn bridge_address(route: &str, trie: &str, iface: &str) -> Option<Ipv4Addr> {
+    let hex = |s: &str| u32::from_str_radix(s, 16).ok().map(u32::from_be);
+    // The interface's own network, not a default route through it (mask 0).
+    let (net, mask) = route.lines().skip(1).find_map(|line| {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.first() != Some(&iface) {
+            return None;
+        }
+        let (net, mask) = (hex(fields.get(1)?)?, hex(fields.get(7)?)?);
+        (mask != 0).then_some((net, mask))
+    })?;
+    let mut last: Option<Ipv4Addr> = None;
+    for line in trie.lines() {
+        let line = line.trim_start();
+        if let Some(addr) = line.strip_prefix("|-- ") {
+            last = addr.trim().parse().ok();
+        } else if line.contains("host LOCAL")
+            && let Some(ip) = last
+            && u32::from(ip) & mask == net
+        {
+            return Some(ip);
+        }
+    }
+    None
+}
+
 /// The open port.
 pub struct AiPort {
     task: String,
     port: u16,
+    client_host: String,
     token: String,
     calls: Receiver<AiCall>,
     stop: Arc<AtomicBool>,
@@ -94,13 +223,34 @@ impl Store {
         self.set_local_setting(TOKEN_KEY, &token)?;
         Ok(token)
     }
+
+    /// Who may connect to the port; [`Reach::Local`] until chosen.
+    pub fn ai_reach(&self) -> Result<Reach> {
+        Ok(Reach::from_name(self.local_setting(REACH_KEY)?.as_deref()))
+    }
+
+    pub fn set_ai_reach(&self, reach: Reach) -> Result<()> {
+        self.set_local_setting(REACH_KEY, reach.name())
+    }
 }
 
 impl AiPort {
-    /// Opens the port on the loopback for the AI Task that waits, or a
-    /// new one ([`Store::open_ai_task`]): on the port it had last time
-    /// while that is free, else on a free one, which is kept.
+    /// Opens the port for whoever may connect ([`Store::ai_reach`]), for
+    /// the AI Task that waits, or a new one ([`Store::open_ai_task`]): on
+    /// the port it had last time while that is free, else on a free one,
+    /// which is kept. The Docker choice without a Docker bridge opens
+    /// nothing ([`Error::NoDockerBridge`]).
     pub fn open(store: &Store) -> Result<AiPort> {
+        let reach = store.ai_reach()?;
+        let bridge = match reach {
+            Reach::Docker if cfg!(target_os = "linux") => docker_bridge(),
+            _ => None,
+        };
+        AiPort::open_at(store, &reach.endpoint(bridge)?)
+    }
+
+    /// Opens the port on `endpoint`, as [`AiPort::open`] does.
+    pub fn open_at(store: &Store, endpoint: &Endpoint) -> Result<AiPort> {
         let task = store.open_ai_task()?;
         let token = store.ai_port_token()?;
         let kept: u16 = store
@@ -108,9 +258,9 @@ impl AiPort {
             .and_then(|p| p.parse().ok())
             .unwrap_or(0);
         let bind_error = |e: std::io::Error| Error::Invalid(format!("bind: {e}"));
-        let loopback = IpAddr::V4(Ipv4Addr::LOCALHOST);
-        let listener = TcpListener::bind(SocketAddr::new(loopback, kept))
-            .or_else(|_| TcpListener::bind(SocketAddr::new(loopback, 0)))
+        let bind = endpoint.bind;
+        let listener = TcpListener::bind(SocketAddr::new(bind, kept))
+            .or_else(|_| TcpListener::bind(SocketAddr::new(bind, 0)))
             .map_err(bind_error)?;
         listener.set_nonblocking(true).map_err(bind_error)?;
         let port = listener.local_addr().map_err(bind_error)?.port();
@@ -122,11 +272,13 @@ impl AiPort {
         let thread = {
             let stop = stop.clone();
             let digest = Sha256::digest(token.as_bytes()).to_vec();
-            std::thread::spawn(move || accept_loop(listener, tx, digest, stop))
+            let hosts = endpoint.hosts.clone();
+            std::thread::spawn(move || accept_loop(listener, tx, digest, hosts, stop))
         };
         Ok(AiPort {
             task,
             port,
+            client_host: endpoint.client_host.clone(),
             token,
             calls: rx,
             stop,
@@ -149,7 +301,7 @@ impl AiPort {
 
     /// Where a client reaches the port.
     pub fn url(&self) -> String {
-        format!("http://127.0.0.1:{}{MCP_PATH}", self.port)
+        format!("http://{}:{}{MCP_PATH}", self.client_host, self.port)
     }
 
     /// The next tool call, if one waits.
@@ -223,14 +375,24 @@ pub fn bridged_client_config(url: &str, token: &str) -> String {
     serde_json::to_string_pretty(&config).unwrap_or_default()
 }
 
-fn accept_loop(listener: TcpListener, tx: Sender<AiCall>, digest: Vec<u8>, stop: Arc<AtomicBool>) {
+fn accept_loop(
+    listener: TcpListener,
+    tx: Sender<AiCall>,
+    digest: Vec<u8>,
+    hosts: Vec<String>,
+    stop: Arc<AtomicBool>,
+) {
     let digest = Arc::new(digest);
+    let hosts = Arc::new(hosts);
     while !stop.load(Ordering::Relaxed) {
         match listener.accept() {
             Ok((stream, peer)) => {
                 let tx = tx.clone();
                 let digest = digest.clone();
-                std::thread::spawn(move || drop(serve_connection(stream, peer, &tx, &digest)));
+                let hosts = hosts.clone();
+                std::thread::spawn(move || {
+                    drop(serve_connection(stream, peer, &tx, &digest, &hosts));
+                });
             }
             Err(_) => std::thread::sleep(Duration::from_millis(50)),
         }
@@ -268,12 +430,32 @@ fn local_origin(origin: Option<&str>) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "[::1]")
 }
 
+/// Whether a request's `Host`, without its port number, is one of
+/// `hosts`: a page whose name was pointed at this computer (DNS
+/// rebinding) names its own host and is refused. A request without one
+/// is refused too.
+fn allowed_host(host: Option<&str>, hosts: &[String]) -> bool {
+    let Some(host) = host.map(str::trim) else {
+        return false;
+    };
+    let name = match host.strip_prefix('[') {
+        // An IPv6 address, as `[::1]:port`.
+        Some(rest) => rest.split_once(']').map_or(rest, |(name, _)| name),
+        None => match host.rsplit_once(':') {
+            Some((name, port)) if port.bytes().all(|b| b.is_ascii_digit()) => name,
+            _ => host,
+        },
+    };
+    hosts.iter().any(|h| h.eq_ignore_ascii_case(name))
+}
+
 /// One client's request: checked, answered, and the connection closed.
 fn serve_connection(
     stream: TcpStream,
     peer: SocketAddr,
     tx: &Sender<AiCall>,
     digest: &[u8],
+    hosts: &[String],
 ) -> std::io::Result<()> {
     stream.set_nonblocking(false)?;
     stream.set_nodelay(true)?;
@@ -282,7 +464,9 @@ fn serve_connection(
     let mut reader = BufReader::new(stream);
     let response = match read_request(&mut reader, peer.ip()) {
         Ok(Some(request)) => {
-            if !local_origin(request.header("origin")) {
+            if !allowed_host(request.header("host"), hosts) {
+                Response::text(403, "host")
+            } else if !local_origin(request.header("origin")) {
                 Response::text(403, "origin")
             } else if !holds_token(request.header("authorization"), digest) {
                 let mut refused = Response::text(401, "token");
@@ -465,6 +649,212 @@ mod tests {
         assert_eq!(again.token(), token);
         assert_eq!(again.port(), number);
         assert!(client_config(&again.url(), &token).contains(&token));
+        Ok(())
+    }
+
+    const ROUTE: &str = "\
+Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT
+wlan0\t00000000\t0102A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0
+docker0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0
+wlan0\t0002A8C0\t00000000\t0001\t0\t0\t600\t00FFFFFF\t0\t0\t0
+";
+
+    const TRIE: &str = "\
+Main:
+  +-- 0.0.0.0/0 3 0 5
+     |-- 0.0.0.0
+        /0 universe UNICAST
+     +-- 172.17.0.0/16 2 0 2
+        +-- 172.17.0.0/30 2 0 2
+           |-- 172.17.0.0
+              /16 link UNICAST
+           |-- 172.17.0.1
+              /32 host LOCAL
+        |-- 172.17.255.255
+           /32 link BROADCAST
+     +-- 192.168.2.0/24 2 0 2
+        |-- 192.168.2.40
+           /32 host LOCAL
+";
+
+    /// A computer without Docker: only the wireless network.
+    const ROUTE_NO_DOCKER: &str = "\
+Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT
+wlan0\t00000000\t0102A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0
+wlan0\t0002A8C0\t00000000\t0001\t0\t0\t600\t00FFFFFF\t0\t0\t0
+";
+
+    const TRIE_NO_DOCKER: &str = "\
+Main:
+  +-- 0.0.0.0/0 3 0 5
+     |-- 0.0.0.0
+        /0 universe UNICAST
+     +-- 192.168.2.0/24 2 0 2
+        |-- 192.168.2.40
+           /32 host LOCAL
+";
+
+    #[test]
+    fn the_bridge_address_comes_from_route_and_trie() {
+        assert_eq!(
+            bridge_address(ROUTE, TRIE, "docker0"),
+            Some(Ipv4Addr::new(172, 17, 0, 1))
+        );
+        assert_eq!(
+            bridge_address(ROUTE, TRIE, "wlan0"),
+            Some(Ipv4Addr::new(192, 168, 2, 40))
+        );
+        assert_eq!(
+            bridge_address(ROUTE_NO_DOCKER, TRIE_NO_DOCKER, "docker0"),
+            None
+        );
+        assert_eq!(bridge_address(ROUTE, TRIE_NO_DOCKER, "docker0"), None);
+        assert_eq!(bridge_address("", "", "docker0"), None);
+    }
+
+    #[test]
+    fn who_may_connect_is_kept_and_this_computer_only_until_chosen() -> TestResult {
+        let store = store();
+        assert_eq!(store.ai_reach()?, Reach::Local);
+        store.set_ai_reach(Reach::Docker)?;
+        assert_eq!(store.ai_reach()?, Reach::Docker);
+        assert_eq!(store.local_setting(REACH_KEY)?.as_deref(), Some("docker"));
+        store.set_local_setting(REACH_KEY, "elsewhere")?;
+        assert_eq!(store.ai_reach()?, Reach::Local);
+        Ok(())
+    }
+
+    #[test]
+    fn each_choice_binds_and_accepts_its_own_hosts() -> TestResult {
+        let hosts = |e: &Endpoint, host: &str| allowed_host(Some(host), &e.hosts);
+        let local = Reach::Local.endpoint(Some(Ipv4Addr::new(172, 17, 0, 1)))?;
+        assert_eq!(local, Endpoint::local());
+        assert_eq!(local.bind, IpAddr::V4(Ipv4Addr::LOCALHOST));
+        for passes in ["localhost", "127.0.0.1:7342", "[::1]:7342", "LOCALHOST:1"] {
+            assert!(hosts(&local, passes), "{passes}");
+        }
+        for refused in [
+            "host.docker.internal:7342",
+            "172.17.0.1:7342",
+            "attacker.example",
+            "127.0.0.1.attacker.example",
+            "",
+        ] {
+            assert!(!hosts(&local, refused), "{refused}");
+        }
+        assert!(!allowed_host(None, &local.hosts));
+
+        let bridge = Ipv4Addr::new(172, 17, 0, 1);
+        let docker = Reach::Docker.endpoint(Some(bridge))?;
+        assert_eq!(docker.client_host, DOCKER_HOST);
+        assert!(hosts(&docker, "host.docker.internal:7342"));
+        for refused in ["localhost", "::1", "attacker.example:7342"] {
+            assert!(!hosts(&docker, refused), "{refused}");
+        }
+        if cfg!(target_os = "linux") {
+            // Only the bridge, not every address of this computer.
+            assert_eq!(docker.bind, IpAddr::V4(bridge));
+            assert!(hosts(&docker, "172.17.0.1:7342"));
+            assert!(!hosts(&docker, "127.0.0.1"));
+            assert!(matches!(
+                Reach::Docker.endpoint(None),
+                Err(Error::NoDockerBridge)
+            ));
+        } else {
+            // Docker Desktop forwards the name to the loopback.
+            assert_eq!(docker.bind, IpAddr::V4(Ipv4Addr::LOCALHOST));
+            assert!(Reach::Docker.endpoint(None).is_ok());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn the_copied_commands_use_the_address_of_the_choice() -> TestResult {
+        let token = "abc";
+        let local = Endpoint::local().url(7342);
+        assert_eq!(local, "http://127.0.0.1:7342/mcp");
+        let docker = Reach::Docker
+            .endpoint(Some(Ipv4Addr::new(172, 17, 0, 1)))?
+            .url(7342);
+        assert_eq!(docker, "http://host.docker.internal:7342/mcp");
+        for (url, other) in [(&local, &docker), (&docker, &local)] {
+            for text in [
+                client_config(url, token),
+                claude_code_command(url, token),
+                bridged_client_config(url, token),
+            ] {
+                assert!(text.contains(url.as_str()), "{text}");
+                assert!(!text.contains(other.as_str()), "{text}");
+            }
+        }
+        Ok(())
+    }
+
+    /// The status line of a ping sent with this `Host` header and the
+    /// token: ureq always sends the URL's own.
+    fn status_for_host(port: &AiPort, host: &str) -> Made<String> {
+        use std::io::Read;
+        let body = rpc("ping", json!({})).to_string();
+        let mut stream = TcpStream::connect(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            port.port(),
+        ))?;
+        write!(
+            stream,
+            "POST /mcp HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",
+            port.token(),
+            body.len()
+        )?;
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw)?;
+        Ok(raw.chars().take(12).collect())
+    }
+
+    #[test]
+    fn a_container_gets_in_only_when_docker_containers_may_connect() -> TestResult {
+        let store = store();
+        let mut local = AiPort::open(&store)?;
+        let number = local.port();
+        assert_eq!(
+            status_for_host(&local, &format!("{DOCKER_HOST}:{number}"))?,
+            "HTTP/1.1 403"
+        );
+        assert_eq!(status_for_host(&local, "attacker.example")?, "HTTP/1.1 403");
+        assert_eq!(
+            status_for_host(&local, &format!("localhost:{number}"))?,
+            "HTTP/1.1 200"
+        );
+        local.close();
+
+        // The Docker choice as Docker Desktop has it, on the loopback:
+        // this sandbox need not have a bridge.
+        let docker = Endpoint {
+            bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            hosts: vec!["127.0.0.1".into(), DOCKER_HOST.into()],
+            client_host: DOCKER_HOST.into(),
+        };
+        let port = AiPort::open_at(&store, &docker)?;
+        assert_eq!(port.url(), format!("http://{DOCKER_HOST}:{number}/mcp"));
+        assert_eq!(
+            status_for_host(&port, &format!("{DOCKER_HOST}:{number}"))?,
+            "HTTP/1.1 200"
+        );
+        assert_eq!(status_for_host(&port, "attacker.example")?, "HTTP/1.1 403");
+        assert_eq!(status_for_host(&port, "localhost")?, "HTTP/1.1 403");
+        Ok(())
+    }
+
+    #[test]
+    fn without_a_bridge_the_docker_choice_opens_nothing() -> TestResult {
+        let store = store();
+        store.set_ai_reach(Reach::Docker)?;
+        if !cfg!(target_os = "linux") || docker_bridge().is_some() {
+            // A bridge here (or Docker Desktop): nothing to show.
+            return Ok(());
+        }
+        assert!(matches!(AiPort::open(&store), Err(Error::NoDockerBridge)));
+        assert_eq!(store.ai_task()?, None, "no AI Task was opened");
+        assert!(!store.sync_paused()?);
         Ok(())
     }
 

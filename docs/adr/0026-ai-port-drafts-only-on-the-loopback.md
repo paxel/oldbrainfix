@@ -48,3 +48,16 @@ A tool that changes something runs through the same calls the screens use, insid
 ## Capture Context (ADR 0037)
 
 Amended by ADR 0037 (#162): a tool removes one detail of a Note's or Section's Capture Context (`remove_captured`), and an AI Task may write the fields of a Capture Context (`location`, `sourcePackage`, `sourceLabel`, `calendar`, `bluetooth`) only as null, where this Device may change the Note or Section. Such a removal is reviewed among anything else.
+
+## Who may connect (#167)
+
+Amended by #167: the port is no longer on the loopback only when the user chooses so. An AI client in a Docker container, such as Claude Code in a sandbox, cannot reach 127.0.0.1 of the computer, which inside the container is the container itself. The AI port's card offers **Who may connect**, kept in the local setting `ai:reach` (`local` or `docker`) and changed only while the port is closed; the port still stays closed at every start.
+
+- **This computer only** (`local`, the default): binds 127.0.0.1 as before. The `Host` header must name `localhost`, `127.0.0.1` or `::1`; `host.docker.internal` is refused, so a container that reaches the port anyway, through host networking or a forward, gets 403.
+- **Docker containers on this computer** (`docker`): on Linux the port binds only this computer's address on the `docker0` bridge, read from `/proc/net/route` (the bridge's network) and `/proc/net/fib_trie` (the local address in it), with no new crate and no `unsafe`; the loopback and the other networks are not bound. Docker Desktop on macOS and Windows forwards `host.docker.internal` to the computer's loopback, so there the port stays on 127.0.0.1. Accepted `Host` names are the bound address and `host.docker.internal`. The address shown and the copied client config, Claude Code command and Claude Desktop config use `http://host.docker.internal:<port>/mcp`. With no `docker0` bridge on Linux the card says so, and the port does not open: no AI Task is opened and sync does not pause (`Error::NoDockerBridge`).
+
+Unchanged in both: the token on every request, compared by its digest; the refusal of a request whose `Origin` is not the loopback; Pending Changes only; sync paused while the port is open. New in both: a request whose `Host` is not on the choice's list, or that has none, gets 403 before the `Origin` and the token are looked at. The list is never empty, so DNS rebinding, a web page whose own name was pointed at this computer, is blocked.
+
+Security: every container on the Docker bridge, not only the one the user meant, can reach the port while it is open, and the token (256 bits) is the only barrier; anyone who can read the client's config in a container can use the port. A Linux container must be started with `--add-host=host.docker.internal:host-gateway` to resolve the name; with rootless Podman, `host-gateway` may not point at `docker0`. The card says that every container on the bridge can reach the port and how to start a Linux container. Requests cross the bridge as plain HTTP, which does not leave the computer.
+
+Considered: an address of the user's choice, as whiteboxed's "Other address" (rejected: it would put the token on the network unencrypted, and no use of the app needs it); binding every address (`0.0.0.0`) with the `Host` check alone (rejected: other machines on the network could try the token).

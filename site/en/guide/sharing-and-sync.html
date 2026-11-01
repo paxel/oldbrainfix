@@ -285,11 +285,24 @@
 <h3>The AI Task</h3>
 <p>
   On the desktop, an AI model of your choice can work on your Notes for one task, such as fixing
-  typos. Settings, <strong>Open the AI port</strong> opens a port reachable only from this computer
-  with its token, and shows its address with ways to copy what a client needs: <strong>Copy client
-  config</strong> for MCP clients that connect over HTTP, <strong>Copy the command for Claude
-  Code</strong> and <strong>Copy the config for Claude Desktop</strong>. While the port is open and
-  until the review, sync is paused, and a banner says so.
+  typos. Settings, <strong>Open the AI port</strong> opens a port reachable only with its token,
+  and shows its address with ways to copy what a client needs: <strong>Copy client config</strong>
+  for MCP clients that connect over HTTP, <strong>Copy the command for Claude Code</strong> and
+  <strong>Copy the config for Claude Desktop</strong>. While the port is open and until the review,
+  sync is paused, and a banner says so.
+</p>
+<p>
+  Above the button, <strong>Who may connect</strong> sets who reaches the port the next time it
+  opens, kept on this computer; the port itself stays closed at every start.
+  <strong>This computer only</strong>, the default, lets in programs on this computer through
+  127.0.0.1. <strong>Docker containers on this computer</strong> lets in an AI client running in a
+  container, which connects as <code>host.docker.internal</code>; the address and everything copied
+  then use <code>http://host.docker.internal:&lt;port&gt;/mcp</code>. Every container on the Docker
+  bridge can reach the port while it is open, and only its token keeps them out. On Linux the port
+  listens on the Docker bridge (<code>docker0</code>) alone, and the container must be started with
+  <code>--add-host=host.docker.internal:host-gateway</code>; without a Docker bridge the card says so
+  and the port does not open. With Docker Desktop on macOS and Windows the port stays on 127.0.0.1,
+  where Docker Desktop forwards the name.
 </p>
 <p>
   <strong>Done, review</strong> closes the port and opens "Review the AI Task": every change, grouped

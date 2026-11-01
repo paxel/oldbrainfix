@@ -74,7 +74,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, PopupCloseBehavior,
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
-use oldbrainfix_core::ai_port::AiPort;
+use oldbrainfix_core::ai_port::{AiPort, Reach, docker_bridge};
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
@@ -3330,12 +3330,22 @@ impl App {
         match asked {
             AiAction::Open => {
                 if self.ai_port.is_none() {
-                    self.ai_port = Some(AiPort::open(&self.store)?);
+                    match AiPort::open(&self.store) {
+                        Ok(port) => self.ai_port = Some(port),
+                        // The card says so; nothing opened.
+                        Err(oldbrainfix_core::Error::NoDockerBridge) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
                     self.ai_copied = None;
                 }
                 // The review waits again until "Done, review".
                 if self.selection == Selection::AiReview {
                     self.go(Selection::Agenda);
+                }
+            }
+            AiAction::Reach(reach) => {
+                if self.ai_port.is_none() {
+                    self.store.set_ai_reach(reach)?;
                 }
             }
             AiAction::Copy(client) => {
@@ -10651,6 +10661,13 @@ impl App {
         let ai_url = self.ai_port.as_ref().map(AiPort::url);
         let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
         let ai_copied = self.ai_copied;
+        let ai_reach = self.store.ai_reach().unwrap_or_default();
+        // Looked for every frame while it matters: Docker started
+        // meanwhile shows at once.
+        let ai_no_bridge = self.ai_port.is_none()
+            && ai_reach == Reach::Docker
+            && cfg!(target_os = "linux")
+            && docker_bridge().is_none();
         let units = settings.chosen_unit_system().ok().flatten();
         let shopping_way = settings
             .shopping_agenda()
@@ -10683,9 +10700,14 @@ impl App {
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
                 });
-                if let Some(asked) =
-                    ai_view::port_card(ui, &t, tones, ai_url.as_deref(), ai_waiting, ai_copied)
-                {
+                let ai_shown = ai_view::PortShown {
+                    url: ai_url.as_deref(),
+                    waiting: ai_waiting,
+                    copied: ai_copied,
+                    reach: ai_reach,
+                    no_bridge: ai_no_bridge,
+                };
+                if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
                     actions.push(Action::Ai(asked));
                 }
                 embossed(ui, tones, false, None, |ui| {

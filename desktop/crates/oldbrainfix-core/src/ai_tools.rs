@@ -182,7 +182,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, and what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), and the theme (system, light or dark). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -605,6 +605,7 @@ impl Store {
                 let quiet = settings.quiet_hours()?;
                 let shows = |control| settings.quick_note_shows(control);
                 ToolOutput::json(&json!({
+                    "aiReach": self.ai_reach()?.name(),
                     "alertsOn": settings.alerts_on()?,
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
                     "quickNote": {
@@ -917,6 +918,7 @@ mod tests {
         assert_eq!(read.pointer("/quickNote/formatBar"), Some(&json!(false)));
         assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
         assert_eq!(read.pointer("/theme"), Some(&json!("system")));
+        assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
         Ok(())
     }
 }

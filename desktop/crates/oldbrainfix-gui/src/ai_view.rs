@@ -1,5 +1,6 @@
 //! The AI port on the desktop's screen (#112, ADR 0026): the Settings
-//! card that opens it for one AI Task, shows where a client reaches it
+//! card that opens it for one AI Task, for this computer only or for its
+//! Docker containers (#167), shows where a client reaches it
 //! and copies the client's config, and "Done, review", which closes it;
 //! and the review of the AI Task, its changes grouped by kind, each with
 //! what the log holds and what the task wrote, accepted or rejected as a
@@ -8,7 +9,7 @@
 //! Item was refused for it.
 
 use egui::{Id, RichText, Ui};
-use oldbrainfix_core::ai_port::{bridged_client_config, claude_code_command, client_config};
+use oldbrainfix_core::ai_port::{Reach, bridged_client_config, claude_code_command, client_config};
 use oldbrainfix_core::ai_task::{AiChangeKind, AiFieldChange, AiReviewItem};
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
@@ -26,6 +27,8 @@ use crate::theme::Tones;
 pub enum AiAction {
     /// Opens the port, for the AI Task that waits or a new one.
     Open,
+    /// Keeps who may connect the next time the port opens.
+    Reach(Reach),
     /// Copies what this client needs to reach the port.
     Copy(Client),
     /// Closes the port and shows the review.
@@ -299,26 +302,35 @@ fn value_text(
     })
 }
 
-/// The AI port's card in the Settings: closed, "Open the AI port", and
-/// the review when an AI Task waits for one; open, the address, the
-/// three ways to copy what a client needs, the copied one marked, and
-/// "Done, review".
-pub fn port_card(
-    ui: &mut Ui,
-    t: &L10n,
-    tones: Tones,
-    url: Option<&str>,
-    waiting: bool,
-    copied: Option<Client>,
-) -> Option<AiAction> {
+/// What the AI port's card shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PortShown<'a> {
+    /// Where a client reaches the port while it is open.
+    pub url: Option<&'a str>,
+    /// Whether an AI Task waits for its review.
+    pub waiting: bool,
+    /// The client whose text was copied last.
+    pub copied: Option<Client>,
+    /// Who may connect the next time the port opens.
+    pub reach: Reach,
+    /// Whether the Docker choice found no Docker bridge, so the port
+    /// cannot open.
+    pub no_bridge: bool,
+}
+
+/// The AI port's card in the Settings: closed, who may connect, "Open
+/// the AI port", and the review when an AI Task waits for one; open, the
+/// address, the three ways to copy what a client needs, the copied one
+/// marked, and "Done, review".
+pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> Option<AiAction> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.ai_port_title()).strong().color(text));
         ui.label(RichText::new(t.ai_port_intro()).small().color(weak));
-        let Some(url) = url else {
-            if waiting {
+        let Some(url) = shown.url else {
+            if shown.waiting {
                 ui.label(RichText::new(t.ai_task_waiting()).color(text));
                 if ui
                     .button(RichText::new(t.ai_review_open()).color(text))
@@ -327,10 +339,29 @@ pub fn port_card(
                     asked = Some(AiAction::Review);
                 }
             }
-            if ui
-                .button(RichText::new(t.ai_port_open()).color(text))
-                .clicked()
-            {
+            ui.label(RichText::new(t.ai_reach_heading()).color(text));
+            for (reach, label) in [
+                (Reach::Local, t.ai_reach_local()),
+                (Reach::Docker, t.ai_reach_docker()),
+            ] {
+                let on = shown.reach == reach;
+                if ui.radio(on, RichText::new(label).color(text)).clicked() && !on {
+                    asked = Some(AiAction::Reach(reach));
+                }
+            }
+            if shown.reach == Reach::Docker {
+                ui.label(
+                    RichText::new(t.ai_reach_docker_detail())
+                        .small()
+                        .color(weak),
+                );
+            }
+            if shown.no_bridge {
+                let error = ui.visuals().error_fg_color;
+                ui.label(RichText::new(t.ai_reach_no_bridge()).color(error));
+            }
+            let open = egui::Button::new(RichText::new(t.ai_port_open()).color(text));
+            if ui.add_enabled(!shown.no_bridge, open).clicked() {
                 asked = Some(AiAction::Open);
             }
             return;
@@ -355,7 +386,7 @@ pub fn port_card(
             if !detail.is_empty() {
                 ui.label(RichText::new(detail).small().color(weak));
             }
-            if copied == Some(client) {
+            if shown.copied == Some(client) {
                 ui.label(RichText::new(t.ai_port_copied()).small().color(weak));
             }
         }
