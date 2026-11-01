@@ -19,7 +19,7 @@ The text capture screen, and on the desktop the quick note dialog of the window 
 _Avoid_: quick add
 
 **Capture Context**:
-What was true when a Note was captured and helps make sense of it days later: time, Named Place or coordinates, source app, the calendar event running, the connected Bluetooth device.
+What was true when a Note was captured and helps make sense of it days later: time, Named Place or coordinates, source app, the calendar event running, the connected Bluetooth device. Each of them but the time can be removed on its own; the time stays.
 _Avoid_: metadata (in the UI), tags (a Tag is a #word of the text)
 
 **Named Place**:

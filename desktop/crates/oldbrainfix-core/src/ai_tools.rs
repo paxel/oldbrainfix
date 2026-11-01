@@ -3,7 +3,7 @@
 //! Capture Context, a photo scaled down, the Areas and Topics, the
 //! Routines and Reminders, and this Device's settings; and doing what the
 //! user can do with Notes, Areas, Topics, Merges, the trash, Importance,
-//! Routines and Reminders. Every change goes through the screens' own
+//! the details of a Capture Context, Routines and Reminders. Every change goes through the screens' own
 //! calls inside [`Store::drafting`], so it is a Pending Change of the AI
 //! Task until the user accepts it. Nothing reaches other people: no
 //! sending, sharing, Profile cards nor blocking, and settings are only
@@ -17,7 +17,7 @@ use chrono::Duration;
 use serde_json::{Value, json};
 
 use crate::entry::dart_iso;
-use crate::notes::{Importance, Note, Notes};
+use crate::notes::{CapturedDetail, Importance, Note, Notes};
 use crate::places::{NotesGo, Places};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Recurrence, Schedule};
@@ -231,6 +231,16 @@ pub fn tools() -> Vec<Value> {
                 "importance": {"enum": ["unimportant", "normal", "important"], "type": "string"},
             }),
             &["id", "importance"],
+        ),
+        tool(
+            "remove_captured",
+            "Removes one captured detail from the Capture Context of a Note or Section: where it was captured (place), the calendar events running (event), the Bluetooth devices connected (device) or the app it was shared in from (app). The capture time and the other details stay.",
+            false,
+            json!({
+                "detail": {"enum": ["place", "event", "device", "app"], "type": "string"},
+                "id": id("Note or Section"),
+            }),
+            &["id", "detail"],
         ),
         tool(
             "trash_note",
@@ -653,6 +663,13 @@ impl Store {
                 notes.set_importance(id()?, importance)?;
                 id()?.to_string()
             }
+            "remove_captured" => {
+                let detail = text_arg(args, "detail")?;
+                let detail = CapturedDetail::parse(detail)
+                    .ok_or_else(|| Error::Invalid(format!("no captured detail {detail}")))?;
+                notes.remove_captured(id()?, detail)?;
+                id()?.to_string()
+            }
             "trash_note" => {
                 let with = args.get("withRoutines").and_then(Value::as_bool) != Some(false);
                 routines.trash_note(id()?, with)?;
@@ -821,6 +838,53 @@ mod tests {
         assert!(review.groups.iter().any(|(kind, items)| {
             *kind == crate::ai_task::AiChangeKind::NoteFiled && items[0].entity == milk.id
         }));
+        Ok(())
+    }
+
+    #[test]
+    fn a_captured_detail_is_removed_as_a_pending_change_and_no_longer_read() -> TestResult {
+        let store = store();
+        let toner = Notes::new(&store).capture("Order toner", None, None)?.id;
+        for (field, value) in [
+            ("location", "52.52,13.405"),
+            ("sourcePackage", "org.example.chat"),
+            ("sourceLabel", "Chat"),
+            ("calendar", r#"["Katzenklo"]"#),
+        ] {
+            store.append(&toner, field, Some(value), None)?;
+        }
+        let task = store.open_ai_task()?;
+        let logged = store.all_entries()?.len();
+        for detail in ["place", "app"] {
+            let out = store.ai_tool(
+                &task,
+                "remove_captured",
+                &json!({"detail": detail, "id": toner}),
+            )?;
+            assert!(!out.is_error, "{out:?}");
+        }
+        let unknown = store.ai_tool(
+            &task,
+            "remove_captured",
+            &json!({"detail": "time", "id": toner}),
+        )?;
+        assert!(unknown.is_error);
+        let again = store.ai_tool(
+            &task,
+            "remove_captured",
+            &json!({"detail": "place", "id": toner}),
+        )?;
+        assert!(again.is_error, "nothing left to remove");
+        assert_eq!(store.all_entries()?.len(), logged);
+        let read = store.ai_tool(&task, "read_note", &json!({"id": toner}))?;
+        let [ToolContent::Text(text)] = &read.content[..] else {
+            return Err("a text".into());
+        };
+        let note: Value = serde_json::from_str(text)?;
+        assert_eq!(
+            note.get("captureContext"),
+            Some(&json!({"calendar": r#"["Katzenklo"]"#}))
+        );
         Ok(())
     }
 

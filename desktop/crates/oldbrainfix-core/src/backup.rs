@@ -1270,6 +1270,29 @@ mod tests {
     }
 
     #[test]
+    fn a_backup_restores_the_removal_of_a_captured_detail() -> Result<()> {
+        use crate::CapturedDetail;
+        use crate::notes::keys;
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        let id = Notes::new(&old).capture("Order toner", None, None)?.id;
+        old.append(&id, keys::LOCATION, Some("52.52,13.405"), None)?;
+        old.append(&id, keys::BLUETOOTH, Some(r#"["Headset"]"#), None)?;
+        Notes::new(&old).remove_captured(&id, CapturedDetail::Place)?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("b.{EXTENSION}"));
+        write_backup(&old, &path, &mut system_random)?;
+        let header = read_header(&path)?.ok_or(damaged_err())?;
+        let key = unlock(&header, None, Some(&code))?.ok_or(damaged_err())?;
+        let store = device(dir.path(), "new", &held(20), 2)?;
+        restore(&store, &path, &key)?;
+        let context = Notes::new(&store).by_id(&id)?.ok_or(damaged_err())?.context;
+        assert!(context.location.is_none());
+        assert_eq!(context.bluetooth_devices, ["Headset"]);
+        Ok(())
+    }
+
+    #[test]
     fn a_device_without_a_playback_speed_chosen_leaves_the_new_one_at_normal_speed() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let old = full(dir.path())?;

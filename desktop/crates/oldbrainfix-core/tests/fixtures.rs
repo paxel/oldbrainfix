@@ -28,12 +28,12 @@ use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
-    Frogs, ImportFile, ImportSummary, Importance, Imports, Note, Notes, NotesGo, Occurrence,
-    PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines,
-    STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, ShoppingAgenda, ShoppingList,
-    ShoppingLists, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule,
-    UnitSystem, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, CaptureContext, CapturedDetail, Checklist, Checklists, ClockTime,
+    Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, Note, Notes,
+    NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
+    RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
+    ShoppingAgenda, ShoppingList, ShoppingLists, SigningKey, SimpleRepeat, Store, Tallies,
+    TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -4632,6 +4632,27 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     )?;
     assert!(taken.profile_changed);
     assert_eq!(people_json(&ben)?, after_folder["joinerPeople"]);
+
+    // Ann removes the place and the calendar event from her Note in the
+    // Area: the same entries. Ben, a Member, may not remove its Bluetooth
+    // device, and writes nothing when he tries.
+    *clock.lock() = at("capturedAt")?;
+    let toner = expected["capturedNote"].as_str().ok_or("capturedNote")?;
+    let mark = ann.current_seq()?;
+    Notes::new(&ann).remove_captured(toner, CapturedDetail::Place)?;
+    Notes::new(&ann).remove_captured(toner, CapturedDetail::Event)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("captured.jsonl"))?
+    );
+    let mark = ben.current_seq()?;
+    assert!(!Notes::new(&ben).may_remove_captured(toner, CapturedDetail::Device)?);
+    assert!(
+        Notes::new(&ben)
+            .remove_captured(toner, CapturedDetail::Device)
+            .is_err()
+    );
+    assert_eq!(ben.current_seq()?, mark);
 
     // What Ben wrote, allowed and not, and Ann filing a Note in; then a
     // paired session: only the Area goes, the filed Note whole.

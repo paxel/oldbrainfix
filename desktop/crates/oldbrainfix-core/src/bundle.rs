@@ -575,6 +575,27 @@ mod tests {
     }
 
     #[test]
+    fn a_bundle_carries_the_removal_of_a_captured_detail() -> TestResult {
+        use crate::CapturedDetail;
+        use crate::notes::keys;
+        let phone = device(1)?;
+        let desk = device(2)?;
+        let id = Notes::new(&desk).capture("Order toner", None, None)?.id;
+        desk.append(&id, keys::CALENDAR, Some(r#"["Katzenklo"]"#), None)?;
+        desk.append(&id, keys::BLUETOOTH, Some(r#"["Headset"]"#), None)?;
+        meet(&phone, &desk)?;
+        Notes::new(&desk).remove_captured(&id, CapturedDetail::Device)?;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("captured.obfsync");
+        write_bundle_now(&desk, &path, Some(&phone.device_id()?))?.ok_or("a bundle")?;
+        import_bundle(&phone, &path)?;
+        let context = Notes::new(&phone).by_id(&id)?.ok_or("the Note")?.context;
+        assert!(context.bluetooth_devices.is_empty());
+        assert_eq!(context.calendar_events, ["Katzenklo"]);
+        Ok(())
+    }
+
+    #[test]
     fn a_bundle_carries_a_checklists_lines_and_checks() -> TestResult {
         use crate::Checklists;
         let phone = device(1)?;

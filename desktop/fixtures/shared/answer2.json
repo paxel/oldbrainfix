@@ -82,14 +82,36 @@
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 65,
+      "dseq": 79,
+      "entity": "note:00000000000000000000000000000007",
+      "field": "location",
+      "value": null,
+      "date": "2026-02-01T10:45:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T10:45:00.000Z",
+      "sig": "PXQSGsJIl/MaF6PGsXVowCfsMRELwuvna50rPRPhqpj83bFYUrvpz5k5VXxRXAAzhiKxUwyarYV7dwPwsImWDw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 80,
+      "entity": "note:00000000000000000000000000000007",
+      "field": "calendar",
+      "value": null,
+      "date": "2026-02-01T10:45:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T10:45:00.000Z",
+      "sig": "ZYzCAWvtQIBC4XMpbLP6t7xYfpuuLlfynPyeuqXSARkM1J+w9rWn0QriUUTbdc0sswrjmyAJmtWjble2x6D0BA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 81,
       "entity": "note:00000000000000000000000000000004",
       "field": "place",
       "value": "area:00000000000000000000000000000101",
       "date": "2026-02-01T11:30:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:30:00.000Z",
-      "sig": "BFtNtIDBoEuDHRwugsiwT+Ham9MqEzHWsG9pE1ha6AQlxtqkuodlnam2jWMonTmV56yFf7Nde4T7mNFXkmyiDw=="
+      "sig": "4bJUvSJ83tDfTh7Pmo2d4qIV/AdirFZFnIu6uufrNkfP1LLfnh/AmpOzFuK0M+5EXV1rxFvpp+ejRVreKXKJAA=="
     }
   ],
   "wantBlobs": [],
@@ -120,16 +142,16 @@
       "aliases": [],
       "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
       "keys": [],
-      "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann Lovelace\",\"version\":3}",
-      "sig": "v+/hPzY/tA+OqxUlzSDJK6/XucrISSES2uNzw663LZBHqjWoqlpHNFIAKxyEuGXt6xWS+RHVU3zoExd+veQYAA==",
+      "record": "{\"id\":\"00000000000000000000000000000009\",\"name\":\"Ann Lovelace\",\"version\":3}",
+      "sig": "fi5nHJtnHAH8vYnOqhDfESfhRxJUS1RWoQBRcY/zKR5N5Cy60J8/hJFRhePj0kkrexcozgDOf4p1mOowl+5XDg==",
       "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
     },
     {
       "aliases": [],
       "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
       "keys": [],
-      "record": "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}",
-      "sig": "Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==",
+      "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ben\",\"version\":1}",
+      "sig": "oRBY6vVmH9gZC0JaJ1DLsYyU3DBUXEuqEXJ2Ng6150XCUvq0ROaUrqIYgPpIXt2RFMzd6P8AKJCezyuLK/wdCA==",
       "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
     }
   ]

@@ -4743,6 +4743,23 @@ Future<void> _sharedFixture(Directory root) async {
     final blood = Notes(ann).capture('Blood results', place: health);
     final loose = Notes(ann).capture('Fix the tap');
     Notes(ann).amend(loose.id, 'The hot one');
+    // A Note in the Area with every captured detail (ADR 0037), at a
+    // Named Place of Ann's own.
+    NamedPlaces(ann).add('Work', Coordinates(52.52, 13.405), radius: 100);
+    final toner = Notes(ann)
+        .capture(
+          'Order toner',
+          place: kitchen,
+          sourceApp: const SourceApp('org.example.chat', label: 'Chat'),
+        )
+        .id;
+    Notes(ann)
+      ..locate(toner, Coordinates(52.52, 13.405))
+      ..attachContext(
+        toner,
+        calendarEvents: ['Katzenklo'],
+        bluetoothDevices: ['Headset'],
+      );
     Notes(ben).capture('Ben private');
     // Their Profiles: Ann named hers, Ben's has the defaults.
     ann
@@ -4865,12 +4882,25 @@ Future<void> _sharedFixture(Directory root) async {
       'joinerPeople': _people(ben),
     };
 
+    // Ann removes the place and the calendar event from her Note in the
+    // Area: two nulls, no ids drawn (ADR 0037).
+    final capturedAt = DateTime.utc(2026, 2, 1, 10, 45);
+    _held = capturedAt;
+    mark = ann.currentSeq();
+    Notes(ann)
+      ..removeCaptured(toner, CapturedDetail.place)
+      ..removeCaptured(toner, CapturedDetail.event);
+    _writeAfter(ann, mark, File('${out.path}/captured.jsonl'));
+
     // Ben, a Member: his own Note, an Amend, a Done and a text his
     // machine read count; editing and trashing Ann's Note, removing that
-    // text, renaming the Area, rescheduling and a Topic and a Routine of
-    // his own are ignored everywhere.
+    // text or a captured detail of Ann's, renaming the Area, rescheduling
+    // and a Topic and a Routine of his own are ignored everywhere.
     _held = DateTime.utc(2026, 2, 1, 11);
     mark = ben.currentSeq();
+    if (Notes(ben).mayRemoveCaptured(toner, CapturedDetail.device)) {
+      throw StateError('a Member may remove a detail of Ann\'s Note');
+    }
     final topic = Places(ben).topics(area).single.id;
     final own = Notes(ben).capture('Ben buys bread', place: topic);
     Notes(ben).edit(own.id, 'Ben buys rye bread');
@@ -4880,6 +4910,7 @@ Future<void> _sharedFixture(Directory root) async {
     // which a Member's machine may add, and its removal, which it may not.
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), 'Oat milk 1,29');
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), null);
+    ben.append(toner, NoteKeys.bluetooth, null);
     Notes(ben).edit(milk.id, 'Buy beer');
     Notes(ben).trash(milk.id);
     Places(ben).rename(area, "Ben's");
@@ -4951,6 +4982,15 @@ Future<void> _sharedFixture(Directory root) async {
         Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
         Notes(ann).byId(milk.id)?.text != 'Buy milk') {
       throw StateError('the two Devices of the shared fixture disagree');
+    }
+    for (final store in [ann, ben]) {
+      final context = Notes(store).byId(toner)?.context;
+      if (context == null ||
+          context.location != null ||
+          context.calendarEvents.isNotEmpty ||
+          context.bluetoothDevices.isEmpty) {
+        throw StateError('a removal of a captured detail went wrong');
+      }
     }
 
     // Ann makes Ben a Manager, then removes him.
@@ -5025,7 +5065,7 @@ Future<void> _sharedFixture(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'capturedAt': capturedAt.toIso8601String(), 'capturedNote': toner, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -7729,8 +7769,11 @@ Future<void> main(List<String> args) async {
     'Agenda (`agenda.jsonl`, ids counted from 0x201; a choice that never '
     'reaches him, so it stays on his), Ann renamed and publishing the Area\'s Profiles '
     'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
-    'from 2000) and what Ben keeps after reading it, what Ben wrote, '
-    'allowed and not (`member.jsonl`), Ann filing a Note in '
+    'from 2000) and what Ben keeps after reading it, Ann removing the '
+    'place and the calendar event from a Note in the Area that also '
+    'holds a Bluetooth device and an app (`captured.jsonl`), what Ben '
+    'wrote, allowed and not, his removal of that Bluetooth device among '
+    'it (`member.jsonl`), Ann filing a Note in '
     '(`owner.jsonl`), the paired session after (`request2.json`, '
     '`answer2.json`), Ben made Manager (`role.jsonl`) and writing as one '
     '(`manager.jsonl`), then removed '

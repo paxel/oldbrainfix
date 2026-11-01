@@ -195,6 +195,65 @@ impl CaptureContext {
             || !self.calendar_events.is_empty()
             || !self.bluetooth_devices.is_empty()
     }
+
+    /// Whether `detail` shows in it.
+    pub fn holds(&self, detail: CapturedDetail) -> bool {
+        match detail {
+            CapturedDetail::Place => self.location.is_some(),
+            CapturedDetail::Event => !self.calendar_events.is_empty(),
+            CapturedDetail::Device => !self.bluetooth_devices.is_empty(),
+            CapturedDetail::App => self.source_app.is_some(),
+        }
+    }
+}
+
+/// A detail of a Capture Context the user can remove on its own (ADR
+/// 0037), as the Dart core's `CapturedDetail`: where it was captured (the
+/// coordinates, and with them the Named Place), the calendar events
+/// running, the Bluetooth devices connected and the app it was shared in
+/// from. The capture time is none: it stays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CapturedDetail {
+    Place,
+    Event,
+    Device,
+    App,
+}
+
+impl CapturedDetail {
+    /// Every detail, in the Dart core's order.
+    pub const ALL: [CapturedDetail; 4] = [
+        CapturedDetail::Place,
+        CapturedDetail::Event,
+        CapturedDetail::Device,
+        CapturedDetail::App,
+    ];
+
+    /// Its name, as the Dart core's enum names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            CapturedDetail::Place => "place",
+            CapturedDetail::Event => "event",
+            CapturedDetail::Device => "device",
+            CapturedDetail::App => "app",
+        }
+    }
+
+    /// The detail named `name`, if there is one.
+    pub fn parse(name: &str) -> Option<CapturedDetail> {
+        Self::ALL.into_iter().find(|d| d.name() == name)
+    }
+
+    /// The fields it is kept under, on a Note and a Section alike; the
+    /// app's label goes with its package.
+    fn fields(self) -> &'static [&'static str] {
+        match self {
+            CapturedDetail::Place => &[keys::LOCATION],
+            CapturedDetail::Event => &[keys::CALENDAR],
+            CapturedDetail::Device => &[keys::BLUETOOTH],
+            CapturedDetail::App => &[keys::SOURCE_PACKAGE, keys::SOURCE_LABEL],
+        }
+    }
 }
 
 /// A Note as the screens want it (CONTEXT.md).
@@ -746,6 +805,54 @@ impl<'a> Notes<'a> {
         self.store
             .append(note_id, &keys::transcript(hash), None, None)
             .map(drop)
+    }
+
+    /// Whether this Device may remove `detail` from the Capture Context
+    /// of the Note or Section `id`, a merged Note included: it shows
+    /// there, and the Note or Section is this Device's to change
+    /// ([`Store::may_change`]).
+    pub fn may_remove_captured(&self, id: &str, detail: CapturedDetail) -> Result<bool> {
+        match self.captured_of(id)? {
+            Some(context) if context.holds(detail) => self.store.may_change(id),
+            _ => Ok(false),
+        }
+    }
+
+    /// Removes `detail` from the Capture Context of the Note or Section
+    /// `id` (ADR 0037): its fields set to null, an edit like any other,
+    /// signed, synced and judged by the roles of a Shared Area. The
+    /// capture time and every other detail stay. Refused unless
+    /// [`Notes::may_remove_captured`].
+    pub fn remove_captured(&self, id: &str, detail: CapturedDetail) -> Result<()> {
+        if self.captured_of(id)?.is_none() {
+            return Err(Error::Invalid(format!("not a Note or Section: {id}")));
+        }
+        if !self.may_remove_captured(id, detail)? {
+            return Err(Error::Invalid(format!(
+                "the {} of {id} may not be removed here",
+                detail.name()
+            )));
+        }
+        self.store.batch(|| {
+            for field in detail.fields() {
+                self.store.append(id, field, None, None)?;
+            }
+            Ok(())
+        })
+    }
+
+    /// The Capture Context of the Note or Section `id`, or `None` when it
+    /// is neither.
+    fn captured_of(&self, id: &str) -> Result<Option<CaptureContext>> {
+        let fields = self.store.current_fields(id)?;
+        match fields.get(keys::TYPE) {
+            Some(keys::TYPE_NOTE) => Ok(self.by_id(id)?.map(|n| n.context)),
+            Some(keys::TYPE_SECTION) => {
+                let note = fields.get(keys::NOTE).unwrap_or_default().to_string();
+                Ok(self.section(id, &note, &fields)?.map(|s| s.context))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// The blobs `of` every Note not in the trash that have no text yet,
@@ -2328,6 +2435,190 @@ mod tests {
         )?;
         let cleared = note(&store, &shared.id)?.context;
         assert!(cleared.calendar_events.is_empty() && cleared.location.is_none());
+        Ok(())
+    }
+
+    // ------------------------------- removing a captured detail (ADR 0037)
+
+    /// What the phone records on `id` when capturing at Work, shared in
+    /// from a chat, during a meeting and with a headset connected.
+    fn with_context(store: &Store, id: &str) -> Result<()> {
+        put(
+            store,
+            id,
+            &[
+                (keys::SOURCE_PACKAGE, Some("org.example.chat")),
+                (keys::SOURCE_LABEL, Some("Chat")),
+                (keys::LOCATION, Some("52.52,13.405")),
+                (keys::CALENDAR, Some(r#"["Katzenklo"]"#)),
+                (keys::BLUETOOTH, Some(r#"["Headset"]"#)),
+            ],
+        )
+    }
+
+    #[test]
+    fn each_captured_detail_goes_on_its_own_and_the_time_stays() -> TestResult {
+        use crate::named_places::keys as place_keys;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        put(
+            &store,
+            "namedplace:work",
+            &[
+                (place_keys::TYPE, Some(place_keys::TYPE_NAMED_PLACE)),
+                (place_keys::NAME, Some("Work")),
+                (place_keys::CENTRE, Some("52.52,13.405")),
+                (place_keys::RADIUS, Some("100.0")),
+            ],
+        )?;
+        let id = notes.capture("Order toner", None, None)?.id;
+        with_context(&store, &id)?;
+        let at = note(&store, &id)?.captured;
+        for detail in CapturedDetail::ALL {
+            assert!(notes.may_remove_captured(&id, detail)?, "{detail:?}");
+            assert_eq!(CapturedDetail::parse(detail.name()), Some(detail));
+        }
+        assert_eq!(CapturedDetail::parse("time"), None);
+
+        notes.remove_captured(&id, CapturedDetail::Event)?;
+        let context = note(&store, &id)?.context;
+        assert!(context.calendar_events.is_empty());
+        assert_eq!(context.bluetooth_devices, ["Headset"]);
+        assert_eq!(context.named_place.map(|p| p.name).as_deref(), Some("Work"));
+        notes.remove_captured(&id, CapturedDetail::Place)?;
+        let context = note(&store, &id)?.context;
+        assert!(context.location.is_none() && context.named_place.is_none());
+        assert_eq!(NamedPlaces::new(&store).all()?.len(), 1);
+        notes.remove_captured(&id, CapturedDetail::Device)?;
+        notes.remove_captured(&id, CapturedDetail::App)?;
+        let read = note(&store, &id)?;
+        assert_eq!(read.context, CaptureContext::default());
+        assert_eq!(read.captured, at);
+        let last: Vec<(String, Option<String>)> = store
+            .history(&id)?
+            .into_iter()
+            .rev()
+            .take(5)
+            .map(|e| (e.field, e.value))
+            .collect();
+        let nulls: Vec<(String, Option<String>)> = [
+            keys::SOURCE_LABEL,
+            keys::SOURCE_PACKAGE,
+            keys::BLUETOOTH,
+            keys::LOCATION,
+            keys::CALENDAR,
+        ]
+        .iter()
+        .map(|f| (f.to_string(), None))
+        .collect();
+        assert_eq!(last, nulls);
+
+        // What does not show is not removed: gone once, garbled, typed.
+        let typed = notes.capture("Typed", None, None)?.id;
+        put(
+            &store,
+            &typed,
+            &[
+                (keys::LOCATION, Some("somewhere")),
+                (keys::CALENDAR, Some("[]")),
+            ],
+        )?;
+        let mark = store.current_seq()?;
+        for (on, detail) in CapturedDetail::ALL
+            .iter()
+            .flat_map(|d| [(&id, *d), (&typed, *d)])
+        {
+            assert!(!notes.may_remove_captured(on, detail)?);
+            assert!(notes.remove_captured(on, detail).is_err());
+        }
+        assert_eq!(store.current_seq()?, mark);
+        assert!(
+            notes
+                .remove_captured("note:none", CapturedDetail::Place)
+                .is_err()
+        );
+        let area = Places::new(&store).add_area("Work")?.id;
+        assert!(!notes.may_remove_captured(&area, CapturedDetail::Place)?);
+        Ok(())
+    }
+
+    #[test]
+    fn an_amend_and_a_merged_note_lose_theirs_as_sections() -> TestResult {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let host = notes.capture("Toner", None, None)?;
+        let amend = notes.amend(&host.id, "Ordered")?;
+        with_context(&store, &amend.id)?;
+        let merged = notes.capture("Order toner", None, None)?.id;
+        with_context(&store, &merged)?;
+        notes.merge(&merged, &host.id)?;
+        assert!(notes.may_remove_captured(&amend.id, CapturedDetail::Event)?);
+        notes.remove_captured(&amend.id, CapturedDetail::Event)?;
+        notes.remove_captured(&merged, CapturedDetail::Device)?;
+        let sections = notes.sections(&host.id)?;
+        let of = |id: &str| {
+            sections
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| s.context.clone())
+                .unwrap_or_default()
+        };
+        assert!(of(&amend.id).calendar_events.is_empty());
+        assert!(of(&amend.id).location.is_some());
+        assert!(of(&merged).bluetooth_devices.is_empty());
+        assert_eq!(of(&merged).calendar_events, ["Katzenklo"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_removal_of_a_captured_detail_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let id = Notes::new(&ann)
+            .capture("Order toner", Some(&area), None)?
+            .id;
+        with_context(&ann, &id)?;
+        let own = Notes::new(&ben)
+            .capture("Ben's toner", Some(&area), None)?
+            .id;
+        with_context(&ben, &own)?;
+        exchange(&ben, &ann, None)?;
+        let mark = ben.current_seq()?;
+        for detail in CapturedDetail::ALL {
+            assert!(!Notes::new(&ben).may_remove_captured(&id, detail)?);
+            assert!(Notes::new(&ben).remove_captured(&id, detail).is_err());
+        }
+        assert_eq!(ben.current_seq()?, mark);
+        // As a modified app would write them.
+        put(
+            &ben,
+            &id,
+            &[
+                (keys::LOCATION, None),
+                (keys::CALENDAR, None),
+                (keys::BLUETOOTH, None),
+                (keys::SOURCE_PACKAGE, None),
+            ],
+        )?;
+        // A Member removes from their own Note, a Manager from anyone's.
+        Notes::new(&ben).remove_captured(&own, CapturedDetail::Place)?;
+        Notes::new(&ann).remove_captured(&own, CapturedDetail::Event)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let context = note(store, &id)?.context;
+            assert!(context.location.is_some());
+            assert_eq!(context.calendar_events, ["Katzenklo"]);
+            assert_eq!(context.bluetooth_devices, ["Headset"]);
+            assert_eq!(
+                context.source_app.map(|a| a.package).as_deref(),
+                Some("org.example.chat")
+            );
+            let theirs = note(store, &own)?.context;
+            assert!(theirs.location.is_none() && theirs.calendar_events.is_empty());
+            assert_eq!(theirs.bluetooth_devices, ["Headset"]);
+        }
         Ok(())
     }
 }

@@ -44,3 +44,7 @@ A tool that changes something runs through the same calls the screens use, insid
 ## Changes to earlier decisions
 
 - ADR 0022: the AI Task is a set of kind `ai-task`, shown, with no payload, holding drafts only. While a shown set waits, sync waits in the core itself, and the alarm plan reads the log alone.
+
+## Capture Context (ADR 0037)
+
+Amended by ADR 0037 (#162): a tool removes one detail of a Note's or Section's Capture Context (`remove_captured`), and an AI Task may write the fields of a Capture Context (`location`, `sourcePackage`, `sourceLabel`, `calendar`, `bluetooth`) only as null, where this Device may change the Note or Section. Such a removal is reviewed among anything else.

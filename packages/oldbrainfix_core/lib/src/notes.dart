@@ -207,7 +207,22 @@ class CaptureContext {
       sourceApp != null ||
       calendarEvents.isNotEmpty ||
       bluetoothDevices.isNotEmpty;
+
+  /// Whether [detail] shows in it.
+  bool holds(CapturedDetail detail) => switch (detail) {
+    CapturedDetail.place => location != null,
+    CapturedDetail.event => calendarEvents.isNotEmpty,
+    CapturedDetail.device => bluetoothDevices.isNotEmpty,
+    CapturedDetail.app => sourceApp != null,
+  };
 }
+
+/// A detail of a Capture Context the user can remove on its own (ADR
+/// 0037): where it was captured (the coordinates, and with them the
+/// Named Place), the calendar events running, the Bluetooth devices
+/// connected and the app it was shared in from. The capture time is none:
+/// it stays.
+enum CapturedDetail { place, event, device, app }
 
 /// A Note as the screens want it (CONTEXT.md).
 class Note {
@@ -973,6 +988,54 @@ class Notes {
       }
     });
   }
+
+  /// Whether this Device may remove [detail] from the Capture Context of
+  /// the Note or Section [id], a merged Note included: it shows there,
+  /// and the Note or Section is this Device's to change
+  /// ([SharedAreas.mayChange]).
+  bool mayRemoveCaptured(String id, CapturedDetail detail) =>
+      _capturedOf(id)?.holds(detail) == true && store.mayChange(id);
+
+  /// Removes [detail] from the Capture Context of the Note or Section
+  /// [id] (ADR 0037): its fields set to null, an edit like any other,
+  /// signed, synced and judged by the roles of a Shared Area. The capture
+  /// time and every other detail stay. Refused unless
+  /// [mayRemoveCaptured].
+  void removeCaptured(String id, CapturedDetail detail) {
+    if (_capturedOf(id) == null) {
+      throw ArgumentError.value(id, 'id', 'not a Note or Section');
+    }
+    if (!mayRemoveCaptured(id, detail)) {
+      throw StateError('the ${detail.name} of $id may not be removed here');
+    }
+    store.batch(() {
+      for (final field in _capturedFields(detail)) {
+        store.append(id, field, null);
+      }
+    });
+  }
+
+  /// The fields [detail] is kept under, on a Note and a Section alike;
+  /// the app's label goes with its package.
+  static List<String> _capturedFields(CapturedDetail detail) =>
+      switch (detail) {
+        CapturedDetail.place => const [NoteKeys.location],
+        CapturedDetail.event => const [NoteKeys.calendar],
+        CapturedDetail.device => const [NoteKeys.bluetooth],
+        CapturedDetail.app => const [
+          NoteKeys.sourcePackage,
+          NoteKeys.sourceLabel,
+        ],
+      };
+
+  /// The Capture Context of the Note or Section [id], or null when it is
+  /// neither.
+  CaptureContext? _capturedOf(String id) =>
+      switch (store.current(id, NoteKeys.type)) {
+        NoteKeys.typeNote => byId(id)?.context,
+        SectionKeys.typeSection => _section(id)?.context,
+        _ => null,
+      };
 
   /// Sets the Importance of the Note [noteId].
   void setImportance(String noteId, Importance importance) {

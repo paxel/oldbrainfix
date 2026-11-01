@@ -81,7 +81,9 @@ pub use history::{
 };
 pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
-pub use notes::{Blob, CaptureContext, Importance, Note, Notes, Section, SourceApp, Wordless};
+pub use notes::{
+    Blob, CaptureContext, CapturedDetail, Importance, Note, Notes, Section, SourceApp, Wordless,
+};
 pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
 pub use pairing::PairedDevice;

@@ -74,6 +74,16 @@ const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys:
 
 /// The fields written only when an entity is made: its type, when it was
 /// captured, and the Note it belongs to.
+/// The fields of a Note's or Section's Capture Context, which an AI Task
+/// only ever removes (ADR 0037): it never says where or when something
+/// was captured.
+const CONTEXT_FIELDS: [&str; 5] = [
+    note_keys::LOCATION,
+    note_keys::SOURCE_PACKAGE,
+    note_keys::SOURCE_LABEL,
+    note_keys::CALENDAR,
+    note_keys::BLUETOOTH,
+];
 const MADE_ONCE: [&str; 3] = [note_keys::TYPE, note_keys::CAPTURED, note_keys::NOTE];
 
 /// Which thread drafts into which set, and which read the log alone.
@@ -288,8 +298,9 @@ impl Store {
     }
 
     /// Whether an AI Task may write `field` on `entity` as `value`: a
-    /// field of [`NOTE_FIELDS`] and the others, an entity's type and
-    /// links only when it is made, and only what this Device's role in
+    /// field of [`NOTE_FIELDS`] and the others, a field of
+    /// [`CONTEXT_FIELDS`] only as null, an entity's type and links only
+    /// when it is made, and only what this Device's role in
     /// the Shared Area allows, as the log has it, as the screens ask
     /// before they write.
     fn check_ai_draft(&self, entity: &str, field: &str, value: Option<&str>) -> Result<()> {
@@ -307,7 +318,11 @@ impl Store {
             "topic" => &TOPIC_FIELDS,
             _ => &[],
         };
-        if !fields.contains(&field) {
+        let context = matches!(ty, "note" | "section") && CONTEXT_FIELDS.contains(&field);
+        if context && value.is_some() {
+            return refuse("a captured detail it only removes");
+        }
+        if !context && !fields.contains(&field) {
             return refuse("a field it never writes");
         }
         let made = self.logged_history(entity)?.is_empty();
@@ -553,6 +568,17 @@ mod tests {
             store.drafting(&task, || {
                 store
                     .append(&milk.id, "$type", Some("routine"), None)
+                    .map(drop)
+            }),
+            // A captured detail it may remove, but never set.
+            store.drafting(&task, || {
+                store
+                    .append(&milk.id, "location", Some("52.52,13.405"), None)
+                    .map(drop)
+            }),
+            store.drafting(&task, || {
+                store
+                    .append(&milk.id, "bluetooth", Some(r#"["Headset"]"#), None)
                     .map(drop)
             }),
             store.drafting(&task, || store.set_local_setting("renagMinutes", "1")),

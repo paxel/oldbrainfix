@@ -17,7 +17,7 @@ Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog de
 _Avoid_: Schnell hinzufügen
 
 **Erfassungskontext** [Capture Context]:
-Was beim Erfassen einer Notiz galt und ihr Tage später Sinn gibt: die Zeit, der benannte Ort oder die Koordinaten, die App, aus der geteilt wurde, der laufende Kalendertermin, das verbundene Bluetooth-Gerät.
+Was beim Erfassen einer Notiz galt und ihr Tage später Sinn gibt: die Zeit, der benannte Ort oder die Koordinaten, die App, aus der geteilt wurde, der laufende Kalendertermin, das verbundene Bluetooth-Gerät. Jede dieser Angaben außer der Zeit lässt sich einzeln entfernen; die Zeit bleibt.
 _Avoid_: Metadaten (in der App), Schlagwörter (ein #Wort ist ein Wort des Textes)
 
 **Benannter Ort** [Named Place]:
