@@ -266,12 +266,6 @@ NoteActions noteActions(
   );
   return NoteActions(
     onEdit: onEdit,
-    onImportance: placed.changes
-        ? (picked) {
-            notes.setImportance(id, picked);
-            changed();
-          }
-        : null,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
     calendar: () => noteCalendar(context, Routines(notes.store), placed.note),

@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.3.1]
 
+### Changed
+
+- The Note card's ⋮ no longer holds the Importance, which is changed through its badge in the Note editor.
+
 ### Fixed
 
 - A Tally that "Another one" swapped into a Session's pick and that then got its entry stays in the pick, done, in its place, even when another Device wrote the day's first pick later, and an Occurrence that lost such a Tally shows it again, so that it is Done once every pick has its entry.

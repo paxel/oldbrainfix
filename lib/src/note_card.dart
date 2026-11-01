@@ -107,7 +107,8 @@ class NoteActions {
   /// Opens the Note's editor, as a long press on the card does.
   final VoidCallback? onEdit;
 
-  /// Sets the Note's Importance, picked in the menu.
+  /// Sets the Importance of a Note being captured, picked in the menu;
+  /// a card leaves it out, its editor's badge changes it (#182).
   final ValueChanged<Importance>? onImportance;
 
   /// Sends the Note to a person as a Sent Item.
@@ -641,8 +642,8 @@ class NoteActionRow extends StatelessWidget {
 }
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
-/// leads with Edit, then the Note's Importance as radio buttons, the one it has
-/// marked, then Show ticks while it has boxes, then sending, the calendar, adding to the Note, "Add entry" of
+/// leads with Edit, then, for a Note being captured, its Importance as radio
+/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" and "Uncheck all" (a
 /// Checklist's) and "Back to a plain Note", removing a photo or recording while its

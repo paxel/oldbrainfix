@@ -293,9 +293,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   one; Show on the Agenda for a Checklist without a Routine; Show ticks
   while it has a box. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
-  name, which changes it at once: Importance as radio buttons, the
-  switches, Back to a plain Note; Captured only shows its details. Area
-  and Topic opens File into…, a Routine or Reminder its editor. Where
+  name, which changes it at once: Importance as radio buttons (only
+  here, not in the card's ⋮, #182), the switches, Back to a plain Note;
+  Captured only shows its details. Area and Topic opens File into…, a
+  Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value". The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
