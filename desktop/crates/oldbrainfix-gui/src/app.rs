@@ -90,12 +90,12 @@ use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
-    CaptureContext, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings,
-    Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo,
-    Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl, QuietHours,
-    Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda, ShoppingLine,
-    ShoppingList, ShoppingLists, ShownBox, Store, Tallies, ThemeChoice, Topic, UnitSystem, bundle,
-    markdown, text_format,
+    CaptureContext, CapturedDetail, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day,
+    DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes,
+    NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl,
+    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda,
+    ShoppingLine, ShoppingList, ShoppingLists, ShownBox, Store, Tallies, ThemeChoice, Topic,
+    UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -400,6 +400,10 @@ struct View {
     /// The selected Note and its Sections whose text this Device may
     /// change, by id.
     text_changeable: HashSet<String>,
+    /// The captured details of the selected Note and its Sections this
+    /// Device may remove while the capture time stays (ADR 0037), by
+    /// Note or Section id.
+    captured_removable: HashSet<(String, CapturedDetail)>,
     notes: Vec<Placed>,
     /// The Sections of each Note listed, oldest first, read in one pass
     /// for the full cards (#114).
@@ -673,6 +677,12 @@ enum Dialog {
         note: String,
         hash: String,
         photo: bool,
+    },
+    /// Whether the captured `detail` of the Note or Section `id` goes
+    /// while the capture time stays (ADR 0037).
+    RemoveCaptured {
+        id: String,
+        detail: CapturedDetail,
     },
     /// What a failure announced at the top was (UI laws,
     /// "Announcements"): its cause and fix, one sentence each, and the
@@ -1160,6 +1170,14 @@ enum Action {
     },
     /// Removes the photo or recording asked about and keeps its text.
     RemoveMedia,
+    /// Asks whether the captured `detail` of the Note or Section `id`,
+    /// the selected Note or one of its Sections, goes (ADR 0037).
+    AskRemoveCaptured {
+        id: String,
+        detail: CapturedDetail,
+    },
+    /// Removes the captured detail asked about; the capture time stays.
+    RemoveCaptured,
     /// Makes the Photo Text (`photo`) or Transcript of `hash` the text of
     /// the Note `note`, the selected one or one merged into it, or adds
     /// it on a line of its own after that text (`append`) (ADR 0025).
@@ -2392,6 +2410,45 @@ impl App {
                 details,
             },
         ));
+    }
+
+    /// Removes the captured `detail` of the Note or Section `id`, asked
+    /// about, while the capture time stays (ADR 0037). A detail a sync
+    /// took meanwhile is gone already; a refusal, as when a role in the
+    /// Area changed, is announced at the top with its cause and fix.
+    fn remove_captured(
+        &mut self,
+        id: &str,
+        detail: CapturedDetail,
+    ) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let shown = match notes.by_id(id)? {
+            Some(note) => Some(note.context),
+            None => match &self.view.detail {
+                Some((p, _)) => notes
+                    .sections(&p.note.id)?
+                    .into_iter()
+                    .find(|section| section.id == id)
+                    .map(|section| section.context),
+                None => None,
+            },
+        };
+        if !shown.is_some_and(|context| context.holds(detail)) {
+            return Ok(());
+        }
+        if let Err(refused) = notes.remove_captured(id, detail) {
+            let t = self.t;
+            self.announce_failure(
+                t.remove_captured_failed(),
+                t.remove_captured_failed_title(),
+                (
+                    t.remove_captured_failed_cause(),
+                    t.remove_captured_failed_fix(),
+                ),
+                format!("remove captured {}: {refused}", detail.name()),
+            );
+        }
+        Ok(())
     }
 
     /// Announces that what was asked was refused for the reason `said`
@@ -4012,9 +4069,18 @@ impl App {
         let mut text_removable = HashSet::new();
         let mut remakeable = HashSet::new();
         let mut text_changeable = HashSet::new();
+        let mut captured_removable = HashSet::new();
         if let Some((p, sections)) = &detail
             && !p.note.is_trashed()
         {
+            let ids = std::iter::once(&p.note.id).chain(sections.iter().map(|s| &s.id));
+            for id in ids {
+                for detail in CapturedDetail::ALL {
+                    if notes.may_remove_captured(id, detail)? {
+                        captured_removable.insert((id.clone(), detail));
+                    }
+                }
+            }
             if may.changes && p.note.text_editable {
                 text_changeable.insert(p.note.id.clone());
             }
@@ -4316,6 +4382,7 @@ impl App {
             text_removable,
             remakeable,
             text_changeable,
+            captured_removable,
             notes: placed,
             table_ticking: self.table_ticking(&box_looks, &box_ticks)?,
             sections,
@@ -5358,6 +5425,15 @@ impl App {
                         }
                         notes.remove_recording(&note, &hash)?;
                     }
+                }
+            }
+            Action::AskRemoveCaptured { id, detail } => {
+                self.save_text()?;
+                self.dialog = Some(Dialog::RemoveCaptured { id, detail });
+            }
+            Action::RemoveCaptured => {
+                if let Some(Dialog::RemoveCaptured { id, detail }) = self.dialog.take() {
+                    self.remove_captured(&id, detail)?;
                 }
             }
             Action::TakeOver {
@@ -7808,6 +7884,7 @@ impl App {
         };
         let t = self.t;
         let note = &placed.note;
+        let captured_removable = &self.view.captured_removable;
         let shown = (&t, tones);
         let closed = match open {
             NoteBadge::Importance => badge_dialog(
@@ -7839,7 +7916,15 @@ impl App {
                 (icons::CONTEXT_WHEN, None),
                 t.captured_heading(),
                 // Each detail on a line of its own.
-                |ui| capture_context(ui, &t, note.captured, &note.context),
+                |ui| {
+                    let id = &note.id;
+                    let removable = |detail| captured_removable.contains(&(id.clone(), detail));
+                    let shown = (note.captured, &note.context);
+                    if let Some(detail) = capture_context(ui, &t, shown, removable) {
+                        let id = id.clone();
+                        actions.push(Action::AskRemoveCaptured { id, detail });
+                    }
+                },
             ),
             NoteBadge::Kind => {
                 let kind = note_kind(&t, &self.view);
@@ -8669,6 +8754,7 @@ impl App {
         let no_boxes = BoxLook::default();
         let box_looks = &self.view.box_looks;
         let box_ticks = &self.view.box_ticks;
+        let captured_removable = &self.view.captured_removable;
         let look_of = |id: &str| box_looks.get(id).unwrap_or(&no_boxes);
         let boxes = look_of(&note.id);
         let ticks = box_ticks.contains(&note.id);
@@ -9111,7 +9197,13 @@ impl App {
                             (playing, transcribing, can_play, speed),
                             actions,
                         );
-                        capture_context(ui, &t, section.captured, &section.context);
+                        let shown = (section.captured, &section.context);
+                        let id = &section.id;
+                        let removable = |detail| captured_removable.contains(&(id.clone(), detail));
+                        if let Some(detail) = capture_context(ui, &t, shown, removable) {
+                            let id = id.clone();
+                            actions.push(Action::AskRemoveCaptured { id, detail });
+                        }
                     });
                 }
                 if trashed {
@@ -9547,6 +9639,25 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
                                 actions.push(Action::RemoveMedia);
+                            }
+                        });
+                    }
+                    Dialog::RemoveCaptured { id, detail } => {
+                        let of_note = view.detail.as_ref().is_some_and(|(p, _)| p.note.id == *id);
+                        title(
+                            ui,
+                            &if of_note {
+                                t.remove_captured_question(detail.name())
+                            } else {
+                                t.remove_captured_section_question(detail.name())
+                            },
+                        );
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.remove_captured_detail()).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove()) {
+                                actions.push(Action::RemoveCaptured);
                             }
                         });
                     }
@@ -12846,8 +12957,9 @@ fn where_captured(context: &CaptureContext) -> Option<String> {
 /// What a Capture Context says beyond the time, line by line with each
 /// line's icon, as the phone's `CaptureContextLines`: where, with its
 /// Named Place, the app it was shared in from, the calendar events
-/// running and the Bluetooth devices connected.
-fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String)> {
+/// running and the Bluetooth devices connected; each with the detail
+/// it shows.
+fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String, CapturedDetail)> {
     let mut lines = Vec::new();
     if let Some(at) = context.location {
         let at = coordinates_text(at);
@@ -12857,18 +12969,22 @@ fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String)> {
                 Some(place) => format!("{} ({at})", place.name),
                 None => at,
             },
+            CapturedDetail::Place,
         ));
     }
     if let Some(app) = &context.source_app {
-        lines.push((icons::CONTEXT_APP, t.context_source_app(app.name())));
+        let line = t.context_source_app(app.name());
+        lines.push((icons::CONTEXT_APP, line, CapturedDetail::App));
     }
     if !context.calendar_events.is_empty() {
         let events = context.calendar_events.join(", ");
-        lines.push((icons::CONTEXT_CALENDAR, t.context_during(&events)));
+        let line = t.context_during(&events);
+        lines.push((icons::CONTEXT_CALENDAR, line, CapturedDetail::Event));
     }
     if !context.bluetooth_devices.is_empty() {
         let devices = context.bluetooth_devices.join(", ");
-        lines.push((icons::CONTEXT_BLUETOOTH, t.context_bluetooth(&devices)));
+        let line = t.context_bluetooth(&devices);
+        lines.push((icons::CONTEXT_BLUETOOTH, line, CapturedDetail::Device));
     }
     lines
 }
@@ -12887,15 +13003,41 @@ fn context_line(ui: &mut Ui, icon: char, line: &str) {
 
 /// The whole Capture Context of a Note or Section `captured` then, line
 /// by line, as the phone's `CaptureContextLines`: when, then
-/// [`context_lines`].
-fn capture_context(ui: &mut Ui, t: &L10n, captured: DateTime<Utc>, context: &CaptureContext) {
+/// [`context_lines`]. Each detail `removable` says may go ends in a
+/// Remove (ADR 0037), the time in none; the detail whose Remove was
+/// clicked.
+fn capture_context(
+    ui: &mut Ui,
+    t: &L10n,
+    (captured, context): (DateTime<Utc>, &CaptureContext),
+    removable: impl Fn(CapturedDetail) -> bool,
+) -> Option<CapturedDetail> {
+    let mut asked = None;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         context_line(ui, icons::CONTEXT_WHEN, &when(t, captured));
-        for (icon, line) in context_lines(t, context) {
-            context_line(ui, icon, &line);
+        for (icon, line, detail) in context_lines(t, context) {
+            if !removable(detail) {
+                context_line(ui, icon, &line);
+                continue;
+            }
+            // The Remove first, at the end of the line, so the line
+            // wraps in what is left beside it.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                let text = ui.visuals().text_color();
+                let remove = ui.button(RichText::new(t.remove()).color(text));
+                let label = t.remove_captured_label(detail.name());
+                remove.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+                if remove.clicked() {
+                    asked = Some(detail);
+                }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                    context_line(ui, icon, &line);
+                });
+            });
         }
     });
+    asked
 }
 
 /// Where a Note is filed, `Area / Topic`; `None` while it is in no
@@ -13663,7 +13805,7 @@ fn note_card(
             if look.full {
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 4.0;
-                    for (icon, line) in context_lines(t, &note.context) {
+                    for (icon, line, _) in context_lines(t, &note.context) {
                         context_line(ui, icon, &line);
                     }
                 });
@@ -13717,7 +13859,7 @@ fn note_card(
                     }
                     for section in look.sections {
                         ui.separator();
-                        capture_context(ui, t, section.captured, &section.context);
+                        capture_context(ui, t, (section.captured, &section.context), |_| false);
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);

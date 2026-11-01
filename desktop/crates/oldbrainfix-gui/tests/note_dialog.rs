@@ -8,7 +8,10 @@
 //! field; each setting is a badge read as "setting: value" whose small
 //! editor changes it; "+" makes a Note, a Checklist, a Shopping List, a
 //! Tally, a Session or a Frog where the list is, and the last card of a
-//! list scrolls fully clear of the window's edge (#158).
+//! list scrolls fully clear of the window's edge (#158); a captured
+//! detail of the Note, in its Captured badge, or of a Section, under it,
+//! goes with its Remove after one question while the time stays, and
+//! where this Device may change the Note only (#162).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -18,9 +21,12 @@ use egui::accesskit::Role;
 use egui::{Key, Modifiers};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
+use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
+use oldbrainfix_core::named_places::keys as place_keys;
+use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{
-    Checklists, Day, Frogs, Importance, Notes, OwnProfile, Places, Recurrence, Routines, Schedule,
-    Sessions, ShoppingLists, SigningKey, Store, Tallies, TallyRule,
+    AreaRole, Checklists, Day, Frogs, Importance, Invite, Notes, OwnProfile, PairedDevice, Places,
+    Recurrence, Routines, Schedule, Sessions, ShoppingLists, SigningKey, Store, Tallies, TallyRule,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -683,5 +689,207 @@ fn tab_stays_in_the_note_dialog_and_off_the_list_beneath() -> TestResult {
         }
     }
     assert!(harness.state().note_open());
+    Ok(())
+}
+
+/// The Note "Fix the tap" in `area` with a Capture Context as a phone
+/// keeps it, at Home, shared from WhatsApp during a call with two
+/// Bluetooth devices, and an Amend captured elsewhere during another
+/// event: the Note's id.
+fn captured_in(store: &Store, area: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    let notes = Notes::new(store);
+    let note = notes.capture("Fix the tap", area, None)?;
+    let home = "namedplace:home";
+    let place = |field: &str, value: &str| store.append(home, field, Some(value), None);
+    place(place_keys::TYPE, place_keys::TYPE_NAMED_PLACE)?;
+    place(place_keys::NAME, "Home")?;
+    place(place_keys::CENTRE, "52.52,13.405")?;
+    place(place_keys::RADIUS, "100")?;
+    let at = |field: &str, value: &str| store.append(&note.id, field, Some(value), None);
+    at(note_keys::LOCATION, "52.52,13.405")?;
+    at(note_keys::SOURCE_PACKAGE, "com.whatsapp")?;
+    at(note_keys::SOURCE_LABEL, "WhatsApp")?;
+    at(note_keys::CALENDAR, r#"["Team call"]"#)?;
+    at(note_keys::BLUETOOTH, r#"["Car kit","Headphones"]"#)?;
+    let amend = notes.amend(&note.id, "Washer bought")?;
+    let at = |field: &str, value: &str| store.append(&amend.id, field, Some(value), None);
+    at(note_keys::LOCATION, "48.13724,11.57561")?;
+    at(note_keys::CALENDAR, r#"["Dentist"]"#)?;
+    Ok(note.id)
+}
+
+/// Opens the Captured badge of the Note open: the time it shows.
+fn open_captured(harness: &mut Harness<'_, App>) -> Result<String, Box<dyn std::error::Error>> {
+    let badge = harness
+        .query_all_by_label_contains("Captured: ")
+        .next()
+        .ok_or("Captured")?
+        .accesskit_node()
+        .label()
+        .unwrap_or_default();
+    click(harness, &badge);
+    harness.run_steps(8);
+    assert!(shows(harness, "Captured"));
+    Ok(badge.trim_start_matches("Captured: ").to_string())
+}
+
+/// Clicks `remove` and answers its question `question` with Remove.
+fn remove(harness: &mut Harness<'_, App>, remove: &str, question: &str) {
+    click(harness, remove);
+    harness.run_steps(8);
+    assert!(shows(harness, question), "{question}");
+    click(harness, "Remove");
+    harness.run_steps(8);
+}
+
+#[test]
+fn each_captured_detail_but_the_time_goes_from_the_captured_badge() -> TestResult {
+    let (store, _) = store()?;
+    let tap = captured_in(&store, None)?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let time = open_captured(&mut harness)?;
+    let steps = [
+        ("place", "Home (52.5200, 13.4050)"),
+        ("calendar events", "During: Team call"),
+        ("Bluetooth devices", "Connected: Car kit, Headphones"),
+        ("app", "Shared from WhatsApp"),
+    ];
+    for (detail, line) in steps {
+        assert!(shows(&harness, line), "{line}");
+        let question = format!("Remove the {detail} from this Note?");
+        remove(&mut harness, &format!("Remove the {detail}"), &question);
+        // Gone from the dialog, which stays open over the Note.
+        assert!(!shows(&harness, line), "{line}");
+        assert!(!shows(&harness, &question));
+        assert!(shows(&harness, "Captured"));
+        assert!(harness.state().note_open());
+    }
+    let context = Notes::new(&store).by_id(&tap)?.ok_or("the Note")?.context;
+    assert!(context.location.is_none() && context.named_place.is_none());
+    assert!(context.source_app.is_none());
+    assert!(context.calendar_events.is_empty() && context.bluetooth_devices.is_empty());
+    // The time stays, with no Remove of its own; the two left are the
+    // Amend's, under it.
+    assert!(shows(&harness, &time), "{time}");
+    assert_eq!(harness.query_all_by_label_contains("Remove the").count(), 2);
+    Ok(())
+}
+
+#[test]
+fn cancel_keeps_the_captured_detail() -> TestResult {
+    let (store, _) = store()?;
+    let tap = captured_in(&store, None)?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    open_captured(&mut harness)?;
+    click(&mut harness, "Remove the calendar events");
+    harness.run_steps(8);
+    assert!(shows(
+        &harness,
+        "Remove the calendar events from this Note?"
+    ));
+    click(&mut harness, "Cancel");
+    harness.run_steps(8);
+    assert!(!shows(
+        &harness,
+        "Remove the calendar events from this Note?"
+    ));
+    assert!(shows(&harness, "During: Team call"));
+    assert!(shows(&harness, "Remove the calendar events"));
+    let context = Notes::new(&store).by_id(&tap)?.ok_or("the Note")?.context;
+    assert_eq!(context.calendar_events, ["Team call"]);
+    Ok(())
+}
+
+#[test]
+fn a_sections_captured_detail_goes_from_under_it() -> TestResult {
+    let (store, _) = store()?;
+    let tap = captured_in(&store, None)?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    // The Amend's own, under it in the Note dialog.
+    assert!(shows(&harness, "48.1372, 11.5756"));
+    remove(
+        &mut harness,
+        "Remove the place",
+        "Remove the place from this Section?",
+    );
+    assert!(!shows(&harness, "48.1372, 11.5756"));
+    assert!(shows(&harness, "During: Dentist"));
+    let notes = Notes::new(&store);
+    let amend = notes
+        .sections(&tap)?
+        .into_iter()
+        .next()
+        .ok_or("the Amend")?;
+    assert!(amend.context.location.is_none());
+    assert_eq!(amend.context.calendar_events, ["Dentist"]);
+    // The Note's own place stays.
+    let context = notes.by_id(&tap)?.ok_or("the Note")?.context;
+    assert!(context.location.is_some());
+    Ok(())
+}
+
+/// Ann's Household with her captured Note in it, shared with Ben as a
+/// Member: Ben's store and the Note's id.
+fn shared_captured() -> Result<(Arc<Store>, String), Box<dyn std::error::Error>> {
+    let (ann, house) = store()?;
+    let tap = captured_in(&ann, Some(&house))?;
+    let start = DateTime::parse_from_rfc3339("2026-03-02T11:00:00Z")?.with_timezone(&Utc);
+    let ticks = Arc::new(AtomicI64::new(0));
+    let clock =
+        Box::new(move || start + Duration::microseconds(ticks.fetch_add(1, Ordering::SeqCst)));
+    let ben = Store::in_memory(clock, || Ok(SigningKey::from_seed([5; 32])))?;
+    OwnProfile::new(&ben).apply_defaults("Ben", None)?;
+    let area = ann.share(&house)?;
+    let request = sync_request_as(
+        &ben,
+        &ann.version_vector()?,
+        "Phone",
+        &ann.device_id()?,
+        "",
+        Joining::Invited,
+    )?;
+    let invite = Invite {
+        area,
+        role: AreaRole::Member,
+    };
+    let (answer, _) =
+        answer_sync_inviting(&ann, &request, "Desk", Some(&invite))?.ok_or("an answer")?;
+    apply_answer_as(&ben, &answer, true, None)?;
+    ben.remember_device(&PairedDevice {
+        id: ann.device_id()?,
+        name: String::new(),
+        fingerprint: String::new(),
+        host: None,
+        port: None,
+        last_sync: ben.now(),
+        shared: true,
+    })?;
+    Ok((Arc::new(ben), tap))
+}
+
+#[test]
+fn a_member_has_no_remove_on_another_persons_note() -> TestResult {
+    let (ben, tap) = shared_captured()?;
+    let mut harness = window(&ben, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    // The Amend's details show, without a Remove.
+    assert!(shows(&harness, "48.1372, 11.5756"));
+    open_captured(&mut harness)?;
+    // Ann's Named Place stays hers: Ben sees the coordinates.
+    assert!(shows(&harness, "52.5200, 13.4050"));
+    assert!(shows(&harness, "During: Team call"));
+    assert!(
+        harness
+            .query_all_by_label_contains("Remove the")
+            .next()
+            .is_none()
+    );
     Ok(())
 }
