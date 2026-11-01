@@ -766,6 +766,7 @@ impl CapturePopup {
     fn show_page(&mut self, ui: &mut Ui) {
         let t = self.t;
         let tones = theme::tones(ui.visuals());
+        let shown_now = (self.wall)(self.store.now());
         let mut asked = None;
         Frame::NONE
             .fill(tones.background)
@@ -775,7 +776,7 @@ impl CapturePopup {
                 self.failure_line(ui);
                 asked = match &mut self.page {
                     Some(Page::Schedule(editor)) => {
-                        editor.show(ui, &t, tones).map(PageAsk::Schedule)
+                        editor.show(ui, &t, tones, shown_now).map(PageAsk::Schedule)
                     }
                     Some(Page::Tally(form)) => form.show(ui, &t, tones).map(PageAsk::Tally),
                     None => None,

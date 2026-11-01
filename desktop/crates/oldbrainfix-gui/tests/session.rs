@@ -321,6 +321,8 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     add_menu(&mut harness, &t);
     click_button(&mut harness, t.session());
     assert!(shows(&harness, t.new_session()));
+    // Every day, All day, by default.
+    assert!(shows(&harness, t.all_day()));
     // Rolling by default, one a time, the weekdays folded.
     assert!(checked(
         &harness,
@@ -407,6 +409,7 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     assert_eq!(session.count, 2);
     assert_eq!(session.counts, BTreeMap::from([(6, 1)]));
     assert_eq!(session.rule, SessionRule::Rolling);
+    assert!(session.routine.schedule.times.is_empty());
     assert!(harness.state().routine_editor().is_none());
     Ok(())
 }
@@ -530,6 +533,7 @@ fn new_session_on_all_routines_makes_one_with_its_note_from_the_text() -> TestRe
         .ok_or("its Note")?;
     assert_eq!(note.text, "Morning sport");
     assert_eq!(session.pool, vec![device.tallies[0].clone()]);
+    assert!(session.routine.schedule.times.is_empty());
     // Its Note is no Unsorted one, as a new Routine's is not.
     let unsorted = Notes::new(&device.store).unsorted()?;
     assert!(unsorted.iter().all(|n| n.id != note.id));

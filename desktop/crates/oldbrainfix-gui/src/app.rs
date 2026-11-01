@@ -8051,6 +8051,7 @@ impl App {
             .fill(tones.background)
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
+        let shown_now = (self.wall)(self.store.now());
         let mut asked = None;
         let modal = egui::Modal::new(Id::new("editor"))
             .frame(frame)
@@ -8058,7 +8059,7 @@ impl App {
                 ui.set_width(size.x);
                 ui.set_height(size.y);
                 if let Some(editor) = &mut self.editor {
-                    asked = editor.show(ui, &t, tones).map(Action::Editor);
+                    asked = editor.show(ui, &t, tones, shown_now).map(Action::Editor);
                 } else if let Some(form) = &mut self.tally_form {
                     asked = form.show(ui, &t, tones).map(Action::TallyForm);
                 }

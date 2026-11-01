@@ -311,11 +311,19 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     harness.run();
     assert!(shows(&harness, "New Routine"));
     assert!(shows(&harness, "From the Note"));
-    // 08:00 to start with, and 20:00 added.
-    type_into(&mut harness, "HH:MM", "20:00");
+    // All day to start with; the time field holds the current time,
+    // 12:00 in Berlin, which is typed over with 20:00 and added.
+    assert!(shows(&harness, "All day"));
+    type_over(&mut harness, "12:00", "20:00");
     harness.get_by_label("Add a time").click();
     harness.run();
     assert!(shows(&harness, "Remove 20:00"));
+    assert!(!shows(&harness, "All day"));
+    // The field holds the current time again, which "Add" takes as is.
+    holding(&harness, "12:00");
+    harness.get_by_label("Add a time").click();
+    harness.run();
+    assert!(shows(&harness, "Remove 12:00"));
     // Its own Re-nag, and Escalation, each a column of radio buttons.
     assert!(
         radio(&harness, "Default (10 min)")
@@ -342,7 +350,7 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
         .iter()
         .map(ToString::to_string)
         .collect();
-    assert_eq!(times, ["08:00", "20:00"]);
+    assert_eq!(times, ["12:00", "20:00"]);
     assert_eq!(
         routine.schedule.rule.map(|r| r.format()).as_deref(),
         Some("FREQ=DAILY")
@@ -358,7 +366,44 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
             .all(|n| n.text != "Another thought")
     );
     // Its badge in the Note dialog (#160).
-    assert!(shows(&harness, "Routine: Every day · 08:00, 20:00"));
+    assert!(shows(&harness, "Routine: Every day · 12:00, 20:00"));
+    Ok(())
+}
+
+#[test]
+fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_time() -> TestResult
+{
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    harness.get_by_label("All Notes").click();
+    harness.run();
+    edit(&harness, "Another thought").click();
+    harness.run();
+    harness
+        .get_by_label("Routine, Reminder, Frog or Session")
+        .click();
+    harness.run();
+    harness
+        .get_all_by_label("Reminder")
+        .last()
+        .ok_or("Reminder")?
+        .click();
+    harness.run();
+    assert!(shows(&harness, "New Reminder"));
+    // 13:00, the next full hour after 12:00 in Berlin; with its one time
+    // there is no time field.
+    assert!(shows(&harness, "Remove 13:00"));
+    assert!(!shows(&harness, "All day"));
+    assert!(
+        harness
+            .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some("12:00"))
+            .next()
+            .is_none()
+    );
+    // Without it, the field shows, holding the current time.
+    harness.get_by_label("Remove 13:00").click();
+    harness.run();
+    assert!(shows(&harness, "All day"));
+    holding(&harness, "12:00");
     Ok(())
 }
 

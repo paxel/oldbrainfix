@@ -101,8 +101,11 @@ pub struct RoutineEditor {
     /// The start day as typed.
     pub start_text: String,
     pub times: Vec<ClockTime>,
-    /// A time of day being typed in.
+    /// A time of day being typed in, the current time at first.
     pub time_text: String,
+    /// Whether the time field takes the current time when it shows next:
+    /// when the editor opens and after a time is added.
+    time_now: bool,
     /// Its own Re-nag interval in minutes; `None` for the Device's.
     pub renag: Option<i64>,
     /// After how many ignored Re-nags it escalates; `None` when off.
@@ -152,11 +155,8 @@ impl RoutineEditor {
                 ClockTime::new(hour, 0).into_iter().collect(),
             )
         } else {
-            (
-                RepeatKind::Every,
-                today,
-                ClockTime::new(8, 0).into_iter().collect(),
-            )
+            // A new Routine or Session: every day, All day.
+            (RepeatKind::Every, today, Vec::new())
         };
         let mut editor = RoutineEditor {
             routine: None,
@@ -182,6 +182,7 @@ impl RoutineEditor {
             start_text: start.to_string(),
             times,
             time_text: String::new(),
+            time_now: true,
             renag: None,
             escalation: None,
             device_renag: device_renag.num_minutes(),
@@ -201,7 +202,8 @@ impl RoutineEditor {
 
     /// The New Session page (#161): its name, its pool of `draft` with
     /// "New Tally" at its end, its count and rule, and its schedule every
-    /// day, all day, at first; its Note filed into `place`.
+    /// day, all day, at first, as any new Session; its Note filed into
+    /// `place`.
     pub fn new_session_page(
         place: Option<String>,
         draft: SessionDraft,
@@ -210,7 +212,6 @@ impl RoutineEditor {
         device_renag: Duration,
     ) -> RoutineEditor {
         let mut editor = RoutineEditor::new(None, false, now, wall, device_renag);
-        editor.times.clear();
         editor.place = place;
         editor.named = true;
         let mut draft = draft;
@@ -297,6 +298,7 @@ impl RoutineEditor {
             start_text: schedule.start.to_string(),
             times: schedule.times.clone(),
             time_text: String::new(),
+            time_now: true,
             renag: routine.renag.map(|r| r.num_minutes()),
             escalation: routine.escalation,
             device_renag: device_renag.num_minutes(),
@@ -538,8 +540,15 @@ impl RoutineEditor {
         Ok(Some(id))
     }
 
-    /// Draws the editor; what was asked of it.
-    pub fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<Intent> {
+    /// Draws the editor, `shown_now` being the time on the wall clock;
+    /// what was asked of it.
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        t: &L10n,
+        tones: Tones,
+        shown_now: NaiveDateTime,
+    ) -> Option<Intent> {
         let mut intent = None;
         let mut changed = false;
         let text = ui.visuals().text_color();
@@ -669,7 +678,7 @@ impl RoutineEditor {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    changed |= self.times_editor(ui, t, tones, once);
+                    changed |= self.times_editor(ui, t, tones, once, shown_now);
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.next_occurrences()).strong().color(text));
@@ -919,7 +928,14 @@ impl RoutineEditor {
         changed
     }
 
-    fn times_editor(&mut self, ui: &mut Ui, t: &L10n, tones: Tones, once: bool) -> bool {
+    fn times_editor(
+        &mut self,
+        ui: &mut Ui,
+        t: &L10n,
+        tones: Tones,
+        once: bool,
+        shown_now: NaiveDateTime,
+    ) -> bool {
         let mut changed = false;
         let text = ui.visuals().text_color();
         ui.label(RichText::new(t.times_heading()).strong().color(text));
@@ -941,6 +957,10 @@ impl RoutineEditor {
             }
         });
         if !once || self.times.is_empty() {
+            if std::mem::take(&mut self.time_now) {
+                // "Add" takes the current time as is, or it is typed over.
+                self.time_text = shown_now.format("%H:%M").to_string();
+            }
             ui.horizontal(|ui| {
                 let field = ui.add(
                     TextEdit::singleline(&mut self.time_text)
@@ -962,7 +982,7 @@ impl RoutineEditor {
                         self.times.push(time);
                         self.times.sort();
                     }
-                    self.time_text.clear();
+                    self.time_now = true;
                     changed = true;
                 }
             });
@@ -1117,6 +1137,14 @@ mod tests {
         assert_eq!(editor.start, Day::new(2026, 10, 24));
         // No Note and no text: nothing to save yet.
         assert!(!editor.can_save());
+    }
+
+    #[test]
+    fn a_new_routine_starts_every_day_all_day() {
+        let editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
+        assert!(!editor.once());
+        assert!(editor.times.is_empty());
+        assert_eq!(editor.start, Day::new(2026, 10, 24));
     }
 
     #[test]
