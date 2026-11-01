@@ -160,7 +160,7 @@ void main() {
 
   group('on the card', () {
     testWidgets('"Make it a Checklist" in the ⋮ makes its lines Lines, an '
-        'indented one under the line above, the group in a frame under '
+        'indented one under the line above, the group in a frame with '
         'its parent', (tester) async {
       final note = notes.capture('Trip\nBath\n  Soap\nTent').id;
       await startAtNotes(tester);
@@ -177,18 +177,23 @@ void main() {
       for (final id in [bath, soap, tent]) {
         expect(key('checklist-check-$id'), findsOneWidget);
       }
+      // The frame holds the group's own Line too (#184), not Tent.
       final frame = key('checklist-group-$bath');
+      for (final id in [bath, soap]) {
+        expect(
+          find.descendant(of: frame, matching: key('checklist-line-$id')),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .getRect(frame)
+              .contains(tester.getCenter(key('checklist-check-$id'))),
+          isTrue,
+        );
+      }
       expect(
-        find.descendant(of: frame, matching: key('checklist-line-$soap')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: frame, matching: key('checklist-line-$bath')),
+        find.descendant(of: frame, matching: key('checklist-line-$tent')),
         findsNothing,
-      );
-      expect(
-        tester.getTopLeft(frame).dy,
-        greaterThan(tester.getTopLeft(key('checklist-line-$bath')).dy),
       );
       expect(
         tester.getTopLeft(key('checklist-check-$soap')).dx,
@@ -296,7 +301,9 @@ void main() {
       final note = notes.capture('Shop\nMilk\nEggs').id;
       lists.make(note);
       await openEditor(tester, 'Shop');
+      // One block of text: no field to add from, no "Add Line" (#184).
       expect(key('checklist-add-text'), findsNothing);
+      expect(key('checklist-add'), findsNothing);
       final milk = idOf(note, 'Milk');
       final eggs = idOf(note, 'Eggs');
       expect(typedIn(tester, milk), 'Milk');
@@ -332,15 +339,15 @@ void main() {
       expect(store.current(bread, ChecklistKeys.trashed), isNotNull);
 
       // An empty Line simply goes, the cursor to the end of the one above.
-      await tap(tester, key('checklist-add'));
+      await type(tester, idOf(note, 'Tea'), 'Tea\n', 4);
       expect(cursor(tester), ('', 0));
       await backspaceAtStart(tester, 'new-2');
       expect(key('checklist-field-new-2'), findsNothing);
       expect(cursor(tester), ('Tea', 3));
 
       // Typed and left: kept; an empty Line is dropped.
-      await type(tester, idOf(note, 'Tea'), 'Green tea', 9);
-      await tap(tester, key('checklist-add'));
+      await type(tester, idOf(note, 'Tea'), 'Green tea\n', 10);
+      expect(cursor(tester), ('', 0));
       await leave(tester);
       expect(shown(note), ['MilkBread', 'Eggs', 'Green tea']);
       expect(lists.byNote(note)!.lines.first.checked, isFalse);
@@ -355,12 +362,79 @@ void main() {
       expect(shown(note), ['MilkEggs', '  Soap']);
     });
 
+    testWidgets('a new list starts with one empty Line, the cursor in it; '
+        'Return makes the next, and the only Line stays', (tester) async {
+      final note = notes.capture('Trip').id;
+      await openEditor(tester, 'Trip');
+      await tap(tester, key('checklist-make'));
+      expect(shown(note), isEmpty);
+      expect(key('checklist-field-new-1'), findsOneWidget);
+      expect(cursor(tester), ('', 0));
+      expect(
+        tester.widget<Checkbox>(key('checklist-check-new-1')).value,
+        false,
+      );
+
+      // A Backspace in the only Line leaves it there to type in.
+      await backspaceAtStart(tester, 'new-1');
+      expect(key('checklist-field-new-1'), findsOneWidget);
+
+      await type(tester, 'new-1', 'Tent\n', 5);
+      await type(tester, 'new-2', 'Soap', 4);
+      await leave(tester);
+      expect(shown(note), ['Tent', 'Soap']);
+    });
+
+    testWidgets('the Line deleted last by ⋮ leaves an empty one to type in', (
+      tester,
+    ) async {
+      final note = notes.capture('Shop\nMilk').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      expect(key('checklist-field-new-1'), findsNothing);
+      await lineMenu(tester, milk);
+      await tap(tester, key('checklist-delete'));
+      await tap(tester, key('checklist-delete-confirm'));
+      expect(shown(note), isEmpty);
+      expect(key('checklist-field-new-1'), findsOneWidget);
+    });
+
+    testWidgets('the Lines read as one block, and a group\'s frame holds its '
+        'own Line', (tester) async {
+      final note = notes.capture('Trip\nBath\n  Soap\nTent').id;
+      lists.make(note);
+      await openEditor(tester, 'Trip');
+      final bath = idOf(note, 'Bath');
+      final soap = idOf(note, 'Soap');
+      final tent = idOf(note, 'Tent');
+      final frame = key('checklist-group-$bath');
+      for (final id in [bath, soap]) {
+        expect(
+          tester
+              .getRect(frame)
+              .contains(tester.getCenter(key('checklist-check-$id'))),
+          isTrue,
+        );
+      }
+      expect(
+        tester
+            .getRect(frame)
+            .contains(tester.getCenter(key('checklist-check-$tent'))),
+        isFalse,
+      );
+      // Rows 40 high, the boxes 40 wide: no gaps between the Lines.
+      double top(String id) => tester.getTopLeft(key('checklist-check-$id')).dy;
+      expect(top(soap) - top(bath), 40);
+      expect(tester.getSize(key('checklist-check-$bath')), const Size(40, 40));
+    });
+
     testWidgets('a new Line stored while typed in keeps its field and the '
         'cursor', (tester) async {
       final note = notes.capture('Shop\nMilk').id;
       lists.make(note);
       await openEditor(tester, 'Shop');
-      await tap(tester, key('checklist-add'));
+      await type(tester, idOf(note, 'Milk'), 'Milk\n', 5);
       await type(tester, 'new-1', 'Tea', 3);
       await tester.tap(key('checklist-check-new-1'));
       await tester.pumpAndSettle();
@@ -563,7 +637,7 @@ void main() {
       expect(key('checklist-field-$milk'), findsNothing);
       expect(key('checklist-line-$milk'), findsOneWidget);
 
-      await tap(tester, key('checklist-add'));
+      // Under Ann's Lines an empty one of his own to type in.
       await type(tester, 'new-1', 'Bread', 5);
       // A Backspace at its start does not join it with Ann's Line.
       await backspaceAtStart(tester, 'new-1');

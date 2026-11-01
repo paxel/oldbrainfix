@@ -1645,7 +1645,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
-              focusAdd: widget.typeLines,
+              startLine: widget.typeLines,
             ),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),

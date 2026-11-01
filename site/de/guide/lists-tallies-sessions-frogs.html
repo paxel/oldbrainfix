@@ -22,7 +22,7 @@
 </figure>
 <ul>
   <li><strong>Notiz</strong> öffnet den Erfassungsbildschirm, wie das „+“ der Agenda.</li>
-  <li><strong>Checkliste</strong> und <strong>Einkaufsliste</strong> fragen nach dem Namen der Liste; <strong>Anlegen</strong> öffnet den Editor der Notiz mit dem Cursor in ihrer ersten Zeile, bei einer Einkaufsliste im Feld oben, um die Zeilen an ihrem Platz zu tippen.</li>
+  <li><strong>Checkliste</strong> und <strong>Einkaufsliste</strong> fragen nach dem Namen der Liste; <strong>Anlegen</strong> öffnet den Editor der Notiz mit dem Cursor in ihrer ersten Zeile, um die Zeilen an ihrem Platz zu tippen.</li>
   <li><strong>Frosch</strong> fragt nur nach seinem Namen und legt den Frosch mit seiner Notiz an.</li>
   <li><strong>Strichliste</strong> öffnet eine Seite: ihr <strong>Name</strong>, dann eine Reihe je Feld, anfangs eine, und <strong>Feld hinzufügen</strong> für das nächste. Die Reihe eines Felds ist sein Name mit drei Plaketten: wie ein Tag mit mehreren Einträgen zählt („Σ Summe“ oder „Größter Wert“), seine Maßeinheit und sein Ziel. Ein Tippen auf eine Plakette öffnet ihren kleinen Editor; die Maßeinheit wird getippt, mit den bekannten Maßeinheiten, die gemeint sein können, als Vorschlägen, und die Regel folgt der Art der Maßeinheit, bis sie gewählt wird. <strong>Speichern</strong> legt die Strichliste mit jedem Feld an, das einen Namen hat; Reihen ohne Namen fallen weg.</li>
   <li><strong>Einheit</strong> öffnet eine Seite: ihr <strong>Name</strong>; ihr <strong>Vorrat</strong>, ein Kästchen je Strichliste, am Ende <strong>Neue Strichliste</strong>, das die Seite der Strichliste öffnet und mit der neuen Strichliste angehakt zurückkommt; dann drei Plaketten: wie viele sie jedes Mal auswählt, mit − und + eingestellt, wie sie auswählt und ihr Zeitplan, anfangs jeden Tag ganztägig, der den Zeitplan des Routinen-Editors öffnet. <strong>Speichern</strong> legt die Einheit an; die Anzahl je Wochentag und die Reihenfolge für Reihum werden später in ihrem Editor eingestellt.</li>
@@ -55,10 +55,18 @@
 <ul>
   <li>Auf einer vollen Karte hat jede Zeile ihr Kästchen; eine abgehakte Zeile wird an ihrem Platz durchgestrichen. Eine kompakte Karte zeigt „2 von 5 abgehakt“.</li>
   <li>Eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Sind alle Zeilen einer Gruppe abgehakt, ist auch die Zeile darüber abgehakt; wird diese abgehakt, ist ihre ganze Gruppe abgehakt; wird eine Zeile der Gruppe wieder freigegeben, ist es auch die Zeile darüber.</li>
-  <li>Im Editor wird jede Zeile an ihrem Platz getippt, neben ihrem Kästchen. Die Eingabetaste teilt eine Zeile am Cursor und beginnt an ihrem Ende eine neue leere Zeile darunter; <strong>Zeile hinzufügen</strong> beginnt eine am Ende. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
+  <li>Eine Gruppe steht in einem Rahmen mit der Zeile, unter der sie steht.</li>
+  <li>Im Editor werden die Zeilen wie ein zusammenhängender Text bearbeitet, jede Zeile beginnt mit ihrem Kästchen; eine neue Liste beginnt mit einer leeren Zeile. Die Eingabetaste fügt unter der Zeile mit dem Cursor eine neue Zeile mit leerem Kästchen ein; mitten in einer Zeile nimmt die neue Zeile den Rest der Zeile mit. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; die Haken der angehängten Zeile bleiben im Protokoll. Eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
   <li>Alles Getippte bleibt beim Verlassen des Editors erhalten; leer gebliebene Zeilen fallen weg. ⋮ an einer Zeile bietet <strong>Nach oben</strong>, <strong>Nach unten</strong>, <strong>Unter die Zeile darüber</strong> oder <strong>Zurück auf die oberste Ebene</strong> und <strong>Löschen</strong>.</li>
   <li><strong>Alle Haken entfernen</strong> erscheint, solange eine Zeile abgehakt ist, um die Liste wieder zu benutzen. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte und im Editor hinter der Plakette „Checkliste“, macht sie zurück: Jede Zeile wird eine Zeile des Notiztexts, eine abgehakte mit „✓ “ davor.</li>
 </ul>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/de/light/list-editor.png" alt="Eine Packliste als Checkliste im Notiz-Editor, jede Zeile eine Textzeile nach ihrem Kästchen, die Gruppe in einem Rahmen mit ihrer eigenen Zeile" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/de/dark/list-editor.png" alt="Eine Packliste als Checkliste im Notiz-Editor, jede Zeile eine Textzeile nach ihrem Kästchen, die Gruppe in einem Rahmen mit ihrer eigenen Zeile" width="648" height="1152" loading="lazy">
+  <figcaption>Eine Checkliste im Editor, bearbeitet wie ein zusammenhängender Text.</figcaption>
+</figure>
+
 <p>
   In einem geteilten Bereich fügt jeder mit einer Rolle Zeilen hinzu und hakt sie ab; Umbenennen,
   Verschieben und Löschen einer Zeile bleiben beim Verfasser der Notiz oder der Zeile und bei den
@@ -98,8 +106,9 @@
 <ul>
   <li>Eine abgehakte Zeile wird durchgestrichen und rückt ans Ende, mit dem Tag, an dem sie wiederkommt, etwa „wieder Sa., 31. Okt.“. Zu Beginn dieses Tages ist sie wieder offen, ganz oben.</li>
   <li>Jede Zeile hat ihre <strong>Wiederkehr</strong>: <strong>Einmal</strong> oder 1, 2, 3 oder 4 Wochen; eine neue Zeile hat 1 Woche. Sie kommt am selben Wochentag so viele Wochen später wieder, nach der Uhr des Geräts. Eine Zeile mit Einmal ist nach dem Abhaken weg.</li>
-  <li>Im Editor fügt ein Feld oben Zeilen hinzu: Die Eingabetaste fügt das Getippte hinzu und lässt das Feld für die nächste bereit, ebenso <strong>Hinzufügen</strong>; was im Feld stehen bleibt, wird beim Verlassen hinzugefügt. Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, ganz oben, und eine offene bleibt.</li>
-  <li>Die Zeilen werden an ihrem Platz umbenannt; eine leer gelassene fällt beim Verlassen weg. ⋮ an einer Zeile bietet die Wiederkehr zur Wahl und <strong>Löschen</strong>.</li>
+  <li>Im Editor werden die Zeilen wie bei einer Checkliste bearbeitet: ein zusammenhängender Text, jede Zeile beginnt mit ihrem Kästchen, die Eingabetaste für eine neue Zeile, die Rücktaste am Anfang, um eine Zeile an die darüber anzuhängen. Solange der Editor offen ist, bleibt eine Zeile, wo sie getippt oder abgehakt wurde; beim nächsten Mal zeigt die Liste die neueste Zeile oben.</li>
+  <li>Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, und eine offene bleibt.</li>
+  <li>Eine leer gelassene Zeile fällt beim Verlassen weg. ⋮ an einer Zeile bietet die Wiederkehr zur Wahl und <strong>Löschen</strong>.</li>
   <li>Auf einer vollen Karte stehen die Zeilen mit ihren Kästchen, die offenen zuerst; eine kompakte Karte zeigt „3 offen“. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte und hinter der Plakette „Einkaufsliste“ im Editor, schreibt die Zeilen in den Text, die durchgestrichenen mit „✓ “ davor.</li>
 </ul>
 

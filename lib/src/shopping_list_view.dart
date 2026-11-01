@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'browser.dart';
 import 'checklist_view.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
-import 'two_row_text_field.dart';
 
 /// What a Note's card knows of its Shopping List (#122): [read] gives it
 /// as it shows now, or null for a Note that is none, read when the card
@@ -142,36 +142,37 @@ class _CardShoppingListState extends State<CardShoppingList>
 List<ShownLine> _shown(BuildContext context, ShoppingList list) {
   final t = context.t;
   final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
-  return [
-    for (final line in list.lines)
-      (
-        id: line.id,
-        text: line.text,
-        inGroup: false,
-        checked: line.struck,
-        below: switch (line.backOn) {
-          final back? when line.struck => t.shoppingBack(day.format(back.wall)),
-          _ => null,
-        },
-      ),
-  ];
+  return [for (final line in list.lines) _shownLine(t, day, line)];
 }
+
+/// [line] as it is drawn, a struck one with the [day] it comes back.
+ShownLine _shownLine(AppLocalizations t, DateFormat day, ShoppingLine line) => (
+  id: line.id,
+  text: line.text,
+  inGroup: false,
+  checked: line.struck,
+  below: switch (line.backOn) {
+    final back? when line.struck => t.shoppingBack(day.format(back.wall)),
+    _ => null,
+  },
+);
 
 /// What the menu of a Shopping List's Line does besides setting its
 /// reappear time.
 enum _ShopStep { delete }
 
 /// The Shopping List part of a Note's editor (#122), nothing while the
-/// Note is none: at the top a field for anyone with a role in its Area,
-/// whose Return adds what was typed and leaves it ready for the next,
-/// and "Add"; then its Lines to check, open first and struck at the end,
-/// each renamed in place where this Device may change it (#141); for
-/// those, ⋮ with its reappear time as radio buttons and Delete. "Back
-/// to a plain Note" is in the editor's kind badge (#160). What is typed
-/// is stored as the cursor leaves a Line and whenever [typed] says so; as the editor
-/// is left, what is left in the field is added and a Line left empty
-/// goes. It
-/// follows the log as it changes and reads again when a new day begins.
+/// Note is none: its Lines with their boxes, typed in place as one block
+/// of text as a Checklist's are (#141, #184, [TypedRows]); a new list
+/// starts with one empty Line. A Line stays where it was typed while the
+/// editor is open, checked or not; the list shows it at the top, open
+/// ones first, the next time. A name the list has already brings its Line
+/// back instead. ⋮ of a Line this Device may change has its reappear time
+/// as radio buttons and Delete. "Back to a plain Note" is in the editor's
+/// kind badge (#160). What is typed is stored as the cursor leaves a Line
+/// and whenever [typed] says so; a Line left empty goes as the editor is
+/// left. It follows the log as it changes and reads again when a new day
+/// begins.
 class ShoppingSection extends StatefulWidget {
   final Notes notes;
   final String noteId;
@@ -179,15 +180,15 @@ class ShoppingSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Whether the cursor starts in the field at the top (#161).
-  final bool focusAdd;
+  /// Whether the cursor starts in the empty Line of a new list (#161).
+  final bool startLine;
 
   const ShoppingSection({
     super.key,
     required this.notes,
     required this.noteId,
     this.typed,
-    this.focusAdd = false,
+    this.startLine = false,
   });
 
   @override
@@ -195,16 +196,16 @@ class ShoppingSection extends StatefulWidget {
 }
 
 class _ShoppingSectionState extends State<ShoppingSection>
-    with ReloadsOnLogChange, _ReadsAtDayStart, AutomaticKeepAliveClientMixin {
+    with
+        ReloadsOnLogChange,
+        _ReadsAtDayStart,
+        TypedRows,
+        AutomaticKeepAliveClientMixin {
   late final _lists = ShoppingLists(widget.notes.store);
   late final _twoRows = widget.notes.store.twoRowEditorOn;
-  final _add = TextEditingController();
   ShoppingList? _list;
   var _checks = false;
   Set<String> _editable = const {};
-
-  /// The Lines as they are typed, by id.
-  Map<String, TypedLine> _rows = const {};
 
   @override
   Store get log => widget.notes.store;
@@ -226,169 +227,96 @@ class _ShoppingSectionState extends State<ShoppingSection>
   void initState() {
     super.initState();
     _load();
-    _add.addListener(_addChanged);
-    widget.typed?.listen(_keepTyped);
+    widget.typed?.listen(keepTyped);
+    if (widget.startLine) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) focusEmptyRow();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(ShoppingSection old) {
     super.didUpdateWidget(old);
     if (old.typed != widget.typed) {
-      old.typed?.forget(_keepTyped);
-      widget.typed?.listen(_keepTyped);
+      old.typed?.forget(keepTyped);
+      widget.typed?.listen(keepTyped);
     }
   }
 
   @override
   void dispose() {
-    widget.typed?.forget(_keepTyped);
-    _add.dispose();
-    for (final row in _rows.values) {
-      row.dispose();
-    }
+    widget.typed?.forget(keepTyped);
     super.dispose();
   }
 
+  /// Whether the list was read once, to tell a list made in the editor.
+  var _read = false;
+
   void _load() {
+    final made = _read && _list == null;
+    _read = true;
     final list = _list = _lists.byNote(widget.noteId, deviceWallClock);
     _checks = list != null && _lists.mayCheck(widget.noteId);
     _editable = {
       for (final line in list?.lines ?? const <ShoppingLine>[])
         if (_lists.mayEdit(line.id)) line.id,
     };
-    final old = _rows;
-    _rows = {
-      for (final id in _editable)
-        if (list?.line(id) case final line?)
-          id: (old[id] ?? _row(id, line.text))..take(line.text),
-    };
-    for (final MapEntry(:key, :value) in old.entries) {
-      if (!_rows.containsKey(key)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => value.dispose());
-      }
+    rows = rowsInPlace(switch (list) {
+      final list? => [
+        for (final line in list.lines)
+          (id: line.id, text: line.text, inGroup: false),
+      ],
+      null => null,
+    });
+    // Made a Shopping List in the editor: the cursor in its first Line.
+    if (made && list != null && list.lines.isEmpty && rows.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) focusEmptyRow();
+      });
     }
     watchDay(list != null && list.struckCount > 0);
   }
 
-  TypedLine _row(String id, String text) {
-    final row = TypedLine(id: id, kept: text);
-    row.text.addListener(() {
-      if (row.setting) return;
-      final typed = row.text.text;
-      // Return ends the rename; there is no new Line under it.
-      if (typed.contains('\n') || typed.contains('\r')) {
-        scheduleMicrotask(() => _returned(row));
-      }
-    });
-    row.focus.addListener(() {
-      if (!row.focus.hasFocus) scheduleMicrotask(() => _store(row));
-    });
-    return row;
-  }
+  @override
+  Store get linesLog => widget.notes.store;
 
-  bool get _open =>
+  /// Whether the Note is a Shopping List out of the trash, to write to.
+  @override
+  bool get linesWritable =>
       !(widget.notes.byId(widget.noteId)?.isTrashed ?? true) &&
       _lists.isShoppingList(widget.noteId);
 
-  /// Renames the Line of [row] to what was typed, unless it is empty.
-  void _store(TypedLine row) {
-    final id = row.id;
-    final typed = row.typed;
-    if (!mounted || id == null || !identical(_rows[id], row)) return;
-    if (typed.isEmpty || !row.changed || !_open) return;
-    if (!_shows(id) || !_lists.mayEdit(id)) return;
-    _lists.rename(id, typed);
-    row.kept = typed;
-  }
+  @override
+  bool get mayAddLine => _checks;
 
-  void _returned(TypedLine row) {
-    if (!mounted || !identical(_rows[row.id], row)) return;
-    final typed = row.typed;
-    row.set(
-      TextEditingValue(
-        text: typed,
-        selection: TextSelection.collapsed(offset: typed.length),
-      ),
-    );
-    _store(row);
-    row.focus.unfocus();
-  }
+  @override
+  bool mayEditLine(String id) => _lists.mayEdit(id);
 
-  /// A Return in the field adds what was typed before it; the field
-  /// keeps the rest, ready for the next.
-  void _addChanged() {
-    final text = _add.text;
-    if (text.contains('\n') || text.contains('\r')) {
-      scheduleMicrotask(_addReturned);
-    }
-  }
+  @override
+  bool showsLine(String id) =>
+      _lists.byNote(widget.noteId, deviceWallClock)?.line(id) != null;
 
-  void _addReturned() {
-    if (!mounted) return;
-    final text = _add.text;
-    final end = text.lastIndexOf(RegExp('[\r\n]'));
-    if (end < 0) return;
-    final rest = text.substring(end + 1);
-    _add.value = TextEditingValue(
-      text: rest,
-      selection: TextSelection.collapsed(offset: rest.length),
-    );
-    _addText(text.substring(0, end));
-  }
+  /// At the top of the list, where it shows the next time; a name it has
+  /// already brings that Line back.
+  @override
+  String addLine(String text, {required int at, required bool inGroup}) =>
+      _lists.add(widget.noteId, text, deviceWallClock);
 
-  /// Adds a Line for every line of [text] that is not blank, the first
-  /// ending at the top; a name the list has already brings its Line
-  /// back instead.
-  void _addText(String text) {
-    if (text.trim().isEmpty || !_open || !_lists.mayCheck(widget.noteId)) {
-      return;
-    }
-    _lists.addLines(widget.noteId, text, deviceWallClock);
-    setState(_load);
-  }
+  @override
+  void renameLine(String id, String text) => _lists.rename(id, text);
 
-  void _addTyped() {
-    final text = _add.text;
-    _add.clear();
-    _addText(text);
-  }
-
-  /// Stores what was typed; [leaving], what is left in the field is
-  /// added and the Lines left empty go.
-  void _keepTyped({required bool leaving}) {
-    if (!mounted) return;
-    final typed = [
-      for (final row in _rows.values)
-        if (row.changed && row.typed.isNotEmpty) row,
-    ];
-    if (typed.isNotEmpty) {
-      widget.notes.store.batch(() {
-        for (final row in typed) {
-          _store(row);
-        }
-      });
-    }
-    if (!leaving) return;
-    // What is left in the field is added as the editor is left only, so
-    // a save on the way leaves it there to finish.
-    if (_add.text.trim().isNotEmpty) _addTyped();
-    final gone = [
-      for (final MapEntry(:key, :value) in _rows.entries)
-        if (value.typed.isEmpty && _shows(key)) key,
-    ];
-    if (gone.isEmpty || !_open) return;
-    widget.notes.store.batch(() {
-      for (final id in gone) {
-        _lists.delete(id);
-      }
-    });
-    setState(_load);
-  }
+  /// Into the trash, as a Checklist's Line goes (ADR 0030).
+  @override
+  void deleteLine(String id) => _lists.delete(id);
 
   void _check(String id, bool checked) {
+    // A new Line is stored first; an empty one has nothing to check.
+    final line = storedId(id);
+    if (line == null) return;
     checked
-        ? _lists.check(id, deviceWallClock)
-        : _lists.uncheck(id, deviceWallClock);
+        ? _lists.check(line, deviceWallClock)
+        : _lists.uncheck(line, deviceWallClock);
     setState(_load);
   }
 
@@ -397,7 +325,9 @@ class _ShoppingSectionState extends State<ShoppingSection>
       : context.t.shoppingWeeks(reappear.weeks);
 
   Future<void> _menu(String id, Offset at) async {
-    final line = _list?.line(id);
+    // What was typed is stored first, so the menu sees the list as shown.
+    keepTyped(leaving: false);
+    final line = _lists.byNote(widget.noteId, deviceWallClock)?.line(id);
     if (line == null) return;
     final t = context.t;
     final overlay =
@@ -447,45 +377,19 @@ class _ShoppingSectionState extends State<ShoppingSection>
       ],
     );
     if (picked == null || !mounted) return;
+    // A sync while the menu was open may have taken it away.
+    if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
       case Reappear reappear:
         // A tap on the one it has changes nothing.
         if (reappear == line.reappear) return;
         _lists.setReappear(id, reappear);
       case _ShopStep.delete:
-        // Into the trash, as a Checklist's Line goes (ADR 0030).
         if (!await confirmLineDelete(context)) return;
-        if (!mounted || !_shows(id)) return;
+        if (!mounted || !linesWritable || !showsLine(id)) return;
         _lists.delete(id);
     }
     setState(_load);
-  }
-
-  /// Whether the Line [id] still shows on the list.
-  bool _shows(String id) =>
-      _lists.byNote(widget.noteId, deviceWallClock)?.line(id) != null;
-
-  /// The field of [shown] where this Device may rename it in place.
-  Widget? _field(ShownLine shown) {
-    final row = _rows[shown.id];
-    if (row == null) return null;
-    return KeyedSubtree(
-      key: ValueKey('shopping-field-${shown.id}'),
-      child: TwoRowTextField(
-        // The same field while the Line moves, struck or back.
-        key: GlobalObjectKey(row),
-        controller: row.text,
-        focusNode: row.focus,
-        twoRows: _twoRows,
-        style: lineStyle(context, checked: shown.checked),
-        decoration: const InputDecoration(
-          filled: false,
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
   }
 
   @override
@@ -494,44 +398,39 @@ class _ShoppingSectionState extends State<ShoppingSection>
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
+    final day = DateFormat.MMMEd(Localizations.localeOf(context).toString());
+    ShownLine shownRow(TypedLine row) {
+      if (row.id case final id?) {
+        if (list.line(id) case final line?) return _shownLine(t, day, line);
+      }
+      // New, or gone from the list a moment ago and read anew soon.
+      return (
+        id: TypedRows.shownId(row),
+        text: row.kept,
+        inGroup: false,
+        checked: false,
+        below: null,
+      );
+    }
+
     // Under the text field, as the Lines are under the text on a card.
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: EditorPanel(
         key: const ValueKey('shopping'),
         heading: t.shoppingHeading,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Adding sits at the top, where a new Line shows.
-            if (_checks) ...[
-              TwoRowTextField(
-                key: const ValueKey('shopping-add-text'),
-                controller: _add,
-                twoRows: _twoRows,
-                autofocus: widget.focusAdd,
-                decoration: InputDecoration(hintText: t.checklistNewLine),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  key: const ValueKey('shopping-add'),
-                  onPressed: _addTyped,
-                  icon: const Icon(Icons.add),
-                  label: Text(t.add),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            ChecklistLines(
-              lines: _shown(context, list),
-              onCheck: _checks ? _check : null,
-              onMenu: _menu,
-              editable: _editable,
-              field: _field,
-            ),
-          ],
+        child: ChecklistLines(
+          lines: [for (final row in rows) shownRow(row)],
+          onCheck: _checks ? _check : null,
+          onMenu: _menu,
+          editable: _editable,
+          field: (shown) => typedField(
+            shown,
+            prefix: 'shopping',
+            editable: _editable,
+            twoRows: _twoRows,
+          ),
+          compact: true,
         ),
       ),
     );

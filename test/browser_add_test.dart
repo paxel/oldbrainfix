@@ -218,21 +218,28 @@ void main() {
         expect(find.text('Before the trip'), findsOneWidget);
       });
 
-      testWidgets('Shopping List takes its name, then its field at the top', (
+      testWidgets('Shopping List takes its name, then its Lines in place', (
         tester,
       ) async {
         await openPage(tester, page);
         await pick(tester, NewKind.shopping);
         await name(tester, 'Groceries');
-        final add = find.descendant(
-          of: key('shopping-add-text'),
+        // The cursor waits in its first Line, as a Checklist's (#184).
+        expect(key('shopping-add-text'), findsNothing);
+        final line = find.descendant(
+          of: key('shopping-field-new-1'),
           matching: find.byType(TextField),
         );
         expect(
-          tester.widget<TextField>(add).focusNode?.hasFocus ?? false,
+          tester.widget<TextField>(line).focusNode?.hasFocus ?? false,
           isTrue,
         );
-        await tester.enterText(add, 'Milk\n');
+        tester.testTextInput.updateEditingValue(
+          const TextEditingValue(
+            text: '${lineStart}Milk',
+            selection: TextSelection.collapsed(offset: 5),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.pageBack();
         await tester.pumpAndSettle();

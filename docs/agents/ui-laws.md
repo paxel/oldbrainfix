@@ -422,25 +422,31 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 ## Checklist and Shopping List Lines
 
-- **The Lines of a Checklist and a Shopping List are typed in place** in
-  the Note editor: each Line is a text row beside its box, and the
+- **A Checklist and a Shopping List are edited the same way**, as one
+  block of text with boxes (#184): in the Note editor every Line is a
+  text row starting with its box, the rows close together, and the
   cursor moves between them. Cards only check them.
-- On a Checklist, **Return** splits the Line at the cursor; at its end
-  it starts a new empty Line with an open box under it, in the group of
-  a Line with one; **Add Line** starts one at the end. **Backspace at
-  the start** of a Line joins it with the Line above: its text goes to
-  the end of that Line, which keeps its box and state; an empty Line
-  simply goes.
+- **A new list starts with one empty boxed Line**, the cursor in it. A
+  list this Device may add to always has a Line to type in.
+- **Return** adds a new Line with an empty box under the cursor's Line,
+  in the group of a Line with one; in the middle of a Line it moves the
+  rest of the Line into the new one. **Backspace at the start** of a
+  Line joins it with the Line above: its text goes to the end of that
+  Line, which keeps its box and state, and the Line goes, its checks
+  staying in the log; an empty Line simply goes. **No Add Line button
+  and no Add field**: Return makes new Lines.
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
   at the top. On the desktop **Tab and Shift+Tab** do it, in place of
   the buttons.
+- **The frame around a group holds the group's own Line** and the Lines
+  under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.
-- A Shopping List keeps its field at the top: **Return adds** what was
-  typed and leaves the field ready for the next; text left there is
-  added on leaving. Its Lines are renamed in place.
+- On a Shopping List a Line stays where it was typed or checked while
+  the editor is open; the list shows the latest on top the next time. A
+  name the list has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, its reappear time, Delete); a
   long press in a Line's text selects, as in any field.
 
