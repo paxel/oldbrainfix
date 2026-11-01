@@ -3337,6 +3337,67 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Maßeinheit.';
 
   @override
+  String get tallyUnitHint => 'z. B. kg, min, Seiten';
+
+  @override
+  String get tallyUnitHelper =>
+      'Tippe auf einen Vorschlag für eine bekannte Maßeinheit; alles andere bleibt, wie getippt.';
+
+  @override
+  String get unitNamesKg => 'Kilogramm, Kilo';
+
+  @override
+  String get unitNamesG => 'Gramm';
+
+  @override
+  String get unitNamesKm => 'Kilometer';
+
+  @override
+  String get unitNamesM => 'Meter';
+
+  @override
+  String get unitNamesCm => 'Zentimeter';
+
+  @override
+  String get unitNamesKmh => 'Kilometer pro Stunde, Stundenkilometer, kmh';
+
+  @override
+  String get unitNamesCelsius => 'Grad Celsius, Celsius';
+
+  @override
+  String get unitNamesDegree => 'Grad';
+
+  @override
+  String get unitNamesHour => 'Stunde, Stunden, Std';
+
+  @override
+  String get unitNamesMinute => 'Minute, Minuten';
+
+  @override
+  String get unitNamesSecond => 'Sekunde, Sekunden, Sek';
+
+  @override
+  String get unitNamesPound => 'Pfund';
+
+  @override
+  String get unitNamesOunce => 'Unze, Unzen';
+
+  @override
+  String get unitNamesMile => 'Meile, Meilen';
+
+  @override
+  String get unitNamesFoot => 'Fuß, Fuss';
+
+  @override
+  String get unitNamesInch => 'Zoll';
+
+  @override
+  String get unitNamesMph => 'Meilen pro Stunde';
+
+  @override
+  String get unitNamesFahrenheit => 'Grad Fahrenheit, Fahrenheit';
+
+  @override
   String get unitKindMass => 'Masse';
 
   @override

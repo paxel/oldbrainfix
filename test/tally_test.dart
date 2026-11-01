@@ -136,14 +136,22 @@ void main() {
       await cardMenu(tester);
       await tap(tester, key('note-make-tally'));
 
-      // The unit is a column of radio buttons, shown in imperial.
+      // The unit is one field; the known units it may mean show under it
+      // as chips, in imperial.
+      expect(find.byType(RadioListTile<String>), findsNothing);
+      await enter(tester, key('tally-field-name'), 'Weight');
+      await enter(tester, key('tally-unit-text'), 'p');
       expect(
         find.descendant(of: key('tally-unit'), matching: find.text('lb')),
         findsOneWidget,
       );
+      expect(key('tally-unit-g'), findsNothing);
       expect(find.text('kg'), findsNothing);
-      await enter(tester, key('tally-field-name'), 'Weight');
       await tap(tester, key('tally-unit-kg'));
+      expect(
+        tester.widget<TextField>(key('tally-unit-text')).controller!.text,
+        'lb',
+      );
       await enter(tester, key('tally-field-target'), '100');
       await tap(tester, key('tally-field-save'));
 
@@ -156,6 +164,122 @@ void main() {
       await tester.longPress(find.text('Lifting'));
       await tester.pumpAndSettle();
       expect(find.text('lb · Target 100 lb'), findsOneWidget);
+    });
+
+    testWidgets('typing filters the known units, in English or German; a '
+        'chip picks one, and a unit typed out is that unit', (tester) async {
+      region(tester, 'GB');
+      final note = notes.capture('Video');
+      await startAtNotes(tester);
+      await cardMenu(tester);
+      await tap(tester, key('note-make-tally'));
+      await enter(tester, key('tally-field-name'), 'Watched');
+
+      // Every known unit until something is typed.
+      for (final known in TallyUnits.known) {
+        expect(key('tally-unit-${known.code}'), findsOneWidget);
+      }
+      await enter(tester, key('tally-unit-text'), 'k');
+      expect(key('tally-unit-kg'), findsOneWidget);
+      expect(key('tally-unit-km'), findsOneWidget);
+      expect(key('tally-unit-min'), findsNothing);
+      await enter(tester, key('tally-unit-text'), 'Minu');
+      expect(key('tally-unit-min'), findsOneWidget);
+      expect(key('tally-unit-kg'), findsNothing);
+      await tap(tester, key('tally-unit-min'));
+      expect(
+        tester.widget<TextField>(key('tally-unit-text')).controller!.text,
+        'min',
+      );
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.fields.single.unit, 'min');
+    });
+
+    testWidgets('in imperial, a symbol typed out without its chip is that '
+        'known unit', (tester) async {
+      region(tester, 'US');
+      final note = notes.capture('Running');
+      await startAtNotes(tester);
+      await cardMenu(tester);
+      await tap(tester, key('note-make-tally'));
+      await enter(tester, key('tally-field-name'), 'Distance');
+      await enter(tester, key('tally-unit-text'), 'mi');
+      expect(key('tally-unit-km'), findsOneWidget);
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.fields.single.unit, 'km');
+    });
+
+    testWidgets('anything else typed stays a unit of the user\'s own, and '
+        'the field opens with it as typed', (tester) async {
+      region(tester, 'US');
+      final note = notes.capture('Reading');
+      // Typed on another Device: it reads like a known symbol here.
+      final id = tallies.addField(note.id, name: 'Weight', unit: 'lb');
+      tallies.add(note.id, values: {id: 3});
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Reading'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-field-$id'));
+      expect(
+        tester.widget<TextField>(key('tally-unit-text')).controller!.text,
+        'lb',
+      );
+      // A unit of its own takes no known one.
+      expect(find.byType(ActionChip), findsNothing);
+      await enter(tester, key('tally-field-name'), 'Load');
+      await tap(tester, key('tally-field-save'));
+      final field = tallies.byNote(note.id)!.field(id)!;
+      expect(field.name, 'Load');
+      expect(field.unit, 'lb');
+    });
+
+    testWidgets('a chip makes a unit of the user\'s own that reads like a '
+        'known symbol that known unit', (tester) async {
+      region(tester, 'US');
+      final note = notes.capture('Lifting');
+      final id = tallies.addField(note.id, name: 'Weight', unit: 'lb');
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Lifting'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-field-$id'));
+      // No entries yet: every known unit is a tap away.
+      await tap(tester, key('tally-unit-kg'));
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.field(id)!.unit, 'kg');
+    });
+
+    testWidgets('once entries hold values, a unit of another kind is not '
+        'saved and the field says why', (tester) async {
+      region(tester, 'DE');
+      final note = notes.capture('Running');
+      final id = tallies.addField(note.id, name: 'Distance', unit: 'km');
+      tallies.add(note.id, values: {id: 5000});
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Running'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-field-$id'));
+
+      await enter(tester, key('tally-unit-text'), 'kilo');
+      expect(key('tally-unit-km'), findsOneWidget);
+      expect(key('tally-unit-kg'), findsNothing);
+      expect(key('tally-unit-km/h'), findsNothing);
+      await enter(tester, key('tally-unit-text'), 'pages');
+      await tap(tester, key('tally-field-save'));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      expect(
+        find.text(
+          'Entries hold values for this field, so its kind of unit stays.',
+        ),
+        findsNWidgets(2),
+      );
+      expect(tallies.byNote(note.id)!.field(id)!.unit, 'km');
+
+      // Within the kind it changes; the values stay in metres.
+      await enter(tester, key('tally-unit-text'), 'Met');
+      await tap(tester, key('tally-unit-m'));
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.field(id)!.unit, 'm');
+      expect(tallies.entries(note.id).single.values[id], 5000);
     });
 
     testWidgets('a field hidden keeps its values, which return when it is '
@@ -176,7 +300,7 @@ void main() {
         findsOneWidget,
       );
       expect(key('tally-unit-kg'), findsNothing);
-      expect(key('tally-unit-typed'), findsNothing);
+      expect(key('tally-unit-km'), findsOneWidget);
       expect(key('tally-unit-m'), findsOneWidget);
 
       await tap(tester, key('tally-field-hide'));

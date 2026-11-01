@@ -5342,6 +5342,126 @@ abstract class AppLocalizations {
   /// **'Entries hold values for this field, so its kind of unit stays.'**
   String get tallyUnitFixed;
 
+  /// Hint in the one field a Tally field's unit is typed into; suggestions of known units show under it as chips.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. kg, min, pages'**
+  String get tallyUnitHint;
+
+  /// No description provided for @tallyUnitHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a suggestion for a known unit; anything else stays as typed.'**
+  String get tallyUnitHelper;
+
+  /// Not shown: the names, separated by commas, that a typed unit is matched against to suggest this known unit (ADR 0028). Every language's names are matched in every language. The unitNames keys name kg, g, km, m, cm, km/h, °C, °, h, min, s and, in imperial, lb, oz, mi, ft, in, mph, °F.
+  ///
+  /// In en, this message translates to:
+  /// **'kilogram, kilograms, kilogramme, kilo, kilos'**
+  String get unitNamesKg;
+
+  /// No description provided for @unitNamesG.
+  ///
+  /// In en, this message translates to:
+  /// **'gram, grams, gramme'**
+  String get unitNamesG;
+
+  /// No description provided for @unitNamesKm.
+  ///
+  /// In en, this message translates to:
+  /// **'kilometre, kilometres, kilometer, kilometers'**
+  String get unitNamesKm;
+
+  /// No description provided for @unitNamesM.
+  ///
+  /// In en, this message translates to:
+  /// **'metre, metres, meter, meters'**
+  String get unitNamesM;
+
+  /// No description provided for @unitNamesCm.
+  ///
+  /// In en, this message translates to:
+  /// **'centimetre, centimetres, centimeter, centimeters'**
+  String get unitNamesCm;
+
+  /// No description provided for @unitNamesKmh.
+  ///
+  /// In en, this message translates to:
+  /// **'kilometres per hour, kilometers per hour, kmh, kph'**
+  String get unitNamesKmh;
+
+  /// No description provided for @unitNamesCelsius.
+  ///
+  /// In en, this message translates to:
+  /// **'degrees Celsius, Celsius'**
+  String get unitNamesCelsius;
+
+  /// No description provided for @unitNamesDegree.
+  ///
+  /// In en, this message translates to:
+  /// **'degree, degrees'**
+  String get unitNamesDegree;
+
+  /// No description provided for @unitNamesHour.
+  ///
+  /// In en, this message translates to:
+  /// **'hour, hours, hr'**
+  String get unitNamesHour;
+
+  /// No description provided for @unitNamesMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'minute, minutes'**
+  String get unitNamesMinute;
+
+  /// No description provided for @unitNamesSecond.
+  ///
+  /// In en, this message translates to:
+  /// **'second, seconds, sec'**
+  String get unitNamesSecond;
+
+  /// No description provided for @unitNamesPound.
+  ///
+  /// In en, this message translates to:
+  /// **'pound, pounds, lbs'**
+  String get unitNamesPound;
+
+  /// No description provided for @unitNamesOunce.
+  ///
+  /// In en, this message translates to:
+  /// **'ounce, ounces'**
+  String get unitNamesOunce;
+
+  /// No description provided for @unitNamesMile.
+  ///
+  /// In en, this message translates to:
+  /// **'mile, miles'**
+  String get unitNamesMile;
+
+  /// No description provided for @unitNamesFoot.
+  ///
+  /// In en, this message translates to:
+  /// **'foot, feet'**
+  String get unitNamesFoot;
+
+  /// No description provided for @unitNamesInch.
+  ///
+  /// In en, this message translates to:
+  /// **'inch, inches'**
+  String get unitNamesInch;
+
+  /// No description provided for @unitNamesMph.
+  ///
+  /// In en, this message translates to:
+  /// **'miles per hour'**
+  String get unitNamesMph;
+
+  /// No description provided for @unitNamesFahrenheit.
+  ///
+  /// In en, this message translates to:
+  /// **'degrees Fahrenheit, Fahrenheit'**
+  String get unitNamesFahrenheit;
+
   /// No description provided for @unitKindMass.
   ///
   /// In en, this message translates to:

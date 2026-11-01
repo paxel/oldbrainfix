@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'capture_choices.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
+import 'tally_unit_match.dart';
 import 'tally_view.dart';
 
 /// "Make it a Tally" (#103): the page for the first field of the Note
@@ -42,7 +44,8 @@ Future<bool> openTallyField(
     false;
 
 /// One field of a Tally on a full-screen page, Save in the top bar: its
-/// name; its unit, a known one shown in this Device's system or one as
+/// name; its unit, typed into one field under which the known units it
+/// may mean show as chips in this Device's system, a known one or one as
 /// typed, only of its kind once entries hold values for it; its target,
 /// optional, prefilled in each new entry; and how a day with several
 /// entries counts, their sum or the largest, which follows the kind of
@@ -71,9 +74,6 @@ class TallyFieldScreen extends StatefulWidget {
 }
 
 class _TallyFieldScreenState extends State<TallyFieldScreen> {
-  /// The unit option of a unit as typed.
-  static const _typedChoice = '\u0000typed';
-
   late final _tallies = Tallies(widget.notes.store);
   late final UnitSystem _system = deviceUnitSystem(widget.notes.store);
   late final TallyField? _field = switch ((widget.noteId, widget.fieldId)) {
@@ -81,17 +81,36 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
     _ => null,
   };
   late final _name = TextEditingController(text: _field?.name ?? '');
-  late String _unit = switch (_field) {
-    final field? when TallyUnits.byCode(field.unit) != null => field.unit,
-    _ => _typedChoice,
+
+  /// The unit as the page opened, shown in this Device's system.
+  late final String _unitAsOpened = switch (_field) {
+    final field? => shownUnit(field.unit, _system),
+    null => '',
   };
-  late final _typed = TextEditingController(
-    text: _unit == _typedChoice ? _field?.unit ?? '' : '',
+  late final _unitText = TextEditingController(text: _unitAsOpened);
+
+  /// Once entries hold values, only units of the field's kind are left.
+  late final UnitKind? _fixed = switch (_field) {
+    final field? when field.hasEntries => field.kind,
+    _ => null,
+  };
+
+  /// The names the known units are matched by, in every language.
+  late final _unitNames = unitNames(
+    AppLocalizations.supportedLocales.map(lookupAppLocalizations),
+    _system,
   );
+
+  /// The known units offered for the unit typed so far.
+  late var _matches = _match();
+
+  /// The code of the known unit a chip put into the field, until it is
+  /// typed in again.
+  String? _picked;
   late final _target = TextEditingController();
   final _nameFocus = FocusNode();
   final _targetFocus = FocusNode();
-  final _typedFocus = FocusNode();
+  final _unitFocus = FocusNode();
   late TallyRule _rule = _field?.rule ?? TallyRule.sum;
 
   /// Whether the rule was picked here; until then it follows the unit.
@@ -125,22 +144,51 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
   @override
   void dispose() {
     _name.dispose();
-    _typed.dispose();
+    _unitText.dispose();
     _target.dispose();
     _nameFocus.dispose();
     _targetFocus.dispose();
-    _typedFocus.dispose();
+    _unitFocus.dispose();
     super.dispose();
   }
 
-  String get _chosenUnit => _unit == _typedChoice ? _typed.text.trim() : _unit;
+  /// The unit a chip picked, else the unit typed: the field's own while
+  /// the text is as it opened, so a unit of the user's own that reads
+  /// like a known symbol stays theirs.
+  String get _chosenUnit =>
+      _picked ??
+      switch (_field) {
+        final field? when _unitText.text == _unitAsOpened => field.unit,
+        _ => unitOfTyped(_unitText.text, _system),
+      };
 
-  void _pickUnit(String unit) => setState(() {
-    _unit = unit;
+  /// Every known unit left while the unit is as the page opened, so
+  /// another one is a tap away; then those the text typed may mean.
+  List<KnownUnit> _match() => matchingUnits(
+    _unitText.text == _unitAsOpened ? '' : _unitText.text,
+    _system,
+    _unitNames,
+    kind: _fixed,
+  );
+
+  /// The unit typed changed; its kind may change the rule.
+  void _typedUnit() => setState(() {
+    _matches = _match();
     if (!_rulePicked && _field == null) {
       _rule = TallyUnits.defaultRule(TallyUnits.kindOf(_chosenUnit));
     }
   });
+
+  /// A chip picks the known unit [known], shown in this Device's system.
+  void _pickUnit(KnownUnit known) {
+    final shown = shownUnit(known.code, _system);
+    _picked = known.code;
+    _unitText.value = TextEditingValue(
+      text: shown,
+      selection: TextSelection.collapsed(offset: shown.length),
+    );
+    _typedUnit();
+  }
 
   void _pickRule(TallyRule rule) => setState(() {
     _rule = rule;
@@ -169,7 +217,7 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
       return;
     }
     if (_unitInvalid) {
-      showField(_typedFocus);
+      showField(_unitFocus);
       return;
     }
     if (_targetInvalid) {
@@ -236,8 +284,7 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final field = _field;
-    // Once entries hold values, only units of the field's kind are left.
-    final fixed = field != null && field.hasEntries ? field.kind : null;
+    final fixed = _fixed;
     return Scaffold(
       appBar: pageBar(
         context,
@@ -276,41 +323,44 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (fixed != null) Text(t.tallyUnitFixed),
-                  RadioColumn<String>(
-                    key: const ValueKey('tally-unit'),
-                    value: _unit,
-                    onChanged: _pickUnit,
-                    options: [
-                      for (final known in TallyUnits.known)
-                        if (fixed == null || known.kind == fixed)
-                          RadioOption(
-                            key: ValueKey('tally-unit-${known.code}'),
-                            value: known.code,
-                            title: Text(shownUnit(known.code, _system)),
-                            subtitle: Text(_kindName(known.kind)),
-                          ),
-                      if (fixed == null || fixed == UnitKind.typed)
-                        RadioOption(
-                          key: const ValueKey('tally-unit-typed'),
-                          value: _typedChoice,
-                          title: Text(t.tallyUnitTyped),
-                        ),
-                    ],
-                  ),
-                  if (_unit == _typedChoice)
-                    TextField(
-                      key: const ValueKey('tally-unit-text'),
-                      controller: _typed,
-                      focusNode: _typedFocus,
-                      decoration: InputDecoration(
-                        labelText: t.tallyUnitTyped,
-                        hintText: t.tallyUnitTypedHint,
-                        errorText: _unitInvalid ? t.tallyUnitFixed : null,
-                      ),
-                      // A typed known code is that unit; its kind may
-                      // change the rule.
-                      onChanged: (_) => _pickUnit(_typedChoice),
+                  TextField(
+                    key: const ValueKey('tally-unit-text'),
+                    controller: _unitText,
+                    focusNode: _unitFocus,
+                    decoration: InputDecoration(
+                      hintText: t.tallyUnitHint,
+                      // A unit of the user's own takes no known one.
+                      helperText: fixed == UnitKind.typed
+                          ? null
+                          : t.tallyUnitHelper,
+                      helperMaxLines: 3,
+                      errorText: _unitInvalid ? t.tallyUnitFixed : null,
+                      errorMaxLines: 3,
                     ),
+                    onChanged: (_) {
+                      _picked = null;
+                      _typedUnit();
+                    },
+                  ),
+                  if (_matches.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      key: const ValueKey('tally-unit'),
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        for (final known in _matches)
+                          // Suggestions that fill in the field, not a
+                          // choice of their own.
+                          ActionChip(
+                            key: ValueKey('tally-unit-${known.code}'),
+                            label: Text(shownUnit(known.code, _system)),
+                            tooltip: _kindName(known.kind),
+                            onPressed: () => _pickUnit(known),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

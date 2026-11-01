@@ -3301,6 +3301,68 @@ class AppLocalizationsEn extends AppLocalizations {
       'Entries hold values for this field, so its kind of unit stays.';
 
   @override
+  String get tallyUnitHint => 'e.g. kg, min, pages';
+
+  @override
+  String get tallyUnitHelper =>
+      'Tap a suggestion for a known unit; anything else stays as typed.';
+
+  @override
+  String get unitNamesKg => 'kilogram, kilograms, kilogramme, kilo, kilos';
+
+  @override
+  String get unitNamesG => 'gram, grams, gramme';
+
+  @override
+  String get unitNamesKm => 'kilometre, kilometres, kilometer, kilometers';
+
+  @override
+  String get unitNamesM => 'metre, metres, meter, meters';
+
+  @override
+  String get unitNamesCm => 'centimetre, centimetres, centimeter, centimeters';
+
+  @override
+  String get unitNamesKmh =>
+      'kilometres per hour, kilometers per hour, kmh, kph';
+
+  @override
+  String get unitNamesCelsius => 'degrees Celsius, Celsius';
+
+  @override
+  String get unitNamesDegree => 'degree, degrees';
+
+  @override
+  String get unitNamesHour => 'hour, hours, hr';
+
+  @override
+  String get unitNamesMinute => 'minute, minutes';
+
+  @override
+  String get unitNamesSecond => 'second, seconds, sec';
+
+  @override
+  String get unitNamesPound => 'pound, pounds, lbs';
+
+  @override
+  String get unitNamesOunce => 'ounce, ounces';
+
+  @override
+  String get unitNamesMile => 'mile, miles';
+
+  @override
+  String get unitNamesFoot => 'foot, feet';
+
+  @override
+  String get unitNamesInch => 'inch, inches';
+
+  @override
+  String get unitNamesMph => 'miles per hour';
+
+  @override
+  String get unitNamesFahrenheit => 'degrees Fahrenheit, Fahrenheit';
+
+  @override
   String get unitKindMass => 'Mass';
 
   @override

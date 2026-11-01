@@ -283,7 +283,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   ugly with every option added. Several options that can be picked
   together are checkboxes or filter chips. A setting that is only on or
   off is a switch, not a choice. Tabs that switch pages are not a
-  choice of value.
+  choice of value. Suggestions under a text field are chips that fill
+  in what is typed, such as the known units under a Tally field's
+  unit (#159): the value is the text, so they are not a choice.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error
