@@ -545,6 +545,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   thicker outline, and say so to a screen reader; Esc and showing
   another place drop the selection. A double-click or Edit opens the
   Note dialog.
+- **In the Note dialog a text that is only read selects with the
+  mouse** and copies with Ctrl+C (Cmd on macOS): the Note's and a
+  Section's (#183); a Section this Device may edit has its own field and
+  format bar there. "Copy as text" in a card's right-click menu, the
+  Note menu and the dialog is the desktop's "Copy text": the Note and
+  its Sections as they show.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
   in the sidebar, which outlines the row under the pointer, or with
   File into… from the card's right-click, the Note menu or Ctrl+M,

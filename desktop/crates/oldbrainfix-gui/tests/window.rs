@@ -62,6 +62,18 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// The widgets that show `text`: labelled with it, or a field holding it,
+/// as a Section this Device may edit in the Note dialog (#183).
+fn showing<'a>(
+    harness: &'a Harness<'_, App>,
+    text: &'a str,
+) -> impl DoubleEndedIterator<Item = egui_kittest::Node<'a>> {
+    harness.query_all_by(move |n| {
+        let shown = matches!(n.role(), Role::Label | Role::MultilineTextInput);
+        n.label().as_deref() == Some(text) || shown && n.value().as_deref() == Some(text)
+    })
+}
+
 /// The card of the Note with `text`.
 fn card<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by_role_and_label(Role::Button, text)
@@ -184,17 +196,13 @@ fn a_selected_note_shows_in_its_dialog_with_its_sections_and_merged_notes() -> T
         "Called, all set",
     ] {
         // On the card, and in the Note dialog over the list (#146).
-        let shown: Vec<egui::Rect> = harness
-            .query_all_by_label(section)
-            .map(|n| n.rect())
-            .collect();
+        let shown: Vec<egui::Rect> = showing(&harness, section).map(|n| n.rect()).collect();
         assert_eq!(shown.len(), 2, "{section} on the card and in the dialog");
         assert!(target.contains_rect(shown[0]), "{section} on the card");
     }
     // Oldest first, in the dialog, drawn last.
     let top = |label| {
-        harness
-            .query_all_by_label(label)
+        showing(&harness, label)
             .map(|n| n.rect())
             .next_back()
             .map_or(f32::NAN, |r| r.top())
@@ -664,8 +672,8 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     let cellar = find(harness.state(), "Sort the cellar")?.id;
     assert_eq!(note(&harness, &kettle)?.merged_into, Some(cellar.clone()));
     assert_eq!(harness.state().selected_note(), Some(cellar.as_str()));
-    assert!(shows(&harness, "Descale the kettle"));
-    assert!(shows(&harness, "Vinegar works"));
+    assert!(showing(&harness, "Descale the kettle").next().is_some());
+    assert!(showing(&harness, "Vinegar works").next().is_some());
     Ok(())
 }
 

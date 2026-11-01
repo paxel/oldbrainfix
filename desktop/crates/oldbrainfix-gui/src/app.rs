@@ -548,6 +548,8 @@ enum Dialog {
         linked: bool,
         /// Whether it goes on the Amend field's text.
         amend: bool,
+        /// The Section whose field's text it goes on (#183).
+        section: Option<String>,
     },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
@@ -968,16 +970,18 @@ enum Action {
     /// Keeps the selected Note's edited text.
     SaveText,
     /// Keeps it as a formatted text, its first format just applied
-    /// (#127, ADR 0033).
-    FormatText,
+    /// (#127, ADR 0033): the Note's, or the Section's of this id (#183).
+    FormatText(Option<String>),
     /// Asks for the address of a link on the bytes `start..end` of the
-    /// edited text, or of the Amend field's with `amend`, `url` the
-    /// link's there is one already.
+    /// edited text, of the Amend field's with `amend` or of the field of
+    /// the Section `section` (#183), `url` the link's there is one
+    /// already.
     AskLink {
         start: usize,
         end: usize,
         url: Option<String>,
         amend: bool,
+        section: Option<String>,
     },
     /// Puts the link asked for on the text it was asked for.
     SetLink,
@@ -1331,6 +1335,9 @@ pub struct App {
     /// selection `text_select` in bytes when there is one.
     text_focus: bool,
     text_select: Option<(usize, usize)>,
+    /// The text of each Section of the selected Note this Device may
+    /// edit in place (#183), by its id, as it is being edited.
+    section_texts: BTreeMap<String, SectionField>,
     /// The text of the Section being added, and whether its field is to
     /// take the keyboard, once, with the selection `amend_select` in
     /// bytes when there is one.
@@ -1715,6 +1722,7 @@ impl App {
             text_editing: false,
             text_focus: false,
             text_select: None,
+            section_texts: BTreeMap::new(),
             amend: String::new(),
             amend_focus: false,
             amend_select: None,
@@ -3781,6 +3789,25 @@ impl App {
             self.amend.clear();
             self.amend_focus = false;
             self.amend_select = None;
+            self.section_texts.clear();
+        }
+        // Each Section this Device may edit has its field (#183), none
+        // while the Note is in the trash; what is typed in one stays as
+        // the Sections are read again, only a save puts the stored text
+        // back into it.
+        let editable = &self.view.text_changeable;
+        let sections = self.view.detail.as_ref().map_or(&[][..], |(_, s)| s);
+        self.section_texts
+            .retain(|id, _| editable.contains(id) && sections.iter().any(|s| &s.id == id));
+        for section in sections {
+            if editable.contains(&section.id) {
+                self.section_texts
+                    .entry(section.id.clone())
+                    .or_insert_with(|| SectionField {
+                        text: section.text.clone(),
+                        ..SectionField::default()
+                    });
+            }
         }
         // "To full editor": the Note's text takes the keyboard (#142).
         if let Some(wanted) = self.edit_wanted.take()
@@ -4095,7 +4122,7 @@ impl App {
                 text_changeable.insert(p.note.id.clone());
             }
             for section in sections {
-                if section.text_editable && self.store.may_change(&section.id)? {
+                if notes.may_edit_section(&section.id)? {
                     text_changeable.insert(section.id.clone());
                 }
             }
@@ -4738,12 +4765,14 @@ impl App {
                 }
             }
             Action::SaveText => self.save_text()?,
-            Action::FormatText => self.save_formatted()?,
+            Action::FormatText(None) => self.save_formatted()?,
+            Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
             Action::AskLink {
                 start,
                 end,
                 url,
                 amend,
+                section,
             } => {
                 self.dialog = Some(Dialog::Link {
                     linked: url.is_some(),
@@ -4751,6 +4780,7 @@ impl App {
                     start,
                     end,
                     amend,
+                    section,
                 });
                 self.focus = true;
             }
@@ -4770,6 +4800,26 @@ impl App {
                     self.amend_select = Some((linked.start, linked.end));
                     self.amend_focus = true;
                     self.dialog = None;
+                } else if let Some(Dialog::Link {
+                    address,
+                    start,
+                    end,
+                    section: Some(section),
+                    ..
+                }) = &self.dialog
+                {
+                    // Into the Section's field, kept at once (#183).
+                    let section = section.clone();
+                    let url = format_bar::address(address);
+                    if let Some(field) = self.section_texts.get_mut(&section) {
+                        let linked = markdown::link(&field.text, *start, *end, &url);
+                        field.text = linked.text;
+                        field.select = Some((linked.start, linked.end));
+                        field.editing = true;
+                        field.focus = true;
+                    }
+                    self.dialog = None;
+                    self.save_section_formatted(&section)?;
                 } else if let Some(Dialog::Link {
                     address,
                     start,
@@ -5473,6 +5523,10 @@ impl App {
                 let written = notes.take_over(&note, generated, append)?;
                 if self.text_of.as_deref() == Some(note.as_str()) {
                     self.text = written;
+                } else if let Some(field) = self.section_texts.get_mut(&note) {
+                    // A Section's field shows the text it has now, or the
+                    // next save would put the old one back (#183).
+                    field.text = written;
                 }
             }
             Action::AskRemoveText { note, hash, photo } => {
@@ -5883,26 +5937,43 @@ impl App {
         }))
     }
 
-    /// Shows the table `opening` says full screen (#128). A Note's table
-    /// is edited there only where this Device may change the Note as it
-    /// is stored now; what is typed into the Note shown goes in first, and
-    /// the view holds the text as stored, at the same table.
+    /// The stored text and its format of the Note or Section `id`
+    /// (#183) where this Device may write it as it is stored now: not in
+    /// the trash, in a format known here, its to change.
+    fn writable_text(&self, id: &str) -> oldbrainfix_core::Result<Option<(String, String)>> {
+        let notes = Notes::new(&self.store);
+        // A merged Note is a Section of the one it went into.
+        if let Some(section) = notes.section_by_id(id)? {
+            return Ok(Self::section_writable(&notes, &section)?
+                .then_some((section.text, section.text_format)));
+        }
+        Ok(match notes.by_id(id)? {
+            Some(now) if !now.is_trashed() && now.text_editable && self.store.may_change(id)? => {
+                Some((now.text, now.text_format))
+            }
+            _ => None,
+        })
+    }
+
+    /// Shows the table `opening` says full screen (#128). A table of a
+    /// Note or Section (#183) is edited there only where this Device may
+    /// change its text as it is stored now; what is typed into the Note
+    /// shown goes in first, and the view holds the text as stored, at the
+    /// same table.
     fn open_table(&mut self, mut opening: Opening) -> oldbrainfix_core::Result<()> {
         self.table_amends = false;
         if let Some(note) = opening.note.take() {
-            if self.text_of.as_deref() == Some(note.as_str()) {
+            if self.text_of.as_deref() == Some(note.as_str())
+                || self.section_texts.contains_key(&note)
+            {
                 self.save_text()?;
             }
-            let now = Notes::new(&self.store).by_id(&note)?;
-            if let Some(now) = now
-                && !now.is_trashed()
-                && now.text_editable
-                && now.text_format == text_format::MARKDOWN
-                && self.store.may_change(&note)?
-                && let Some(at) = same_table((&opening.text, opening.at), &now.text)
+            if let Some((now, format)) = self.writable_text(&note)?
+                && format == text_format::MARKDOWN
+                && let Some(at) = same_table((&opening.text, opening.at), &now)
             {
                 opening.note = Some(note);
-                opening.text = now.text;
+                opening.text = now;
                 opening.at = at;
             } else {
                 opening.cell = None;
@@ -5950,9 +6021,9 @@ impl App {
     }
 
     /// Keeps `text`, its table edited full screen, as the text of the
-    /// Note the table is in, where this Device may change it as it is
-    /// stored now; a text left blank is not kept. The Note shown then
-    /// holds it in its field.
+    /// Note or Section (#183) the table is in, where this Device may
+    /// change it as it is stored now; a text left blank is not kept. The
+    /// field of the Note or Section shown then holds it.
     fn write_table(&mut self, text: &str) -> oldbrainfix_core::Result<()> {
         // A table of the Amend field goes back into it, kept with the
         // Section.
@@ -5968,21 +6039,25 @@ impl App {
         else {
             return Ok(());
         };
-        let notes = Notes::new(&self.store);
-        let Some(now) = notes.by_id(&note)? else {
+        let Some((now, _)) = self.writable_text(&note)? else {
             return Ok(());
         };
-        if now.is_trashed() || !now.text_editable || !self.store.may_change(&note)? {
-            return Ok(());
-        }
         let text = text.trim();
-        if text.is_empty() || text == now.text {
+        if text.is_empty() || text == now {
             return Ok(());
         }
-        notes.edit_as(&note, text, text_format::MARKDOWN)?;
+        let notes = Notes::new(&self.store);
+        let section = notes.section_by_id(&note)?.is_some();
         // As stored, its new boxes with their ids (ADR 0035), here and in
         // the view, so the next write keeps them.
-        let Some(stored) = notes.by_id(&note)?.map(|n| n.text) else {
+        let stored = if section {
+            notes.edit_section_as(&note, text, text_format::MARKDOWN)?;
+            notes.section_by_id(&note)?.map(|s| s.text)
+        } else {
+            notes.edit_as(&note, text, text_format::MARKDOWN)?;
+            notes.by_id(&note)?.map(|n| n.text)
+        };
+        let Some(stored) = stored else {
             return Ok(());
         };
         if let Some(table) = &mut self.table
@@ -5992,6 +6067,8 @@ impl App {
         }
         if self.text_of.as_deref() == Some(note.as_str()) {
             self.text = stored;
+        } else if let Some(field) = self.section_texts.get_mut(&note) {
+            field.text = stored;
         }
         Ok(())
     }
@@ -6465,12 +6542,85 @@ impl App {
         Ok(())
     }
 
-    /// Keeps the edited text of the shown Note when it changed; an
-    /// emptied text goes back to what it was.
+    /// Keeps the edited text of the shown Note when it changed, then
+    /// each of its Sections' (#183); an emptied text goes back to what it
+    /// was.
     fn save_text(&mut self) -> oldbrainfix_core::Result<()> {
         // What was typed into its Lines first, by anyone who may add them
         // (#141).
         self.lines.keep(&self.store)?;
+        self.save_note_text()?;
+        self.save_sections()
+    }
+
+    /// Keeps the edited text of each Section of the shown Note whose
+    /// field changed (#183), fixed in place as the Note's is, where this
+    /// Device may edit it as it is stored now; an emptied text goes back
+    /// to what it was. Each field then holds the text as it was kept, its
+    /// new boxes with their ids (ADR 0035).
+    fn save_sections(&mut self) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        for (id, field) in &mut self.section_texts {
+            let Some(section) = notes.section_by_id(id)? else {
+                continue;
+            };
+            let text = field.text.trim();
+            if text.is_empty() {
+                field.text = section.text;
+                continue;
+            }
+            if text == section.text || !Self::section_writable(&notes, &section)? {
+                continue;
+            }
+            notes.edit_section(id, text)?;
+            if let Some(now) = notes.section_by_id(id)? {
+                field.text = now.text;
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether this Device may write the text of `section` now: its
+    /// Note is not in the trash and [`Notes::may_edit_section`] (#183).
+    fn section_writable(notes: &Notes<'_>, section: &Section) -> oldbrainfix_core::Result<bool> {
+        let trashed = notes
+            .by_id(&section.note_id)?
+            .is_none_or(|n| n.is_trashed());
+        Ok(!trashed && notes.may_edit_section(&section.id)?)
+    }
+
+    /// Keeps the Section `id`'s edited text as a formatted text, at once,
+    /// as its first format is applied (#183, ADR 0033), as
+    /// [`App::save_formatted`] keeps the Note's.
+    fn save_section_formatted(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let Some(section) = notes.section_by_id(id)? else {
+            return Ok(());
+        };
+        let Some(field) = self.section_texts.get_mut(id) else {
+            return Ok(());
+        };
+        let text = field.text.trim();
+        if text.is_empty() || !Self::section_writable(&notes, &section)? {
+            return Ok(());
+        }
+        if section.text_format != text_format::MARKDOWN || text != section.text {
+            notes.edit_section_as(id, text, text_format::MARKDOWN)?;
+            if let Some(now) = notes.section_by_id(id)?
+                && now.text != text
+            {
+                let typed = field.text.clone();
+                let before = &typed[..typed.len() - typed.trim_start().len()];
+                let after = &typed[typed.trim_end().len()..];
+                field.text = format!("{before}{}{after}", now.text);
+            }
+        }
+        Ok(())
+    }
+
+    /// Keeps the edited text of the shown Note when it changed; an
+    /// emptied text goes back to what it was.
+    fn save_note_text(&mut self) -> oldbrainfix_core::Result<()> {
         let Some((placed, _)) = &self.view.detail else {
             return Ok(());
         };
@@ -7929,7 +8079,7 @@ impl App {
                 |ui| {
                     let id = &note.id;
                     let removable = |detail| captured_removable.contains(&(id.clone(), detail));
-                    let shown = (note.captured, &note.context);
+                    let shown = (note.captured, &note.context, None);
                     if let Some(detail) = capture_context(ui, &t, shown, removable) {
                         let id = id.clone();
                         actions.push(Action::AskRemoveCaptured { id, detail });
@@ -8716,7 +8866,9 @@ impl App {
     /// The selected Note's editor (UI laws, "Desktop").
     /// The Note dialog's content (#146): the text, the badges of the
     /// Note's settings under it (#160), its Lines, media, Tally and
-    /// Sections, Amend and the rest of what can be done to it.
+    /// Sections, Amend and the rest of what can be done to it. A Section
+    /// this Device may edit has a field of its own, as the Note's text
+    /// (#183); a text only read selects to be copied.
     fn note_editor(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
@@ -8742,6 +8894,7 @@ impl App {
         let editing = &mut self.text_editing;
         let focus = &mut self.text_focus;
         let select = &mut self.text_select;
+        let section_texts = &mut self.section_texts;
         let amend = &mut self.amend;
         let amend_focus = &mut self.amend_focus;
         let amend_select = &mut self.amend_select;
@@ -8788,7 +8941,9 @@ impl App {
                     let formatted = note.text_format == text_format::MARKDOWN;
                     if trashed || !may.changes || !note.text_editable {
                         // Its marks show, to read (#125), and a formatted
-                        // text reads as it is formatted (#127).
+                        // text reads as it is formatted (#127); it selects
+                        // to be copied (#183).
+                        ui.style_mut().interaction.selectable_labels = true;
                         let all = (0, note.text.len());
                         let spots = text_marks_view::formatted_label(
                             ui,
@@ -8821,262 +8976,18 @@ impl App {
                         text_marks_view::link_clicks(ui, of, &spots.links);
                         return;
                     }
-                    let id = Id::new("note text");
-                    let focused = ui.memory(|m| m.has_focus(id));
-                    if focused {
-                        *editing = true;
-                        if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
-                            actions.push(Action::SaveText);
-                        }
-                    }
-                    // The format bar above the field (#127), on its
-                    // selection as the field last had it; Ctrl+B and
-                    // Ctrl+I as its bold and italic while typing.
-                    let selected = format_bar::selection(ui, id, edited);
-                    let at = format_bar::At::of(edited, selected, formatted);
-                    let mut picked =
-                        format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL);
-                    if focused {
-                        ui.input_mut(|i| {
-                            if i.consume_key(Modifiers::COMMAND, Key::B) {
-                                picked = Some(Format::Bold);
-                            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
-                                picked = Some(Format::Italic);
-                            }
-                        });
-                    }
-                    if formatted && !*editing {
-                        // As it reads; a click on it edits its source.
-                        let all = (0, edited.len());
-                        let shown = ui.scope(|ui| {
-                            text_marks_view::formatted_label(
-                                ui,
-                                (edited, text_format::MARKDOWN, boxes),
-                                all,
-                                (Some(18.0), text),
-                                false,
-                            )
-                        });
-                        let read = Id::new(("read", &note.id));
-                        let open = ui.interact(shown.response.rect, read, Sense::click());
-                        open.widget_info(|| {
-                            WidgetInfo::labeled(WidgetType::Button, true, t.edit())
-                        });
-                        if open.on_hover_cursor(egui::CursorIcon::Text).clicked() {
-                            *editing = true;
-                            *focus = true;
-                        }
-                        let spots = shown.inner;
-                        let marked = Id::new(("field", &note.id));
-                        // A click on a table opens it full screen, to
-                        // edit (#128).
-                        if let Some(at) =
-                            text_marks_view::table_clicks(ui, &t, marked, &spots.tables)
-                        {
-                            actions.push(Action::OpenTable(Opening {
-                                note: Some(note.id.clone()),
-                                text: edited.clone(),
-                                at,
-                                cell: None,
-                                tags: true,
-                                boxes: Some(note.id.clone()),
-                            }));
-                        }
-                        // A tick is no edit: what is typed stays.
-                        if let Some(asked) = text_marks_view::box_clicks(
-                            ui,
-                            &t,
-                            marked,
-                            &spots.boxes,
-                            (ticks, &ticked),
-                        ) {
-                            actions.push(box_action(note.id.clone(), asked));
-                        }
-                        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags)
-                        {
-                            actions.push(Action::SearchFor(tag));
-                        }
-                        text_marks_view::link_clicks(ui, marked, &spots.links);
-                    } else {
-                        // Its tags in the accent colour, a formatted text's
-                        // marks dimmed; a click on a tag places the cursor,
-                        // as anywhere in the field (#126). Its boxes as they
-                        // show, their ids not drawn (ADR 0035), with Show
-                        // ticks room after each for who ticked it.
-                        let accent = ui.visuals().hyperlink_color;
-                        let weak = ui.visuals().weak_text_color();
-                        let small = FontId::proportional(13.0);
-                        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
-                            let typed = typed.as_str();
-                            let font = FontId::proportional(18.0);
-                            let job = if formatted {
-                                text_marks_view::source_job(typed, font, (text, accent, weak))
-                            } else {
-                                text_marks_view::tag_job(
-                                    typed,
-                                    (0, typed.len()),
-                                    font,
-                                    (text, accent),
-                                )
-                            };
-                            let gap = |after: &str| {
-                                let said = after.to_string();
-                                let galley =
-                                    ui.fonts_mut(|f| f.layout_no_wrap(said, small.clone(), weak));
-                                galley.size().x + 8.0
-                            };
-                            let mut job = text_marks_view::field_job(job, boxes, &gap);
-                            job.wrap.max_width = width;
-                            ui.fonts_mut(|f| f.layout_job(job))
-                        };
-                        // Pasted with a format, a plain text becomes a
-                        // formatted one (ADR 0033).
-                        let pasted = focused
-                            && ui.input(|i| {
-                                i.events.iter().any(
-                                    |e| matches!(e, egui::Event::Paste(p) if markdown::uses(p)),
-                                )
-                            });
-                        let placed = *focus && select.is_some();
-                        // Not in the dialog's first, sizing pass, which
-                        // drops a focus.
-                        if !ui.is_sizing_pass() && std::mem::take(focus) {
-                            let typed = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id)
-                                .and_then(|s| s.cursor.char_range())
-                                .is_some();
-                            match select.take() {
-                                Some(range) => format_bar::select(ui, id, edited, range),
-                                // Never typed into: the cursor at the end.
-                                None if !typed => {
-                                    let end = edited.len();
-                                    format_bar::select(ui, id, edited, (end, end));
-                                }
-                                None => ui.memory_mut(|m| m.request_focus(id)),
-                            }
-                        }
-                        // A box goes whole, its id with it, and the cursor
-                        // stays where it was as a save gives boxes ids.
-                        let cut = text_marks_view::guard_field(ui, id, edited, !placed);
-                        let output = TextEdit::multiline(edited)
-                            .id(id)
-                            .font(FontId::proportional(18.0))
-                            .layouter(&mut layouter)
-                            .desired_rows(1)
-                            .desired_width(f32::INFINITY)
-                            .frame(Frame::NONE)
-                            .show(ui);
-                        text_marks_view::guard_cursor(ui, id, edited);
-                        if cut {
-                            ui.ctx().request_repaint();
-                        }
-                        name_field(ui, &output.response.response, t.note_text_field_name());
-                        // A click on the bar keeps the field being edited.
-                        if output.response.response.lost_focus() && picked.is_none() {
-                            *editing = false;
-                            actions.push(Action::SaveText);
-                        }
-                        // A shortcut typed makes a plain text a formatted
-                        // one, as the first format from the bar does.
-                        if output.response.response.changed() && !formatted {
-                            let cursor =
-                                output.cursor_range.map_or(0, |range| range.primary.index.0);
-                            let byte = edited
-                                .char_indices()
-                                .nth(cursor)
-                                .map_or(edited.len(), |(b, _)| b);
-                            if pasted || markdown::shortcut_at(edited, byte) {
-                                actions.push(Action::FormatText);
-                            }
-                        }
-                        // With Show ticks, who ticked each box, after it.
-                        let place = (&output.galley, output.galley_pos);
-                        text_marks_view::paint_after(ui, place, (edited, boxes), (small, weak));
-                        // A click on a box ticks it, no edit of the text
-                        // (ADR 0035).
-                        let spots = text_marks_view::field_spots(
-                            &output.galley,
-                            output.galley_pos,
-                            edited,
-                            boxes,
-                        );
-                        let marked = Id::new(("field", &note.id));
-                        if let Some(asked) =
-                            text_marks_view::box_clicks(ui, &t, marked, &spots, (ticks, &ticked))
-                        {
-                            actions.push(box_action(note.id.clone(), asked));
-                        }
-                    }
-                    match picked {
-                        // In a table it opens it; elsewhere it puts a new
-                        // one in and edits its first cell (#128), the
-                        // text formatted from then on.
-                        Some(Format::Table) => {
-                            let opening = match markdown::table::at(edited, selected.0) {
-                                Some(table) => Opening {
-                                    note: Some(note.id.clone()),
-                                    text: edited.clone(),
-                                    at: table.start,
-                                    cell: None,
-                                    tags: true,
-                                    boxes: Some(note.id.clone()),
-                                },
-                                None => {
-                                    let change = markdown::table::insert(edited, selected.0);
-                                    *edited = change.text;
-                                    actions.push(if formatted {
-                                        Action::SaveText
-                                    } else {
-                                        Action::FormatText
-                                    });
-                                    Opening {
-                                        note: Some(note.id.clone()),
-                                        text: edited.clone(),
-                                        at: change.start,
-                                        cell: Some((0, 0)),
-                                        tags: true,
-                                        boxes: Some(note.id.clone()),
-                                    }
-                                }
-                            };
-                            actions.push(Action::OpenTable(opening));
-                        }
-                        Some(Format::Link) => {
-                            *editing = true;
-                            actions.push(Action::AskLink {
-                                start: selected.0,
-                                end: selected.1,
-                                url: at.url.clone(),
-                                amend: false,
-                            });
-                        }
-                        Some(format) => {
-                            *editing = true;
-                            match format_bar::change(format, edited, selected) {
-                                Some(changed) => {
-                                    *edited = changed.text;
-                                    let range = (changed.start, changed.end);
-                                    format_bar::select(ui, id, edited, range);
-                                    // The first format makes it a formatted
-                                    // text, kept at once.
-                                    if format != Format::Mark && !formatted {
-                                        actions.push(Action::FormatText);
-                                    }
-                                }
-                                None => ui.memory_mut(|m| m.request_focus(id)),
-                            }
-                        }
-                        None => {}
-                    }
-                    text_marks_view::remember_text(ui, id, edited);
-                    ui.horizontal(|ui| {
-                        let changed = edited.trim();
-                        if !changed.is_empty()
-                            && changed != note.text
-                            && ui.button(RichText::new(t.save()).color(text)).clicked()
-                        {
-                            actions.push(Action::SaveText);
-                        }
-                    });
+                    let field = EditedText {
+                        id: Id::new("note text"),
+                        of: &note.id,
+                        section: false,
+                        stored: &note.text,
+                        formatted,
+                        boxes,
+                        ticks: (ticks, &ticked),
+                        name: t.note_text_field_name(),
+                    };
+                    let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
+                    edited_text(ui, (t, tones), field, state, actions);
                 });
                 // Each setting as its badge, in one wrapping row under the
                 // text (#160).
@@ -9143,12 +9054,36 @@ impl App {
                         if !section.text_editable {
                             ui.label(RichText::new(t.text_newer_format()).color(weak));
                         }
-                        if !section.text.is_empty() {
-                            // Its boxes tick; a Section's text has no edit
-                            // (ADR 0035). A formatted one reads formatted.
+                        let look = look_of(&section.id);
+                        let section_ticks = box_ticks.contains(&section.id);
+                        let section_ticked = ticked_in(&section.boxes);
+                        if let Some(field) = section_texts.get_mut(&section.id) {
+                            // Edited in place as the Note's text is, by the
+                            // same people (#183).
+                            let shown = EditedText {
+                                id: Id::new(("section text", &section.id)),
+                                of: &section.id,
+                                section: true,
+                                stored: &section.text,
+                                formatted: section.text_format == text_format::MARKDOWN,
+                                boxes: look,
+                                ticks: (section_ticks, &section_ticked),
+                                name: t.section_text_field_name(),
+                            };
+                            let state = (
+                                &mut field.text,
+                                &mut field.editing,
+                                &mut field.focus,
+                                &mut field.select,
+                            );
+                            edited_text(ui, (t, tones), shown, state, actions);
+                        } else if !section.text.is_empty() {
+                            // Its boxes tick; only read, its text selects
+                            // to be copied (#183). A formatted one reads
+                            // formatted.
+                            ui.style_mut().interaction.selectable_labels = true;
                             let all = (0, section.text.len());
                             let shown = (None, text);
-                            let look = look_of(&section.id);
                             let spots = text_marks_view::formatted_label(
                                 ui,
                                 (&section.text, &section.text_format, look),
@@ -9169,8 +9104,6 @@ impl App {
                                     boxes: Some(section.id.clone()),
                                 }));
                             }
-                            let section_ticks = box_ticks.contains(&section.id);
-                            let section_ticked = ticked_in(&section.boxes);
                             if let Some(asked) = text_marks_view::box_clicks(
                                 ui,
                                 &t,
@@ -9185,6 +9118,7 @@ impl App {
                                 actions.push(Action::SearchFor(tag));
                             }
                             text_marks_view::link_clicks(ui, of, &spots.links);
+                            ui.style_mut().interaction.selectable_labels = false;
                         }
                         let media = Media {
                             id: &section.id,
@@ -9208,7 +9142,8 @@ impl App {
                             (playing, transcribing, can_play, speed),
                             actions,
                         );
-                        let shown = (section.captured, &section.context);
+                        let edited = section_edited(&t, section);
+                        let shown = (section.captured, &section.context, edited.as_deref());
                         let id = &section.id;
                         let removable = |detail| captured_removable.contains(&(id.clone(), detail));
                         if let Some(detail) = capture_context(ui, &t, shown, removable) {
@@ -9272,6 +9207,7 @@ impl App {
                             end: selected.1,
                             url: at.url.clone(),
                             amend: true,
+                            section: None,
                         }),
                         Some(format) => match format_bar::change(format, amend, selected) {
                             Some(changed) => {
@@ -10224,8 +10160,16 @@ impl App {
     /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
         // The link not set: the field has the keyboard again.
-        match self.dialog {
+        match &self.dialog {
             Some(Dialog::Link { amend: true, .. }) => self.amend_focus = true,
+            Some(Dialog::Link {
+                section: Some(section),
+                ..
+            }) => {
+                if let Some(field) = self.section_texts.get_mut(section) {
+                    field.focus = true;
+                }
+            }
             Some(Dialog::Link { .. }) => self.text_focus = true,
             _ => {}
         }
@@ -13024,21 +12968,43 @@ fn context_line(ui: &mut Ui, icon: char, line: &str) {
     });
 }
 
+/// When the text of `section` was last edited and by whom (#183), as
+/// the phone's `CaptureContextLines.ofSection` says it: no "by" for a
+/// writer not known or a Profile without a name; `None` while it was
+/// never edited.
+fn section_edited(t: &L10n, section: &Section) -> Option<String> {
+    let at = when(t, section.modified?);
+    let name = section.edited_by.as_ref().map(|p| p.name.trim());
+    Some(match name.filter(|n| !n.is_empty()) {
+        Some(name) => t.section_edited_by(&at, name),
+        None => t.section_edited(&at),
+    })
+}
+
 /// The whole Capture Context of a Note or Section `captured` then, line
-/// by line, as the phone's `CaptureContextLines`: when, then
+/// by line, as the phone's `CaptureContextLines`: when, under it, small
+/// and dimmed, a Section's `edited` line (#183, [`section_edited`]), then
 /// [`context_lines`]. Each detail `removable` says may go ends in a
 /// Remove (ADR 0037), the time in none; the detail whose Remove was
 /// clicked.
 fn capture_context(
     ui: &mut Ui,
     t: &L10n,
-    (captured, context): (DateTime<Utc>, &CaptureContext),
+    (captured, context, edited): (DateTime<Utc>, &CaptureContext, Option<&str>),
     removable: impl Fn(CapturedDetail) -> bool,
 ) -> Option<CapturedDetail> {
     let mut asked = None;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         context_line(ui, icons::CONTEXT_WHEN, &when(t, captured));
+        if let Some(edited) = edited {
+            let weak = ui.visuals().weak_text_color();
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                icons::show(ui, icons::EDIT, 16.0, weak);
+                ui.add(egui::Label::new(RichText::new(edited).size(12.0).color(weak)).wrap());
+            });
+        }
         for (icon, line, detail) in context_lines(t, context) {
             if !removable(detail) {
                 context_line(ui, icon, &line);
@@ -13619,6 +13585,280 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     resp.on_hover_text(label).clicked()
 }
 
+/// A text edited in the Note dialog: the Note's, or a Section's (#183)
+/// in the same field, with the same format bar and the same rules.
+struct EditedText<'a> {
+    /// The field's id.
+    id: Id,
+    /// The Note or Section whose text it is, and whether a Section's.
+    of: &'a str,
+    section: bool,
+    /// Its text as stored, and whether it is a formatted one.
+    stored: &'a str,
+    formatted: bool,
+    /// How its boxes show, whether this Device may tick them and which
+    /// were ticked (ADR 0035).
+    boxes: &'a BoxLook,
+    ticks: (bool, &'a dyn Fn(&str) -> bool),
+    /// What a screen reader calls the field.
+    name: &'a str,
+}
+
+/// The field of a text of the Note dialog, `edit`, its format bar above
+/// it (#127): `edited` as it is being edited, whether it is (a formatted
+/// text shows its source meanwhile, as it reads otherwise), and whether
+/// it is to take the keyboard, once, with the selection `select`; a Save
+/// under it while it changed.
+fn edited_text(
+    ui: &mut Ui,
+    (t, tones): (L10n, Tones),
+    edit: EditedText<'_>,
+    (edited, editing, focus, select): (
+        &mut String,
+        &mut bool,
+        &mut bool,
+        &mut Option<(usize, usize)>,
+    ),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let (formatted, boxes) = (edit.formatted, edit.boxes);
+    // Kept as a formatted text at once: the Note's, or the Section's.
+    let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
+    let id = edit.id;
+    let of = edit.of;
+    let focused = ui.memory(|m| m.has_focus(id));
+    if focused {
+        *editing = true;
+        if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
+            actions.push(Action::SaveText);
+        }
+    }
+    // The format bar above the field (#127), on its
+    // selection as the field last had it; Ctrl+B and
+    // Ctrl+I as its bold and italic while typing.
+    let selected = format_bar::selection(ui, id, edited);
+    let at = format_bar::At::of(edited, selected, formatted);
+    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL);
+    if focused {
+        ui.input_mut(|i| {
+            if i.consume_key(Modifiers::COMMAND, Key::B) {
+                picked = Some(Format::Bold);
+            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
+                picked = Some(Format::Italic);
+            }
+        });
+    }
+    if formatted && !*editing {
+        // As it reads; a click on it edits its source.
+        let all = (0, edited.len());
+        let shown = ui.scope(|ui| {
+            text_marks_view::formatted_label(
+                ui,
+                (edited, text_format::MARKDOWN, boxes),
+                all,
+                (Some(18.0), text),
+                false,
+            )
+        });
+        let read = Id::new(("read", of));
+        let open = ui.interact(shown.response.rect, read, Sense::click());
+        open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
+        if open.on_hover_cursor(egui::CursorIcon::Text).clicked() {
+            *editing = true;
+            *focus = true;
+        }
+        let spots = shown.inner;
+        let marked = Id::new(("field", of));
+        // A click on a table opens it full screen, to
+        // edit (#128).
+        if let Some(at) = text_marks_view::table_clicks(ui, &t, marked, &spots.tables) {
+            actions.push(Action::OpenTable(Opening {
+                note: Some(of.to_string()),
+                text: edited.clone(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(of.to_string()),
+            }));
+        }
+        // A tick is no edit: what is typed stays.
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, edit.ticks) {
+            actions.push(box_action(of.to_string(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, marked, &spots.links);
+    } else {
+        // Its tags in the accent colour, a formatted text's
+        // marks dimmed; a click on a tag places the cursor,
+        // as anywhere in the field (#126). Its boxes as they
+        // show, their ids not drawn (ADR 0035), with Show
+        // ticks room after each for who ticked it.
+        let accent = ui.visuals().hyperlink_color;
+        let weak = ui.visuals().weak_text_color();
+        let small = FontId::proportional(13.0);
+        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+            let typed = typed.as_str();
+            let font = FontId::proportional(18.0);
+            let job = if formatted {
+                text_marks_view::source_job(typed, font, (text, accent, weak))
+            } else {
+                text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
+            };
+            let gap = |after: &str| {
+                let said = after.to_string();
+                let galley = ui.fonts_mut(|f| f.layout_no_wrap(said, small.clone(), weak));
+                galley.size().x + 8.0
+            };
+            let mut job = text_marks_view::field_job(job, boxes, &gap);
+            job.wrap.max_width = width;
+            ui.fonts_mut(|f| f.layout_job(job))
+        };
+        // Pasted with a format, a plain text becomes a
+        // formatted one (ADR 0033).
+        let pasted = focused
+            && ui.input(|i| {
+                i.events
+                    .iter()
+                    .any(|e| matches!(e, egui::Event::Paste(p) if markdown::uses(p)))
+            });
+        let placed = *focus && select.is_some();
+        // Not in the dialog's first, sizing pass, which
+        // drops a focus.
+        if !ui.is_sizing_pass() && std::mem::take(focus) {
+            let typed = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id)
+                .and_then(|s| s.cursor.char_range())
+                .is_some();
+            match select.take() {
+                Some(range) => format_bar::select(ui, id, edited, range),
+                // Never typed into: the cursor at the end.
+                None if !typed => {
+                    let end = edited.len();
+                    format_bar::select(ui, id, edited, (end, end));
+                }
+                None => ui.memory_mut(|m| m.request_focus(id)),
+            }
+        }
+        // A box goes whole, its id with it, and the cursor
+        // stays where it was as a save gives boxes ids.
+        let cut = text_marks_view::guard_field(ui, id, edited, !placed);
+        let output = TextEdit::multiline(edited)
+            .id(id)
+            .font(FontId::proportional(18.0))
+            .layouter(&mut layouter)
+            .desired_rows(1)
+            .desired_width(f32::INFINITY)
+            .frame(Frame::NONE)
+            .show(ui);
+        text_marks_view::guard_cursor(ui, id, edited);
+        if cut {
+            ui.ctx().request_repaint();
+        }
+        name_field(ui, &output.response.response, edit.name);
+        // A click on the bar keeps the field being edited.
+        if output.response.response.lost_focus() && picked.is_none() {
+            *editing = false;
+            actions.push(Action::SaveText);
+        }
+        // A shortcut typed makes a plain text a formatted
+        // one, as the first format from the bar does.
+        if output.response.response.changed() && !formatted {
+            let cursor = output.cursor_range.map_or(0, |range| range.primary.index.0);
+            let byte = edited
+                .char_indices()
+                .nth(cursor)
+                .map_or(edited.len(), |(b, _)| b);
+            if pasted || markdown::shortcut_at(edited, byte) {
+                actions.push(format_text());
+            }
+        }
+        // With Show ticks, who ticked each box, after it.
+        let place = (&output.galley, output.galley_pos);
+        text_marks_view::paint_after(ui, place, (edited, boxes), (small, weak));
+        // A click on a box ticks it, no edit of the text
+        // (ADR 0035).
+        let spots = text_marks_view::field_spots(&output.galley, output.galley_pos, edited, boxes);
+        let marked = Id::new(("field", of));
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots, edit.ticks) {
+            actions.push(box_action(of.to_string(), asked));
+        }
+    }
+    match picked {
+        // In a table it opens it; elsewhere it puts a new
+        // one in and edits its first cell (#128), the
+        // text formatted from then on.
+        Some(Format::Table) => {
+            let opening = match markdown::table::at(edited, selected.0) {
+                Some(table) => Opening {
+                    note: Some(of.to_string()),
+                    text: edited.clone(),
+                    at: table.start,
+                    cell: None,
+                    tags: true,
+                    boxes: Some(of.to_string()),
+                },
+                None => {
+                    let change = markdown::table::insert(edited, selected.0);
+                    *edited = change.text;
+                    actions.push(if formatted {
+                        Action::SaveText
+                    } else {
+                        format_text()
+                    });
+                    Opening {
+                        note: Some(of.to_string()),
+                        text: edited.clone(),
+                        at: change.start,
+                        cell: Some((0, 0)),
+                        tags: true,
+                        boxes: Some(of.to_string()),
+                    }
+                }
+            };
+            actions.push(Action::OpenTable(opening));
+        }
+        Some(Format::Link) => {
+            *editing = true;
+            actions.push(Action::AskLink {
+                start: selected.0,
+                end: selected.1,
+                url: at.url.clone(),
+                amend: false,
+                section: edit.section.then(|| of.to_string()),
+            });
+        }
+        Some(format) => {
+            *editing = true;
+            match format_bar::change(format, edited, selected) {
+                Some(changed) => {
+                    *edited = changed.text;
+                    let range = (changed.start, changed.end);
+                    format_bar::select(ui, id, edited, range);
+                    // The first format makes it a formatted
+                    // text, kept at once.
+                    if format != Format::Mark && !formatted {
+                        actions.push(format_text());
+                    }
+                }
+                None => ui.memory_mut(|m| m.request_focus(id)),
+            }
+        }
+        None => {}
+    }
+    text_marks_view::remember_text(ui, id, edited);
+    ui.horizontal(|ui| {
+        let changed = edited.trim();
+        if !changed.is_empty()
+            && changed != edit.stored
+            && ui.button(RichText::new(t.save()).color(text)).clicked()
+        {
+            actions.push(Action::SaveText);
+        }
+    });
+}
+
 /// What a click on a box of the text `entity` asked, as an action.
 fn box_action(entity: String, asked: BoxAsk) -> Action {
     match asked {
@@ -13630,6 +13870,18 @@ fn box_action(entity: String, asked: BoxAsk) -> Action {
 /// Whether a box of `look` has been ticked: it offers its History then.
 fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
     move |id| boxes.iter().any(|b| b.id == id && b.last.is_some())
+}
+
+/// A Section's text being edited in the Note dialog (#183), as the
+/// Note's own is: with the ids of its boxes, whether it is being edited
+/// (a formatted text shows its source meanwhile), and whether the field
+/// is to take the keyboard, once, with the selection `select` in bytes.
+#[derive(Debug, Clone, Default)]
+struct SectionField {
+    text: String,
+    editing: bool,
+    focus: bool,
+    select: Option<(usize, usize)>,
 }
 
 /// The text of a Note or Section and its photos and voice recordings,
@@ -13882,7 +14134,9 @@ fn note_card(
                     }
                     for section in look.sections {
                         ui.separator();
-                        capture_context(ui, t, (section.captured, &section.context), |_| false);
+                        let edited = section_edited(t, section);
+                        let captured = (section.captured, &section.context, edited.as_deref());
+                        capture_context(ui, t, captured, |_| false);
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);

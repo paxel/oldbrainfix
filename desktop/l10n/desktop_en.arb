@@ -445,6 +445,8 @@
   "@captureFieldName": {"description": "What a screen reader calls the text field of the desktop's quick note, in the window and the capture popup, once it holds text."},
   "noteTextFieldName": "Note text",
   "@noteTextFieldName": {"description": "What a screen reader calls the text field of the desktop's Note editor."},
+  "sectionTextFieldName": "Section text",
+  "@sectionTextFieldName": {"description": "What a screen reader calls the text field of a Section that can be edited in the desktop's Note dialog (#183)."},
   "showStreaksDevice": "Show Streaks on this computer",
   "@showStreaksDevice": {"description": "Desktop wording of the phone's showStreaks: the switch in the Settings that hides the Streak on a Routine's History."},
   "snoozesHereDevice": "Snoozes show only as this computer recorded them, for about the last month.",

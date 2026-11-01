@@ -3,8 +3,9 @@
 //! leaves it; a cell is edited on one line, Enter writes it, Tab goes on,
 //! Esc leaves it as it was; a row's or column's heading opens its menu;
 //! the empty row adds one; the format bar puts a new table in; a cell's
-//! box ticks in place, its text as it was; a Section's table opens to
-//! read only.
+//! box ticks in place, its text as it was; a Section's table is edited
+//! as the Note's by who may edit the Section (#183), and opens to read
+//! only in the trash.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -279,12 +280,30 @@ fn a_cells_box_ticks_in_place() -> TestResult {
 }
 
 #[test]
-fn a_sections_table_opens_to_read_only() -> TestResult {
+fn a_sections_table_is_edited_as_the_notes_and_read_only_in_the_trash() -> TestResult {
     let (store, note) = with_note("Shop", MARKDOWN)?;
-    Notes::new(&store).amend_as(&note, TABLE, MARKDOWN)?;
+    let notes = Notes::new(&store);
+    let amend = notes.amend_as(&note, TABLE, MARKDOWN)?.id;
     let mut harness = editor(&store, &note);
+    // The Section is this Device's: its table is edited in place (#183).
     press(&mut harness, "Open the table")?;
     assert_eq!(harness.state().shown_table(), Some(TABLE));
+    assert_eq!(buttons(&harness, "Row 1"), 1);
+    click(&mut harness, "milk")?;
+    typed(&mut harness, "s");
+    key(&mut harness, Key::Enter);
+    let section = notes.section_by_id(&amend)?.ok_or("the Amend")?;
+    assert_eq!(section.text, "| Item | Qty |\n| --- | --- |\n| milks | 2 |");
+    assert!(section.modified.is_some());
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().shown_table(), None);
+    // In the trash it opens to read only.
+    notes.trash(&note)?;
+    harness.state_mut().select_note(&note);
+    harness.run();
+    press(&mut harness, "Open the table")?;
+    assert!(harness.state().shown_table().is_some());
     assert_eq!(buttons(&harness, "Row 1"), 0);
     assert_eq!(buttons(&harness, "Add a row"), 0);
     Ok(())
