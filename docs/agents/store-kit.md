@@ -53,10 +53,6 @@ and F-Droid both take them. `docs/screenshots/play` links to
 No tablet frames. Feature graphic (1024 × 500) and hi-res icon (512 × 512)
 are uploaded in the Play Console by hand.
 
-## Pages
-
-The Play Kit page is a private page of the person running the release; its
-link stays out of this public repo. There is no App Store Kit.
 
 ## Glossary
 
