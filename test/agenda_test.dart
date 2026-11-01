@@ -405,13 +405,13 @@ void main() {
       await tap(tester, find.text('Save'));
 
       expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(find.text('Every day · 08:00'), findsOneWidget);
+      expect(find.text('Every day · All day'), findsOneWidget);
       expect(find.textContaining('Once, '), findsOneWidget);
       final spawned = routines.ofNote(dentist.id);
       expect(spawned, hasLength(2));
       expect(spawned.where((r) => r.isReminder), hasLength(1));
 
-      await tap(tester, find.text('Every day · 08:00'));
+      await tap(tester, find.text('Every day · All day'));
       expect(find.text('From the Note'), findsOneWidget);
       await tap(tester, find.text('dentist'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
@@ -457,7 +457,7 @@ void main() {
       expect(note.text, 'pills');
       expect(note.isUnsorted, isFalse);
       expect(routines.note(routines.all().single)?.id, note.id);
-      expect(agendaRows(tester).take(2), ['08:00 pills', '08:00 pills']);
+      expect(agendaRows(tester).take(2), ['All day pills', 'All day pills']);
     });
   });
 
@@ -480,18 +480,19 @@ void main() {
       );
       await reveal(tester, weeks);
       await tap(tester, weeks);
-      // A second time of day: the picker offers 08:00, after 08:00 went.
-      await reveal(tester, find.byTooltip('Remove 08:00'));
-      await tap(tester, find.byTooltip('Remove 08:00'));
+      // A new Routine starts All day; the picker opens at the current
+      // time, 09:25 here.
+      now = DateTime(2026, 10, 24, 9, 25);
       expect(find.text('All day'), findsOneWidget);
       await reveal(tester, find.text('Add a time'));
       await tap(tester, find.text('Add a time'));
       await tap(tester, find.text('OK'));
+      expect(find.text('All day'), findsNothing);
       await tap(tester, find.text('Save'));
 
       final schedule = routines.all().single.schedule;
       expect(schedule.rule?.format(), 'FREQ=WEEKLY;INTERVAL=2');
-      expect(schedule.times, [at(8)]);
+      expect(schedule.times, [ClockTime(9, 25)]);
       expect(schedule.start, today);
     });
 
@@ -570,7 +571,7 @@ void main() {
         'FREQ=MONTHLY;BYDAY=1MO,-1FR',
       );
       await tester.pumpAndSettle();
-      expect(find.text('Mon, 11/2/2026  08:00'), findsOneWidget);
+      expect(find.text('Mon, 11/2/2026  All day'), findsOneWidget);
       await tap(tester, find.text('Save'));
 
       final routine = routines.all().single;
@@ -579,7 +580,10 @@ void main() {
       await tap(tester, find.byTooltip('All Notes'));
       await tester.longPress(find.text('pills'));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Rule: FREQ=MONTHLY;BYDAY=1MO,-1FR · 08:00'));
+      await tap(
+        tester,
+        find.text('Rule: FREQ=MONTHLY;BYDAY=1MO,-1FR · All day'),
+      );
       // A rule the simple editor cannot show opens in the advanced mode.
       expect(find.text('FREQ=MONTHLY;BYDAY=1MO,-1FR'), findsOneWidget);
     });
@@ -605,7 +609,7 @@ void main() {
       await tap(tester, find.byTooltip('All Notes'));
       await tester.longPress(find.text('pills'));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Every month on the last Friday · 08:00'));
+      await tap(tester, find.text('Every month on the last Friday · All day'));
       // In the simple editor, as it was built.
       expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsNothing);
       // Whether the option [text] is the one its radio group holds.

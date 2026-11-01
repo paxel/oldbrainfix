@@ -199,6 +199,8 @@ void main() {
       final note = routinesNote(store, made);
       expect(note?.text, 'Morning sport');
       expect(made.pool, [pushUps]);
+      // A new Session starts All day (#163).
+      expect(made.routine.schedule.times, isEmpty);
       // Its Note is no Unsorted one, as a new Routine's is not.
       expect(notes.unsorted().map((n) => n.id), isNot(contains(note?.id)));
       expect(find.byType(AllRoutinesScreen), findsOneWidget);

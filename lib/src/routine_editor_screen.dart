@@ -263,9 +263,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         _kind = RepeatKind.once;
         _start = Day.of(wall.add(const Duration(hours: 1)));
         _times = [ClockTime((wall.hour + 1) % 24, 0)];
-      } else {
-        _times = [ClockTime(8, 0)];
       }
+      // Else a new Routine or Session: every day, All day.
     }
     _text.addListener(_typed);
     _update();
@@ -433,9 +432,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   }
 
   Future<void> _addTime() async {
+    // The picker opens at the current time.
+    final wall = deviceWallClock(widget.notes.store.clock().toUtc());
     final picked = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 8, minute: 0),
+      initialTime: TimeOfDay(hour: wall.hour, minute: wall.minute),
     );
     if (!mounted || picked == null) return;
     _change(() => _times = [..._times, ClockTime(picked.hour, picked.minute)]);
