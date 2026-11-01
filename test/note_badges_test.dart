@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,16 +41,18 @@ void main() {
       tester.widget<SettingBadge>(key(badge)).value ?? '';
 
   /// Opens the editor of the Note [id] from the Agenda, on a phone-tall
-  /// page.
-  Future<void> edit(WidgetTester tester, String id) async {
+  /// page, on this Device or [on].
+  Future<void> edit(WidgetTester tester, String id, {Store? on}) async {
     tester.view
       ..physicalSize = const Size(1080, 2340)
       ..devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(OldBrainFixApp(store: store));
+    final device = on ?? store;
+    final book = Notes(device);
+    await tester.pumpWidget(OldBrainFixApp(store: device));
     await tester.pumpAndSettle();
     final agenda = tester.element(find.byType(AgendaScreen));
-    unawaited(openNote(agenda, notes, places, notes.byId(id)!));
+    unawaited(openNote(agenda, book, Places(device), book.byId(id)!));
     await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
@@ -143,7 +146,7 @@ void main() {
     });
 
     testWidgets('Captured shows the time, the calendar event and the '
-        'Bluetooth device, read only', (tester) async {
+        'Bluetooth device, each detail with a Remove', (tester) async {
       final id = notes.capture('meeting notes').id;
       notes.attachContext(
         id,
@@ -160,7 +163,8 @@ void main() {
       );
       expect(inDialog(find.text('During: Dentist')), findsOneWidget);
       expect(inDialog(find.textContaining('Car')), findsOneWidget);
-      expect(inDialog(find.byType(TextButton)), findsOneWidget);
+      // Close, and a Remove for the event and the device; none for the time.
+      expect(inDialog(find.byType(TextButton)), findsNWidgets(3));
       await tap(tester, key('badge-close'));
       expect(find.byType(AlertDialog), findsNothing);
     });
@@ -303,5 +307,183 @@ void main() {
       expect(find.text(words), findsOneWidget, reason: words);
     }
     expect(tester.takeException(), isNull);
+  });
+
+  group('removing a captured detail (ADR 0037)', () {
+    /// A Note captured at a place, shared in from a chat, during a
+    /// meeting and with a headset connected.
+    String captured(Store on, {String? place}) {
+      final book = Notes(on);
+      final id = book
+          .capture(
+            'Order toner',
+            place: place,
+            sourceApp: const SourceApp('org.example.chat', label: 'Chat'),
+          )
+          .id;
+      book.locate(id, Coordinates(52.52, 13.405));
+      book.attachContext(
+        id,
+        calendarEvents: ['Katzenklo'],
+        bluetoothDevices: ['Headset'],
+      );
+      return id;
+    }
+
+    Finder remove(CapturedDetail detail) =>
+        key('remove-captured-${detail.name}');
+
+    testWidgets('each detail goes on its own after asking once, the dialog '
+        'follows and the time stays', (tester) async {
+      final id = captured(store);
+      final at = notes.byId(id)!.captured;
+      await edit(tester, id);
+      final time = value(tester, 'badge-captured');
+      await tap(tester, key('badge-captured'));
+      for (final detail in CapturedDetail.values) {
+        expect(inDialog(remove(detail)), findsOneWidget, reason: '$detail');
+      }
+      final semantics = tester.ensureSemantics();
+      expect(find.bySemanticsLabel('Remove the place'), findsOneWidget);
+      semantics.dispose();
+
+      final lines = {
+        CapturedDetail.place: find.byIcon(Icons.place_outlined),
+        CapturedDetail.app: find.text('Shared from Chat'),
+        CapturedDetail.event: find.text('During: Katzenklo'),
+        CapturedDetail.device: find.text('Connected: Headset'),
+      };
+      for (final MapEntry(key: detail, value: line) in lines.entries) {
+        expect(inDialog(line), findsOneWidget, reason: '$detail');
+        await tap(tester, remove(detail));
+        if (detail == CapturedDetail.place) {
+          expect(find.text('Remove the place from this Note?'), findsOneWidget);
+        }
+        await tap(tester, key('remove-media-confirm'));
+        // The badge's dialog stays open and shows what is left.
+        expect(dialogTitle('Captured'), findsOneWidget);
+        expect(inDialog(line), findsNothing, reason: '$detail');
+        expect(remove(detail), findsNothing, reason: '$detail');
+        expect(
+          notes.byId(id)!.context.holds(detail),
+          isFalse,
+          reason: '$detail',
+        );
+      }
+      final note = notes.byId(id)!;
+      expect(note.context.hasMore, isFalse);
+      expect(note.captured, at);
+      expect(note.text, 'Order toner');
+      expect(inDialog(find.text(time)), findsOneWidget);
+      // Only Close is left: the time has no Remove.
+      expect(inDialog(find.byType(TextButton)), findsOneWidget);
+      await tap(tester, key('badge-close'));
+      expect(value(tester, 'badge-captured'), time);
+    });
+
+    testWidgets('Cancel keeps the detail', (tester) async {
+      final id = captured(store);
+      await edit(tester, id);
+      await tap(tester, key('badge-captured'));
+      await tap(tester, remove(CapturedDetail.event));
+      await tap(tester, find.text('Cancel'));
+      expect(inDialog(find.text('During: Katzenklo')), findsOneWidget);
+      expect(inDialog(remove(CapturedDetail.event)), findsOneWidget);
+      expect(notes.byId(id)!.context.calendarEvents, ['Katzenklo']);
+    });
+
+    testWidgets('a Section removes its own, under it in the editor; the '
+        'Note keeps its', (tester) async {
+      final id = captured(store);
+      final section = notes.amend(id, 'Ordered').id;
+      notes.attachContext(section, calendarEvents: ['Standup']);
+      await edit(tester, id);
+      final lines = key('captured-details:$section');
+      final button = find.descendant(
+        of: lines,
+        matching: remove(CapturedDetail.event),
+      );
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tap(tester, button);
+      expect(
+        find.text('Remove the calendar events from this Section?'),
+        findsOneWidget,
+      );
+      await tap(tester, key('remove-media-confirm'));
+      expect(
+        find.descendant(of: lines, matching: find.text('During: Standup')),
+        findsNothing,
+      );
+      expect(button, findsNothing);
+      expect(notes.sections(id).single.context.calendarEvents, isEmpty);
+      expect(notes.byId(id)!.context.calendarEvents, ['Katzenklo']);
+    });
+
+    group('in a Shared Area', () {
+      late Store ben;
+      late String house;
+      late String anns;
+
+      Map<String, Object?> wire(Map<String, Object?> json) =>
+          jsonDecode(jsonEncode(json)) as Map<String, Object?>;
+
+      setUp(() {
+        store
+          ..applyProfileDefaults(name: 'Desk')
+          ..renameOwnProfile('Ann');
+        ben = Store.inMemory(clock: () => now)
+          ..starterSetOffered = true
+          ..alarmSetupDone = true
+          ..applyProfileDefaults(name: 'Pixel')
+          ..renameOwnProfile('Ben');
+        house = places.addArea('Household').id;
+        anns = captured(store, place: house);
+        final area = store.share(house);
+        // Ann's computer invites Ben's phone as a Member.
+        final done = answerSync(
+          store,
+          wire(
+            syncRequest(
+              ben,
+              store.versionVector(),
+              name: 'Phone',
+              hostDevice: store.deviceId,
+              invited: true,
+            ),
+          ),
+          name: 'Desk',
+          inviting: Invite(area, role: AreaRole.member),
+        )!;
+        applyAnswer(ben, wire(done.answer), shared: true);
+      });
+      tearDown(() => ben.close());
+
+      testWidgets("a Member sees no Remove on another person's Note", (
+        tester,
+      ) async {
+        await edit(tester, anns, on: ben);
+        await tap(tester, key('badge-captured'));
+        expect(inDialog(find.text('During: Katzenklo')), findsOneWidget);
+        for (final detail in CapturedDetail.values) {
+          expect(remove(detail), findsNothing, reason: '$detail');
+        }
+      });
+
+      testWidgets('a Member removes a detail of their own Note', (
+        tester,
+      ) async {
+        final own = captured(ben, place: house);
+        await edit(tester, own, on: ben);
+        await tap(tester, key('badge-captured'));
+        await tap(tester, remove(CapturedDetail.device));
+        await tap(tester, key('remove-media-confirm'));
+        expect(Notes(ben).byId(own)!.context.bluetoothDevices, isEmpty);
+        expect(
+          find.text('A captured detail could not be removed.'),
+          findsNothing,
+        );
+      });
+    });
   });
 }

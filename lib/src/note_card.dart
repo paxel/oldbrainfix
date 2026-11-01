@@ -979,15 +979,20 @@ class _AuthorLineState extends State<_AuthorLine> {
 /// The Capture Context of a Note or Section, one line per thing known:
 /// the time; where it was, the Named Place with its coordinates or the
 /// coordinates alone; the app it was shared in from; the calendar events
-/// running; the Bluetooth devices connected.
+/// running; the Bluetooth devices connected. Each detail in [removable]
+/// ends in a Remove that calls [onRemove] (ADR 0037); the time has none.
 class CaptureContextLines extends StatelessWidget {
   final CaptureContext capture;
   final DateFormat when;
+  final Set<CapturedDetail> removable;
+  final void Function(CapturedDetail detail)? onRemove;
 
   const CaptureContextLines({
     super.key,
     required this.capture,
     required this.when,
+    this.removable = const {},
+    this.onRemove,
   });
 
   @override
@@ -997,40 +1002,64 @@ class CaptureContextLines extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final location = capture.location;
     final named = capture.namedPlace;
-    final lines = [
-      (Icons.schedule, when.format(capture.captured.toLocal())),
+    final lines = <(IconData, String, CapturedDetail?)>[
+      (Icons.schedule, when.format(capture.captured.toLocal()), null),
       if (location != null)
         (
           Icons.place_outlined,
           named == null
               ? coordinatesText(location)
               : '${named.name} (${coordinatesText(location)})',
+          CapturedDetail.place,
         ),
       if (capture.sourceApp case final app?)
-        (Icons.apps, t.contextSourceApp(app.name)),
+        (Icons.apps, t.contextSourceApp(app.name), CapturedDetail.app),
       if (capture.calendarEvents.isNotEmpty)
         (
           Icons.event_outlined,
           t.contextDuring(capture.calendarEvents.join(', ')),
+          CapturedDetail.event,
         ),
       if (capture.bluetoothDevices.isNotEmpty)
         (
           Icons.bluetooth,
           t.contextBluetooth(capture.bluetoothDevices.join(', ')),
+          CapturedDetail.device,
         ),
     ];
+    final remove = onRemove;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final (i, (icon, line)) in lines.indexed) ...[
+        for (final (i, (icon, line, detail)) in lines.indexed) ...[
           if (i > 0) const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(icon, size: 20, color: muted),
-              const SizedBox(width: 8),
-              Flexible(child: Text(line, style: text.bodyMedium)),
-            ],
-          ),
+          if (remove != null && detail != null && removable.contains(detail))
+            Row(
+              children: [
+                Icon(icon, size: 20, color: muted),
+                const SizedBox(width: 8),
+                Expanded(child: Text(line, style: text.bodyMedium)),
+                Semantics(
+                  label: t.removeCapturedLabel(detail.name),
+                  excludeSemantics: true,
+                  button: true,
+                  onTap: () => remove(detail),
+                  child: TextButton(
+                    key: ValueKey('remove-captured-${detail.name}'),
+                    onPressed: () => remove(detail),
+                    child: Text(t.remove),
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Icon(icon, size: 20, color: muted),
+                const SizedBox(width: 8),
+                Flexible(child: Text(line, style: text.bodyMedium)),
+              ],
+            ),
         ],
       ],
     );

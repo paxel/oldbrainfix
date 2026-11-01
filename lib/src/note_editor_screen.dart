@@ -522,6 +522,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Those being made again now.
   final _remaking = <(String, String)>{};
 
+  /// The captured details, by the Note or Section they belong to, that
+  /// this Device may remove while the capture time stays (ADR 0037).
+  Set<(String, CapturedDetail)> _capturedRemovable = const {};
+
   /// The Note and Sections whose text this Device may change, by id.
   Set<String> _textChangeable = const {};
 
@@ -664,6 +668,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           for (final hash in recordings)
             if (notes.recordingBytes(hash) != null) (id, hash),
         ],
+    };
+    _capturedRemovable = {
+      for (final id in [?note?.id, for (final section in _sections) section.id])
+        for (final detail in CapturedDetail.values)
+          if (notes.mayRemoveCaptured(id, detail)) (id, detail),
     };
     _textChangeable = {
       if (_placed case final placed? when placed.changes)
@@ -848,20 +857,89 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The Captured badge's editor: the time, place, calendar event,
   /// Bluetooth device and app of the Capture Context, each on a line of
-  /// its own, read only.
-  Future<void> _showCaptured(CaptureContext capture, DateFormat when) =>
-      showDialog<void>(
-        context: context,
-        builder: (context) => BadgeDialog(
+  /// its own, every detail but the time with a Remove where this Device
+  /// may remove it (ADR 0037). It shows what is left after each.
+  Future<void> _showCaptured(DateFormat when) => showDialog<void>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialog) {
+        final note = _placed?.note;
+        return BadgeDialog(
           setting: context.t.capturedHeading,
           icon: Icons.schedule,
-          content: CaptureContextLines(
-            key: const ValueKey('captured-details'),
-            capture: capture,
-            when: when,
-          ),
+          content: note == null
+              ? const SizedBox.shrink()
+              : CaptureContextLines(
+                  key: const ValueKey('captured-details'),
+                  capture: note.context,
+                  when: when,
+                  removable: _capturedOf(note.id),
+                  onRemove: (detail) async {
+                    await _removeCaptured(note.id, detail);
+                    if (context.mounted) setDialog(() {});
+                  },
+                ),
+        );
+      },
+    ),
+  );
+
+  /// The details of the Note or Section [id] this Device may remove.
+  Set<CapturedDetail> _capturedOf(String id) => {
+    for (final (of, detail) in _capturedRemovable)
+      if (of == id) detail,
+  };
+
+  /// Removes the captured [detail] of the Note or Section [id] after
+  /// asking once; the capture time stays. A refusal is announced at the
+  /// top with its cause; a detail a sync took meanwhile is gone already.
+  Future<void> _removeCaptured(String id, CapturedDetail detail) async {
+    _saveText();
+    final t = context.t;
+    final notes = widget.notes;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _RemoveDialog(
+        title: id == widget.noteId
+            ? t.removeCapturedQuestion(detail.name)
+            : t.removeCapturedSectionQuestion(detail.name),
+        detail: t.removeCapturedDetail,
+      ),
+    );
+    if (!mounted) return;
+    if (confirmed != true) return;
+    final shown = id == widget.noteId
+        ? notes.byId(id)?.context
+        : notes
+              .sections(widget.noteId)
+              .where((section) => section.id == id)
+              .firstOrNull
+              ?.context;
+    Object? refused;
+    if (shown != null && shown.holds(detail)) {
+      try {
+        notes.removeCaptured(id, detail);
+      } on Object catch (error) {
+        refused = error;
+      }
+    }
+    _reload();
+    if (refused == null) return;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context);
+    announcements?.announce(
+      t.removeCapturedFailed,
+      onTap: () => unawaited(
+        showFailure(
+          navigator.context,
+          title: t.removeCapturedFailedTitle,
+          cause: t.removeCapturedFailedCause,
+          fix: t.removeCapturedFailedFix,
+          details: 'remove captured ${detail.name}: $refused',
         ),
-      );
+      ),
+    );
+  }
 
   /// The kind badge's editor: the kind in words, and "Back to a plain
   /// Note" where this Device may turn it back.
@@ -997,7 +1075,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           setting: t.capturedHeading,
           icon: Icons.schedule,
           value: when.format(note.context.captured.toLocal()),
-          onTap: (_) => _showCaptured(note.context, when),
+          onTap: (_) => _showCaptured(when),
         ),
         for (final routine in _routines)
           SettingBadge(
@@ -1635,7 +1713,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       ),
                     ],
                     const SizedBox(height: 8),
-                    CaptureContextLines(capture: section.context, when: when),
+                    CaptureContextLines(
+                      key: ValueKey('captured-details:${section.id}'),
+                      capture: section.context,
+                      when: when,
+                      removable: _capturedOf(section.id),
+                      onRemove: (detail) => _removeCaptured(section.id, detail),
+                    ),
                   ],
                 ),
               ),

@@ -4490,6 +4490,54 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get remove;
 
+  /// What a screen reader says for the Remove at the end of a captured detail's line in the Captured badge's dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail, select, place{Remove the place} event{Remove the calendar events} device{Remove the Bluetooth devices} other{Remove the app}}'**
+  String removeCapturedLabel(String detail);
+
+  /// No description provided for @removeCapturedQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail, select, place{Remove the place from this Note?} event{Remove the calendar events from this Note?} device{Remove the Bluetooth devices from this Note?} other{Remove the app from this Note?}}'**
+  String removeCapturedQuestion(String detail);
+
+  /// No description provided for @removeCapturedSectionQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail, select, place{Remove the place from this Section?} event{Remove the calendar events from this Section?} device{Remove the Bluetooth devices from this Section?} other{Remove the app from this Section?}}'**
+  String removeCapturedSectionQuestion(String detail);
+
+  /// No description provided for @removeCapturedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It goes from all your Devices and from everyone you share the Note\'s Area with. The time it was captured stays.'**
+  String get removeCapturedDetail;
+
+  /// Announcement when Remove in the Captured badge's dialog was refused.
+  ///
+  /// In en, this message translates to:
+  /// **'A captured detail could not be removed.'**
+  String get removeCapturedFailed;
+
+  /// No description provided for @removeCapturedFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not removed'**
+  String get removeCapturedFailedTitle;
+
+  /// No description provided for @removeCapturedFailedCause.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device may not change this Note any more, for example because a role in its Area changed.'**
+  String get removeCapturedFailedCause;
+
+  /// No description provided for @removeCapturedFailedFix.
+  ///
+  /// In en, this message translates to:
+  /// **'The detail stays on the Note. A Manager of the Area can remove it.'**
+  String get removeCapturedFailedFix;
+
   /// Button under a Transcript or Photo Text that makes it the Note's text.
   ///
   /// In en, this message translates to:

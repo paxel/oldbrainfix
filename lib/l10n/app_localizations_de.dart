@@ -2799,6 +2799,58 @@ class AppLocalizationsDe extends AppLocalizations {
   String get remove => 'Entfernen';
 
   @override
+  String removeCapturedLabel(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Den Ort entfernen',
+      'event': 'Die Kalendertermine entfernen',
+      'device': 'Die Bluetooth-Geräte entfernen',
+      'other': 'Die App entfernen',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String removeCapturedQuestion(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Den Ort von dieser Notiz entfernen?',
+      'event': 'Die Kalendertermine von dieser Notiz entfernen?',
+      'device': 'Die Bluetooth-Geräte von dieser Notiz entfernen?',
+      'other': 'Die App von dieser Notiz entfernen?',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String removeCapturedSectionQuestion(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Den Ort von diesem Abschnitt entfernen?',
+      'event': 'Die Kalendertermine von diesem Abschnitt entfernen?',
+      'device': 'Die Bluetooth-Geräte von diesem Abschnitt entfernen?',
+      'other': 'Die App von diesem Abschnitt entfernen?',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get removeCapturedDetail =>
+      'Die Angabe verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Die Zeit der Erfassung bleibt.';
+
+  @override
+  String get removeCapturedFailed =>
+      'Eine erfasste Angabe konnte nicht entfernt werden.';
+
+  @override
+  String get removeCapturedFailedTitle => 'Nicht entfernt';
+
+  @override
+  String get removeCapturedFailedCause =>
+      'Dieses Gerät darf diese Notiz nicht mehr ändern, etwa weil sich eine Rolle in ihrem Bereich geändert hat.';
+
+  @override
+  String get removeCapturedFailedFix =>
+      'Die Angabe bleibt an der Notiz. Ein Verwalter des Bereichs kann sie entfernen.';
+
+  @override
   String get replaceNoteText => 'Notiztext ersetzen';
 
   @override

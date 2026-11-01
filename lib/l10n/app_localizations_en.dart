@@ -2772,6 +2772,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get remove => 'Remove';
 
   @override
+  String removeCapturedLabel(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Remove the place',
+      'event': 'Remove the calendar events',
+      'device': 'Remove the Bluetooth devices',
+      'other': 'Remove the app',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String removeCapturedQuestion(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Remove the place from this Note?',
+      'event': 'Remove the calendar events from this Note?',
+      'device': 'Remove the Bluetooth devices from this Note?',
+      'other': 'Remove the app from this Note?',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String removeCapturedSectionQuestion(String detail) {
+    String _temp0 = intl.Intl.selectLogic(detail, {
+      'place': 'Remove the place from this Section?',
+      'event': 'Remove the calendar events from this Section?',
+      'device': 'Remove the Bluetooth devices from this Section?',
+      'other': 'Remove the app from this Section?',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get removeCapturedDetail =>
+      'It goes from all your Devices and from everyone you share the Note\'s Area with. The time it was captured stays.';
+
+  @override
+  String get removeCapturedFailed => 'A captured detail could not be removed.';
+
+  @override
+  String get removeCapturedFailedTitle => 'Not removed';
+
+  @override
+  String get removeCapturedFailedCause =>
+      'This Device may not change this Note any more, for example because a role in its Area changed.';
+
+  @override
+  String get removeCapturedFailedFix =>
+      'The detail stays on the Note. A Manager of the Area can remove it.';
+
+  @override
   String get replaceNoteText => 'Replace Note text';
 
   @override
