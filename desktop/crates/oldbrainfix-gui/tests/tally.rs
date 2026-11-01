@@ -1,6 +1,7 @@
 //! Tallies in the window (#103, ADR 0028): "Make it a Tally" in a Note's
-//! editor opens the field page, whose name is required and whose units
-//! show in this Device's system; "Add entry" opens the entry page
+//! editor opens the field page, whose name is required and whose unit
+//! is typed, the known units it may mean suggested under it in this
+//! Device's system (#159); "Add entry" opens the entry page
 //! prefilled with the targets; the Tally part lists the entries newest
 //! first, charts each field and edits, deletes and restores entries; a
 //! hidden field comes back with its values; the unit setting follows the
@@ -17,6 +18,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync, answer_sync_inviting, apply_answer_as};
 use oldbrainfix_core::lan::{sync_request, sync_request_as};
+use oldbrainfix_core::tally_units::KNOWN;
 use oldbrainfix_core::{
     AreaRole, Day, DeviceSettings, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey,
     Store, Tallies, TallyRule, UnitSystem,
@@ -115,6 +117,14 @@ fn radio_on(harness: &Harness<'_, App>, label: &str) -> bool {
         == Some(Toggled::True)
 }
 
+/// Whether a suggestion of the known unit shown as `unit` shows.
+fn suggested(harness: &Harness<'_, App>, unit: &str) -> bool {
+    harness
+        .query_all_by_role_and_label(Role::Button, unit)
+        .next()
+        .is_some()
+}
+
 /// The entry whose row holds `part`.
 fn entry_row<'a>(harness: &'a Harness<'_, App>, part: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by(move |n| n.role() == Role::Button && n.label().is_some_and(|l| l.contains(part)))
@@ -148,14 +158,19 @@ fn make_it_a_tally_asks_for_a_name_and_saves_the_first_field() -> TestResult {
     let mut harness = window(&store, Some(&note));
     click_button(&mut harness, "Make it a Tally");
     assert!(shows(&harness, "New field"));
-    // A typed unit until one of the list is picked.
-    assert!(radio_on(&harness, "Another unit"));
+    // One field for the unit, every known unit suggested under it.
+    assert_eq!(holds(&harness, "Unit").as_deref(), Some(""));
+    for known in &KNOWN {
+        assert!(suggested(&harness, known.code), "{}", known.code);
+    }
+    assert!(!shows(&harness, "Another unit"));
     click_button(&mut harness, "Save");
     assert!(shows(&harness, "Give the field a name."));
     assert!(!Tallies::new(&store).is_tally(&note)?);
 
     type_into(&mut harness, "Name", "Push-ups");
-    type_into(&mut harness, "Another unit", "times");
+    type_into(&mut harness, "Unit", "times");
+    assert!(!suggested(&harness, "kg"), "no known unit for it");
     type_into(&mut harness, "Target (optional)", "20");
     click_button(&mut harness, "Save");
     let tally = Tallies::new(&store).by_note(&note)?.ok_or("a Tally")?;
@@ -184,19 +199,18 @@ fn a_known_unit_shows_in_imperial_and_its_kind_picks_the_rule() -> TestResult {
     harness.run();
     click_button(&mut harness, "Make it a Tally");
     for unit in ["lb", "oz", "mi", "ft", "in", "mph", "°F"] {
-        assert!(
-            harness
-                .query_all_by_role_and_label(Role::RadioButton, unit)
-                .next()
-                .is_some(),
-            "{unit}"
-        );
+        assert!(suggested(&harness, unit), "{unit}");
     }
-    assert!(shows(&harness, "Mass"), "the kind under the unit");
-    assert!(radio_on(&harness, "Their sum"));
-    click_radio(&mut harness, "lb");
-    assert!(radio_on(&harness, "The largest"), "mass counts the largest");
+    assert!(!suggested(&harness, "kg"));
     type_into(&mut harness, "Name", "Lift");
+    // "p" for pound, and nothing else in imperial.
+    type_into(&mut harness, "Unit", "p");
+    assert!(suggested(&harness, "lb"));
+    assert!(!suggested(&harness, "oz") && !suggested(&harness, "mph"));
+    assert!(radio_on(&harness, "Their sum"));
+    click_button(&mut harness, "lb");
+    assert_eq!(holds(&harness, "Unit").as_deref(), Some("lb"));
+    assert!(radio_on(&harness, "The largest"), "mass counts the largest");
     type_into(&mut harness, "Target (optional)", "100");
     click_button(&mut harness, "Save");
     let tally = Tallies::new(&store).by_note(&note)?.ok_or("a Tally")?;
@@ -205,6 +219,96 @@ fn a_known_unit_shows_in_imperial_and_its_kind_picks_the_rule() -> TestResult {
     assert_eq!(field.rule, TallyRule::Max);
     assert!((field.target.ok_or("a target")? - 45.359237).abs() < 1e-9);
     assert!(shows(&harness, "lb · Target 100 lb"));
+    Ok(())
+}
+
+#[test]
+fn typing_filters_the_known_units_in_english_or_german_and_a_suggestion_picks_one() -> TestResult {
+    let (store, note) = with_note()?;
+    let mut harness = window(&store, Some(&note));
+    click_button(&mut harness, "Make it a Tally");
+    type_into(&mut harness, "Name", "Watched");
+    type_into(&mut harness, "Unit", "k");
+    for unit in ["kg", "km", "km/h"] {
+        assert!(suggested(&harness, unit), "{unit}");
+    }
+    assert!(!suggested(&harness, "min"));
+    type_into(&mut harness, "Unit", "Minu");
+    assert!(suggested(&harness, "min"));
+    assert!(!suggested(&harness, "kg"));
+    // German names count as well.
+    type_into(&mut harness, "Unit", "Stun");
+    assert!(suggested(&harness, "h") && suggested(&harness, "km/h"));
+    assert!(!suggested(&harness, "min"));
+    type_into(&mut harness, "Unit", "Minu");
+    click_button(&mut harness, "min");
+    assert_eq!(holds(&harness, "Unit").as_deref(), Some("min"));
+    click_button(&mut harness, "Save");
+    let tally = Tallies::new(&store).by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(tally.fields[0].unit, "min");
+    Ok(())
+}
+
+#[test]
+fn in_imperial_a_symbol_typed_out_without_its_suggestion_is_that_known_unit() -> TestResult {
+    let (store, note) = with_note()?;
+    let mut harness = window(&store, Some(&note));
+    harness.state_mut().set_region(Some("US"));
+    harness.run();
+    click_button(&mut harness, "Make it a Tally");
+    type_into(&mut harness, "Name", "Distance");
+    type_into(&mut harness, "Unit", "mi");
+    assert!(suggested(&harness, "mi"));
+    click_button(&mut harness, "Save");
+    let tally = Tallies::new(&store).by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(tally.fields[0].unit, "km");
+    Ok(())
+}
+
+#[test]
+fn a_unit_of_the_users_own_stays_and_the_field_opens_with_it_as_typed() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    // Typed on another Device: it reads like a known symbol here.
+    let weight = tallies.add_field(&note, "Weight", "lb", None, None)?;
+    tallies.add(&note, &BTreeMap::from([(weight.clone(), 3.0)]), "", None)?;
+    let mut harness = window(&store, Some(&note));
+    harness.state_mut().set_region(Some("US"));
+    harness.run();
+    click_button(&mut harness, "Weight");
+    assert_eq!(holds(&harness, "Unit").as_deref(), Some("lb"));
+    // A unit of its own takes no known one.
+    for known in &KNOWN {
+        assert!(!suggested(&harness, known.imperial), "{}", known.imperial);
+    }
+    type_into(&mut harness, "Name", "Load");
+    click_button(&mut harness, "Save");
+    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(
+        (tally.fields[0].name.as_str(), tally.fields[0].unit.as_str()),
+        ("Load", "lb")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_suggestion_makes_a_unit_of_the_users_own_that_reads_like_a_symbol_that_known_unit()
+-> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    tallies.add_field(&note, "Lift", "lb", None, None)?;
+    let mut harness = window(&store, Some(&note));
+    harness.state_mut().set_region(Some("US"));
+    harness.run();
+    click_button(&mut harness, "Lift");
+    assert_eq!(holds(&harness, "Unit").as_deref(), Some("lb"));
+    // No entries yet: every known unit is a click away.
+    click_button(&mut harness, "lb");
+    click_button(&mut harness, "Save");
+    assert_eq!(
+        tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].unit,
+        "kg"
+    );
     Ok(())
 }
 
@@ -434,17 +538,30 @@ fn once_entries_hold_values_only_units_of_the_same_kind_are_offered() -> TestRes
         &harness,
         "Entries hold values for this field, so its kind of unit stays."
     ));
-    let offered = |harness: &Harness<'_, App>, unit: &str| {
-        harness
-            .query_all_by_role_and_label(Role::RadioButton, unit)
-            .next()
-            .is_some()
-    };
-    assert!(offered(&harness, "kg") && offered(&harness, "g"));
+    // Every unit of its kind, a click away.
+    assert!(suggested(&harness, "kg") && suggested(&harness, "g"));
     for other in ["km", "s", "Another unit"] {
-        assert!(!offered(&harness, other), "{other}");
+        assert!(!suggested(&harness, other), "{other}");
     }
-    click_radio(&mut harness, "g");
+    type_into(&mut harness, "Unit", "kilo");
+    assert!(suggested(&harness, "kg"));
+    assert!(!suggested(&harness, "km") && !suggested(&harness, "km/h"));
+    // Another kind is not saved, and the field says why.
+    type_into(&mut harness, "Unit", "pages");
+    click_button(&mut harness, "Save");
+    assert_eq!(
+        harness
+            .query_all_by_label("Entries hold values for this field, so its kind of unit stays.")
+            .count(),
+        2
+    );
+    assert_eq!(
+        tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].unit,
+        "kg"
+    );
+    // Within the kind it changes; the values stay in kilograms.
+    type_into(&mut harness, "Unit", "Gram");
+    click_button(&mut harness, "g");
     click_button(&mut harness, "Save");
     assert_eq!(
         tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].unit,

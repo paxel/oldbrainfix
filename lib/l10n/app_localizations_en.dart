@@ -3294,9 +3294,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyUnitTyped => 'Another unit';
 
   @override
-  String get tallyUnitTypedHint => 'e.g. pages, times';
-
-  @override
   String get tallyUnitFixed =>
       'Entries hold values for this field, so its kind of unit stays.';
 

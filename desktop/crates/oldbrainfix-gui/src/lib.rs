@@ -62,6 +62,7 @@ pub mod starter_set_view;
 pub mod store_needs_update;
 pub mod sync_view;
 pub mod table_view;
+pub mod tally_unit_match;
 pub mod tally_view;
 pub mod text_marks_view;
 pub mod theme;

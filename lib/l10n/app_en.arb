@@ -1797,7 +1797,6 @@
   "tallyUnit": "Unit",
   "tallyUnitTyped": "Another unit",
   "@tallyUnitTyped": {"description": "The unit option that takes a unit as typed, such as pages or times."},
-  "tallyUnitTypedHint": "e.g. pages, times",
   "tallyUnitFixed": "Entries hold values for this field, so its kind of unit stays.",
   "tallyUnitHint": "e.g. kg, min, pages",
   "@tallyUnitHint": {"description": "Hint in the one field a Tally field's unit is typed into; suggestions of known units show under it as chips."},

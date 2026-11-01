@@ -3330,9 +3330,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyUnitTyped => 'Andere Maßeinheit';
 
   @override
-  String get tallyUnitTypedHint => 'z. B. Seiten, Mal';
-
-  @override
   String get tallyUnitFixed =>
       'Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Maßeinheit.';
 

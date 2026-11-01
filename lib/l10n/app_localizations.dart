@@ -5330,12 +5330,6 @@ abstract class AppLocalizations {
   /// **'Another unit'**
   String get tallyUnitTyped;
 
-  /// No description provided for @tallyUnitTypedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. pages, times'**
-  String get tallyUnitTypedHint;
-
   /// No description provided for @tallyUnitFixed.
   ///
   /// In en, this message translates to:

@@ -454,5 +454,7 @@
   "photoOutMissingCause": "The photo's file is not on this computer yet.",
   "@photoOutMissingCause": {"description": "The cause in the dialogs behind 'photoNotSaved', 'photoNotCopied' and 'photoNotOpened' when the photo came from another Device without its file."},
   "photoOutMissingFix": "Sync with the Device that holds it, then try again.",
-  "@photoOutMissingFix": {"description": "The fix that goes with 'photoOutMissingCause'."}
+  "@photoOutMissingFix": {"description": "The fix that goes with 'photoOutMissingCause'."},
+  "tallyUnitHelper": "Click a suggestion for a known unit; anything else stays as typed.",
+  "@tallyUnitHelper": {"description": "Under the field a Tally field's unit is typed into; the suggestions of known units are small buttons under it. The phone's says tap."}
 }

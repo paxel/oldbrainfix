@@ -250,5 +250,6 @@
   "photoNotOpenedCause": "Auf diesem Computer ließ sich kein Programm für Bilder starten.",
   "photoNotOpenedFix": "Installiere ein Programm für Bilder, oder speichere das Foto mit „Bild speichern unter …“ und öffne die Datei von dort.",
   "photoOutMissingCause": "Die Datei des Fotos ist noch nicht auf diesem Computer.",
-  "photoOutMissingFix": "Synchronisiere mit dem Gerät, auf dem es liegt, und versuche es dann erneut."
+  "photoOutMissingFix": "Synchronisiere mit dem Gerät, auf dem es liegt, und versuche es dann erneut.",
+  "tallyUnitHelper": "Klicke auf einen Vorschlag für eine bekannte Maßeinheit; alles andere bleibt, wie getippt."
 }

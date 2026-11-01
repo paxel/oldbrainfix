@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 use egui::{Id, RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType};
-use oldbrainfix_core::tally_units::{self, KNOWN};
+use oldbrainfix_core::tally_units::{self, KnownUnit};
 use oldbrainfix_core::{
     Day, Error, Occurrence, PersonFilter, Profile, Sessions, Store, Tallies, Tally, TallyBucket,
     TallyEntry, TallyField, TallyPeriod, TallyRule, UnitKind, UnitSystem, WallClock,
@@ -28,6 +28,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
+use crate::tally_unit_match::{self, UnitNames};
 use crate::theme::Tones;
 
 /// The local setting that keeps "Removed entries" open, the phone's.
@@ -689,9 +690,10 @@ fn field_error(ui: &mut Ui, error: &str) {
     ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
 }
 
-/// One field of a Tally: its name; its unit, a known one shown in this
-/// Device's system with its kind under it, or one as typed, only of its
-/// kind once entries hold values for it; its target, optional; and how a
+/// One field of a Tally: its name; its unit, typed into one field under
+/// which the known units it may mean show as small buttons in this
+/// Device's system (#159), a known one or one as typed, only of its kind
+/// once entries hold values for it; its target, optional; and how a
 /// day with several entries counts, which follows the kind of unit until
 /// it is picked. A field that exists has "Hide field", or "Show field
 /// again", at the bottom. Leaving without Save changes nothing. For the
@@ -706,9 +708,17 @@ pub struct FieldForm {
     /// The field shown; `None` for a new one.
     field: Option<TallyField>,
     pub name: String,
-    /// The known unit picked, or `None` for one as typed.
-    pub unit: Option<&'static str>,
-    pub typed: String,
+    /// The unit as typed.
+    pub unit_text: String,
+    /// The unit as the page opened, shown in this Device's system.
+    unit_as_opened: String,
+    /// The code of the known unit a suggestion put into the field, until
+    /// it is typed in again.
+    picked: Option<&'static str>,
+    /// Once entries hold values, only units of the field's kind are left.
+    fixed: Option<UnitKind>,
+    /// The names the known units are matched by, in every language.
+    unit_names: UnitNames,
     pub target: String,
     target_as_opened: String,
     pub rule: TallyRule,
@@ -722,7 +732,7 @@ pub struct FieldForm {
 }
 
 const NAME_FIELD: &str = "tally field name";
-const TYPED_FIELD: &str = "tally unit text";
+const UNIT_FIELD: &str = "tally unit text";
 const TARGET_FIELD: &str = "tally field target";
 const LINE_FIELD: &str = "tally entry line";
 const DAY_FIELD: &str = "tally entry day";
@@ -736,14 +746,10 @@ impl FieldForm {
         t: &L10n,
     ) -> FieldForm {
         let decimal = decimal_sign(t);
-        let unit = field
+        let unit_as_opened = field
             .as_ref()
-            .and_then(|f| tally_units::by_code(&f.unit))
-            .map(|k| k.code);
-        let typed = match (&field, unit) {
-            (Some(f), None) => f.unit.clone(),
-            _ => String::new(),
-        };
+            .map(|f| tally_units::shown_unit(&f.unit, system))
+            .unwrap_or_default();
         let target = field
             .as_ref()
             .map(|f| typed_value(f.target, &f.unit, system, decimal))
@@ -752,8 +758,14 @@ impl FieldForm {
             note_id: note_id.to_string(),
             capturing: false,
             name: field.as_ref().map(|f| f.name.clone()).unwrap_or_default(),
-            unit,
-            typed,
+            unit_text: unit_as_opened.clone(),
+            unit_as_opened,
+            picked: None,
+            fixed: field
+                .as_ref()
+                .filter(|f| f.has_entries)
+                .map(TallyField::kind),
+            unit_names: tally_unit_match::unit_names(system),
             target_as_opened: target.clone(),
             target,
             rule: field.as_ref().map_or(TallyRule::Sum, |f| f.rule),
@@ -767,11 +779,26 @@ impl FieldForm {
         }
     }
 
+    /// The unit a suggestion picked, else the unit typed: the field's own
+    /// while the text is as it opened, so a unit of the user's own that
+    /// reads like a known symbol stays theirs.
     fn chosen_unit(&self) -> String {
-        match self.unit {
-            Some(code) => code.to_string(),
-            None => self.typed.trim().to_string(),
+        match (self.picked, &self.field) {
+            (Some(code), _) => code.to_string(),
+            (None, Some(field)) if self.unit_text == self.unit_as_opened => field.unit.clone(),
+            (None, _) => tally_unit_match::unit_of_typed(&self.unit_text, self.system),
         }
+    }
+
+    /// Every known unit left while the unit is as the page opened, so
+    /// another one is a click away; then those the text typed may mean.
+    fn matches(&self) -> Vec<&'static KnownUnit> {
+        let typed = if self.unit_text == self.unit_as_opened {
+            ""
+        } else {
+            &self.unit_text
+        };
+        tally_unit_match::matching_units(typed, self.system, &self.unit_names, self.fixed)
     }
 
     /// The rule follows the kind of unit until it is picked, for a new
@@ -856,7 +883,7 @@ impl FieldForm {
         self.focus = if self.name_missing {
             Some(NAME_FIELD)
         } else if self.unit_invalid {
-            Some(TYPED_FIELD)
+            Some(UNIT_FIELD)
         } else if self.target_invalid {
             Some(TARGET_FIELD)
         } else {
@@ -891,13 +918,7 @@ impl FieldForm {
             t.tally_field()
         };
         let mut intent = None;
-        // Once entries hold values, only units of the field's kind are
-        // left.
-        let fixed = self
-            .field
-            .as_ref()
-            .filter(|f| f.has_entries)
-            .map(TallyField::kind);
+        let fixed = self.fixed;
         egui::ScrollArea::vertical()
             .id_salt("tally field")
             .auto_shrink([false, false])
@@ -925,57 +946,52 @@ impl FieldForm {
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.spacing_mut().item_spacing.y = 6.0;
-                    ui.label(RichText::new(t.tally_unit()).strong().color(text));
+                    let label = ui.label(RichText::new(t.tally_unit()).strong().color(text));
                     if fixed.is_some() {
                         ui.label(RichText::new(t.tally_unit_fixed()).small().color(weak));
                     }
-                    let mut changed = false;
-                    for known in KNOWN.iter().filter(|k| fixed.is_none_or(|f| f == k.kind)) {
-                        let label = tally_units::shown_unit(known.code, self.system);
-                        changed |= ui
-                            .radio_value(
-                                &mut self.unit,
-                                Some(known.code),
-                                RichText::new(label).color(text),
-                            )
-                            .clicked();
-                        ui.horizontal(|ui| {
-                            ui.add_space(24.0);
-                            ui.label(RichText::new(kind_name(t, known.kind)).small().color(weak));
-                        });
+                    let field = ui
+                        .add(
+                            TextEdit::singleline(&mut self.unit_text)
+                                .id(Id::new(UNIT_FIELD))
+                                .hint_text(t.tally_unit_hint())
+                                .text_color(text)
+                                .desired_width(f32::INFINITY),
+                        )
+                        .labelled_by(label.id);
+                    if focus == Some(UNIT_FIELD) {
+                        field.request_focus();
                     }
-                    let typed = if fixed.is_none_or(|f| f == UnitKind::Typed) {
-                        let typed = ui.radio_value(
-                            &mut self.unit,
-                            None,
-                            RichText::new(t.tally_unit_typed()).color(text),
-                        );
-                        changed |= typed.clicked();
-                        Some(typed)
-                    } else {
-                        None
-                    };
-                    if self.unit.is_none()
-                        && let Some(typed) = typed
-                    {
-                        let field = ui
-                            .add(
-                                TextEdit::singleline(&mut self.typed)
-                                    .id(Id::new(TYPED_FIELD))
-                                    .hint_text(t.tally_unit_typed_hint())
-                                    .text_color(text)
-                                    .desired_width(f32::INFINITY),
-                            )
-                            .labelled_by(typed.id);
-                        if focus == Some(TYPED_FIELD) {
-                            field.request_focus();
-                        }
-                        // A typed known code is that unit; its kind may
-                        // change the rule.
-                        changed |= field.changed();
-                        if self.unit_invalid {
-                            field_error(ui, t.tally_unit_fixed());
-                        }
+                    // Typing again leaves the known unit picked; the
+                    // kind typed may change the rule.
+                    let mut changed = field.changed();
+                    if changed {
+                        self.picked = None;
+                    }
+                    if self.unit_invalid {
+                        field_error(ui, t.tally_unit_fixed());
+                    }
+                    // A unit of the user's own takes no known one.
+                    if fixed != Some(UnitKind::Typed) {
+                        ui.label(RichText::new(t.tally_unit_helper()).small().color(weak));
+                    }
+                    let matches = self.matches();
+                    if !matches.is_empty() {
+                        // Suggestions that fill in the field, not a
+                        // choice of their own.
+                        ui.horizontal_wrapped(|ui| {
+                            for known in matches {
+                                let shown = tally_units::shown_unit(known.code, self.system);
+                                let chip = ui
+                                    .small_button(RichText::new(&shown).color(text))
+                                    .on_hover_text(kind_name(t, known.kind));
+                                if chip.clicked() {
+                                    self.picked = Some(known.code);
+                                    self.unit_text = shown;
+                                    changed = true;
+                                }
+                            }
+                        });
                     }
                     if changed {
                         self.unit_changed();

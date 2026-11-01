@@ -881,7 +881,6 @@
   "tallyFieldNameMissing": "Gib dem Feld einen Namen.",
   "tallyUnit": "Maßeinheit",
   "tallyUnitTyped": "Andere Maßeinheit",
-  "tallyUnitTypedHint": "z. B. Seiten, Mal",
   "tallyUnitFixed": "Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Maßeinheit.",
   "tallyUnitHint": "z. B. kg, min, Seiten",
   "tallyUnitHelper": "Tippe auf einen Vorschlag für eine bekannte Maßeinheit; alles andere bleibt, wie getippt.",
