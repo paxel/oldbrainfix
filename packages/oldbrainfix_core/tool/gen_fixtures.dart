@@ -1164,6 +1164,58 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'session-swap',
+    about:
+        'A Session picking two of Push-ups, Half bridge and a Tally added '
+        'to its pool later: Half bridge recorded, Push-ups swapped for the '
+        'new one with "Another one" and that recorded, then the first pick '
+        'another Device of the user\'s wrote later winning on the field, '
+        'the Tally recorded kept in its place all the same; the next day '
+        'the second pick swapped, recorded and lost alike, and today\'s '
+        'picks writing it back once.',
+    build: (store) {
+      final notes = Notes(store);
+      final tallies = Tallies(store);
+      final sessions = Sessions(store);
+      String tally(String name) {
+        final id = notes.capture(name).id;
+        tallies.addField(id, name: name, unit: 'times', target: 10);
+        return id;
+      }
+
+      final pushUps = tally('Push-ups');
+      final bridge = tally('Half bridge');
+      final sport = sessions.create(
+        'Sport',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(7)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pushUps, bridge],
+        count: 2,
+        rule: SessionRule.rolling,
+      );
+      sessions.pickToday(_frogDay(0));
+      final morning = Occurrence(Day(2026, 1, 1), _at(7));
+      sessions.record(sport.id, morning, bridge, line: 'Shaky');
+      final march = tally('Long march');
+      sessions.setPool(sport.id, [pushUps, bridge, march]);
+      sessions.another(sport.id, morning, pushUps);
+      sessions.record(sport.id, morning, march, line: 'Slow');
+      // As another Device of the user's writes its first pick, having
+      // shown the day before it synced.
+      store.append(sport.id, SessionKeys.pick(morning), '$pushUps,$bridge');
+      sessions.pickToday(_frogDay(1));
+      final next = Occurrence(Day(2026, 1, 2), _at(7));
+      sessions.another(sport.id, next, march);
+      sessions.record(sport.id, next, bridge, line: 'Better');
+      store.append(sport.id, SessionKeys.pick(next), '$pushUps,$march');
+      sessions.pickToday(_frogDay(1));
+      sessions.pickToday(_frogDay(1));
+    },
+  ),
+  (
     name: 'markers',
     about:
         'Values of a later version (ADR 0034): Routines whose schedule is '
@@ -7647,7 +7699,8 @@ Future<void> main(List<String> args) async {
     'adds one; Ada renames, deletes and adds Lines and sends the update; '
     'she turns it back into a plain Note and sends that. Read on a UTC '
     'wall clock.\n'
-    '- `sessions/sessions.json`: each Session of the `sessions` log with '
+    '- `sessions/sessions.json`, `session-swap/sessions.json`: each '
+    'Session of the log with '
     'its pool, counts and rule, the Tallies it picks from and may pick, '
     'its Routine with what is Done, from entries too, and today\'s '
     'Occurrences with their picks, their targets and the entries recorded '

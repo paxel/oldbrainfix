@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.3.1]
 
+### Behoben
+
+- Eine Strichliste, die „Noch eine“ in die Auswahl einer Einheit getauscht hat und die danach ihren Eintrag bekam, bleibt erledigt an ihrem Platz in der Auswahl, auch wenn ein anderes Gerät die erste Auswahl des Tages später geschrieben hat, und eine Fälligkeit, die eine solche Strichliste verloren hat, zeigt sie wieder, sodass sie erledigt ist, sobald jede ausgewählte Strichliste ihren Eintrag hat.
+
 ## [0.3.0] - 2026-11-01
 
 ### Neu

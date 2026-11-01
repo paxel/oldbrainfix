@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 21] = [
+const SCENARIOS: [&str; 22] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -58,6 +58,7 @@ const SCENARIOS: [&str; 21] = [
     "places",
     "routines",
     "sections",
+    "session-swap",
     "sessions",
     "shopping-lists",
     "tallies",
@@ -1828,7 +1829,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 21] = [
+    let writers: [(&str, Writer); 22] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1846,6 +1847,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("places", write_places),
         ("routines", write_routines),
         ("sections", write_sections),
+        ("session-swap", write_session_swap),
         ("sessions", write_sessions),
         ("shopping-lists", write_shopping_lists),
         ("tallies", write_tallies),
@@ -2310,9 +2312,57 @@ fn write_sessions(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `session-swap` scenario.
+fn write_session_swap(store: &Store) -> Built {
+    use oldbrainfix_core::sessions::keys::pick;
+    let notes = Notes::new(store);
+    let tallies = Tallies::new(store);
+    let sessions = Sessions::new(store);
+    let tally = |name: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let id = notes.capture(name, None, None)?.id;
+        tallies.add_field(&id, name, "times", Some(10.0), None)?;
+        Ok(id)
+    };
+    let none = BTreeMap::new();
+    let push_ups = tally("Push-ups")?;
+    let bridge = tally("Half bridge")?;
+    let every_day =
+        Schedule::new(Day::new(2026, 1, 1), &[at(7, 0)?], daily()).ok_or("a schedule")?;
+    let sport = sessions.create(
+        "Sport",
+        &every_day,
+        &[push_ups.clone(), bridge.clone()],
+        2,
+        SessionRule::Rolling,
+    )?;
+    sessions.pick_today(&frog_day(0))?;
+    let morning = Occurrence::new(Day::new(2026, 1, 1), Some(at(7, 0)?));
+    sessions.record(sport.id(), &morning, &bridge, &none, "Shaky")?;
+    let march = tally("Long march")?;
+    sessions.set_pool(
+        sport.id(),
+        &[push_ups.clone(), bridge.clone(), march.clone()],
+    )?;
+    sessions.another(sport.id(), &morning, &push_ups)?;
+    sessions.record(sport.id(), &morning, &march, &none, "Slow")?;
+    // As another Device of the user's writes its first pick, having
+    // shown the day before it synced.
+    let first = format!("{push_ups},{bridge}");
+    store.append(sport.id(), &pick(&morning), Some(&first), None)?;
+    sessions.pick_today(&frog_day(1))?;
+    let next = Occurrence::new(Day::new(2026, 1, 2), Some(at(7, 0)?));
+    sessions.another(sport.id(), &next, &march)?;
+    sessions.record(sport.id(), &next, &bridge, &none, "Better")?;
+    let lost = format!("{push_ups},{march}");
+    store.append(sport.id(), &pick(&next), Some(&lost), None)?;
+    sessions.pick_today(&frog_day(1))?;
+    sessions.pick_today(&frog_day(1))?;
+    Ok(())
+}
+
 #[test]
 fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["history", "sessions"] {
+    for scenario in ["history", "session-swap", "sessions"] {
         sessions_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())

@@ -163,8 +163,11 @@ impl SessionOccurrence {
 /// own Devices wrote.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SessionMarks {
-    /// The current pick of each Occurrence.
+    /// The current pick of each Occurrence: the one its field holds,
+    /// with every Tally that has an entry recorded for it in it.
     pub picks: BTreeMap<String, Vec<String>>,
+    /// The pick each Occurrence's field holds, as written.
+    pub stored: BTreeMap<String, Vec<String>>,
     /// Every Tally a pick of each Occurrence ever held.
     pub offered: BTreeMap<String, BTreeSet<String>>,
     /// The entries recorded for each Occurrence: the Tally's Note by
@@ -188,6 +191,8 @@ impl SessionMarks {
         let mut own = HashMap::new();
         let mut latest: BTreeMap<&str, &Entry> = BTreeMap::new();
         let mut offered: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        // The place each Tally had in the latest pick that held it.
+        let mut places: Places = BTreeMap::new();
         for e in history {
             let pick = e.field.strip_prefix(keys::PICK_PREFIX);
             if pick.is_none() && !e.field.starts_with(keys::ENTRY_PREFIX) {
@@ -203,10 +208,17 @@ impl SessionMarks {
                 latest.insert(&e.field, e);
             }
             if let Some(key) = pick.and_then(occurrence_key) {
-                offered
-                    .entry(key)
-                    .or_default()
-                    .extend(note_ids(e.value.as_deref()));
+                let ids = note_ids(e.value.as_deref());
+                let placed = places.entry(key.clone()).or_default();
+                for (i, note_id) in ids.iter().enumerate() {
+                    let newer = placed
+                        .get(note_id)
+                        .is_none_or(|(was, _)| Store::latest_wins(e, was) == Ordering::Greater);
+                    if newer {
+                        placed.insert(note_id.clone(), (e, i));
+                    }
+                }
+                offered.entry(key).or_default().extend(ids);
             }
         }
         let mut marks = SessionMarks {
@@ -219,7 +231,7 @@ impl SessionMarks {
                 if let Some(key) = occurrence_key(key)
                     && !ids.is_empty()
                 {
-                    marks.picks.insert(key, ids);
+                    marks.stored.insert(key, ids);
                 }
                 continue;
             }
@@ -241,7 +253,50 @@ impl SessionMarks {
                 .or_default()
                 .insert(entry_id.to_string(), note.to_string());
         }
+        marks.picks = marks.stored.clone();
+        marks.heal(store, &places)?;
         Ok(marks)
+    }
+
+    /// Puts each Tally with an entry recorded for an Occurrence back into
+    /// its current pick when the field no longer holds it, as when a pick
+    /// another Device wrote later wins over the one it was recorded for:
+    /// in the place it had in the latest pick that held it, while the
+    /// Tally there has no entry, else at the end.
+    fn heal(&mut self, store: &Store, places: &Places) -> Result<()> {
+        for (key, recorded) in &self.entries {
+            let mut pick = self.picks.get(key).cloned().unwrap_or_default();
+            let mut missing: Vec<&String> = Vec::new();
+            for note_id in recorded.values() {
+                if !pick.contains(note_id) && !missing.contains(&note_id) {
+                    missing.push(note_id);
+                }
+            }
+            missing.sort_by(|a, b| utf16_cmp(a, b));
+            let mut healed = false;
+            for note_id in missing {
+                if self.entries_for(store, key, note_id)?.is_empty() {
+                    continue;
+                }
+                let place = places
+                    .get(key)
+                    .and_then(|placed| placed.get(note_id))
+                    .map(|(_, i)| *i);
+                let free = match place.and_then(|i| pick.get(i)) {
+                    Some(there) => self.entries_for(store, key, there)?.is_empty(),
+                    None => false,
+                };
+                match place {
+                    Some(i) if free => pick[i] = note_id.clone(),
+                    _ => pick.push(note_id.clone()),
+                }
+                healed = true;
+            }
+            if healed {
+                self.picks.insert(key.clone(), pick);
+            }
+        }
+        Ok(())
     }
 
     /// The entries recorded for `note_id` in the Occurrence `key`, not
@@ -286,6 +341,10 @@ impl SessionMarks {
 }
 
 const NOTE_PREFIX: &str = "note:";
+
+/// The place each Tally had in the latest pick of an Occurrence that held
+/// it, with that pick's entry, by Occurrence key and Note.
+type Places<'a> = BTreeMap<String, BTreeMap<String, (&'a Entry, usize)>>;
 
 /// `text` when it is an Occurrence's key as the apps write it.
 fn occurrence_key(text: &str) -> Option<String> {
@@ -540,7 +599,8 @@ impl<'a> Sessions<'a> {
     /// `occurrence` of the Session `id` for the next by the Session's
     /// rule, in its place: one this Occurrence has not offered yet, else
     /// the first not picked. The one swapped out keeps its place in the
-    /// rule. Nothing happens when the pool holds no other.
+    /// rule. Nothing happens when the pool holds no other, or when the
+    /// pick has an entry.
     pub fn another(&self, id: &str, occurrence: &Occurrence, note_id: &str) -> Result<()> {
         let session = self.require_due(id, occurrence)?;
         self.require_check_off(id)?;
@@ -549,6 +609,13 @@ impl<'a> Sessions<'a> {
         let wanted = self.wanted(&session, occurrence, &pool, &marks)?;
         if !wanted.iter().any(|w| w == note_id) {
             return Err(Error::Invalid(format!("not picked then: {note_id}")));
+        }
+        // A pick with an entry stays in the pick.
+        if !marks
+            .entries_for(self.store, &occurrence.key(), note_id)?
+            .is_empty()
+        {
+            return Ok(());
         }
         let mut offered = marks
             .offered
@@ -788,8 +855,8 @@ impl<'a> Sessions<'a> {
         Ok(out)
     }
 
-    /// Writes `ids` as the pick of `occurrence`, unless that is the pick
-    /// already or there is nothing to pick; whether it wrote.
+    /// Writes `ids` as the pick of `occurrence`, unless its field holds
+    /// that pick already or there is nothing to pick; whether it wrote.
     fn write_pick(
         &self,
         id: &str,
@@ -799,7 +866,7 @@ impl<'a> Sessions<'a> {
     ) -> Result<bool> {
         if ids.is_empty()
             || marks
-                .picks
+                .stored
                 .get(&occurrence.key())
                 .is_some_and(|held| held == ids)
         {
@@ -1268,6 +1335,49 @@ mod tests {
     }
 
     #[test]
+    fn a_tally_with_an_entry_for_it_stays_in_its_pick_in_its_place() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let sessions = Sessions::new(&ann);
+        let t = tallies(&ann, &["A", "B", "C", "D", "E"], None)?;
+        let tallies = Tallies::new(&ann);
+        let of = |i: &[usize]| -> Vec<String> { i.iter().map(|i| t[*i].clone()).collect() };
+        let s = session(&ann, &t, 3, SessionRule::Rolling, None)?;
+        let today = day(&ann, 0);
+        assert_eq!(picked(&ann, &s, 0)?, of(&[0, 1, 2]));
+        sessions.another(s.id(), &today, &t[2])?;
+        let entry = record(&ann, &s, 0, &t[3])?;
+        // As a pick another Device wrote later.
+        let stale = of(&[0, 1, 2]).join(",");
+        ann.append(s.id(), &keys::pick(&today), Some(&stale), None)?;
+        assert_eq!(shown(&ann, &s, 0)?, of(&[0, 1, 3]));
+        assert_eq!(done_at(&ann, &s, &today)?, None);
+        // A pick with an entry is swapped for none.
+        let before = ann.all_entries()?.len();
+        sessions.another(s.id(), &today, &t[3])?;
+        assert_eq!(ann.all_entries()?.len(), before);
+        // Removed, the entry takes it out again; an entry made on the
+        // Tally itself is no pick's.
+        tallies.trash_entry(&entry.id)?;
+        assert_eq!(shown(&ann, &s, 0)?, of(&[0, 1, 2]));
+        tallies.add(&t[3], &BTreeMap::new(), "Elsewhere", None)?;
+        assert_eq!(shown(&ann, &s, 0)?, of(&[0, 1, 2]));
+        tallies.restore_entry(&entry.id)?;
+        assert_eq!(shown(&ann, &s, 0)?, of(&[0, 1, 3]));
+        // Its place taken by one with an entry, it goes at the end, and
+        // the pick is trimmed by one without.
+        let desk = of(&[0, 1, 4]).join(",");
+        ann.append(s.id(), &keys::pick(&today), Some(&desk), None)?;
+        tallies.add_with(&t[4], &BTreeMap::new(), "Desk", None, |id| {
+            ann.append(s.id(), &keys::entry(&today, id), Some(&t[4]), None)
+                .map(drop)
+        })?;
+        let marks = SessionMarks::of(&ann, s.id())?;
+        assert_eq!(marks.picks.get(&today.key()), Some(&of(&[0, 1, 4, 3])));
+        assert_eq!(shown(&ann, &s, 0)?, of(&[0, 4, 3]));
+        Ok(())
+    }
+
+    #[test]
     fn done_once_every_pick_has_an_entry_or_when_checked_off() -> TestResult {
         let ann = device(1, "Ann")?;
         let routines = Routines::new(&ann);
@@ -1342,6 +1452,61 @@ mod tests {
         assert!(done.is_some());
         assert_eq!(done_at(&desk, &s, &today)?, done);
         assert_eq!(shown(&desk, &s, 1)?, shown(&ann, &s, 1)?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_pick_recorded_stays_when_a_first_pick_written_later_wins() -> TestResult {
+        // Push-ups and Half bridge picked, Half bridge recorded, Push-ups
+        // swapped for a new Tally and that recorded; meanwhile the desk,
+        // not synced yet, showed the day and wrote its own first pick,
+        // which wins on the field after the sync.
+        let ann = device(1, "Ann")?;
+        let desk = device(3, "Ann at the desk")?;
+        exchange(&desk, &ann, false)?;
+        remember(&ann, &desk, false)?;
+        remember(&desk, &ann, false)?;
+        let t = tallies(&ann, &["Push-ups", "Half bridge"], None)?;
+        let (push_ups, bridge) = (t[0].clone(), t[1].clone());
+        let s = session(&ann, &t, 2, SessionRule::Rolling, None)?;
+        let today = day(&ann, 0);
+        exchange(&desk, &ann, false)?;
+        assert_eq!(picked(&ann, &s, 0)?, [push_ups.clone(), bridge.clone()]);
+        record(&ann, &s, 0, &bridge)?;
+        let march = tallies(&ann, &["Long march"], None)?.remove(0);
+        let pool = [push_ups.clone(), bridge.clone(), march.clone()];
+        Sessions::new(&ann).set_pool(s.id(), &pool)?;
+        Sessions::new(&ann).another(s.id(), &today, &push_ups)?;
+        assert_eq!(shown(&ann, &s, 0)?, [march.clone(), bridge.clone()]);
+        record(&ann, &s, 0, &march)?;
+        assert_eq!(picked(&desk, &s, 0)?, [push_ups.clone(), bridge.clone()]);
+        exchange(&desk, &ann, false)?;
+        let stored = SessionMarks::of(&ann, s.id())?.stored;
+        assert_eq!(
+            stored.get(&today.key()),
+            Some(&vec![push_ups.clone(), bridge.clone()])
+        );
+        for store in [&ann, &desk] {
+            let occurrence = Sessions::new(store).on(s.id(), &today)?;
+            let ids: Vec<&str> = occurrence
+                .picks
+                .iter()
+                .map(|p| p.note_id.as_str())
+                .collect();
+            assert_eq!(ids, [march.as_str(), bridge.as_str()]);
+            let done: Vec<bool> = occurrence.picks.iter().map(SessionPick::done).collect();
+            assert_eq!(done, [true, true]);
+            assert!(occurrence.complete());
+            assert!(done_at(store, &s, &today)?.is_some());
+        }
+        // The Agenda writes the pick back once; Push-ups stays out.
+        let before = ann.all_entries()?.len();
+        assert_eq!(picked(&ann, &s, 0)?, [march.clone(), bridge.clone()]);
+        assert_eq!(ann.all_entries()?.len(), before + 1);
+        assert_eq!(picked(&ann, &s, 0)?, [march.clone(), bridge.clone()]);
+        assert_eq!(ann.all_entries()?.len(), before + 1);
+        let stored = SessionMarks::of(&ann, s.id())?.stored;
+        assert_eq!(stored.get(&today.key()), Some(&vec![march, bridge]));
         Ok(())
     }
 
