@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'app_lock.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
+import 'browser_add.dart';
 import 'l10n.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
@@ -16,7 +17,8 @@ import 'system_bars.dart';
 /// and those of closed locked Areas left out; reached from the top of
 /// the notes browser, and filtered to one person by "Their Notes" on
 /// their Profile. Swipe right goes back. Full or compact as last chosen
-/// for this list.
+/// for this list. Its "+" fans out what it makes, Unsorted (#161), but
+/// not on a person's Notes.
 class AllNotesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -100,9 +102,31 @@ class _AllNotesScreenState extends State<AllNotesScreen>
     _reload();
   }
 
+  /// "+" fans out what it makes, Unsorted (#161).
+  Future<void> _add(BuildContext button) async {
+    final kind = await pickNewKind(
+      context,
+      button,
+      newKinds(widget.notes.store, null),
+    );
+    if (!mounted || kind == null) return;
+    await makeNew(
+      context,
+      widget.notes,
+      widget.places,
+      kind,
+      onChanged: () {
+        if (mounted) _reload();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    // "Their Notes" on a Profile shows another person's; nothing is made
+    // there.
+    final adds = widget.people.isEveryone;
     return BrowserSwipes(
       child: Scaffold(
         appBar: pageBar(
@@ -118,10 +142,15 @@ class _AllNotesScreenState extends State<AllNotesScreen>
           ],
         ),
         body: ListView(
-          padding: clearOfSystemBars(
-            context,
-            const EdgeInsets.symmetric(vertical: 8),
-          ),
+          padding: adds
+              ? clearOfFloatingButtons(
+                  context,
+                  const EdgeInsets.symmetric(vertical: 8),
+                )
+              : clearOfSystemBars(
+                  context,
+                  const EdgeInsets.symmetric(vertical: 8),
+                ),
           children: [
             PersonFilterChips(
               store: widget.notes.store,
@@ -150,6 +179,15 @@ class _AllNotesScreenState extends State<AllNotesScreen>
               ),
           ],
         ),
+        floatingActionButton: !adds
+            ? null
+            : Builder(
+                builder: (button) => FloatingActionButton(
+                  tooltip: t.addHere,
+                  onPressed: () => _add(button),
+                  child: const Icon(Icons.add),
+                ),
+              ),
       ),
     );
   }

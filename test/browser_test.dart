@@ -261,6 +261,8 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('addFan-note')));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
       await tester.tap(find.byKey(const ValueKey('captureSave')));
       await tester.pumpAndSettle();
@@ -274,26 +276,22 @@ void main() {
       expect(find.byTooltip('New Area'), findsOneWidget);
     });
 
-    testWidgets('+ in an Area offers a Note filed into it or a Topic', (
-      tester,
-    ) async {
+    testWidgets('+ in an Area fans out a Note filed into it, the other '
+        'kinds and a Topic', (tester) async {
       await openBrowser(tester);
       await open(tester, 'Household');
-      final plus = tester.getCenter(find.byTooltip('Add here'));
+      final plus = tester.getRect(find.byTooltip('Add here'));
       await tester.tap(find.byTooltip('Add here'));
       await tester.pumpAndSettle();
-      // The menu opens where the finger is, not from the bottom edge.
-      final menu = tester.getRect(
-        find.ancestor(
-          of: find.text('Note here'),
-          matching: find.byWidgetPredicate((w) => w is PopupMenuItem),
-        ),
-      );
-      expect((menu.center - plus).distance, lessThan(200));
+      // The fan opens upward from the button, not from the bottom edge.
+      final note = find.byKey(const ValueKey('addFan-note'));
+      expect(tester.getRect(note).bottom, lessThanOrEqualTo(plus.top));
+      expect((tester.getCenter(note) - plus.center).distance, lessThan(200));
       expect(find.text('Topic'), findsOneWidget);
       expect(find.byType(BottomSheet), findsNothing);
 
-      await open(tester, 'Note here');
+      await tester.tap(note);
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
       await tester.tap(find.byKey(const ValueKey('captureSave')));
       await tester.pumpAndSettle();

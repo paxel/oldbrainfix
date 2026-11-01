@@ -638,11 +638,47 @@ abstract class AppLocalizations {
   /// **'Add here'**
   String get addHere;
 
-  /// No description provided for @noteHere.
+  /// In the fan of the browser's '+': a Note, captured as on the Agenda.
   ///
   /// In en, this message translates to:
-  /// **'Note here'**
-  String get noteHere;
+  /// **'Note'**
+  String get addFanNote;
+
+  /// No description provided for @newChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'New Checklist'**
+  String get newChecklist;
+
+  /// No description provided for @newShoppingList.
+  ///
+  /// In en, this message translates to:
+  /// **'New Shopping List'**
+  String get newShoppingList;
+
+  /// No description provided for @newTally.
+  ///
+  /// In en, this message translates to:
+  /// **'New Tally'**
+  String get newTally;
+
+  /// No description provided for @newFrog.
+  ///
+  /// In en, this message translates to:
+  /// **'New Frog'**
+  String get newFrog;
+
+  /// No description provided for @kindName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get kindName;
+
+  /// No description provided for @kindNameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Give it a name.'**
+  String get kindNameMissing;
 
   /// No description provided for @topicChoice.
   ///
@@ -5558,6 +5594,42 @@ abstract class AppLocalizations {
   /// **'Add field'**
   String get tallyAddField;
 
+  /// No description provided for @tallyFieldsMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Give at least one field a name.'**
+  String get tallyFieldsMissing;
+
+  /// Value of a field's rule badge on the New Tally page, after the sign Σ.
+  ///
+  /// In en, this message translates to:
+  /// **'Sum'**
+  String get tallyRuleSumShort;
+
+  /// No description provided for @tallyRuleMaxShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Largest'**
+  String get tallyRuleMaxShort;
+
+  /// No description provided for @tallyNoUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'No unit'**
+  String get tallyNoUnit;
+
+  /// No description provided for @tallyTargetBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get tallyTargetBadge;
+
+  /// No description provided for @tallyNoTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'No target'**
+  String get tallyNoTarget;
+
   /// No description provided for @tallyFields.
   ///
   /// In en, this message translates to:
@@ -5791,6 +5863,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose at least one Tally.'**
   String get sessionPoolMissing;
+
+  /// No description provided for @sessionSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get sessionSchedule;
 
   /// The drag handle of a Tally in a Session's pool.
   ///

@@ -133,6 +133,18 @@ void main() {
     await expectLastRowAboveButtons(tester);
   });
 
+  testWidgets('All Notes scrolls its last Note above "+"', (tester) async {
+    phoneWithNavigationBar(tester);
+    for (var i = 0; i < 30; i++) {
+      capture('Milk $i');
+    }
+    await openBrowser(tester);
+    await tester.tap(find.byTooltip('All Notes'));
+    await tester.pumpAndSettle();
+
+    await expectLastRowAboveButtons(tester);
+  });
+
   testWidgets('an Area scrolls its last row above "+"', (tester) async {
     phoneWithNavigationBar(tester);
     final home = places.addArea('Household');

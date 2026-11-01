@@ -93,6 +93,10 @@ typedef _Texts = ({
   String reading,
   String pagesRead,
   String pages,
+  String exercises,
+  String plank,
+  String squats,
+  String evening,
   String formatted,
   String meters,
 });
@@ -138,6 +142,10 @@ const _en = (
   reading: 'Reading before bed',
   pagesRead: 'Pages read',
   pages: 'pages',
+  exercises: 'Morning exercises',
+  plank: 'Plank',
+  squats: 'Squats',
+  evening: 'Evening routine',
   formatted:
       '## Boiler service\n'
       'Booked for **Thursday, 8 to 10**. Have the *service booklet* ready.\n'
@@ -198,6 +206,10 @@ const _de = (
   reading: 'Lesen vor dem Schlafen',
   pagesRead: 'Gelesene Seiten',
   pages: 'Seiten',
+  exercises: 'Morgenübungen',
+  plank: 'Unterarmstütz',
+  squats: 'Kniebeugen',
+  evening: 'Abendrunde',
   formatted:
       '## Wartung der Therme\n'
       'Termin am **Donnerstag, 8 bis 10 Uhr**. Das *Serviceheft* bereitlegen.\n'
@@ -1002,6 +1014,56 @@ void main() {
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
           }
+
+          /// The Household's "+" opened on what it makes (#161).
+          Future<void> addFan(WidgetTester tester) async {
+            await household(tester);
+            final t = lookupAppLocalizations(Locale(language));
+            await _tap(tester, find.byTooltip(t.addHere));
+          }
+
+          frame('add-fan', (tester) async {
+            await addFan(tester);
+            expect(find.byKey(const ValueKey('addFan-tally')), findsOneWidget);
+          });
+
+          frame('new-tally', (tester) async {
+            await addFan(tester);
+            await _tap(tester, find.byKey(const ValueKey('addFan-tally')));
+            Finder key(String k) => find.byKey(ValueKey(k));
+            await tester.enterText(key('tally-form-name'), texts.exercises);
+            await tester.enterText(key('tally-form-field-name-0'), texts.plank);
+            await _tap(tester, key('tally-form-unit-0'));
+            await tester.enterText(key('tally-unit-text'), 'min');
+            await _tap(tester, key('badge-close'));
+            await _tap(tester, key('tally-form-target-0'));
+            await tester.enterText(key('tally-field-target'), '1');
+            await _tap(tester, key('badge-close'));
+            await _tap(tester, key('tally-form-add-field'));
+            await tester.enterText(
+              key('tally-form-field-name-1'),
+              texts.squats,
+            );
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(find.text(texts.squats), findsOneWidget);
+          });
+
+          frame('new-session', (tester) async {
+            await addFan(tester);
+            await _tap(tester, find.byKey(const ValueKey('addFan-session')));
+            await tester.enterText(
+              find.byKey(const ValueKey('session-form-name')),
+              texts.evening,
+            );
+            await _tap(tester, find.text(texts.reading));
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('session-new-tally')),
+              findsOneWidget,
+            );
+          });
 
           /// The Household's list of Notes, scrolling down.
           final notesList = find.byWidgetPredicate(

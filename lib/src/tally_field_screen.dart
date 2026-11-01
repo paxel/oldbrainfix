@@ -267,19 +267,6 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
     Navigator.of(context).pop(true);
   }
 
-  String _kindName(UnitKind kind) {
-    final t = context.t;
-    return switch (kind) {
-      UnitKind.mass => t.unitKindMass,
-      UnitKind.distance => t.unitKindDistance,
-      UnitKind.speed => t.unitKindSpeed,
-      UnitKind.temperature => t.unitKindTemperature,
-      UnitKind.angle => t.unitKindAngle,
-      UnitKind.time => t.unitKindTime,
-      UnitKind.typed => t.tallyUnitTyped,
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -342,25 +329,11 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
                       _typedUnit();
                     },
                   ),
-                  if (_matches.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      key: const ValueKey('tally-unit'),
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final known in _matches)
-                          // Suggestions that fill in the field, not a
-                          // choice of their own.
-                          ActionChip(
-                            key: ValueKey('tally-unit-${known.code}'),
-                            label: Text(shownUnit(known.code, _system)),
-                            tooltip: _kindName(known.kind),
-                            onPressed: () => _pickUnit(known),
-                          ),
-                      ],
-                    ),
-                  ],
+                  UnitSuggestions(
+                    matches: _matches,
+                    system: _system,
+                    onPick: _pickUnit,
+                  ),
                 ],
               ),
             ),
@@ -416,6 +389,55 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The known units [matches] under a Tally field's unit (#159), each a
+/// chip in this Device's [system] that fills in the field through
+/// [onPick]; suggestions, not a choice of their own. Nothing for none.
+class UnitSuggestions extends StatelessWidget {
+  final List<KnownUnit> matches;
+  final UnitSystem system;
+  final ValueChanged<KnownUnit> onPick;
+
+  const UnitSuggestions({
+    super.key,
+    required this.matches,
+    required this.system,
+    required this.onPick,
+  });
+
+  String _kindName(AppLocalizations t, UnitKind kind) => switch (kind) {
+    UnitKind.mass => t.unitKindMass,
+    UnitKind.distance => t.unitKindDistance,
+    UnitKind.speed => t.unitKindSpeed,
+    UnitKind.temperature => t.unitKindTemperature,
+    UnitKind.angle => t.unitKindAngle,
+    UnitKind.time => t.unitKindTime,
+    UnitKind.typed => t.tallyUnitTyped,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (matches.isEmpty) return const SizedBox.shrink();
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        key: const ValueKey('tally-unit'),
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final known in matches)
+            ActionChip(
+              key: ValueKey('tally-unit-${known.code}'),
+              label: Text(shownUnit(known.code, system)),
+              tooltip: _kindName(t, known.kind),
+              onPressed: () => onPick(known),
+            ),
+        ],
       ),
     );
   }

@@ -29,7 +29,23 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   **swipe left goes forward** into the last selected Area or Topic, if
   there is one. The last selected Area and Topic are highlighted.
 - Every browser level (Areas, Topics, Notes) has a "+" that adds the
-  thing shown on that level.
+  thing shown on that level. On the Areas list it adds an Area. **In an
+  Area, a Topic and All Notes "+" fans out Note, Checklist, Shopping
+  List, Tally, Session and Frog** (#161), and in an Area Topic, each an
+  icon with its words, upward from the button as the Agenda's fan does;
+  Session, Frog and Topic only for who may set them up. What it makes is
+  filed into the Area or Topic shown, from All Notes into none: Note
+  opens Capture; Checklist and Shopping List ask their name, then open
+  the editor with the cursor in the first Line or the field at the top;
+  Frog asks its name only. **Tally is one page**: its name, a row per
+  field, one at first, with "Add field" for the next, each field's rule,
+  unit and target as badges whose tap opens their small editor, the unit
+  typed with suggestions; rows left without a name are dropped on Save.
+  **Session is one page**: its name, its pool as a list of checkboxes
+  ending in "New Tally", which opens the Tally page and comes back with
+  that Tally ticked, then its count, rule and schedule as badges, the
+  schedule every day, all day, at first. Leaving a name dialog or one of
+  the pages without Create or Save makes nothing.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.

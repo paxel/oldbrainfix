@@ -5,7 +5,7 @@ import '../l10n/app_localizations.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
 import 'browser.dart';
-import 'capture_screen.dart';
+import 'browser_add.dart';
 import 'file_into_screen.dart';
 import 'frogs_screen.dart';
 import 'l10n.dart';
@@ -422,11 +422,10 @@ enum _AreaAction { rename, look, share, people, delete }
 
 enum _TopicAction { rename, delete }
 
-enum _AreaAdd { note, topic }
-
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
-/// those of its Topics, and "+" to add a Topic.
+/// those of its Topics, and "+" to make a Note, a Checklist, a Shopping
+/// List, a Tally, a Session, a Frog or a Topic in it.
 class AreaScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -530,50 +529,30 @@ class _AreaScreenState extends State<AreaScreen>
   @override
   void reloadLog() => _reload();
 
-  /// "+" opens a menu at the button: a Note filed straight into this
-  /// Area, or a new Topic.
+  /// "+" fans out what it makes, filed straight into this Area (#161),
+  /// and for a Manager a new Topic.
   Future<void> _add(BuildContext button) async {
     final t = context.t;
-    if (!_manages) {
-      // A Member adds Notes only.
-      await captureNote(
+    final kind = await pickNewKind(
+      context,
+      button,
+      newKinds(widget.places.store, widget.areaId, topic: true),
+    );
+    if (!mounted || kind == null) return;
+    if (kind != NewKind.topic) {
+      await makeNew(
         context,
         widget.notes,
+        widget.places,
+        kind,
         place: widget.areaId,
         onChanged: _reloadIfMounted,
       );
       return;
     }
-    final box = button.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (box == null || overlay == null) return;
-    final choice = await showMenu<_AreaAdd>(
-      context: context,
-      position: RelativeRect.fromRect(
-        box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
-        Offset.zero & overlay.size,
-      ),
-      items: [
-        PopupMenuItem(value: _AreaAdd.note, child: Text(t.noteHere)),
-        PopupMenuItem(value: _AreaAdd.topic, child: Text(t.topicChoice)),
-      ],
-    );
-    if (!mounted || choice == null) return;
-    switch (choice) {
-      case _AreaAdd.note:
-        await captureNote(
-          context,
-          widget.notes,
-          place: widget.areaId,
-          onChanged: _reloadIfMounted,
-        );
-        return;
-      case _AreaAdd.topic:
-        final name = await askName(context, title: t.newTopic);
-        if (!mounted || name == null) return;
-        widget.places.addTopic(widget.areaId, name);
-    }
+    final name = await askName(context, title: t.newTopic);
+    if (!mounted || name == null) return;
+    widget.places.addTopic(widget.areaId, name);
     _reload();
   }
 
@@ -796,7 +775,8 @@ class _AreaScreenState extends State<AreaScreen>
 }
 
 /// The browser's last level, one Topic: its diary of cards with a
-/// search field over them, and "+" to capture a Note into it.
+/// search field over them, and "+" to make a Note, a Checklist, a
+/// Shopping List, a Tally, a Session or a Frog in it.
 class TopicScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -858,10 +838,19 @@ class _TopicScreenState extends State<TopicScreen>
     _load();
   });
 
-  Future<void> _add() async {
-    await captureNote(
+  /// "+" fans out what it makes, filed straight into this Topic (#161).
+  Future<void> _add(BuildContext button) async {
+    final kind = await pickNewKind(
+      context,
+      button,
+      newKinds(widget.places.store, widget.topicId),
+    );
+    if (!mounted || kind == null) return;
+    await makeNew(
       context,
       widget.notes,
+      widget.places,
+      kind,
       place: widget.topicId,
       onChanged: _reloadIfMounted,
     );
@@ -1014,10 +1003,12 @@ class _TopicScreenState extends State<TopicScreen>
         ),
         floatingActionButton: !_writes
             ? null
-            : FloatingActionButton(
-                tooltip: t.captureTooltip,
-                onPressed: _add,
-                child: const Icon(Icons.add),
+            : Builder(
+                builder: (button) => FloatingActionButton(
+                  tooltip: t.addHere,
+                  onPressed: () => _add(button),
+                  child: const Icon(Icons.add),
+                ),
               ),
       ),
     );

@@ -138,6 +138,13 @@ class RoutineEditorScreen extends StatefulWidget {
   /// (#113): Save pops it as a [ScheduleChoice] instead of writing it.
   final CaptureDraft? capture;
 
+  /// What a new one starts as, in place of every day at 08:00: the
+  /// schedule a Session's form holds (#161).
+  final ScheduleChoice? initial;
+
+  /// The page's title in place of the kind's.
+  final String? title;
+
   const RoutineEditorScreen({
     super.key,
     required this.notes,
@@ -147,6 +154,8 @@ class RoutineEditorScreen extends StatefulWidget {
     this.reminder = false,
     this.session = false,
     this.capture,
+    this.initial,
+    this.title,
   });
 
   @override
@@ -244,7 +253,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           noteId ?? widget.capture?.place ?? '',
         );
       }
-      if (widget.reminder) {
+      if (widget.initial case final initial?) {
+        _renag = initial.renag;
+        _escalation = initial.escalation;
+        _load(initial.schedule);
+      } else if (widget.reminder) {
         // The next full hour, today or just after midnight.
         final wall = deviceWallClock(now.toUtc());
         _kind = RepeatKind.once;
@@ -554,11 +567,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         _schedule?.once ??
         (_advanced ? _rule.text.trim().isEmpty : _kind == RepeatKind.once);
     final routine = _routine;
-    final title = _draft != null
-        ? (routine == null ? t.newSession : t.session)
-        : routine == null
-        ? (once ? t.newReminder : t.newRoutine)
-        : (once ? t.reminder : t.routine);
+    final title =
+        widget.title ??
+        (_draft != null
+            ? (routine == null ? t.newSession : t.session)
+            : routine == null
+            ? (once ? t.newReminder : t.newRoutine)
+            : (once ? t.reminder : t.routine));
     final note = _note;
     return Scaffold(
       appBar: pageBar(

@@ -309,7 +309,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addHere => 'Add here';
 
   @override
-  String get noteHere => 'Note here';
+  String get addFanNote => 'Note';
+
+  @override
+  String get newChecklist => 'New Checklist';
+
+  @override
+  String get newShoppingList => 'New Shopping List';
+
+  @override
+  String get newTally => 'New Tally';
+
+  @override
+  String get newFrog => 'New Frog';
+
+  @override
+  String get kindName => 'Name';
+
+  @override
+  String get kindNameMissing => 'Give it a name.';
 
   @override
   String get topicChoice => 'Topic';
@@ -3412,6 +3430,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyAddField => 'Add field';
 
   @override
+  String get tallyFieldsMissing => 'Give at least one field a name.';
+
+  @override
+  String get tallyRuleSumShort => 'Sum';
+
+  @override
+  String get tallyRuleMaxShort => 'Largest';
+
+  @override
+  String get tallyNoUnit => 'No unit';
+
+  @override
+  String get tallyTargetBadge => 'Target';
+
+  @override
+  String get tallyNoTarget => 'No target';
+
+  @override
   String get tallyFields => 'Fields';
 
   @override
@@ -3541,6 +3577,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionPoolMissing => 'Choose at least one Tally.';
+
+  @override
+  String get sessionSchedule => 'Schedule';
 
   @override
   String sessionMove(String name) {

@@ -306,11 +306,16 @@ class ChecklistSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
+  /// Whether a list without Lines starts one, the cursor in it, as
+  /// Add Line does (#161).
+  final bool startLine;
+
   const ChecklistSection({
     super.key,
     required this.notes,
     required this.noteId,
     this.typed,
+    this.startLine = false,
   });
 
   @override
@@ -351,6 +356,11 @@ class _ChecklistSectionState extends State<ChecklistSection>
     super.initState();
     _load();
     widget.typed?.listen(_keepTyped);
+    if (widget.startLine && _adds && _rows.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _addEmpty();
+      });
+    }
   }
 
   @override

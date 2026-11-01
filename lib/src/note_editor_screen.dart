@@ -40,19 +40,22 @@ import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
-/// Opens the editor of [note]; returns once the user left it.
+/// Opens the editor of [note]; returns once the user left it. With
+/// [typeLines] the cursor starts in the Lines of a new list (#161).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
   Places places,
-  Note note,
-) => Navigator.of(context).push(
+  Note note, {
+  bool typeLines = false,
+}) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
       notes: notes,
       places: places,
       drafts: DraftsScope.of(context),
       noteId: note.id,
+      typeLines: typeLines,
     ),
   ),
 );
@@ -467,12 +470,18 @@ class NoteEditorScreen extends StatefulWidget {
   final Drafts drafts;
   final String noteId;
 
+  /// Whether the cursor starts in the Lines of a Checklist or Shopping
+  /// List just made from the browser's "+" (#161): a new empty Line of a
+  /// Checklist, the field at the top of a Shopping List.
+  final bool typeLines;
+
   const NoteEditorScreen({
     super.key,
     required this.notes,
     required this.places,
     required this.drafts,
     required this.noteId,
+    this.typeLines = false,
   });
 
   @override
@@ -1447,12 +1456,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
+              startLine: widget.typeLines,
             ),
             // Nothing while the Note is no Shopping List.
             ShoppingSection(
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
+              focusAdd: widget.typeLines,
             ),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),

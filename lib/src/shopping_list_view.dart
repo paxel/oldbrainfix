@@ -179,11 +179,15 @@ class ShoppingSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
+  /// Whether the cursor starts in the field at the top (#161).
+  final bool focusAdd;
+
   const ShoppingSection({
     super.key,
     required this.notes,
     required this.noteId,
     this.typed,
+    this.focusAdd = false,
   });
 
   @override
@@ -505,6 +509,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
                 key: const ValueKey('shopping-add-text'),
                 controller: _add,
                 twoRows: _twoRows,
+                autofocus: widget.focusAdd,
                 decoration: InputDecoration(hintText: t.checklistNewLine),
               ),
               const SizedBox(height: 8),
