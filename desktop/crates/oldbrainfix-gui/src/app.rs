@@ -3357,7 +3357,7 @@ impl App {
             AiAction::Done => {
                 if let Some(mut port) = self.ai_port.take() {
                     // What the client asked before "Done" still counts.
-                    port.answer_waiting(&self.store);
+                    port.answer_waiting(&self.store, &*self.wall);
                     port.close();
                 }
                 self.ai_copied = None;
@@ -6786,7 +6786,7 @@ impl App {
         // The AI port's tool calls are answered on this thread, while the
         // window idles too; what they drafted shows at once.
         if let Some(port) = &self.ai_port {
-            if port.answer_waiting(&self.store) > 0 {
+            if port.answer_waiting(&self.store, &*self.wall) > 0 {
                 self.refresh();
             }
             ui.ctx()

@@ -10,6 +10,8 @@
 //! Who may connect (#167) is chosen on the card while the port is
 //! closed, this computer only until then, and kept for the next start;
 //! the Docker choice without a Docker bridge says so and does not open.
+//! The set-ups of Tallies, Checklists and Shopping Lists, Frogs and
+//! Sessions (#168) show in groups of their own, before and after.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -20,7 +22,11 @@ use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::ai_port::{Reach, docker_bridge};
-use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_core::schedule::{ClockTime, Day, Schedule};
+use oldbrainfix_core::tallies::Tallies;
+use oldbrainfix_core::{
+    Checklists, Frogs, Notes, OwnProfile, Places, SessionRule, Sessions, SigningKey, Store,
+};
 use oldbrainfix_gui::ai_view::{AiAction, PortShown, port_card};
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -208,6 +214,57 @@ fn the_users_own_later_edit_is_marked_as_staying() -> TestResult {
     let harness = window(App::new(store.clone(), "en"));
     assert_eq!(harness.state().selection(), &Selection::AiReview);
     assert!(shows(&harness, t.ai_your_edit_stays()));
+    Ok(())
+}
+
+#[test]
+fn the_set_ups_of_tallies_lists_frogs_and_sessions_show_in_groups_of_their_own() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let notes = Notes::new(&store);
+    let run = notes.capture("Run", None, None)?.id;
+    let trip = notes.capture("Trip\nSocks", None, None)?.id;
+    let bank = notes.capture("Call the bank", None, None)?.id;
+    let ten: Vec<ClockTime> = ClockTime::new(10, 0).into_iter().collect();
+    let daily = Schedule::new(Day::new(2026, 3, 2), &ten, None).ok_or("a schedule")?;
+    let task = store.open_ai_task()?;
+    store.drafting(&task, || {
+        Tallies::new(&store).add_field(&run, "Distance", "km", Some(5000.0), None)?;
+        Checklists::new(&store).make(&trip)?;
+        Frogs::new(&store).spawn(&bank)?;
+        Sessions::new(&store).spawn(
+            &bank,
+            &daily,
+            std::slice::from_ref(&run),
+            2,
+            SessionRule::Random,
+        )?;
+        Ok(())
+    })?;
+
+    let harness = window(App::new(store.clone(), "en"));
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    for group in [
+        t.ai_kind_tally(),
+        t.ai_kind_list(),
+        t.ai_kind_frog(),
+        t.ai_kind_session(),
+    ] {
+        assert!(shows(&harness, group), "{group}");
+    }
+    assert!(!shows(&harness, t.ai_kind_routine()), "the Session as one");
+    assert!(shows(
+        &harness,
+        &t.ai_tally_field("Distance", t.tally_target_badge())
+    ));
+    assert!(shows(&harness, &t.ai_before(t.tally_no_target())));
+    assert!(shows(&harness, &t.ai_after("5 km")));
+    assert!(shows(&harness, t.ai_field_kind()));
+    assert!(shows(&harness, &t.ai_before(t.ai_plain_note())));
+    assert!(shows(&harness, &t.ai_after(t.checklist_heading())));
+    assert!(shows(&harness, &t.ai_after("Socks")));
+    assert!(shows(&harness, &t.ai_after(t.session_rule_random())));
+    assert!(shows(&harness, &t.ai_after("Run")), "the pool by its Notes");
     Ok(())
 }
 

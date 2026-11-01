@@ -1,29 +1,47 @@
 //! The tools an AI client calls through the AI port (#112, ADR 0026):
-//! reading Notes with their Sections, Transcripts, Photo Texts and
-//! Capture Context, a photo scaled down, the Areas and Topics, the
-//! Routines and Reminders, and this Device's settings; and doing what the
-//! user can do with Notes, Areas, Topics, Merges, the trash, Importance,
-//! the details of a Capture Context, Routines and Reminders. Every change goes through the screens' own
-//! calls inside [`Store::drafting`], so it is a Pending Change of the AI
-//! Task until the user accepts it. Nothing reaches other people: no
-//! sending, sharing, Profile cards nor blocking, and settings are only
-//! read.
+//! reading Notes with their Sections, Transcripts, Photo Texts, Capture
+//! Context and Boxes, what kind each Note is with its parts, a photo
+//! scaled down, the Areas and Topics, the Routines and Reminders, and
+//! this Device's settings; and doing what the user can do with Notes,
+//! Areas, Topics, Merges, the trash, Importance, the details of a Capture
+//! Context, Routines and Reminders, and setting up Tallies, Sessions,
+//! Checklists, Shopping Lists and Frogs (#168). Every change goes through
+//! the screens' own calls inside [`Store::drafting`], so it is a Pending
+//! Change of the AI Task until the user accepts it. The user's own data,
+//! a Tally's entries, the ticks of Lines and Boxes, the check-offs, a
+//! Session's picks and the eaten Frogs, is only read, each with its date.
+//! Nothing reaches other people: no sending, sharing, Profile cards nor
+//! blocking, and settings are only read.
 
 use std::io::Cursor;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::Duration;
+use std::collections::{BTreeMap, BTreeSet};
+
+use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 
-use crate::entry::dart_iso;
+use crate::boxes::Boxes;
+use crate::checklists::{
+    Checklists, LineChecks, keys as checklist_keys, parse_line_in, parse_list_kind, split_lines,
+};
+use crate::entry::{dart_iso, parse_time};
+use crate::frogs::Frogs;
 use crate::notes::{CapturedDetail, Importance, Note, Notes};
+use crate::people::PersonFilter;
 use crate::places::{NotesGo, Places};
 use crate::routines::{Routine, Routines};
-use crate::schedule::{ClockTime, Day, Recurrence, Schedule};
+use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
 use crate::search::Search;
+use crate::sessions::{SessionMarks, SessionRule, Sessions};
 use crate::settings::{DeviceSettings, QuickNoteControl};
+use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
 use crate::store::Store;
+use crate::tallies::{Tallies, Tally};
+use crate::tally_units::{self, TallyRule, UnitSystem};
+use crate::text_boxes::ShownBox;
+use crate::text_format;
 use crate::{Error, Result};
 
 /// The longest side of a photo handed out, unless asked for less.
@@ -133,10 +151,10 @@ fn schedule_properties(extra: Value) -> Value {
 /// Every tool, with its input schema.
 pub fn tools() -> Vec<Value> {
     let id = |what: &str| string(&format!("The id of the {what}"));
-    vec![
+    let mut all = vec![
         tool(
             "list_notes",
-            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search.",
+            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList or tally), its open Frog and the Sessions spawned from it.",
             true,
             json!({
                 "place": string("Only the Notes in this Area or Topic (an Area's Topics included)"),
@@ -147,7 +165,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Routines and Reminders.",
+            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: a Tally's fields, the Lines of a Checklist or Shopping List, and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -172,7 +190,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "list_routines",
-            "Lists the Routines and Reminders, of one Note or all; those in the trash on request.",
+            "Lists the Routines and Reminders, of one Note or all, each Session with its pool, count and picking rule; those in the trash on request.",
             true,
             json!({
                 "note": string("Only those spawned from this Note"),
@@ -349,6 +367,241 @@ pub fn tools() -> Vec<Value> {
             json!({"id": id("Routine")}),
             &["id"],
         ),
+    ];
+    all.extend(set_up_tools());
+    all.extend(data_tools());
+    all
+}
+
+/// A Tally's field as a tool takes it.
+fn field_properties() -> Value {
+    json!({
+        "name": string("The field's name, such as Push-ups"),
+        "rule": {"description": "How a day with several entries counts: their sum or the largest; by the kind of unit when left out", "enum": ["sum", "max"], "type": "string"},
+        "target": {"description": "The target per day, in the field's unit; none when left out", "type": "number"},
+        "unit": string("The unit: one the app knows (kg, g, km, m, cm, km/h, °C, °, h, min, s) or any word; none when left out"),
+    })
+}
+
+/// The day range of a tool that reads the user's own data.
+fn range_properties(extra: Value) -> Value {
+    let mut properties = json!({
+        "from": string("Only from this day on, YYYY-MM-DD, on this computer's clock"),
+        "until": string("Only up to this day, YYYY-MM-DD, that day included"),
+    });
+    if let (Some(all), Value::Object(more)) = (properties.as_object_mut(), extra) {
+        all.extend(more);
+    }
+    properties
+}
+
+/// The tools that set up Tallies, Sessions, Checklists, Shopping Lists
+/// and Frogs (#168). None writes an entry, a tick, a check-off, a pick or
+/// an eaten Frog.
+fn set_up_tools() -> Vec<Value> {
+    let id = |what: &str| string(&format!("The id of the {what}"));
+    let pool = json!({"description": "The Notes of the Tallies it picks from, in the order Rolling goes through them", "items": {"type": "string"}, "type": "array"});
+    let picking = json!({"description": "How it picks: random, rolling (through the pool in its order) or least (the fewest entries first); rolling when left out", "enum": ["random", "rolling", "least"], "type": "string"});
+    let count =
+        json!({"description": "How many Tallies an Occurrence picks, 1 to 99", "type": "integer"});
+    vec![
+        tool(
+            "make_tally",
+            "Makes a Note a Tally with the fields given, which takes it out of Unsorted. A Checklist or Shopping List is never a Tally.",
+            false,
+            json!({
+                "fields": {"description": "At least one field", "items": {"properties": field_properties(), "required": ["name"], "type": "object"}, "type": "array"},
+                "id": id("Note"),
+            }),
+            &["id", "fields"],
+        ),
+        tool(
+            "add_tally_field",
+            "Adds a field to a Tally, or makes a Note a Tally with its first field.",
+            false,
+            {
+                let mut properties = field_properties();
+                if let Some(all) = properties.as_object_mut() {
+                    all.insert("id".into(), id("Note"));
+                }
+                properties
+            },
+            &["id", "name"],
+        ),
+        tool(
+            "rename_tally_field",
+            "Renames a field of a Tally.",
+            false,
+            json!({"field": id("field"), "id": id("Note"), "name": string("The new name")}),
+            &["id", "field", "name"],
+        ),
+        tool(
+            "set_tally_field",
+            "Sets the unit, the target or the rule of a field of a Tally; what is left out stays. A unit of another kind is refused while entries hold values for the field.",
+            false,
+            json!({
+                "field": id("field"),
+                "id": id("Note"),
+                "rule": {"enum": ["sum", "max"], "type": "string"},
+                "target": {"description": "The target per day in the field's unit, or null for none", "type": ["number", "null"]},
+                "unit": string("The new unit"),
+            }),
+            &["id", "field"],
+        ),
+        tool(
+            "remove_tally_field",
+            "Removes a field from a Tally. The values its entries hold stay, and it can be brought back on the screen.",
+            false,
+            json!({"field": id("field"), "id": id("Note")}),
+            &["id", "field"],
+        ),
+        tool(
+            "make_session",
+            "Makes a Session: a Routine that picks Tallies from its pool for each Occurrence, spawned from a Note, or from a new Note with the text given.",
+            false,
+            schedule_properties(json!({
+                "count": count,
+                "note": id("Note it is spawned from"),
+                "picking": picking,
+                "pool": pool,
+                "text": string("The text of a new Note to spawn it from, when no note is given"),
+            })),
+            &["pool", "start", "times"],
+        ),
+        tool(
+            "set_session",
+            "Changes a Session's pool, count, picking rule or the count of single weekdays; what is left out stays. Its schedule is changed with reschedule_routine.",
+            false,
+            json!({
+                "count": count,
+                "id": id("Session"),
+                "picking": picking,
+                "pool": pool,
+                "weekdayCounts": {"additionalProperties": {"type": ["integer", "null"]}, "description": "The count of single weekdays, 1 for Monday to 7 for Sunday, such as {\"6\": 2}; null takes a weekday's own count away", "type": "object"},
+            }),
+            &["id"],
+        ),
+        tool(
+            "make_list",
+            "Makes a Note a Checklist or a Shopping List: its first line stays its text and every other line not blank becomes a Line, on a Checklist under the line above when it starts with a space. A text with a line marked \"✓ \" is refused, as that Line would be checked.",
+            false,
+            json!({"id": id("Note"), "list": {"enum": ["checklist", "shoppingList"], "type": "string"}}),
+            &["id", "list"],
+        ),
+        tool(
+            "list_to_plain",
+            "Turns a Checklist or Shopping List back into a plain Note: every Line becomes a line of its text.",
+            false,
+            json!({"id": id("Note")}),
+            &["id"],
+        ),
+        tool(
+            "add_line",
+            "Adds a Line to a Checklist, at the end or at a place, or to the top of a Shopping List. On a Shopping List a name it holds already adds nothing; one that is checked is refused, as adding it would bring it back.",
+            false,
+            json!({
+                "at": {"description": "Checklist only: its place among the Lines, from 0; at the end when left out", "type": "integer"},
+                "id": id("Note"),
+                "text": string("The Line's text"),
+                "under": {"description": "Checklist only: in the group of the Line above", "type": "boolean"},
+            }),
+            &["id", "text"],
+        ),
+        tool(
+            "rename_line",
+            "Renames a Line of a Checklist or Shopping List.",
+            false,
+            json!({"id": id("Line"), "text": string("The new text")}),
+            &["id", "text"],
+        ),
+        tool(
+            "move_line",
+            "Moves a Line of a Checklist, with its group, to just before another Line, or to the end. A single Line put before a Line of a group joins that group.",
+            false,
+            json!({"before": string("The id of the Line it goes before; the end when left out"), "id": id("Line")}),
+            &["id"],
+        ),
+        tool(
+            "group_line",
+            "Puts a Line of a Checklist into the group of the Line above it, or back to the top.",
+            false,
+            json!({"id": id("Line"), "under": {"description": "true for the group of the Line above, false for the top", "type": "boolean"}}),
+            &["id", "under"],
+        ),
+        tool(
+            "set_reappear",
+            "Sets how long a Line of a Shopping List stays struck through once checked: once (gone), or 1 to 4 weeks.",
+            false,
+            json!({"id": id("Line"), "reappear": {"enum": ["once", "1w", "2w", "3w", "4w"], "type": "string"}}),
+            &["id", "reappear"],
+        ),
+        tool(
+            "remove_line",
+            "Deletes a Line of a Checklist or Shopping List; on a Checklist its group comes up to the top. It can be restored on the screen.",
+            false,
+            json!({"id": id("Line")}),
+            &["id"],
+        ),
+        tool(
+            "make_frog",
+            "Makes a Frog of a Note: a job with no time, done once, offered on the Agenda to eat one a day. A Note has one open Frog at a time.",
+            false,
+            json!({"id": id("Note")}),
+            &["id"],
+        ),
+        tool(
+            "frog_to_plain",
+            "Turns a Note's open Frog back into a plain Note: the Frog goes to the trash, the Note stays.",
+            false,
+            json!({"id": id("Note")}),
+            &["id"],
+        ),
+    ]
+}
+
+/// The tools that read the user's own data, each with its date: a
+/// Tally's entries, the ticks of Lines and Boxes, the check-offs, the
+/// eaten Frogs and a Session's picks.
+fn data_tools() -> Vec<Value> {
+    let id = |what: &str| string(&format!("The id of the {what}"));
+    vec![
+        tool(
+            "read_tally_entries",
+            "Reads the entries of a Tally, newest first, everyone's: when each counts for, its values in each field's unit and its line of text.",
+            true,
+            range_properties(json!({"note": id("Note of the Tally")})),
+            &["note"],
+        ),
+        tool(
+            "read_ticks",
+            "Reads the ticks of a Note, newest first: each time a Line of its Checklist or Shopping List was checked, for the list itself or for an Occurrence of a Routine spawned from it, and each tick of a Box in its text or its Sections' texts, with its state.",
+            true,
+            range_properties(json!({"note": id("Note")})),
+            &["note"],
+        ),
+        tool(
+            "read_check_offs",
+            "Reads the check-offs of Routines and Reminders, of one, of those of a Note, or all: each Occurrence checked off, with its day and when it was checked off. The range goes by the Occurrence's day.",
+            true,
+            range_properties(
+                json!({"note": string("Only those spawned from this Note"), "routine": string("Only this Routine")}),
+            ),
+            &[],
+        ),
+        tool(
+            "read_eaten_frogs",
+            "Reads the Frogs eaten (checked off), most recently first, with when each was eaten and its Note.",
+            true,
+            range_properties(json!({})),
+            &[],
+        ),
+        tool(
+            "read_session_picks",
+            "Reads a Session's picks, newest first: for each Occurrence the Tallies picked, the entries recorded for them and whether it was checked off. The range goes by the Occurrence's day.",
+            true,
+            range_properties(json!({"id": id("Session")})),
+            &["id"],
+        ),
     ]
 }
 
@@ -413,17 +666,162 @@ fn schedule_arg(args: &Value) -> Result<Schedule> {
         .ok_or_else(|| Error::Invalid("that schedule never happens".into()))
 }
 
-fn note_summary(note: &Note) -> Value {
+fn note_summary(note: &Note, kind: &NoteKind) -> Value {
     json!({
         "captured": dart_iso(note.captured),
+        "frog": kind.frog,
         "id": note.id,
         "importance": note.importance.name(),
+        "kind": kind.kind,
         "mergedInto": note.merged_into,
         "place": note.place,
+        "sessions": kind.sessions,
         "text": note.text,
         "trashed": note.is_trashed(),
         "unsorted": note.is_unsorted(),
     })
+}
+
+/// What a Note is besides its text: `plain`, `checklist`, `shoppingList`
+/// or `tally` (a Note is at most one of the last three), its open Frog,
+/// and the Sessions spawned from it.
+struct NoteKind {
+    kind: &'static str,
+    frog: Option<String>,
+    sessions: Vec<String>,
+}
+
+/// The Tallies, open Frogs and Sessions, read once for many Notes.
+struct Kinds {
+    tallies: BTreeSet<String>,
+    frogs: BTreeMap<String, String>,
+    sessions: BTreeMap<String, Vec<String>>,
+}
+
+/// The list the Note `note` is by its kind: `checklist`, `shoppingList`,
+/// or `None` for none.
+fn list_of(store: &Store, note: &str) -> Result<Option<&'static str>> {
+    let kind = store.current(note, checklist_keys::KIND)?;
+    Ok(
+        match parse_list_kind(kind.as_deref()).map(|(list, _)| list) {
+            Some(checklist_keys::CHECKLIST) => Some(CHECKLIST),
+            Some(shopping_keys::SHOPPING) => Some(SHOPPING_LIST),
+            _ => None,
+        },
+    )
+}
+
+const CHECKLIST: &str = "checklist";
+const SHOPPING_LIST: &str = "shoppingList";
+const PENDING: &str = "kept once the user accepts the AI Task";
+
+/// The days an answer is narrowed to, both included.
+struct Range {
+    from: Option<Day>,
+    until: Option<Day>,
+}
+
+impl Range {
+    fn of(args: &Value) -> Result<Range> {
+        let day = |key: &str| -> Result<Option<Day>> {
+            match optional_text(args, key) {
+                None => Ok(None),
+                Some(text) => Day::parse(text)
+                    .map(Some)
+                    .ok_or_else(|| Error::Invalid(format!("{key} is no day YYYY-MM-DD"))),
+            }
+        };
+        Ok(Range {
+            from: day("from")?,
+            until: day("until")?,
+        })
+    }
+
+    fn holds(&self, day: Day) -> bool {
+        self.from.is_none_or(|from| day >= from) && self.until.is_none_or(|until| day <= until)
+    }
+}
+
+/// The strings under `key`, which must be given.
+fn strings_arg(args: &Value, key: &str) -> Result<Vec<String>> {
+    args.get(key)
+        .and_then(Value::as_array)
+        .ok_or_else(|| Error::Invalid(format!("{key} is missing")))?
+        .iter()
+        .map(|v| {
+            v.as_str()
+                .map(str::to_string)
+                .ok_or_else(|| Error::Invalid(format!("{key} holds no text: {v}")))
+        })
+        .collect()
+}
+
+fn rule_arg(args: &Value) -> Result<Option<TallyRule>> {
+    match optional_text(args, "rule") {
+        None => Ok(None),
+        Some(rule) => TallyRule::parse(rule)
+            .map(Some)
+            .ok_or_else(|| Error::Invalid(format!("no rule {rule}: sum or max"))),
+    }
+}
+
+fn picking_arg(args: &Value) -> Result<Option<SessionRule>> {
+    match optional_text(args, "picking") {
+        None => Ok(None),
+        Some(rule) => SessionRule::parse(rule)
+            .map(Some)
+            .ok_or_else(|| Error::Invalid(format!("no picking rule {rule}"))),
+    }
+}
+
+fn count_arg(args: &Value) -> Result<Option<i64>> {
+    match args.get("count") {
+        None => Ok(None),
+        Some(v) => v
+            .as_i64()
+            .map(Some)
+            .ok_or_else(|| Error::Invalid("count is no whole number".into())),
+    }
+}
+
+/// A Tally's fields, each target in the field's unit.
+fn tally_json(tally: &Tally) -> Value {
+    let fields: Vec<Value> = tally
+        .fields
+        .iter()
+        .map(|f| {
+            json!({
+                "hasEntries": f.has_entries,
+                "id": f.id,
+                "name": f.name,
+                "removed": f.hidden,
+                "rule": f.rule.name(),
+                "target": f.target.map(|t| tally_units::from_base(t, &f.unit, UnitSystem::Metric)),
+                "unit": f.unit,
+            })
+        })
+        .collect();
+    json!({"fields": fields})
+}
+
+/// The Boxes of a text, each with its state and its latest tick.
+fn boxes_json(boxes: &[ShownBox]) -> Vec<Value> {
+    boxes
+        .iter()
+        .map(|b| {
+            json!({
+                "id": b.id,
+                "state": b.state.name(),
+                "ticked": b.last.as_ref().map(|t| dart_iso(t.at)),
+            })
+        })
+        .collect()
+}
+
+/// `found` newest first, as the values to hand out.
+fn newest_first(mut found: Vec<(DateTime<Utc>, Value)>) -> Value {
+    found.sort_by_key(|a| std::cmp::Reverse(a.0));
+    Value::Array(found.into_iter().map(|(_, v)| v).collect())
 }
 
 fn texts_of(map: &std::collections::BTreeMap<String, String>, key: &str) -> Vec<Value> {
@@ -463,20 +861,148 @@ impl Store {
     /// `task`. A change is drafted into the task; one that fails leaves
     /// it as it was, and says why in an output marked as an error. An
     /// error only for a tool there is none of.
-    pub fn ai_tool(&self, task: &str, name: &str, args: &Value) -> Result<ToolOutput> {
+    /// `wall` is this computer's clock, for the days of the user's data
+    /// and for a Shopping List's struck Lines.
+    pub fn ai_tool(
+        &self,
+        task: &str,
+        name: &str,
+        args: &Value,
+        wall: &WallClock,
+    ) -> Result<ToolOutput> {
         if !is_tool(name) {
             return Err(Error::Invalid(format!("no tool {name}")));
         }
         let done = if reads_only(name) {
-            self.ai_read(name, args)
+            self.ai_read(name, args, wall)
         } else {
-            self.drafting(task, || self.ai_change(name, args))
+            self.drafting(task, || self.ai_change(name, args, wall))
                 .map(|value| ToolOutput::json(&value))
         };
         Ok(done.unwrap_or_else(|e| ToolOutput::failed(&e.to_string())))
     }
 
-    fn ai_read(&self, name: &str, args: &Value) -> Result<ToolOutput> {
+    /// The Tallies, open Frogs and Sessions, by their Notes.
+    fn kinds(&self) -> Result<Kinds> {
+        let tallies = Tallies::new(self)
+            .all()?
+            .into_iter()
+            .map(|t| t.note_id)
+            .collect();
+        let frogs_of = Frogs::new(self);
+        let mut frogs = BTreeMap::new();
+        for frog in frogs_of.open()? {
+            if let Some(note) = frogs_of.note(&frog)? {
+                frogs.insert(note.id, frog.id);
+            }
+        }
+        let mut sessions: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for session in Sessions::new(self).all()? {
+            sessions
+                .entry(session.routine.note_id.clone())
+                .or_default()
+                .push(session.routine.id);
+        }
+        Ok(Kinds {
+            tallies,
+            frogs,
+            sessions,
+        })
+    }
+
+    /// What the Note `note` is, by `kinds`.
+    fn kind_of(&self, kinds: &Kinds, note: &Note) -> Result<NoteKind> {
+        let tally = kinds.tallies.contains(&note.id)
+            || (note.is_trashed() && Tallies::new(self).is_tally(&note.id)?);
+        let kind = match tally {
+            true => "tally",
+            false => list_of(self, &note.id)?.unwrap_or("plain"),
+        };
+        Ok(NoteKind {
+            kind,
+            frog: kinds.frogs.get(&note.id).cloned(),
+            sessions: kinds.sessions.get(&note.id).cloned().unwrap_or_default(),
+        })
+    }
+
+    /// A Routine or Reminder as a tool hands it out, a Session with its
+    /// pool, count and picking rule.
+    fn routine_value(&self, routine: &Routine) -> Result<Value> {
+        let mut out = routine_json(routine);
+        if let (Some(session), Some(all)) =
+            (Sessions::new(self).by_id(&routine.id)?, out.as_object_mut())
+        {
+            let weekdays: BTreeMap<String, i64> = session
+                .counts
+                .iter()
+                .map(|(day, count)| (day.to_string(), *count))
+                .collect();
+            all.insert(
+                "session".into(),
+                json!({
+                    "count": session.count,
+                    "picking": session.rule.name(),
+                    "pool": session.pool,
+                    "weekdayCounts": weekdays,
+                }),
+            );
+        }
+        Ok(out)
+    }
+
+    fn routines_value(&self, routines: &[Routine]) -> Result<Value> {
+        Ok(Value::Array(
+            routines
+                .iter()
+                .map(|r| self.routine_value(r))
+                .collect::<Result<_>>()?,
+        ))
+    }
+
+    /// The Lines of the Note `note`, when it is a Checklist or Shopping
+    /// List.
+    fn lines_value(&self, note: &str, wall: &WallClock) -> Result<Value> {
+        Ok(match list_of(self, note)? {
+            Some(CHECKLIST) => match Checklists::new(self).by_note(note)? {
+                Some(list) => Value::Array(
+                    list.lines
+                        .iter()
+                        .map(|l| {
+                            json!({
+                                "checked": l.checked,
+                                "checkedAt": l.checked_at.map(dart_iso),
+                                "group": l.parent,
+                                "id": l.id,
+                                "text": l.text,
+                            })
+                        })
+                        .collect(),
+                ),
+                None => Value::Null,
+            },
+            Some(_) => match ShoppingLists::new(self).by_note(note, wall)? {
+                Some(list) => Value::Array(
+                    list.lines
+                        .iter()
+                        .map(|l| {
+                            json!({
+                                "backOn": l.back_on.map(|d| d.to_string()),
+                                "checkedAt": l.checked_at.map(dart_iso),
+                                "id": l.id,
+                                "reappear": l.reappear.code(),
+                                "struck": l.struck,
+                                "text": l.text,
+                            })
+                        })
+                        .collect(),
+                ),
+                None => Value::Null,
+            },
+            None => Value::Null,
+        })
+    }
+
+    fn ai_read(&self, name: &str, args: &Value, wall: &WallClock) -> Result<ToolOutput> {
         let notes = Notes::new(self);
         Ok(match name {
             "list_notes" => {
@@ -490,7 +1016,12 @@ impl Store {
                         None => notes.all()?,
                     },
                 };
-                ToolOutput::json(&Value::Array(found.iter().map(note_summary).collect()))
+                let kinds = self.kinds()?;
+                let mut out = Vec::new();
+                for note in &found {
+                    out.push(note_summary(note, &self.kind_of(&kinds, note)?));
+                }
+                ToolOutput::json(&Value::Array(out))
             }
             "read_note" => {
                 let id = text_arg(args, "id")?;
@@ -511,6 +1042,7 @@ impl Store {
                         json!({
                             "captured": dart_iso(s.captured),
                             "id": s.id,
+                            "boxes": boxes_json(&s.boxes),
                             "photoTexts": texts_of(&s.photo_texts, "photo"),
                             "photos": s.photos,
                             "text": s.text,
@@ -518,14 +1050,26 @@ impl Store {
                         })
                     })
                     .collect();
-                let routines: Vec<Value> = Routines::new(self)
+                let routines = self.routines_value(&Routines::new(self).of_note(id)?)?;
+                let frogs: Vec<Value> = Frogs::new(self)
                     .of_note(id)?
                     .iter()
-                    .map(routine_json)
+                    .map(|f| {
+                        json!({
+                            "eaten": f.done.map(dart_iso),
+                            "id": f.id,
+                            "spawned": dart_iso(f.spawned),
+                        })
+                    })
                     .collect();
-                let mut out = note_summary(&note);
+                let tally = Tallies::new(self).by_note(id)?.map(|t| tally_json(&t));
+                let lines = self.lines_value(id, wall)?;
+                let mut out = note_summary(&note, &self.kind_of(&self.kinds()?, &note)?);
                 if let Some(all) = out.as_object_mut() {
+                    all.insert("boxes".into(), json!(boxes_json(&note.boxes)));
                     all.insert("captureContext".into(), Value::Object(context));
+                    all.insert("frogs".into(), json!(frogs));
+                    all.insert("lines".into(), lines);
                     all.insert("mayChange".into(), json!(self.may_change(id)?));
                     all.insert(
                         "photoTexts".into(),
@@ -534,6 +1078,7 @@ impl Store {
                     all.insert("photos".into(), json!(note.photos));
                     all.insert("routines".into(), json!(routines));
                     all.insert("sections".into(), json!(sections));
+                    all.insert("tally".into(), json!(tally));
                     all.insert(
                         "transcripts".into(),
                         json!(texts_of(&note.transcripts, "recording")),
@@ -598,7 +1143,7 @@ impl Store {
                     (Some(note), false) => routines.of_note(note)?,
                     (None, false) => routines.all()?,
                 };
-                ToolOutput::json(&Value::Array(found.iter().map(routine_json).collect()))
+                ToolOutput::json(&self.routines_value(&found)?)
             }
             "read_settings" => {
                 let settings = DeviceSettings::new(self);
@@ -625,12 +1170,210 @@ impl Store {
                     "theme": settings.theme()?.name(),
                 }))
             }
-            _ => return Err(Error::Invalid(format!("no tool {name}"))),
+            other => ToolOutput::json(&self.ai_read_data(other, args, wall)?),
         })
     }
 
+    /// The user's own data, each with its date, narrowed to the days of
+    /// `from` and `until`: read only.
+    fn ai_read_data(&self, name: &str, args: &Value, wall: &WallClock) -> Result<Value> {
+        let range = Range::of(args)?;
+        let day = |at: DateTime<Utc>| Day::today(at, wall);
+        let mut found: Vec<(DateTime<Utc>, Value)> = Vec::new();
+        match name {
+            "read_tally_entries" => {
+                let note = text_arg(args, "note")?;
+                let tallies = Tallies::new(self);
+                let tally = tallies
+                    .by_note(note)?
+                    .ok_or_else(|| Error::Invalid(format!("not a Tally: {note}")))?;
+                for entry in tallies.entries(note, &PersonFilter::default())? {
+                    if !range.holds(day(entry.at)) {
+                        continue;
+                    }
+                    let values: Vec<Value> = tally
+                        .fields
+                        .iter()
+                        .filter_map(|f| {
+                            let base = *entry.values.get(&f.id)?;
+                            Some(json!({
+                                "field": f.id,
+                                "name": f.name,
+                                "unit": f.unit,
+                                "value": tally_units::from_base(base, &f.unit, UnitSystem::Metric),
+                            }))
+                        })
+                        .collect();
+                    let value = json!({
+                        "at": dart_iso(entry.at),
+                        "day": day(entry.at).to_string(),
+                        "id": entry.id,
+                        "line": entry.line,
+                        "values": values,
+                    });
+                    found.push((entry.at, value));
+                }
+            }
+            "read_ticks" => {
+                let note = text_arg(args, "note")?;
+                let lines: Vec<(String, String)> = match list_of(self, note)? {
+                    Some(CHECKLIST) => Checklists::new(self)
+                        .by_note(note)?
+                        .map(|l| l.lines.into_iter().map(|l| (l.id, l.text)).collect())
+                        .unwrap_or_default(),
+                    Some(_) => ShoppingLists::new(self)
+                        .by_note(note, wall)?
+                        .map(|l| {
+                            l.lines
+                                .iter()
+                                .chain(l.gone())
+                                .map(|l| (l.id.clone(), l.text.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    None => Vec::new(),
+                };
+                for (line, text) in &lines {
+                    for e in self.history(line)? {
+                        let at = e.value.as_deref().and_then(|v| parse_time(v).ok());
+                        let Some(at) = at.filter(|_| e.field == checklist_keys::CHECKED) else {
+                            continue;
+                        };
+                        if range.holds(day(at)) {
+                            let value = json!({"at": dart_iso(at), "day": day(at).to_string(), "line": line, "text": text});
+                            found.push((at, value));
+                        }
+                    }
+                }
+                for routine in Routines::new(self).of_note(note)? {
+                    let checks = LineChecks::of(self, &routine.id)?;
+                    for (key, by_line) in &checks.by_occurrence {
+                        for (line, e) in by_line {
+                            let Some(at) = e.value.as_deref().and_then(|v| parse_time(v).ok())
+                            else {
+                                continue;
+                            };
+                            if !range.holds(day(at)) {
+                                continue;
+                            }
+                            let text = lines.iter().find(|(id, _)| id == line).map(|(_, t)| t);
+                            let value = json!({
+                                "at": dart_iso(at),
+                                "day": day(at).to_string(),
+                                "line": line,
+                                "occurrence": key,
+                                "routine": routine.id,
+                                "text": text,
+                            });
+                            found.push((at, value));
+                        }
+                    }
+                }
+                let mut texts = vec![note.to_string()];
+                texts.extend(Notes::new(self).sections(note)?.into_iter().map(|s| s.id));
+                let boxes = Boxes::new(self);
+                for entity in &texts {
+                    for shown in boxes.of(entity)? {
+                        for tick in boxes.history(entity, &shown.id)? {
+                            if !range.holds(day(tick.at)) {
+                                continue;
+                            }
+                            let value = json!({
+                                "at": dart_iso(tick.at),
+                                "box": shown.id,
+                                "day": day(tick.at).to_string(),
+                                "in": entity,
+                                "state": tick.state.name(),
+                            });
+                            found.push((tick.at, value));
+                        }
+                    }
+                }
+            }
+            "read_check_offs" => {
+                let routines = Routines::new(self);
+                let all = match (optional_text(args, "routine"), optional_text(args, "note")) {
+                    (Some(id), _) => routines.by_id(id)?.into_iter().collect(),
+                    (None, Some(note)) => routines.of_note(note)?,
+                    (None, None) => routines.all()?,
+                };
+                for routine in all {
+                    for (key, at) in &routine.done {
+                        let Some(occurrence) = Occurrence::parse(key) else {
+                            continue;
+                        };
+                        if !range.holds(occurrence.day) {
+                            continue;
+                        }
+                        let value = json!({
+                            "at": dart_iso(*at),
+                            "day": occurrence.day.to_string(),
+                            "note": routine.note_id,
+                            "occurrence": key,
+                            "routine": routine.id,
+                        });
+                        found.push((*at, value));
+                    }
+                }
+            }
+            "read_eaten_frogs" => {
+                let frogs = Frogs::new(self);
+                for frog in frogs.done()? {
+                    let Some(at) = frog.done.filter(|at| range.holds(day(*at))) else {
+                        continue;
+                    };
+                    let note = frogs.note(&frog)?;
+                    let value = json!({
+                        "at": dart_iso(at),
+                        "day": day(at).to_string(),
+                        "id": frog.id,
+                        "note": note.as_ref().map(|n| n.id.clone()),
+                        "text": note.map(|n| n.text),
+                    });
+                    found.push((at, value));
+                }
+            }
+            "read_session_picks" => {
+                let id = text_arg(args, "id")?;
+                let session = Sessions::new(self)
+                    .by_id(id)?
+                    .ok_or_else(|| Error::Invalid(format!("not a Session: {id}")))?;
+                let marks = SessionMarks::of(self, id)?;
+                let mut picked: Vec<(String, Value)> = Vec::new();
+                for (key, picks) in &marks.picks {
+                    let Some(occurrence) = Occurrence::parse(key) else {
+                        continue;
+                    };
+                    if !range.holds(occurrence.day) {
+                        continue;
+                    }
+                    let mut tallies = Vec::new();
+                    for note in picks {
+                        let entries: Vec<Value> = marks
+                            .entries_for(self, key, note)?
+                            .iter()
+                            .map(|e| json!({"at": dart_iso(e.at), "id": e.id}))
+                            .collect();
+                        tallies.push(json!({"entries": entries, "note": note}));
+                    }
+                    let value = json!({
+                        "checkedOff": session.routine.done.get(key).map(|at| dart_iso(*at)),
+                        "day": occurrence.day.to_string(),
+                        "occurrence": key,
+                        "picks": tallies,
+                    });
+                    picked.push((key.clone(), value));
+                }
+                picked.sort_by(|a, b| b.0.cmp(&a.0));
+                return Ok(Value::Array(picked.into_iter().map(|(_, v)| v).collect()));
+            }
+            _ => return Err(Error::Invalid(format!("no tool {name}"))),
+        }
+        Ok(newest_first(found))
+    }
+
     /// One change, inside [`Store::drafting`]; what it made, by id.
-    fn ai_change(&self, name: &str, args: &Value) -> Result<Value> {
+    fn ai_change(&self, name: &str, args: &Value, wall: &WallClock) -> Result<Value> {
         let notes = Notes::new(self);
         let places = Places::new(self);
         let routines = Routines::new(self);
@@ -744,9 +1487,316 @@ impl Store {
                 routines.restore(id()?)?;
                 id()?.to_string()
             }
-            _ => return Err(Error::Invalid(format!("no tool {name}"))),
+            other => return self.ai_set_up(other, args, wall),
         };
-        Ok(json!({"id": made, "pending": "kept once the user accepts the AI Task"}))
+        Ok(json!({"id": made, "pending": PENDING}))
+    }
+
+    /// One set-up of a Tally, Session, Checklist, Shopping List or Frog,
+    /// inside [`Store::drafting`]; what it made, by id.
+    fn ai_set_up(&self, name: &str, args: &Value, wall: &WallClock) -> Result<Value> {
+        let tallies = Tallies::new(self);
+        let sessions = Sessions::new(self);
+        let checklists = Checklists::new(self);
+        let shopping = ShoppingLists::new(self);
+        let frogs = Frogs::new(self);
+        let id = || text_arg(args, "id");
+        let field = || text_arg(args, "field");
+        let done = |id: &str| json!({"id": id, "pending": PENDING});
+        Ok(match name {
+            "make_tally" => {
+                let note = id()?;
+                if tallies.is_tally(note)? {
+                    return Err(Error::Invalid(format!(
+                        "{note} is a Tally already: add_tally_field adds a field"
+                    )));
+                }
+                let fields = args
+                    .get("fields")
+                    .and_then(Value::as_array)
+                    .filter(|f| !f.is_empty())
+                    .ok_or_else(|| Error::Invalid("fields needs at least one field".into()))?;
+                let made = fields
+                    .iter()
+                    .map(|f| self.ai_add_field(note, f))
+                    .collect::<Result<Vec<_>>>()?;
+                json!({"fields": made, "id": note, "pending": PENDING})
+            }
+            "add_tally_field" => {
+                let note = id()?;
+                let made = self.ai_add_field(note, args)?;
+                json!({"field": made, "id": note, "pending": PENDING})
+            }
+            "rename_tally_field" => {
+                tallies.rename_field(id()?, field()?, text_arg(args, "name")?)?;
+                done(id()?)
+            }
+            "set_tally_field" => {
+                let (note, field) = (id()?, field()?);
+                let mut set = false;
+                if let Some(unit) = optional_text(args, "unit") {
+                    tallies.set_unit(note, field, unit)?;
+                    set = true;
+                }
+                if let Some(target) = args.get("target") {
+                    let unit = tallies
+                        .by_note(note)?
+                        .and_then(|t| t.field(field).map(|f| f.unit.clone()))
+                        .ok_or_else(|| Error::Invalid(format!("not a field of {note}: {field}")))?;
+                    let base = match target {
+                        Value::Null => None,
+                        v => Some(tally_units::to_base(
+                            v.as_f64()
+                                .ok_or_else(|| Error::Invalid("target is no number".into()))?,
+                            &unit,
+                            UnitSystem::Metric,
+                        )),
+                    };
+                    tallies.set_target(note, field, base)?;
+                    set = true;
+                }
+                if let Some(rule) = rule_arg(args)? {
+                    tallies.set_rule(note, field, rule)?;
+                    set = true;
+                }
+                if !set {
+                    return Err(Error::Invalid(
+                        "nothing to set: give a unit, a target or a rule".into(),
+                    ));
+                }
+                done(note)
+            }
+            "remove_tally_field" => {
+                tallies.hide_field(id()?, field()?)?;
+                done(id()?)
+            }
+            "make_session" => {
+                let schedule = schedule_arg(args)?;
+                let pool = strings_arg(args, "pool")?;
+                let count = count_arg(args)?.unwrap_or(1);
+                let rule = picking_arg(args)?.unwrap_or(SessionRule::Rolling);
+                let session = match (optional_text(args, "note"), optional_text(args, "text")) {
+                    (Some(note), _) => sessions.spawn(note, &schedule, &pool, count, rule)?,
+                    (None, Some(text)) => sessions.create(text, &schedule, &pool, count, rule)?,
+                    (None, None) => {
+                        return Err(Error::Invalid("a note or a text is needed".into()));
+                    }
+                };
+                done(session.id())
+            }
+            "set_session" => {
+                let session = id()?;
+                let mut set = false;
+                if args.get("pool").is_some() {
+                    sessions.set_pool(session, &strings_arg(args, "pool")?)?;
+                    set = true;
+                }
+                if let Some(count) = count_arg(args)? {
+                    sessions.set_count(session, count)?;
+                    set = true;
+                }
+                if let Some(rule) = picking_arg(args)? {
+                    sessions.set_rule(session, rule)?;
+                    set = true;
+                }
+                if let Some(days) = args.get("weekdayCounts") {
+                    let days = days
+                        .as_object()
+                        .ok_or_else(|| Error::Invalid("weekdayCounts is no object".into()))?;
+                    for (weekday, count) in days {
+                        let weekday: u32 = weekday
+                            .parse()
+                            .map_err(|_| Error::Invalid(format!("no weekday {weekday}")))?;
+                        let count = match count {
+                            Value::Null => None,
+                            v => Some(v.as_i64().ok_or_else(|| {
+                                Error::Invalid(format!("the count of {weekday} is no whole number"))
+                            })?),
+                        };
+                        sessions.set_count_on(session, weekday, count)?;
+                        set = true;
+                    }
+                }
+                if !set {
+                    return Err(Error::Invalid(
+                        "nothing to set: give a pool, a count, a picking rule or weekdayCounts"
+                            .into(),
+                    ));
+                }
+                done(session)
+            }
+            "make_list" => {
+                let note = id()?;
+                let text = Notes::new(self).by_id(note)?.map(|n| {
+                    let markdown = n.text_format == text_format::MARKDOWN;
+                    split_lines(&n.text)
+                        .iter()
+                        .skip(1)
+                        .filter_map(|r| parse_line_in(r, markdown))
+                        .any(|l| l.checked)
+                });
+                if text == Some(true) {
+                    return Err(Error::Invalid(format!(
+                        "the text of {note} has lines marked \"✓ \", which would be checked Lines, and an AI Task checks nothing: take the marks out with edit_note first, or leave this to the user"
+                    )));
+                }
+                match text_arg(args, "list")? {
+                    CHECKLIST => checklists.make(note)?,
+                    SHOPPING_LIST => shopping.make(note)?,
+                    other => return Err(Error::Invalid(format!("no list {other}"))),
+                }
+                done(note)
+            }
+            "list_to_plain" => {
+                let note = id()?;
+                match list_of(self, note)? {
+                    Some(CHECKLIST) => checklists.to_plain(note)?,
+                    Some(_) => shopping.to_plain(note, wall)?,
+                    None => {
+                        return Err(Error::Invalid(format!(
+                            "neither a Checklist nor a Shopping List: {note}"
+                        )));
+                    }
+                }
+                done(note)
+            }
+            "add_line" => {
+                let (note, text) = (id()?, text_arg(args, "text")?);
+                let line = match list_of(self, note)? {
+                    Some(CHECKLIST) => {
+                        let at = args
+                            .get("at")
+                            .and_then(Value::as_u64)
+                            .and_then(|at| usize::try_from(at).ok());
+                        let under = args.get("under").and_then(Value::as_bool) == Some(true);
+                        checklists.add(note, text, at, under)?
+                    }
+                    Some(_) => {
+                        let wanted = ShoppingLists::name_key(text);
+                        let checked = shopping.by_note(note, wall)?.is_some_and(|list| {
+                            list.struck()
+                                .into_iter()
+                                .chain(list.gone())
+                                .any(|l| ShoppingLists::name_key(&l.text) == wanted)
+                        });
+                        if checked {
+                            return Err(Error::Invalid(format!(
+                                "{note} holds a checked Line of that name, and adding it would bring it back, which only the user does"
+                            )));
+                        }
+                        shopping.add(note, text, wall)?
+                    }
+                    None => {
+                        return Err(Error::Invalid(format!(
+                            "neither a Checklist nor a Shopping List: {note}"
+                        )));
+                    }
+                };
+                json!({"id": note, "line": line, "pending": PENDING})
+            }
+            "rename_line" => {
+                let (line, text) = (id()?, text_arg(args, "text")?);
+                match self.list_of_line(line)? {
+                    CHECKLIST => checklists.rename(line, text)?,
+                    _ => shopping.rename(line, text)?,
+                }
+                done(line)
+            }
+            "move_line" => {
+                let line = self.checklist_line(id()?)?;
+                checklists.move_line(line, optional_text(args, "before"))?;
+                done(line)
+            }
+            "group_line" => {
+                let line = self.checklist_line(id()?)?;
+                let under = args
+                    .get("under")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| Error::Invalid("under is missing".into()))?;
+                checklists.indent(line, under)?;
+                done(line)
+            }
+            "set_reappear" => {
+                let line = id()?;
+                if self.list_of_line(line)? != SHOPPING_LIST {
+                    return Err(Error::Invalid(format!(
+                        "not a Line of a Shopping List: {line}"
+                    )));
+                }
+                let code = text_arg(args, "reappear")?;
+                let reappear = Reappear::ALL
+                    .into_iter()
+                    .find(|r| r.code() == code)
+                    .ok_or_else(|| Error::Invalid(format!("no reappear time {code}")))?;
+                shopping.set_reappear(line, reappear)?;
+                done(line)
+            }
+            "remove_line" => {
+                let line = id()?;
+                match self.list_of_line(line)? {
+                    CHECKLIST => checklists.delete(line)?,
+                    _ => shopping.delete(line)?,
+                }
+                done(line)
+            }
+            "make_frog" => {
+                let note = id()?;
+                let frog = frogs.spawn(note)?;
+                json!({"frog": frog.id, "id": note, "pending": PENDING})
+            }
+            "frog_to_plain" => {
+                let note = id()?;
+                let open: Vec<String> = frogs
+                    .of_note(note)?
+                    .into_iter()
+                    .filter(|f| !f.is_done())
+                    .map(|f| f.id)
+                    .collect();
+                if open.is_empty() {
+                    return Err(Error::Invalid(format!("no open Frog of {note}")));
+                }
+                for frog in &open {
+                    frogs.trash(frog)?;
+                }
+                done(note)
+            }
+            _ => return Err(Error::Invalid(format!("no tool {name}"))),
+        })
+    }
+
+    /// Adds the field `field` asks for to the Note `note`, its target
+    /// given in its unit; the field's id.
+    fn ai_add_field(&self, note: &str, field: &Value) -> Result<String> {
+        let name = text_arg(field, "name")?;
+        let unit = optional_text(field, "unit").unwrap_or("").trim();
+        let target = match field.get("target") {
+            None | Some(Value::Null) => None,
+            Some(v) => Some(tally_units::to_base(
+                v.as_f64()
+                    .ok_or_else(|| Error::Invalid("target is no number".into()))?,
+                unit,
+                UnitSystem::Metric,
+            )),
+        };
+        Tallies::new(self).add_field(note, name, unit, target, rule_arg(field)?)
+    }
+
+    /// The list the Line `line` belongs to: [`CHECKLIST`] or
+    /// [`SHOPPING_LIST`].
+    fn list_of_line(&self, line: &str) -> Result<&'static str> {
+        let note = self
+            .current(line, checklist_keys::NOTE)?
+            .filter(|_| line.starts_with(checklist_keys::LINE_PREFIX))
+            .ok_or_else(|| Error::Invalid(format!("not a Line: {line}")))?;
+        list_of(self, &note)?.ok_or_else(|| Error::Invalid(format!("not a Line of a list: {line}")))
+    }
+
+    /// `line`, when it is a Line of a Checklist.
+    fn checklist_line<'a>(&self, line: &'a str) -> Result<&'a str> {
+        if self.list_of_line(line)? != CHECKLIST {
+            return Err(Error::Invalid(format!("not a Line of a Checklist: {line}")));
+        }
+        Ok(line)
     }
 }
 
@@ -754,8 +1804,14 @@ impl Store {
 mod tests {
     use super::*;
     use crate::store::tests::store;
+    use chrono::TimeZone;
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    /// The tool `name` called with `args` for `task`, on a clock in UTC.
+    fn call(store: &Store, task: &str, name: &str, args: &Value) -> Result<ToolOutput> {
+        store.ai_tool(task, name, args, &|t: DateTime<Utc>| t.naive_utc())
+    }
 
     fn png(width: u32, height: u32) -> std::result::Result<Vec<u8>, image::ImageError> {
         let mut out = Cursor::new(Vec::new());
@@ -773,7 +1829,8 @@ mod tests {
         let task = store.open_ai_task()?;
         let hash = receipt.photos.first().ok_or("a photo")?;
 
-        let out = store.ai_tool(
+        let out = call(
+            &store,
             &task,
             "read_photo",
             &json!({"note": receipt.id, "photo": hash, "size": 100}),
@@ -784,13 +1841,14 @@ mod tests {
         let image = image::load_from_memory(jpeg)?;
         assert_eq!((image.width(), image.height()), (100, 50));
 
-        let elsewhere = store.ai_tool(
+        let elsewhere = call(
+            &store,
             &task,
             "read_photo",
             &json!({"note": other.id, "photo": hash}),
         )?;
         assert!(elsewhere.is_error);
-        assert!(store.ai_tool(&task, "send_note", &json!({})).is_err());
+        assert!(call(&store, &task, "send_note", &json!({})).is_err());
         Ok(())
     }
 
@@ -803,7 +1861,8 @@ mod tests {
         let milk = Notes::new(&store).capture("Milk", Some(&kitchen.id), None)?;
         let task = store.open_ai_task()?;
 
-        let out = store.ai_tool(
+        let out = call(
+            &store,
             &task,
             "delete_place",
             &json!({"id": house.id, "notesGo": "unsorted"}),
@@ -857,27 +1916,30 @@ mod tests {
         let task = store.open_ai_task()?;
         let logged = store.all_entries()?.len();
         for detail in ["place", "app"] {
-            let out = store.ai_tool(
+            let out = call(
+                &store,
                 &task,
                 "remove_captured",
                 &json!({"detail": detail, "id": toner}),
             )?;
             assert!(!out.is_error, "{out:?}");
         }
-        let unknown = store.ai_tool(
+        let unknown = call(
+            &store,
             &task,
             "remove_captured",
             &json!({"detail": "time", "id": toner}),
         )?;
         assert!(unknown.is_error);
-        let again = store.ai_tool(
+        let again = call(
+            &store,
             &task,
             "remove_captured",
             &json!({"detail": "place", "id": toner}),
         )?;
         assert!(again.is_error, "nothing left to remove");
         assert_eq!(store.all_entries()?.len(), logged);
-        let read = store.ai_tool(&task, "read_note", &json!({"id": toner}))?;
+        let read = call(&store, &task, "read_note", &json!({"id": toner}))?;
         let [ToolContent::Text(text)] = &read.content[..] else {
             return Err("a text".into());
         };
@@ -897,9 +1959,9 @@ mod tests {
         let logged = store.all_entries()?.len();
         let schedule = json!({"note": milk.id, "rule": "FREQ=DAILY", "start": "2026-01-02", "times": ["08:00"]});
 
-        let added = store.ai_tool(&task, "add_routine", &schedule)?;
+        let added = call(&store, &task, "add_routine", &schedule)?;
         assert!(!added.is_error, "{added:?}");
-        let read = store.ai_tool(&task, "list_routines", &json!({"note": milk.id}))?;
+        let read = call(&store, &task, "list_routines", &json!({"note": milk.id}))?;
         let [ToolContent::Text(text)] = &read.content[..] else {
             return Err("a text".into());
         };
@@ -908,7 +1970,7 @@ mod tests {
         assert_eq!(routines.pointer("/0/rule"), Some(&json!("FREQ=DAILY")));
         assert_eq!(store.all_entries()?.len(), logged);
         DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
-        let settings = store.ai_tool(&task, "read_settings", &json!({}))?;
+        let settings = call(&store, &task, "read_settings", &json!({}))?;
         assert!(!settings.is_error);
         let [ToolContent::Text(text)] = &settings.content[..] else {
             return Err("a text".into());
@@ -919,6 +1981,569 @@ mod tests {
         assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
         assert_eq!(read.pointer("/theme"), Some(&json!("system")));
         assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
+        Ok(())
+    }
+
+    type Made<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    fn utc(t: DateTime<Utc>) -> chrono::NaiveDateTime {
+        t.naive_utc()
+    }
+
+    /// The text a tool handed back, read as JSON.
+    fn json_of(out: &ToolOutput) -> Made<Value> {
+        let [ToolContent::Text(text)] = &out.content[..] else {
+            return Err(format!("no text: {out:?}").into());
+        };
+        Ok(serde_json::from_str(text)?)
+    }
+
+    fn daily() -> Value {
+        json!({"start": "2026-01-01", "times": ["08:00"], "rule": "FREQ=DAILY"})
+    }
+
+    fn schedule() -> Made<Schedule> {
+        let eight: Vec<ClockTime> = ClockTime::new(8, 0).into_iter().collect();
+        let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| format!("{e}"))?;
+        Ok(Schedule::new(Day::new(2026, 1, 1), &eight, Some(rule)).ok_or("a schedule")?)
+    }
+
+    /// A Note made a Tally with one field: its id and the field's.
+    fn tally(store: &Store, text: &str) -> Made<(String, String)> {
+        let note = Notes::new(store).capture(text, None, None)?.id;
+        let field = Tallies::new(store).add_field(&note, text, "", None, None)?;
+        Ok((note, field))
+    }
+
+    /// A Note made a Checklist of `text`.
+    fn checklist(store: &Store, text: &str) -> Made<String> {
+        let note = Notes::new(store).capture(text, None, None)?.id;
+        Checklists::new(store).make(&note)?;
+        Ok(note)
+    }
+
+    fn shopping_list(store: &Store, text: &str) -> Made<String> {
+        let note = Notes::new(store).capture(text, None, None)?.id;
+        ShoppingLists::new(store).make(&note)?;
+        Ok(note)
+    }
+
+    fn lines(store: &Store, note: &str) -> Made<Vec<crate::checklists::Line>> {
+        Ok(Checklists::new(store)
+            .by_note(note)?
+            .ok_or("a Checklist")?
+            .lines)
+    }
+
+    fn tally_field(store: &Store, note: &str) -> Made<Option<crate::tallies::TallyField>> {
+        Ok(Tallies::new(store)
+            .by_note(note)?
+            .and_then(|t| t.fields.into_iter().next()))
+    }
+
+    /// Seeds a store, calls `name` with the args the seed gives and checks
+    /// with `shows` that the change waits, seen by the reads and not in
+    /// the log; that Accept keeps it; and, on another store, that Reject
+    /// leaves nothing.
+    fn lands_as_pending(
+        name: &str,
+        seed: impl Fn(&Store) -> Made<Value>,
+        shows: impl Fn(&Store, &Value) -> Made<bool>,
+    ) -> TestResult {
+        for accept in [true, false] {
+            let store = store();
+            let args = seed(&store)?;
+            let task = store.open_ai_task()?;
+            let logged = store.all_entries()?.len();
+            let out = call(&store, &task, name, &args)?;
+            assert!(!out.is_error, "{name}: {out:?}");
+            assert_eq!(store.all_entries()?.len(), logged, "{name} wrote the log");
+            assert!(shows(&store, &args)?, "{name}: the reads show it");
+            assert!(
+                !store.log_only(|| shows(&store, &args))?,
+                "{name}: the log holds it already"
+            );
+            assert!(!store.ai_review(&task)?.is_empty(), "{name}: reviewed");
+            if accept {
+                store.accept_pending(&task)?;
+                assert!(shows(&store, &args)?, "{name}: kept on Accept");
+            } else {
+                store.decline_pending(&task)?;
+                assert!(!shows(&store, &args)?, "{name}: gone on Reject");
+                assert_eq!(store.all_entries()?.len(), logged, "{name}: nothing left");
+            }
+        }
+        Ok(())
+    }
+
+    fn arg(args: &Value, key: &str) -> Made<String> {
+        Ok(args
+            .get(key)
+            .and_then(Value::as_str)
+            .ok_or("an id")?
+            .to_string())
+    }
+
+    #[test]
+    fn every_tally_set_up_waits_for_the_review() -> TestResult {
+        lands_as_pending(
+            "make_tally",
+            |s| {
+                Ok(
+                    json!({"fields": [{"name": "Run", "target": 5, "unit": "km"}], "id": Notes::new(s).capture("Run", None, None)?.id}),
+                )
+            },
+            |s, a| {
+                let field = tally_field(s, &arg(a, "id")?)?;
+                Ok(field.is_some_and(|f| f.unit == "km" && f.target == Some(5000.0)))
+            },
+        )?;
+        lands_as_pending(
+            "add_tally_field",
+            |s| Ok(json!({"id": tally(s, "Run")?.0, "name": "Time", "rule": "max", "unit": "min"})),
+            |s, a| {
+                let tally = Tallies::new(s).by_note(&arg(a, "id")?)?.ok_or("a Tally")?;
+                Ok(tally.fields.len() == 2 && tally.fields[1].rule == TallyRule::Max)
+            },
+        )?;
+        lands_as_pending(
+            "rename_tally_field",
+            |s| {
+                let (id, field) = tally(s, "Pushups")?;
+                Ok(json!({"field": field, "id": id, "name": "Push-ups"}))
+            },
+            |s, a| Ok(tally_field(s, &arg(a, "id")?)?.is_some_and(|f| f.name == "Push-ups")),
+        )?;
+        lands_as_pending(
+            "set_tally_field",
+            |s| {
+                let (id, field) = tally(s, "Plank")?;
+                Ok(json!({"field": field, "id": id, "rule": "max", "target": 2, "unit": "min"}))
+            },
+            |s, a| {
+                let field = tally_field(s, &arg(a, "id")?)?.ok_or("a field")?;
+                Ok(field.unit == "min"
+                    && field.target == Some(120.0)
+                    && field.rule == TallyRule::Max)
+            },
+        )?;
+        lands_as_pending(
+            "remove_tally_field",
+            |s| {
+                let (id, field) = tally(s, "Squats")?;
+                Ok(json!({"field": field, "id": id}))
+            },
+            |s, a| Ok(tally_field(s, &arg(a, "id")?)?.is_some_and(|f| f.hidden)),
+        )
+    }
+
+    #[test]
+    fn every_session_set_up_waits_for_the_review() -> TestResult {
+        lands_as_pending(
+            "make_session",
+            |s| {
+                let mut args = daily();
+                let pool = vec![tally(s, "Push-ups")?.0, tally(s, "Squats")?.0];
+                if let Some(all) = args.as_object_mut() {
+                    all.insert("count".into(), json!(1));
+                    all.insert("picking".into(), json!("random"));
+                    all.insert("pool".into(), json!(pool));
+                    all.insert("text".into(), json!("Workout"));
+                }
+                Ok(args)
+            },
+            |s, _| {
+                let all = Sessions::new(s).all()?;
+                Ok(all.len() == 1 && all[0].pool.len() == 2 && all[0].rule == SessionRule::Random)
+            },
+        )?;
+        lands_as_pending(
+            "set_session",
+            |s| {
+                let (one, two) = (tally(s, "Push-ups")?.0, tally(s, "Squats")?.0);
+                let session = Sessions::new(s).create(
+                    "Workout",
+                    &schedule()?,
+                    std::slice::from_ref(&one),
+                    1,
+                    SessionRule::Rolling,
+                )?;
+                Ok(
+                    json!({"count": 2, "id": session.id(), "picking": "least", "pool": [one, two], "weekdayCounts": {"6": 1}}),
+                )
+            },
+            |s, a| {
+                let session = Sessions::new(s).by_id(&arg(a, "id")?)?.ok_or("a Session")?;
+                Ok(session.pool.len() == 2
+                    && session.count == 2
+                    && session.rule == SessionRule::Least
+                    && session.counts.get(&6) == Some(&1))
+            },
+        )
+    }
+
+    #[test]
+    fn every_list_set_up_waits_for_the_review() -> TestResult {
+        for (list, is) in [("checklist", true), ("shoppingList", false)] {
+            lands_as_pending(
+                "make_list",
+                |s| {
+                    Ok(
+                        json!({"id": Notes::new(s).capture("Trip\nSocks\nShirt", None, None)?.id, "list": list}),
+                    )
+                },
+                |s, a| {
+                    let id = arg(a, "id")?;
+                    Ok(match is {
+                        true => Checklists::new(s).is_checklist(&id)?,
+                        false => ShoppingLists::new(s).is_shopping_list(&id)?,
+                    })
+                },
+            )?;
+        }
+        lands_as_pending(
+            "list_to_plain",
+            |s| Ok(json!({"id": checklist(s, "Trip\nSocks")?})),
+            |s, a| Ok(!Checklists::new(s).is_checklist(&arg(a, "id")?)?),
+        )?;
+        lands_as_pending(
+            "add_line",
+            |s| Ok(json!({"at": 0, "id": checklist(s, "Trip\nSocks")?, "text": "Passport"})),
+            |s, a| Ok(lines(s, &arg(a, "id")?)?[0].text == "Passport"),
+        )?;
+        lands_as_pending(
+            "add_line",
+            |s| Ok(json!({"id": shopping_list(s, "Shop\nMilk")?, "text": "Bread"})),
+            |s, a| {
+                let list = ShoppingLists::new(s).by_note(&arg(a, "id")?, &utc)?;
+                Ok(list.is_some_and(|l| l.count() == 2))
+            },
+        )?;
+        lands_as_pending(
+            "rename_line",
+            |s| Ok(json!({"id": lines(s, &checklist(s, "Trip\nSoks")?)?[0].id, "text": "Socks"})),
+            |s, a| {
+                let line = arg(a, "id")?;
+                Ok(s.current(&line, checklist_keys::TEXT)?
+                    .is_some_and(|t| crate::StoredText::read(Some(&t)).text == "Socks"))
+            },
+        )?;
+        lands_as_pending(
+            "move_line",
+            |s| {
+                let note = checklist(s, "Trip\nSocks\nPassport")?;
+                let all = lines(s, &note)?;
+                Ok(json!({"before": all[0].id, "id": all[1].id, "note": note}))
+            },
+            |s, a| Ok(lines(s, &arg(a, "note")?)?[0].text == "Passport"),
+        )?;
+        lands_as_pending(
+            "group_line",
+            |s| {
+                let note = checklist(s, "Trip\nBag\nSocks")?;
+                Ok(json!({"id": lines(s, &note)?[1].id, "note": note, "under": true}))
+            },
+            |s, a| Ok(lines(s, &arg(a, "note")?)?[1].in_group()),
+        )?;
+        lands_as_pending(
+            "set_reappear",
+            |s| {
+                let note = shopping_list(s, "Shop\nMilk")?;
+                let list = ShoppingLists::new(s)
+                    .by_note(&note, &utc)?
+                    .ok_or("a list")?;
+                Ok(json!({"id": list.lines[0].id, "note": note, "reappear": "2w"}))
+            },
+            |s, a| {
+                let list = ShoppingLists::new(s).by_note(&arg(a, "note")?, &utc)?;
+                Ok(list.is_some_and(|l| l.lines[0].reappear == Reappear::Week2))
+            },
+        )?;
+        lands_as_pending(
+            "remove_line",
+            |s| {
+                let note = checklist(s, "Trip\nSocks\nShirt")?;
+                Ok(json!({"id": lines(s, &note)?[0].id, "note": note}))
+            },
+            |s, a| Ok(lines(s, &arg(a, "note")?)?.len() == 1),
+        )
+    }
+
+    #[test]
+    fn every_frog_set_up_waits_for_the_review() -> TestResult {
+        lands_as_pending(
+            "make_frog",
+            |s| Ok(json!({"id": Notes::new(s).capture("Call the bank", None, None)?.id})),
+            |s, a| Ok(!Frogs::new(s).of_note(&arg(a, "id")?)?.is_empty()),
+        )?;
+        lands_as_pending(
+            "frog_to_plain",
+            |s| {
+                let note = Notes::new(s).capture("Call the bank", None, None)?.id;
+                Frogs::new(s).spawn(&note)?;
+                Ok(json!({"id": note}))
+            },
+            |s, a| Ok(Frogs::new(s).of_note(&arg(a, "id")?)?.is_empty()),
+        )
+    }
+
+    #[test]
+    fn no_tool_writes_the_users_own_data() {
+        let names = |read_only: bool| -> Vec<String> {
+            tools()
+                .iter()
+                .filter(|t| t.pointer("/annotations/readOnlyHint") == Some(&Value::Bool(read_only)))
+                .filter_map(|t| t.get("name").and_then(Value::as_str).map(str::to_string))
+                .collect()
+        };
+        let writers = [
+            "capture_note",
+            "edit_note",
+            "amend_note",
+            "file_note",
+            "merge_notes",
+            "set_importance",
+            "remove_captured",
+            "trash_note",
+            "restore_note",
+            "add_area",
+            "add_topic",
+            "rename_place",
+            "set_area_colour",
+            "set_area_icon",
+            "delete_place",
+            "add_routine",
+            "reschedule_routine",
+            "set_renag",
+            "set_escalation",
+            "trash_routine",
+            "restore_routine",
+            "make_tally",
+            "add_tally_field",
+            "rename_tally_field",
+            "set_tally_field",
+            "remove_tally_field",
+            "make_session",
+            "set_session",
+            "make_list",
+            "list_to_plain",
+            "add_line",
+            "rename_line",
+            "move_line",
+            "group_line",
+            "set_reappear",
+            "remove_line",
+            "make_frog",
+            "frog_to_plain",
+        ];
+        assert_eq!(
+            names(false),
+            writers,
+            "only these write, as Pending Changes"
+        );
+        let readers = names(true);
+        for data in [
+            "read_tally_entries",
+            "read_ticks",
+            "read_check_offs",
+            "read_eaten_frogs",
+            "read_session_picks",
+        ] {
+            assert!(readers.iter().any(|r| r == data), "{data} reads");
+        }
+        assert_eq!(readers.len() + writers.len(), tools().len());
+    }
+
+    #[test]
+    fn a_list_with_checked_lines_or_a_checked_name_is_refused_with_words() -> TestResult {
+        let store = store();
+        let trip = Notes::new(&store).capture("Trip\n✓ Socks\nShirt", None, None)?;
+        let shop = shopping_list(&store, "Shop\nMilk")?;
+        let milk = ShoppingLists::new(&store)
+            .by_note(&shop, &utc)?
+            .ok_or("a list")?;
+        ShoppingLists::new(&store).check(&milk.lines[0].id, &utc)?;
+        let task = store.open_ai_task()?;
+
+        let made = call(
+            &store,
+            &task,
+            "make_list",
+            &json!({"id": trip.id, "list": "checklist"}),
+        )?;
+        assert!(made.is_error);
+        assert!(format!("{made:?}").contains("✓"), "{made:?}");
+        let added = call(
+            &store,
+            &task,
+            "add_line",
+            &json!({"id": shop, "text": " milk "}),
+        )?;
+        assert!(added.is_error, "{added:?}");
+        let ticked = call(&store, &task, "move_line", &json!({"id": milk.lines[0].id}))?;
+        assert!(ticked.is_error, "a Shopping List's Lines do not move");
+        assert!(
+            store
+                .pending_set(&task)?
+                .ok_or("the task")?
+                .drafts()
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn notes_name_their_kind_and_parts() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let plain = notes.capture("Plain ☐ box", None, None)?.id;
+        let (run, field) = tally(&store, "Run")?;
+        Tallies::new(&store).set_unit(&run, &field, "km")?;
+        Tallies::new(&store).set_target(&run, &field, Some(5000.0))?;
+        let trip = checklist(&store, "Trip\nBag\n Socks")?;
+        let shop = shopping_list(&store, "Shop\nMilk")?;
+        let bank = notes.capture("Call the bank", None, None)?.id;
+        let frog = Frogs::new(&store).spawn(&bank)?;
+        let workout = Sessions::new(&store).spawn(
+            &bank,
+            &schedule()?,
+            std::slice::from_ref(&run),
+            1,
+            SessionRule::Least,
+        )?;
+        let task = store.open_ai_task()?;
+
+        let listed = json_of(&call(&store, &task, "list_notes", &json!({}))?)?;
+        let kind = |id: &str| -> Option<Value> {
+            listed
+                .as_array()?
+                .iter()
+                .find(|n| n.get("id") == Some(&json!(id)))
+                .cloned()
+        };
+        let kind_of = |id: &str| kind(id).and_then(|n| n.get("kind").cloned());
+        assert_eq!(kind_of(&plain), Some(json!("plain")));
+        assert_eq!(kind_of(&run), Some(json!("tally")));
+        assert_eq!(kind_of(&trip), Some(json!("checklist")));
+        assert_eq!(kind_of(&shop), Some(json!("shoppingList")));
+        let bank_listed = kind(&bank).ok_or("the bank's Note")?;
+        assert_eq!(bank_listed.get("frog"), Some(&json!(frog.id)));
+        assert_eq!(bank_listed.get("sessions"), Some(&json!([workout.id()])));
+
+        let read = |id: &str| json_of(&call(&store, &task, "read_note", &json!({"id": id}))?);
+        let tallied = read(&run)?;
+        assert_eq!(tallied.pointer("/tally/fields/0/unit"), Some(&json!("km")));
+        assert_eq!(tallied.pointer("/tally/fields/0/target"), Some(&json!(5.0)));
+        let packed = read(&trip)?;
+        assert_eq!(packed.pointer("/lines/1/text"), Some(&json!("Socks")));
+        assert!(
+            packed
+                .pointer("/lines/1/group")
+                .is_some_and(|g| g.is_string())
+        );
+        assert_eq!(
+            read(&shop)?.pointer("/lines/0/reappear"),
+            Some(&json!("1w"))
+        );
+        let banked = read(&bank)?;
+        assert_eq!(banked.pointer("/frogs/0/id"), Some(&json!(frog.id)));
+        assert_eq!(
+            banked.pointer("/routines/0/session/picking"),
+            Some(&json!("least"))
+        );
+        assert_eq!(
+            banked.pointer("/routines/0/session/pool"),
+            Some(&json!([run]))
+        );
+        assert_eq!(
+            read(&plain)?.pointer("/boxes/0/state"),
+            Some(&json!("open"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_users_own_data_is_read_with_its_dates_and_by_range() -> TestResult {
+        let store = store();
+        let at = |day: u32| {
+            Utc.with_ymd_and_hms(2025, 10, day, 18, 0, 0)
+                .single()
+                .ok_or("a time")
+        };
+        let (run, field) = tally(&store, "Run")?;
+        let tallies = Tallies::new(&store);
+        for day in [3, 17] {
+            tallies.add(
+                &run,
+                &BTreeMap::from([(field.clone(), 4.0)]),
+                "park",
+                Some(at(day)?),
+            )?;
+        }
+        let trip = checklist(&store, "Trip\nSocks\nShirt")?;
+        Checklists::new(&store).check(&lines(&store, &trip)?[0].id)?;
+        let bank = Notes::new(&store).capture("Call the bank", None, None)?.id;
+        let frog = Frogs::new(&store).spawn(&bank)?;
+        Frogs::new(&store).mark_done(&frog.id, Some(at(20)?))?;
+        let pills = Notes::new(&store).capture("Pills", None, None)?.id;
+        let routine = Routines::new(&store).spawn(&pills, &schedule()?)?;
+        let first = Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(8, 0));
+        Routines::new(&store).mark_done(&routine.id, &first, None)?;
+        let session = Sessions::new(&store).spawn(
+            &bank,
+            &schedule()?,
+            std::slice::from_ref(&run),
+            1,
+            SessionRule::Rolling,
+        )?;
+        Sessions::new(&store).pick_today(&utc)?;
+        Sessions::new(&store).record(session.id(), &first, &run, &BTreeMap::new(), "done")?;
+        let task = store.open_ai_task()?;
+        let read = |name: &str, args: Value| json_of(&call(&store, &task, name, &args)?);
+
+        let entries = read("read_tally_entries", json!({"note": run}))?;
+        assert_eq!(
+            entries.as_array().map(Vec::len),
+            Some(3),
+            "with the Session's"
+        );
+        let october = read(
+            "read_tally_entries",
+            json!({"from": "2025-10-01", "note": run, "until": "2025-10-31"}),
+        )?;
+        assert_eq!(october.pointer("/0/day"), Some(&json!("2025-10-17")));
+        assert_eq!(october.pointer("/1/at"), Some(&json!(dart_iso(at(3)?))));
+        assert_eq!(october.pointer("/1/values/0/value"), Some(&json!(4.0)));
+        assert_eq!(october.as_array().map(Vec::len), Some(2));
+        let ticks = read("read_ticks", json!({"note": trip}))?;
+        assert_eq!(ticks.pointer("/0/text"), Some(&json!("Socks")));
+        assert_eq!(ticks.pointer("/0/day"), Some(&json!("2026-01-01")));
+        let none = read("read_ticks", json!({"note": trip, "until": "2025-12-31"}))?;
+        assert_eq!(none, json!([]));
+        let offs = read("read_check_offs", json!({"note": pills}))?;
+        assert_eq!(offs.pointer("/0/occurrence"), Some(&json!(first.key())));
+        assert!(offs.pointer("/0/at").is_some_and(Value::is_string));
+        let eaten = read("read_eaten_frogs", json!({"from": "2025-10-20"}))?;
+        assert_eq!(eaten.pointer("/0/at"), Some(&json!(dart_iso(at(20)?))));
+        assert_eq!(
+            read("read_eaten_frogs", json!({"from": "2025-10-21"}))?,
+            json!([])
+        );
+        let picks = read("read_session_picks", json!({"id": session.id()}))?;
+        assert_eq!(picks.pointer("/0/day"), Some(&json!("2026-01-01")));
+        assert_eq!(picks.pointer("/0/picks/0/note"), Some(&json!(run)));
+        assert!(
+            picks
+                .pointer("/0/picks/0/entries/0/at")
+                .is_some_and(Value::is_string)
+        );
+        let bad = call(
+            &store,
+            &task,
+            "read_eaten_frogs",
+            &json!({"from": "October"}),
+        )?;
+        assert!(bad.is_error);
         Ok(())
     }
 }

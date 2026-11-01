@@ -21,12 +21,17 @@ use std::thread::ThreadId;
 
 use chrono::{DateTime, Utc};
 
+use crate::checklists::{Checklists, keys as line_keys};
 use crate::entry::Entry;
+use crate::frogs::keys as frog_keys;
 use crate::notes::keys as note_keys;
 use crate::pending::{GiveWay, PendingDraft};
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
+use crate::sessions::keys as session_keys;
+use crate::shopping_lists::keys as shopping_keys;
 use crate::store::Store;
+use crate::tallies::keys as tally_keys;
 use crate::{Error, Result};
 
 /// The kind of pending set an AI Task is.
@@ -34,9 +39,12 @@ pub const AI_TASK_KIND: &str = "ai-task";
 
 /// The fields an AI Task may write, by the type of the entity: what the
 /// user can do with Notes, Areas, Topics, Merges, the trash, Importance,
-/// Routines and Reminders. Not a role, a block, an Override, a Sent
-/// Item's link, a Profile, a check-off, nor a photo or recording.
-const NOTE_FIELDS: [&str; 9] = [
+/// Routines and Reminders, and the set-up of Tallies, Sessions,
+/// Checklists, Shopping Lists and Frogs (#168). Not a role, a block, an
+/// Override, a Sent Item's link, a Profile, nor a photo or recording; and
+/// none of the user's own data: no check-off, Tally entry, tick of a Line
+/// or Box, Session pick nor eaten Frog.
+const NOTE_FIELDS: [&str; 10] = [
     note_keys::TYPE,
     note_keys::CAPTURED,
     note_keys::TEXT,
@@ -46,6 +54,15 @@ const NOTE_FIELDS: [&str; 9] = [
     note_keys::MERGED,
     note_keys::SPAWNED,
     note_keys::NUDGE,
+    line_keys::KIND,
+];
+/// The keys of a Tally's field on its Note, `tally:<field id>:<key>`.
+const TALLY_FIELD_KEYS: [&str; 5] = [
+    tally_keys::NAME,
+    tally_keys::UNIT,
+    tally_keys::TARGET,
+    tally_keys::RULE,
+    tally_keys::HIDDEN,
 ];
 const SECTION_FIELDS: [&str; 4] = [
     note_keys::TYPE,
@@ -53,7 +70,7 @@ const SECTION_FIELDS: [&str; 4] = [
     note_keys::CAPTURED,
     note_keys::TEXT,
 ];
-const ROUTINE_FIELDS: [&str; 9] = [
+const ROUTINE_FIELDS: [&str; 12] = [
     routine_keys::TYPE,
     routine_keys::NOTE,
     routine_keys::START,
@@ -63,7 +80,23 @@ const ROUTINE_FIELDS: [&str; 9] = [
     routine_keys::ESCALATION,
     routine_keys::TRASHED,
     routine_keys::TRASHED_WITH,
+    session_keys::POOL,
+    session_keys::COUNT,
+    session_keys::RULE,
 ];
+/// A Line of a Checklist or Shopping List: never whether it is checked.
+const LINE_FIELDS: [&str; 8] = [
+    line_keys::TYPE,
+    line_keys::NOTE,
+    line_keys::MADE,
+    line_keys::TEXT,
+    line_keys::ORDER,
+    line_keys::INDENT,
+    line_keys::TRASHED,
+    shopping_keys::REAPPEAR,
+];
+/// A Frog: never when it was eaten.
+const FROG_FIELDS: [&str; 3] = [frog_keys::TYPE, frog_keys::NOTE, frog_keys::TRASHED];
 const AREA_FIELDS: [&str; 4] = [
     place_keys::TYPE,
     place_keys::NAME,
@@ -72,8 +105,6 @@ const AREA_FIELDS: [&str; 4] = [
 ];
 const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys::NAME];
 
-/// The fields written only when an entity is made: its type, when it was
-/// captured, and the Note it belongs to.
 /// The fields of a Note's or Section's Capture Context, which an AI Task
 /// only ever removes (ADR 0037): it never says where or when something
 /// was captured.
@@ -84,7 +115,27 @@ const CONTEXT_FIELDS: [&str; 5] = [
     note_keys::CALENDAR,
     note_keys::BLUETOOTH,
 ];
-const MADE_ONCE: [&str; 3] = [note_keys::TYPE, note_keys::CAPTURED, note_keys::NOTE];
+/// The fields written only when an entity is made: its type, when it was
+/// captured, the Note it belongs to and the making of a Line's list.
+const MADE_ONCE: [&str; 4] = [
+    note_keys::TYPE,
+    note_keys::CAPTURED,
+    note_keys::NOTE,
+    line_keys::MADE,
+];
+
+/// Whether `field` is the key of a Tally's field on a Note.
+fn is_tally_field(field: &str) -> bool {
+    field
+        .strip_prefix(tally_keys::FIELD_PREFIX)
+        .and_then(|rest| rest.rsplit_once(':'))
+        .is_some_and(|(id, key)| !id.is_empty() && TALLY_FIELD_KEYS.contains(&key))
+}
+
+/// Whether `field` is the count of a Session for one weekday.
+fn is_weekday_count(field: &str) -> bool {
+    (1..=7).any(|weekday| field == session_keys::count_on(weekday))
+}
 
 /// Which thread drafts into which set, and which read the log alone.
 #[derive(Default)]
@@ -114,10 +165,12 @@ impl Drop for ScopeEnd<'_> {
     }
 }
 
-/// What a group of the review holds (#112): the Notes added, filed,
+/// What a group of the review holds (#112, #168): the Notes added, filed,
 /// merged, moved to the trash or back, whose text or Importance changed,
-/// the Routines and Reminders changed, the Areas and Topics changed, and
-/// anything else. In the order the review shows them.
+/// the Tallies set up, the Checklists and Shopping Lists with their
+/// Lines, the Frogs, the Routines and Reminders changed, the Sessions,
+/// the Areas and Topics changed, and anything else. In the order the
+/// review shows them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AiChangeKind {
     NoteAdded,
@@ -127,7 +180,11 @@ pub enum AiChangeKind {
     NoteRestored,
     NoteText,
     NoteImportance,
+    Tally,
+    List,
+    Frog,
     Routine,
+    Session,
     Place,
     Other,
 }
@@ -168,9 +225,12 @@ impl AiReview {
 }
 
 /// The group the change of `field` to `after` on an entity of type `ty`
-/// falls in; `made` for an entity the task made.
-fn kind_of(ty: &str, made: bool, field: &str, after: Option<&str>) -> AiChangeKind {
+/// falls in; `made` for an entity the task made, `session` for a Routine
+/// that is a Session.
+fn kind_of(ty: &str, made: bool, session: bool, field: &str, after: Option<&str>) -> AiChangeKind {
     match ty {
+        "note" if is_tally_field(field) => AiChangeKind::Tally,
+        "note" if field == line_keys::KIND => AiChangeKind::List,
         "note" if made => AiChangeKind::NoteAdded,
         "note" => match field {
             note_keys::PLACE | note_keys::SPAWNED | note_keys::NUDGE => AiChangeKind::NoteFiled,
@@ -182,7 +242,10 @@ fn kind_of(ty: &str, made: bool, field: &str, after: Option<&str>) -> AiChangeKi
             _ => AiChangeKind::Other,
         },
         "section" => AiChangeKind::NoteText,
+        "routine" if session => AiChangeKind::Session,
         "routine" => AiChangeKind::Routine,
+        line_keys::TYPE_LINE => AiChangeKind::List,
+        frog_keys::TYPE_FROG => AiChangeKind::Frog,
         "area" | "topic" => AiChangeKind::Place,
         _ => AiChangeKind::Other,
     }
@@ -316,13 +379,20 @@ impl Store {
             "routine" => &ROUTINE_FIELDS,
             "area" => &AREA_FIELDS,
             "topic" => &TOPIC_FIELDS,
+            line_keys::TYPE_LINE => &LINE_FIELDS,
+            frog_keys::TYPE_FROG => &FROG_FIELDS,
             _ => &[],
         };
         let context = matches!(ty, "note" | "section") && CONTEXT_FIELDS.contains(&field);
         if context && value.is_some() {
             return refuse("a captured detail it only removes");
         }
-        if !context && !fields.contains(&field) {
+        let set_up = match ty {
+            "note" => is_tally_field(field),
+            "routine" => is_weekday_count(field),
+            _ => false,
+        };
+        if !context && !set_up && !fields.contains(&field) {
             return refuse("a field it never writes");
         }
         let made = self.logged_history(entity)?.is_empty();
@@ -354,6 +424,25 @@ impl Store {
                 (made || self.may_change_routine(entity)?)
                     && match (field, value) {
                         (routine_keys::NOTE, Some(note)) => {
+                            self.may_manage(self.area_of(note)?.as_deref())?
+                        }
+                        _ => true,
+                    }
+            }
+            line_keys::TYPE_LINE => {
+                if made {
+                    match (field, value) {
+                        (line_keys::NOTE, Some(note)) => self.may_write_in(note)?,
+                        _ => true,
+                    }
+                } else {
+                    Checklists::new(self).may_edit(entity)?
+                }
+            }
+            frog_keys::TYPE_FROG => {
+                (made || self.may_change_routine(entity)?)
+                    && match (field, value) {
+                        (frog_keys::NOTE, Some(note)) => {
                             self.may_manage(self.area_of(note)?.as_deref())?
                         }
                         _ => true,
@@ -418,9 +507,12 @@ impl Store {
             let made = self.logged_history(entity)?.is_empty();
             let note = match ty {
                 "note" => Some(entity.clone()),
-                "section" | "routine" => self.current(entity, note_keys::NOTE)?,
+                "section" | "routine" | line_keys::TYPE_LINE | frog_keys::TYPE_FROG => {
+                    self.current(entity, note_keys::NOTE)?
+                }
                 _ => None,
             };
+            let session = ty == "routine" && self.current(entity, session_keys::POOL)?.is_some();
             let mut items: Vec<AiReviewItem> = Vec::new();
             for field in fields.get(entity).into_iter().flatten() {
                 let Some(d) = last.get(&(entity.clone(), field.clone())) else {
@@ -436,7 +528,7 @@ impl Store {
                     mine_wins: self.gives_way(entity, field, d.mark, &mut by)?,
                     after: d.value.clone(),
                 };
-                let kind = kind_of(ty, made, field, d.value.as_deref());
+                let kind = kind_of(ty, made, session, field, d.value.as_deref());
                 match items.iter_mut().find(|i| i.kind == kind) {
                     Some(item) => item.changes.push(change),
                     None => items.push(AiReviewItem {
@@ -605,6 +697,30 @@ mod tests {
     /// Ann shares her Household with Ben as a Member, with her Note and
     /// Reminder in it.
     fn member() -> Made<(Store, Store, String, String, String)> {
+        let shared = member_with(|_, _| Ok(Vec::new()))?;
+        Ok((
+            shared.ann,
+            shared.ben,
+            shared.area,
+            shared.milk,
+            shared.reminder,
+        ))
+    }
+
+    /// Ann's Household shared with Ben, a Member; `more` what Ann set up
+    /// in it before, by id.
+    struct Shared {
+        ann: Store,
+        ben: Store,
+        area: String,
+        milk: String,
+        reminder: String,
+        more: Vec<String>,
+    }
+
+    /// [`member`], with `prepare` setting up more in the Household (its
+    /// id given) before it is shared.
+    fn member_with(prepare: impl FnOnce(&Store, &str) -> Made<Vec<String>>) -> Made<Shared> {
         let device = |seed: u8, name: &str| -> Made<Store> {
             let store = Store::in_memory(ticking(), move || Ok(SigningKey::from_seed([seed; 32])))?;
             crate::profile::OwnProfile::new(&store).apply_defaults(name, None)?;
@@ -615,6 +731,7 @@ mod tests {
         let house = Places::new(&ann).add_area("Household")?;
         let milk = Notes::new(&ann).capture("Buy milk", Some(&house.id), None)?;
         let reminder = Routines::new(&ann).spawn(&milk.id, &at_ten(2)?)?;
+        let more = prepare(&ann, &house.id)?;
         let area = ann.share(&house.id)?;
         let invite = Invite {
             area: area.clone(),
@@ -632,7 +749,14 @@ mod tests {
             answer_sync_inviting(&ann, &request, "D", Some(&invite))?.ok_or("an answer")?;
         apply_answer_as(&ben, &answer, true, None)?;
         assert_eq!(ben.access_in(&area, None)?, AreaAccess::Member);
-        Ok((ann, ben, area, milk.id, reminder.id))
+        Ok(Shared {
+            ann,
+            ben,
+            area,
+            milk: milk.id,
+            reminder: reminder.id,
+            more,
+        })
     }
 
     #[test]
@@ -669,6 +793,346 @@ mod tests {
             .collect();
         assert!(!drafted.contains(&milk) && !drafted.contains(&reminder));
         assert!(!drafted.contains(&area));
+        Ok(())
+    }
+
+    #[test]
+    fn an_ai_task_writes_none_of_the_users_own_data() -> TestResult {
+        use crate::boxes::Boxes;
+        use crate::checklists::Checklists;
+        use crate::frogs::Frogs;
+        use crate::schedule::Occurrence;
+        use crate::sessions::{SessionRule, Sessions};
+        use crate::shopping_lists::ShoppingLists;
+        use crate::tallies::Tallies;
+        let store = store();
+        let notes = Notes::new(&store);
+        let wall = |t: DateTime<Utc>| t.naive_utc();
+        let run = notes.capture("Run", None, None)?.id;
+        let field = Tallies::new(&store).add_field(&run, "Run", "km", None, None)?;
+        let entry = Tallies::new(&store).add(&run, &BTreeMap::new(), "park", None)?;
+        let trip = notes.capture("Trip\nSocks", None, None)?.id;
+        Checklists::new(&store).make(&trip)?;
+        let socks = Checklists::new(&store)
+            .by_note(&trip)?
+            .ok_or("a Checklist")?
+            .lines[0]
+            .id
+            .clone();
+        let shop = notes.capture("Shop\nMilk", None, None)?.id;
+        ShoppingLists::new(&store).make(&shop)?;
+        let milk = ShoppingLists::new(&store)
+            .by_note(&shop, &wall)?
+            .ok_or("a Shopping List")?
+            .lines[0]
+            .id
+            .clone();
+        let bank = notes.capture("Call the bank ☐", None, None)?;
+        let frog = Frogs::new(&store).spawn(&bank.id)?;
+        let box_id = bank.boxes.first().ok_or("a Box")?.id.clone();
+        let daily = Schedule::new(
+            Day::new(2026, 1, 1),
+            &ClockTime::new(8, 0).into_iter().collect::<Vec<_>>(),
+            Some(crate::schedule::Recurrence::parse("FREQ=DAILY").map_err(|e| e.to_string())?),
+        )
+        .ok_or("a schedule")?;
+        let session = Sessions::new(&store).spawn(
+            &trip,
+            &daily,
+            std::slice::from_ref(&run),
+            1,
+            SessionRule::Rolling,
+        )?;
+        let first = Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(8, 0));
+        let task = store.open_ai_task()?;
+        let raw = |entity: &str, field: &str, value: &str| -> Result<()> {
+            store.drafting(&task, || {
+                store.append(entity, field, Some(value), None).map(drop)
+            })
+        };
+        let at = "2026-01-01T10:00:00.000Z";
+        let tries: Vec<(&str, Result<()>)> = vec![
+            ("an entry", raw("tallyEntry:x", "$type", "tallyEntry")),
+            (
+                "an entry's value",
+                raw(&entry.id, &crate::tallies::keys::value(&field), "5"),
+            ),
+            ("an entry's line", raw(&entry.id, "line", "track")),
+            ("a Line's tick", raw(&socks, "checked", at)),
+            ("a Shopping Line's check", raw(&milk, "checked", at)),
+            (
+                "a tick per Occurrence",
+                raw(session.id(), &format!("check@{}@{socks}", first.key()), at),
+            ),
+            (
+                "a check-off",
+                raw(session.id(), &crate::routines::keys::done(&first), at),
+            ),
+            (
+                "a pick",
+                raw(session.id(), &crate::sessions::keys::pick(&first), &run),
+            ),
+            (
+                "an entry of a pick",
+                raw(
+                    session.id(),
+                    &crate::sessions::keys::entry(&first, &entry.id),
+                    &run,
+                ),
+            ),
+            ("an eaten Frog", raw(&frog.id, "done", at)),
+            (
+                "today's Frogs",
+                raw("frogs:pick", "pick", &format!("2026-01-01,{}", frog.id)),
+            ),
+            (
+                "a Box's tick",
+                raw(&bank.id, &crate::boxes::tick_field(&box_id), "done"),
+            ),
+            ("an unknown field", raw(&run, "tally:x:values", "1")),
+            (
+                "the calls",
+                store.drafting(&task, || {
+                    Tallies::new(&store)
+                        .add(&run, &BTreeMap::new(), "track", None)
+                        .map(drop)
+                }),
+            ),
+            (
+                "",
+                store.drafting(&task, || Checklists::new(&store).check(&socks)),
+            ),
+            (
+                "",
+                store.drafting(&task, || ShoppingLists::new(&store).check(&milk, &wall)),
+            ),
+            (
+                "",
+                store.drafting(&task, || Frogs::new(&store).mark_done(&frog.id, None)),
+            ),
+            (
+                "",
+                store.drafting(&task, || Frogs::new(&store).pick_today(&wall).map(drop)),
+            ),
+            (
+                "",
+                store.drafting(&task, || Sessions::new(&store).pick_today(&wall).map(drop)),
+            ),
+            (
+                "",
+                store.drafting(&task, || {
+                    Sessions::new(&store)
+                        .record(session.id(), &first, &run, &BTreeMap::new(), "track")
+                        .map(drop)
+                }),
+            ),
+            (
+                "",
+                store.drafting(&task, || {
+                    Routines::new(&store).mark_done(session.id(), &first, None)
+                }),
+            ),
+            (
+                "",
+                store.drafting(&task, || {
+                    Boxes::new(&store).tick(&bank.id, &box_id, crate::text_boxes::BoxState::Done)
+                }),
+            ),
+        ];
+        for (n, (what, tried)) in tries.iter().enumerate() {
+            // Refused by the judge, not by the call's own checks.
+            let judged = tried
+                .as_ref()
+                .is_err_and(|e| e.to_string().starts_with("not for an AI Task"));
+            assert!(judged, "try {n} ({what}): {tried:?}");
+        }
+        assert!(
+            store
+                .pending_set(&task)?
+                .ok_or("the task")?
+                .drafts()
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn set_up_does_only_what_the_role_allows() -> TestResult {
+        use crate::checklists::Checklists;
+        use crate::tallies::Tallies;
+        let shared = member_with(|ann, house| {
+            let notes = Notes::new(ann);
+            let trip = notes.capture("Trip\nSocks", Some(house), None)?.id;
+            Checklists::new(ann).make(&trip)?;
+            let run = notes.capture("Run", Some(house), None)?.id;
+            Tallies::new(ann).add_field(&run, "Run", "km", None, None)?;
+            let bank = notes.capture("Call the bank", Some(house), None)?.id;
+            crate::frogs::Frogs::new(ann).spawn(&bank)?;
+            let session = crate::sessions::Sessions::new(ann).spawn(
+                &bank,
+                &at_ten(2)?,
+                std::slice::from_ref(&run),
+                1,
+                crate::sessions::SessionRule::Rolling,
+            )?;
+            Ok(vec![trip, run, bank, session.id().to_string()])
+        })?;
+        let (ben, milk) = (&shared.ben, &shared.milk);
+        let (trip, run) = (&shared.more[0], &shared.more[1]);
+        let (bank, session) = (&shared.more[2], &shared.more[3]);
+        let socks = Checklists::new(ben)
+            .by_note(trip)?
+            .ok_or("a Checklist")?
+            .lines[0]
+            .id
+            .clone();
+        let field = Tallies::new(ben).by_note(run)?.ok_or("a Tally")?.fields[0]
+            .id
+            .clone();
+        let task = ben.open_ai_task()?;
+        let call = |name: &str, args: serde_json::Value| {
+            ben.ai_tool(&task, name, &args, &|t: DateTime<Utc>| t.naive_utc())
+        };
+        let added = call("add_line", serde_json::json!({"id": trip, "text": "Shirt"}))?;
+        assert!(!added.is_error, "a Member adds a Line: {added:?}");
+        for (name, args) in [
+            (
+                "rename_line",
+                serde_json::json!({"id": socks, "text": "Sox"}),
+            ),
+            ("remove_line", serde_json::json!({"id": socks})),
+            (
+                "make_tally",
+                serde_json::json!({"fields": [{"name": "Milk"}], "id": milk}),
+            ),
+            (
+                "rename_tally_field",
+                serde_json::json!({"field": field, "id": run, "name": "Jog"}),
+            ),
+            ("make_frog", serde_json::json!({"id": milk})),
+            (
+                "make_list",
+                serde_json::json!({"id": milk, "list": "checklist"}),
+            ),
+            ("list_to_plain", serde_json::json!({"id": trip})),
+            ("move_line", serde_json::json!({"id": socks})),
+            (
+                "group_line",
+                serde_json::json!({"id": socks, "under": false}),
+            ),
+            ("frog_to_plain", serde_json::json!({"id": bank})),
+            (
+                "set_session",
+                serde_json::json!({"count": 2, "id": session}),
+            ),
+        ] {
+            let out = call(name, args)?;
+            assert!(out.is_error, "{name} went through: {out:?}");
+        }
+        // Trashing a Frog has no check of its own: the judge refuses it.
+        let frog = call("frog_to_plain", serde_json::json!({"id": bank}))?;
+        assert!(format!("{frog:?}").contains("role"), "{frog:?}");
+        // Even past the screens' checks, the judge refuses.
+        let raw = ben.drafting(&task, || {
+            ben.append(
+                run,
+                &crate::tallies::keys::field(&field, "name"),
+                Some("Jog"),
+                None,
+            )
+            .map(drop)
+        });
+        assert!(raw.is_err());
+        let drafted: Vec<String> = ben
+            .pending_set(&task)?
+            .ok_or("the task")?
+            .drafts()
+            .iter()
+            .map(|d| d.entity.clone())
+            .collect();
+        assert!(
+            drafted
+                .iter()
+                .all(|e| e.starts_with("line:") && *e != socks)
+        );
+        assert!(!drafted.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn the_review_groups_the_set_ups_by_kind() -> TestResult {
+        use crate::checklists::Checklists;
+        use crate::frogs::Frogs;
+        use crate::sessions::{SessionRule, Sessions};
+        use crate::tallies::Tallies;
+        let store = store();
+        let notes = Notes::new(&store);
+        let run = notes.capture("Run", None, None)?.id;
+        let trip = notes.capture("Trip\nSocks", None, None)?.id;
+        let bank = notes.capture("Call the bank", None, None)?.id;
+        let later = at_ten(2)?;
+        let task = store.open_ai_task()?;
+        store.drafting(&task, || {
+            Tallies::new(&store).add_field(&run, "Run", "km", Some(5000.0), None)?;
+            Checklists::new(&store).make(&trip)?;
+            Frogs::new(&store).spawn(&bank)?;
+            Sessions::new(&store).spawn(
+                &bank,
+                &later,
+                std::slice::from_ref(&run),
+                1,
+                SessionRule::Random,
+            )?;
+            Ok(())
+        })?;
+        let review = store.ai_review(&task)?;
+        let kinds: Vec<AiChangeKind> = review.groups.iter().map(|(k, _)| *k).collect();
+        for kind in [
+            AiChangeKind::Tally,
+            AiChangeKind::List,
+            AiChangeKind::Frog,
+            AiChangeKind::Session,
+        ] {
+            assert!(kinds.contains(&kind), "{kind:?} in {kinds:?}");
+        }
+        assert!(
+            !kinds.contains(&AiChangeKind::Routine),
+            "the Session as one"
+        );
+        let items = |kind: AiChangeKind| -> Vec<AiReviewItem> {
+            review
+                .groups
+                .iter()
+                .find(|(k, _)| *k == kind)
+                .map(|(_, items)| items.clone())
+                .unwrap_or_default()
+        };
+        let tally = &items(AiChangeKind::Tally)[0];
+        assert_eq!(tally.note.as_deref(), Some(run.as_str()));
+        let target = tally
+            .changes
+            .iter()
+            .find(|c| c.field.ends_with(":target"))
+            .ok_or("the target")?;
+        assert_eq!(
+            (target.before.as_deref(), target.after.as_deref()),
+            (None, Some("5000"))
+        );
+        let lists = items(AiChangeKind::List);
+        assert!(lists.iter().any(|i| i.entity == trip));
+        assert!(
+            lists
+                .iter()
+                .any(|i| i.entity.starts_with("line:") && i.note.as_deref() == Some(trip.as_str()))
+        );
+        assert_eq!(
+            items(AiChangeKind::Frog)[0].note.as_deref(),
+            Some(bank.as_str())
+        );
+        assert_eq!(
+            items(AiChangeKind::Session)[0].note.as_deref(),
+            Some(bank.as_str())
+        );
         Ok(())
     }
 

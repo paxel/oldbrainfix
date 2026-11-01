@@ -11,15 +11,23 @@
 use egui::{Id, RichText, Ui};
 use oldbrainfix_core::ai_port::{Reach, bridged_client_config, claude_code_command, client_config};
 use oldbrainfix_core::ai_task::{AiChangeKind, AiFieldChange, AiReviewItem};
+use oldbrainfix_core::checklists::{keys as line_keys, parse_list_kind};
+use oldbrainfix_core::frogs::keys as frog_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::routines::keys as routine_keys;
-use oldbrainfix_core::{Importance, Notes, Places, Routines, Store, StoredText, parse_time};
+use oldbrainfix_core::sessions::keys as session_keys;
+use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
+use oldbrainfix_core::tallies::keys as tally_keys;
+use oldbrainfix_core::tally_units::{self, UnitSystem};
+use oldbrainfix_core::{
+    Checklists, Importance, Notes, Places, Routines, SessionRule, Store, StoredText, parse_time,
+};
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
-use crate::schedule_text::schedule_text;
+use crate::schedule_text::{schedule_text, weekday_long};
 use crate::theme::Tones;
 
 /// What the user asked of the AI port's card or of the review.
@@ -101,7 +109,11 @@ pub fn kind_label(t: &L10n, kind: AiChangeKind) -> &'static str {
         AiChangeKind::NoteRestored => t.ai_kind_note_restored(),
         AiChangeKind::NoteText => t.ai_kind_note_text(),
         AiChangeKind::NoteImportance => t.ai_kind_note_importance(),
+        AiChangeKind::Tally => t.ai_kind_tally(),
+        AiChangeKind::List => t.ai_kind_list(),
+        AiChangeKind::Frog => t.ai_kind_frog(),
         AiChangeKind::Routine => t.ai_kind_routine(),
+        AiChangeKind::Session => t.ai_kind_session(),
         AiChangeKind::Place => t.ai_kind_place(),
         AiChangeKind::Other => t.ai_kind_other(),
     }
@@ -156,7 +168,7 @@ fn review_item(
         if ty == routine_keys::TYPE_ROUTINE && schedule(&change) {
             continue;
         }
-        if let Some(line) = change_line(store, t, ty, change)? {
+        if let Some(line) = change_line(store, t, ty, &item.entity, change)? {
             changes.push(line);
         }
     }
@@ -203,15 +215,138 @@ fn place_name(store: &Store, t: &L10n, id: &str) -> oldbrainfix_core::Result<Opt
     }
 }
 
-/// One changed field in words; `None` for one that says nothing the
-/// group does not, as the type of a thing the task made.
+/// One changed field of `entity` in words; `None` for one that says
+/// nothing the group or the item's title does not, as the type of a thing
+/// the task made.
 fn change_line(
     store: &Store,
     t: &L10n,
     ty: &str,
+    entity: &str,
     change: &AiFieldChange,
 ) -> oldbrainfix_core::Result<Option<ReviewChange>> {
     let field = change.field.as_str();
+    let only = |label: &str| {
+        Some(ReviewChange {
+            label: label.to_string(),
+            before: None,
+            after: None,
+            mine_wins: change.mine_wins,
+        })
+    };
+    let words = |label: String, text: &dyn Fn(Option<&str>) -> String| {
+        Some(ReviewChange {
+            label,
+            before: Some(text(change.before.as_deref())),
+            after: Some(text(change.after.as_deref())),
+            mine_wins: change.mine_wins,
+        })
+    };
+    if ty == note_keys::TYPE_NOTE
+        && let Some((id, part)) = field
+            .strip_prefix(tally_keys::FIELD_PREFIX)
+            .and_then(|rest| rest.rsplit_once(':'))
+    {
+        return tally_change(store, t, entity, id, part, change);
+    }
+    match (ty, field) {
+        (note_keys::TYPE_NOTE, line_keys::KIND) => {
+            return Ok(words(t.ai_field_kind().to_string(), &|v| {
+                list_text(t, v).to_string()
+            }));
+        }
+        (line_keys::TYPE_LINE | frog_keys::TYPE_FROG, line_keys::NOTE | line_keys::MADE) => {
+            // The item is titled with its Note.
+            return Ok(None);
+        }
+        (line_keys::TYPE_LINE, line_keys::TEXT) => {
+            let text = |v: Option<&str>| match v {
+                Some(v) => StoredText::read(Some(v)).text,
+                None => t.conflict_empty().to_string(),
+            };
+            return Ok(words(t.ai_field_line().to_string(), &text));
+        }
+        (line_keys::TYPE_LINE, line_keys::ORDER) => {
+            let place = |store: &Store| line_place(store, entity);
+            let before = store.log_only(|| place(store))?;
+            let Some(after) = place(store)? else {
+                return Ok(None);
+            };
+            return Ok(Some(ReviewChange {
+                label: t.ai_field_line_order().to_string(),
+                before: Some(
+                    before.map_or_else(|| t.conflict_empty().to_string(), |n| n.to_string()),
+                ),
+                after: Some(after.to_string()),
+                mine_wins: change.mine_wins,
+            }));
+        }
+        (line_keys::TYPE_LINE, line_keys::INDENT) => {
+            return Ok(words(t.ai_field_line_group().to_string(), &|v| {
+                match v {
+                    Some(_) => t.checklist_indent(),
+                    None => t.checklist_outdent(),
+                }
+                .to_string()
+            }));
+        }
+        (line_keys::TYPE_LINE, shopping_keys::REAPPEAR) => {
+            return Ok(words(t.shopping_reappear().to_string(), &|v| {
+                reappear_text(t, v)
+            }));
+        }
+        (line_keys::TYPE_LINE, line_keys::TRASHED) if change.after.is_some() => {
+            return Ok(only(t.ai_deleted()));
+        }
+        (frog_keys::TYPE_FROG, frog_keys::TRASHED) if change.after.is_some() => {
+            return Ok(only(t.checklist_to_plain()));
+        }
+        (routine_keys::TYPE_ROUTINE, session_keys::POOL) => {
+            let pool = |v: Option<&str>| -> oldbrainfix_core::Result<String> {
+                let mut names = Vec::new();
+                for id in v.unwrap_or_default().split(',').filter(|id| !id.is_empty()) {
+                    names.push(note_title(store, t, id)?);
+                }
+                Ok(match names.is_empty() {
+                    true => t.conflict_empty().to_string(),
+                    false => names.join(", "),
+                })
+            };
+            return Ok(Some(ReviewChange {
+                label: t.session_pool().to_string(),
+                before: Some(pool(change.before.as_deref())?),
+                after: Some(pool(change.after.as_deref())?),
+                mine_wins: change.mine_wins,
+            }));
+        }
+        (routine_keys::TYPE_ROUTINE, session_keys::RULE) => {
+            return Ok(words(t.session_rule().to_string(), &|v| {
+                match v.and_then(SessionRule::parse) {
+                    Some(SessionRule::Random) => t.session_rule_random(),
+                    Some(SessionRule::Least) => t.session_rule_least(),
+                    Some(SessionRule::Rolling) | None => t.session_rule_rolling(),
+                }
+                .to_string()
+            }));
+        }
+        (routine_keys::TYPE_ROUTINE, session_keys::COUNT) => {
+            return Ok(words(t.session_count().to_string(), &|v| {
+                v.unwrap_or("1").to_string()
+            }));
+        }
+        _ => {}
+    }
+    if ty == routine_keys::TYPE_ROUTINE
+        && let Some(weekday) = (1..=7).find(|d| field == session_keys::count_on(*d))
+    {
+        let label = t.ai_session_weekday_count(weekday_long(t, weekday));
+        return Ok(words(label, &|v| {
+            v.map_or_else(
+                || t.session_weekday_count_hint().to_string(),
+                str::to_string,
+            )
+        }));
+    }
     if field == note_keys::TYPE {
         // Deleted: an Area or Topic the task deleted.
         return Ok(
@@ -300,6 +435,101 @@ fn value_text(
             Err(_) => value.to_string(),
         },
     })
+}
+
+/// What a Note is by its `kind`: a Checklist, a Shopping List or a plain
+/// Note.
+fn list_text(t: &L10n, kind: Option<&str>) -> &'static str {
+    match parse_list_kind(kind).map(|(list, _)| list) {
+        Some(line_keys::CHECKLIST) => t.checklist_heading(),
+        Some(shopping_keys::SHOPPING) => t.shopping_heading(),
+        _ => t.ai_plain_note(),
+    }
+}
+
+/// A Shopping List's reappear time in words.
+fn reappear_text(t: &L10n, code: Option<&str>) -> String {
+    match Reappear::read(code) {
+        Reappear::Once => t.shopping_once().to_string(),
+        weeks => t.shopping_weeks(weeks.weeks()),
+    }
+}
+
+/// Where the Line `line` stands in its Checklist, from 1; `None` when it
+/// is in none.
+fn line_place(store: &Store, line: &str) -> oldbrainfix_core::Result<Option<usize>> {
+    let Some(note) = store.current(line, line_keys::NOTE)? else {
+        return Ok(None);
+    };
+    Ok(Checklists::new(store)
+        .by_note(&note)?
+        .and_then(|list| list.lines.iter().position(|l| l.id == line))
+        .map(|i| i + 1))
+}
+
+/// One changed part `part` of the field `id` of the Tally of `note` in
+/// words: the field by its name, a target in its unit, a rule
+/// translated; hiding and showing it again without before and after.
+fn tally_change(
+    store: &Store,
+    t: &L10n,
+    note: &str,
+    id: &str,
+    part: &str,
+    change: &AiFieldChange,
+) -> oldbrainfix_core::Result<Option<ReviewChange>> {
+    let held = |key: &str| -> oldbrainfix_core::Result<Option<String>> {
+        let field = tally_keys::field(id, key);
+        Ok(match store.current(note, &field)? {
+            Some(value) => Some(value),
+            None => store.log_only(|| store.current(note, &field))?,
+        })
+    };
+    let name = held(tally_keys::NAME)?.unwrap_or_default();
+    let unit = held(tally_keys::UNIT)?.unwrap_or_default();
+    let label = |part: &str| t.ai_tally_field(&name, part);
+    let shown = |label: String| ReviewChange {
+        label,
+        before: None,
+        after: None,
+        mine_wins: change.mine_wins,
+    };
+    let text = |value: Option<&str>| -> String {
+        match (part, value) {
+            (tally_keys::UNIT, None | Some("")) => t.tally_no_unit().to_string(),
+            (tally_keys::TARGET, None) => t.tally_no_target().to_string(),
+            (tally_keys::TARGET, Some(v)) => match tally_units::decode_number(Some(v)) {
+                Some(base) => {
+                    let value = tally_units::from_base(base, &unit, UnitSystem::Metric);
+                    format!("{value} {unit}").trim().to_string()
+                }
+                None => v.to_string(),
+            },
+            (tally_keys::RULE, Some("max")) => t.tally_rule_max().to_string(),
+            (tally_keys::RULE, _) => t.tally_rule_sum().to_string(),
+            (_, Some(v)) => v.to_string(),
+            (_, None) => t.conflict_empty().to_string(),
+        }
+    };
+    let part_label = match part {
+        tally_keys::NAME => t.tally_field_name(),
+        tally_keys::UNIT => t.tally_unit(),
+        tally_keys::TARGET => t.tally_target_badge(),
+        tally_keys::RULE => t.tally_rule(),
+        tally_keys::HIDDEN => {
+            return Ok(Some(shown(match change.after {
+                Some(_) => label(t.tally_field_hidden()),
+                None => label(t.tally_show_field()),
+            })));
+        }
+        _ => t.conflict_other(),
+    };
+    Ok(Some(ReviewChange {
+        label: label(part_label),
+        before: Some(text(change.before.as_deref())),
+        after: Some(text(change.after.as_deref())),
+        mine_wins: change.mine_wins,
+    }))
 }
 
 /// What the AI port's card shows.

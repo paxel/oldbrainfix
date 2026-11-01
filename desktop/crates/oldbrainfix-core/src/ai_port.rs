@@ -26,6 +26,7 @@ use sha2::{Digest, Sha256};
 
 use crate::ai_tools::tools;
 use crate::lan::{Response, read_request};
+use crate::schedule::WallClock;
 use crate::store::Store;
 use crate::{Error, Result};
 
@@ -48,7 +49,7 @@ pub const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-0
 pub const SERVER_NAME: &str = "oldbrainfix";
 
 /// What the port tells the client about itself at `initialize`.
-const INSTRUCTIONS: &str = "Old Brain Fix is a memory aid. Through this port you work on the user's Notes, Areas, Topics, Routines and Reminders for one task. Every change you make waits as a Pending Change: the user reviews all of them together when the task is done and accepts or rejects them. Nothing reaches other people.";
+const INSTRUCTIONS: &str = "Old Brain Fix is a memory aid. Through this port you work on the user's Notes, Areas, Topics, Routines and Reminders for one task, and set up Tallies, Sessions, Checklists, Shopping Lists and Frogs. Every change you make waits as a Pending Change: the user reviews all of them together when the task is done and accepts or rejects them. What the user recorded, a Tally's entries, the ticks of Lines and Boxes, the check-offs, a Session's picks and the eaten Frogs, you only read. Nothing reaches other people.";
 
 /// A tool call waiting for its answer.
 #[derive(Debug)]
@@ -60,10 +61,11 @@ pub struct AiCall {
 }
 
 impl AiCall {
-    /// Answers the call for the AI Task `task` ([`Store::ai_tool`]).
-    pub fn answer(self, store: &Store, task: &str) {
+    /// Answers the call for the AI Task `task` ([`Store::ai_tool`]), on
+    /// this computer's clock `wall`.
+    pub fn answer(self, store: &Store, task: &str, wall: &WallClock) {
         let out = store
-            .ai_tool(task, &self.name, &self.arguments)
+            .ai_tool(task, &self.name, &self.arguments, wall)
             .map(|output| output.to_json())
             .map_err(|e| e.to_string());
         drop(self.reply.send(out));
@@ -314,11 +316,12 @@ impl AiPort {
         self.calls.recv_timeout(wait).ok()
     }
 
-    /// Answers every tool call that waits; returns how many.
-    pub fn answer_waiting(&self, store: &Store) -> usize {
+    /// Answers every tool call that waits, on this computer's clock
+    /// `wall`; returns how many.
+    pub fn answer_waiting(&self, store: &Store, wall: &WallClock) -> usize {
         let mut answered = 0;
         while let Some(call) = self.next_call() {
-            call.answer(store, &self.task);
+            call.answer(store, &self.task, wall);
             answered += 1;
         }
         answered
@@ -921,7 +924,9 @@ Main:
             let client = s.spawn(|| client(&url, &token).map_err(|e| e.to_string()));
             while !client.is_finished() {
                 if let Some(call) = port.wait_call(Duration::from_millis(20)) {
-                    call.answer(&store, port.task());
+                    call.answer(&store, port.task(), &|t: chrono::DateTime<chrono::Utc>| {
+                        t.naive_utc()
+                    });
                 }
             }
             client.join()
