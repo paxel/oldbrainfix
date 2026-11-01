@@ -2,7 +2,7 @@
 
 Rules every screen follows. Check a change against them before it lands;
 a screen that breaks one is a bug, not a style choice. Terms are those of
-`CONTEXT.md`.
+`CONTEXT.md`. #n refers to issue n on https://github.com/paxel/oldbrainfix/issues.
 
 ## Navigation
 
@@ -20,7 +20,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   **the magnifier** opens the notes browser. Nothing else floats, except
   the ways "+" fans out while it is open (see Capture).
 - Settings, Backups and Sync are reached only through the **Profile
-  picture in the Agenda's top corner**, where the settings gear was. It
+  picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
   recovery; Your Devices; People; Settings of this Device, with About
   inside. No hamburger menu, no ⋮ menu for them. On the desktop the
@@ -140,7 +140,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
   shortcut, also one a phone key or gesture starts): File into… and the
   alarm clock, and ⋮ with the Importance, Make it a Tally (with the
-  Routine switch, Q481) and Add to a Shopping List. Each opens its usual
+  Routine switch) and Add to a Shopping List. Each opens its usual
   page and comes back to the capture screen with the choice shown at the
   top ("→ Household"), not saved yet; the user can keep typing or add
   more. All of it is optional. With the format bar on, it rides on the
@@ -541,11 +541,3 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
   details how many moved and how many stayed.
-
-## User guide
-
-- **A ticket that changes a screen also updates its guide page and
-  frames**: the page's text under `site/en/guide/` and `site/de/guide/`,
-  and the frames, written anew by `tool/guide-frames.sh` and committed
-  with the change. CI fails while a committed frame no longer matches
-  its screen.

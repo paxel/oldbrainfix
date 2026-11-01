@@ -89,6 +89,10 @@ _Avoid_: domain, category, folder
 The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. German: Thema.
 _Avoid_: category, subcategory, tag (a Tag is a #word of the text)
 
+**Browser**:
+Where the user finds and opens filed Notes. On the phone the page that "Search and browse" (the Agenda's magnifier) opens: the Areas list with a search over every Note, All Notes, Frogs and Trash in its bar, and from it each Area and Topic. On the desktop the sidebar and the list beside it. German: Browser.
+_Avoid_: search screen, library
+
 **Unsorted**:
 The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
 _Avoid_: uncategorized, inbox

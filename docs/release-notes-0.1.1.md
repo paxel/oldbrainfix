@@ -1,5 +1,7 @@
 # Release notes 0.1.1
 
+Paste source for the Google Play Console: the release's What's new (the tag pipeline reads the `play_notes_en` and `play_notes_de` blocks) and tester notes. The changes themselves are in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Summary
 
 Fixes and changes from the first round of testing 0.1.0 on phones: the Agenda week, new Note cards, swipes that follow the finger, removing a recording or photo while its text stays, playback speed, and better transcription of English words in German speech with an optional larger model. Removing recordings and photos, playback speed and the speech model changes are on the desktop too. The listing stays as in 0.1.0. The store screenshots predate the new Agenda week, Capture buttons and Note cards and are regenerated after the next Capture changes (#98).

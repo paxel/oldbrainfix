@@ -1,5 +1,7 @@
 # Release notes 0.2.0
 
+Paste source for the Google Play Console: the release's What's new (the tag pipeline reads the `play_notes_en` and `play_notes_de` blocks), tester notes and store listing. The changes themselves are in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Summary
 
 Version 0.2.0 after 0.1.1, which is on Google Play's internal track and on F-Droid. It covers the 0.2.0 section of the changelog. Phone highlights: Checklists and Shopping Lists, formatted text with tables, boxes and #tags, Tallies, Sessions and Frogs, Paste and Share to an app, sorting while capturing, adding a Device of one's own at the first start, and sharing an Area from afar. Desktop-only changes stay out of the phone texts. The store frames were regenerated: capture, editor and fan changed.

@@ -1,6 +1,6 @@
 # Imports make dated Notes in a new Area
 
-People come from other note apps with their notes in a folder of Markdown or text files (#150, grill Q435–Q437). An Import makes Notes of them: one Note per file, each dated by its file, all in a new Area named after the source, none of them Unsorted or Nudged. The apps pick the folder with the system's picker and read its files; both cores do the rest the same way (`imports.dart`, `imports.rs`), so the same files make the same entries, byte for byte (the fixture `import`).
+People come from other note apps with their notes in a folder of Markdown or text files (#150). An Import makes Notes of them: one Note per file, each dated by its file, all in a new Area named after the source, none of them Unsorted or Nudged. The apps pick the folder with the system's picker and read its files; both cores do the rest the same way (`imports.dart`, `imports.rs`), so the same files make the same entries, byte for byte (the fixture `import`).
 
 ## Two steps
 
@@ -38,7 +38,7 @@ A file of more than 1 MiB is skipped as too large without being read, and the ap
 
 ## Google Keep
 
-People export their notes from Google Keep with Google Takeout (#151, grill Q435–Q437), a zip holding a folder `Takeout/Keep` with one `.json` per note, an `.html` twin of each, `Labels.txt` and the files attached to the notes. The apps hand over the entries of the zip, or the files of the folder once unpacked, each by its path and its bytes (`Imports.keep`, `Imports::keep`); both cores do the rest. The field names follow the export as Keep writes it, checked against the importers of Obsidian and Trilium: `title`, `textContent`, `listContent` (items with `text` and `isChecked`), `labels` (each with a `name`), `attachments` (each with a `filePath`), `isTrashed`, `isArchived`, `createdTimestampUsec` and `userEditedTimestampUsec`.
+People export their notes from Google Keep with Google Takeout (#151), a zip holding a folder `Takeout/Keep` with one `.json` per note, an `.html` twin of each, `Labels.txt` and the files attached to the notes. The apps hand over the entries of the zip, or the files of the folder once unpacked, each by its path and its bytes (`Imports.keep`, `Imports::keep`); both cores do the rest. The field names follow the export as Keep writes it, checked against the importers of Obsidian and Trilium: `title`, `textContent`, `listContent` (items with `text` and `isChecked`), `labels` (each with a `name`), `attachments` (each with a `filePath`), `isTrashed`, `isArchived`, `createdTimestampUsec` and `userEditedTimestampUsec`.
 
 - **What is read.** A `.json` file is read as a note, any other only when a note names it; the `.html` twins, `Labels.txt` and the rest are not read, and not counted. When any entry lies in a folder named `Keep` (in any case of ASCII letters), only the entries of such a folder count, so a Takeout of several Google products can be handed over whole. Each core says which entries it reads, and how many bytes of them, so the apps need read no more (`Imports.keepReads`, `keep_reads`): a `.json` of up to 1 MiB, a photo of up to 16 MiB. A larger one is handed over as that many bytes and one more, unread, and counted as too large.
 - **A note.** A `.json` is a note when its bytes are UTF-8 (a byte order mark before them dropped) holding a JSON object with either time as a whole number; anything else is skipped as no text. A value of the wrong kind counts as absent: a flag is set only by `true`, a text only by a string. A note that holds nothing, neither a text nor a Line nor a photo, is skipped as no text, its labels alone being no text.
@@ -65,7 +65,7 @@ An Import has no AI port tool (ADR 0026): it is a person's own act with the syst
 - Leaving the Notes Unsorted to be sorted (rejected: every file of a folder would be Nudged at once; the decision was a new Area, not Nudged).
 - Converting what the subset does not know, such as task lists into Boxes or front matter into a Capture Context (rejected for now: the Markdown stays as written, and nothing of it is lost).
 - Importing the notes in Keep's trash, or leaving the archived ones out (rejected: a note thrown away would come back, and an archived one, kept on purpose, would be lost).
-- Keep's labels as Topics or Areas (rejected by the grill: labels are tags, Q435–Q437; a note has many labels and a Note one place).
+- Keep's labels as Topics or Areas (rejected: labels are tags; a note has many labels and a Note one place).
 - Keep's formatted text from `textContentHtml` as a formatted Note (rejected for now: the words are all in `textContent`, and an HTML reader in both cores would have to agree on every tag).
 - Keep's voice recordings as recordings of the Note (rejected for now: the ticket asks for photos; they are counted, so the person knows).
 - Leaving imported Checklists on the Agenda, as every other Checklist starts (rejected: an Import of dozens of Keep lists with open Lines would put every one of them on today's Agenda at once, much as Nudging every imported Note would).

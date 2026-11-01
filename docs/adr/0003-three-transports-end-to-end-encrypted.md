@@ -1,6 +1,6 @@
 # Three sync transports, end-to-end encrypted per Area, syncing automatically
 
-Devices sync without a server over LAN (TLS, pairing by QR or code), a shared folder (Syncthing, Nextcloud, USB), and bundle files sent through any messenger. Unlike Catlog, where folder files and bundles are only signed, every Area has its own key, handed over at Pairing, and everything leaving a Device is encrypted with it; health notes on a third-party cloud or in a chat backup must stay unreadable. Unlike Catlog's manual LAN sessions, paired Devices find each other (mDNS) and sync on their own, in the background where the platform allows it, because nobody should have to remember to sync a memory aid.
+Devices sync without a server over LAN (TLS, pairing by QR or code), a shared folder (Syncthing, Nextcloud, USB), and bundle files sent through any messenger. Unlike cat(a)log, where folder files and bundles are only signed, every Area has its own key, handed over at Pairing, and everything leaving a Device is encrypted with it; health notes on a third-party cloud or in a chat backup must stay unreadable. Unlike cat(a)log's manual LAN sessions, paired Devices find each other (mDNS) and sync on their own, in the background where the platform allows it, because nobody should have to remember to sync a memory aid.
 
 ## Consequences
 

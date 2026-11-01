@@ -1,5 +1,7 @@
 # Release notes 0.1.0
 
+Paste source for the Google Play Console: the release's What's new (the tag pipeline reads the `play_notes_en` and `play_notes_de` blocks), tester notes and store listing. The changes themselves are in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Summary
 
 First release; nothing is live on Google Play yet. This covers the 0.1.0 changelog section, phone features only. The eight phone frames per language are new, rendered by the screenshot generator. Play only: no App Store.
@@ -14,7 +16,7 @@ frames: regenerated
 
 ## Play: release notes
 
-<!-- block id=play_notes_en limit=500 lang=en title="Release notes, en-US" where="Production release" -->
+<!-- block id=play_notes_en limit=500 lang=en title="Release notes, en-US" where="Internal testing release" -->
 ```
 Added
 • Text, photo and voice Notes from the +, widgets, Quick Settings tiles and app shortcuts.
@@ -24,7 +26,7 @@ Added
 • Encrypted Backups, App Lock and Area Locks. No account, no server.
 ```
 
-<!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Production release" -->
+<!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
 ```
 Neu
 • Text-, Foto- und Sprachnotizen über +, Widgets, Schnelleinstellungen und App-Verknüpfungen.
@@ -210,7 +212,7 @@ Phone 1080 × 1920, 8 per language; the first three carry the listing. No tablet
 
 1. Create the app in the Play Console (default language en-US, app, free) if it does not exist yet.
 2. Store listing: title, short and full description per language from above, the hi-res icon, the feature graphic, and the eight phone screenshots per language.
-3. App content: privacy policy URL from above, then data safety, ads, target audience, the full-screen intent and foreground service declarations as in the handover page.
+3. App content: privacy policy URL from above, then data safety, ads, target audience, the full-screen intent and foreground service declarations.
 4. Testing, Internal testing, Create new release: upload the AAB of the tag pipeline by hand once; later tags upload to the internal track on their own.
 5. Release notes en-US and de-DE from above, inside the language tags the console shows. Start rollout to Internal testing.
 6. Closed testing with at least 12 testers for 14 days, then apply for production access.

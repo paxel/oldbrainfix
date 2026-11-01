@@ -1,3 +1,5 @@
+Instructions for AI coding agents working in this repository.
+
 ## Agent skills
 
 ### Issue tracker

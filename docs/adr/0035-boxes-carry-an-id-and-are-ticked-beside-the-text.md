@@ -1,6 +1,6 @@
 # Boxes carry an id in the text and are ticked beside it
 
-Supersedes ADR 0031. A ☐, ✅ or ❌ in a Note's or a Section's text is a Box (grill Q402–Q409): it can be anywhere in the text, it is open, done or failed, and anyone with a role in its Area changes its state, in a Section's text too. The status marks of ADR 0031, characters at the start of a line changed by an edit of the text, never shipped; they are replaced. Both cores find, make, show and tick Boxes the same way (`text_boxes.dart`/`boxes.dart`, `text_boxes.rs`/`boxes.rs`).
+Supersedes ADR 0031. A ☐, ✅ or ❌ in a Note's or a Section's text is a Box: it can be anywhere in the text, it is open, done or failed, and anyone with a role in its Area changes its state, in a Section's text too. The status marks of ADR 0031, characters at the start of a line changed by an edit of the text, never shipped; they are replaced. Both cores find, make, show and tick Boxes the same way (`text_boxes.dart`/`boxes.dart`, `text_boxes.rs`/`boxes.rs`).
 
 ## A Box in the text
 

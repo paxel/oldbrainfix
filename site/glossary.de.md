@@ -87,6 +87,10 @@ _Avoid_: Domäne, Kategorie, Ordner
 Die zweite und letzte Ebene, innerhalb eines Bereichs, etwa Haushalt/Küche, Kinder/Schule.
 _Avoid_: Kategorie, Unterkategorie, Schlagwort (ein #Wort ist ein Wort des Textes)
 
+**Browser** [Browser]:
+Wo du abgelegte Notizen findest und öffnest. Auf dem Handy die Seite, die „Suchen und stöbern“ (die Lupe der Agenda) öffnet: die Bereichsliste mit einer Suche über alle Notizen, Alle Notizen, Frösche und Papierkorb in ihrer Leiste, und von ihr aus jeder Bereich und jedes Thema. Auf dem Desktop die Seitenleiste und die Liste daneben.
+_Avoid_: Suchseite, Bibliothek
+
 **Unsortiert** [Unsorted]:
 Der Zustand einer Notiz, um die sich noch niemand gekümmert hat. Eine Notiz verlässt Unsortiert, wenn sie einen Bereich oder ein Thema bekommt, eine Routine, Erinnerung oder einen Frosch hervorbringt, zur Strichliste, Checkliste oder Einkaufsliste gemacht, zusammengeführt oder gelöscht wird. Sie wird wieder unsortiert, wenn ihr Bereich oder Thema gelöscht wird und du seine Notizen nach Unsortiert zurückschickst.
 _Avoid_: Unkategorisiert, Posteingang

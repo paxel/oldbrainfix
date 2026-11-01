@@ -1,5 +1,7 @@
 # Issue tracker: GitHub
 
+This file instructs AI coding agents how to use the GitHub issue tracker.
+
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
 ## Conventions
@@ -17,11 +19,13 @@ Every ticket's "Everywhere" section names what each change must reach besides it
 
 - AI port tools (read and set up) for anything new: a new kind, field or setting gets its tools in `desktop/crates/oldbrainfix-core/src/ai_tools.rs` (ADR 0026), and the user's own data (entries, ticks, check-offs, picks) stays read-only there.
 
+A ticket that changes a screen also updates its guide page and frames: the page's text under `site/en/guide/` and `site/de/guide/`, and the frames, written anew by `tool/guide-frames.sh` and committed with the change. CI fails while a committed frame no longer matches its screen.
+
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
 ## Pull requests as a triage surface
 
-**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
+**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; the agents' `/triage` skill reads this flag.)_
 
 When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
 
@@ -41,7 +45,7 @@ Run `gh issue view <number> --comments`.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
+Used by the agents' `/wayfinder` skill. The **map** is a single issue with **child** issues as tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
 - **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.

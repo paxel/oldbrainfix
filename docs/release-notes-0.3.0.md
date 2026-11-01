@@ -1,8 +1,10 @@
 # Release notes 0.3.0
 
+Paste source for the Google Play Console: the release's What's new (the tag pipeline reads the `play_notes_en` and `play_notes_de` blocks), tester notes and store listing. The changes themselves are in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Summary
 
-Version 0.3.0 after 0.2.0, which is on Google Play's internal track and on F-Droid. It covers the 0.3.0 section of the changelog. Phone highlights: Checklists on the Agenda, imports from a folder and from Google Keep, getting a photo out, the browser's "+" for every kind, removing captured details, a plainer quick note, settings as badges, Lines typed in place, tables as a grid while editing, the full Agenda on the widget and the Profile card as a file. Desktop-only changes (menu bar, sidebar, Note dialog, theme, moving several cards, AI port) stay out of the phone texts. The store frames were regenerated during the release's tickets and match the app at this version. No listing edit: nothing in the release makes a listing line untrue, and the German full description is at its 4000-character limit.
+Version 0.3.0 after 0.2.0, which is on Google Play's internal track and on F-Droid. It covers the 0.3.0 section of the changelog. Phone highlights: Checklists on the Agenda, imports from a folder and from Google Keep, getting a photo out, the browser's "+" for every kind, removing captured details, a plainer quick note, settings as badges, Lines typed in place, tables as a grid while editing, the full Agenda on the widget and the Profile card as a file. Desktop-only changes (menu bar, sidebar, Note dialog, theme, moving several cards, AI port) stay out of the phone texts. The store screenshots show the app at this version. The listing is unchanged.
 
 <!-- store-kit
 live_play: 0.2.0 (internal)

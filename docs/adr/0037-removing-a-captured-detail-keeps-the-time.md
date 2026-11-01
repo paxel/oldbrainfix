@@ -1,6 +1,6 @@
 # Removing a captured detail keeps the capture time
 
-A Capture Context records what was true at Capture, and some of it is noted by chance: "during: Katzenklo" on a work Note stays for good (#162, grill Q451 (a)). Each detail can now be removed on its own: the place (the coordinates, and with them the Named Place they lie in), the calendar events running, the Bluetooth devices connected and the app it was shared in from. The capture time is no such detail and stays. This follows removing a recording while its Transcript stays (ADR 0020, 0025).
+A Capture Context records what was true at Capture, and some of it is noted by chance: "during: Katzenklo" (cat litter) on a work Note stays for good (#162). Each detail can now be removed on its own: the place (the coordinates, and with them the Named Place they lie in), the calendar events running, the Bluetooth devices connected and the app it was shared in from. The capture time is no such detail and stays. This follows removing a recording while its Transcript stays (ADR 0020, 0025).
 
 ## Removing
 
@@ -31,7 +31,7 @@ No version marker is needed (ADR 0034): an older version reads the null as every
 - Removing a single calendar event or Bluetooth device out of a list (rejected: the editor shows each list as one detail, and a list written again would read as a new detail rather than a removal).
 - An empty value instead of null (rejected: the AI port would still show the field, and an empty list would read as "nothing was running" rather than as removed).
 - Leaving the app's label when its package is removed (rejected: the label names the app, and the AI port reads the raw fields).
-- Letting the capture time go too (rejected by the ticket: the time places the Note in the diary).
+- Letting the capture time go too (the time places the Note in the diary).
 
 ## Consequences
 

@@ -4,7 +4,7 @@ Old Brain Fix itself is dual-licensed under Apache-2.0 or MIT. The phone
 and desktop apps ship the third-party components below. Their full
 licence texts, with their copyright lines, are in [`licenses/`](licenses)
 and in each app: on the phone under About, Open-source licenses; on the
-desktop under Settings, About Old Brain Fix, Open-source licenses.
+desktop under Help ▸ About Old Brain Fix, Open-source licenses.
 
 | Component                                                                                     | Ships in         | Licence                                                       | Full text                     |
 | --------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------- | ----------------------------- |

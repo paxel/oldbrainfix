@@ -39,16 +39,16 @@ and F-Droid both take them. `docs/screenshots/play` links to
 `fastlane/metadata/android`, so the release notes file names a frame as
 `play/<locale>/images/phoneScreenshots/<file>`.
 
-| # | File             | What is on it                                              |
-|---|------------------|------------------------------------------------------------|
-| 1 | `1-agenda.png`   | Agenda: today's Routines, two Frogs, the Unsorted banner   |
-| 2 | `2-capture.png`  | Capture with Photo, Voice, Gallery, Paste, the action row  |
-| 3 | `3-diary.png`    | An Area's diary of Note cards in full                      |
-| 4 | `4-editor.png`   | Note editor with its badges and dated parts                |
-| 5 | `5-fan.png`      | The "+" fanned out: Text, Voice, Photo, Gallery, Paste     |
-| 6 | `6-alarm.png`    | Alarm ring screen with Done and Snooze                     |
-| 7 | `7-history.png`  | Routine history with Streak and Adherence                  |
-| 8 | `8-dark.png`     | Agenda in the dark theme, scrolled to the rest of the week |
+| # | File            | What is on it                                                                            |
+|---|-----------------|------------------------------------------------------------------------------------------|
+| 1 | `1-agenda.png`  | Agenda: today's Routines, two Frogs, the Unsorted banner                                 |
+| 2 | `2-capture.png` | The quick note with Photo, Voice, Gallery, Paste, the Nudge buttons and "To full editor" |
+| 3 | `3-diary.png`   | An Area's diary of Note cards in full                                                    |
+| 4 | `4-editor.png`  | Note editor with its badges and dated parts                                              |
+| 5 | `5-fan.png`     | The "+" fanned out: Text, Voice, Photo, Gallery, Paste                                   |
+| 6 | `6-alarm.png`   | Alarm ring screen with Done and Snooze                                                   |
+| 7 | `7-history.png` | Routine history with Streak and Adherence                                                |
+| 8 | `8-dark.png`    | Agenda in the dark theme, scrolled to the rest of the week                               |
 
 No tablet frames. Feature graphic (1024 × 500) and hi-res icon (512 × 512)
 are uploaded in the Play Console by hand.
