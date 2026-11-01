@@ -29,7 +29,8 @@ use std::collections::HashSet;
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, Store, WallClock,
+    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, ShoppingOnAgenda, Store,
+    WallClock,
 };
 
 use crate::app::{check, embossed, icon_button};
@@ -190,9 +191,9 @@ fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<
 }
 
 /// What the menu of a Note's card offers of a Checklist (#120) and a
-/// Shopping List (#122), read as it opens: making it one, a Checklist's
-/// "Show on the Agenda" (#143), unchecking all of its Lines and turning
-/// either back into a plain Note.
+/// Shopping List (#122), read as it opens: making it one, "Show on the
+/// Agenda" of a Checklist (#143) and of a Shopping List (#186),
+/// unchecking all of its Lines and turning either back into a plain Note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardMenu {
     pub note: String,
@@ -201,6 +202,9 @@ pub struct CardMenu {
     /// Whether the Checklist shows on this person's Agenda, while the
     /// switch applies to it.
     pub on_agenda: Option<bool>,
+    /// How the Shopping List shows on this person's Agenda, while the
+    /// choice applies to it (#186).
+    pub shopping_on_agenda: Option<ShoppingOnAgenda>,
     pub uncheck_all: bool,
     pub to_plain: bool,
 }
@@ -226,6 +230,7 @@ pub fn card_menu(
         make: list.is_none() && lists.may_make(&note.id)?,
         make_shopping: shopping.may_make(&note.id)?,
         on_agenda: on_agenda(&lists, &note.id)?,
+        shopping_on_agenda: shopping_view::on_agenda(&shopping, &note.id)?,
         uncheck_all,
         to_plain,
     })

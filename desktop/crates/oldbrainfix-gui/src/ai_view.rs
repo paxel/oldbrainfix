@@ -21,13 +21,15 @@ use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
 use oldbrainfix_core::tally_units::{self, UnitSystem};
 use oldbrainfix_core::{
-    Checklists, Importance, Notes, Places, Routines, SessionRule, Store, StoredText, parse_time,
+    Checklists, DeviceSettings, Importance, Notes, Places, Routines, SessionRule, ShoppingOnAgenda,
+    Store, StoredText, parse_time,
 };
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::schedule_text::{schedule_text, weekday_long};
+use crate::shopping_view::on_agenda_label;
 use crate::theme::Tones;
 
 /// What the user asked of the AI port's card or of the review.
@@ -293,6 +295,22 @@ fn change_line(
         (line_keys::TYPE_LINE, shopping_keys::REAPPEAR) => {
             return Ok(words(t.shopping_reappear().to_string(), &|v| {
                 reappear_text(t, v)
+            }));
+        }
+        // The user's own choice of how a Shopping List shows on their
+        // Agenda (#186), on the entity `agenda:<note id>`.
+        (agenda, shopping_keys::AGENDA)
+            if line_keys::AGENDA_PREFIX.strip_suffix(':') == Some(agenda) =>
+        {
+            // None chosen yet: as this Device showed Shopping Lists.
+            let standard =
+                ShoppingOnAgenda::from_device(DeviceSettings::new(store).shopping_agenda()?);
+            return Ok(words(t.checklist_show_on_agenda().to_string(), &|v| {
+                let shows = match v {
+                    Some(code) => ShoppingOnAgenda::parse(code).unwrap_or(ShoppingOnAgenda::Count),
+                    None => standard,
+                };
+                on_agenda_label(t, shows).to_string()
             }));
         }
         (line_keys::TYPE_LINE, line_keys::TRASHED) if change.after.is_some() => {

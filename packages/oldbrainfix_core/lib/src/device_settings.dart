@@ -261,10 +261,6 @@ extension DeviceSettings on Store {
   ShoppingAgenda get shoppingAgenda =>
       ShoppingAgenda.read(localSetting(_shoppingAgenda));
 
-  /// As a version before #186 wrote it.
-  set shoppingAgenda(ShoppingAgenda way) =>
-      setLocalSetting(_shoppingAgenda, way.name);
-
   /// How fast this Device plays voice recordings: one of
   /// [playbackSpeeds], normal speed when none was chosen. The one Device
   /// setting a Backup carries (ADR 0016).

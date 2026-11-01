@@ -93,8 +93,8 @@ use oldbrainfix_core::{
     CaptureContext, CapturedDetail, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day,
     DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes,
     NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda,
-    ShoppingLine, ShoppingList, ShoppingLists, ShownBox, Store, Tallies, ThemeChoice, Topic,
+    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingLine,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
     UnitSystem, bundle, markdown, text_format,
 };
 
@@ -755,6 +755,8 @@ enum NoteBadge {
     /// The kind, with "Back to a plain Note".
     Kind,
     OnAgenda,
+    /// A Shopping List's "Show on the Agenda", its three ways (#186).
+    ShoppingOnAgenda,
     Ticks,
 }
 
@@ -1247,8 +1249,6 @@ enum Setting {
     /// The system Tallies show known units in; `None` follows the
     /// region (#103).
     Units(Option<UnitSystem>),
-    /// How the Agenda shows Shopping Lists today (#123).
-    ShoppingAgenda(ShoppingAgenda),
     /// Whether a Routine's History shows its Streak (Q400).
     Streaks(bool),
     /// Whether the quick note shows this control (#142).
@@ -4234,9 +4234,8 @@ impl App {
                 // it is new, and reading again writes nothing.
                 let today = frogs.pick_today(wall)?;
                 let frog_rows = shown_frogs(today.shown.clone())?;
-                let way = DeviceSettings::new(store).shopping_agenda()?;
                 let mut shopping_rows = Vec::new();
-                for shown in shopping.agenda(way, wall)? {
+                for shown in shopping.agenda_rows(wall)? {
                     let Some(note) = notes.by_id(&shown.list.note_id)? else {
                         continue;
                     };
@@ -4254,20 +4253,20 @@ impl App {
                         text,
                         checks,
                     };
+                    // As this person chose for the list (#186); one kept
+                    // off is not among them.
                     let count = shown.lines.len() as i64;
-                    match way {
-                        ShoppingAgenda::Lines => {
+                    match shown.shows {
+                        ShoppingOnAgenda::Lines => {
                             for line in shown.lines {
                                 let text = line.text.clone();
                                 shopping_rows.push(row(Some(line), text));
                             }
                         }
-                        ShoppingAgenda::Open => {
+                        ShoppingOnAgenda::Count => {
                             shopping_rows.push(row(None, self.t.shopping_row_open(&title, count)));
                         }
-                        ShoppingAgenda::Back | ShoppingAgenda::Off => {
-                            shopping_rows.push(row(None, self.t.shopping_row_back(&title, count)));
-                        }
+                        ShoppingOnAgenda::Off => {}
                     }
                 }
                 let mut checklist_rows = Vec::new();
@@ -5804,6 +5803,13 @@ impl App {
                     }
                 }
             }
+            ShoppingAction::OnAgenda(note, shows) => {
+                // It may have gone to the trash or back to a plain Note
+                // meanwhile.
+                if lists.may_show_on_agenda(&note)? {
+                    lists.set_on_agenda(&note, shows)?;
+                }
+            }
         }
         Ok(())
     }
@@ -6520,7 +6526,6 @@ impl App {
             }
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
-            Setting::ShoppingAgenda(way) => settings.set_shopping_agenda(way)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
@@ -8110,6 +8115,26 @@ impl App {
                     }
                 })
             }
+            NoteBadge::ShoppingOnAgenda => {
+                let shows = self.view.shopping.as_ref().and_then(|s| s.on_agenda);
+                let setting = t.checklist_show_on_agenda();
+                badge_dialog(ctx, shown, (icons::ON_AGENDA, None), setting, |ui| {
+                    let Some(shows) = shows else {
+                        return;
+                    };
+                    let mut picked = shows;
+                    let options = ShoppingOnAgenda::ALL
+                        .map(|way| (way, shopping_view::on_agenda_label(&t, way).to_string()));
+                    // A pick writes it and closes, as on the phone.
+                    if radio_column(ui, &mut picked, options) {
+                        if picked != shows {
+                            let asked = ShoppingAction::OnAgenda(note.id.clone(), picked);
+                            actions.push(Action::Shopping(asked));
+                        }
+                        actions.push(Action::Badge(None));
+                    }
+                })
+            }
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();
@@ -8983,6 +9008,7 @@ impl App {
                     newer: newer_routines,
                     kind,
                     on_agenda: checklist.and_then(|c| c.on_agenda),
+                    shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
                     ticks: has_boxes.then_some(show_ticks),
                     may,
                     frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
@@ -10599,9 +10625,6 @@ impl App {
             && cfg!(target_os = "linux")
             && docker_bridge().is_none();
         let units = settings.chosen_unit_system().ok().flatten();
-        let shopping_way = settings
-            .shopping_agenda()
-            .unwrap_or(ShoppingAgenda::STANDARD);
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
         let quick = self.view.capture_quick;
@@ -10761,31 +10784,6 @@ impl App {
                     let mut chosen = units;
                     if radio_column(ui, &mut chosen, options) && chosen != units {
                         actions.push(Action::Setting(Setting::Units(chosen)));
-                    }
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(
-                        RichText::new(t.settings_shopping_agenda())
-                            .strong()
-                            .color(text),
-                    );
-                    ui.label(
-                        RichText::new(t.settings_shopping_agenda_detail())
-                            .small()
-                            .color(weak),
-                    );
-                    let options = ShoppingAgenda::ALL.map(|way| {
-                        let label = match way {
-                            ShoppingAgenda::Lines => t.shopping_agenda_lines(),
-                            ShoppingAgenda::Back => t.shopping_agenda_back(),
-                            ShoppingAgenda::Open => t.shopping_agenda_open(),
-                            ShoppingAgenda::Off => t.shopping_agenda_off(),
-                        };
-                        (way, label.to_string())
-                    });
-                    let mut chosen = shopping_way;
-                    if radio_column(ui, &mut chosen, options) && chosen != shopping_way {
-                        actions.push(Action::Setting(Setting::ShoppingAgenda(chosen)));
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
@@ -13143,14 +13141,15 @@ pub(crate) fn embossed(
 /// What the Note dialog's badges show (#160): the Note where it is filed,
 /// its Routines and Reminders and how many of them a newer version saved,
 /// its kind with whether it may go back to a plain Note, Show on the
-/// Agenda and Show ticks where they apply, what this Device may do to it
-/// and whether it has an open Frog.
+/// Agenda of a Checklist or a Shopping List and Show ticks where they
+/// apply, what this Device may do to it and whether it has an open Frog.
 struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
     newer: usize,
     kind: Option<(char, &'static str, bool)>,
     on_agenda: Option<bool>,
+    shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
     may: NoteMay,
     frog_open: bool,
@@ -13243,6 +13242,15 @@ fn note_badges(
             && badge(ui, look, (icon, None), t.badge_kind(), Some(name), plain).clicked()
         {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
+        }
+        // A Shopping List's three ways, where a Checklist's switch sits.
+        if let Some(shows) = shown.shopping_on_agenda {
+            let value = shopping_view::on_agenda_label(t, shows);
+            let icon = (icons::ON_AGENDA, None);
+            let setting = t.checklist_show_on_agenda();
+            if badge(ui, look, icon, setting, Some(value), true).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::ShoppingOnAgenda)));
+            }
         }
         let switches = [
             (
@@ -14246,6 +14254,11 @@ fn note_card(
                 .clicked()
         {
             picked = Some(Action::AskFileInto(vec![note.id.clone()]));
+        }
+        // A Shopping List's ways onto the Agenda before "Back to a plain
+        // Note", as on the phone (#186).
+        if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m)) {
+            picked = Some(Action::Shopping(asked));
         }
         if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
             picked = Some(Action::Checklist(asked));

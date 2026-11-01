@@ -146,18 +146,18 @@ void main() {
         (ShoppingAgenda.back, ShoppingOnAgenda.count),
         (ShoppingAgenda.open, ShoppingOnAgenda.count),
       ]) {
-        ann.shoppingAgenda = old;
+        ann.setLocalSetting('shoppingAgenda', old.name);
         expect(lists.onAgenda(week), shows, reason: old.name);
         expect(lists.onAgenda(chosen), ShoppingOnAgenda.count);
       }
-      ann.shoppingAgenda = ShoppingAgenda.off;
+      ann.setLocalSetting('shoppingAgenda', ShoppingAgenda.off.name);
       expect(rows(ann), ['Hardware: 1 open']);
       ann.setLocalSetting('shoppingAgenda', 'sideways');
       expect(lists.onAgenda(week), ShoppingOnAgenda.count);
     });
 
     test('a value no app writes reads as one row with the count', () {
-      ann.shoppingAgenda = ShoppingAgenda.off;
+      ann.setLocalSetting('shoppingAgenda', ShoppingAgenda.off.name);
       final week = shopping(ann, 'Groceries\nMilk');
       final entity = '${ChecklistKeys.agendaPrefix}$week';
       for (final value in ['OFF', 'off ', 'later', '']) {
@@ -265,7 +265,7 @@ void main() {
       final note = shopping(ann, 'Shop\nMilk');
       exchange(annDesk, ann);
       // The desk's old setting showed nothing; her choice shows it there.
-      annDesk.shoppingAgenda = ShoppingAgenda.off;
+      annDesk.setLocalSetting('shoppingAgenda', ShoppingAgenda.off.name);
       expect(rows(annDesk), isEmpty);
       ShoppingLists(ann).setOnAgenda(note, ShoppingOnAgenda.lines);
       exchange(annDesk, ann);

@@ -196,11 +196,11 @@ void main() {
 
   testWidgets('a list nobody chose for shows as this Device showed '
       'Shopping Lists before', (tester) async {
-    store.shoppingAgenda = ShoppingAgenda.off;
+    store.setLocalSetting('shoppingAgenda', ShoppingAgenda.off.name);
     lists.setOnAgenda(hardware, ShoppingOnAgenda.count);
     await start(tester);
     expect(shoppingRows(tester), ['shopping-row-$hardware']);
-    store.shoppingAgenda = ShoppingAgenda.lines;
+    store.setLocalSetting('shoppingAgenda', ShoppingAgenda.lines.name);
     await tester.pumpWidget(const SizedBox());
     await start(tester);
     expect(shoppingRows(tester), [

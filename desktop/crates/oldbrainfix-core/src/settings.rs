@@ -377,11 +377,6 @@ impl<'a> DeviceSettings<'a> {
         ))
     }
 
-    /// As a version before #186 wrote it.
-    pub fn set_shopping_agenda(&self, way: ShoppingAgenda) -> Result<()> {
-        self.store.set_local_setting(SHOPPING_AGENDA, way.code())
-    }
-
     /// How fast this Device plays voice recordings: one of
     /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. The one
     /// Device setting a Backup carries (ADR 0016).
@@ -530,20 +525,16 @@ mod tests {
     }
 
     #[test]
-    fn the_agenda_shows_a_row_per_shopping_list_with_lines_back_until_another_way_is_chosen()
+    fn the_agenda_showed_a_row_per_shopping_list_with_lines_back_unless_another_way_was_chosen()
     -> Result<()> {
         let store = crate::store::tests::store();
         let settings = DeviceSettings::new(&store);
         assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
+        // As a version before #186 wrote it.
         for way in ShoppingAgenda::ALL {
-            settings.set_shopping_agenda(way)?;
+            store.set_local_setting(SHOPPING_AGENDA, way.code())?;
             assert_eq!(settings.shopping_agenda()?, way);
         }
-        settings.set_shopping_agenda(ShoppingAgenda::Lines)?;
-        assert_eq!(
-            store.local_setting(SHOPPING_AGENDA)?.as_deref(),
-            Some("lines")
-        );
         store.set_local_setting(SHOPPING_AGENDA, "sideways")?;
         assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
         Ok(())

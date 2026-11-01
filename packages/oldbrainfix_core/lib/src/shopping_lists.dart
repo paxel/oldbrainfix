@@ -86,10 +86,6 @@ enum ShoppingAgenda {
       values.asNameMap()[code] ?? standard;
 }
 
-/// A Shopping List on today's Agenda with the Lines its row stands for:
-/// those that came back today, or for [ShoppingAgenda.open] those open.
-typedef ShoppingAgendaList = ({ShoppingList list, List<ShoppingLine> lines});
-
 /// How a Shopping List shows on today's Agenda (#186), each person's own
 /// choice for each list, kept as an Override is (ADR 0030).
 enum ShoppingOnAgenda {
@@ -278,38 +274,6 @@ class ShoppingLists {
       for (final MapEntry(key: note, value: making) in makings.entries)
         note: _list(note, making, read[note] ?? []),
     };
-  }
-
-  /// The Shopping Lists on today's Agenda by [wallClock] as a Device
-  /// showed them the way [way] before #186, until the apps read
-  /// [agendaRows]: each list not in the trash nor merged with the Lines
-  /// that came back today, or for [ShoppingAgenda.open] those open,
-  /// where there are any; oldest capture first. For
-  /// [ShoppingAgenda.lines] each of those Lines is a row of its own.
-  List<ShoppingAgendaList> agenda(ShoppingAgenda way, WallClock wallClock) {
-    if (way == ShoppingAgenda.off) return const [];
-    final notes = Notes(store);
-    final shown = <Note>[];
-    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      if (making(id) == null) continue;
-      if (notes.byId(id) case final note?
-          when !note.isTrashed && !note.isMerged) {
-        shown.add(note);
-      }
-    }
-    shown.sort((a, b) {
-      final byCapture = a.captured.compareTo(b.captured);
-      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
-    });
-    final lists = ofNotes([for (final n in shown) n.id], wallClock);
-    final today = Day.today(store.clock(), wallClock);
-    return [
-      for (final note in shown)
-        if (lists[note.id] case final list?)
-          if (way == ShoppingAgenda.open ? list.open : list.cameBack(today)
-              case final lines when lines.isNotEmpty)
-            (list: list, lines: lines),
-    ];
   }
 
   /// The Shopping Lists on today's Agenda by [wallClock] (#186): each

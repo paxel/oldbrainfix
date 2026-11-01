@@ -12,7 +12,8 @@
 //! new list starts with one empty Line. For a Line this Device may
 //! change, ⋮ and a right-click on its box's row with its reappear time as
 //! radio buttons and "Delete for good". "Back to a plain Note" is a badge
-//! of the Note dialog (#160).
+//! of the Note dialog (#160), as is "Show on the Agenda" (#186), whose
+//! three ways the card's ⋮ offers as radio buttons too.
 //! Nothing is written when a struck Line comes back: the window
 //! reads the list again every half minute, so it shows open soon after
 //! the start of its day.
@@ -20,7 +21,9 @@
 use std::collections::HashSet;
 
 use egui::{RichText, Ui};
-use oldbrainfix_core::{Note, Reappear, ShoppingList, ShoppingLists, Store, WallClock};
+use oldbrainfix_core::{
+    Note, Reappear, ShoppingList, ShoppingLists, ShoppingOnAgenda, Store, WallClock,
+};
 
 use crate::app::embossed;
 use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
@@ -49,6 +52,9 @@ pub enum ShoppingAction {
     Typed(Typing),
     /// A step of the menu of the Line with this id.
     Step(String, ShopStep),
+    /// Chooses how the Note's Shopping List shows on this person's
+    /// Agenda (#186).
+    OnAgenda(String, ShoppingOnAgenda),
 }
 
 /// The Shopping List of the selected Note as its editor shows it.
@@ -61,6 +67,9 @@ pub struct ShoppingShown {
     pub editable: HashSet<String>,
     /// Whether it may turn it back into a plain Note.
     pub plain: bool,
+    /// How it shows on this person's Agenda, while "Show on the Agenda"
+    /// applies to it (#186).
+    pub on_agenda: Option<ShoppingOnAgenda>,
 }
 
 /// Reads the Shopping List of the Note `note` as it shows now, days as
@@ -86,8 +95,31 @@ pub fn read(
         checks: lists.may_check(&note.id)?,
         editable,
         plain: changes && note.text_editable,
+        on_agenda: on_agenda(&lists, &note.id)?,
         list,
     }))
+}
+
+/// How the Shopping List of `note` shows on this person's Agenda, or
+/// `None` while "Show on the Agenda" does not apply to it (#186): offered
+/// while no Line is open too, for when Lines come back.
+pub fn on_agenda(
+    lists: &ShoppingLists,
+    note: &str,
+) -> oldbrainfix_core::Result<Option<ShoppingOnAgenda>> {
+    if !lists.may_show_on_agenda(note)? {
+        return Ok(None);
+    }
+    Ok(Some(lists.on_agenda(note)?))
+}
+
+/// The words of a way a Shopping List shows on the Agenda.
+pub fn on_agenda_label(t: &L10n, shows: ShoppingOnAgenda) -> &'static str {
+    match shows {
+        ShoppingOnAgenda::Off => t.setting_off(),
+        ShoppingOnAgenda::Count => t.shopping_on_agenda_count(),
+        ShoppingOnAgenda::Lines => t.shopping_on_agenda_lines(),
+    }
 }
 
 /// The Lines of `list` as they are drawn: open ones first, struck ones at
@@ -241,6 +273,32 @@ pub fn section(
         // Back to a plain Note is the Note dialog's kind badge (#160).
         actions.extend(typing.into_iter().map(ShoppingAction::Typed));
     });
+}
+
+/// "Show on the Agenda" of a Shopping List in a card's menu as `menu`
+/// offers it (#186): its three ways as radio buttons under their heading,
+/// before "Back to a plain Note" as on the phone; the way clicked. A
+/// click on the way it has already changes nothing.
+pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ShoppingAction> {
+    let current = menu.shopping_on_agenda?;
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let mut picked = None;
+    ui.separator();
+    ui.label(
+        RichText::new(t.checklist_show_on_agenda())
+            .small()
+            .color(weak),
+    );
+    for shows in ShoppingOnAgenda::ALL {
+        let on = shows == current;
+        let label = RichText::new(on_agenda_label(t, shows)).color(text);
+        if ui.radio(on, label).clicked() && !on {
+            picked = Some(ShoppingAction::OnAgenda(menu.note.clone(), shows));
+        }
+    }
+    ui.separator();
+    picked
 }
 
 /// The Shopping List entry of a card's menu as `menu` offers it, making
