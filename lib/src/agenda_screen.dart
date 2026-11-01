@@ -94,11 +94,10 @@ enum _RowChoice { history, share }
 /// Occurrences by time. They are read only, marked with their calendar,
 /// and "Copy into a Note" makes a Note of one.
 ///
-/// Today also shows the Shopping Lists the way Settings of this Device
-/// choose (#123), after the all-day rows: each Line that came back today
-/// with its box, or one row per list with how many came back or are
-/// open, or none. A tap opens the list; a Masked one is one row that
-/// names no Line.
+/// Today also shows the Shopping Lists with open Lines, after the
+/// all-day rows, each as the user chose for it (#186): each open Line
+/// with its box, or one row with how many are open, or none. A tap opens
+/// the list; a Masked one is one row that names no Line.
 ///
 /// After them today shows each Checklist without a Routine or Reminder
 /// that has open Lines and that the user did not switch off for their
@@ -153,8 +152,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _checklists = Checklists(widget.notes.store);
   late final _shopping = ShoppingLists(widget.notes.store);
 
-  /// How this Device shows Shopping Lists today, as read last.
-  var _shoppingWay = ShoppingAgenda.standard;
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
@@ -318,7 +315,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
       frogsToday: frogs,
       appointments: _appointments,
     );
-    _shoppingWay = days.shoppingWay;
     _system = days.system;
     _today = days.todayRows;
     _tomorrow = days.tomorrowRows;
@@ -747,9 +743,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  /// A Shopping List's row today: a Line that came back, with its box
-  /// and the list's title under it, or the list with how many Lines came
-  /// back or are open. A tap opens the list.
+  /// A Shopping List's row today: an open Line, with its box and the
+  /// list's title under it, or the list with how many Lines are open. A
+  /// tap opens the list.
   Widget _shoppingRow(AppLocalizations t, ShoppingRow shopping) {
     final (:note, :area, :masked, :line, :count, :checks) = shopping;
     final title = switch (noteText(t, note).trim().split('\n').first.trim()) {
@@ -765,11 +761,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       area: masked ? null : area,
       text: switch (line) {
         final line? => line.text,
-        null when _shoppingWay == ShoppingAgenda.open => t.shoppingRowOpen(
-          shown,
-          count,
-        ),
-        null => t.shoppingRowBack(shown, count),
+        null => t.shoppingRowOpen(shown, count),
       },
       list: line == null ? null : title,
       checkKey: line == null ? null : ValueKey('shopping-check-${line.id}'),

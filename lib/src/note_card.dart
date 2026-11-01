@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'area_look.dart';
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
@@ -183,7 +184,8 @@ class NoteActions {
 /// The Checklist and Shopping List entries of a card's ⋮ as the menu
 /// opens (#120, #122): [isList] while the Note is either; [showOnAgenda]
 /// whether a Checklist without a Routine shows on this person's Agenda,
-/// and switching that (#143).
+/// and switching that (#143); [shoppingOnAgenda] how a Shopping List
+/// shows there for this person, and choosing that (#186).
 typedef ChecklistMenu = ({
   bool isList,
   VoidCallback? make,
@@ -191,7 +193,24 @@ typedef ChecklistMenu = ({
   VoidCallback? toPlain,
   VoidCallback? uncheckAll,
   ({bool on, VoidCallback toggle})? showOnAgenda,
+  ShoppingOnAgendaChoice? shoppingOnAgenda,
 });
+
+/// How a Shopping List shows on this person's Agenda (#186), and
+/// choosing another way.
+typedef ShoppingOnAgendaChoice = ({
+  ShoppingOnAgenda shows,
+  ValueChanged<ShoppingOnAgenda> choose,
+});
+
+/// The three ways a Shopping List shows on the Agenda with their words,
+/// in the order they are offered.
+List<(ShoppingOnAgenda, String)> shoppingOnAgendaOptions(AppLocalizations t) =>
+    [
+      (ShoppingOnAgenda.off, t.settingOff),
+      (ShoppingOnAgenda.count, t.shoppingOnAgendaCount),
+      (ShoppingOnAgenda.lines, t.shoppingOnAgendaLines),
+    ];
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
@@ -650,8 +669,9 @@ class NoteActionRow extends StatelessWidget {
 /// leads with Edit, then, for a Note being captured, its Importance as radio
 /// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
-/// Shopping List" or, for one, "Show on the Agenda" and "Uncheck all" (a
-/// Checklist's) and "Back to a plain Note", removing a photo or recording while its
+/// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
+/// switch, a Shopping List's three choices as radio buttons) and "Uncheck
+/// all" (a Checklist's) and "Back to a plain Note", removing a photo or recording while its
 /// text stays, one entry each with the start of that text under it, and
 /// deleting.
 class _MoreButton extends StatelessWidget {
@@ -777,6 +797,34 @@ class _MoreButton extends StatelessWidget {
             ),
           if (list?.showOnAgenda case final agenda?)
             showOnAgendaItem(button, agenda),
+          if (list?.shoppingOnAgenda case final agenda?) ...[
+            const PopupMenuDivider(),
+            // The heading the choices continue, as Importance's.
+            PopupMenuItem(enabled: false, child: Text(t.checklistShowOnAgenda)),
+            for (final (value, label) in shoppingOnAgendaOptions(t))
+              PopupMenuItem(
+                key: ValueKey('note-show-on-agenda-${value.name}'),
+                // A tap on the one it has changes nothing.
+                value: () {
+                  if (value != agenda.shows) agenda.choose(value);
+                },
+                child: Semantics(
+                  checked: value == agenda.shows,
+                  inMutuallyExclusiveGroup: true,
+                  child: Row(
+                    children: [
+                      Icon(
+                        value == agenda.shows
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(child: Text(label)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
           if (list?.uncheckAll case final uncheck?)
             item(
               'note-uncheck-all',

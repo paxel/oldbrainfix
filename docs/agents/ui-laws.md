@@ -189,7 +189,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
-  rows as Settings of this Device choose (today only), then the
+  rows as the user chose for each list (today only, oldest capture
+  first, none for a list without open Lines), then the
   Checklists' rows (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
@@ -300,11 +301,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   like a shield. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
   its schedule; the kind (Checklist, Shopping List, Tally) while it has
-  one; Show on the Agenda for a Checklist without a Routine; Show ticks
-  while it has a box. A setting that does not apply has no badge. A tap
+  one; Show on the Agenda for a Checklist without a Routine and for a
+  Shopping List (#186); Show ticks while it has a box. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
   name, which changes it at once: Importance as radio buttons (only
-  here, not in the card's ⋮, #182), the switches, Back to a plain Note;
+  here, not in the card's ⋮, #182), a Shopping List's Show on the
+  Agenda as radio buttons (here and in the card's ⋮), the switches,
+  Back to a plain Note;
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A

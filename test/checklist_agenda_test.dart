@@ -112,7 +112,6 @@ void main() {
     lists.make(first);
     final groceries = notes.capture('Groceries\nMilk').id;
     ShoppingLists(store).make(groceries);
-    store.shoppingAgenda = ShoppingAgenda.open;
     final routines = Routines(store);
     routines.create(
       'Bins out',

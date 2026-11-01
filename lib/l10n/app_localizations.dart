@@ -7064,11 +7064,23 @@ abstract class AppLocalizations {
   /// **'Private Checklist'**
   String get maskedChecklist;
 
-  /// Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The person's own choice, kept on their own Devices.
+  /// Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The heading of the same choice of a Shopping List with three options, and the name of its badge in the Note editor. The person's own choice, kept on their own Devices.
   ///
   /// In en, this message translates to:
   /// **'Show on the Agenda'**
   String get checklistShowOnAgenda;
+
+  /// Radio choice under 'Show on the Agenda' of a Shopping List, the default: one Agenda row with the list's title and how many of its Lines are open, such as 'Groceries: 4 open'.
+  ///
+  /// In en, this message translates to:
+  /// **'One row with the number of open Lines'**
+  String get shoppingOnAgendaCount;
+
+  /// Radio choice under 'Show on the Agenda' of a Shopping List: every Line not struck through gets its own checkable row on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Each open Line on its own row'**
+  String get shoppingOnAgendaLines;
 
   /// Menu entry at a status mark at the start of a line of a Note's text: changes it to ✅.
   ///

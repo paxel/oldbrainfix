@@ -4390,6 +4390,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get checklistShowOnAgenda => 'Auf der Agenda zeigen';
 
   @override
+  String get shoppingOnAgendaCount =>
+      'Eine Reihe mit der Zahl der offenen Zeilen';
+
+  @override
+  String get shoppingOnAgendaLines =>
+      'Jede offene Zeile in einer eigenen Reihe';
+
+  @override
   String get textMarkCheck => 'Abhaken';
 
   @override

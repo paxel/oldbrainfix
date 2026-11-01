@@ -264,7 +264,7 @@ void main() {
 
       expect(titles(today), [
         'bins out',
-        'Groceries: 2 back',
+        'Groceries: 3 open',
         'Before the trip: 2 of 2 open',
         'pills',
         'Eat a frog',
@@ -357,29 +357,38 @@ void main() {
       expect(eaten[1].done, isTrue);
     });
 
-    test('Shopping Lists the way this Device shows them', () {
+    test('Shopping Lists as the user chose for each (#186)', () {
       final id = groceries();
+      final lists = ShoppingLists(store);
 
-      expect(titles(snapshot().days['2026-10-24']), ['Groceries: 2 back']);
+      expect(titles(snapshot().days['2026-10-24']), ['Groceries: 3 open']);
       expect(snapshot().days['2026-10-24']?.single.checks, isFalse);
 
-      store.shoppingAgenda = ShoppingAgenda.open;
-      expect(titles(snapshot().days['2026-10-24']), ['Groceries: 3 open']);
-
-      store.shoppingAgenda = ShoppingAgenda.lines;
+      lists.setOnAgenda(id, ShoppingOnAgenda.lines);
       final lines = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
-      expect(titles(lines), ['Milk · Groceries', 'Eggs · Groceries']);
+      expect(titles(lines), [
+        'Milk · Groceries',
+        'Eggs · Groceries',
+        'Rice · Groceries',
+      ]);
       expect(lines.every((row) => row.checks && row.lineId != null), isTrue);
       expect(
         lines.first.lineId,
-        ShoppingLists(store)
+        lists
             .byNote(id, deviceWallClock)
             ?.lines
             .firstWhere((l) => l.text == 'Milk')
             .id,
       );
 
-      store.shoppingAgenda = ShoppingAgenda.off;
+      lists.setOnAgenda(id, ShoppingOnAgenda.off);
+      expect(snapshot().days['2026-10-24'], isEmpty);
+
+      // Without an open Line it never shows.
+      lists.setOnAgenda(id, ShoppingOnAgenda.count);
+      for (final line in lists.byNote(id, deviceWallClock)!.open) {
+        lists.check(line.id, deviceWallClock);
+      }
       expect(snapshot().days['2026-10-24'], isEmpty);
     });
 
@@ -425,7 +434,7 @@ void main() {
       final doctor = Places(store).addArea('Doctor');
       packing(place: doctor.id);
       sport(place: doctor.id);
-      groceries(place: doctor.id);
+      final shopping = groceries(place: doctor.id);
       trip(place: doctor.id);
       Frogs(store).spawn(notes.capture('taxes', place: doctor.id).id);
       routines.spawn(
@@ -435,13 +444,13 @@ void main() {
       store.setPin('1234', iterations: 10);
       store.setAreaLocked(doctor.id, true);
       store.setAreaMasked(doctor.id, true);
-      store.shoppingAgenda = ShoppingAgenda.lines;
+      ShoppingLists(store).setOnAgenda(shopping, ShoppingOnAgenda.lines);
 
       final s = snapshot();
 
       expect(titles(s.days['2026-10-24']), [
         en.maskedRoutineAt(en.allDay),
-        en.shoppingRowBack(en.maskedShoppingList, 2),
+        en.shoppingRowOpen(en.maskedShoppingList, 3),
         en.checklistRowOpen(en.maskedChecklist, 2, 2),
         en.maskedRoutineAt('07:00'),
         en.maskedRoutineAt('08:00'),
@@ -564,7 +573,6 @@ void main() {
       final shopping = ShoppingLists(store);
       final groceries = notes.capture('Groceries\nMilk').id;
       shopping.make(groceries);
-      store.shoppingAgenda = ShoppingAgenda.open;
       await start(tester);
       final today = alarms.agendas.last.days['2026-10-24'] ?? const [];
       final lines = [

@@ -38,8 +38,7 @@ enum _UnitChoice { region, metric, imperial }
 enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme; the units of Tallies; how the Agenda shows Shopping
-/// Lists; the alarm setup, the default Re-nag interval and the
+/// page: the theme; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
@@ -75,7 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _streaksOn = widget.store.streaksOn;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
-  late ShoppingAgenda _shopping = widget.store.shoppingAgenda;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
     null => _UnitChoice.region,
     UnitSystem.metric => _UnitChoice.metric,
@@ -118,11 +116,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _UnitChoice.imperial => UnitSystem.imperial,
     };
     setState(() => _units = choice);
-  }
-
-  void _setShopping(ShoppingAgenda way) {
-    widget.store.shoppingAgenda = way;
-    setState(() => _shopping = way);
   }
 
   void _setStreaks(bool on) {
@@ -518,32 +511,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
                 onChanged: _setUnits,
-              ),
-            ),
-            SettingsHeading(t.settingsShoppingAgenda),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-              child: Text(t.settingsShoppingAgendaDetail),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: RadioColumn<ShoppingAgenda>(
-                key: const ValueKey('shoppingAgenda'),
-                value: _shopping,
-                options: [
-                  for (final (way, label) in [
-                    (ShoppingAgenda.lines, t.shoppingAgendaLines),
-                    (ShoppingAgenda.back, t.shoppingAgendaBack),
-                    (ShoppingAgenda.open, t.shoppingAgendaOpen),
-                    (ShoppingAgenda.off, t.shoppingAgendaOff),
-                  ])
-                    RadioOption(
-                      key: ValueKey('shoppingAgenda-${way.name}'),
-                      value: way,
-                      title: Text(label),
-                    ),
-                ],
-                onChanged: _setShopping,
               ),
             ),
             SettingsHeading(t.settingsAlarms),

@@ -32,9 +32,8 @@ typedef ShownPicks = ({
   bool swaps,
 });
 
-/// A Shopping List's row on today's Agenda (#123): one Line that came
-/// back today when [line] is set, else the list with [count] Lines back
-/// or open; with where its Note is filed, whether it shows Masked and
+/// A Shopping List's row on today's Agenda (#123, #186): one open Line
+/// when [line] is set, else the list with [count] open Lines; with where its Note is filed, whether it shows Masked and
 /// whether this Device may check its Lines.
 typedef ShoppingRow = ({
   Note note,
@@ -79,9 +78,6 @@ class AgendaDays {
   /// Today's Frogs as they show.
   final List<ShownFrog> frogs;
 
-  /// How this Device shows Shopping Lists today.
-  final ShoppingAgenda shoppingWay;
-
   /// The units a Session's targets show in.
   final UnitSystem system;
 
@@ -92,7 +88,6 @@ class AgendaDays {
     required this.tomorrowRows,
     required this.later,
     required this.frogs,
-    required this.shoppingWay,
     required this.system,
   });
 
@@ -151,7 +146,6 @@ class AgendaDays {
           if (placeFrog(frogs, places, frog) case final placed?)
             (placed: placed, masked: reader.masksNote(placed.note)),
       ],
-      shoppingWay: reader.shoppingWay,
       system: deviceUnitSystem(store),
     );
   }
@@ -168,7 +162,6 @@ class _Reader {
   final Sessions sessions;
   final Checklists checklists;
   final ShoppingLists shopping;
-  final ShoppingAgenda shoppingWay;
 
   /// Today's Occurrences of Sessions with their picks, by Session id and
   /// Occurrence key.
@@ -189,7 +182,6 @@ class _Reader {
       sessions = Sessions(store),
       checklists = Checklists(store),
       shopping = ShoppingLists(store),
-      shoppingWay = store.shoppingAgenda,
       sessionsToday = {
         for (final occurrence in today)
           _sessionKey(occurrence.session.id, occurrence.occurrence): occurrence,
@@ -256,19 +248,18 @@ class _Reader {
     ];
   }
 
-  /// Today's rows of the Shopping Lists, the way this Device shows them:
-  /// one per Line that came back today, or one per list. A list of a
-  /// Masked Area is one row that tells nothing of its Lines.
+  /// Today's rows of the Shopping Lists, as this person chose for each
+  /// list (#186): one per open Line, or one per list with their number.
+  /// A list of a Masked Area is one row that tells nothing of its Lines.
   List<ShoppingRow> shoppingRows() {
-    final way = shoppingWay;
     final rows = <ShoppingRow>[];
-    for (final (:list, :lines) in shopping.agenda(way, wallClock)) {
+    for (final (:list, :shows, :lines) in shopping.agendaRows(wallClock)) {
       final note = notes.byId(list.noteId);
       if (note == null) continue;
       final masked = masksNote(note);
       final area = placeNote(places, note).area;
       final checks = shopping.mayCheck(note.id);
-      if (way == ShoppingAgenda.lines && !masked) {
+      if (shows == ShoppingOnAgenda.lines && !masked) {
         for (final line in lines) {
           rows.add((
             note: note,

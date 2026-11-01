@@ -4332,6 +4332,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checklistShowOnAgenda => 'Show on the Agenda';
 
   @override
+  String get shoppingOnAgendaCount => 'One row with the number of open Lines';
+
+  @override
+  String get shoppingOnAgendaLines => 'Each open Line on its own row';
+
+  @override
   String get textMarkCheck => 'Check';
 
   @override

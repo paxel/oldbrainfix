@@ -338,6 +338,7 @@ NoteActions noteActions(
               }
             : null,
         showOnAgenda: showOnAgendaEntry(lists, id, changed),
+        shoppingOnAgenda: shoppingOnAgendaEntry(shopping, id, changed),
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
@@ -385,6 +386,26 @@ BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
     on: on,
     toggle: () {
       lists.setShowOnAgenda(noteId, !on);
+      changed();
+    },
+  );
+}
+
+/// The "Show on the Agenda" choice of the Shopping List [noteId] (#186):
+/// how it shows on this person's Agenda, and choosing another way; null
+/// unless it is a Shopping List not in the trash nor merged. It is
+/// offered while no Line is open too, for when Lines come back.
+/// [changed] runs after a choice.
+ShoppingOnAgendaChoice? shoppingOnAgendaEntry(
+  ShoppingLists lists,
+  String noteId,
+  VoidCallback changed,
+) {
+  if (!lists.mayShowOnAgenda(noteId)) return null;
+  return (
+    shows: lists.onAgenda(noteId),
+    choose: (shows) {
+      lists.setOnAgenda(noteId, shows);
       changed();
     },
   );
@@ -578,6 +599,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// (#143); null for any other Note.
   ({bool on, VoidCallback toggle})? _onAgenda;
 
+  /// How a Shopping List shows on this person's Agenda (#186); null for
+  /// any other Note.
+  ShoppingOnAgendaChoice? _shoppingOnAgenda;
+
   @override
   void initState() {
     super.initState();
@@ -656,6 +681,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final shopping = ShoppingLists(widget.notes.store);
     _makesShopping = shopping.mayMake(widget.noteId);
     _isShopping = shopping.isShoppingList(widget.noteId);
+    _shoppingOnAgenda = shoppingOnAgendaEntry(shopping, widget.noteId, _reload);
     _isTally = Tallies(widget.notes.store).isTally(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
@@ -907,6 +933,34 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final lists = Checklists(widget.notes.store);
     lists.setShowOnAgenda(widget.noteId, !lists.showsOnAgenda(widget.noteId));
     _reload();
+  }
+
+  /// The Shopping List's "Show on the Agenda" badge's editor (#186): the
+  /// three ways as radio buttons, the one it has marked; a tap on another
+  /// writes it and closes.
+  Future<void> _editShoppingOnAgenda(ShoppingOnAgendaChoice agenda) async {
+    final t = context.t;
+    final picked = await showDialog<ShoppingOnAgenda>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.checklistShowOnAgenda,
+        icon: Icons.today_outlined,
+        content: RadioColumn<ShoppingOnAgenda>(
+          value: agenda.shows,
+          options: [
+            for (final (value, label) in shoppingOnAgendaOptions(t))
+              RadioOption(
+                key: ValueKey('shopping-agenda-${value.name}'),
+                value: value,
+                title: Text(label),
+              ),
+          ],
+          onChanged: (picked) => Navigator.of(context).pop(picked),
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    agenda.choose(picked);
   }
 
   void _setImportance(Importance picked) {
@@ -1207,6 +1261,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               agenda.on,
               _toggleOnAgenda,
             ),
+          ),
+        if (_shoppingOnAgenda case final agenda?)
+          SettingBadge(
+            key: const ValueKey('badge-agenda'),
+            setting: t.checklistShowOnAgenda,
+            icon: Icons.today_outlined,
+            value: switch (agenda.shows) {
+              ShoppingOnAgenda.off => t.settingOff,
+              ShoppingOnAgenda.count => t.shoppingOnAgendaCount,
+              ShoppingOnAgenda.lines => t.shoppingOnAgendaLines,
+            },
+            onTap: (_) => _editShoppingOnAgenda(agenda),
           ),
         if (_hasBoxes)
           SettingBadge(

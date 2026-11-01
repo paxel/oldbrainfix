@@ -1171,6 +1171,8 @@
   "checklistRowOpen": "{list}: {open} von {count} offen",
   "maskedChecklist": "Private Checkliste",
   "checklistShowOnAgenda": "Auf der Agenda zeigen",
+  "shoppingOnAgendaCount": "Eine Reihe mit der Zahl der offenen Zeilen",
+  "shoppingOnAgendaLines": "Jede offene Zeile in einer eigenen Reihe",
   "textMarkCheck": "Abhaken",
   "textMarkFail": "Als gescheitert markieren",
   "textMarkReopen": "Wieder öffnen",
