@@ -10,8 +10,9 @@
 //! may change a Line, ⋮ and a right-click on its box's row with Move up,
 //! Move down, putting it under the Line above or back to the top level,
 //! and Delete; "Add Line" for anyone with a role in its Area, starting an
-//! empty Line at the end; "Uncheck all" while one is checked; and "Back
-//! to a plain Note" for who may change the Note.
+//! empty Line at the end; and "Uncheck all" while one is checked. "Show
+//! on the Agenda" and "Back to a plain Note" are badges of the Note
+//! dialog (#160).
 //!
 //! A Checklist with a Routine or Reminder (#121) shows on its card and in
 //! its editor as checked for the Occurrence it is on now, and on the
@@ -635,8 +636,7 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
 
 /// The Checklist part of a Note's editor (#120), under its text: its
 /// Lines, each typed in place in `typed` where this Device may change it
-/// (#141), "Add Line", and "Uncheck all" and "Back to a plain Note" as
-/// `shown` allows.
+/// (#141), "Add Line", and "Uncheck all" as `shown` allows.
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -710,36 +710,15 @@ pub fn section(
         {
             actions.push(ChecklistAction::AddLine(note.clone()));
         }
-        let uncheck = shown.checks && list.checked_count() > 0;
-        if uncheck || shown.plain || shown.on_agenda.is_some() {
-            ui.horizontal_wrapped(|ui| {
-                // The desktop editor has no ⋮: the switch sits with the
-                // list's other entries (#143).
-                if let Some(mut on) = shown.on_agenda
-                    && ui
-                        .checkbox(
-                            &mut on,
-                            RichText::new(t.checklist_show_on_agenda()).color(text),
-                        )
-                        .clicked()
-                {
-                    actions.push(ChecklistAction::ShowOnAgenda(note.clone(), on));
-                }
-                if uncheck
-                    && ui
-                        .button(RichText::new(t.checklist_uncheck_all()).color(text))
-                        .clicked()
-                {
-                    actions.push(ChecklistAction::UncheckAll(note.clone()));
-                }
-                if shown.plain
-                    && ui
-                        .button(RichText::new(t.checklist_to_plain()).color(text))
-                        .clicked()
-                {
-                    actions.push(ChecklistAction::ToPlain(note.clone()));
-                }
-            });
+        // Show on the Agenda and Back to a plain Note are the Note
+        // dialog's badges (#160).
+        if shown.checks
+            && list.checked_count() > 0
+            && ui
+                .button(RichText::new(t.checklist_uncheck_all()).color(text))
+                .clicked()
+        {
+            actions.push(ChecklistAction::UncheckAll(note.clone()));
         }
     });
 }

@@ -13,7 +13,7 @@ use std::thread::JoinHandle;
 use chrono::{DateTime, Duration, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{
     DEVICE_HEADER, FORMAT_HEADER, Joining, OWN_FORMATS, PIN_HEADER, answer_sync,
     answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
@@ -117,13 +117,21 @@ fn a_member_sees_who_shares_and_only_adds_to_someone_elses_note() -> TestResult 
     harness.state_mut().select_note(&milk);
     harness.run();
     assert!(shows(&harness, "Add to Note"));
-    assert!(shows(
-        &harness,
-        "Only a Manager of this Area can change this."
-    ));
-    for hidden in ["Move to trash", "Merge into…", "File into…"] {
+    // No "+" badge for Routines and the rest; where it is filed and its
+    // Importance only show (#160).
+    for hidden in [
+        "Move to trash",
+        "Merge into…",
+        "Routine, Reminder, Frog or Session",
+    ] {
         assert!(!shows(&harness, hidden), "{hidden}");
     }
+    for read_only in ["Importance: Normal", "Area and Topic: Household"] {
+        let badge = harness.get_by_label(read_only);
+        assert_ne!(badge.accesskit_node().role(), Role::Button, "{read_only}");
+    }
+    harness.state_mut().close_note();
+    harness.run();
     open_menu(&mut harness, "Household");
     assert!(shows(&harness, "People"));
     for hidden in ["Rename", "Share…", "Delete", "New Topic"] {

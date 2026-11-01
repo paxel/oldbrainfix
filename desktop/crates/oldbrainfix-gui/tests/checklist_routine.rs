@@ -249,17 +249,17 @@ fn the_editor_checks_and_unchecks_all_for_the_occurrence_it_is_on() -> TestResul
     harness.state_mut().select(Selection::All);
     harness.state_mut().select_note(&note);
     harness.run();
-    // The editor's box lies right of the card's.
+    // The editor's box lies over the card's, in the Note dialog.
     let editor = |harness: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
         let node = boxes(harness, "Bath")
             .into_iter()
-            .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+            .last()
             .ok_or("the editor's Bath")?;
         Ok(is_checked(&node))
     };
     boxes(&harness, "Bath")
         .into_iter()
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+        .last()
         .ok_or("the editor's Bath")?
         .click_accesskit();
     harness.run();

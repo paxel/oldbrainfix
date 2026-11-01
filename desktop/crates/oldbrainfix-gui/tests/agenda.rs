@@ -298,7 +298,16 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     harness.run();
     edit(&harness, "Another thought").click();
     harness.run();
-    harness.get_by_label("Routine").click();
+    // The "+" badge of the Note dialog (#160).
+    harness
+        .get_by_label("Routine, Reminder, Frog or Session")
+        .click();
+    harness.run();
+    harness
+        .get_all_by_label("Routine")
+        .last()
+        .ok_or("Routine")?
+        .click();
     harness.run();
     assert!(shows(&harness, "New Routine"));
     assert!(shows(&harness, "From the Note"));
@@ -348,7 +357,8 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
             .iter()
             .all(|n| n.text != "Another thought")
     );
-    assert!(shows(&harness, "Every day · 08:00, 20:00"));
+    // Its badge in the Note dialog (#160).
+    assert!(shows(&harness, "Routine: Every day · 08:00, 20:00"));
     Ok(())
 }
 
@@ -529,6 +539,8 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     let routines = Routines::new(harness.state().store());
     assert!(routines.all()?.iter().all(|r| r.note_id != walk));
     // Restored, the Note brings its Routine back.
+    harness.state_mut().close_note();
+    harness.run();
     left(&harness, "Trash").click();
     harness.run();
     edit(&harness, "Walk the dog").click();
@@ -536,6 +548,8 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     harness.get_by_label("Restore").click();
     harness.run();
     assert!(routine_of(harness.state(), "Walk the dog").is_ok());
+    harness.state_mut().close_note();
+    harness.run();
 
     // A Routine on its own: deleted from its editor, after asking, and
     // restored from the trash.

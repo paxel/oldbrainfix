@@ -122,6 +122,14 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// Opens the menu of the Note dialog's "+" badge (#160).
+fn add_menu(harness: &mut Harness<'_, App>, t: &L10n) {
+    harness
+        .get_by_label(t.routine_or_reminder())
+        .click_accesskit();
+    harness.run();
+}
+
 fn click_button(harness: &mut Harness<'_, App>, label: &str) {
     harness
         .get_by_role_and_label(Role::Button, label)
@@ -310,6 +318,7 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     let device = device()?;
     let mut harness = window(&device.store, Some(&device.legs));
     let t = L10n::new("en");
+    add_menu(&mut harness, &t);
     click_button(&mut harness, t.session());
     assert!(shows(&harness, t.new_session()));
     // Rolling by default, one a time, the weekdays folded.
@@ -538,6 +547,7 @@ fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() ->
     let store = Arc::new(store);
     let t = L10n::new("en");
     let mut harness = window(&store, Some(&legs));
+    add_menu(&mut harness, &t);
     for offered in [t.routine(), t.reminder(), t.frog(), t.session()] {
         assert!(
             harness

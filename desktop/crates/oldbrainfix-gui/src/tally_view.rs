@@ -1,8 +1,8 @@
 //! Tallies on the desktop's screen (#103, ADR 0028), as the phone's
 //! `tally_view.dart`, `tally_field_screen.dart` and
 //! `tally_entry_screen.dart` draw them: the Tally part of a Note's
-//! editor, and the field page and the entry page, which take the right
-//! pane as the Routine editor does, Save at their top.
+//! editor, and the field page and the entry page, each in a dialog over
+//! the window as the Routine editor is, Save at their top.
 //!
 //! The Tally part lists the fields, each opening its field page for who
 //! may change the Note, with "Add entry" and "Add field"; in a Shared
@@ -257,7 +257,7 @@ fn typed_value(base: Option<f64>, unit: &str, system: UnitSystem, decimal: &str)
 }
 
 /// The name of a kind of unit; "Another unit" for a typed one.
-fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
+pub(crate) fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
     match kind {
         UnitKind::Mass => t.unit_kind_mass(),
         UnitKind::Distance => t.unit_kind_distance(),
@@ -632,7 +632,7 @@ pub enum FormIntent {
     Delete,
 }
 
-/// The field page or the entry page in the right pane.
+/// The field page or the entry page in its dialog over the window.
 #[derive(Debug, Clone)]
 pub enum TallyForm {
     Field(FieldForm),

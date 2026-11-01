@@ -955,6 +955,33 @@ mod tests {
     }
 
     #[test]
+    fn fields_saved_together_a_microsecond_apart_keep_their_order() -> TestResult {
+        // As the New Tally page saves them (#161): in one batch, each a
+        // read of the clock after the one before.
+        let start = ticking()();
+        let ticks = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0));
+        let clock: crate::Clock = Box::new(move || {
+            let n = ticks.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            start + Duration::microseconds(n)
+        });
+        let store = Store::in_memory(clock, || Ok(SigningKey::from_seed([3; 32])))?;
+        OwnProfile::new(&store).apply_defaults("Ann", None)?;
+        let note = Notes::new(&store).capture("Morning", None, None)?;
+        let tallies = Tallies::new(&store);
+        let names = ["Weight", "Waist", "Steps", "Arm", "Calf", "Back"];
+        store.batch(|| {
+            for name in names {
+                tallies.add_field(&note.id, name, "", None, None)?;
+            }
+            Ok(())
+        })?;
+        let made = tallies.by_note(&note.id)?.ok_or("a Tally")?;
+        let shown: Vec<&str> = made.fields.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(shown, names);
+        Ok(())
+    }
+
+    #[test]
     fn a_fields_kind_of_unit_is_fixed_once_it_has_entries() -> TestResult {
         let ann = device(1, "Ann")?;
         let tallies = Tallies::new(&ann);

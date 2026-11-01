@@ -308,11 +308,8 @@ fn the_add_field_adds_at_the_top_and_a_name_there_brings_its_line_back() -> Test
         .get_by(|n| n.placeholder() == Some("New Line"))
         .rect()
         .top();
-    // The editor's, right of the card's.
-    let milk = boxes(&harness, "Milk")
-        .into_iter()
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
-        .ok_or("Milk")?;
+    // The editor's, over the card's in the Note dialog.
+    let milk = boxes(&harness, "Milk").into_iter().last().ok_or("Milk")?;
     assert!(field < milk.rect().top());
     // Enter adds what was typed and leaves the field ready for the next.
     type_line(&mut harness, "Eggs");
@@ -407,17 +404,14 @@ fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
     let reappear = |harness: &Harness<'_, App>| -> Result<Reappear, Box<dyn std::error::Error>> {
         Ok(list(harness, &note)?.line(&milk).ok_or("Milk")?.reappear)
     };
+    // The pick closed the menu; Esc now would close the Note dialog.
     assert_eq!(reappear(&harness)?, Reappear::Week3);
-    harness.key_press(egui::Key::Escape);
-    harness.run();
     tick(&mut harness, "Milk")?;
     assert!(shows(&harness, "back Sat, Nov 14"));
 
     // Once: gone when checked.
     click(&mut harness, "More: Apples")?;
     click(&mut harness, "Once")?;
-    harness.key_press(egui::Key::Escape);
-    harness.run();
     tick(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
 
@@ -447,6 +441,8 @@ fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
     lists.make(&note)?;
     lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
     let mut harness = window(&store, Some(&note));
+    // In the Note dialog's kind badge (#160).
+    click(&mut harness, "Kind: Shopping List")?;
     click(&mut harness, "Back to a plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
@@ -730,7 +726,7 @@ fn agenda(
 }
 
 /// The Agenda's message for a day with nothing due.
-const NOTHING_TODAY: &str = "Nothing due today. Type a thought into the field above to capture it.";
+const NOTHING_TODAY: &str = "Nothing due today. Click + to capture a thought.";
 
 #[test]
 fn by_default_the_agenda_has_a_row_per_list_with_the_lines_back_today() -> TestResult {

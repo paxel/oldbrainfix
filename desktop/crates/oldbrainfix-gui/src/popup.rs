@@ -6,7 +6,7 @@
 //! phone's capture screen does; empty, it just closes.
 //!
 //! Above the Nudge buttons sits "To full editor" (#142), which saves the
-//! Note as Enter does and opens it in the window's Note editor; it waits
+//! Note as Enter does and opens it in the window's Note dialog; it waits
 //! while there is nothing to save. Beside it, of the Note card's buttons
 //! (#113), only what this Device switched on in Settings ▸ Quick note
 //! shows: "File into…", Routine, Reminder, Frog and Session where this
@@ -85,7 +85,7 @@ pub enum Outcome {
     /// Done with: it saved what was typed, or nothing was.
     Closed,
     /// Done with, the Note of this id saved, to be opened in the
-    /// window's Note editor ("To full editor", #142).
+    /// window's Note dialog ("To full editor", #142, #146).
     Edit(String),
 }
 
@@ -407,7 +407,7 @@ impl CapturePopup {
     }
 
     /// "To full editor": saves as leaving does, and hands the Note on to
-    /// the window's Note editor; stays open when nothing was saved.
+    /// the window's Note dialog; stays open when nothing was saved.
     fn open_in_editor(&mut self) -> Outcome {
         match self.keep(Notes::default_nudge()) {
             (Outcome::Closed, Some(id)) => Outcome::Edit(id),

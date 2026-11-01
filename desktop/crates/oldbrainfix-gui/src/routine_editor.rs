@@ -1,4 +1,4 @@
-//! Making or changing a Routine or Reminder in the right pane, as the
+//! Making or changing a Routine or Reminder in its dialog, as the
 //! phone's Routine editor does: the Note it comes from (or a text for a
 //! new Note), its schedule in a simple editor (once, every N days, weeks,
 //! months or years, chosen weekdays, every N months on a day or on the
@@ -119,6 +119,14 @@ pub struct RoutineEditor {
     /// Whether it has a History to open: a Routine saved, not a
     /// Reminder, as it was opened.
     history: bool,
+    /// Where the Note made behind the scenes is filed; `None` for
+    /// Unsorted.
+    pub place: Option<String>,
+    /// Whether the text made behind the scenes is the name of what is
+    /// made, as on the New Session page (#161): asked for as its name,
+    /// and said when missing, which `name_missing` holds.
+    named: bool,
+    name_missing: bool,
 }
 
 impl RoutineEditor {
@@ -183,9 +191,41 @@ impl RoutineEditor {
             next: Vec::new(),
             session: None,
             history: false,
+            place: None,
+            named: false,
+            name_missing: false,
         };
         editor.update();
         editor
+    }
+
+    /// The New Session page (#161): its name, its pool of `draft` with
+    /// "New Tally" at its end, its count and rule, and its schedule every
+    /// day, all day, at first; its Note filed into `place`.
+    pub fn new_session_page(
+        place: Option<String>,
+        draft: SessionDraft,
+        now: DateTime<Utc>,
+        wall: &dyn Fn(DateTime<Utc>) -> NaiveDateTime,
+        device_renag: Duration,
+    ) -> RoutineEditor {
+        let mut editor = RoutineEditor::new(None, false, now, wall, device_renag);
+        editor.times.clear();
+        editor.place = place;
+        editor.named = true;
+        let mut draft = draft;
+        draft.new_tally = true;
+        editor.session = Some((draft, None));
+        editor.update();
+        editor
+    }
+
+    /// Puts the Tally `id`, shown as `name`, made from the New Session
+    /// page, first in its pool, ticked.
+    pub fn add_made_tally(&mut self, id: &str, name: &str) {
+        if let Some((draft, _)) = &mut self.session {
+            draft.add_made(id, name);
+        }
     }
 
     /// A new Routine, or a Reminder when `reminder`, set up for the Note
@@ -266,6 +306,9 @@ impl RoutineEditor {
             next: Vec::new(),
             session: None,
             history: !routine.is_reminder(),
+            place: None,
+            named: false,
+            name_missing: false,
         };
         match SimpleRepeat::of(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
@@ -415,6 +458,9 @@ impl RoutineEditor {
         }
         match &self.note {
             Some(note) => !note.is_trashed() && !note.is_merged(),
+            // A missing name is said under its field once Save is
+            // clicked.
+            None if self.named => true,
             None => !self.from_note && !self.text.trim().is_empty(),
         }
     }
@@ -452,7 +498,8 @@ impl RoutineEditor {
     /// fixing first, which then says so under its fields and writes
     /// nothing.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
-        if self.session_to_fix() {
+        self.name_missing = self.named && self.text.trim().is_empty();
+        if self.session_to_fix() || self.name_missing {
             return Ok(None);
         }
         let routines = Routines::new(store);
@@ -478,8 +525,11 @@ impl RoutineEditor {
                         "the text must not be empty".into(),
                     ));
                 }
-                let note = Notes::new(store).capture(text, None, None)?;
-                draft.spawn(store, &note.id, schedule)?
+                let place = self.place.as_deref();
+                store.batch(|| {
+                    let note = Notes::new(store).capture(text, place, None)?;
+                    draft.spawn(store, &note.id, schedule)
+                })?
             }
             (None, None, None) => routines.create(&self.text, schedule)?.id,
         };
@@ -520,6 +570,25 @@ impl RoutineEditor {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
+                    if self.named {
+                        let label = ui.label(RichText::new(t.kind_name()).strong().color(text));
+                        let field = ui
+                            .add(
+                                TextEdit::singleline(&mut self.text)
+                                    .id(Id::new("routine text"))
+                                    .text_color(text)
+                                    .desired_width(f32::INFINITY),
+                            )
+                            .labelled_by(label.id);
+                        if self.name_missing {
+                            let error = ui.visuals().error_fg_color;
+                            ui.label(RichText::new(t.kind_name_missing()).color(error));
+                            if field.changed() {
+                                self.name_missing = false;
+                            }
+                        }
+                        return;
+                    }
                     if !self.from_note {
                         ui.add(
                             TextEdit::multiline(&mut self.text)

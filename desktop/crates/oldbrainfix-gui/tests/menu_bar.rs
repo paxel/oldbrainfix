@@ -103,11 +103,15 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     let mut app = App::new(store, "en");
     app.select(Selection::Frogs);
     let mut harness = window(app);
-    // The Frogs have no capture field: New Note goes to the Agenda's.
+    // New Note opens the quick note's dialog over the list (#146).
     pick(&mut harness, "File", "New Note Ctrl+N");
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    assert!(harness.state().quick_note_open());
+    assert_eq!(harness.state().selection(), &Selection::Frogs);
     assert_eq!(focused(&harness).as_deref(), Some("Capture"));
+    harness.key_press(Key::Escape);
+    harness.run();
+    assert!(!harness.state().quick_note_open());
 
     assert!(!harness.state_mut().take_quick_note());
     pick(&mut harness, "File", "Quick note");
@@ -136,22 +140,23 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
 
 #[test]
 fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field() -> TestResult {
-    let (store, _, _) = store()?;
+    let (store, _, tap) = store()?;
     let mut harness = window(App::new(store, "en"));
-    // Cut, Copy and Paste want a field the cursor was in.
+    // Cut, Copy and Paste want a field the cursor was in: the Note
+    // dialog's, under the menu bar at hand (#146).
     assert!(!enabled(&mut harness, "Edit", "Copy"));
-    harness
-        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
-        .click();
+    harness.state_mut().select_note(&tap);
     harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Buy stamps");
+    harness.get_by_label("Note text").click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text(" now");
     harness.run();
     pick(&mut harness, "Edit", "Copy");
     let asked = &harness.output().viewport_output[&ViewportId::ROOT].commands;
     assert!(asked.contains(&ViewportCommand::RequestCopy), "{asked:?}");
     harness.run();
     // The cursor is back in the field.
-    assert_eq!(focused(&harness).as_deref(), Some("Capture"));
+    assert_eq!(focused(&harness).as_deref(), Some("Note text"));
 
     // Find: All Notes' search on the Agenda, which has none.
     pick(&mut harness, "Edit", "Find Ctrl+F");
@@ -256,6 +261,9 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     pick(&mut harness, "Note", "Routine…");
     harness.run();
     assert!(harness.state().routine_editor().is_some());
+    // Its dialog over the Note's, back to it with Esc.
+    harness.key_press(Key::Escape);
+    harness.run();
 
     pick(&mut harness, "Note", "Send to a person");
     harness.run();
@@ -350,8 +358,13 @@ fn the_keys_open_what_their_entries_open() -> TestResult {
         harness.run();
     };
     press(&mut harness, Key::N);
-    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    assert!(harness.state().quick_note_open());
     assert_eq!(focused(&harness).as_deref(), Some("Capture"));
+    // The keys rest over the quick note's dialog.
+    press(&mut harness, Key::F);
+    assert_eq!(harness.state().selection(), &Selection::Trash);
+    harness.key_press(Key::Escape);
+    harness.run();
     press(&mut harness, Key::F);
     assert_eq!(harness.state().selection(), &Selection::All);
     assert_eq!(focused(&harness).as_deref(), Some("Search all Notes"));

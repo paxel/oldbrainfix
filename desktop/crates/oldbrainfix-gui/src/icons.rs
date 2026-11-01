@@ -106,6 +106,26 @@ pub const ARROW_FORWARD: char = '\u{e09b}';
 /// The frog that marks Frogs, from the emoji font, as there is none
 /// among the Material icons ([`crate::frogs_view::FROG`]).
 pub const FROG: char = '\u{1F438}';
+/// The badges of a Note's settings (#160), as the phone's editor draws
+/// them: `label_important_outline` for the Importance, `today_outlined`
+/// for Show on the Agenda and `history_toggle_off` for Show ticks; for
+/// a field of the New Tally page (#161) `functions` for its rule,
+/// `straighten` for its unit and `flag_outlined` for its target; for the
+/// New Session page `tag` for its count, `shuffle` for its rule and
+/// `event_repeat` for its schedule, which also marks a Session; and
+/// `bar_chart` for a Tally and `edit_note` for a Note in the menu of
+/// "+".
+pub const IMPORTANCE: char = '\u{e362}';
+pub const ON_AGENDA: char = '\u{f44d}';
+pub const SHOW_TICKS: char = '\u{e316}';
+pub const TALLY_RULE: char = '\u{e2cd}';
+pub const TALLY_UNIT: char = '\u{e60e}';
+pub const TALLY_TARGET: char = '\u{f07b}';
+pub const SESSION_COUNT: char = '\u{e640}';
+pub const SESSION_RULE: char = '\u{e5a1}';
+pub const SESSION: char = '\u{f04fb}';
+pub const TALLY: char = '\u{e0cc}';
+pub const NEW_NOTE: char = '\u{f04f6}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
@@ -146,7 +166,11 @@ pub fn fonts() -> egui::FontDefinitions {
 /// fonts are bound (the very first pass), or one of the text's fonts,
 /// as the frog, when it lies outside the Private Use Area.
 pub fn paint(painter: &Painter, rect: Rect, icon: char, color: Color32) {
-    if !('\u{e000}'..='\u{f8ff}').contains(&icon) {
+    // The Private Use Areas, the second one's for Material's newer
+    // icons, such as `event_repeat`.
+    let private =
+        ('\u{e000}'..='\u{f8ff}').contains(&icon) || ('\u{f0000}'..='\u{ffffd}').contains(&icon);
+    if !private {
         let size = rect.height() * 0.9;
         painter.text(
             rect.center(),

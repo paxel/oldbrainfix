@@ -1,11 +1,11 @@
 //! The uncluttered quick note (#142) in the capture popup and the
-//! window's capture field, driven headless by egui_kittest over a store
+//! window's quick note dialog (#146), driven headless by egui_kittest over a store
 //! with its clock held still: by default only the text, its buttons for
 //! recordings, pictures and files, the Nudge buttons and "To full
 //! editor" show; each switch of Settings ▸ Quick note brings its control
 //! back and takes it away again; with the Nudge buttons off one Save
 //! nudges in 1 h; a filed capture shows Save; "To full editor" saves the
-//! Note and opens it in the Note editor.
+//! Note and opens it in the Note dialog.
 
 use std::sync::Arc;
 
@@ -122,6 +122,11 @@ fn window(store: &Arc<Store>, selection: Selection) -> Harness<'static, App> {
 }
 
 fn type_in_window(harness: &mut Harness<'_, App>, text: &str) {
+    // The quick note's dialog first (#146).
+    if !harness.state().quick_note_open() {
+        harness.state_mut().new_note();
+        harness.run();
+    }
     harness
         .get_by(|n| n.placeholder() == Some("What's on your mind?"))
         .click();

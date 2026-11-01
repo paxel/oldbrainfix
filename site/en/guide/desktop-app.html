@@ -1,9 +1,9 @@
 <!-- page: title="The desktop app" track="guide" order=8 summary="Old Brain Fix on Linux, Windows and macOS: the window, its menu bar, dialogs and keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, sync with the phone and the AI Task." -->
 <p class="lede">
   The desktop app runs on Linux, Windows and macOS and holds the same Notes, Areas and Routines as
-  the phone once the two are paired. It is a window with a menu bar, the places on the left, the list
-  in the middle and the Note editor on the right, worked with the mouse and the keyboard, with a
-  capture popup and a command line for capturing from anywhere. Settings belong to this computer and
+  the phone once the two are paired. It is a window with a menu bar, the places on the left and the
+  list beside them, a Note opening as a dialog over them, worked with the mouse and the keyboard, with
+  a capture popup and a command line for capturing from anywhere. Settings belong to this computer and
   are never synced.
 </p>
 
@@ -23,25 +23,42 @@
 
 <h2>The window</h2>
 <p>
-  The window has the menu bar on top and three columns below it; the borders between the columns can
-  be dragged.
+  The window has the menu bar on top and two columns below it; the border between them can be
+  dragged.
 </p>
 <ul>
   <li><strong>Left</strong>, the sidebar: Agenda, Unsorted, All Notes and Frogs, then "Areas" with a "+" for a new Area, each Area with its Topics below it, and the Trash. The place the list shows is marked. A right-click on an Area opens New Topic, Rename, Colour and icon, Share…, People when it is shared, and Delete, as far as you manage the Area; a right-click on a Topic opens Rename and Delete. These menus close once an entry is picked, with the mouse, the keyboard or a screen reader.</li>
-  <li><strong>Middle</strong>, the list: on top the back and forward arrows and the path to the place shown, such as "Areas › Household › Repairs", where a click on a level shows it; "Areas" leads to All Notes. Below them what is selected on the left. The Agenda and every list of Notes except the Trash have the capture field on top (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). All Notes, an Area and a Topic have a search field; every list of Notes except the Trash has a switch between full and compact cards and a filter by person. An Area's heading has a "+" for a new Topic.</li>
-  <li><strong>Right</strong>: the editor of the Note or Occurrence opened in the middle.</li>
+  <li><strong>Middle</strong>, the list: on top the back and forward arrows and the path to the place shown, such as "Areas › Household › Repairs", where a click on a level shows it; "Areas" leads to All Notes. Below them what is selected on the left. All Notes, an Area and a Topic have a search field; every list of Notes except the Trash has a switch between full and compact cards and a filter by person. The heading ends with a "+" (see below).</li>
 </ul>
 <p>
+  The "+" of All Notes, an Area and a Topic opens a menu: <strong>Note</strong> opens the quick note,
+  <strong>Checklist</strong>, <strong>Shopping List</strong> and <strong>Frog</strong> ask for a name,
+  <strong>Tally</strong> and <strong>Session</strong> open their page, and in an Area
+  <strong>Topic</strong> adds a Topic. What it makes is filed into the Area or Topic shown, from All
+  Notes into none; Session, Frog and Topic are there for who may set them up. A new Checklist or
+  Shopping List opens in the Note dialog, the cursor in its first Line or its field at the top (see
+  <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>).
+  The "+" of the Agenda and of Unsorted opens the quick note at once. Nothing is made while the list
+  shows another person's Notes only. Every list ends with room after its last card, so that card
+  scrolls fully into view.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/add-menu.png" alt="The Household's Notes with the menu of the "+" at the end of the heading open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic, each with its icon" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/add-menu.png" alt="The Household's Notes with the menu of the "+" at the end of the heading open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic, each with its icon" width="1280" height="800" loading="lazy">
+  <figcaption>What "+" makes in an Area.</figcaption>
+</figure>
+<p>
   In a list of Notes, a click unfolds a compact card; a double-click or the pencil opens the Note in
-  the editor. A right-click on a card or its ⋮ opens <strong>Edit</strong>, the Checklist entries with <strong>Show on the Agenda</strong>, the Shopping List entries
+  the Note dialog. A right-click on a card or its ⋮ opens <strong>Edit</strong>, the Checklist entries with <strong>Show on the Agenda</strong>, the Shopping List entries
   (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>),
   <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Save as Markdown…</strong>. A card
   dragged onto an Area or Topic in the sidebar is filed there; Notes in the Trash are not
   dragged.
 </p>
 <p>
-  A click on a photo in the editor shows it full screen. A right-click on a photo in the editor or
-  full screen opens <strong>Save image as…</strong>, which saves its file where you say,
+  A click on a photo in the Note dialog shows it full screen. A right-click on a photo in the Note
+  dialog or full screen opens <strong>Save image as…</strong>, which saves its file where you say,
   <strong>Copy image</strong>, which puts the picture on the clipboard, and <strong>Open in
   another program</strong>, which opens it in the computer's program for pictures. Saved and copied
   say nothing; when one of them fails, a line at the top of the window says so, and a click on it
@@ -51,18 +68,37 @@
   The Agenda's bar holds All Routines and Reminders and New Routine or Reminder.
 </p>
 
+<h2>The Note dialog</h2>
+<p>
+  A Note opens as a dialog over the list and the sidebar, one at a time; the menu bar stays at hand
+  above it. It holds the text with the format bar, under it the Note's settings as badges, then its
+  Lines, photos and recordings, its Tally and its Sections, Add to Note and the rest of what can be
+  done to it. Its cross, Esc, Alt+Left, the mouse's back button and a click beside it close it, and
+  what was typed is kept, a Section typed into Add to Note too.
+</p>
+<p>
+  Each badge shows a setting with its icon and value, as on the phone (see
+  <a href="capture-and-sort.html#the-note-editor">Capture and sort</a>): the Importance, Area and
+  Topic, Captured, each Routine and Reminder, the kind of a Checklist, Shopping List or Tally, Show on
+  the Agenda for a Checklist without a Routine, Show ticks while there is a box, and "+" with
+  Routine, Reminder, Frog and Session for who may set them up. A click opens its small editor as a
+  dialog over the Note; Area and Topic opens File into…, a Routine or Reminder its editor. The
+  Routine editor, a Tally's pages, the New Tally page and the New Session page open as dialogs over
+  what they were opened from.
+</p>
+
 <figure class="frame">
-  <img class="shot-light" src="../../assets/frames/desktop/en/light/window.png" alt="The desktop window: the menu bar on top, Areas and Topics on the left, the Household's Notes in the middle under the back and forward arrows and the path Areas › Household, the kitchen tap Note from Repairs open in the editor on the right" width="1280" height="800" loading="lazy">
-  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/window.png" alt="The desktop window: the menu bar on top, Areas and Topics on the left, the Household's Notes in the middle under the back and forward arrows and the path Areas › Household, the kitchen tap Note from Repairs open in the editor on the right" width="1280" height="800" loading="lazy">
-  <figcaption>The window with an Area's Notes and one Note in the editor.</figcaption>
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/window.png" alt="The desktop window with the kitchen tap Note from Repairs open in the Note dialog over the Household's Notes: its text, the badges Important, Household / Repairs, its capture time and +, a Section and Add to Note" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/window.png" alt="The desktop window with the kitchen tap Note from Repairs open in the Note dialog over the Household's Notes: its text, the badges Important, Household / Repairs, its capture time and +, a Section and Add to Note" width="1280" height="800" loading="lazy">
+  <figcaption>A Note in the Note dialog, its settings as badges.</figcaption>
 </figure>
 
 <h2>The menu bar</h2>
 <ul>
-  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) puts the cursor into the capture field, the Agenda's where the list has none. <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong> and <strong>Google Keep…</strong> (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Save as Markdown…</strong> saves the Note in the editor. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
+  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong> and <strong>Google Keep…</strong> (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field, All Notes' where the list has none. <strong>Settings…</strong> (Ctrl+,) opens this computer's Settings.</li>
   <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Full cards</strong> and <strong>Compact cards</strong> for the list shown; <strong>Theme</strong>, which says that the window is light or dark as the system is set.</li>
-  <li><strong>Note</strong>, for the Note in the editor: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong>, <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Delete</strong>. They are greyed while no Note is open in the editor, and each one where the editor does not offer it either.</li>
+  <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong>, <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Delete</strong>. They are greyed while no Note is open, and each one where the Note dialog does not offer it either.</li>
   <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see below).</li>
   <li><strong>Help</strong>: <strong>User guide</strong> opens this page in the browser; <strong>About Old Brain Fix</strong> shows the version, the documentation and privacy policy, the source code and every third-party component with its licence.</li>
 </ul>
@@ -74,7 +110,7 @@
 <figure class="frame">
   <img class="shot-light" src="../../assets/frames/desktop/en/light/menu.png" alt="The Note menu open over the window: File into… with Ctrl+M, Routine…, Reminder…, Frog, Session, Make it a Checklist, Make it a Shopping List, Make it a Tally, Send to a person, Copy as text and Delete" width="1280" height="800" loading="lazy">
   <img class="shot-dark" src="../../assets/frames/desktop/en/dark/menu.png" alt="The Note menu open over the window: File into… with Ctrl+M, Routine…, Reminder…, Frog, Session, Make it a Checklist, Make it a Shopping List, Make it a Tally, Send to a person, Copy as text and Delete" width="1280" height="800" loading="lazy">
-  <figcaption>The Note menu for the Note in the editor.</figcaption>
+  <figcaption>The Note menu for the Note in the Note dialog.</figcaption>
 </figure>
 
 <h2>Dialogs</h2>
@@ -99,15 +135,15 @@
   and Alt+Right rest while the cursor is in a text field; the mouse buttons always work.
 </p>
 <ul>
-  <li><strong>Alt+Left, the mouse's back button or the back arrow above the list</strong>: the place the list showed before, as a browser goes back. In a dialog opened from another it leads back to that one, and otherwise closes the dialog; a photo or table shown full screen closes.</li>
+  <li><strong>Alt+Left, the mouse's back button or the back arrow above the list</strong>: the place the list showed before, as a browser goes back. In a dialog opened from another it leads back to that one, and otherwise closes the dialog, the Note dialog and the quick note keeping what was typed; a photo or table shown full screen closes.</li>
   <li><strong>Alt+Right, the mouse's forward button or the forward arrow</strong>: the place back came from. Showing another place forgets what lay ahead.</li>
-  <li><strong>Ctrl+N, Ctrl+F, Ctrl+M and Ctrl+,</strong> (Cmd on macOS): New Note, Find, File into… and Settings…, as in the menu bar; also while the cursor is in a text field, not while a dialog is open.</li>
-  <li><strong>Ctrl+Enter</strong> (Cmd+Enter on macOS): saves the capture field's Note and saves the text being edited in the Note editor. Enter alone starts a new line.</li>
+  <li><strong>Ctrl+N, Ctrl+F, Ctrl+M and Ctrl+,</strong> (Cmd on macOS): New Note, Find, File into… and Settings…, as in the menu bar; also while the cursor is in a text field and over the Note dialog, not while another dialog is open.</li>
+  <li><strong>Ctrl+Enter</strong> (Cmd+Enter on macOS): saves the quick note's Note and saves the text being edited in the Note dialog. Enter alone starts a new line.</li>
   <li><strong>In a Line of a Checklist</strong>, Enter splits the Line at the cursor, Backspace at its start joins it with the Line above, Tab and Shift+Tab put it under the Line above and back at the top, and Up and Down move to the Line above and below. In a Shopping List's field Enter adds the Line, and in one of its Lines it ends the rename (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>).</li>
   <li><strong>Ctrl+B and Ctrl+I</strong> (Cmd on macOS): bold and italic while the Note's text is edited.</li>
-  <li><strong>Ctrl+V</strong> (Cmd+V on macOS) in the empty capture field: takes the clipboard's text into the field and its picture into the Note as its photo.</li>
+  <li><strong>Ctrl+V</strong> (Cmd+V on macOS) in the quick note's empty field: takes the clipboard's text into the field and its picture into the Note as its photo.</li>
   <li><strong>Enter</strong> in a one-line field of a dialog, such as a name or a link's address, takes it.</li>
-  <li><strong>Esc</strong> closes a dialog, as does a click beside it, and closes a photo or table shown full screen. In a table cell, Tab and Shift+Tab move to the next and the previous cell (see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted text</a>).</li>
+  <li><strong>Esc</strong> closes a dialog, as does a click beside it, and closes a photo or table shown full screen. In a table cell, Tab and Shift+Tab move to the next and the previous cell (see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted text</a>). The Note dialog and the quick note keep what was typed when they close.</li>
 </ul>
 
 <h2>The tray and starting at login</h2>
@@ -147,7 +183,7 @@
   also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong> and the command
   <code>oldbrainfix capture</code> open it too. It takes text, a voice recording and the clipboard,
   offers <strong>To full editor</strong> and what Settings under "Quick note" switched on, as the
-  capture field does, and never asks anything: Enter saves the Note
+  quick note in the window does, and never asks anything: Enter saves the Note
   with a Nudge in 1 h, and Esc keeps what is typed the same way (see
   <a href="capture-and-sort.html#the-hotkey-and-the-popup">Capture and sort</a>).
 </p>
@@ -178,7 +214,7 @@
 
 <h2>Drag and drop</h2>
 <ul>
-  <li>Pictures and sound files dropped onto the window wait under the capture field, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
+  <li>Pictures and sound files dropped onto the window open the quick note and wait in it, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
   <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline; a Profile card file (<code>.obfcard</code>) adds the person and opens their Profile.</li>
   <li>A Note's card dragged onto an Area or Topic in the sidebar is filed there.</li>
 </ul>

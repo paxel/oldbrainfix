@@ -361,10 +361,10 @@ fn a_table_of_add_to_note_is_edited_full_screen_and_goes_back_into_the_field() -
     harness.run();
     harness.key_press(Key::Enter);
     harness.run();
-    // Its arrow back, "Close", leaves it.
+    // Its arrow back, "Close", over the Note dialog's cross, leaves it.
     harness
         .query_all_by_role_and_label(Role::Button, "Close")
-        .next()
+        .last()
         .ok_or("the arrow back")?
         .click_accesskit();
     harness.run();
@@ -380,14 +380,17 @@ fn a_table_of_add_to_note_is_edited_full_screen_and_goes_back_into_the_field() -
 #[test]
 fn the_text_fields_have_a_name_once_they_hold_text() -> TestResult {
     let (store, note) = with_note("buy milk", "plain")?;
-    let harness = editor(&store, &note);
-    let named = |name: &'static str| {
+    let mut harness = editor(&store, &note);
+    let named = |harness: &Harness<'_, App>, name: &'static str| {
         harness
             .query_all_by_role_and_label(Role::MultilineTextInput, name)
             .filter_map(|n| n.value())
             .collect::<Vec<_>>()
     };
-    assert_eq!(named("Note text"), ["buy milk"]);
-    assert_eq!(named("Capture"), [""]);
+    assert_eq!(named(&harness, "Note text"), ["buy milk"]);
+    // The quick note's, in its own dialog (#146).
+    harness.state_mut().new_note();
+    harness.run();
+    assert_eq!(named(&harness, "Capture"), [""]);
     Ok(())
 }

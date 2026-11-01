@@ -135,13 +135,12 @@ fn photo_note(dir: &std::path::Path) -> Result<PhotoNote, Box<dyn std::error::Er
     Ok((store, note.id, hash, bytes))
 }
 
-/// Right-clicks the photo in the editor, the one furthest right.
+/// Right-clicks the photo in the Note dialog, drawn over the list.
 fn right_click_editor_photo(harness: &mut Harness<'_, App>) -> TestResult {
     let photo = harness
         .query_all_by_role_and_label(Role::Image, "Photo")
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+        .last()
         .ok_or("no photo in the editor")?;
-    assert!(photo.rect().left() > 640.0, "{:?}", photo.rect());
     photo.click_secondary();
     harness.run();
     Ok(())
@@ -151,7 +150,7 @@ fn right_click_editor_photo(harness: &mut Harness<'_, App>) -> TestResult {
 fn open_full_screen(harness: &mut Harness<'_, App>) -> TestResult {
     harness
         .query_all_by_role_and_label(Role::Image, "Photo")
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+        .last()
         .ok_or("no photo in the editor")?
         .click();
     harness.run();
@@ -363,11 +362,11 @@ fn the_menu_speaks_german_in_german() -> TestResult {
     Ok(())
 }
 
-/// Right-clicks the photo in the German editor, the one furthest right.
+/// Right-clicks the photo in the German Note dialog, drawn over the list.
 fn right_click_editor_photo_de(harness: &mut Harness<'_, App>) -> TestResult {
     let photo = harness
         .query_all_by_role_and_label(Role::Image, "Foto")
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+        .last()
         .ok_or("no photo in the editor")?;
     photo.click_secondary();
     harness.run();

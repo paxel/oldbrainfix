@@ -186,6 +186,8 @@ fn the_popup_adds_the_line_to_the_list_and_keeps_no_note() -> TestResult {
 fn window(app: App) -> Harness<'static, App> {
     let mut app = app;
     app.set_wall_clock(Arc::new(utc));
+    // The quick note's dialog, as File ▸ New Note opens it (#146).
+    app.new_note();
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
@@ -201,6 +203,11 @@ fn window(app: App) -> Harness<'static, App> {
 
 /// Types `rows` into the capture field, one line each.
 fn type_rows(harness: &mut Harness<'_, App>, rows: &[&str]) {
+    // The quick note's dialog first (#146).
+    if !harness.state().quick_note_open() {
+        harness.state_mut().new_note();
+        harness.run();
+    }
     harness
         .get_by(|n| n.placeholder() == Some("What's on your mind?"))
         .click();

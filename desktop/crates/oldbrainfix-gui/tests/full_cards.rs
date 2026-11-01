@@ -217,14 +217,16 @@ fn a_click_unfolds_a_compact_note_and_a_double_click_or_edit_opens_the_editor() 
     assert!(shows(&harness, AMEND));
     assert_eq!(harness.state().selected_note(), None);
     assert_eq!(harness.state().viewed_photo(), None);
-    // A double-click opens the editor on the right.
+    // A double-click opens the Note dialog (#146).
     pause(&mut harness);
     let node = card(&harness, "Buy milk");
     node.click();
     node.click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(milk.as_str()));
-    // So does Edit.
+    // So does Edit, once the Note dialog over the list is closed.
+    harness.state_mut().close_note();
+    harness.run();
     edit(&harness, TEXT).click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(dentist.as_str()));
@@ -234,7 +236,7 @@ fn a_click_unfolds_a_compact_note_and_a_double_click_or_edit_opens_the_editor() 
     harness.state_mut().select(Selection::All);
     harness.run();
     assert!(!harness.query_all_by_label(AMEND).any(|n| {
-        // The editor on the right shows the Section; the card does not.
+        // The Note dialog shows the Section; the card does not.
         card(&harness, TEXT).rect().contains_rect(n.rect())
     }));
     Ok(())
@@ -369,10 +371,19 @@ fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -
     edit(&harness, TEXT).click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(id.as_str()));
-    let card = card(&harness, TEXT).rect();
-    for line in NOTE_CONTEXT.iter().chain(&AMEND_CONTEXT) {
-        let shown = harness.get_by_label(line).rect();
-        assert!(!card.contains_rect(shown), "{line} in the editor");
+    // The Section's under it in the Note dialog; the Note's own behind
+    // its Captured badge (#160), each on a line of its own.
+    for line in AMEND_CONTEXT {
+        assert!(shows(&harness, line), "{line} in the editor");
+    }
+    let captured = harness
+        .query_all_by_label_contains("Captured: ")
+        .next()
+        .ok_or("the Captured badge")?;
+    captured.click();
+    harness.run();
+    for line in NOTE_CONTEXT {
+        assert_eq!(harness.query_all_by_label(line).count(), 1, "{line}");
     }
     Ok(())
 }
@@ -476,12 +487,11 @@ fn a_click_on_a_photo_in_the_editor_shows_it_full_screen() -> TestResult {
     let mut harness = window(store, Selection::All);
     edit(&harness, TEXT).click();
     harness.run();
-    // The editor's photo lies on the right.
+    // The editor's photo lies in the Note dialog, over the list (#146).
     let editor = harness
         .query_all_by_role_and_label(Role::Image, "Photo")
-        .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
+        .last()
         .ok_or("no photo in the editor")?;
-    assert!(editor.rect().left() > 640.0, "{:?}", editor.rect());
     editor.click();
     harness.run();
     assert!(harness.state().viewed_photo().is_some());

@@ -124,8 +124,10 @@ pub struct TypedLines {
     /// The Note whose Lines they are.
     pub note: Option<String>,
     pub rows: Vec<TypedLine>,
-    /// What the Shopping List's field at the top holds.
+    /// What the Shopping List's field at the top holds, and whether it
+    /// is to take the keyboard, until it has it: a list just made (#161).
     pub add: String,
+    pub add_focus: bool,
     /// The field to take the keyboard, by its row's key, with the cursor
     /// at this byte of its text.
     pub focus: Option<(u64, usize)>,
@@ -168,6 +170,7 @@ impl TypedLines {
             self.note = note.map(str::to_string);
             self.rows.clear();
             self.add.clear();
+            self.add_focus = false;
             self.focus = None;
         }
         match (checklist, shopping) {

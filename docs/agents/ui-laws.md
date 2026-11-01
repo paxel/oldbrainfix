@@ -13,7 +13,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   gesture and button navigation alike: the last row scrolls fully above
   it, and controls anchored at the bottom sit above it. **The end of a
   page also clears its floating buttons** (#158): the last row scrolls
-  fully above them, their margin and a gap included.
+  fully above them, their margin and a gap included. On the desktop
+  nothing floats over a list; every list ends with the same room after
+  its last card, so that card scrolls fully into view.
 - The Agenda carries two floating buttons: **"+"** captures a Note and
   **the magnifier** opens the notes browser. Nothing else floats, except
   the ways "+" fans out while it is open (see Capture).
@@ -46,7 +48,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   ending in "New Tally", which opens the Tally page and comes back with
   that Tally ticked, then its count, rule and schedule as badges, the
   schedule every day, all day, at first. Leaving a name dialog or one of
-  the pages without Create or Save makes nothing.
+  the pages without Create or Save makes nothing. **On the desktop "+"
+  sits at the end of the list's heading** (#146, #161) and opens a menu
+  of the same kinds, Note first, each with its icon and words; the
+  Agenda's and Unsorted's "+" open the quick note at once. The pages
+  open as dialogs over the window; the desktop's Session page is the
+  Routine editor's, its name first, the count, rule and schedule as its
+  panels.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.
@@ -138,17 +146,20 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   more. All of it is optional. With the format bar on, it rides on the
   keyboard; where the room is small the buttons under the text scroll
   and the text keeps two lines.
-- **On the desktop** the capture popup and the window's capture field
-  are the quick note and follow the same switches (desktop Settings ▸
-  Quick note, beside Quick capture): by default the text, Record voice,
-  Paste (the field also From file…), the Nudge buttons and To full
-  editor; switched on, File into…, Routine, Reminder, Frog and Session,
-  and More with the Importance, Make it a Tally and Add to a Shopping
-  List, and the format bar over the field, without ☐, link and table.
-  To full editor in the window opens the Note in the editor on the
-  right, the middle pane staying where it was; in the popup it closes
-  the popup and opens the Note there in the window, brought back from
-  the tray.
+- **On the desktop** the capture popup and the window's quick note
+  dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
+  quick note and follow the same switches (desktop Settings ▸ Quick
+  note, beside Quick capture): by default the text, Record voice, Paste
+  (the dialog also From file…), the Nudge buttons and To full editor;
+  switched on, File into…, Routine, Reminder, Frog and Session, and
+  More with the Importance, Make it a Tally and Add to a Shopping List,
+  and the format bar over the field, without ☐, link and table. Files
+  dropped onto the window open the dialog and wait in it. Leaving the
+  dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
+  beside it keeps what is typed, nudged in 1 h. To full editor in the
+  window opens the Note in the Note dialog in its place; in the popup it
+  closes the popup and opens the Note there in the window, brought back
+  from the tray.
 - **Add to a Shopping List** makes each line of the capture a Line of
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
@@ -289,7 +300,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   screen reader reads each as "setting: value". The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
   there only for who may set them up. The text, the Lines, the photos and
-  recordings and the Sections stay the page's content.
+  recordings and the Sections stay the page's content. On the desktop
+  the badges sit under the text in the Note dialog, their small editors
+  are dialogs over it, and the menu of "+" opens under it.
 - Another person's Note shows their Profile picture, or its
   placeholder, on its card; one's own Notes show none. Tapping another
   person's picture, anywhere it shows, opens their Profile.
@@ -485,14 +498,18 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   bar** on top (File, Edit, View, Note, Sync, Help); **the sidebar** on
   the left with the Agenda, Unsorted, All Notes, Frogs, the Areas with
   their Topics and the Trash, marking the place shown; **the list** in
-  the middle. The selected Note's editor sits on the right until the
-  Note opens as a dialog (#146).
+  the middle. **A Note opens as a dialog over the window** (#146), one at
+  a time, over the list and the sidebar but not the menu bar, which
+  stays at hand for it; closing it keeps what was typed: its cross, Esc,
+  Alt+Left, the mouse's back button and a click beside it. The Routine
+  editor, a Tally's pages and the New Tally page open as dialogs over
+  the dialog or the list they were opened from.
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader; the Note menu acts on the
-  Note in the editor and is greyed while there is none, each entry as
-  far as the editor offers it. Its keys (Ctrl+N, Ctrl+F, Ctrl+M,
+  Note in the Note dialog and is greyed while none is open, each entry
+  as far as the dialog offers it. Its keys (Ctrl+N, Ctrl+F, Ctrl+M,
   Ctrl+,; Cmd on macOS) stand beside the entries and work while typing,
-  not while a dialog is open.
+  over the Note dialog too, not while another dialog is open.
 - **The Settings, About and everything under Sync (Sync, Pair a Device,
   People, Profile, Backups) open as dialogs over the window**, never as
   views replacing the list, and no button on the main window leads to
@@ -509,7 +526,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Household › Repairs"; a click on a level shows it, "Areas" leading to
   All Notes.
 - In the Note lists a click unfolds a compact Note; a double-click or
-  Edit opens the editor.
+  Edit opens the Note dialog.
 
 ## User guide
 

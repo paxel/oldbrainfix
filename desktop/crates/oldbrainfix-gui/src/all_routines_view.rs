@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use egui::{Id, RichText, Ui};
 use oldbrainfix_core::{Area, Note, Routine, Routines};
 
-use crate::app::{area_colour, banded_clickable_card, icon_button};
+use crate::app::{area_colour, banded_clickable_card, icon_button, list_scroll};
 use crate::icons;
 use crate::l10n::{self, L10n};
 use crate::schedule_text::schedule_text;
@@ -22,7 +22,7 @@ use crate::theme::Tones;
 /// What the page asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllRoutinesAction {
-    /// The editor of the Routine with this id, on the right.
+    /// The editor of the Routine with this id, in its dialog.
     Open(String),
     /// The Note with this id, that of a Routine a newer version saved.
     OpenNote(String),
@@ -109,36 +109,33 @@ pub fn page(
         ui.label(RichText::new(t.all_routines_empty()).color(weak));
         return;
     }
-    egui::ScrollArea::vertical()
-        .id_salt("all routines")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
-            ui.add_space(4.0);
-            for (routine, name, area) in rows {
-                let icon = if routine.is_reminder() {
-                    icons::REMINDER
-                } else {
-                    icons::REPEAT
-                };
-                let when = schedule_text(t, &routine.schedule);
-                if card(ui, tones, (&routine.id, name, area.as_ref()), icon, &when) {
-                    actions.push(AllRoutinesAction::Open(routine.id.clone()));
-                }
+    list_scroll(ui, "all routines", |ui| {
+        ui.spacing_mut().item_spacing.y = 12.0;
+        ui.add_space(4.0);
+        for (routine, name, area) in rows {
+            let icon = if routine.is_reminder() {
+                icons::REMINDER
+            } else {
+                icons::REPEAT
+            };
+            let when = schedule_text(t, &routine.schedule);
+            if card(ui, tones, (&routine.id, name, area.as_ref()), icon, &when) {
+                actions.push(AllRoutinesAction::Open(routine.id.clone()));
             }
-            for row in newer {
-                let when = t.newer_version_needed();
-                if card(
-                    ui,
-                    tones,
-                    (&row.id, &row.name, row.area.as_ref()),
-                    icons::HISTORY,
-                    when,
-                ) {
-                    actions.push(AllRoutinesAction::OpenNote(row.note.clone()));
-                }
+        }
+        for row in newer {
+            let when = t.newer_version_needed();
+            if card(
+                ui,
+                tones,
+                (&row.id, &row.name, row.area.as_ref()),
+                icons::HISTORY,
+                when,
+            ) {
+                actions.push(AllRoutinesAction::OpenNote(row.note.clone()));
             }
-        });
+        }
+    });
 }
 
 /// One Routine or Reminder as a card: `icon` for its kind, its name and

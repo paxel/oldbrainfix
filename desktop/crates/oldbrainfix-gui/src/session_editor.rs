@@ -29,6 +29,9 @@ pub const WEEKDAYS_OPEN: &str = "sessionWeekdaysOpen";
 pub enum SessionIntent {
     /// Keeps whether the weekdays' counts are open.
     WeekdaysOpen(bool),
+    /// "New Tally" at the end of the pool (#161): the New Tally page,
+    /// whose Tally comes back ticked.
+    NewTally,
 }
 
 /// What the Routine editor holds of a Session while it is edited: the
@@ -52,6 +55,9 @@ pub struct SessionDraft {
     /// Set by a Save that found something to fix: the pool's error shows
     /// from then on.
     pub checked: bool,
+    /// Whether the pool ends in "New Tally", as on the New Session page
+    /// (#161).
+    pub new_tally: bool,
 }
 
 impl SessionDraft {
@@ -86,6 +92,7 @@ impl SessionDraft {
             counts: std::array::from_fn(|i| counts.get(&(i as u32 + 1)).copied()),
             weekdays_open: store.local_setting(WEEKDAYS_OPEN)?.as_deref() == Some("true"),
             checked: false,
+            new_tally: false,
         })
     }
 
@@ -107,6 +114,15 @@ impl SessionDraft {
     /// How many weekdays have their own count.
     pub fn own_counts(&self) -> i64 {
         self.counts.iter().flatten().count() as i64
+    }
+
+    /// Puts the Tally `id`, shown as `name`, just made, first in the
+    /// picker, ticked.
+    pub fn add_made(&mut self, id: &str, name: &str) {
+        self.order.retain(|held| held != id);
+        self.order.insert(0, id.to_string());
+        self.chosen.insert(id.to_string());
+        self.names.insert(id.to_string(), name.to_string());
     }
 
     pub fn valid(&self) -> bool {
@@ -177,10 +193,20 @@ impl SessionDraft {
         embossed(ui, tones, false, None, |ui| {
             ui.label(RichText::new(t.session_pool()).strong().color(text));
             ui.label(RichText::new(t.session_pool_explain()).color(text));
-            if self.order.is_empty() {
+            if self.order.is_empty() && !self.new_tally {
                 ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
-            } else {
+            } else if !self.order.is_empty() {
                 self.pool_rows(ui, t);
+            }
+            // Making one stays inside the list, on this page (#161).
+            if self.new_tally {
+                let made = ui.horizontal(|ui| {
+                    icons::show(ui, icons::ADD, 20.0, text);
+                    ui.button(RichText::new(t.new_tally()).color(text))
+                });
+                if made.inner.clicked() {
+                    intent = Some(SessionIntent::NewTally);
+                }
             }
             if self.rule == SessionRule::Rolling && self.order.len() > 1 {
                 ui.label(

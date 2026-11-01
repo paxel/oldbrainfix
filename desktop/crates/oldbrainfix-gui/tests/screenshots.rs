@@ -64,9 +64,11 @@ struct Texts {
     snack: &'static str,
     bins: &'static str,
     garage: &'static str,
-    /// The capture field's hint, and a thought typed into it.
+    /// The quick note's hint, and a thought typed into it.
     hint: &'static str,
     capture: &'static str,
+    /// The "+" at the top of a list (#161).
+    add_here: &'static str,
     /// A Note with a typo, and its text as an AI Task fixes it.
     typo: &'static str,
     fixed: &'static str,
@@ -94,6 +96,7 @@ const EN: Texts = Texts {
     garage: "Call the garage about the winter tyres",
     hint: "What's on your mind?",
     capture: "Ask Dana if she still needs the ladder",
+    add_here: "Add here",
     typo: "Pick up the parcel for Dana at the post office tomorow",
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
     note_menu: "Note",
@@ -119,6 +122,7 @@ const DE: Texts = Texts {
     garage: "Werkstatt wegen der Winterreifen anrufen",
     hint: "Was geht dir durch den Kopf?",
     capture: "Dana fragen, ob sie die Leiter noch braucht",
+    add_here: "Hier hinzufügen",
     typo: "Packet für Dana morgen bei der Post abhohlen",
     fixed: "Paket für Dana morgen bei der Post abholen",
     note_menu: "Notiz",
@@ -376,9 +380,12 @@ fn guide_frames() -> TestResult {
                 |screen: &str| format!("site/assets/frames/desktop/{language}/{name}/{screen}.png");
             let mut harness = window(texts, language, theme)?;
             problems.extend(match_frame(&mut harness, &frame("agenda"))?);
-            // A thought typed into the Agenda's capture field: the action
-            // row and the Nudge times show.
+            // A thought typed into the quick note, opened over the Agenda
+            // as File ▸ New Note opens it (#146): the action row and the
+            // Nudge times show.
             let mut harness = window(texts, language, theme)?;
+            harness.state_mut().new_note();
+            harness.run();
             harness
                 .get_by(|n| n.placeholder() == Some(texts.hint))
                 .click();
@@ -406,8 +413,9 @@ fn guide_frames() -> TestResult {
                 })
             })?;
             problems.extend(match_frame(&mut harness, &frame("ai-review"))?);
-            // The window's three panes: the Household's Notes, the
-            // kitchen tap's, filed into Repairs, open in the editor.
+            // The Household's Notes under the kitchen tap's, filed into
+            // Repairs, open in the Note dialog with its badges (#146,
+            // #160).
             let mut tap = String::new();
             let mut harness = window_with(texts, language, theme, |_, ids| {
                 tap = ids[0].clone();
@@ -429,6 +437,18 @@ fn guide_frames() -> TestResult {
                 .click();
             harness.run();
             problems.extend(match_frame(&mut harness, &frame("menu"))?);
+            // What "+" at the top of the Household's list makes (#161).
+            let mut harness = window(texts, language, theme)?;
+            let household = Places::new(harness.state().store())
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.household)
+                .ok_or("the Household Area")?;
+            harness.state_mut().select(Selection::Place(household.id));
+            harness.run();
+            harness.get_by_label(texts.add_here).click();
+            harness.run();
+            problems.extend(match_frame(&mut harness, &frame("add-menu"))?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;

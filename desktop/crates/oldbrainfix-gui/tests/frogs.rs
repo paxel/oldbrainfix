@@ -208,11 +208,16 @@ fn the_heading_opens_the_frog_view_with_the_done_fold_closed() -> TestResult {
     harness.run();
     assert!(frogs.done()?.is_empty());
 
-    // A click on a row opens its Note; back goes to the Agenda.
+    // A click on a row opens its Note in the Note dialog; back closes
+    // it, then goes to the Agenda.
     harness.get_by_role_and_label(Role::Button, JOBS[1]).click();
     harness.run();
     let note = frogs.open()?.remove(1).note_id;
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert!(!harness.state().note_open());
+    assert_eq!(harness.state().selection(), &Selection::Frogs);
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Agenda);
@@ -280,6 +285,10 @@ fn the_note_editor_makes_a_frog() -> TestResult {
     let mut harness = window(&store, "en");
     harness.state_mut().select_note(&note.id);
     harness.run();
+    // In the menu of the "+" badge (#160).
+    let add = t.routine_or_reminder();
+    harness.get_by_label(add).click();
+    harness.run();
     harness
         .get_by_role_and_label(Role::Button, t.frog())
         .click();
@@ -292,14 +301,16 @@ fn the_note_editor_makes_a_frog() -> TestResult {
             .iter()
             .any(|n| n.id == note.id)
     );
-    // One open Frog at a time: the button goes while it is open.
+    // One open Frog at a time: the entry goes while it is open.
+    harness.get_by_label(add).click();
+    harness.run();
+    assert!(shows(&harness, t.reminder()));
     assert!(
         harness
             .query_all_by_role_and_label(Role::Button, t.frog())
             .next()
             .is_none()
     );
-    assert!(shows(&harness, &format!("Done: {}", t.frog())));
     Ok(())
 }
 

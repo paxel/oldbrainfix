@@ -184,14 +184,20 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
-/// Where `label` shows furthest right: in the editor, when the card in
-/// the middle shows it too (#114).
+/// Where `label` shows last: in the Note dialog, over the card in the
+/// list that shows it too (#114, #146).
 fn rightmost<S>(harness: &Harness<'_, S>, label: &str) -> egui::Rect {
     harness
         .query_all_by_label(label)
         .map(|n| n.rect())
-        .max_by(|a, b| a.left().total_cmp(&b.left()))
+        .next_back()
         .unwrap_or_else(|| panic!("no {label:?}"))
+}
+
+/// Opens the quick note's dialog, as File ▸ New Note does (#146).
+fn quick(harness: &mut Harness<'_, App>) {
+    harness.state_mut().new_note();
+    harness.run();
 }
 
 #[test]
@@ -200,6 +206,7 @@ fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> Te
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
+    quick(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     assert!(harness.state().recording());
@@ -225,9 +232,15 @@ fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> Te
         store.current(&note.id, "nudge")?,
         Some(dart_iso(store.now() + Duration::hours(1)))
     );
-    // The new Note shows in the editor with its play button.
-    assert_eq!(harness.state().selected_note(), Some(note.id.as_str()));
-    harness.get_by_label("Play the voice recording").click();
+    // The new Note's card shows; opened, its dialog has its play button.
+    assert_eq!(harness.state().selected_note(), None);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness
+        .get_all_by_label("Play the voice recording")
+        .last()
+        .ok_or("the dialog's play button")?
+        .click();
     // While it plays, the window looks every quarter second.
     harness.run_steps(3);
     assert_eq!(devices.borrow().played, vec![heard()]);
@@ -243,6 +256,7 @@ fn a_recording_and_the_typed_text_go_into_one_note_with_the_picked_nudge() -> Te
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
+    quick(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     type_into(&mut harness, "What's on your mind?", "Garage");
@@ -265,6 +279,7 @@ fn closing_the_window_while_recording_keeps_the_recording() -> TestResult {
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
+    quick(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     harness.state_mut().flush();
@@ -279,6 +294,7 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
+    quick(&mut harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     assert_eq!(devices.borrow().starts, 1);
@@ -303,6 +319,7 @@ fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
+    quick(&mut harness);
     harness.get_by_label("Paste").click();
     harness.run();
     // Nothing there is said in grey, not announced (#130).
@@ -333,8 +350,8 @@ fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
     assert_eq!(notes[0].text, "Parking spot");
     assert_eq!(notes[0].photos.len(), 1);
     assert_eq!(store.photo(&notes[0].photos[0]), Some(photo));
-    // The card and the editor show it.
-    assert!(harness.query_all_by_label("Photo").count() >= 2);
+    // Its card shows it.
+    assert!(harness.query_all_by_label("Photo").count() >= 1);
     Ok(())
 }
 
@@ -845,7 +862,9 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     // On the card and in the editor.
     assert_eq!(harness.query_all_by_label(spare).count(), 2);
     assert!(!shows(&harness, "Remove photo, keep text"));
-    // Search still finds it.
+    // Search still finds it, under the Note dialog.
+    harness.state_mut().close_note();
+    harness.run();
     type_into(&mut harness, "Search all Notes", "spare key");
     assert_eq!(harness.state().shown_notes(), vec![SHED]);
     Ok(())
@@ -897,16 +916,30 @@ fn disk_store(dir: &std::path::Path) -> Result<Arc<Store>, Box<dyn std::error::E
     Ok(Arc::new(store))
 }
 
-/// Records a voice Note through the fake microphone; it opens in the
-/// editor with its play button.
-fn record_note<S>(harness: &mut Harness<'_, S>, devices: &Shared) {
+/// Records a voice Note through the fake microphone in the quick note,
+/// then opens it in the Note dialog with its play button.
+fn record_note(harness: &mut Harness<'_, App>, devices: &Shared) {
     devices.borrow_mut().mic = true;
+    quick(harness);
     harness.get_by_label("Record voice").click();
     harness.run();
     harness.get_by_label("Stop").click();
     harness.run();
     harness.get_by_label("1 h").click();
     harness.run();
+    open_newest(harness);
+}
+
+/// Opens the Note captured last in the Note dialog.
+fn open_newest(harness: &mut Harness<'_, App>) {
+    let notes = Notes::new(harness.state().store())
+        .all()
+        .unwrap_or_default();
+    if let Some(newest) = notes.first() {
+        let id = newest.id.clone();
+        harness.state_mut().select_note(&id);
+        harness.run();
+    }
 }
 
 #[test]
@@ -977,12 +1010,14 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     let devices: Shared = Rc::default();
     let mut harness = window_in(store, &devices, "de");
     devices.borrow_mut().mic = true;
+    quick(&mut harness);
     harness.get_by_label("Sprache aufnehmen").click();
     harness.run();
     harness.get_by_label("Beenden").click();
     harness.run();
     harness.get_by_label("1 Std.").click();
     harness.run();
+    open_newest(&mut harness);
     assert!(shows(&harness, "1,5×"));
     harness.get_by_label("1,5×").click();
     harness.run_steps(3);
@@ -1122,6 +1157,9 @@ fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
     ] {
         assert!(!shows(&harness, gone), "{gone}");
     }
+    // The search lies under the Note dialog.
+    harness.state_mut().close_note();
+    harness.run();
     type_into(&mut harness, "Search all Notes", "spare key");
     assert!(harness.state().shown_notes().is_empty());
     Ok(())

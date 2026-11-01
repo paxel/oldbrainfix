@@ -390,6 +390,9 @@ fn the_person_filter_ticks_me_and_people_and_combines_with_the_search() -> TestR
     press(&mut harness, Role::Button, "Show Notes by…");
     press(&mut harness, Role::CheckBox, "Ben");
     assert!(!harness.state().people_filter().is_everyone());
+    // Leaving closes the menu, as the click on the sidebar would.
+    harness.key_press(egui::Key::Escape);
+    harness.run();
     harness.state_mut().select(Selection::Unsorted);
     harness.run();
     assert!(harness.state().people_filter().is_everyone());

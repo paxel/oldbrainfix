@@ -49,6 +49,8 @@ fn window(store: Arc<Store>, locale: &str, picked: Vec<PathBuf>) -> Harness<'sta
     let mut app = App::new(store, locale);
     app.set_files_picker(Box::new(move |_| picked.clone()));
     app.select(Selection::All);
+    // From file… is the quick note's, in its dialog (#146).
+    app.new_note();
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(

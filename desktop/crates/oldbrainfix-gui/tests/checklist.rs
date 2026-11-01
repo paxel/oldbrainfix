@@ -486,6 +486,8 @@ fn back_to_a_plain_note_marks_the_checked_lines_and_indents_the_groups() -> Test
     let charger = list_of(&store, &note)?.lines[1].id.clone();
     Checklists::new(&store).check(&charger)?;
     let mut harness = window(&store, Some(&note));
+    // In the Note dialog's kind badge (#160).
+    click(&mut harness, "Kind: Checklist")?;
     click(&mut harness, "Back to a plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?

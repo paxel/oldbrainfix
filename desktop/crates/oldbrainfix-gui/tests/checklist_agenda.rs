@@ -31,7 +31,7 @@ const PACKING: &str = "Packing\nPassport\n  Charger\nTicket";
 const SWITCH: &str = "Show on the Agenda";
 
 /// The Agenda's message for a day with nothing due.
-const NOTHING_TODAY: &str = "Nothing due today. Type a thought into the field above to capture it.";
+const NOTHING_TODAY: &str = "Nothing due today. Click + to capture a thought.";
 
 /// A store on a clock that moves a second per read from [`NOW`], with
 /// its own Profile, and the Checklist [`PACKING`]: the store and the
@@ -223,10 +223,15 @@ fn the_cards_menu_switches_it_off_the_agenda_and_on_again() -> TestResult {
 fn the_editor_switches_it_off_the_agenda() -> TestResult {
     let (store, note) = packing()?;
     let mut harness = window(&store, Selection::All, Some(&note));
+    // The Note dialog's badge for it (#160), its switch in its editor.
+    assert!(harness.query_by_label("Show on the Agenda: On").is_some());
+    click(&mut harness, "Show on the Agenda: On")?;
     assert_eq!(switch(&harness), Some(true));
     click(&mut harness, SWITCH)?;
     assert!(!Checklists::new(&store).shows_on_agenda(&note)?);
     assert_eq!(switch(&harness), Some(false));
+    click(&mut harness, "Close")?;
+    assert!(harness.query_by_label("Show on the Agenda: Off").is_some());
     harness.state_mut().select(Selection::Agenda);
     harness.run();
     assert!(!shows(&harness, "Packing: 3 of 3 open"));
@@ -251,6 +256,12 @@ fn a_checklist_with_a_routine_has_no_row_and_no_switch() -> TestResult {
     harness.state_mut().select_note(&note);
     harness.run();
     assert_eq!(switch(&harness), None);
+    assert!(
+        harness
+            .query_all_by_label_contains("Show on the Agenda")
+            .next()
+            .is_none()
+    );
     Ok(())
 }
 

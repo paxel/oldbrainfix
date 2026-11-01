@@ -11,7 +11,8 @@
 //! then the Lines to check, each renamed in place where this Device may
 //! change it (#141, `line_editing`); for those, ⋮ and a right-click on
 //! its box's row with its reappear time as radio buttons and "Delete for
-//! good"; and "Back to a plain Note" for who may change the Note. Nothing is written when a struck Line comes back: the window
+//! good". "Back to a plain Note" is a badge of the Note dialog (#160).
+//! Nothing is written when a struck Line comes back: the window
 //! reads the list again every half minute, so it shows open soon after
 //! the start of its day.
 
@@ -152,8 +153,7 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
 
 /// The Shopping List part of a Note's editor (#122), under its text: the
 /// field and "Add" at the top, where a new Line shows, its Lines, each
-/// renamed in place in `typed` where this Device may (#141), and "Back to
-/// a plain Note" as `shown` allows.
+/// renamed in place in `typed` where this Device may (#141).
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -178,7 +178,7 @@ pub fn section(
             {
                 actions.push(ShoppingAction::Add(note.clone()));
             }
-            ui.add(
+            let field = ui.add(
                 TextEdit::multiline(&mut typed.add)
                     .id(id)
                     .hint_text(t.checklist_new_line())
@@ -186,6 +186,11 @@ pub fn section(
                     .desired_rows(1)
                     .desired_width(f32::INFINITY),
             );
+            // A list just made: what is bought first goes in here (#161).
+            if typed.add_focus {
+                field.request_focus();
+                typed.add_focus = !field.has_focus();
+            }
             let add = ui.add_enabled(
                 !typed.add.trim().is_empty(),
                 egui::Button::new(RichText::new(t.add()).color(text)),
@@ -239,14 +244,8 @@ pub fn section(
                 LineAsk::Menu(id, step) => ShoppingAction::Step(id, step),
             });
         }
+        // Back to a plain Note is the Note dialog's kind badge (#160).
         actions.extend(typing.into_iter().map(ShoppingAction::Typed));
-        if shown.plain
-            && ui
-                .button(RichText::new(t.checklist_to_plain()).color(text))
-                .clicked()
-        {
-            actions.push(ShoppingAction::ToPlain(note.clone()));
-        }
     });
 }
 

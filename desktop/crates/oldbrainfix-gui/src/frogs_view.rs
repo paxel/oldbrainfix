@@ -8,7 +8,7 @@
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Area, Day, Frog, Note};
 
-use crate::app::{area_colour, check, embossed, row_title};
+use crate::app::{area_colour, check, embossed, list_scroll, row_title};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::day_text;
@@ -176,33 +176,30 @@ pub fn frogs_page(
         ui.heading(RichText::new(t.frogs_title()).color(text));
     });
     ui.add_space(8.0);
-    egui::ScrollArea::vertical()
-        .id_salt("frogs")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
-            ui.add_space(4.0);
-            if open.is_empty() {
-                ui.label(RichText::new(t.frogs_empty_desk()).color(weak));
-            }
-            for shown in open {
-                frog_row(ui, t, tones, shown, (false, None), actions);
-            }
-            if done.is_empty() {
-                return;
-            }
-            let fold = egui::CollapsingHeader::new(RichText::new(t.frogs_done()).color(text))
-                .id_salt("frogs done")
-                .open(Some(done_open))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 12.0;
-                    for shown in done {
-                        let on = shown.done_on.map(|day| t.frog_done_on(&day_text(t, day)));
-                        frog_row(ui, t, tones, shown, (false, on.as_deref()), actions);
-                    }
-                });
-            if fold.header_response.clicked() {
-                actions.push(FrogAction::DoneOpen(!done_open));
-            }
-        });
+    list_scroll(ui, "frogs", |ui| {
+        ui.spacing_mut().item_spacing.y = 12.0;
+        ui.add_space(4.0);
+        if open.is_empty() {
+            ui.label(RichText::new(t.frogs_empty_desk()).color(weak));
+        }
+        for shown in open {
+            frog_row(ui, t, tones, shown, (false, None), actions);
+        }
+        if done.is_empty() {
+            return;
+        }
+        let fold = egui::CollapsingHeader::new(RichText::new(t.frogs_done()).color(text))
+            .id_salt("frogs done")
+            .open(Some(done_open))
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 12.0;
+                for shown in done {
+                    let on = shown.done_on.map(|day| t.frog_done_on(&day_text(t, day)));
+                    frog_row(ui, t, tones, shown, (false, on.as_deref()), actions);
+                }
+            });
+        if fold.header_response.clicked() {
+            actions.push(FrogAction::DoneOpen(!done_open));
+        }
+    });
 }

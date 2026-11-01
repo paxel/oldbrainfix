@@ -165,7 +165,7 @@ fn starter_names_show_in_the_apps_language() -> TestResult {
 }
 
 #[test]
-fn a_selected_note_shows_right_with_its_sections_and_merged_notes() -> TestResult {
+fn a_selected_note_shows_in_its_dialog_with_its_sections_and_merged_notes() -> TestResult {
     let mut harness = harness("sections", "en")?;
     // Merged Notes leave every list: they show on their target's card.
     assert!(!has_card(&harness, "Dentist on Tuesday"));
@@ -183,30 +183,24 @@ fn a_selected_note_shows_right_with_its_sections_and_merged_notes() -> TestResul
         "Bring the old X-ray",
         "Called, all set",
     ] {
+        // On the card, and in the Note dialog over the list (#146).
         let shown: Vec<egui::Rect> = harness
             .query_all_by_label(section)
             .map(|n| n.rect())
             .collect();
-        assert!(
-            shown.iter().any(|r| r.left() > target.right()),
-            "{section} on the right"
-        );
-        assert!(
-            shown.iter().any(|r| target.contains_rect(*r)),
-            "{section} on the card"
-        );
+        assert_eq!(shown.len(), 2, "{section} on the card and in the dialog");
+        assert!(target.contains_rect(shown[0]), "{section} on the card");
     }
-    // Oldest first, on the right.
+    // Oldest first, in the dialog, drawn last.
     let top = |label| {
         harness
             .query_all_by_label(label)
             .map(|n| n.rect())
-            .find(|r| r.left() > target.right())
+            .next_back()
             .map_or(f32::NAN, |r| r.top())
     };
     assert!(top("Dentist on Tuesday") < top("Called, all set"));
-    assert!(shows(&harness, "Importance"));
-    assert!(shows(&harness, "Normal"));
+    assert!(shows(&harness, "Importance: Normal"));
     Ok(())
 }
 
@@ -224,7 +218,7 @@ fn trashed_notes_show_only_in_the_trash() -> TestResult {
     assert!(!has_card(&harness, "Into the bin with the other"));
     assert!(!shows(&harness, "Not so old after all"));
     // The row on the left and the heading in the middle, then the
-    // Note's state on the right.
+    // Note's state in its dialog.
     assert_eq!(harness.query_all_by_label("Trash").count(), 2);
     edit(&harness, "Old shopping list").click();
     harness.run();
@@ -377,6 +371,9 @@ fn retype(harness: &mut Harness<'_, App>, text: &str) {
 fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
     let mut harness = harness("places", "en")?;
     let now = harness.state().store().now();
+    // The quick note's dialog (#146).
+    harness.state_mut().new_note();
+    harness.run();
     field(&harness, "What's on your mind?").click();
     harness.run();
     typing(&harness).type_text("Buy milk");
@@ -386,19 +383,20 @@ fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
     harness.run();
     let milk = find(harness.state(), "Buy milk")?;
     assert!(milk.is_unsorted());
-    assert_eq!(harness.state().selected_note(), Some(milk.id.as_str()));
+    // Saved, the dialog goes, and no Note opens.
+    assert!(!harness.state().quick_note_open());
+    assert_eq!(harness.state().selected_note(), None);
     let nudge = |h: &Harness<'_, App>, id: &str| h.state().store().current(id, "nudge");
     assert_eq!(
         nudge(&harness, &milk.id)?,
         Some(dart_iso(now + Duration::minutes(30)))
     );
-    assert!(field(&harness, "What's on your mind?").rect().width() > 0.0);
 
     // Inside a Topic the Note is filed there, sorted: one Save instead
     // of the Nudge times, and Ctrl+Enter saves it without a Nudge (#113).
     harness.get_by_label("Kitchen").click();
     harness.run();
-    field(&harness, "What's on your mind?").click();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();
     typing(&harness).type_text("  Buy descaler ");
     harness.run();
@@ -532,10 +530,14 @@ fn a_text_in_a_later_structure_shows_as_it_is_and_version_1_is_plain() -> TestRe
     harness.run();
     assert_eq!(harness.state().store().current(&id, "text")?, before);
     // Version 1 in a format not known here: read-only too.
+    harness.state_mut().close_note();
+    harness.run();
     edit(&harness, "# Version one").click();
     harness.run();
     assert!(shows(&harness, NEWER));
     // Version 1 written out, in a known format, is editable.
+    harness.state_mut().close_note();
+    harness.run();
     edit(&harness, "Version one written out").click();
     harness.run();
     assert!(!shows(&harness, NEWER));
@@ -555,7 +557,8 @@ fn a_note_in_an_unknown_format_is_merged_with_its_text_as_it_is() -> TestResult 
         .to_string();
     let before = harness.state().store().current(&id, "text")?;
     harness.get_by_label("Merge into…").click_accesskit();
-    harness.run();
+    // The picker over the Note dialog takes a few frames to settle.
+    harness.run_steps(8);
     // The picker's search has the keyboard; the list behind has one too.
     typing(&harness).type_text("OAT");
     harness.run();
@@ -605,6 +608,9 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
             .ok_or_else(|| "the Note".into())
     };
 
+    // The Importance badge's small editor (#160).
+    harness.get_by_label("Importance: Normal").click();
+    harness.run();
     harness.get_by_label("Important").click();
     harness.run();
     assert_eq!(note(&harness, &kettle)?.importance, Importance::Important);
@@ -639,7 +645,7 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
             .query_by_role_and_label(Role::Button, "Descale the kettle")
             .is_none()
     );
-    // The Note stays on the right, to be restored at once.
+    // The Note stays in its dialog, to be restored at once.
     harness.get_by_label("Restore").click();
     harness.run();
     assert!(!note(&harness, &kettle)?.is_trashed());
@@ -669,8 +675,10 @@ fn a_note_is_filed_from_its_editor_or_by_dragging_its_card() -> TestResult {
     edit(&harness, "Still Unsorted").click();
     harness.run();
     let id = find(harness.state(), "Still Unsorted")?.id;
-    harness.get_by_label("File into…").click();
-    harness.run();
+    // The badge of where it is filed opens File into… (#160).
+    harness.get_by_label("Area and Topic: Unsorted").click();
+    // File into… over the Note dialog takes a few frames to settle.
+    harness.run_steps(8);
     right_of(&harness, "Kitchen", 300.0)?.click();
     harness.run();
     let filed = |h: &Harness<'_, App>| -> Result<_, Box<dyn std::error::Error>> {
@@ -679,6 +687,8 @@ fn a_note_is_filed_from_its_editor_or_by_dragging_its_card() -> TestResult {
             .and_then(|n| n.place))
     };
     assert_eq!(filed(&harness)?, Some(place(harness.state(), "Kitchen")?));
+    harness.state_mut().close_note();
+    harness.run();
 
     // Dragged onto a Topic on the left, the card is filed there.
     let from = card(&harness, "Still Unsorted").rect().center();
@@ -928,11 +938,12 @@ fn back_and_forward_walk_the_places_shown_and_the_path_leads_up() -> TestResult 
     // While typing, Alt+arrows stay with the text.
     harness.get_by_label("Unsorted").click();
     harness.run();
-    field(&harness, "What's on your mind?").click();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Unsorted);
+    assert!(harness.state().quick_note_open());
     Ok(())
 }
 
@@ -942,11 +953,11 @@ fn the_editor_speaks_german() -> TestResult {
     edit(&harness, "Still Unsorted").click();
     harness.run();
     for label in [
-        "Ablegen in …",
+        "Wichtigkeit: Normal",
+        "Bereich und Thema: Unsortiert",
         "Zusammenführen mit …",
         "In den Papierkorb",
         "Zur Notiz hinzufügen",
-        "Oder ihre Karte auf einen Bereich oder ein Thema ziehen.",
     ] {
         assert!(shows(&harness, label), "{label}");
     }
@@ -964,7 +975,8 @@ fn what_is_typed_is_kept_as_the_window_closes() -> TestResult {
     harness.run();
     retype(&mut harness, "Still Unsorted, sadly");
     harness.run();
-    field(&harness, "What's on your mind?").click();
+    // Ctrl+N keeps the Note's text and opens the quick note (#146).
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();
     typing(&harness).type_text("Half a thought");
     harness.run();
@@ -981,8 +993,12 @@ fn an_areas_level_adds_topics() -> TestResult {
     let mut harness = harness("places", "en")?;
     harness.get_by_label("Kids").click();
     harness.run();
-    harness.get_by_label("New Topic").click();
+    // In the menu of "+" (#161).
+    harness.get_by_label("Add here").click();
     harness.run();
+    harness.get_by_label("Topic").click();
+    harness.run();
+    assert!(shows(&harness, "New Topic"));
     typing(&harness).type_text("Homework");
     harness.run();
     harness.get_by_label("Create").click();
@@ -991,6 +1007,8 @@ fn an_areas_level_adds_topics() -> TestResult {
     // Not on a Topic's level: there is no third.
     harness.get_by_label("Homework").click();
     harness.run();
-    assert!(harness.query_by_label("New Topic").is_none());
+    harness.get_by_label("Add here").click();
+    harness.run();
+    assert!(harness.query_by_label("Topic").is_none());
     Ok(())
 }

@@ -13,7 +13,7 @@ use oldbrainfix_core::{
     Adherence, ClockTime, Day, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory,
 };
 
-use crate::app::embossed;
+use crate::app::{embossed, list_scroll};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_text};
@@ -66,35 +66,32 @@ pub fn page(ui: &mut Ui, t: &L10n, tones: Tones, shown: Option<&HistoryShown>, w
         return;
     };
     let history = &shown.history;
-    egui::ScrollArea::vertical()
-        .id_salt("routine history")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
-            ui.add_space(4.0);
-            let title: Vec<&str> = shown.title.trim().lines().take(TITLE_LINES).collect();
-            ui.label(
-                RichText::new(title.join("\n"))
-                    .size(16.0)
-                    .strong()
-                    .color(text),
-            );
-            ui.label(RichText::new(&shown.schedule).color(text));
-            if shown.streaks {
-                embossed(ui, tones, false, None, |ui| {
-                    streak_panel(ui, t, tones, history)
-                });
-            }
-            embossed(ui, tones, false, None, |ui| adherence_panel(ui, t, history));
-            ui.label(RichText::new(t.history_log()).strong().color(text));
-            ui.label(RichText::new(t.snoozes_here_device()).small().color(weak));
-            if history.entries.is_empty() {
-                ui.label(RichText::new(t.history_empty()).color(text));
-            }
-            for entry in history.entries.iter().rev() {
-                log_row(ui, t, tones, entry, wall);
-            }
-        });
+    list_scroll(ui, "routine history", |ui| {
+        ui.spacing_mut().item_spacing.y = 12.0;
+        ui.add_space(4.0);
+        let title: Vec<&str> = shown.title.trim().lines().take(TITLE_LINES).collect();
+        ui.label(
+            RichText::new(title.join("\n"))
+                .size(16.0)
+                .strong()
+                .color(text),
+        );
+        ui.label(RichText::new(&shown.schedule).color(text));
+        if shown.streaks {
+            embossed(ui, tones, false, None, |ui| {
+                streak_panel(ui, t, tones, history)
+            });
+        }
+        embossed(ui, tones, false, None, |ui| adherence_panel(ui, t, history));
+        ui.label(RichText::new(t.history_log()).strong().color(text));
+        ui.label(RichText::new(t.snoozes_here_device()).small().color(weak));
+        if history.entries.is_empty() {
+            ui.label(RichText::new(t.history_empty()).color(text));
+        }
+        for entry in history.entries.iter().rev() {
+            log_row(ui, t, tones, entry, wall);
+        }
+    });
 }
 
 /// The current and longest Streak, and the last seven days as dots.

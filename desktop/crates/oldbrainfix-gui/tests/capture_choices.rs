@@ -279,6 +279,11 @@ fn window(store: &Arc<Store>) -> Harness<'static, App> {
 }
 
 fn type_in_window(harness: &mut Harness<'_, App>, text: &str) {
+    // The quick note's dialog first (#146).
+    if !harness.state().quick_note_open() {
+        harness.state_mut().new_note();
+        harness.run();
+    }
     harness
         .get_by(|n| n.placeholder() == Some("What's on your mind?"))
         .click();
@@ -319,7 +324,9 @@ fn the_windows_capture_holds_its_choices_until_saved() -> TestResult {
     assert_eq!(plants.importance, Importance::Important);
     assert_eq!(Frogs::new(&store).of_note(&plants.id)?.len(), 1);
     assert_eq!(nudge(&store, &plants.id)?, None);
-    assert_eq!(harness.state().selected_note(), Some(plants.id.as_str()));
+    // Saved, the quick note's dialog goes; no Note dialog opens (#146).
+    assert!(!harness.state().quick_note_open());
+    assert_eq!(harness.state().selected_note(), None);
     assert!(!shows(&harness, "Remove Frog"));
     Ok(())
 }

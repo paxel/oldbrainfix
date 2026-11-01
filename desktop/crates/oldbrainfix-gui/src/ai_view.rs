@@ -15,7 +15,7 @@ use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::routines::keys as routine_keys;
 use oldbrainfix_core::{Importance, Notes, Places, Routines, Store, StoredText, parse_time};
 
-use crate::app::{clickable_card, embossed, row_title, when};
+use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::schedule_text::schedule_text;
@@ -372,7 +372,7 @@ pub fn port_card(
 /// The review page: what it is, Accept all and Reject all, then a section
 /// per kind of change, each item a card naming what it is about with its
 /// changes, before and after, the user's own later edits marked as
-/// staying. A click on an item with a Note opens that Note on the right,
+/// staying. A click on an item with a Note opens that Note in the Note dialog,
 /// as the task leaves it. Whether a Note was asked for, by its id.
 pub fn review_page(
     ui: &mut Ui,
@@ -403,36 +403,33 @@ pub fn review_page(
     });
     ui.add_space(8.0);
     let mut open = None;
-    egui::ScrollArea::vertical()
-        .id_salt("ai review")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
-            for (kind, items) in &shown.groups {
-                ui.add_space(4.0);
-                ui.label(RichText::new(kind_label(t, *kind)).strong().color(text));
-                for item in items {
-                    let content = |ui: &mut Ui| {
-                        ui.label(RichText::new(&item.title).strong().color(text));
-                        for change in &item.changes {
-                            change_rows(ui, t, tones, change);
+    list_scroll(ui, "ai review", |ui| {
+        ui.spacing_mut().item_spacing.y = 12.0;
+        for (kind, items) in &shown.groups {
+            ui.add_space(4.0);
+            ui.label(RichText::new(kind_label(t, *kind)).strong().color(text));
+            for item in items {
+                let content = |ui: &mut Ui| {
+                    ui.label(RichText::new(&item.title).strong().color(text));
+                    for change in &item.changes {
+                        change_rows(ui, t, tones, change);
+                    }
+                };
+                match &item.note {
+                    Some(note) => {
+                        let id = Id::new(("ai review", *kind, &item.entity));
+                        if clickable_card(ui, tones, (id, &item.title), content) {
+                            open = Some(note.clone());
                         }
-                    };
-                    match &item.note {
-                        Some(note) => {
-                            let id = Id::new(("ai review", *kind, &item.entity));
-                            if clickable_card(ui, tones, (id, &item.title), content) {
-                                open = Some(note.clone());
-                            }
-                        }
-                        None => {
-                            embossed(ui, tones, false, None, content);
-                        }
+                    }
+                    None => {
+                        embossed(ui, tones, false, None, content);
                     }
                 }
             }
-            ui.add_space(8.0);
-        });
+        }
+        ui.add_space(8.0);
+    });
     open
 }
 

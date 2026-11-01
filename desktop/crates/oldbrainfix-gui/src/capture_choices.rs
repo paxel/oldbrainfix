@@ -6,7 +6,7 @@
 //! in one batch, so a write that fails on the way leaves nothing, and an
 //! empty Note writes nothing at all.
 //!
-//! The capture popup and the window's capture field share it, with
+//! The capture popup and the window's quick note dialog share it, with
 //! "To full editor" and the Note card's buttons ([`action_row`]) and the
 //! choices shown at the top ([`chips`]), each with a button that drops it
 //! again. Of the buttons only what this Device switched on in Settings ▸
@@ -623,7 +623,7 @@ fn shopping_picker(
     picked
 }
 
-/// What this Device's quick note, the capture field and the popup, shows
+/// What this Device's quick note, its dialog in the window and the popup, shows
 /// besides its text, its buttons for recordings, pictures and files and
 /// "To full editor" (#142, ADR 0008): each control once switched on in
 /// Settings ▸ Quick note, and the Nudge buttons until switched off.

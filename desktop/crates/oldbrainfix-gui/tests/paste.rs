@@ -70,6 +70,8 @@ fn window(store: Arc<Store>, board: &Shared) -> Harness<'static, App> {
     let mut app = App::new(store, "en");
     app.set_clipboard(Box::new(FakeClipboard(board.clone())));
     app.select(Selection::All);
+    // The quick note's dialog, as File ▸ New Note opens it (#146).
+    app.new_note();
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(
