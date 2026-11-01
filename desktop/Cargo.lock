@@ -3307,7 +3307,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -3338,7 +3338,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-gui"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "arboard",
  "ashpd",
@@ -3379,7 +3379,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-l10n"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -3387,7 +3387,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-whisper"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cmake",
  "hex",
