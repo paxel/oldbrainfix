@@ -2621,7 +2621,7 @@ pub(crate) mod tests {
 
     /// `desk` paired with `ann` as one of her own Devices, everything
     /// of hers taken in.
-    fn own_exchange(desk: &Store, ann: &Store) -> TestResult {
+    pub(crate) fn own_exchange(desk: &Store, ann: &Store) -> TestResult {
         let request = sync_request(desk, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
         let (answer, _) = answer_sync(ann, &request, "Desk")?.ok_or("an answer")?;
         crate::lan::apply_answer(desk, &answer)?;

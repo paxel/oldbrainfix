@@ -103,7 +103,8 @@ pub use sessions::{Session, SessionMarks, SessionOccurrence, SessionPick, Sessio
 pub use settings::{DeviceSettings, QuickNoteControl, ThemeChoice};
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use shopping_lists::{
-    Reappear, ShoppingAgenda, ShoppingAgendaList, ShoppingLine, ShoppingList, ShoppingLists,
+    Reappear, ShoppingAgenda, ShoppingAgendaList, ShoppingAgendaRow, ShoppingLine, ShoppingList,
+    ShoppingLists, ShoppingOnAgenda,
 };
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, STORE_VERSION, Store};

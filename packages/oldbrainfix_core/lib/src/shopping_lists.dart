@@ -1,6 +1,8 @@
 import 'checklists.dart';
+import 'device_settings.dart';
 import 'entry.dart';
 import 'notes.dart';
+import 'profiles.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
 import 'store.dart';
@@ -21,6 +23,12 @@ abstract final class ShoppingKeys {
   /// On a Line: how long it stays struck once checked, a [Reappear]'s
   /// code.
   static const reappear = 'reappear';
+
+  /// On the user's own `agenda:<note id>` entity
+  /// ([ChecklistKeys.agendaPrefix]), beside a Checklist's field: how the
+  /// Shopping List shows on their Agenda (#186), a [ShoppingOnAgenda]'s
+  /// code.
+  static const agenda = 'shopping';
 }
 
 /// How long a checked Line of a Shopping List stays struck through
@@ -54,8 +62,9 @@ enum Reappear {
   }
 }
 
-/// How the Agenda of a Device shows Shopping Lists (#123), a setting of
-/// that Device.
+/// How the Agenda of a Device showed Shopping Lists (#123), a setting of
+/// that Device until each Shopping List had its own choice (#186). It is
+/// read only for the default of [ShoppingOnAgenda] on this Device.
 enum ShoppingAgenda {
   /// Each Line that came back today on its own row, checkable there.
   lines,
@@ -80,6 +89,45 @@ enum ShoppingAgenda {
 /// A Shopping List on today's Agenda with the Lines its row stands for:
 /// those that came back today, or for [ShoppingAgenda.open] those open.
 typedef ShoppingAgendaList = ({ShoppingList list, List<ShoppingLine> lines});
+
+/// How a Shopping List shows on today's Agenda (#186), each person's own
+/// choice for each list, kept as an Override is (ADR 0030).
+enum ShoppingOnAgenda {
+  /// Never.
+  off,
+
+  /// One row with the number of its open Lines, such as "Groceries: 4
+  /// open".
+  count,
+
+  /// Each open Line on a row of its own, checkable there.
+  lines;
+
+  /// How it is stored.
+  String get code => name;
+
+  /// The choice [code] names; null for none known here.
+  static ShoppingOnAgenda? parse(String? code) => values.asNameMap()[code];
+
+  /// What a list nobody chose for shows as on a Device whose Agenda
+  /// showed Shopping Lists the way [old] before: off for "Not at all",
+  /// each open Line for "Each Line that came back today", else one row
+  /// with the count.
+  static ShoppingOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
+    ShoppingAgenda.off => off,
+    ShoppingAgenda.lines => lines,
+    ShoppingAgenda.back || ShoppingAgenda.open => count,
+  };
+}
+
+/// A Shopping List on today's Agenda (#186), how it shows there and its
+/// open Lines: one row with their number for [ShoppingOnAgenda.count],
+/// one row each for [ShoppingOnAgenda.lines].
+typedef ShoppingAgendaRow = ({
+  ShoppingList list,
+  ShoppingOnAgenda shows,
+  List<ShoppingLine> lines,
+});
 
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
@@ -232,10 +280,11 @@ class ShoppingLists {
     };
   }
 
-  /// The Shopping Lists on today's Agenda by [wallClock] when it shows
-  /// them the way [way]: each list not in the trash nor merged with the
-  /// Lines that came back today, or for [ShoppingAgenda.open] those
-  /// open, where there are any; oldest capture first. For
+  /// The Shopping Lists on today's Agenda by [wallClock] as a Device
+  /// showed them the way [way] before #186, until the apps read
+  /// [agendaRows]: each list not in the trash nor merged with the Lines
+  /// that came back today, or for [ShoppingAgenda.open] those open,
+  /// where there are any; oldest capture first. For
   /// [ShoppingAgenda.lines] each of those Lines is a row of its own.
   List<ShoppingAgendaList> agenda(ShoppingAgenda way, WallClock wallClock) {
     if (way == ShoppingAgenda.off) return const [];
@@ -261,6 +310,94 @@ class ShoppingLists {
               case final lines when lines.isNotEmpty)
             (list: list, lines: lines),
     ];
+  }
+
+  /// The Shopping Lists on today's Agenda by [wallClock] (#186): each
+  /// list not in the trash nor merged that has an open Line and that
+  /// this person does not keep [ShoppingOnAgenda.off], with how it shows
+  /// ([onAgenda]) and its open Lines; oldest capture first. A list whose
+  /// Lines are all struck or gone shows whatever the choice. Reading
+  /// writes nothing.
+  List<ShoppingAgendaRow> agendaRows(WallClock wallClock) {
+    final notes = Notes(store);
+    final standard = ShoppingOnAgenda.fromDevice(store.shoppingAgenda);
+    final own = <String, bool>{};
+    final shown = <(Note, ShoppingOnAgenda)>[];
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      if (making(id) == null) continue;
+      final shows = _onAgenda(id, standard, own);
+      if (shows == ShoppingOnAgenda.off) continue;
+      if (notes.byId(id) case final note?
+          when !note.isTrashed && !note.isMerged) {
+        shown.add((note, shows));
+      }
+    }
+    shown.sort((a, b) {
+      final byCapture = a.$1.captured.compareTo(b.$1.captured);
+      return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
+    });
+    final lists = ofNotes([for (final (n, _) in shown) n.id], wallClock);
+    return [
+      for (final (note, shows) in shown)
+        if (lists[note.id] case final list?)
+          if (list.open case final open when open.isNotEmpty)
+            (list: list, shows: shows, lines: open),
+    ];
+  }
+
+  /// How the Shopping List of [noteId] shows on today's Agenda for this
+  /// person: as one of the user's own Devices chose last; for a list
+  /// nobody chose for, as this Device showed Shopping Lists before
+  /// (#186, [ShoppingOnAgenda.fromDevice]). What another person's Device
+  /// wrote counts for nothing, so in a Shared Area each person decides
+  /// for their own Agenda; a value no app writes reads as
+  /// [ShoppingOnAgenda.count], so it hides no list.
+  ShoppingOnAgenda onAgenda(String noteId) =>
+      _onAgenda(noteId, ShoppingOnAgenda.fromDevice(store.shoppingAgenda), {});
+
+  ShoppingOnAgenda _onAgenda(
+    String noteId,
+    ShoppingOnAgenda standard,
+    Map<String, bool> own,
+  ) {
+    final code = _chosen(noteId, own);
+    if (code == null) return standard;
+    return ShoppingOnAgenda.parse(code) ?? ShoppingOnAgenda.count;
+  }
+
+  String? _chosen(String noteId, Map<String, bool> own) => store.currentByOwn(
+    '${ChecklistKeys.agendaPrefix}$noteId',
+    ShoppingKeys.agenda,
+    own,
+  );
+
+  /// Whether "Show on the Agenda" applies to the Note [noteId]: a
+  /// Shopping List not in the trash nor merged. One with a Routine or
+  /// Reminder shows too, as its Lines keep their own checks.
+  bool mayShowOnAgenda(String noteId) {
+    final note = Notes(store).byId(noteId);
+    return note != null &&
+        !note.isTrashed &&
+        !note.isMerged &&
+        making(noteId) != null;
+  }
+
+  /// Sets how the Shopping List of [noteId] shows on the Agenda for this
+  /// person alone, kept like an Override: on the user's own Devices
+  /// only, whatever their role in its Area. The choice is written even
+  /// when the list already shows that way by this Device's default, so
+  /// every own Device shows it alike; the same choice again writes
+  /// nothing.
+  void setOnAgenda(String noteId, ShoppingOnAgenda shows) {
+    if (making(noteId) == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Shopping List');
+    }
+    if (_chosen(noteId, {}) == shows.code) return;
+    store.append(
+      '${ChecklistKeys.agendaPrefix}$noteId',
+      ShoppingKeys.agenda,
+      shows.code,
+    );
   }
 
   /// The Notes that are a Shopping List this Device may add Lines to:

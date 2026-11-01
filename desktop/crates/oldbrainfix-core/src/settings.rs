@@ -366,14 +366,18 @@ impl<'a> DeviceSettings<'a> {
         self.store.set_local_setting(THEME, choice.name())
     }
 
-    /// How this Device's Agenda shows Shopping Lists; one row per list on
-    /// a day when Lines came back unless another way was chosen.
+    /// How this Device's Agenda showed Shopping Lists before each list had
+    /// its own choice (#186); one row per list on a day when Lines came
+    /// back unless another way was chosen. Read only for the default of a
+    /// list nobody chose for ([`crate::ShoppingOnAgenda::from_device`]); no
+    /// app offers it any more.
     pub fn shopping_agenda(&self) -> Result<ShoppingAgenda> {
         Ok(ShoppingAgenda::read(
             self.store.local_setting(SHOPPING_AGENDA)?.as_deref(),
         ))
     }
 
+    /// As a version before #186 wrote it.
     pub fn set_shopping_agenda(&self, way: ShoppingAgenda) -> Result<()> {
         self.store.set_local_setting(SHOPPING_AGENDA, way.code())
     }

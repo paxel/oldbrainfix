@@ -82,29 +82,29 @@
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 83,
+      "dseq": 103,
       "entity": "note:00000000000000000000000000000008",
       "field": "location",
       "value": null,
       "date": "2026-02-01T10:45:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T10:45:00.000Z",
-      "sig": "x1Ws6daBVAD+AEx1Isugr1p0ll3DJolz/GLpeIDAXLJDWDHOmSntXNEm6Dr952vM16BMbR9tLFU6UpdYIVyaBg=="
+      "sig": "M6lN4wX2at9IOB4USgfUAp+5HEyBrMtRKFaY+zzbg0jVZmO1FfTe+JPxGg2YStv0nSkVpsjkagRtXQAMZLgJDw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 84,
+      "dseq": 104,
       "entity": "note:00000000000000000000000000000008",
       "field": "calendar",
       "value": null,
       "date": "2026-02-01T10:45:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T10:45:00.000Z",
-      "sig": "4sRtidO6lRXJe/9NG+EAfZ/v7ENNnzDB488XVjxZwt0GnRUQrkZSnem1fO2dLJmrRi/p4pQPXeFx9IBYPB4BCQ=="
+      "sig": "vx0Y66FkyiuwuiKlA9epJM9XlsEtyA4nA5AYIkF5iUHYvmCskcs2kbJ5IuH7RP37i2/TfMvAPyy4X4wT4GrmAw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 85,
+      "dseq": 105,
       "entity": "section:00000000000000000000000000000005",
       "field": "text",
       "value": "{\"format\":\"plain\",\"text\":\"The hot one, it drips\"}",
@@ -112,18 +112,18 @@
       "author": "Ada",
       "recorded": "2026-02-01T10:45:00.000Z",
       "ctx": "",
-      "sig": "MYI9F3mAxU4Bnnye3upSIdKRuAYf3Bh47q9NoTtek7E/oVUJAFQAAY36VG+zp+enySuwL9nPN52MbKAq+rZ7CA=="
+      "sig": "zSPECs/iiOZxLNckBW6pwb7p4gVnPvLVqprmn153x1kNd4WC+BH50wv9Z7y/wgD6CG7ztzEZpWyR/3MJvOB/AQ=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 86,
+      "dseq": 106,
       "entity": "note:00000000000000000000000000000004",
       "field": "place",
       "value": "area:00000000000000000000000000000101",
       "date": "2026-02-01T11:30:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:30:00.000Z",
-      "sig": "ihRQQjqV1J2QKiY6B9yzEe7w2PcNZh/rEz2pv74RhLM6lfDhhr973nvgEHGEbU47XMIWsP1triCEaE7Wb8H6Aw=="
+      "sig": "aIx/r8Zk8ybrceHyCmimm929BUKizTntNWGXuIZxVFIDto7qRLmSr80OhD/bQNs8C88+eAP8/nVIlNtxFfh1BA=="
     }
   ],
   "wantBlobs": [],
