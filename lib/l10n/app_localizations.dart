@@ -7657,6 +7657,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing was imported. Download the export again, copy it onto the phone and import it from there.'**
   String get importKeepFailedFix;
+
+  /// What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.
+  ///
+  /// In en, this message translates to:
+  /// **'{setting}: {value}'**
+  String settingBadgeLabel(String setting, String value);
+
+  /// The name of the Note editor's badge that shows where the Note is filed (#160).
+  ///
+  /// In en, this message translates to:
+  /// **'Area and Topic'**
+  String get badgePlace;
+
+  /// The name of the Note editor's badge that shows whether the Note is a Checklist, a Shopping List or a Tally (#160).
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get badgeKind;
+
+  /// The value of a Note editor's badge for a setting that is switched on, such as Show ticks (#160).
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get settingOn;
+
+  /// The value of a Note editor's badge for a setting that is switched off (#160).
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingOff;
 }
 
 class _AppLocalizationsDelegate

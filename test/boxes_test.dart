@@ -505,8 +505,8 @@ void main() {
       expect(note.shownText, 'Done ❌! today');
     });
 
-    testWidgets('Show ticks in the editor\'s ⋮ says who ticked a box after '
-        'it, in the field and in a Section', (tester) async {
+    testWidgets('Show ticks in the editor\'s badge says who ticked a box '
+        'after it, in the field and in a Section', (tester) async {
       final id = notes.capture('Plan ☐').id;
       notes.amend(id, '☐ Later');
       Boxes(store).tick(id, boxesOf(id).single.id, BoxState.done);
@@ -516,8 +516,9 @@ void main() {
       await openEditor(tester);
       expect(find.textContaining('You, ', findRichText: true), findsNothing);
 
-      await tap(tester, key('editor-menu'));
-      await tap(tester, key('note-show-ticks'));
+      await tap(tester, key('badge-ticks'));
+      await tap(tester, key('badge-switch'));
+      await tap(tester, key('badge-close'));
       expect(showsTicks(store, id), isTrue);
       expect(
         find.textContaining(yours(now), findRichText: true),
@@ -527,10 +528,11 @@ void main() {
       expect(field(tester).text, notes.byId(id)!.text);
     });
 
-    testWidgets('a Note without boxes has no ⋮', (tester) async {
+    testWidgets('a Note without boxes has no Show ticks', (tester) async {
       notes.capture('Plan');
       await startAtNotes(tester);
       await openEditor(tester);
+      expect(key('badge-ticks'), findsNothing);
       expect(key('editor-menu'), findsNothing);
     });
   });

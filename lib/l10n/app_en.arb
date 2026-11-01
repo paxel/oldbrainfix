@@ -2487,5 +2487,15 @@
   "importKeepFailedCause": "The zip file or the folder, or one of the files in it, could not be read.",
   "@importKeepFailedCause": {"description": "The cause in the dialog behind 'importKeepFailed'. Shared with the desktop."},
   "importKeepFailedFix": "Nothing was imported. Download the export again, copy it onto the phone and import it from there.",
-  "@importKeepFailedFix": {"description": "The fix in the dialog behind 'importKeepFailed' on the phone."}
+  "@importKeepFailedFix": {"description": "The fix in the dialog behind 'importKeepFailed' on the phone."},
+  "settingBadgeLabel": "{setting}: {value}",
+  "@settingBadgeLabel": {"description": "What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.", "placeholders": {"setting": {"type": "String"}, "value": {"type": "String"}}},
+  "badgePlace": "Area and Topic",
+  "@badgePlace": {"description": "The name of the Note editor's badge that shows where the Note is filed (#160)."},
+  "badgeKind": "Kind",
+  "@badgeKind": {"description": "The name of the Note editor's badge that shows whether the Note is a Checklist, a Shopping List or a Tally (#160)."},
+  "settingOn": "On",
+  "@settingOn": {"description": "The value of a Note editor's badge for a setting that is switched on, such as Show ticks (#160)."},
+  "settingOff": "Off",
+  "@settingOff": {"description": "The value of a Note editor's badge for a setting that is switched off (#160)."}
 }

@@ -103,6 +103,8 @@ void main() {
       expect(source.asked, isEmpty, reason: 'Capture never asks');
 
       await openEditor(tester, 'nees mor sauce');
+      await tester.tap(find.byKey(const ValueKey('badge-captured')));
+      await tester.pumpAndSettle();
       expect(find.text('During: Dentist'), findsOneWidget);
       expect(find.text('Connected: My Car'), findsOneWidget);
     });
@@ -211,6 +213,8 @@ void main() {
       expect(moreIcon, findsOneWidget);
 
       await openEditor(tester, 'https://example.org/sauce');
+      await tester.tap(find.byKey(const ValueKey('badge-captured')));
+      await tester.pumpAndSettle();
       expect(find.text('Shared from WhatsApp'), findsOneWidget);
     });
 

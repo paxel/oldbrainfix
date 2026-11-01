@@ -1267,5 +1267,10 @@
   "importKeepNothingFix": "Wähle die ZIP-Datei von Takeout oder den daraus entpackten Ordner mit dem Ordner Keep darin. Es wurde nichts geändert.",
   "importKeepFailed": "Der Export konnte nicht importiert werden.",
   "importKeepFailedCause": "Die ZIP-Datei oder der Ordner oder eine der Dateien darin ließ sich nicht lesen.",
-  "importKeepFailedFix": "Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort."
+  "importKeepFailedFix": "Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.",
+  "settingBadgeLabel": "{setting}: {value}",
+  "badgePlace": "Bereich und Thema",
+  "badgeKind": "Art",
+  "settingOn": "Ein",
+  "settingOff": "Aus"
 }

@@ -4738,4 +4738,21 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get importKeepFailedFix =>
       'Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.';
+
+  @override
+  String settingBadgeLabel(String setting, String value) {
+    return '$setting: $value';
+  }
+
+  @override
+  String get badgePlace => 'Bereich und Thema';
+
+  @override
+  String get badgeKind => 'Art';
+
+  @override
+  String get settingOn => 'Ein';
+
+  @override
+  String get settingOff => 'Aus';
 }

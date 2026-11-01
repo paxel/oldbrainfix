@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
+import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -165,10 +166,16 @@ void main() {
     expect(find.byTooltip('Move to trash'), findsNothing);
     expect(find.byTooltip('Merge into…'), findsNothing);
     expect(find.byTooltip('File into…'), findsNothing);
-    expect(
-      find.text('Only a Manager of this Area can change this.'),
-      findsOneWidget,
-    );
+    // Only a Manager sets up Routines: no "+" among the badges, and the
+    // settings of the Note are shown, not changed.
+    expect(find.byKey(const ValueKey('badge-add')), findsNothing);
+    for (final badge in ['badge-importance', 'badge-place']) {
+      expect(
+        tester.widget<SettingBadge>(find.byKey(ValueKey(badge))).onTap,
+        isNull,
+        reason: badge,
+      );
+    }
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.readOnly, isTrue);
     await reveal(tester, find.text('Add to Note'));

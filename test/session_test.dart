@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/session_editor.dart';
@@ -102,14 +103,17 @@ void main() {
   }
 
   group('where a Session starts', () {
-    testWidgets('the Note editor offers Routine, Reminder, Frog and Session; '
-        'Session opens the editor the card\'s menu opens', (tester) async {
+    testWidgets('the Note editor\'s "+" offers Routine, Reminder, Frog and '
+        'Session; Session opens the editor the card\'s menu opens', (
+      tester,
+    ) async {
       final pushUps = tally('Push-ups');
       final id = notes.capture('Sport').id;
       await start(tester);
       await edit(tester, id);
+      await tap(tester, key('badge-add'));
       for (final item in ['Routine', 'Reminder', 'Frog', 'Session']) {
-        expect(find.widgetWithText(FilledButton, item), findsOneWidget);
+        expect(find.widgetWithText(PopupMenuItem<Spawn>, item), findsOneWidget);
       }
 
       await tap(tester, key('spawn-session'));
@@ -132,6 +136,7 @@ void main() {
       final id = notes.capture('Sport').id;
       await start(tester);
       await edit(tester, id);
+      await tap(tester, key('badge-add'));
       await tap(tester, key('spawn-session'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('New Session'), findsOneWidget);

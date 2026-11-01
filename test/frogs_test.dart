@@ -95,17 +95,15 @@ void main() {
     });
   });
 
-  testWidgets('"Frog" in the Note editor spawns one, as the card\'s menu '
-      'does', (tester) async {
+  testWidgets('"Frog" in the Note editor\'s "+" spawns one, as the card\'s '
+      'menu does', (tester) async {
     final id = notes.capture('wash the windows').id;
     await start(tester);
     final agenda = tester.element(find.byType(AgendaScreen));
     unawaited(openNote(agenda, notes, places, notes.byId(id)!));
     await tester.pumpAndSettle();
-    final button = find.byKey(const ValueKey('spawn-frog'));
-    await tester.ensureVisible(button);
-    await tester.pumpAndSettle();
-    await tap(tester, button);
+    await tap(tester, find.byKey(const ValueKey('badge-add')));
+    await tap(tester, find.byKey(const ValueKey('spawn-frog')));
 
     expect(frogs.note(frogs.open().single)?.id, id);
     expect(notes.unsorted(), isEmpty);

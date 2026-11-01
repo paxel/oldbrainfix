@@ -27,6 +27,7 @@ import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
+import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
@@ -431,12 +432,13 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// leaving, its photos at full width, each opening full screen when
 /// tapped and with its Photo Text under it, a play button per voice
 /// recording with its Transcript under it, the texts of the photos and
-/// recordings removed while their texts stay, its Importance, its Capture
-/// Context and where it is filed,
-/// its Routines and Reminders, and its Sections, each with its own
-/// Capture Context. "Add to Note" amends it; "Routine", "Reminder",
-/// "Frog" and "Session" spawn one from it, as the card's menu does; the
-/// calendar button adds it, or its Routines and
+/// recordings removed while their texts stay, a row of badges under the
+/// text for its settings (#160), its Importance, where it is filed, its
+/// Capture Context, its Routines and Reminders, its kind, Show on the
+/// Agenda and Show ticks, each opening its small editor, and its
+/// Sections, each with its own Capture Context. "Add to Note" amends it;
+/// the "+" badge spawns a Routine, Reminder, Frog or Session from it, as
+/// the card's menu does; the calendar button adds it, or its Routines and
 /// Reminders, to the calendar; the send button sends it as a Sent Item;
 /// "merge into…" merges it into another Note; the trash button deletes
 /// it. A photo or recording with a text, of the Note or a Section, has a
@@ -519,6 +521,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   BoxTicking? _ticking;
   Map<String, BoxTicking> _sectionTicking = const {};
   bool _hasBoxes = false;
+
+  /// Whether the Note shows its ticks on this Device (ADR 0035).
+  bool _showsTicks = false;
   late final _routineBook = Routines(widget.notes.store);
 
   /// Whether this Device may Amend the Note: anywhere it holds a role.
@@ -532,6 +537,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The same for a Shopping List (#122).
   bool _makesShopping = false;
   bool _isShopping = false;
+
+  /// Whether it is a Tally (ADR 0028).
+  bool _isTally = false;
 
   /// The "Show on the Agenda" switch of a Checklist without a Routine
   /// (#143); null for any other Note.
@@ -612,6 +620,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final shopping = ShoppingLists(widget.notes.store);
     _makesShopping = shopping.mayMake(widget.noteId);
     _isShopping = shopping.isShoppingList(widget.noteId);
+    _isTally = Tallies(widget.notes.store).isTally(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
     _newerRoutines = _routineBook.newerOfNote(widget.noteId);
@@ -655,7 +664,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     };
     // Ticks wherever this Device holds a role, unless in the trash.
     final ticks = note != null && !note.isTrashed;
-    final shows = showsTicks(store, widget.noteId);
+    final shows = _showsTicks = showsTicks(store, widget.noteId);
     BoxTicking ticking(String id, List<ShownBox> boxes) => BoxTicking(
       notes: notes,
       entity: id,
@@ -781,10 +790,268 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
+  /// Takes the Checklist off the Agenda for this person, or puts it back
+  /// (#143).
+  void _toggleOnAgenda() {
+    final lists = Checklists(widget.notes.store);
+    lists.setShowOnAgenda(widget.noteId, !lists.showsOnAgenda(widget.noteId));
+    _reload();
+  }
+
   void _setImportance(Importance picked) {
     _saveText();
     widget.notes.setImportance(widget.noteId, picked);
     _reload();
+  }
+
+  /// The Importance badge's editor: the three as radio buttons, the one
+  /// it has marked; a tap on another writes it and closes.
+  Future<void> _editImportance() async {
+    final current = _placed?.note.importance;
+    if (current == null) return;
+    final t = context.t;
+    final picked = await showDialog<Importance>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.importance,
+        icon: _importanceIcon,
+        content: RadioColumn<Importance>(
+          value: current,
+          options: [
+            for (final (value, label) in [
+              (Importance.unimportant, t.importanceUnimportant),
+              (Importance.normal, t.importanceNormal),
+              (Importance.important, t.importanceImportant),
+            ])
+              RadioOption(
+                key: ValueKey('importance-${value.name}'),
+                value: value,
+                title: Text(label),
+              ),
+          ],
+          onChanged: (picked) => Navigator.of(context).pop(picked),
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    _setImportance(picked);
+  }
+
+  /// The Captured badge's editor: the time, place, calendar event,
+  /// Bluetooth device and app of the Capture Context, each on a line of
+  /// its own, read only.
+  Future<void> _showCaptured(CaptureContext capture, DateFormat when) =>
+      showDialog<void>(
+        context: context,
+        builder: (context) => BadgeDialog(
+          setting: context.t.capturedHeading,
+          icon: Icons.schedule,
+          content: CaptureContextLines(
+            key: const ValueKey('captured-details'),
+            capture: capture,
+            when: when,
+          ),
+        ),
+      );
+
+  /// The kind badge's editor: the kind in words, and "Back to a plain
+  /// Note" where this Device may turn it back.
+  Future<void> _editKind(({IconData icon, String name}) kind) async {
+    final t = context.t;
+    final back = await showDialog<bool>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.badgeKind,
+        icon: kind.icon,
+        content: Text(kind.name),
+        actions: [
+          TextButton(
+            key: const ValueKey('kind-to-plain'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.checklistToPlain),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || back != true) return;
+    _toPlain();
+  }
+
+  /// The editor of an on-or-off badge: its switch, writing at once.
+  Future<void> _editSwitch(
+    String setting,
+    IconData icon,
+    bool on,
+    VoidCallback toggle,
+  ) => showDialog<void>(
+    context: context,
+    builder: (context) => BadgeDialog(
+      setting: setting,
+      icon: icon,
+      content: BadgeSwitch(setting: setting, on: on, toggle: toggle),
+    ),
+  );
+
+  /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
+  /// Session, each spawned as the card's menu does.
+  Future<void> _addMenu(Offset at) async {
+    final t = context.t;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final picked = await showMenu<Spawn>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final (spawn, icon, label) in [
+          (Spawn.routine, const Icon(Icons.repeat), t.routine),
+          (
+            Spawn.reminder,
+            const Icon(Icons.notifications_outlined),
+            t.reminder,
+          ),
+          (Spawn.frog, const FrogIcon(), t.frog),
+          (Spawn.session, const Icon(Icons.event_repeat), t.session),
+        ])
+          PopupMenuItem(
+            key: ValueKey('spawn-${spawn.name}'),
+            value: spawn,
+            child: Row(
+              children: [
+                icon,
+                const SizedBox(width: 12),
+                Flexible(child: Text(label)),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    await _spawn(picked);
+  }
+
+  /// The icon of the Importance, in its badge and its editor.
+  static const _importanceIcon = Icons.label_important_outline;
+
+  /// The row of badges under the text (#160): each setting of the Note
+  /// as its icon and value, a tap opening its small editor; a setting
+  /// that does not apply has none. "+" ends it.
+  Widget _badges(
+    PlacedNote placed,
+    DateFormat when,
+    String place,
+    Color? colour,
+  ) {
+    final t = context.t;
+    final locale = Localizations.localeOf(context).toString();
+    final (:note, :area, :changes, :schedules, topic: _, amends: _, author: _) =
+        placed;
+    final kind = _isList
+        ? (icon: Icons.checklist, name: t.checklistHeading)
+        : _isShopping
+        ? (icon: Icons.shopping_cart_outlined, name: t.shoppingHeading)
+        : _isTally
+        ? (icon: Icons.bar_chart, name: t.tallyHeading)
+        : null;
+    final plainable = (_isList || _isShopping) && changes && note.textEditable;
+    final ticks = _showsTicks;
+    return Wrap(
+      key: const ValueKey('note-badges'),
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        SettingBadge(
+          key: const ValueKey('badge-importance'),
+          setting: t.importance,
+          icon: _importanceIcon,
+          value: switch (note.importance) {
+            Importance.unimportant => t.importanceUnimportant,
+            Importance.normal => t.importanceNormal,
+            Importance.important => t.importanceImportant,
+          },
+          onTap: changes ? (_) => _editImportance() : null,
+        ),
+        // Area and Topic in one: File into… picks both at once.
+        SettingBadge(
+          key: const ValueKey('badge-place'),
+          setting: t.badgePlace,
+          icon: areaIconData(area?.icon) ?? Icons.folder_outlined,
+          iconColour: colour,
+          value: place,
+          onTap: changes ? (_) => _file() : null,
+        ),
+        SettingBadge(
+          key: const ValueKey('badge-captured'),
+          setting: t.capturedHeading,
+          icon: Icons.schedule,
+          value: when.format(note.context.captured.toLocal()),
+          onTap: (_) => _showCaptured(note.context, when),
+        ),
+        for (final routine in _routines)
+          SettingBadge(
+            key: ValueKey('badge-routine-${routine.id}'),
+            setting: routine.isReminder ? t.reminder : t.routine,
+            icon: routine.isReminder
+                ? Icons.notifications_outlined
+                : Icons.repeat,
+            value: scheduleText(t, locale, routine.schedule),
+            onTap: (_) => _openRoutine(routine),
+          ),
+        for (final routine in _newerRoutines)
+          SettingBadge(
+            key: ValueKey('newer-${routine.id}'),
+            setting: t.routine,
+            icon: Icons.update,
+            value: t.newerVersionNeeded,
+          ),
+        if (kind != null)
+          SettingBadge(
+            key: const ValueKey('badge-kind'),
+            setting: t.badgeKind,
+            icon: kind.icon,
+            value: kind.name,
+            onTap: plainable ? (_) => _editKind(kind) : null,
+          ),
+        if (_onAgenda case final agenda?)
+          SettingBadge(
+            key: const ValueKey('badge-agenda'),
+            setting: t.checklistShowOnAgenda,
+            icon: Icons.today_outlined,
+            value: agenda.on ? t.settingOn : t.settingOff,
+            onTap: (_) => _editSwitch(
+              t.checklistShowOnAgenda,
+              Icons.today_outlined,
+              agenda.on,
+              _toggleOnAgenda,
+            ),
+          ),
+        if (_hasBoxes)
+          SettingBadge(
+            key: const ValueKey('badge-ticks'),
+            setting: t.boxShowTicks,
+            icon: Icons.history_toggle_off,
+            value: ticks ? t.settingOn : t.settingOff,
+            onTap: (_) => _editSwitch(
+              t.boxShowTicks,
+              Icons.history_toggle_off,
+              ticks,
+              _toggleTicks,
+            ),
+          ),
+        // In a Shared Area only a Manager sets them up (ADR 0013).
+        if (schedules)
+          SettingBadge(
+            key: const ValueKey('badge-add'),
+            setting: t.routineOrReminder,
+            icon: Icons.add,
+            value: null,
+            onTap: _addMenu,
+          ),
+      ],
+    );
   }
 
   Future<void> _file() async {
@@ -1082,7 +1349,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final t = context.t;
     final placed = _placed;
     if (placed == null) return Scaffold(appBar: AppBar());
-    final (:note, :area, :topic, :changes, :schedules, amends: _, author: _) =
+    final (:note, :area, :topic, :changes, schedules: _, amends: _, author: _) =
         placed;
     // In a Shared Area a Member changes only their own Notes, and only a
     // Manager their Routines (ADR 0013); Amend stays.
@@ -1141,23 +1408,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 icon: const Icon(Icons.delete_outline),
               ),
             ],
-            // Only while there is something in it (UI laws, "The bar").
-            if (_hasBoxes || _onAgenda != null)
-              PopupMenuButton<VoidCallback>(
-                key: const ValueKey('editor-menu'),
-                tooltip: t.more,
-                icon: const Icon(Icons.more_vert),
-                onSelected: (run) => run(),
-                itemBuilder: (button) => [
-                  if (_hasBoxes)
-                    showTicksItem(button, (
-                      on: showsTicks(widget.notes.store, widget.noteId),
-                      toggle: _toggleTicks,
-                    )),
-                  if (_onAgenda case final agenda?)
-                    showOnAgendaItem(button, agenda),
-                ],
-              ),
           ],
         ),
         body: ListView(
@@ -1190,23 +1440,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            _badges(placed, when, place, colour),
             // Nothing while the Note is no Checklist.
             ChecklistSection(
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
-              onToPlain: _isList && changes && note.textEditable
-                  ? _toPlain
-                  : null,
             ),
             // Nothing while the Note is no Shopping List.
             ShoppingSection(
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
-              onToPlain: _isShopping && changes && note.textEditable
-                  ? _toPlain
-                  : null,
             ),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
@@ -1287,122 +1533,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             const SizedBox(height: 16),
             // Nothing while the Note is no Tally.
             TallySection(notes: widget.notes, noteId: widget.noteId),
-            EditorPanel(
-              heading: t.importance,
-              child: RadioColumn<Importance>(
-                value: note.importance,
-                options: [
-                  RadioOption(
-                    value: Importance.unimportant,
-                    title: Text(t.importanceUnimportant),
-                  ),
-                  RadioOption(
-                    value: Importance.normal,
-                    title: Text(t.importanceNormal),
-                  ),
-                  RadioOption(
-                    value: Importance.important,
-                    title: Text(t.importanceImportant),
-                  ),
-                ],
-                onChanged: changes ? _setImportance : null,
-              ),
-            ),
-            EditorPanel(
-              heading: t.capturedHeading,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CaptureContextLines(capture: note.context, when: when),
-                  Row(
-                    children: [
-                      Icon(
-                        areaIconData(area?.icon) ?? Icons.folder_outlined,
-                        size: 20,
-                        color:
-                            colour ??
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(place)),
-                      if (changes)
-                        IconButton(
-                          tooltip: t.fileInto,
-                          onPressed: _file,
-                          icon: const Icon(Icons.drive_file_move_outline),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            EditorPanel(
-              heading: t.routinesHeading,
-              // The rows' ink shows on the panel, not under it.
-              child: Material(
-                type: MaterialType.transparency,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final routine in _routines)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          routine.isReminder
-                              ? Icons.notifications_outlined
-                              : Icons.repeat,
-                        ),
-                        title: Text(
-                          scheduleText(
-                            t,
-                            Localizations.localeOf(context).toString(),
-                            routine.schedule,
-                          ),
-                        ),
-                        onTap: () => _openRoutine(routine),
-                      ),
-                    for (final routine in _newerRoutines)
-                      ListTile(
-                        key: ValueKey('newer-${routine.id}'),
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.update),
-                        title: Text(t.newerVersionNeeded),
-                      ),
-                    if (!schedules)
-                      Text(t.onlyManagers)
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilledButton.tonalIcon(
-                            onPressed: () => _spawn(Spawn.routine),
-                            icon: const Icon(Icons.repeat),
-                            label: Text(t.routine),
-                          ),
-                          FilledButton.tonalIcon(
-                            onPressed: () => _spawn(Spawn.reminder),
-                            icon: const Icon(Icons.notifications_outlined),
-                            label: Text(t.reminder),
-                          ),
-                          FilledButton.tonalIcon(
-                            key: const ValueKey('spawn-frog'),
-                            onPressed: () => _spawn(Spawn.frog),
-                            icon: const FrogIcon(size: 18),
-                            label: Text(t.frog),
-                          ),
-                          FilledButton.tonalIcon(
-                            key: const ValueKey('spawn-session'),
-                            onPressed: () => _spawn(Spawn.session),
-                            icon: const Icon(Icons.event_repeat),
-                            label: Text(t.session),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
             for (final section in _sections)
               EditorPanel(
                 child: Column(

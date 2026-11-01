@@ -176,17 +176,18 @@ void main() {
     expect(lists.showsOnAgenda(id), isTrue);
   });
 
-  testWidgets('the editor\'s ⋮ has the switch, also without boxes', (
+  testWidgets('the editor\'s badge has the switch, also without boxes', (
     tester,
   ) async {
     final id = trip();
     await start(tester);
     await tap(tester, key('checklist-row-$id'));
-    await tap(tester, key('editor-menu'));
-    expect(key('note-show-ticks'), findsNothing);
-    expect(switchOn(tester), isTrue);
-    await tap(tester, key('note-show-on-agenda'));
+    expect(key('badge-ticks'), findsNothing);
+    await tap(tester, key('badge-agenda'));
+    expect(tester.widget<Switch>(key('badge-switch')).value, isTrue);
+    await tap(tester, key('badge-switch'));
     expect(lists.showsOnAgenda(id), isFalse);
+    await tap(tester, key('badge-close'));
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(checklistRows(), isEmpty);
@@ -207,7 +208,7 @@ void main() {
     await tester.longPress(find.text('Before the trip').first);
     await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
-    expect(key('editor-menu'), findsNothing);
+    expect(key('badge-agenda'), findsNothing);
   });
 
   testWidgets('no row for a Checklist with a Routine', (tester) async {

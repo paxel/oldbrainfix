@@ -232,6 +232,9 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 200)),
       );
       await tester.pumpAndSettle();
+      // Under the row of badges.
+      await tester.ensureVisible(find.byType(NotePhoto));
+      await tester.pumpAndSettle();
       await tap(tester, find.byType(NotePhoto));
       expect(find.byType(PhotoViewerScreen), findsOneWidget);
       expect(find.byType(InteractiveViewer), findsOneWidget);

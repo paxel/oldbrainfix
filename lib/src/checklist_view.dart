@@ -295,9 +295,9 @@ class _CardChecklistState extends State<CardChecklist> {
 /// or back at the top. "Add Line" starts an empty one at the end for
 /// anyone with a role in its Area. ⋮ of a Line it may change has Move
 /// up, Move down, putting it under the Line above or back to the top
-/// level, and Delete; "Uncheck all" shows while one is checked; and, with
-/// [onToPlain], "Back to a plain Note". What is typed is stored as the
-/// cursor leaves a Line and whenever [typed] says so; a Line left empty
+/// level, and Delete; "Uncheck all" shows while one is checked. "Back
+/// to a plain Note" is in the editor's kind badge (#160). What is typed is
+/// stored as the cursor leaves a Line and whenever [typed] says so; a Line left empty
 /// goes as the editor is left. It follows the log as it changes.
 class ChecklistSection extends StatefulWidget {
   final Notes notes;
@@ -306,15 +306,11 @@ class ChecklistSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Turns the Note back into a plain Note; no button when null.
-  final VoidCallback? onToPlain;
-
   const ChecklistSection({
     super.key,
     required this.notes,
     required this.noteId,
     this.typed,
-    this.onToPlain,
   });
 
   @override
@@ -984,7 +980,6 @@ class _ChecklistSectionState extends State<ChecklistSection>
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
-    final plain = widget.onToPlain;
     final uncheck = _checks && list.checkedCount > 0;
     // Under the text field, as the Lines are under the text on a card.
     return Padding(
@@ -1026,27 +1021,16 @@ class _ChecklistSectionState extends State<ChecklistSection>
                 ),
               ),
             ],
-            if (uncheck || plain != null) ...[
+            if (uncheck) ...[
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (uncheck)
-                    OutlinedButton.icon(
-                      key: const ValueKey('checklist-uncheck-all'),
-                      onPressed: _uncheckAll,
-                      icon: const Icon(Icons.check_box_outline_blank),
-                      label: Text(t.checklistUncheckAll),
-                    ),
-                  if (plain != null)
-                    OutlinedButton.icon(
-                      key: const ValueKey('checklist-to-plain'),
-                      onPressed: plain,
-                      icon: const Icon(Icons.notes),
-                      label: Text(t.checklistToPlain),
-                    ),
-                ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('checklist-uncheck-all'),
+                  onPressed: _uncheckAll,
+                  icon: const Icon(Icons.check_box_outline_blank),
+                  label: Text(t.checklistUncheckAll),
+                ),
               ),
             ],
           ],

@@ -166,9 +166,9 @@ enum _ShopStep { delete }
 /// whose Return adds what was typed and leaves it ready for the next,
 /// and "Add"; then its Lines to check, open first and struck at the end,
 /// each renamed in place where this Device may change it (#141); for
-/// those, ⋮ with its reappear time as radio buttons and Delete; and,
-/// with [onToPlain], "Back to a plain Note". What is typed is stored as
-/// the cursor leaves a Line and whenever [typed] says so; as the editor
+/// those, ⋮ with its reappear time as radio buttons and Delete. "Back
+/// to a plain Note" is in the editor's kind badge (#160). What is typed
+/// is stored as the cursor leaves a Line and whenever [typed] says so; as the editor
 /// is left, what is left in the field is added and a Line left empty
 /// goes. It
 /// follows the log as it changes and reads again when a new day begins.
@@ -179,15 +179,11 @@ class ShoppingSection extends StatefulWidget {
   /// Tells it when the editor saves and when it is left.
   final TypedLines? typed;
 
-  /// Turns the Note back into a plain Note; no button when null.
-  final VoidCallback? onToPlain;
-
   const ShoppingSection({
     super.key,
     required this.notes,
     required this.noteId,
     this.typed,
-    this.onToPlain,
   });
 
   @override
@@ -494,7 +490,6 @@ class _ShoppingSectionState extends State<ShoppingSection>
     final list = _list;
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
-    final plain = widget.onToPlain;
     // Under the text field, as the Lines are under the text on a card.
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -531,18 +526,6 @@ class _ShoppingSectionState extends State<ShoppingSection>
               editable: _editable,
               field: _field,
             ),
-            if (plain != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('shopping-to-plain'),
-                  onPressed: plain,
-                  icon: const Icon(Icons.notes),
-                  label: Text(t.checklistToPlain),
-                ),
-              ),
-            ],
           ],
         ),
       ),

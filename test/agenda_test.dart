@@ -396,10 +396,11 @@ void main() {
       await tester.longPress(find.text('dentist'));
       await tester.pumpAndSettle();
 
-      await tap(tester, find.text('Reminder'));
+      await tap(tester, find.byKey(const ValueKey('badge-add')));
+      await tap(tester, find.byKey(const ValueKey('spawn-reminder')));
       await tap(tester, find.text('Save'));
-      await reveal(tester, find.text('Routine'));
-      await tap(tester, find.text('Routine'));
+      await tap(tester, find.byKey(const ValueKey('badge-add')));
+      await tap(tester, find.byKey(const ValueKey('spawn-routine')));
       expect(find.text('New Routine'), findsOneWidget);
       await tap(tester, find.text('Save'));
 

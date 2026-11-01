@@ -117,13 +117,7 @@ void main() {
       expect(note.nudge, now.add(Notes.defaultNudge));
       expect(notes.unsorted().map((n) => n.id), [note.id]);
 
-      await tap(
-        tester,
-        find.descendant(
-          of: find.byType(NoteEditorScreen),
-          matching: find.byTooltip('File into…'),
-        ),
-      );
+      await tap(tester, find.byKey(const ValueKey('badge-place')));
       await tap(
         tester,
         find.descendant(

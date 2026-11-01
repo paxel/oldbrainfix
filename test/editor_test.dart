@@ -170,10 +170,12 @@ void main() {
       expect(find.byIcon(Icons.label_important), findsNothing);
 
       await edit(tester, find.text('pills'));
+      await tap(tester, find.byKey(const ValueKey('badge-importance')));
       await tap(tester, find.text('Important'));
       await tester.pageBack();
       await tester.pumpAndSettle();
       await edit(tester, find.text('socks'));
+      await tap(tester, find.byKey(const ValueKey('badge-importance')));
       await tap(tester, find.text('Unimportant'));
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -327,6 +329,7 @@ void main() {
     await tap(tester, find.byTooltip('Suchen und stöbern'));
     await tap(tester, find.byTooltip('Alle Notizen'));
     await edit(tester, find.text('Soße kaufen'));
+    await tap(tester, find.byKey(const ValueKey('badge-importance')));
     await tap(tester, find.text('Unwichtig'));
     await reveal(tester, find.text('Zur Notiz hinzufügen'));
     expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);

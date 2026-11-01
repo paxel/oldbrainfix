@@ -185,7 +185,10 @@ void main() {
       await tap(tester, find.byTooltip('All Notes'));
       await tester.longPress(find.text('nees mor sauce'));
       await tester.pumpAndSettle();
+      // In the Captured badge's editor.
+      await tap(tester, find.byKey(const ValueKey('badge-captured')));
       expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('badge-close')));
 
       await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));

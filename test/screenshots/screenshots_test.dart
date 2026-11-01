@@ -982,6 +982,17 @@ void main() {
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
           });
 
+          frame('note-editor', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+            await tester.longPress(find.text(texts.boiler));
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            // The row of badges under the text (#160).
+            expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
           /// The Household with its Checklist, Shopping List and Tally.
           Future<void> household(WidgetTester tester) async {
             final t = await start(

@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/sent_item_screen.dart';
+import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/shopping_list_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -387,13 +388,21 @@ void main() {
       expect(store.current(tea, ChecklistKeys.trashed), isNotNull);
     });
 
-    testWidgets('"Back to a plain Note" there too; the field then holds the '
-        'whole text', (tester) async {
+    testWidgets('"Back to a plain Note" in its kind badge; the field then '
+        'holds the whole text', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs').id;
       lists.make(note);
       await openEditor(tester, 'Shop');
       await tap(tester, key('checklist-check-${idOf(note, 'Milk')}'));
-      await tap(tester, key('shopping-to-plain'));
+      await tap(tester, key('badge-kind'));
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Shopping List'),
+        ),
+        findsOneWidget,
+      );
+      await tap(tester, key('kind-to-plain'));
       expect(lists.isShoppingList(note), isFalse);
       expect(key('shopping'), findsNothing);
       expect(
@@ -457,7 +466,11 @@ void main() {
       await tester.longPress(find.text('Shop'));
       await tester.pumpAndSettle();
       expect(key('checklist-menu-$milk'), findsNothing);
-      expect(key('shopping-to-plain'), findsNothing);
+      expect(
+        tester.widget<SettingBadge>(key('badge-kind')).onTap,
+        isNull,
+        reason: 'the kind stays with the author',
+      );
       // Ann's Lines are no fields of his.
       expect(field(milk), findsNothing);
       expect(key('checklist-line-$milk'), findsOneWidget);

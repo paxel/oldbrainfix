@@ -4679,4 +4679,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importKeepFailedFix =>
       'Nothing was imported. Download the export again, copy it onto the phone and import it from there.';
+
+  @override
+  String settingBadgeLabel(String setting, String value) {
+    return '$setting: $value';
+  }
+
+  @override
+  String get badgePlace => 'Area and Topic';
+
+  @override
+  String get badgeKind => 'Kind';
+
+  @override
+  String get settingOn => 'On';
+
+  @override
+  String get settingOff => 'Off';
 }

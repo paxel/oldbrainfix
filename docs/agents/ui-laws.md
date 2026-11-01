@@ -197,8 +197,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Nothing of an appointment is kept or synced.
 - **A Checklist without a Routine or Reminder is one row today** while
   it has open Lines, "Before the trip: 3 of 7 open", unless the user
-  switched **Show on the Agenda** off in the ⋮ of its card or editor; the
-  switch is there only for such a Checklist. The row has no box; a tap
+  switched **Show on the Agenda** off in the ⋮ of its card or in its
+  badge in the editor; the switch is there only for such a Checklist. The row has no box; a tap
   opens the list. A Masked one says "Private Checklist" and its counts.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
@@ -257,6 +257,22 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note's first line, its media and the action row.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
+- **The Note editor shows each setting of the Note as a badge** (#160),
+  in one wrapping row under the text: the setting's icon and its value,
+  like a shield. Importance; Area and Topic in one; Captured (time, place,
+  calendar event, Bluetooth device, app); each Routine and Reminder with
+  its schedule; the kind (Checklist, Shopping List, Tally) while it has
+  one; Show on the Agenda for a Checklist without a Routine; Show ticks
+  while it has a box. A setting that does not apply has no badge. A tap
+  opens its small editor, a dialog with the same icon and the setting's
+  name, which changes it at once: Importance as radio buttons, the
+  switches, Back to a plain Note; Captured only shows its details. Area
+  and Topic opens File into…, a Routine or Reminder its editor. Where
+  this Device may not change a setting, its badge only shows it. A
+  screen reader reads each as "setting: value". The row ends with "+",
+  whose menu at the finger offers Routine, Reminder, Frog and Session,
+  there only for who may set them up. The text, the Lines, the photos and
+  recordings and the Sections stay the page's content.
 - Another person's Note shows their Profile picture, or its
   placeholder, on its card; one's own Notes show none. Tapping another
   person's picture, anywhere it shows, opens their Profile.
@@ -292,6 +308,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   colour.
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
+  The Note editor's settings are its badges (see Cards).
 
 ## Text editor
 
@@ -353,8 +370,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   step over a box as one character and never end inside it; typing next
   to it keeps its id with its glyph, and deleting the glyph, or any part
   of the box, deletes all of it.
-- **Show ticks** is a switch in the ⋮ of a Note's card and of its
-  editor, there only while the Note or a Section of it has a box: while
+- **Show ticks** is a switch in the ⋮ of a Note's card and in its badge
+  in the editor, there only while the Note or a Section of it has a box: while
   it is on, each ticked box says after it, small and grey, who ticked it
   last and when ("Ann, Tue 14:02", "You" for one's own, the time alone
   for a person not known or blocked). It is kept per Note in a setting
