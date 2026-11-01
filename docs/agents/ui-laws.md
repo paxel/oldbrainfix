@@ -507,9 +507,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader; the Note menu acts on the
   Note in the Note dialog and is greyed while none is open, each entry
-  as far as the dialog offers it. Its keys (Ctrl+N, Ctrl+F, Ctrl+M,
-  Ctrl+,; Cmd on macOS) stand beside the entries and work while typing,
-  over the Note dialog too, not while another dialog is open.
+  as far as the dialog offers it, but File into… acts on the cards
+  selected in the list while no Note is open (#148). Its keys (Ctrl+N,
+  Ctrl+F, Ctrl+M, Ctrl+,; Cmd on macOS) stand beside the entries and
+  work while typing, over the Note dialog too, not while another dialog
+  is open.
 - **The Settings, About and everything under Sync (Sync, Pair a Device,
   People, Profile, Backups) open as dialogs over the window**, never as
   views replacing the list, and no button on the main window leads to
@@ -525,8 +527,20 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **The path beside the arrows leads up the levels**, such as "Areas ›
   Household › Repairs"; a click on a level shows it, "Areas" leading to
   All Notes.
-- In the Note lists a click unfolds a compact Note; a double-click or
-  Edit opens the Note dialog.
+- In the Note lists a click selects the card and unfolds a compact
+  Note; Ctrl-click (Cmd on macOS) adds a card to the selection or takes
+  it away, Shift-click selects the run from the card clicked last in the
+  list's order (#148). The selected cards carry a check mark and a
+  thicker outline, and say so to a screen reader; Esc and showing
+  another place drop the selection. A double-click or Edit opens the
+  Note dialog.
+- **Cards move into an Area or Topic together** (#148): dragged onto it
+  in the sidebar, which outlines the row under the pointer, or with
+  File into… from the card's right-click, the Note menu or Ctrl+M,
+  whose dialog names how many go. A selected card takes the selection
+  along; one outside it goes alone. A card this Device may not move
+  stays where it is; the announcement says so without numbers, its
+  details how many moved and how many stayed.
 
 ## User guide
 

@@ -277,5 +277,12 @@
   "navForward": "Vorwärts",
   "pageClose": "{page} schließen",
   "pageBack": "Zurück zu {page}",
-  "pathUp": "Hoch zu {place}"
+  "pathUp": "Hoch zu {place}",
+  "fileNotesInto": "{count, plural, =1{1 Notiz ablegen in …} other{{count} Notizen ablegen in …}}",
+  "notesCount": "{count, plural, =1{1 Notiz} other{{count} Notizen}}",
+  "fileSomeStayed": "Nicht jede Notiz wurde abgelegt.",
+  "fileSomeStayedTitle": "Nicht alle Notizen abgelegt",
+  "fileSomeStayedCause": "In einem geteilten Bereich verschiebt nur ein Verwalter Notizen, die andere geschrieben haben, und in einen Bereich, aus dem dieser Computer herausgenommen wurde, kommt nichts hinein.",
+  "fileSomeStayedFix": "Nichts ging verloren: Diese Notizen bleiben, wo sie waren. Ein Verwalter ihres Bereichs kann sie verschieben.",
+  "fileSomeStayedDetails": "Abgelegt: {filed}. Geblieben, wo sie waren: {stayed}."
 }

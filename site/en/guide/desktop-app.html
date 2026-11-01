@@ -49,12 +49,23 @@
   <figcaption>What "+" makes in an Area.</figcaption>
 </figure>
 <p>
-  In a list of Notes, a click unfolds a compact card; a double-click or the pencil opens the Note in
-  the Note dialog. A right-click on a card or its ⋮ opens <strong>Edit</strong>, the Checklist entries with <strong>Show on the Agenda</strong>, the Shopping List entries
+  In a list of Notes, a click selects a card and unfolds a compact one; a double-click or the pencil
+  opens the Note in the Note dialog. A right-click on a card or its ⋮ opens <strong>Edit</strong>,
+  <strong>File into…</strong>, the Checklist entries with <strong>Show on the Agenda</strong>, the Shopping List entries
   (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>),
   <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Save as Markdown…</strong>. A card
-  dragged onto an Area or Topic in the sidebar is filed there; Notes in the Trash are not
-  dragged.
+  dragged onto an Area or Topic in the sidebar is filed there, an Unsorted one leaving Unsorted;
+  Notes in the Trash are not dragged.
+</p>
+<p>
+  Ctrl-click (Cmd-click on macOS) adds a card to the selection or takes it away again, and
+  Shift-click selects every card from the one clicked last to this one. Selected cards carry a check
+  mark and a thicker outline. Dragging one of them onto an Area or Topic, <strong>File into…</strong>
+  in its right-click menu, <strong>Note ▸ File into…</strong> and Ctrl+M file them all together;
+  the dialog says how many go. A card outside the selection is dragged alone. Esc and showing
+  another place drop the selection. In a Shared Area a Member's selection may hold Notes other
+  people wrote, which only a Manager moves: they stay where they are, and a line at the top says
+  that not every Note was filed; its click shows how many moved and how many stayed.
 </p>
 <p>
   A click on a photo in the Note dialog shows it full screen. A right-click on a photo in the Note
@@ -98,7 +109,7 @@
   <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong> and <strong>Google Keep…</strong> (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field, All Notes' where the list has none. <strong>Settings…</strong> (Ctrl+,) opens this computer's Settings.</li>
   <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Full cards</strong> and <strong>Compact cards</strong> for the list shown; <strong>Theme</strong> with <strong>System</strong>, which shows the window light or dark as the computer is set and changes with it, <strong>Light</strong> and <strong>Dark</strong>; the choice is kept on this computer.</li>
-  <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong>, <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Delete</strong>. They are greyed while no Note is open, and each one where the Note dialog does not offer it either.</li>
+  <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic and, while no Note is open, files the cards selected in the list, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong>, <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Delete</strong>. They are greyed while no Note is open, but File into… while cards are selected, and each one where the Note dialog does not offer it either.</li>
   <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see below).</li>
   <li><strong>Help</strong>: <strong>User guide</strong> opens this page in the browser; <strong>About Old Brain Fix</strong> shows the version, the documentation and privacy policy, the source code and every third-party component with its licence.</li>
 </ul>
@@ -216,7 +227,7 @@
 <ul>
   <li>Pictures and sound files dropped onto the window open the quick note and wait in it, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
   <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline; a Profile card file (<code>.obfcard</code>) adds the person and opens their Profile.</li>
-  <li>A Note's card dragged onto an Area or Topic in the sidebar is filed there.</li>
+  <li>A Note's card dragged onto an Area or Topic in the sidebar is filed there, with the other cards selected when it is one of them.</li>
 </ul>
 
 <h2>Notifications</h2>

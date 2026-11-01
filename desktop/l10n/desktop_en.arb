@@ -508,5 +508,19 @@
   "pageBack": "Back to {page}",
   "@pageBack": {"description": "The button at the top left of a desktop dialog opened from another, such as About from Settings; 'page' is the other's title.", "placeholders": {"page": {"type": "String"}}},
   "pathUp": "Up to {place}",
-  "@pathUp": {"description": "The name a screen reader hears for a level of the path above the desktop's list, such as the Area above a Topic; the path shows the name alone.", "placeholders": {"place": {"type": "String"}}}
+  "@pathUp": {"description": "The name a screen reader hears for a level of the path above the desktop's list, such as the Area above a Topic; the path shows the name alone.", "placeholders": {"place": {"type": "String"}}},
+  "fileNotesInto": "{count, plural, =1{File 1 Note into…} other{File {count} Notes into…}}",
+  "@fileNotesInto": {"description": "Title of the desktop's File into… dialog when several selected cards are filed together.", "placeholders": {"count": {"type": "int"}}},
+  "notesCount": "{count, plural, =1{1 Note} other{{count} Notes}}",
+  "@notesCount": {"description": "Beside the pointer on the desktop while several selected cards are dragged.", "placeholders": {"count": {"type": "int"}}},
+  "fileSomeStayed": "Not every Note was filed.",
+  "@fileSomeStayed": {"description": "Announced at the top of the desktop when some of the cards filed together may not be moved; carries no numbers, the click opens the dialog with them."},
+  "fileSomeStayedTitle": "Not every Note filed",
+  "@fileSomeStayedTitle": {"description": "Title of the dialog behind 'fileSomeStayed'."},
+  "fileSomeStayedCause": "In a Shared Area only a Manager moves Notes other people wrote, and nothing moves into an Area this computer was taken out of.",
+  "@fileSomeStayedCause": {"description": "The cause in the dialog behind 'fileSomeStayed'."},
+  "fileSomeStayedFix": "Nothing was lost: those Notes stay where they were. A Manager of their Area can move them.",
+  "@fileSomeStayedFix": {"description": "The fix in the dialog behind 'fileSomeStayed'."},
+  "fileSomeStayedDetails": "Filed: {filed}. Stayed where they were: {stayed}.",
+  "@fileSomeStayedDetails": {"description": "The details in the dialog behind 'fileSomeStayed': how many of the cards filed together moved and how many stayed.", "placeholders": {"filed": {"type": "int"}, "stayed": {"type": "int"}}}
 }

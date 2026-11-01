@@ -25,7 +25,9 @@
 //!
 //! Every change goes through `oldbrainfix_core`, which writes the entries
 //! the phone's core writes. A card dragged onto an Area or Topic on the
-//! left is filed there. Back and forward go through the places the list
+//! left is filed there; Ctrl-click and Shift-click select several cards,
+//! which a drag, File into… and Ctrl+M then move together
+//! ([`CardSelection`], #148). Back and forward go through the places the list
 //! showed, as a browser's do ([`Navigation`]): the buttons, Alt+Left and
 //! Alt+Right, and the mouse's back and forward buttons; the path leads up
 //! the levels. The keys rest while text is being typed, where Alt+arrows
@@ -107,6 +109,7 @@ use crate::backups;
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
+use crate::card_selection::CardSelection;
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
@@ -218,6 +221,15 @@ pub enum Page {
     Pair,
 }
 
+/// How a click on a card selects (#148): a plain click this card alone,
+/// Ctrl-click (Cmd on macOS) in or out, Shift-click the run up to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pick {
+    One,
+    Toggle,
+    Run,
+}
+
 /// Which of Edit's Cut, Copy and Paste the field the cursor was in gets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Clip {
@@ -226,9 +238,11 @@ enum Clip {
     Paste,
 }
 
-/// What a card carries while it is dragged: the Note's id.
+/// What a card carries while it is dragged: the ids of the Notes that
+/// move, the selected ones in the list's order when the card is one of
+/// them (#148), else its own.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DraggedNote(pub String);
+pub struct DraggedNotes(pub Vec<String>);
 
 /// A Note with the Area and Topic it is filed in, and the Profile of the
 /// other person who wrote it; none for the user's own.
@@ -688,10 +702,10 @@ enum Dialog {
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
     Import,
-    /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Note
-    /// `note` goes into.
+    /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
+    /// `notes` go into, the selected ones together (#148).
     FileInto {
-        note: String,
+        notes: Vec<String>,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -877,9 +891,14 @@ enum Action {
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
     /// once if one is chosen.
     SyncNow,
-    /// Asks where the Note with this id is filed (Note ▸ File into…,
-    /// Ctrl+M).
-    AskFileInto(String),
+    /// Asks where the Notes with these ids are filed (Note ▸ File into…,
+    /// Ctrl+M, a card's right-click), together (#148).
+    AskFileInto(Vec<String>),
+    /// A click on a card (#148): as its [`Pick`] says, it selects this
+    /// card alone, adds or takes it away, or selects the run up to it.
+    PickCard(String, Pick),
+    /// Esc over the list: no card selected.
+    ClearCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
     /// Opens the Note in the Note dialog (#146): a double-click on its
@@ -957,8 +976,10 @@ enum Action {
     /// screen, putting a new one in there when there is none.
     AmendTable(usize),
     Importance(Importance),
+    /// Files these Notes into the Area or Topic `place`, together; the
+    /// ones this Device may not move stay (#148).
     File {
-        note: String,
+        notes: Vec<String>,
         place: String,
     },
     Trash,
@@ -1231,6 +1252,8 @@ pub struct App {
     t: L10n,
     selection: Selection,
     selected_note: Option<String>,
+    /// The cards selected in the list shown, to move together (#148).
+    cards: CardSelection,
     view: View,
     /// What went wrong reading or writing the log, in full: announced at
     /// the top without it, its click opening it with the cause and fix.
@@ -1645,6 +1668,7 @@ impl App {
             t: L10n::new(locale),
             selection: Selection::Agenda,
             selected_note: None,
+            cards: CardSelection::default(),
             view: View::default(),
             error: None,
             scrolled: 0.0,
@@ -3440,6 +3464,11 @@ impl App {
         self.selected_note.as_deref()
     }
 
+    /// The ids of the cards selected in the list (#148), in its order.
+    pub fn selected_cards(&self) -> Vec<String> {
+        self.cards.in_order(&self.shown_cards())
+    }
+
     /// What went wrong last, as announced at the top.
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
@@ -3593,6 +3622,10 @@ impl App {
             Ok(view) => {
                 self.view = view;
                 self.error = None;
+                // Only cards still shown stay selected (#148): none hidden
+                // by a search, or filed out of the list, moves unseen.
+                let shown = self.shown_cards();
+                self.cards.retain(&shown);
             }
             Err(e) => self.error = Some(e.to_string()),
         }
@@ -4444,7 +4477,16 @@ impl App {
                     self.folder_now()?;
                 }
             }
-            Action::AskFileInto(note) => self.dialog = Some(Dialog::FileInto { note }),
+            Action::AskFileInto(notes) => self.dialog = Some(Dialog::FileInto { notes }),
+            Action::PickCard(id, pick) => {
+                let order = self.shown_cards();
+                match pick {
+                    Pick::One => self.cards.click(&id),
+                    Pick::Toggle => self.cards.toggle(&id),
+                    Pick::Run => self.cards.extend(&id, &order),
+                }
+            }
+            Action::ClearCards => self.cards.clear(),
             Action::AskImport => self.dialog = Some(Dialog::Import),
             Action::SelectNote(id) => {
                 // One dialog at a time: the quick note is kept and closed.
@@ -4705,16 +4747,7 @@ impl App {
                 self.table_amends = true;
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
-            Action::File { note, place } => {
-                // A card dragged by a Member that is not theirs, or into
-                // an Area this Device was taken out of, stays (ADR 0013).
-                if !self.store.may_change(&note)? || !self.store.may_write_in(&place)? {
-                    let t = self.t;
-                    self.announce_refusal(t.only_managers(), "file: not a Manager of the Area");
-                    return Ok(());
-                }
-                notes.file(&note, &place)?;
-            }
+            Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
             Action::Trash => {
                 self.save_text()?;
                 let linked = Routines::new(&self.store).of_note(&selected)?.len() as i64;
@@ -6427,6 +6460,8 @@ impl App {
         if to != self.selection {
             self.query.clear();
             self.people = PersonFilter::default();
+            // The cards selected were those of the list left (#148).
+            self.cards.clear();
         }
         self.selection = to;
     }
@@ -6866,8 +6901,17 @@ impl App {
             || self.badge.is_some()
             || self.top_dialog().is_some_and(|top| top != TopDialog::Note);
         if self.welcome.is_none() && !over {
-            let note = self.note_menu_note();
+            let filing = self.file_into_notes();
+            // Esc over the list drops the cards selected (#148); over a
+            // dialog or menu it is theirs, in a field the field's.
+            let clears = self.top_dialog().is_none()
+                && !self.cards.is_empty()
+                && !ui.ctx().text_edit_focused()
+                && !egui::Popup::is_any_open(ui.ctx());
             ui.input_mut(|i| {
+                if clears && i.consume_key(Modifiers::NONE, Key::Escape) {
+                    actions.push(Action::ClearCards);
+                }
                 if i.consume_key(Modifiers::COMMAND, Key::N) {
                     actions.push(Action::NewNote);
                 }
@@ -6877,8 +6921,8 @@ impl App {
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
                 }
-                if let Some(note) = note.filter(|_| i.consume_key(Modifiers::COMMAND, Key::M)) {
-                    actions.push(Action::AskFileInto(note));
+                if let Some(notes) = filing.filter(|_| i.consume_key(Modifiers::COMMAND, Key::M)) {
+                    actions.push(Action::AskFileInto(notes));
                 }
             });
         }
@@ -7265,10 +7309,67 @@ impl App {
         self.note_menu().filter(|n| n.changes).map(|n| n.id)
     }
 
+    /// The Notes Note ▸ File into… and Ctrl+M file (#148): the one in the
+    /// Note dialog, where it may be filed, else the cards selected in the
+    /// list, in its order; none in the trash, whose Notes are restored.
+    fn file_into_notes(&self) -> Option<Vec<String>> {
+        if self.note_open() {
+            return self.note_menu_note().map(|id| vec![id]);
+        }
+        if self.selection == Selection::Trash || self.cards.is_empty() {
+            return None;
+        }
+        Some(self.cards.in_order(&self.shown_cards()))
+    }
+
+    /// The ids of the Notes the list shows, in its order.
+    fn shown_cards(&self) -> Vec<String> {
+        self.view.notes.iter().map(|p| p.note.id.clone()).collect()
+    }
+
+    /// Files the Notes `ids` into the Area or Topic `place` in one go
+    /// (#148), as File into… and a drop on the sidebar ask, Unsorted ones
+    /// leaving Unsorted. One this Device may not move stays: another
+    /// person's in a Shared Area where it is a Member, one in the trash,
+    /// and every one where this Device may not write in `place`, such as
+    /// an Area it was taken out of (ADR 0013); how many stayed is told.
+    fn file_notes(&mut self, ids: &[String], place: &str) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let into = self.store.may_write_in(place)?;
+        let mut moving = Vec::new();
+        for id in ids {
+            let trashed = notes.by_id(id)?.is_none_or(|n| n.is_trashed());
+            if into && !trashed && self.store.may_change(id)? {
+                moving.push(id.as_str());
+            }
+        }
+        self.store
+            .batch(|| moving.iter().try_for_each(|id| notes.file(id, place)))?;
+        self.cards.clear();
+        let stayed = ids.len() - moving.len();
+        let t = self.t;
+        if stayed == 0 {
+            return Ok(());
+        }
+        if ids.len() == 1 {
+            self.announce_refusal(t.only_managers(), "file: not a Manager of the Area");
+            return Ok(());
+        }
+        let details = t.file_some_stayed_details(moving.len() as i64, stayed as i64);
+        self.announce_failure(
+            t.file_some_stayed(),
+            t.file_some_stayed_title(),
+            (t.file_some_stayed_cause(), t.file_some_stayed_fix()),
+            details,
+        );
+        Ok(())
+    }
+
     /// The menu bar (#145): File, Edit, View, Note, Sync and Help, each
     /// entry with its keys where it has some, the Note menu's greyed
-    /// while no Note is selected. A pick closes its menu, also one by
-    /// keyboard or screen reader.
+    /// while no Note is open, but File into… for the cards selected
+    /// (#148). A pick closes its menu, also one by keyboard or screen
+    /// reader.
     fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -7281,6 +7382,8 @@ impl App {
         };
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
+        // File into… also files the cards selected in the list (#148).
+        let filing = self.file_into_notes();
         let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
@@ -7368,8 +7471,8 @@ impl App {
                     (
                         t.file_into(),
                         keys(Key::M),
-                        may(|n| n.changes),
-                        Action::AskFileInto(id.clone()),
+                        filing.is_some(),
+                        Action::AskFileInto(filing.clone().unwrap_or_default()),
                     ),
                     (
                         t.menu_routine(),
@@ -8281,9 +8384,13 @@ impl App {
             ui.spacing_mut().item_spacing.y = 16.0;
             ui.add_space(4.0);
             let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
+            let order: Vec<String> = self.view.notes.iter().map(|p| p.note.id.clone()).collect();
+            // Ctrl (Cmd on macOS) and Shift as the card is clicked (#148).
+            let modifiers = ui.input(|i| i.modifiers);
             for placed in &self.view.notes {
                 let id = &placed.note.id;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
+                let picked = self.cards.contains(id);
                 // A Note in the trash is restored, not filed.
                 let draggable = !placed.note.is_trashed();
                 let media = CardMedia {
@@ -8310,17 +8417,28 @@ impl App {
                     &self.t,
                     tones,
                     placed,
-                    (selected, draggable),
+                    (selected, picked, draggable),
                     look,
                     media,
                 );
-                // A click unfolds a compact Note and does nothing to a
-                // full one; a double-click or Edit opens the editor
-                // (UI laws, "Desktop").
+                // Dragged, the card takes the cards selected with it when
+                // it is one of them (#148).
+                if draggable && clicks.card.drag_started() {
+                    let moving = self.cards.moving(id, &order);
+                    egui::DragAndDrop::set_payload(ui.ctx(), DraggedNotes(moving));
+                }
+                // A click selects the card and unfolds a compact Note,
+                // Ctrl-click and Shift-click select more (#148); a
+                // double-click or Edit opens the Note dialog (UI laws,
+                // "Desktop").
                 if clicks.menu_opened {
                     actions.push(Action::Checklist(ChecklistAction::Menu(id.clone())));
                 }
-                if let Some(picked) = clicks.picked {
+                if let Some(Action::AskFileInto(_)) = clicks.picked {
+                    // The right-click's File into… files the cards selected
+                    // with it.
+                    actions.push(Action::AskFileInto(self.cards.moving(id, &order)));
+                } else if let Some(picked) = clicks.picked {
                     actions.push(picked);
                 } else if let Some(tag) = clicks.tag {
                     actions.push(Action::SearchFor(tag));
@@ -8349,8 +8467,18 @@ impl App {
                         || clicks.card.triple_clicked()
                 {
                     actions.push(Action::SelectNote(id.clone()));
-                } else if clicks.card.clicked() && !look.full {
-                    actions.push(Action::Unfold(id.clone()));
+                } else if clicks.card.clicked() {
+                    let pick = if modifiers.shift {
+                        Pick::Run
+                    } else if modifiers.command {
+                        Pick::Toggle
+                    } else {
+                        Pick::One
+                    };
+                    actions.push(Action::PickCard(id.clone(), pick));
+                    if pick == Pick::One && !look.full {
+                        actions.push(Action::Unfold(id.clone()));
+                    }
                 }
             }
         });
@@ -9569,8 +9697,12 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
-                    Dialog::FileInto { note } => {
-                        title(ui, t.file_into());
+                    Dialog::FileInto { notes } => {
+                        // Several selected: how many go (#148).
+                        match notes.len() {
+                            1 => title(ui, t.file_into()),
+                            n => title(ui, &t.file_notes_into(n as i64)),
+                        }
                         let text = ui.visuals().text_color();
                         let weak = ui.visuals().weak_text_color();
                         egui::ScrollArea::vertical()
@@ -9595,7 +9727,7 @@ impl App {
                                             if ui.add(button).clicked() {
                                                 actions.push(Action::CloseDialog);
                                                 actions.push(Action::File {
-                                                    note: note.clone(),
+                                                    notes: notes.clone(),
                                                     place,
                                                 });
                                             }
@@ -10656,17 +10788,22 @@ impl App {
         });
     }
 
-    /// The card's text next to the pointer while a card is dragged.
+    /// The card's text next to the pointer while a card is dragged, and
+    /// how many go while several are (#148).
     fn dragged(&self, ctx: &egui::Context, tones: Tones) {
-        let Some(dragged) = egui::DragAndDrop::payload::<DraggedNote>(ctx) else {
+        let Some(dragged) = egui::DragAndDrop::payload::<DraggedNotes>(ctx) else {
             return;
         };
         let Some(pos) = ctx.pointer_interact_pos() else {
             return;
         };
-        let Some(placed) = self.view.notes.iter().find(|p| p.note.id == dragged.0) else {
+        let Some(first) = dragged.0.first() else {
             return;
         };
+        let Some(placed) = self.view.notes.iter().find(|p| &p.note.id == first) else {
+            return;
+        };
+        let count = dragged.0.len();
         ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
         egui::Area::new(Id::new("dragged"))
             .order(egui::Order::Tooltip)
@@ -10680,21 +10817,25 @@ impl App {
                     .show(ui, |ui| {
                         ui.set_max_width(240.0);
                         let text = ui.visuals().text_color();
+                        if count > 1 {
+                            let many = self.t.notes_count(count as i64);
+                            ui.label(RichText::new(many).strong().color(text));
+                        }
                         ui.label(RichText::new(placed.note.visible_text()).color(text));
                     });
             });
     }
 }
 
-/// Selects the Area or Topic `place` when its row is clicked, and files a
-/// card dropped on it there.
+/// Selects the Area or Topic `place` when its row is clicked, and files
+/// the cards dropped on it there, all those dragged together (#148).
 fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
     if resp.clicked() {
         actions.push(Action::Select(Selection::Place(place.to_string())));
     }
-    if let Some(dragged) = resp.dnd_release_payload::<DraggedNote>() {
+    if let Some(dragged) = resp.dnd_release_payload::<DraggedNotes>() {
         actions.push(Action::File {
-            note: dragged.0.clone(),
+            notes: dragged.0.clone(),
             place: place.to_string(),
         });
     }
@@ -12786,7 +12927,7 @@ fn row(
     resp.widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, on, label));
     if ui.is_rect_visible(rect) {
         let fg = ui.visuals().text_color();
-        if droppable && resp.dnd_hover_payload::<DraggedNote>().is_some() {
+        if droppable && resp.dnd_hover_payload::<DraggedNotes>().is_some() {
             ui.painter().rect_stroke(
                 rect,
                 8.0,
@@ -12958,7 +13099,7 @@ fn note_badges(
         )
         .clicked()
         {
-            actions.push(Action::AskFileInto(note.id.clone()));
+            actions.push(Action::AskFileInto(vec![note.id.clone()]));
         }
         let captured = when(t, note.captured);
         let icon = (icons::CONTEXT_WHEN, None);
@@ -13423,14 +13564,17 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 /// the same menu: Edit, then making it a Checklist, "Uncheck all", "Back
 /// to a plain Note" and making it a Shopping List as this Device may
 /// (#120, #122). Important cards carry the accent marker and a stronger
-/// emboss; unimportant ones are dimmed. A `draggable` card can be dropped onto an Area or Topic; a `selected`
-/// one is outlined while its editor shows.
+/// emboss; unimportant ones are dimmed. A `draggable` card can be
+/// dropped onto an Area or Topic, its drag started by the list; a
+/// `selected` one is outlined while its editor shows; a `chosen` one,
+/// among the cards selected (#148), carries a check mark and a thicker
+/// outline, and says so to a screen reader.
 fn note_card(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
     placed: &Placed,
-    (selected, draggable): (bool, bool),
+    (selected, chosen, draggable): (bool, bool, bool),
     look: CardLook,
     media: CardMedia,
 ) -> CardClicks {
@@ -13471,6 +13615,9 @@ fn note_card(
             // Another person's Note shows their picture (ADR 0017); the
             // user's own none.
             ui.horizontal(|ui| {
+                if chosen {
+                    icons::show(ui, icons::STATUS_DONE, 18.0, tones.accent);
+                }
                 if let Some(author) = &placed.author {
                     let name = profile_view::display_name(t, &author.name);
                     let picture = profile_view::person_picture(
@@ -13621,7 +13768,14 @@ fn note_card(
             );
             icons::paint(ui.painter(), marker, icons::IMPORTANT, tones.accent);
         }
-        if selected {
+        if chosen {
+            ui.painter().rect_stroke(
+                rect,
+                theme::CARD_RADIUS,
+                egui::Stroke::new(3.0, tones.accent),
+                egui::StrokeKind::Inside,
+            );
+        } else if selected {
             ui.painter().rect_stroke(
                 rect,
                 theme::CARD_RADIUS,
@@ -13639,10 +13793,7 @@ fn note_card(
     };
     let resp = ui.interact(rect, Id::new(("card", &note.id)), sense);
     let label = note.visible_text();
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, selected, &label));
-    if draggable {
-        resp.dnd_set_drag_payload(DraggedNote(note.id.clone()));
-    }
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
     // The author's picture and Edit lie over the card: registered after
     // it, so they take the click.
     let author = author_rect
@@ -13682,6 +13833,14 @@ fn note_card(
         let text = ui.visuals().text_color();
         if ui.button(RichText::new(t.edit()).color(text)).clicked() {
             picked = Some(Action::SelectNote(note.id.clone()));
+        }
+        // With the cards selected along, as the list makes it (#148).
+        if look.changes
+            && ui
+                .button(RichText::new(t.file_into()).color(text))
+                .clicked()
+        {
+            picked = Some(Action::AskFileInto(vec![note.id.clone()]));
         }
         if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
             picked = Some(Action::Checklist(asked));
