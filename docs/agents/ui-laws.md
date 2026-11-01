@@ -189,7 +189,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
-  rows as Settings of this Device choose (today only), then the
+  rows as the user chose for each list (today only, oldest capture
+  first, none for a list without open Lines), then the
   Checklists' rows (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
@@ -285,17 +286,30 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note's first line, its media and the action row.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
+- **Copy text** in a card's ⋮ puts the text of the Note and of each
+  Section on the clipboard as they show, oldest first, a blank line
+  between them, and says nothing (#183). In the Note editor a text that
+  is only read, the Note's or a Section's, selects with a long press,
+  with Copy in the system's menu.
+- **A Section's text is edited in place in the Note editor** (#183), in
+  the same field and with the same format bar as the Note's text, by the
+  same people (the Section's author, in a Shared Area also the
+  Managers); others read it. Under its time it says, small and grey,
+  when it was last edited and by whom, once it was.
 - **The Note editor shows each setting of the Note as a badge** (#160),
   in one wrapping row under the text: the setting's icon and its value,
   like a shield. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
   its schedule; the kind (Checklist, Shopping List, Tally) while it has
-  one; Show on the Agenda for a Checklist without a Routine; Show ticks
-  while it has a box. A setting that does not apply has no badge. A tap
+  one; Show on the Agenda for a Checklist without a Routine and for a
+  Shopping List (#186); Show ticks while it has a box. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
-  name, which changes it at once: Importance as radio buttons, the
-  switches, Back to a plain Note; Captured only shows its details. Area
-  and Topic opens File into…, a Routine or Reminder its editor. Where
+  name, which changes it at once: Importance as radio buttons (only
+  here, not in the card's ⋮, #182), a Shopping List's Show on the
+  Agenda as radio buttons (here and in the card's ⋮), the switches,
+  Back to a plain Note;
+  Captured only shows its details. Area and Topic opens File into…, a
+  Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value". The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
@@ -411,25 +425,33 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 ## Checklist and Shopping List Lines
 
-- **The Lines of a Checklist and a Shopping List are typed in place** in
-  the Note editor: each Line is a text row beside its box, and the
+- **A Checklist and a Shopping List are edited the same way**, as one
+  block of text with boxes (#184): in the Note editor every Line is a
+  text row starting with its box, the rows close together, and the
   cursor moves between them. Cards only check them.
-- On a Checklist, **Return** splits the Line at the cursor; at its end
-  it starts a new empty Line with an open box under it, in the group of
-  a Line with one; **Add Line** starts one at the end. **Backspace at
-  the start** of a Line joins it with the Line above: its text goes to
-  the end of that Line, which keeps its box and state; an empty Line
-  simply goes.
+- **A new list starts with one empty boxed Line**, the cursor in it. A
+  list this Device may add to always has a Line to type in.
+- **Return** adds a new Line with an empty box under the cursor's Line,
+  in the group of a Line with one; in the middle of a Line it moves the
+  rest of the Line into the new one. **Backspace at the start** of a
+  Line joins it with the Line above: its text goes to the end of that
+  Line, which keeps its box and state, and the Line goes, its checks
+  staying in the log; an empty Line simply goes. **No Add Line button
+  and no Add field**: Return makes new Lines.
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
   at the top. On the desktop **Tab and Shift+Tab** do it, in place of
-  the buttons.
+  the buttons, and Up and Down move the cursor to the Line above and
+  below.
+- **The frame around a group holds the group's own Line** and the Lines
+  under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.
-- A Shopping List keeps its field at the top: **Return adds** what was
-  typed and leaves the field ready for the next; text left there is
-  added on leaving. Its Lines are renamed in place.
+- On a Shopping List the open Lines keep the order they were typed in,
+  also the next time; a Line checked while the editor is open stays in
+  its row, and shows below the open ones the next time. A name the list
+  has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, its reappear time, Delete); a
   long press in a Line's text selects, as in any field.
 
@@ -534,6 +556,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   thicker outline, and say so to a screen reader; Esc and showing
   another place drop the selection. A double-click or Edit opens the
   Note dialog.
+- **In the Note dialog a text that is only read selects with the
+  mouse** and copies with Ctrl+C (Cmd on macOS): the Note's and a
+  Section's (#183); a Section this Device may edit has its own field and
+  format bar there. "Copy as text" in a card's right-click menu, the
+  Note menu and the dialog is the desktop's "Copy text": the Note and
+  its Sections as they show.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
   in the sidebar, which outlines the row under the pointer, or with
   File into… from the card's right-click, the Note menu or Ctrl+M,

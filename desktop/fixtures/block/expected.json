@@ -673,7 +673,9 @@
             "removedPhotos": [],
             "removedRecordings": [],
             "removedTranscripts": [],
-            "removedPhotoTexts": []
+            "removedPhotoTexts": [],
+            "modified": null,
+            "editedBy": null
           }
         ]
       },

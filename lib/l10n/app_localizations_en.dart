@@ -1027,6 +1027,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get copyText => 'Copy text';
+
+  @override
+  String sectionEdited(String when) {
+    return 'Edited $when';
+  }
+
+  @override
+  String sectionEditedBy(String when, String name) {
+    return 'Edited $when by $name';
+  }
+
+  @override
   String get moreCaptureContext => 'More about the capture';
 
   @override
@@ -3279,12 +3292,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get checklistNewLine => 'New Line';
-
-  @override
-  String get checklistAddLine => 'Add Line';
-
-  @override
   String get checklistRenameTitle => 'Rename Line';
 
   @override
@@ -4279,33 +4286,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Download one of the models listed, or pick the file of one of them.';
 
   @override
-  String get settingsShoppingAgenda => 'Shopping Lists on the Agenda';
-
-  @override
-  String get settingsShoppingAgendaDetail =>
-      'Today only, and on this Device only.';
-
-  @override
-  String get shoppingAgendaLines =>
-      'Each Line that came back today, on its own row';
-
-  @override
-  String get shoppingAgendaBack =>
-      'One row per Shopping List on a day when Lines came back';
-
-  @override
-  String get shoppingAgendaOpen =>
-      'One row per Shopping List on every day it has open Lines';
-
-  @override
-  String get shoppingAgendaOff => 'Not at all';
-
-  @override
-  String shoppingRowBack(String list, int count) {
-    return '$list: $count back';
-  }
-
-  @override
   String shoppingRowOpen(String list, int count) {
     return '$list: $count open';
   }
@@ -4323,6 +4303,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checklistShowOnAgenda => 'Show on the Agenda';
+
+  @override
+  String get shoppingOnAgendaCount => 'One row with the number of open Lines';
+
+  @override
+  String get shoppingOnAgendaLines => 'Each open Line on its own row';
 
   @override
   String get textMarkCheck => 'Check';

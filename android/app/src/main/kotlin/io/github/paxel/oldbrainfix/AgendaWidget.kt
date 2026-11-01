@@ -168,13 +168,26 @@ class AgendaWidget : AppWidgetProvider() {
             }
         }
 
+        /**
+         * Every layout a row of the list is drawn with; the list's view
+         * types ([AgendaWidgetService]) count them.
+         */
+        val ROW_LAYOUTS = listOf(R.layout.widget_agenda_row, R.layout.widget_agenda_text, R.layout.widget_agenda_unsorted)
+
+        /** The layout a row of [kind] is drawn with, one of [ROW_LAYOUTS]. */
+        fun layoutOf(kind: String): Int = when (kind) {
+            WidgetRow.UNSORTED -> R.layout.widget_agenda_unsorted
+            WidgetRow.HEADING, WidgetRow.TEXT, WidgetRow.MESSAGE -> R.layout.widget_agenda_text
+            else -> R.layout.widget_agenda_row
+        }
+
         /** The views of [row]: its box checks it, the rest opens the app; the Unsorted count opens the Unsorted list. */
-        fun rowViews(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow): RemoteViews = when (row.kind) {
-            WidgetRow.UNSORTED -> RemoteViews(context.packageName, R.layout.widget_agenda_unsorted).apply {
+        fun rowViews(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow): RemoteViews = when (layoutOf(row.kind)) {
+            R.layout.widget_agenda_unsorted -> RemoteViews(context.packageName, R.layout.widget_agenda_unsorted).apply {
                 setTextViewText(R.id.agenda_unsorted, row.title)
                 setOnClickFillInIntent(R.id.agenda_unsorted, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_UNSORTED))
             }
-            WidgetRow.HEADING, WidgetRow.TEXT, WidgetRow.MESSAGE ->
+            R.layout.widget_agenda_text ->
                 RemoteViews(context.packageName, R.layout.widget_agenda_text).apply {
                     val text = SpannableString(row.title)
                     if (row.kind == WidgetRow.HEADING) {

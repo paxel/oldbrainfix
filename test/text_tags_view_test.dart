@@ -170,30 +170,38 @@ void main() {
   });
 
   group('in the editor', () {
-    testWidgets('the text\'s tags are highlighted as typed, a Section\'s tag '
-        'opens the search', (tester) async {
+    testWidgets('the tags of the text and of a Section are highlighted as '
+        'typed', (tester) async {
       final id = notes.capture('Mow the #Garten, C# too').id;
-      notes.amend(id, 'Water the #Beet');
+      final section = notes.amend(id, 'Water the #Beet');
       await startAtNotes(tester);
       await tester.longPress(find.byType(NoteCard).first);
       await tester.pumpAndSettle();
       expect(find.byType(NoteEditorScreen), findsOneWidget);
 
-      final field = tester.widget<EditableText>(find.byType(EditableText));
-      final span = field.controller.buildTextSpan(
-        context: tester.element(find.byType(EditableText)),
-        withComposing: false,
-      );
-      final coloured = [
-        for (final child in span.children ?? const <InlineSpan>[])
-          if (child is TextSpan && child.style?.color == accent(tester))
-            child.text,
-      ];
-      expect(coloured, ['#Garten']);
-
-      await tap(tester, key('tag-10'));
-      expect(searched(tester), '#Beet');
-      expect(find.byType(NoteCard), findsOneWidget);
+      // A Section's text is edited in its own field, as the Note's (#183).
+      for (final (field, tags) in [
+        ('note-text', ['#Garten']),
+        ('section-text:${section.id}', ['#Beet']),
+      ]) {
+        final editable = find.descendant(
+          of: key(field),
+          matching: find.byType(EditableText),
+        );
+        final span = tester
+            .widget<EditableText>(editable)
+            .controller
+            .buildTextSpan(
+              context: tester.element(editable),
+              withComposing: false,
+            );
+        final coloured = [
+          for (final child in span.children ?? const <InlineSpan>[])
+            if (child is TextSpan && child.style?.color == accent(tester))
+              child.text,
+        ];
+        expect(coloured, tags, reason: field);
+      }
     });
   });
 }

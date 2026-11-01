@@ -254,6 +254,42 @@ void main() {
       expect(picked(ann, s, 0), [c, b]);
       expect(Sessions(ann).pool(Sessions(ann).byId(s.id)!), [c]);
     });
+
+    test('a Tally with an entry for it stays in its pick, in its place', () {
+      final sessions = Sessions(ann);
+      final [a, b, c, d, e] = tallies(ann, ['A', 'B', 'C', 'D', 'E']);
+      final s = session(ann, [a, b, c, d, e], count: 3);
+      final today = day(ann, 0);
+      expect(picked(ann, s, 0), [a, b, c]);
+      sessions.another(s.id, today, c);
+      final entry = record(ann, s, 0, d);
+      // As a pick another Device wrote later.
+      ann.append(s.id, SessionKeys.pick(today), [a, b, c].join(','));
+      expect(shown(ann, s, 0), [a, b, d]);
+      expect(Routines(ann).byId(s.id)?.doneAt(today), isNull);
+      // A pick with an entry is swapped for none.
+      final before = ann.allEntries().length;
+      sessions.another(s.id, today, d);
+      expect(ann.allEntries().length, before);
+      // Removed, the entry takes it out again; an entry made on the
+      // Tally itself is no pick's.
+      Tallies(ann).trashEntry(entry.id);
+      expect(shown(ann, s, 0), [a, b, c]);
+      Tallies(ann).add(d, line: 'Elsewhere');
+      expect(shown(ann, s, 0), [a, b, c]);
+      Tallies(ann).restoreEntry(entry.id);
+      expect(shown(ann, s, 0), [a, b, d]);
+      // Its place taken by one with an entry, it goes at the end, and
+      // the pick is trimmed by one without.
+      ann.append(s.id, SessionKeys.pick(today), [a, b, e].join(','));
+      Tallies(ann).add(
+        e,
+        line: 'Desk',
+        within: (id) => ann.append(s.id, SessionKeys.entry(today, id), e),
+      );
+      expect(SessionMarks.read(ann, s.id).picks[today.key], [a, b, e, d]);
+      expect(shown(ann, s, 0), [a, e, d]);
+    });
   });
 
   group('Done', () {
@@ -320,6 +356,43 @@ void main() {
       expect(Routines(desk).byId(s.id)?.doneAt(today), done);
       // The next day goes on alike.
       expect(shown(desk, s, 1), shown(ann, s, 1));
+    });
+
+    test('a pick recorded stays when a first pick written later wins', () {
+      // Push-ups and Half bridge picked, Half bridge recorded, Push-ups
+      // swapped for a new Tally and that recorded; meanwhile the desk,
+      // not synced yet, showed the day and wrote its own first pick,
+      // which wins on the field after the sync.
+      final desk = device(clock, 'Ann at the desk');
+      exchange(desk, ann);
+      final [pushUps, bridge] = tallies(ann, ['Push-ups', 'Half bridge']);
+      final s = session(ann, [pushUps, bridge]);
+      final today = day(ann, 0);
+      exchange(desk, ann);
+      expect(picked(ann, s, 0), [pushUps, bridge]);
+      record(ann, s, 0, bridge);
+      final march = tally(ann, 'Long march');
+      Sessions(ann).setPool(s.id, [pushUps, bridge, march]);
+      Sessions(ann).another(s.id, today, pushUps);
+      expect(shown(ann, s, 0), [march, bridge]);
+      record(ann, s, 0, march);
+      expect(picked(desk, s, 0), [pushUps, bridge]);
+      exchange(desk, ann);
+      expect(SessionMarks.read(ann, s.id).stored[today.key], [pushUps, bridge]);
+      for (final store in [ann, desk]) {
+        final occurrence = Sessions(store).on(s.id, today);
+        expect([for (final p in occurrence.picks) p.noteId], [march, bridge]);
+        expect([for (final p in occurrence.picks) p.done], [true, true]);
+        expect(occurrence.complete, isTrue);
+        expect(Routines(store).byId(s.id)?.doneAt(today), isNotNull);
+      }
+      // The Agenda writes the pick back once; Push-ups stays out.
+      final before = ann.allEntries().length;
+      expect(picked(ann, s, 0), [march, bridge]);
+      expect(ann.allEntries().length, before + 1);
+      expect(picked(ann, s, 0), [march, bridge]);
+      expect(ann.allEntries().length, before + 1);
+      expect(SessionMarks.read(ann, s.id).stored[today.key], [march, bridge]);
     });
 
     test('a pick another person\'s Device slipped in counts for nothing', () {

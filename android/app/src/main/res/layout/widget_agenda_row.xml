@@ -17,11 +17,14 @@
         android:background="@drawable/widget_agenda_row_background"
         android:gravity="center_vertical"
         android:orientation="horizontal">
-        <View
+        <!-- An ImageView, not a plain View: a widget's list inflates
+             only the view classes RemoteViews allows (#181). -->
+        <ImageView
             android:id="@+id/agenda_strip"
             android:layout_width="4dp"
             android:layout_height="match_parent"
             android:background="@color/agenda_widget_accent"
+            android:importantForAccessibility="no"
             android:visibility="gone" />
         <ImageView
             android:id="@+id/agenda_check"

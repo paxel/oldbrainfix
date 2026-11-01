@@ -19,6 +19,7 @@ use crate::checklists::{
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{Day, WallClock};
+use crate::settings::DeviceSettings;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
 use crate::text_format::{self, StoredText, VERSION};
@@ -39,6 +40,12 @@ pub mod keys {
     /// On a Line: how long it stays struck once checked, a
     /// [`super::Reappear`]'s code.
     pub const REAPPEAR: &str = "reappear";
+
+    /// On the user's own `agenda:<note id>` entity
+    /// ([`crate::checklists::keys::AGENDA_PREFIX`]), beside a Checklist's
+    /// field: how the Shopping List shows on their Agenda (#186), a
+    /// [`super::ShoppingOnAgenda`]'s code.
+    pub const AGENDA: &str = "shopping";
 }
 
 /// How long a checked Line of a Shopping List stays struck through before
@@ -97,8 +104,9 @@ impl Reappear {
     }
 }
 
-/// How the Agenda of a Device shows Shopping Lists (#123), a setting of
-/// that Device.
+/// How the Agenda of a Device showed Shopping Lists (#123), a setting of
+/// that Device until each Shopping List had its own choice (#186). It is
+/// read only for the default of [`ShoppingOnAgenda`] on this Device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShoppingAgenda {
     /// Each Line that came back today on its own row, checkable there.
@@ -143,11 +151,60 @@ impl ShoppingAgenda {
     }
 }
 
-/// A Shopping List on today's Agenda with the Lines its row stands for:
-/// those that came back today, or for [`ShoppingAgenda::Open`] those open.
+/// How a Shopping List shows on today's Agenda (#186), each person's own
+/// choice for each list, kept as an Override is (ADR 0030).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShoppingOnAgenda {
+    /// Never.
+    Off,
+    /// One row with the number of its open Lines, such as "Groceries: 4
+    /// open".
+    Count,
+    /// Each open Line on a row of its own, checkable there.
+    Lines,
+}
+
+impl ShoppingOnAgenda {
+    pub const ALL: [ShoppingOnAgenda; 3] = [
+        ShoppingOnAgenda::Off,
+        ShoppingOnAgenda::Count,
+        ShoppingOnAgenda::Lines,
+    ];
+
+    /// How it is stored, as the Dart core's enum names it.
+    pub fn code(self) -> &'static str {
+        match self {
+            ShoppingOnAgenda::Off => "off",
+            ShoppingOnAgenda::Count => "count",
+            ShoppingOnAgenda::Lines => "lines",
+        }
+    }
+
+    /// The choice `code` names; `None` for none known here.
+    pub fn parse(code: &str) -> Option<ShoppingOnAgenda> {
+        ShoppingOnAgenda::ALL.into_iter().find(|s| s.code() == code)
+    }
+
+    /// What a list nobody chose for shows as on a Device whose Agenda
+    /// showed Shopping Lists the way `old` before: off for "Not at all",
+    /// each open Line for "Each Line that came back today", else one row
+    /// with the count.
+    pub fn from_device(old: ShoppingAgenda) -> ShoppingOnAgenda {
+        match old {
+            ShoppingAgenda::Off => ShoppingOnAgenda::Off,
+            ShoppingAgenda::Lines => ShoppingOnAgenda::Lines,
+            ShoppingAgenda::Back | ShoppingAgenda::Open => ShoppingOnAgenda::Count,
+        }
+    }
+}
+
+/// A Shopping List on today's Agenda (#186), how it shows there and its
+/// open Lines: one row with their number for [`ShoppingOnAgenda::Count`],
+/// one row each for [`ShoppingOnAgenda::Lines`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct ShoppingAgendaList {
+pub struct ShoppingAgendaRow {
     pub list: ShoppingList,
+    pub shows: ShoppingOnAgenda,
     pub lines: Vec<ShoppingLine>,
 }
 
@@ -185,8 +242,9 @@ pub struct ShoppingList {
     pub note_id: String,
     /// The id of its making, as the Note's `kind` names it.
     pub making: String,
-    /// Every Line that shows: the open ones first, the one that came last
-    /// at the top, then the struck ones, the one checked last at the end.
+    /// Every Line that shows: the open ones first, in the order they were
+    /// placed in, then the struck ones, the one
+    /// checked last at the end.
     pub lines: Vec<ShoppingLine>,
     /// The Lines checked Once: gone, but a name added again brings them
     /// back.
@@ -234,8 +292,9 @@ impl ShoppingList {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one by
-/// when it came to the top, on the wall clock.
+/// moment it sorts by: a struck or gone one by its check, an open one
+/// without a valid key by when it came back or was added, on the wall
+/// clock.
 struct Read {
     line: ShoppingLine,
     gone: bool,
@@ -324,6 +383,37 @@ fn by_order(a: &ShoppingLine, b: &ShoppingLine) -> Ordering {
         .then_with(|| utf16_cmp(&a.id, &b.id))
 }
 
+/// The key for a new Line at the place `at` of the open Lines of `list`,
+/// or after every key with none or one past them: between the last valid
+/// key above it and the first valid key of any Line after that one, a
+/// struck or gone Line too.
+fn key_at(list: &ShoppingList, at: Option<usize>) -> String {
+    let open = list.open();
+    let keys = || {
+        list.lines
+            .iter()
+            .chain(&list.gone)
+            .filter_map(|l| l.order.as_deref())
+            .filter(|key| order::is_valid(Some(key)))
+    };
+    let at = match at {
+        Some(at) if at < open.len() => at,
+        _ => {
+            let last = keys().max_by(|a, b| utf16_cmp(a, b));
+            return order::place(last, None);
+        }
+    };
+    let a = open[..at]
+        .iter()
+        .rev()
+        .find(|l| order::is_valid(l.order.as_deref()))
+        .and_then(|l| l.order.as_deref());
+    let b = keys()
+        .filter(|key| a.is_none_or(|a| utf16_cmp(key, a) == Ordering::Greater))
+        .min_by(|a, b| utf16_cmp(a, b));
+    order::place(a, b)
+}
+
 /// `lines` as they show, the gone ones kept apart.
 fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
     let mut open = Vec::new();
@@ -338,7 +428,24 @@ fn list_of(note_id: &str, making: &str, lines: Vec<Read>) -> ShoppingList {
             open.push(r);
         }
     }
-    open.sort_by(|a, b| b.came.cmp(&a.came).then_with(|| by_order(&a.line, &b.line)));
+    // In the order of their keys; one without a valid key, which no app
+    // writes, after them, the one that came last first.
+    open.sort_by(|a, b| {
+        let valid = order::is_valid(a.line.order.as_deref());
+        if valid != order::is_valid(b.line.order.as_deref()) {
+            return if valid {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            };
+        }
+        let by_came = if valid {
+            Ordering::Equal
+        } else {
+            b.came.cmp(&a.came)
+        };
+        by_came.then_with(|| by_order(&a.line, &b.line))
+    });
     let by_check = |a: &Read, b: &Read| {
         a.checked
             .cmp(&b.checked)
@@ -429,51 +536,110 @@ impl<'a> ShoppingLists<'a> {
         Ok(out)
     }
 
-    /// The Shopping Lists on today's Agenda by `wall` when it shows them
-    /// the way `way`: each list not in the trash nor merged with the Lines
-    /// that came back today, or for [`ShoppingAgenda::Open`] those open,
-    /// where there are any; oldest capture first. For
-    /// [`ShoppingAgenda::Lines`] each of those Lines is a row of its own.
-    pub fn agenda(&self, way: ShoppingAgenda, wall: &WallClock) -> Result<Vec<ShoppingAgendaList>> {
-        if way == ShoppingAgenda::Off {
-            return Ok(Vec::new());
-        }
+    /// The Shopping Lists on today's Agenda by `wall` (#186): each list
+    /// not in the trash nor merged that has an open Line and that this
+    /// person does not keep [`ShoppingOnAgenda::Off`], with how it shows
+    /// ([`ShoppingLists::on_agenda`]) and its open Lines; oldest capture
+    /// first. A list whose Lines are all struck or gone shows whatever the
+    /// choice. Reading writes nothing.
+    pub fn agenda_rows(&self, wall: &WallClock) -> Result<Vec<ShoppingAgendaRow>> {
         let notes = Notes::new(self.store);
+        let standard =
+            ShoppingOnAgenda::from_device(DeviceSettings::new(self.store).shopping_agenda()?);
+        let mut own = HashMap::new();
         let mut shown = Vec::new();
         for id in self.store.entities_of_type(note_keys::TYPE_NOTE)? {
             if self.making(&id)?.is_none() {
+                continue;
+            }
+            let shows = self.shows_on_agenda(&id, standard, &mut own)?;
+            if shows == ShoppingOnAgenda::Off {
                 continue;
             }
             if let Some(note) = notes.by_id(&id)?
                 && !note.is_trashed()
                 && !note.is_merged()
             {
-                shown.push(note);
+                shown.push((note, shows));
             }
         }
-        shown.sort_by(|a, b| {
+        shown.sort_by(|(a, _), (b, _)| {
             a.captured
                 .cmp(&b.captured)
                 .then_with(|| utf16_cmp(&a.id, &b.id))
         });
-        let ids: Vec<String> = shown.iter().map(|n| n.id.clone()).collect();
+        let ids: Vec<String> = shown.iter().map(|(n, _)| n.id.clone()).collect();
         let mut lists = self.of_notes(&ids, wall)?;
-        let today = Day::today(self.store.now(), wall);
         let mut out = Vec::new();
-        for id in &ids {
-            let Some(list) = lists.remove(id) else {
+        for (note, shows) in shown {
+            let Some(list) = lists.remove(&note.id) else {
                 continue;
             };
-            let lines: Vec<ShoppingLine> = if way == ShoppingAgenda::Open {
-                list.open().into_iter().cloned().collect()
-            } else {
-                list.came_back(today).into_iter().cloned().collect()
-            };
+            let lines: Vec<ShoppingLine> = list.open().into_iter().cloned().collect();
             if !lines.is_empty() {
-                out.push(ShoppingAgendaList { list, lines });
+                out.push(ShoppingAgendaRow { list, shows, lines });
             }
         }
         Ok(out)
+    }
+
+    /// How the Shopping List of `note_id` shows on today's Agenda for this
+    /// person: as one of the user's own Devices chose last; for a list
+    /// nobody chose for, as this Device showed Shopping Lists before
+    /// (#186, [`ShoppingOnAgenda::from_device`]). What another person's
+    /// Device wrote counts for nothing, so in a Shared Area each person
+    /// decides for their own Agenda; a value no app writes reads as
+    /// [`ShoppingOnAgenda::Count`], so it hides no list.
+    pub fn on_agenda(&self, note_id: &str) -> Result<ShoppingOnAgenda> {
+        let standard =
+            ShoppingOnAgenda::from_device(DeviceSettings::new(self.store).shopping_agenda()?);
+        self.shows_on_agenda(note_id, standard, &mut HashMap::new())
+    }
+
+    fn shows_on_agenda(
+        &self,
+        note_id: &str,
+        standard: ShoppingOnAgenda,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<ShoppingOnAgenda> {
+        Ok(match self.chosen(note_id, own)? {
+            None => standard,
+            Some(code) => ShoppingOnAgenda::parse(&code).unwrap_or(ShoppingOnAgenda::Count),
+        })
+    }
+
+    fn chosen(&self, note_id: &str, own: &mut HashMap<String, bool>) -> Result<Option<String>> {
+        let entity = format!("{}{note_id}", checklist_keys::AGENDA_PREFIX);
+        self.store.own_current(&entity, keys::AGENDA, own)
+    }
+
+    /// Whether "Show on the Agenda" applies to the Note `note_id`: a
+    /// Shopping List not in the trash nor merged. One with a Routine or
+    /// Reminder shows too, as its Lines keep their own checks.
+    pub fn may_show_on_agenda(&self, note_id: &str) -> Result<bool> {
+        let Some(note) = Notes::new(self.store).by_id(note_id)? else {
+            return Ok(false);
+        };
+        Ok(!note.is_trashed() && !note.is_merged() && self.making(note_id)?.is_some())
+    }
+
+    /// Sets how the Shopping List of `note_id` shows on the Agenda for
+    /// this person alone, kept like an Override: on the user's own Devices
+    /// only, whatever their role in its Area. The choice is written even
+    /// when the list already shows that way by this Device's default, so
+    /// every own Device shows it alike; the same choice again writes
+    /// nothing.
+    pub fn set_on_agenda(&self, note_id: &str, shows: ShoppingOnAgenda) -> Result<()> {
+        if self.making(note_id)?.is_none() {
+            return Err(Error::Invalid(format!("not a Shopping List: {note_id}")));
+        }
+        if self.chosen(note_id, &mut HashMap::new())?.as_deref() == Some(shows.code()) {
+            return Ok(());
+        }
+        let entity = format!("{}{note_id}", checklist_keys::AGENDA_PREFIX);
+        self.store
+            .append(&entity, keys::AGENDA, Some(shows.code()), None)?;
+        Ok(())
     }
 
     /// The making of the Shopping List the Note `note_id` is now, or
@@ -622,12 +788,25 @@ impl<'a> ShoppingLists<'a> {
         Checklists::new(self.store).may_edit(line_id)
     }
 
-    /// Adds `text` to the Shopping List of `note_id`, at the top. A name it
-    /// has already, in another case or with spaces around it, adds
-    /// nothing: a struck or gone Line of that name comes back now, at the
-    /// top, an open one stays. Anyone with a role in its Area may. Returns
-    /// the id of the Line added, brought back or found.
+    /// Adds `text` to the Shopping List of `note_id` after every other Line,
+    /// as [`ShoppingLists::add_at`] does.
     pub fn add(&self, note_id: &str, text: &str, wall: &WallClock) -> Result<String> {
+        self.add_at(note_id, text, wall, None)
+    }
+
+    /// Adds `text` to the Shopping List of `note_id` at `at`, an index in
+    /// the order its open Lines show, or after every other. A name it has
+    /// already, in another case or with spaces around it, adds nothing: a
+    /// struck or gone Line of that name comes back now, in its place, an
+    /// open one stays. Anyone with a role in its Area may. Returns the id
+    /// of the Line added, brought back or found.
+    pub fn add_at(
+        &self,
+        note_id: &str,
+        text: &str,
+        wall: &WallClock,
+        at: Option<usize>,
+    ) -> Result<String> {
         let (_, list) = self.require_list(note_id, wall)?;
         if !self.may_check(note_id)? {
             return Err(Error::Invalid(format!(
@@ -656,16 +835,7 @@ impl<'a> ShoppingLists<'a> {
                 .append(&line.id, checklist_keys::CHECKED, None, None)?;
             return Ok(line.id.clone());
         }
-        let mut last: Option<&str> = None;
-        for line in list.lines.iter().chain(&list.gone) {
-            if let Some(key) = line.order.as_deref()
-                && order::is_valid(Some(key))
-                && last.is_none_or(|last| utf16_cmp(key, last) == Ordering::Greater)
-            {
-                last = Some(key);
-            }
-        }
-        let key = order::place(last, None);
+        let key = key_at(&list, at);
         self.store
             .batch(|| self.write_line(note_id, &list.making, &named, &key, false, None))
     }
@@ -696,10 +866,10 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// Adds every line of `text` that is not blank to the Shopping List of
-    /// `note_id` as [`ShoppingLists::add`] does, all in one batch, the first
-    /// line ending at the top: what a capture sorted into the list becomes
-    /// (#124). Returns the ids of the Lines added, brought back or found,
-    /// in the order of the lines; none for a blank `text`.
+    /// `note_id` as [`ShoppingLists::add`] does, all in one batch, in the
+    /// order of the lines after every other: what a capture sorted into the
+    /// list becomes (#124). Returns the ids of the Lines added, brought back
+    /// or found, in the order of the lines; none for a blank `text`.
     pub fn add_lines(&self, note_id: &str, text: &str, wall: &WallClock) -> Result<Vec<String>> {
         let rows: Vec<String> = split_lines(text)
             .into_iter()
@@ -709,13 +879,9 @@ impl<'a> ShoppingLists<'a> {
             return Ok(Vec::new());
         }
         self.store.batch(|| {
-            let mut ids = rows
-                .iter()
-                .rev()
+            rows.iter()
                 .map(|row| self.add(note_id, row, wall))
-                .collect::<Result<Vec<String>>>()?;
-            ids.reverse();
-            Ok(ids)
+                .collect::<Result<Vec<String>>>()
         })
     }
 
@@ -795,7 +961,7 @@ impl<'a> ShoppingLists<'a> {
             .map(drop)
     }
 
-    /// Brings the struck Line `line_id` back now, at the top. An open one
+    /// Brings the struck Line `line_id` back now, in its place. An open one
     /// stays as it is.
     pub fn uncheck(&self, line_id: &str, wall: &WallClock) -> Result<()> {
         let (list, line) = self.require_shown(line_id, wall)?;
@@ -912,7 +1078,7 @@ impl<'a> ShoppingLists<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::checklists::tests::{TestResult, exchange, invite, send};
+    use crate::checklists::tests::{TestResult, exchange, invite, own_exchange, send};
     use crate::routines::Routines;
     use crate::schedule::{Occurrence, Schedule};
     use crate::shared::AreaRole;
@@ -1070,7 +1236,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_came_back_on_the_day_its_check_runs_out_and_each_way_shows_its_lists() -> TestResult {
+    fn a_line_came_back_on_the_day_its_check_runs_out() -> TestResult {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let lists = ShoppingLists::new(&ann);
@@ -1087,24 +1253,23 @@ mod tests {
         lists.check(&id_of(&ann, &gone, "Salt")?, &wall)?;
         Notes::new(&ann).trash(&gone)?;
         assert_eq!(line_of(&ann, &week, "Milk")?.came_back_on, None);
-        let agenda = |way| -> Made<Vec<String>> {
-            Ok(lists
-                .agenda(way, &wall)?
-                .iter()
-                .map(|a| {
-                    let texts: Vec<&str> = a.lines.iter().map(|l| l.text.as_str()).collect();
-                    format!("{}: {}", a.list.note_id, texts.join(", "))
-                })
-                .collect())
+        // What came back on `day`, by list, as "list: Line, Line".
+        let came_back = |day: Day| -> Made<Vec<String>> {
+            let mut out = Vec::new();
+            for note in [&week, &hardware] {
+                let list = lists.by_note(note, &wall)?.ok_or("a Shopping List")?;
+                let texts: Vec<&str> = list
+                    .came_back(day)
+                    .iter()
+                    .map(|l| l.text.as_str())
+                    .collect();
+                if !texts.is_empty() {
+                    out.push(format!("{note}: {}", texts.join(", ")));
+                }
+            }
+            Ok(out)
         };
-        assert!(agenda(ShoppingAgenda::Lines)?.is_empty());
-        assert_eq!(
-            agenda(ShoppingAgenda::Open)?,
-            [
-                format!("{week}: Tea, Eggs, Rice"),
-                format!("{hardware}: Glue")
-            ]
-        );
+        assert!(came_back(Day::new(2026, 3, 11))?.is_empty());
         // Midnight on the wall: Thursday the 12th begins.
         clock.set(utc(11, 23, 0, 0)?);
         let back = Day::new(2026, 3, 12);
@@ -1112,16 +1277,11 @@ mod tests {
         for text in ["Eggs", "Tea", "Rice"] {
             assert_eq!(line_of(&ann, &week, text)?.came_back_on, None, "{text}");
         }
-        assert_eq!(agenda(ShoppingAgenda::Lines)?, [format!("{week}: Milk")]);
-        assert_eq!(
-            agenda(ShoppingAgenda::Back)?,
-            agenda(ShoppingAgenda::Lines)?
-        );
-        assert!(agenda(ShoppingAgenda::Off)?.is_empty());
+        assert_eq!(came_back(back)?, [format!("{week}: Milk")]);
         // The day after it is still open, but no longer back today.
         clock.set(utc(12, 23, 0, 0)?);
         assert_eq!(line_of(&ann, &week, "Milk")?.came_back_on, Some(back));
-        assert!(agenda(ShoppingAgenda::Back)?.is_empty());
+        assert!(came_back(Day::new(2026, 3, 13))?.is_empty());
         Ok(())
     }
 
@@ -1253,13 +1413,13 @@ mod tests {
         assert_eq!(ann.current(&once, checklist_keys::TRASHED)?, None);
         assert!(lists.check(&once, &wall).is_err());
         clock.set(utc(25, 23, 0, 0)?);
-        assert_eq!(shown(&ann, &note)?, ["Three", "Two", "One", "~Four"]);
+        assert_eq!(shown(&ann, &note)?, ["One", "Two", "Three", "~Four"]);
         Ok(())
     }
 
     #[test]
-    fn the_open_line_that_came_last_is_at_the_top_and_the_struck_one_checked_last_at_the_end()
-    -> TestResult {
+    fn the_open_lines_keep_their_order_and_the_struck_one_checked_last_is_at_the_end() -> TestResult
+    {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nEggs\nTea\nRice", None)?;
@@ -1268,14 +1428,80 @@ mod tests {
         lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
         lists.check(&id_of(&ann, &note, "Rice")?, &wall)?;
         assert_eq!(shown(&ann, &note)?, ["Tea", "~Eggs", "~Milk", "~Rice"]);
-        lists.uncheck(&id_of(&ann, &note, "Milk")?, &wall)?;
-        assert_eq!(shown(&ann, &note)?, ["Milk", "Tea", "~Eggs", "~Rice"]);
+        // Unchecked, it comes back now, in its place.
+        lists.uncheck(&id_of(&ann, &note, "Rice")?, &wall)?;
+        assert_eq!(shown(&ann, &note)?, ["Tea", "Rice", "~Eggs", "~Milk"]);
         let before = ann.all_entries()?.len();
         lists.check(&id_of(&ann, &note, "Eggs")?, &wall)?;
         lists.uncheck(&id_of(&ann, &note, "Tea")?, &wall)?;
         assert_eq!(ann.all_entries()?.len(), before);
+        // Eggs and Milk come back on the same day, each in its place.
         clock.set(utc(11, 23, 0, 0)?);
-        assert_eq!(shown(&ann, &note)?, ["Eggs", "Rice", "Milk", "Tea"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Tea", "Rice"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_without_a_valid_key_shows_after_the_others_the_one_added_last_first() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let making = lists
+            .by_note(&note, &wall)?
+            .ok_or("a Shopping List")?
+            .making;
+        // As a modified app would.
+        for (text, order) in [("Old", None), ("Odd", Some("é")), ("New", Some(""))] {
+            let id = format!("line:{}", ann.new_id()?);
+            ann.append(
+                &id,
+                checklist_keys::TYPE,
+                Some(checklist_keys::TYPE_LINE),
+                None,
+            )?;
+            ann.append(&id, checklist_keys::NOTE, Some(&note), None)?;
+            ann.append(&id, checklist_keys::MADE, Some(&making), None)?;
+            let text = StoredText::plain(text).encode();
+            ann.append(&id, checklist_keys::TEXT, Some(&text), None)?;
+            if let Some(order) = order {
+                ann.append(&id, checklist_keys::ORDER, Some(order), None)?;
+            }
+        }
+        lists.add(&note, "Tea", &wall)?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Milk", "Eggs", "Tea", "New", "Odd", "Old"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_new_name_comes_in_where_it_is_told_before_the_struck_ones_after_the_line_above()
+    -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nHam\nJam\nTea", None)?;
+        let lists = ShoppingLists::new(&ann);
+        for text in ["Eggs", "Ham", "Jam"] {
+            lists.check(&id_of(&ann, &note, text)?, &wall)?;
+        }
+        lists.add_at(&note, "Bread", &wall, Some(1))?;
+        lists.add_at(&note, "Rice", &wall, Some(0))?;
+        lists.add_at(&note, "Salt", &wall, Some(9))?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            [
+                "Rice", "Milk", "Bread", "Tea", "Salt", "~Eggs", "~Ham", "~Jam"
+            ]
+        );
+        // A name it has stays where it is.
+        lists.add_at(&note, "tea", &wall, Some(0))?;
+        clock.set(utc(11, 23, 0, 0)?);
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Rice", "Milk", "Bread", "Eggs", "Ham", "Jam", "Tea", "Salt"]
+        );
         Ok(())
     }
 
@@ -1304,14 +1530,11 @@ mod tests {
         assert_eq!(lists.add(&note, "MILK", &wall)?, milk);
         assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Äpfel"]);
         assert_eq!(lists.add(&note, "tea", &wall)?, tea);
-        assert_eq!(shown(&ann, &note)?, ["Tea", "Milk", "Eggs", "Äpfel"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Äpfel", "Tea"]);
         assert_eq!(line_of(&ann, &note, "Tea")?.reappear, Reappear::Once);
-        // A new name comes in at the top; a deleted one is not brought back.
+        // A new name comes in at the end; a deleted one is not brought back.
         let rice = lists.add(&note, "  Rice\n", &wall)?;
-        assert_eq!(
-            shown(&ann, &note)?.first().map(String::as_str),
-            Some("Rice")
-        );
+        assert_eq!(shown(&ann, &note)?.last().map(String::as_str), Some("Rice"));
         lists.delete(&rice)?;
         assert_ne!(lists.add(&note, "rice", &wall)?, rice);
         assert!(lists.add(&note, "  ", &wall).is_err());
@@ -1340,7 +1563,7 @@ mod tests {
     }
 
     #[test]
-    fn the_lines_of_a_text_come_in_at_once_the_first_at_the_top() -> TestResult {
+    fn the_lines_of_a_text_come_in_at_once_in_their_order_at_the_end() -> TestResult {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nTea", None)?;
@@ -1351,7 +1574,7 @@ mod tests {
         let ids = lists.add_lines(&note, "Eggs\r\n  milk \n\n Tea\rbread", &wall)?;
         assert_eq!(
             shown(&ann, &note)?,
-            ["Eggs", "Milk", "bread", "Tea"],
+            ["Milk", "Tea", "Eggs", "bread"],
             "an open one stays"
         );
         assert_eq!(
@@ -1423,7 +1646,7 @@ mod tests {
         lists.add(&note, "milk", &wall)?;
         let bread = lists.add(&note, "Bread", &wall)?;
         exchange(&ben, &ann)?;
-        assert_eq!(shown(&ann, &note)?, ["Bread", "Milk", "~Eggs"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Bread", "~Eggs"]);
         assert!(lists.may_edit(&bread)?);
         assert!(!lists.may_edit(&milk)?);
         assert!(lists.rename(&milk, "Beer").is_err());
@@ -1444,7 +1667,7 @@ mod tests {
         let held: Vec<String> = ann.all_entries()?.iter().map(Entry::id).collect();
         assert!(forged.iter().all(|e| held.contains(&e.id())));
         assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Week1);
-        assert_eq!(shown(&ann, &note)?, ["Bread", "Milk", "~Eggs"]);
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Bread", "~Eggs"]);
         let grants = ann.grants_of(&area)?.ok_or("the grants")?;
         let person = grants
             .person_of(&ben.device_id()?)
@@ -1479,8 +1702,9 @@ mod tests {
         assert_eq!(conflicts[0].entity, milk);
         assert_eq!(conflicts[0].entity_type, checklist_keys::TYPE_LINE);
         assert!(desk.may_resolve(&milk, &conflicts[0].entity_type)?);
+        // Back in its place.
         assert_eq!(
-            shown(&desk, &note)?.first().map(String::as_str),
+            shown(&desk, &note)?.last().map(String::as_str),
             Some("Eggs")
         );
         assert_eq!(shown(&phone, &note)?, shown(&desk, &note)?);
@@ -1620,7 +1844,7 @@ mod tests {
             .collect();
         assert_eq!(removed, ["Milk"]);
         ben.accept_sent_item(&opened.item, false)?;
-        assert_eq!(shown(&ben, &got)?, ["Tea", "Coffee", "~Free-range eggs"]);
+        assert_eq!(shown(&ben, &got)?, ["Coffee", "Tea", "~Free-range eggs"]);
         Ok(())
     }
 
@@ -1686,6 +1910,297 @@ mod tests {
         let other = payload.replacen("\"list\":\"shopping\"", "\"list\":\"pantry\"", 1);
         assert_ne!(other, payload);
         assert!(crate::sent::SentItem::parse(&other).is_none());
+        Ok(())
+    }
+
+    /// Writes how this Device's Agenda showed Shopping Lists as a version
+    /// before #186 did, which no app offers any more.
+    fn old_setting(store: &Store, way: ShoppingAgenda) -> Made<()> {
+        Ok(store.set_local_setting("shoppingAgenda", way.code())?)
+    }
+
+    /// Today's Agenda rows of the Shopping Lists of `store`: "title: n
+    /// open" for one row with the count, "title: Line" for each open Line.
+    fn agenda_rows(store: &Store) -> Made<Vec<String>> {
+        let notes = Notes::new(store);
+        let mut out = Vec::new();
+        for row in ShoppingLists::new(store).agenda_rows(&wall)? {
+            let title = notes.by_id(&row.list.note_id)?.ok_or("the Note")?.text;
+            match row.shows {
+                ShoppingOnAgenda::Count => out.push(format!("{title}: {} open", row.lines.len())),
+                ShoppingOnAgenda::Lines => {
+                    for line in &row.lines {
+                        out.push(format!("{title}: {}", line.text));
+                    }
+                }
+                ShoppingOnAgenda::Off => return Err("an Off row".into()),
+            }
+        }
+        Ok(out)
+    }
+
+    /// Every value of a Shopping List's Agenda choice `store` holds, with
+    /// the Device that wrote it.
+    fn choices(store: &Store) -> Made<Vec<(String, Option<String>)>> {
+        Ok(store
+            .all_entries()?
+            .into_iter()
+            .filter(|e| {
+                e.entity.starts_with(checklist_keys::AGENDA_PREFIX) && e.field == keys::AGENDA
+            })
+            .map(|e| (e.device, e.value))
+            .collect())
+    }
+
+    #[test]
+    fn each_list_shows_on_the_agenda_as_chosen_for_it() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let lists = ShoppingLists::new(&ann);
+        let week = shopping(&ann, "Groceries\nMilk\nEggs\nTea", None)?;
+        let hardware = shopping(&ann, "Hardware\nNails\nGlue", None)?;
+        let pharmacy = shopping(&ann, "Pharmacy\nPlasters", None)?;
+        lists.check(&id_of(&ann, &week, "Tea")?, &wall)?;
+        assert_eq!(lists.on_agenda(&week)?, ShoppingOnAgenda::Count);
+        assert!(lists.may_show_on_agenda(&week)?);
+        assert_eq!(
+            agenda_rows(&ann)?,
+            ["Groceries: 2 open", "Hardware: 2 open", "Pharmacy: 1 open"]
+        );
+        lists.set_on_agenda(&hardware, ShoppingOnAgenda::Lines)?;
+        lists.set_on_agenda(&pharmacy, ShoppingOnAgenda::Off)?;
+        assert_eq!(lists.on_agenda(&pharmacy)?, ShoppingOnAgenda::Off);
+        assert_eq!(
+            agenda_rows(&ann)?,
+            ["Groceries: 2 open", "Hardware: Nails", "Hardware: Glue"]
+        );
+        let count = ann.all_entries()?.len();
+        lists.set_on_agenda(&pharmacy, ShoppingOnAgenda::Off)?;
+        assert_eq!(ann.all_entries()?.len(), count, "the same again");
+        // Chosen as the default shows it, it is written all the same.
+        lists.set_on_agenda(&week, ShoppingOnAgenda::Count)?;
+        let values: Vec<Option<String>> = choices(&ann)?.into_iter().map(|(_, v)| v).collect();
+        assert_eq!(
+            values,
+            [
+                Some("lines".into()),
+                Some("off".into()),
+                Some("count".into())
+            ]
+        );
+        let count = ann.all_entries()?.len();
+        lists.agenda_rows(&wall)?;
+        lists.on_agenda(&week)?;
+        assert_eq!(ann.all_entries()?.len(), count, "reading writes nothing");
+        Ok(())
+    }
+
+    #[test]
+    fn a_list_with_no_open_line_never_shows() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let lists = ShoppingLists::new(&ann);
+        let week = shopping(&ann, "Groceries\nMilk\nEggs", None)?;
+        let hardware = shopping(&ann, "Hardware\nNails", None)?;
+        shopping(&ann, "Title only", None)?;
+        lists.set_on_agenda(&week, ShoppingOnAgenda::Lines)?;
+        lists.set_reappear(&id_of(&ann, &week, "Eggs")?, Reappear::Once)?;
+        for text in ["Milk", "Eggs"] {
+            lists.check(&id_of(&ann, &week, text)?, &wall)?;
+        }
+        lists.check(&id_of(&ann, &hardware, "Nails")?, &wall)?;
+        assert!(agenda_rows(&ann)?.is_empty());
+        // A week on, Milk and Nails are back, Eggs gone Once.
+        clock.set(utc(12, 9, 0, 0)?);
+        assert_eq!(agenda_rows(&ann)?, ["Groceries: Milk", "Hardware: 1 open"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_list_nobody_chose_for_shows_as_the_device_showed_shopping_lists() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let lists = ShoppingLists::new(&ann);
+        let week = shopping(&ann, "Groceries\nMilk", None)?;
+        let chosen = shopping(&ann, "Hardware\nNails", None)?;
+        lists.set_on_agenda(&chosen, ShoppingOnAgenda::Count)?;
+        for (old, shows) in [
+            (ShoppingAgenda::Off, ShoppingOnAgenda::Off),
+            (ShoppingAgenda::Lines, ShoppingOnAgenda::Lines),
+            (ShoppingAgenda::Back, ShoppingOnAgenda::Count),
+            (ShoppingAgenda::Open, ShoppingOnAgenda::Count),
+        ] {
+            old_setting(&ann, old)?;
+            assert_eq!(lists.on_agenda(&week)?, shows, "{old:?}");
+            assert_eq!(
+                lists.on_agenda(&chosen)?,
+                ShoppingOnAgenda::Count,
+                "{old:?}"
+            );
+        }
+        old_setting(&ann, ShoppingAgenda::Off)?;
+        assert_eq!(agenda_rows(&ann)?, ["Hardware: 1 open"]);
+        ann.set_local_setting("shoppingAgenda", "sideways")?;
+        assert_eq!(lists.on_agenda(&week)?, ShoppingOnAgenda::Count);
+        Ok(())
+    }
+
+    #[test]
+    fn an_agenda_choice_no_app_writes_reads_as_one_row_with_the_count() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        old_setting(&ann, ShoppingAgenda::Off)?;
+        let week = shopping(&ann, "Groceries\nMilk", None)?;
+        let entity = format!("{}{week}", checklist_keys::AGENDA_PREFIX);
+        for value in ["OFF", "off ", "later", ""] {
+            ann.append(&entity, keys::AGENDA, Some(value), None)?;
+            assert_eq!(
+                ShoppingLists::new(&ann).on_agenda(&week)?,
+                ShoppingOnAgenda::Count,
+                "{value}"
+            );
+        }
+        // Null is no choice: the default again.
+        ann.append(&entity, keys::AGENDA, None, None)?;
+        assert_eq!(
+            ShoppingLists::new(&ann).on_agenda(&week)?,
+            ShoppingOnAgenda::Off
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_checklists_switch_is_not_a_shopping_lists_choice() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = Notes::new(&ann).capture("Groceries\nMilk", None, None)?.id;
+        let checklists = Checklists::new(&ann);
+        checklists.make(&note)?;
+        checklists.set_show_on_agenda(&note, false)?;
+        checklists.to_plain(&note)?;
+        let lists = ShoppingLists::new(&ann);
+        lists.make(&note)?;
+        assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Count);
+        assert_eq!(agenda_rows(&ann)?, ["Groceries: 1 open"]);
+        lists.set_on_agenda(&note, ShoppingOnAgenda::Off)?;
+        lists.to_plain(&note, &wall)?;
+        checklists.make(&note)?;
+        checklists.set_show_on_agenda(&note, true)?;
+        assert_eq!(checklists.agenda()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn only_shopping_lists_take_an_agenda_choice() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let lists = ShoppingLists::new(&ann);
+        let plain = notes.capture("Plain\nline", None, None)?.id;
+        let trip = notes.capture("Trip\nTent", None, None)?.id;
+        Checklists::new(&ann).make(&trip)?;
+        let trashed = shopping(&ann, "Trashed\nOne", None)?;
+        notes.trash(&trashed)?;
+        let merged = shopping(&ann, "Merged\nOne", None)?;
+        let into = notes.capture("Into", None, None)?.id;
+        notes.merge(&merged, &into)?;
+        let errands = shopping(&ann, "Errands\nStamps", None)?;
+        Routines::new(&ann).spawn(
+            &errands,
+            &Schedule::new(Day::new(2026, 3, 5), &[], None).ok_or("a schedule")?,
+        )?;
+        for id in [&plain, &trip, &trashed, &merged, &into] {
+            assert!(!lists.may_show_on_agenda(id)?, "{id}");
+        }
+        assert!(lists.may_show_on_agenda(&errands)?);
+        assert_eq!(agenda_rows(&ann)?, ["Errands: 1 open"]);
+        assert!(lists.set_on_agenda(&plain, ShoppingOnAgenda::Off).is_err());
+        assert!(lists.set_on_agenda(&trip, ShoppingOnAgenda::Off).is_err());
+        assert!(choices(&ann)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn in_a_shared_area_each_person_chooses_for_their_own_agenda() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let area = ann.share(&house.id)?;
+        invite(&ann, &ben, &area)?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs", Some(&area))?;
+        exchange(&ben, &ann)?;
+        // Ben, a Member, may choose for a list he did not write.
+        ShoppingLists::new(&ben).set_on_agenda(&note, ShoppingOnAgenda::Lines)?;
+        ShoppingLists::new(&ann).set_on_agenda(&note, ShoppingOnAgenda::Off)?;
+        exchange(&ben, &ann)?;
+        exchange(&ben, &ann)?;
+        assert!(agenda_rows(&ann)?.is_empty());
+        assert_eq!(agenda_rows(&ben)?, ["Shop: Milk", "Shop: Eggs"]);
+        assert_eq!(
+            choices(&ann)?,
+            [(ann.device_id()?, Some("off".to_string()))]
+        );
+        assert_eq!(
+            choices(&ben)?,
+            [(ben.device_id()?, Some("lines".to_string()))]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ones_own_devices_carry_the_agenda_choice() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let desk = clock.device(3, "Ann at the desk")?;
+        own_exchange(&desk, &ann)?;
+        let note = shopping(&ann, "Shop\nMilk", None)?;
+        own_exchange(&desk, &ann)?;
+        // The desk's old setting showed nothing; her choice shows it there.
+        old_setting(&desk, ShoppingAgenda::Off)?;
+        assert!(agenda_rows(&desk)?.is_empty());
+        ShoppingLists::new(&ann).set_on_agenda(&note, ShoppingOnAgenda::Lines)?;
+        own_exchange(&desk, &ann)?;
+        assert_eq!(agenda_rows(&desk)?, ["Shop: Milk"]);
+        ShoppingLists::new(&desk).set_on_agenda(&note, ShoppingOnAgenda::Count)?;
+        send(&desk, &ann)?;
+        assert_eq!(agenda_rows(&ann)?, ["Shop: 1 open"]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_agenda_choice_another_persons_device_wrote_counts_for_nothing() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let area = ann.share(&house.id)?;
+        invite(&ann, &ben, &area)?;
+        let note = shopping(&ann, "Shop\nMilk", Some(&area))?;
+        exchange(&ben, &ann)?;
+        // As a modified app would: Ben takes the list off Ann's Agenda.
+        let forged = ben.append(
+            &format!("{}{note}", checklist_keys::AGENDA_PREFIX),
+            keys::AGENDA,
+            Some("off"),
+            None,
+        )?;
+        ann.apply_entries(
+            &[forged.wire()],
+            &[],
+            Some(&ben.device_id()?),
+            &mut crate::signing::ImportReport::default(),
+        )?;
+        assert_eq!(
+            choices(&ann)?,
+            [(ben.device_id()?, Some("off".to_string()))]
+        );
+        let lists = ShoppingLists::new(&ann);
+        assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Count);
+        assert_eq!(agenda_rows(&ann)?, ["Shop: 1 open"]);
+        // Nor does it count as her own choice made already.
+        lists.set_on_agenda(&note, ShoppingOnAgenda::Off)?;
+        assert!(agenda_rows(&ann)?.is_empty());
         Ok(())
     }
 }

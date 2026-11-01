@@ -587,6 +587,31 @@
       }
     }
   },
+  "copyText": "Copy text",
+  "@copyText": {
+    "description": "In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard."
+  },
+  "sectionEdited": "Edited {when}",
+  "@sectionEdited": {
+    "description": "Under a Section of a Note whose text was edited: when it was edited last.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionEditedBy": "Edited {when} by {name}",
+  "@sectionEditedBy": {
+    "description": "Under a Section of a Note whose text was edited: when it was edited last and the Profile name of who edited it.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "moreCaptureContext": "More about the capture",
   "recordVoice": "Record voice",
   "recording": "Recording…",
@@ -1782,9 +1807,6 @@
   "checklistHeading": "Checklist",
   "checklistCount": "{checked} of {count} checked",
   "@checklistCount": {"description": "A compact card of a Checklist: how many of its Lines are checked.", "placeholders": {"checked": {"type": "int"}, "count": {"type": "int"}}},
-  "checklistNewLine": "New Line",
-  "@checklistNewLine": {"description": "The hint of the field that adds Lines to a Checklist; each line typed becomes one."},
-  "checklistAddLine": "Add Line",
   "checklistRenameTitle": "Rename Line",
   "checklistMoveUp": "Move up",
   "checklistMoveDown": "Move down",
@@ -2253,20 +2275,6 @@
   "@speechModelMismatchCause": {"description": "Why the speech model was not kept: it is not a pinned one."},
   "speechModelMismatchFix": "Download one of the models listed, or pick the file of one of them.",
   "@speechModelMismatchFix": {"description": "The fix for 'speechModelMismatchCause'."},
-  "settingsShoppingAgenda": "Shopping Lists on the Agenda",
-  "@settingsShoppingAgenda": {"description": "Section title in Settings: how this Device's Agenda shows Shopping Lists, today only."},
-  "settingsShoppingAgendaDetail": "Today only, and on this Device only.",
-  "@settingsShoppingAgendaDetail": {"description": "Under the section title 'Shopping Lists on the Agenda' in Settings."},
-  "shoppingAgendaLines": "Each Line that came back today, on its own row",
-  "@shoppingAgendaLines": {"description": "Radio choice: every Line of a Shopping List that came back today gets its own checkable row on the Agenda."},
-  "shoppingAgendaBack": "One row per Shopping List on a day when Lines came back",
-  "@shoppingAgendaBack": {"description": "Radio choice, the default: one Agenda row per Shopping List with the number of Lines that came back today."},
-  "shoppingAgendaOpen": "One row per Shopping List on every day it has open Lines",
-  "@shoppingAgendaOpen": {"description": "Radio choice: one Agenda row per Shopping List every day it has Lines not struck through."},
-  "shoppingAgendaOff": "Not at all",
-  "@shoppingAgendaOff": {"description": "Radio choice: Shopping Lists do not show on the Agenda."},
-  "shoppingRowBack": "{list}: {count} back",
-  "@shoppingRowBack": {"description": "An Agenda row of a Shopping List: its title and how many of its Lines came back today, such as 'Groceries: 3 back'.", "placeholders": {"list": {"type": "String"}, "count": {"type": "int"}}},
   "shoppingRowOpen": "{list}: {count} open",
   "@shoppingRowOpen": {"description": "An Agenda row of a Shopping List: its title and how many of its Lines are not struck through, such as 'Groceries: 5 open'.", "placeholders": {"list": {"type": "String"}, "count": {"type": "int"}}},
   "maskedShoppingList": "Private Shopping List",
@@ -2276,7 +2284,11 @@
   "maskedChecklist": "Private Checklist",
   "@maskedChecklist": {"description": "A Checklist from a locked Area set to Masked, on the Agenda."},
   "checklistShowOnAgenda": "Show on the Agenda",
-  "@checklistShowOnAgenda": {"description": "Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The person's own choice, kept on their own Devices."},
+  "@checklistShowOnAgenda": {"description": "Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The heading of the same choice of a Shopping List with three options, and the name of its badge in the Note editor. The person's own choice, kept on their own Devices."},
+  "shoppingOnAgendaCount": "One row with the number of open Lines",
+  "@shoppingOnAgendaCount": {"description": "Radio choice under 'Show on the Agenda' of a Shopping List, the default: one Agenda row with the list's title and how many of its Lines are open, such as 'Groceries: 4 open'."},
+  "shoppingOnAgendaLines": "Each open Line on its own row",
+  "@shoppingOnAgendaLines": {"description": "Radio choice under 'Show on the Agenda' of a Shopping List: every Line not struck through gets its own checkable row on the Agenda."},
   "textMarkCheck": "Check",
   "@textMarkCheck": {"description": "Menu entry at a status mark at the start of a line of a Note's text: changes it to ✅."},
   "textMarkFail": "Fail",

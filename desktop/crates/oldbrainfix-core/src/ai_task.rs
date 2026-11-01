@@ -29,7 +29,7 @@ use crate::pending::{GiveWay, PendingDraft};
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
 use crate::sessions::keys as session_keys;
-use crate::shopping_lists::keys as shopping_keys;
+use crate::shopping_lists::{ShoppingLists, keys as shopping_keys};
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
 use crate::{Error, Result};
@@ -104,6 +104,13 @@ const AREA_FIELDS: [&str; 4] = [
     place_keys::ICON,
 ];
 const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys::NAME];
+/// The type of the user's own Agenda choices for a Note, the entity
+/// `agenda:<note id>`
+/// ([`crate::checklists::keys::AGENDA_PREFIX`]).
+const AGENDA_TYPE: &str = "agenda";
+/// The user's own choices for the Agenda, `agenda:<note id>`: how a
+/// Shopping List shows there (#186), never a Checklist's switch.
+const AGENDA_FIELDS: [&str; 1] = [shopping_keys::AGENDA];
 
 /// The fields of a Note's or Section's Capture Context, which an AI Task
 /// only ever removes (ADR 0037): it never says where or when something
@@ -244,7 +251,7 @@ fn kind_of(ty: &str, made: bool, session: bool, field: &str, after: Option<&str>
         "section" => AiChangeKind::NoteText,
         "routine" if session => AiChangeKind::Session,
         "routine" => AiChangeKind::Routine,
-        line_keys::TYPE_LINE => AiChangeKind::List,
+        line_keys::TYPE_LINE | AGENDA_TYPE => AiChangeKind::List,
         frog_keys::TYPE_FROG => AiChangeKind::Frog,
         "area" | "topic" => AiChangeKind::Place,
         _ => AiChangeKind::Other,
@@ -381,6 +388,7 @@ impl Store {
             "topic" => &TOPIC_FIELDS,
             line_keys::TYPE_LINE => &LINE_FIELDS,
             frog_keys::TYPE_FROG => &FROG_FIELDS,
+            AGENDA_TYPE => &AGENDA_FIELDS,
             _ => &[],
         };
         let context = matches!(ty, "note" | "section") && CONTEXT_FIELDS.contains(&field);
@@ -448,6 +456,11 @@ impl Store {
                         _ => true,
                     }
             }
+            // The user's own, whatever their role in the list's Area.
+            AGENDA_TYPE => {
+                let note = entity.split_once(':').map_or("", |(_, note)| note);
+                ShoppingLists::new(self).making(note)?.is_some()
+            }
             "area" => made || self.may_manage(Some(entity))?,
             "topic" => {
                 (made || self.may_manage(self.area_of(entity)?.as_deref())?)
@@ -510,6 +523,7 @@ impl Store {
                 "section" | "routine" | line_keys::TYPE_LINE | frog_keys::TYPE_FROG => {
                     self.current(entity, note_keys::NOTE)?
                 }
+                AGENDA_TYPE => entity.split_once(':').map(|(_, note)| note.to_string()),
                 _ => None,
             };
             let session = ty == "routine" && self.current(entity, session_keys::POOL)?.is_some();

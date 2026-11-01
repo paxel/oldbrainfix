@@ -36,7 +36,7 @@ use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallCloc
 use crate::search::Search;
 use crate::sessions::{SessionMarks, SessionRule, Sessions};
 use crate::settings::{DeviceSettings, QuickNoteControl};
-use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
+use crate::shopping_lists::{Reappear, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys};
 use crate::store::Store;
 use crate::tallies::{Tallies, Tally};
 use crate::tally_units::{self, TallyRule, UnitSystem};
@@ -165,7 +165,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: a Tally's fields, the Lines of a Checklist or Shopping List, and its Frogs.",
+            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: a Tally's fields, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -224,6 +224,13 @@ pub fn tools() -> Vec<Value> {
             "Adds a dated Section to a Note.",
             false,
             json!({"id": id("Note"), "text": string("The Section's text")}),
+            &["id", "text"],
+        ),
+        tool(
+            "edit_section",
+            "Replaces the text of one Section of a Note, an Amend or a merged Note, by the id read_note lists for it. The Section keeps its place and its capture time; read_note shows when its text was last modified and by whom.",
+            false,
+            json!({"id": id("Section"), "text": string("The new text")}),
             &["id", "text"],
         ),
         tool(
@@ -497,7 +504,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "add_line",
-            "Adds a Line to a Checklist, at the end or at a place, or to the top of a Shopping List. On a Shopping List a name it holds already adds nothing; one that is checked is refused, as adding it would bring it back.",
+            "Adds a Line to a Checklist, at the end or at a place, or to the end of a Shopping List. On a Shopping List a name it holds already adds nothing; one that is checked is refused, as adding it would bring it back.",
             false,
             json!({
                 "at": {"description": "Checklist only: its place among the Lines, from 0; at the end when left out", "type": "integer"},
@@ -541,6 +548,13 @@ fn set_up_tools() -> Vec<Value> {
             false,
             json!({"id": id("Line")}),
             &["id"],
+        ),
+        tool(
+            "set_shopping_agenda",
+            "Sets how a Shopping List shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (each open Line on a row of its own). A list with no open Line never shows.",
+            false,
+            json!({"agenda": {"enum": ["off", "count", "lines"], "type": "string"}, "id": id("Note")}),
+            &["id", "agenda"],
         ),
         tool(
             "make_frog",
@@ -1039,17 +1053,20 @@ impl Store {
                     .sections(id)?
                     .iter()
                     .map(|s| {
-                        json!({
+                        Ok(json!({
                             "captured": dart_iso(s.captured),
+                            "editedBy": s.edited_by.as_ref().map(|p| p.name.clone()),
                             "id": s.id,
                             "boxes": boxes_json(&s.boxes),
+                            "mayEdit": notes.may_edit_section(&s.id)?,
+                            "modified": s.modified.map(dart_iso),
                             "photoTexts": texts_of(&s.photo_texts, "photo"),
                             "photos": s.photos,
                             "text": s.text,
                             "transcripts": texts_of(&s.transcripts, "recording"),
-                        })
+                        }))
                     })
-                    .collect();
+                    .collect::<Result<_>>()?;
                 let routines = self.routines_value(&Routines::new(self).of_note(id)?)?;
                 let frogs: Vec<Value> = Frogs::new(self)
                     .of_note(id)?
@@ -1064,8 +1081,14 @@ impl Store {
                     .collect();
                 let tally = Tallies::new(self).by_note(id)?.map(|t| tally_json(&t));
                 let lines = self.lines_value(id, wall)?;
+                let shopping = ShoppingLists::new(self);
+                let agenda = match shopping.is_shopping_list(id)? {
+                    true => Some(shopping.on_agenda(id)?.code()),
+                    false => None,
+                };
                 let mut out = note_summary(&note, &self.kind_of(&self.kinds()?, &note)?);
                 if let Some(all) = out.as_object_mut() {
+                    all.insert("agenda".into(), json!(agenda));
                     all.insert("boxes".into(), json!(boxes_json(&note.boxes)));
                     all.insert("captureContext".into(), Value::Object(context));
                     all.insert("frogs".into(), json!(frogs));
@@ -1389,6 +1412,10 @@ impl Store {
                 id()?.to_string()
             }
             "amend_note" => notes.amend(id()?, text_arg(args, "text")?)?.id,
+            "edit_section" => {
+                notes.edit_section(id()?, text_arg(args, "text")?)?;
+                id()?.to_string()
+            }
             "file_note" => {
                 notes.file(id()?, text_arg(args, "place")?)?;
                 id()?.to_string()
@@ -1739,6 +1766,14 @@ impl Store {
                 }
                 done(line)
             }
+            "set_shopping_agenda" => {
+                let note = id()?;
+                let code = text_arg(args, "agenda")?;
+                let shows = ShoppingOnAgenda::parse(code)
+                    .ok_or_else(|| Error::Invalid(format!("no way to show {code}")))?;
+                shopping.set_on_agenda(note, shows)?;
+                done(note)
+            }
             "make_frog" => {
                 let note = id()?;
                 let frog = frogs.spawn(note)?;
@@ -1948,6 +1983,61 @@ mod tests {
             note.get("captureContext"),
             Some(&json!({"calendar": r#"["Katzenklo"]"#}))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_sections_text_is_edited_as_a_pending_change() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let note = notes.capture("Dentist", None, None)?;
+        let amend = notes.amend(&note.id, "Moved to Wednesday")?;
+        let later = notes.amend(&note.id, "Later")?;
+        store.append(
+            &later.id,
+            crate::notes::keys::TEXT,
+            Some(r##"{"format":"x-future","text":"# Later"}"##),
+            None,
+        )?;
+        let task = store.open_ai_task()?;
+        let logged = store.all_entries()?.len();
+        let out = call(
+            &store,
+            &task,
+            "edit_section",
+            &json!({"id": amend.id, "text": "Moved to Thursday"}),
+        )?;
+        assert!(!out.is_error, "{out:?}");
+        // A text in a format not known here, and no Section at all.
+        for id in [&later.id, &note.id] {
+            let refused = call(
+                &store,
+                &task,
+                "edit_section",
+                &json!({"id": id, "text": "Overwritten"}),
+            )?;
+            assert!(refused.is_error, "{id}");
+        }
+        assert_eq!(store.all_entries()?.len(), logged);
+        let read = call(&store, &task, "read_note", &json!({"id": note.id}))?;
+        let [ToolContent::Text(text)] = &read.content[..] else {
+            return Err("a text".into());
+        };
+        let read: Value = serde_json::from_str(text)?;
+        assert_eq!(
+            read.pointer("/sections/0/text"),
+            Some(&json!("Moved to Thursday"))
+        );
+        assert_eq!(read.pointer("/sections/0/mayEdit"), Some(&json!(true)));
+        assert!(
+            read.pointer("/sections/0/modified")
+                .is_some_and(Value::is_string)
+        );
+        assert_eq!(read.pointer("/sections/1/mayEdit"), Some(&json!(false)));
+        let review = store.ai_review(&task)?;
+        assert!(review.groups.iter().any(|(kind, items)| {
+            *kind == crate::ai_task::AiChangeKind::NoteText && items[0].entity == amend.id
+        }));
         Ok(())
     }
 
@@ -2266,7 +2356,48 @@ mod tests {
                 Ok(json!({"id": lines(s, &note)?[0].id, "note": note}))
             },
             |s, a| Ok(lines(s, &arg(a, "note")?)?.len() == 1),
+        )?;
+        // Read from the log alone, the choice shows once accepted; the
+        // Pending Change holds it until then.
+        lands_as_pending(
+            "set_shopping_agenda",
+            |s| Ok(json!({"agenda": "lines", "id": shopping_list(s, "Shop\nMilk")?})),
+            |s, a| {
+                let entity = format!("{}{}", checklist_keys::AGENDA_PREFIX, arg(a, "id")?);
+                Ok(s.current(&entity, shopping_keys::AGENDA)?.as_deref() == Some("lines"))
+            },
         )
+    }
+
+    #[test]
+    fn a_shopping_lists_agenda_choice_is_set_once_accepted() -> TestResult {
+        let store = store();
+        let shop = shopping_list(&store, "Shop\nMilk")?;
+        let trip = checklist(&store, "Trip\nSocks")?;
+        let task = store.open_ai_task()?;
+        let set = |id: &str, agenda: &str| {
+            call(
+                &store,
+                &task,
+                "set_shopping_agenda",
+                &json!({"agenda": agenda, "id": id}),
+            )
+        };
+        assert!(set(&trip, "off")?.is_error, "a Checklist");
+        assert!(set(&shop, "sideways")?.is_error, "no such way");
+        assert!(!set(&shop, "off")?.is_error);
+        let review = store.ai_review(&task)?;
+        let items: Vec<&crate::ai_task::AiReviewItem> =
+            review.groups.iter().flat_map(|(_, i)| i).collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, crate::ai_task::AiChangeKind::List);
+        assert_eq!(items[0].note.as_deref(), Some(shop.as_str()));
+        let lists = ShoppingLists::new(&store);
+        assert_eq!(lists.on_agenda(&shop)?, ShoppingOnAgenda::Count);
+        store.accept_pending(&task)?;
+        assert_eq!(lists.on_agenda(&shop)?, ShoppingOnAgenda::Off);
+        assert!(lists.agenda_rows(&utc)?.is_empty());
+        Ok(())
     }
 
     #[test]
@@ -2300,6 +2431,7 @@ mod tests {
             "capture_note",
             "edit_note",
             "amend_note",
+            "edit_section",
             "file_note",
             "merge_notes",
             "set_importance",
@@ -2333,6 +2465,7 @@ mod tests {
             "group_line",
             "set_reappear",
             "remove_line",
+            "set_shopping_agenda",
             "make_frog",
             "frog_to_plain",
         ];
@@ -2445,6 +2578,8 @@ mod tests {
             read(&shop)?.pointer("/lines/0/reappear"),
             Some(&json!("1w"))
         );
+        assert_eq!(read(&shop)?.pointer("/agenda"), Some(&json!("count")));
+        assert_eq!(read(&trip)?.pointer("/agenda"), Some(&Value::Null));
         let banked = read(&bank)?;
         assert_eq!(banked.pointer("/frogs/0/id"), Some(&json!(frog.id)));
         assert_eq!(

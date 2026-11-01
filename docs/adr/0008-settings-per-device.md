@@ -12,6 +12,8 @@ A Backup carries none of them but the playback speed of voice recordings, which 
 
 Amended by #123: how a Device's Agenda shows Shopping Lists today is a setting of its own, one row per list on a day when Lines came back until another way is chosen.
 
+Amended by #186: each person chooses how each Shopping List shows on their Agenda, kept on their own Devices as an Override is (ADR 0030); the Device's setting is no longer offered and is read only for the default of a list nobody chose for.
+
 ## Units (ADR 0028)
 
 Amended by ADR 0028 (#103): whether a Device shows the known units of Tallies in metric or imperial is a setting of its own, following the region the system reports until one is chosen.

@@ -405,7 +405,9 @@
         "removedTranscripts": [],
         "removedPhotoTexts": [
           "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
-        ]
+        ],
+        "modified": null,
+        "editedBy": null
       }
     ],
     "note:00000000000000000000000000000008": [],
@@ -437,7 +439,9 @@
         ],
         "removedRecordings": [],
         "removedTranscripts": [],
-        "removedPhotoTexts": []
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       },
       {
         "id": "note:00000000000000000000000000000006",
@@ -464,7 +468,9 @@
         "removedPhotos": [],
         "removedRecordings": [],
         "removedTranscripts": [],
-        "removedPhotoTexts": []
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       }
     ],
     "note:00000000000000000000000000000003": [],

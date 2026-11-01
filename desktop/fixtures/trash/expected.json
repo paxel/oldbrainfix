@@ -191,7 +191,9 @@
         "removedPhotos": [],
         "removedRecordings": [],
         "removedTranscripts": [],
-        "removedPhotoTexts": []
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       }
     ],
     "note:00000000000000000000000000000001": []

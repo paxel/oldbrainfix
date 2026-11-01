@@ -198,14 +198,10 @@ class AgendaSnapshot {
     return AgendaSnapshot(
       days: {
         '${read.today}': [
-          ...words.day(read.today, read.todayRows, read.shoppingWay),
+          ...words.day(read.today, read.todayRows),
           if (frogs.visible) ...words.frogs(read.frogs),
         ],
-        '${read.tomorrow}': words.day(
-          read.tomorrow,
-          read.tomorrowRows,
-          read.shoppingWay,
-        ),
+        '${read.tomorrow}': words.day(read.tomorrow, read.tomorrowRows),
       },
       missed: words.missed(Alarms(store).missed(wallClock)),
       unsorted: unsorted,
@@ -264,12 +260,12 @@ class _Words {
       noteText(t, note).trim().split('\n').first.trim();
 
   /// The rows of [day] in Agenda order.
-  List<WidgetRow> day(Day day, List<DayEntry> entries, ShoppingAgenda way) => [
+  List<WidgetRow> day(Day day, List<DayEntry> entries) => [
     for (final entry in entries)
       if (entry.row case final placed?)
         ..._occurrence(day, placed)
       else if (entry.shopping case final shopping?)
-        _shopping(shopping, way)
+        _shopping(shopping)
       else if (entry.checklist case final checklist?)
         _checklist(checklist),
   ];
@@ -343,7 +339,7 @@ class _Words {
     final title => title,
   };
 
-  WidgetRow _shopping(ShoppingRow shopping, ShoppingAgenda way) {
+  WidgetRow _shopping(ShoppingRow shopping) {
     final (:note, :masked, :line, :count, :checks, area: _) = shopping;
     final title = _listTitle(note, t.shoppingHeading);
     final shown = masked ? t.maskedShoppingList : title;
@@ -351,8 +347,7 @@ class _Words {
       kind: WidgetRow.shopping,
       title: switch (line) {
         final line? => '${line.text} · $title',
-        null when way == ShoppingAgenda.open => t.shoppingRowOpen(shown, count),
-        null => t.shoppingRowBack(shown, count),
+        null => t.shoppingRowOpen(shown, count),
       },
       checks: line != null && checks,
       lineId: line?.id,

@@ -366,16 +366,15 @@ impl<'a> DeviceSettings<'a> {
         self.store.set_local_setting(THEME, choice.name())
     }
 
-    /// How this Device's Agenda shows Shopping Lists; one row per list on
-    /// a day when Lines came back unless another way was chosen.
+    /// How this Device's Agenda showed Shopping Lists before each list had
+    /// its own choice (#186); one row per list on a day when Lines came
+    /// back unless another way was chosen. Read only for the default of a
+    /// list nobody chose for ([`crate::ShoppingOnAgenda::from_device`]); no
+    /// app offers it any more.
     pub fn shopping_agenda(&self) -> Result<ShoppingAgenda> {
         Ok(ShoppingAgenda::read(
             self.store.local_setting(SHOPPING_AGENDA)?.as_deref(),
         ))
-    }
-
-    pub fn set_shopping_agenda(&self, way: ShoppingAgenda) -> Result<()> {
-        self.store.set_local_setting(SHOPPING_AGENDA, way.code())
     }
 
     /// How fast this Device plays voice recordings: one of
@@ -526,20 +525,16 @@ mod tests {
     }
 
     #[test]
-    fn the_agenda_shows_a_row_per_shopping_list_with_lines_back_until_another_way_is_chosen()
+    fn the_agenda_showed_a_row_per_shopping_list_with_lines_back_unless_another_way_was_chosen()
     -> Result<()> {
         let store = crate::store::tests::store();
         let settings = DeviceSettings::new(&store);
         assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
+        // As a version before #186 wrote it.
         for way in ShoppingAgenda::ALL {
-            settings.set_shopping_agenda(way)?;
+            store.set_local_setting(SHOPPING_AGENDA, way.code())?;
             assert_eq!(settings.shopping_agenda()?, way);
         }
-        settings.set_shopping_agenda(ShoppingAgenda::Lines)?;
-        assert_eq!(
-            store.local_setting(SHOPPING_AGENDA)?.as_deref(),
-            Some("lines")
-        );
         store.set_local_setting(SHOPPING_AGENDA, "sideways")?;
         assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
         Ok(())

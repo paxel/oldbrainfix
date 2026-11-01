@@ -610,6 +610,24 @@ extension People on Store {
     return null;
   }
 
+  /// The person the Device [device] wrote an edit of the text of the
+  /// Note or Section [entity] for, as their Profile shows (#183): the own
+  /// Profile for the user's own Devices; another person's as for
+  /// [tickedBy], through the key of the Device, in a Shared Area the
+  /// person its grant names. Null for a writer not known, for a blocked
+  /// person, and for the user's own while there is no own Profile yet.
+  Profile? editorOf(String entity, String device) {
+    switch (_deviceWriter(device, entity)) {
+      case _Own():
+        return ownProfile;
+      case _Theirs(:final author):
+        if (blockedIds.contains(resolvePerson(author.id))) return null;
+        return _withOverride(author);
+      case _Unknown():
+        return null;
+    }
+  }
+
   /// Whether the person filter of the browser keeps the Note or Section
   /// [entity] (#53): with [filter]'s `me`, the user's own, written on any
   /// of their Devices or under any of their Profile's ids; with its

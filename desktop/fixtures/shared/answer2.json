@@ -82,36 +82,48 @@
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 79,
-      "entity": "note:00000000000000000000000000000007",
+      "dseq": 103,
+      "entity": "note:00000000000000000000000000000008",
       "field": "location",
       "value": null,
       "date": "2026-02-01T10:45:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T10:45:00.000Z",
-      "sig": "PXQSGsJIl/MaF6PGsXVowCfsMRELwuvna50rPRPhqpj83bFYUrvpz5k5VXxRXAAzhiKxUwyarYV7dwPwsImWDw=="
+      "sig": "M6lN4wX2at9IOB4USgfUAp+5HEyBrMtRKFaY+zzbg0jVZmO1FfTe+JPxGg2YStv0nSkVpsjkagRtXQAMZLgJDw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 80,
-      "entity": "note:00000000000000000000000000000007",
+      "dseq": 104,
+      "entity": "note:00000000000000000000000000000008",
       "field": "calendar",
       "value": null,
       "date": "2026-02-01T10:45:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T10:45:00.000Z",
-      "sig": "ZYzCAWvtQIBC4XMpbLP6t7xYfpuuLlfynPyeuqXSARkM1J+w9rWn0QriUUTbdc0sswrjmyAJmtWjble2x6D0BA=="
+      "sig": "vx0Y66FkyiuwuiKlA9epJM9XlsEtyA4nA5AYIkF5iUHYvmCskcs2kbJ5IuH7RP37i2/TfMvAPyy4X4wT4GrmAw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 81,
+      "dseq": 105,
+      "entity": "section:00000000000000000000000000000005",
+      "field": "text",
+      "value": "{\"format\":\"plain\",\"text\":\"The hot one, it drips\"}",
+      "date": "2026-02-01T10:45:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T10:45:00.000Z",
+      "ctx": "",
+      "sig": "zSPECs/iiOZxLNckBW6pwb7p4gVnPvLVqprmn153x1kNd4WC+BH50wv9Z7y/wgD6CG7ztzEZpWyR/3MJvOB/AQ=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 106,
       "entity": "note:00000000000000000000000000000004",
       "field": "place",
       "value": "area:00000000000000000000000000000101",
       "date": "2026-02-01T11:30:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:30:00.000Z",
-      "sig": "4bJUvSJ83tDfTh7Pmo2d4qIV/AdirFZFnIu6uufrNkfP1LLfnh/AmpOzFuK0M+5EXV1rxFvpp+ejRVreKXKJAA=="
+      "sig": "aIx/r8Zk8ybrceHyCmimm929BUKizTntNWGXuIZxVFIDto7qRLmSr80OhD/bQNs8C88+eAP8/nVIlNtxFfh1BA=="
     }
   ],
   "wantBlobs": [],
@@ -142,16 +154,16 @@
       "aliases": [],
       "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
       "keys": [],
-      "record": "{\"id\":\"00000000000000000000000000000009\",\"name\":\"Ann Lovelace\",\"version\":3}",
-      "sig": "fi5nHJtnHAH8vYnOqhDfESfhRxJUS1RWoQBRcY/zKR5N5Cy60J8/hJFRhePj0kkrexcozgDOf4p1mOowl+5XDg==",
+      "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ann Lovelace\",\"version\":3}",
+      "sig": "2hPcobdaWW02AVG/lDUFQQPeuhzRB9INUf5aq/hUPVNFoM4JsxxnNYf36Nouc0RqCjWR9KHQZHbEIUul0/a5AA==",
       "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
     },
     {
       "aliases": [],
       "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
       "keys": [],
-      "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ben\",\"version\":1}",
-      "sig": "oRBY6vVmH9gZC0JaJ1DLsYyU3DBUXEuqEXJ2Ng6150XCUvq0ROaUrqIYgPpIXt2RFMzd6P8AKJCezyuLK/wdCA==",
+      "record": "{\"id\":\"0000000000000000000000000000000b\",\"name\":\"Ben\",\"version\":1}",
+      "sig": "7PAQPvhOG5VQ7AxTiKw/9RohR+9CSbnhA4Q4KFwMrtBERwOELVzYznswJyjT+VGMpYgrrIHmaJQoFTyQd1k3CA==",
       "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
     }
   ]

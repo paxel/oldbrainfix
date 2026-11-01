@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-09T11:33:40.000Z",
+  "now": "2026-01-09T11:35:00.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -34,12 +34,12 @@
       "wordless": "photo"
     },
     {
-      "id": "note:0000000000000000000000000000000c",
+      "id": "note:0000000000000000000000000000000f",
       "text": "Hardware",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-08T11:32:39.000Z",
+      "captured": "2026-01-08T11:33:03.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -64,12 +64,102 @@
       "wordless": "photo"
     },
     {
-      "id": "note:00000000000000000000000000000013",
+      "id": "note:00000000000000000000000000000016",
+      "text": "Pharmacy",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:33:50.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000019",
+      "text": "Garden",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:34:07.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000001d",
+      "text": "Candles",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:34:29.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000020",
       "text": "Odd kind\nOne",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-08T11:33:25.000Z",
+      "captured": "2026-01-08T11:34:45.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -94,12 +184,12 @@
       "wordless": "photo"
     },
     {
-      "id": "note:00000000000000000000000000000015",
+      "id": "note:00000000000000000000000000000022",
       "text": "Unsorted thought",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-08T11:33:37.000Z",
+      "captured": "2026-01-08T11:34:57.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -125,40 +215,64 @@
     }
   ],
   "all": [
-    "note:00000000000000000000000000000015",
-    "note:00000000000000000000000000000013",
-    "note:0000000000000000000000000000000c",
+    "note:00000000000000000000000000000022",
+    "note:00000000000000000000000000000020",
+    "note:0000000000000000000000000000001d",
+    "note:00000000000000000000000000000019",
+    "note:00000000000000000000000000000016",
+    "note:0000000000000000000000000000000f",
     "note:00000000000000000000000000000001"
   ],
   "unsorted": [
-    "note:00000000000000000000000000000013",
-    "note:00000000000000000000000000000015"
+    "note:00000000000000000000000000000020",
+    "note:00000000000000000000000000000022"
   ],
   "trashed": [],
   "inside": {},
   "sections": {
-    "note:00000000000000000000000000000015": [],
-    "note:00000000000000000000000000000013": [],
-    "note:0000000000000000000000000000000c": [],
+    "note:00000000000000000000000000000022": [],
+    "note:00000000000000000000000000000020": [],
+    "note:0000000000000000000000000000001d": [],
+    "note:00000000000000000000000000000019": [],
+    "note:00000000000000000000000000000016": [],
+    "note:0000000000000000000000000000000f": [],
     "note:00000000000000000000000000000001": []
   },
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
   "shares": {
-    "note:00000000000000000000000000000015": {
+    "note:00000000000000000000000000000022": {
       "html": null,
       "photos": [],
       "recordings": [],
       "text": "Unsorted thought"
     },
-    "note:00000000000000000000000000000013": {
+    "note:00000000000000000000000000000020": {
       "html": null,
       "photos": [],
       "recordings": [],
       "text": "Odd kind\nOne"
     },
-    "note:0000000000000000000000000000000c": {
+    "note:0000000000000000000000000000001d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Candles"
+    },
+    "note:00000000000000000000000000000019": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Garden"
+    },
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Pharmacy"
+    },
+    "note:0000000000000000000000000000000f": {
       "html": null,
       "photos": [],
       "recordings": [],
@@ -173,9 +287,12 @@
   },
   "search": {
     "": [
-      "note:00000000000000000000000000000015",
-      "note:00000000000000000000000000000013",
-      "note:0000000000000000000000000000000c",
+      "note:00000000000000000000000000000022",
+      "note:00000000000000000000000000000020",
+      "note:0000000000000000000000000000001d",
+      "note:00000000000000000000000000000019",
+      "note:00000000000000000000000000000016",
+      "note:0000000000000000000000000000000f",
       "note:00000000000000000000000000000001"
     ],
     "sauce": [],
@@ -189,9 +306,12 @@
     "called": [],
     "loop": [],
     " e ": [
-      "note:00000000000000000000000000000015",
-      "note:00000000000000000000000000000013",
-      "note:0000000000000000000000000000000c",
+      "note:00000000000000000000000000000022",
+      "note:00000000000000000000000000000020",
+      "note:0000000000000000000000000000001d",
+      "note:00000000000000000000000000000019",
+      "note:00000000000000000000000000000016",
+      "note:0000000000000000000000000000000f",
       "note:00000000000000000000000000000001"
     ],
     "heading": [],

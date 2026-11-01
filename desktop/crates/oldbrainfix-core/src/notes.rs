@@ -10,9 +10,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use chrono::{DateTime, Duration, Utc};
 
 use crate::boxes::{self, Boxes};
-use crate::entry::{dart_iso, parse_time};
+use crate::entry::{Entry, dart_iso, parse_time};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
+use crate::profile::Profile;
 use crate::store::{Fields, Store};
 use crate::text_boxes::{self, ShownBox};
 use crate::text_format::{self, StoredText};
@@ -402,6 +403,16 @@ pub struct Section {
     pub removed_photo_texts: Vec<String>,
     /// The boxes of `text` as they show now, as for [`Note::boxes`].
     pub boxes: Vec<ShownBox>,
+    /// When `text` was last edited, as the Dart core's `modified` (#183):
+    /// the date of the text that shows, once more than the text it was
+    /// captured with is kept; `None` while it was never edited. Whatever
+    /// date it shows, [`Section::created`] stays.
+    pub modified: Option<DateTime<Utc>>,
+    /// Who edited `text` last, as their Profile shows
+    /// ([`Store::editor_of`]): the user's own Profile for an edit on one
+    /// of their Devices; `None` while it was never edited (`modified` is
+    /// `None`) and for a writer not known.
+    pub edited_by: Option<Profile>,
 }
 
 /// An error unless `format` is a format this version writes.
@@ -414,6 +425,12 @@ fn require_format(format: &str) -> Result<()> {
 }
 
 impl Section {
+    /// When the Section was captured, by Amend or as the merged Note; an
+    /// edit of its text leaves it as it is.
+    pub fn created(&self) -> DateTime<Utc> {
+        self.captured
+    }
+
     /// `text` as it shows, as for [`Note::shown_text`].
     pub fn shown_text(&self) -> String {
         shown_text(&self.text, self.text_editable, &self.boxes)
@@ -1019,6 +1036,63 @@ impl<'a> Notes<'a> {
             .ok_or_else(|| Error::Invalid("the new Section is gone".into()))
     }
 
+    /// Whether this Device may edit the text of the Section `id`, an
+    /// Amend or a Note merged into another (#183), as the text of a Note:
+    /// it is in a format known here (ADR 0018), and the Section is this
+    /// Device's to change ([`Store::may_change`]), its author's or, in a
+    /// Shared Area, a Manager's.
+    pub fn may_edit_section(&self, id: &str) -> Result<bool> {
+        Ok(
+            self.section_by_id(id)?.is_some_and(|s| s.text_editable)
+                && self.store.may_change(id)?,
+        )
+    }
+
+    /// Fixes the text of the Section `id` in place, as [`Notes::edit`]
+    /// fixes the text of a Note: a new entry on the Section, the old text
+    /// stays in the log only, and the Section keeps its place and its
+    /// Capture Context. The text keeps the Section's format; its bare
+    /// glyphs become Boxes (ADR 0035). Nothing is written when the text
+    /// stays as it is. Refused unless [`Notes::may_edit_section`].
+    pub fn edit_section(&self, id: &str, text: &str) -> Result<()> {
+        self.edit_section_in(id, text, None)
+    }
+
+    /// Fixes the text of the Section `id` as [`Notes::edit_section`]
+    /// does, in `format`; a formatted text stays formatted, whatever
+    /// `format` says (ADR 0033).
+    pub fn edit_section_as(&self, id: &str, text: &str, format: &str) -> Result<()> {
+        self.edit_section_in(id, text, Some(format))
+    }
+
+    fn edit_section_in(&self, id: &str, text: &str, format: Option<&str>) -> Result<()> {
+        if let Some(format) = format {
+            require_format(format)?;
+        }
+        let Some(section) = self.section_by_id(id)? else {
+            return Err(Error::Invalid(format!("not a Section: {id}")));
+        };
+        if !self.may_edit_section(id)? {
+            return Err(Error::Invalid(format!(
+                "the text of {id} may not be edited here"
+            )));
+        }
+        let written = if section.text_format == text_format::MARKDOWN {
+            text_format::MARKDOWN
+        } else {
+            format.unwrap_or(&section.text_format)
+        };
+        // A Note merged into another keeps its text under the same key.
+        let boxed = Self::boxed(self.store, Self::text(text)?, written)?;
+        let value = StoredText::of(written, &boxed, text_format::VERSION).encode();
+        if self.store.current(id, keys::TEXT)?.as_deref() == Some(value.as_str()) {
+            return Ok(());
+        }
+        self.store
+            .append(id, keys::TEXT, Some(&value), None)
+            .map(drop)
+    }
+
     /// Merges the Note `note_id` into the Note `into_id`: it becomes a
     /// dated Section of it and leaves every list and Unsorted. Nothing is
     /// copied; the merged Note only points at its target.
@@ -1195,13 +1269,13 @@ impl<'a> Notes<'a> {
             };
             return self.section(id, &note_id, &fields);
         }
-        Ok(match self.by_id(id)? {
-            Some(note) => note
-                .merged_into
-                .clone()
-                .map(|into| Self::merged_section(note, &into)),
-            None => None,
-        })
+        let Some(note) = self.by_id(id)? else {
+            return Ok(None);
+        };
+        match note.merged_into.clone() {
+            Some(into) => Ok(Some(self.merged_section(note, &into)?)),
+            None => Ok(None),
+        }
     }
 
     /// Every Note neither in the trash nor merged, newest capture first.
@@ -1280,7 +1354,7 @@ impl<'a> Notes<'a> {
         let mut sections = Vec::new();
         for id in &merged {
             if let Some(note) = self.by_id(id)? {
-                sections.push(Self::merged_section(note, note_id));
+                sections.push(self.merged_section(note, note_id)?);
             }
         }
         for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
@@ -1317,7 +1391,7 @@ impl<'a> Notes<'a> {
             }
             let note = self.by_id(&id)?;
             if let (Some(note), Some(list)) = (note, of.get_mut(&end)) {
-                list.push(Self::merged_section(note, &end));
+                list.push(self.merged_section(note, &end)?);
             }
             into.insert(id, end);
         }
@@ -1349,8 +1423,9 @@ impl<'a> Notes<'a> {
     }
 
     /// The Note `note`, merged into `note_id`, as a Section of it.
-    fn merged_section(note: Note, note_id: &str) -> Section {
-        Section {
+    fn merged_section(&self, note: Note, note_id: &str) -> Result<Section> {
+        let (modified, edited_by) = self.last_edit(&note.id)?;
+        Ok(Section {
             id: note.id,
             note_id: note_id.to_string(),
             text: note.text,
@@ -1368,6 +1443,35 @@ impl<'a> Notes<'a> {
             removed_transcripts: note.removed_transcripts,
             removed_photo_texts: note.removed_photo_texts,
             boxes: note.boxes,
+            modified,
+            edited_by,
+        })
+    }
+
+    /// When the text of the Note or Section `id` was last edited, and who
+    /// edited it, as the Dart core's `_lastEdit` (#183): the text that wins
+    /// by latest wins, among those that count, once there is more than
+    /// one; `None` while there is only the text it was captured with.
+    /// Ordered by latest wins, not by the log, so every Device finds the
+    /// same.
+    fn last_edit(&self, id: &str) -> Result<(Option<DateTime<Utc>>, Option<Profile>)> {
+        let mut latest: Option<Entry> = None;
+        let mut texts = 0;
+        for e in self.store.history(id)? {
+            if e.field != keys::TEXT {
+                continue;
+            }
+            texts += 1;
+            let newer = latest
+                .as_ref()
+                .is_none_or(|held| Store::latest_wins(&e, held) == std::cmp::Ordering::Greater);
+            if newer {
+                latest = Some(e);
+            }
+        }
+        match latest {
+            Some(e) if texts > 1 => Ok((Some(e.date_at), self.store.editor_of(id, &e.device)?)),
+            _ => Ok((None, None)),
         }
     }
 
@@ -1381,6 +1485,7 @@ impl<'a> Notes<'a> {
         };
         let text = StoredText::read(fields.get(keys::TEXT));
         let boxes = self.boxes(id, &text, fields)?;
+        let (modified, edited_by) = self.last_edit(id)?;
         Ok(Some(Section {
             id: id.to_string(),
             note_id: note_id.to_string(),
@@ -1399,6 +1504,8 @@ impl<'a> Notes<'a> {
             removed_transcripts: Vec::new(),
             removed_photo_texts: Vec::new(),
             boxes,
+            modified,
+            edited_by,
         }))
     }
 
@@ -2618,6 +2725,186 @@ mod tests {
             let theirs = note(store, &own)?.context;
             assert!(theirs.location.is_none() && theirs.calendar_events.is_empty());
             assert_eq!(theirs.bluetooth_devices, ["Headset"]);
+        }
+        Ok(())
+    }
+
+    // ------------------------------------------ editing a Section (#183)
+
+    fn section_of(store: &Store, id: &str) -> Result<Section> {
+        Notes::new(store)
+            .section_by_id(id)?
+            .ok_or_else(|| Error::Invalid(format!("no Section {id}")))
+    }
+
+    #[test]
+    fn an_amend_is_fixed_in_place_and_shows_when_and_by_whom() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let note = notes.capture("Dentist on Tuesday", None, None)?;
+        let amend = notes.amend(&note.id, "Moved to Wednesday")?;
+        let later = notes.amend(&note.id, "Called, all set")?;
+        assert!(amend.modified.is_none() && amend.edited_by.is_none());
+        assert!(notes.may_edit_section(&amend.id)?);
+        notes.edit_section(&amend.id, "  Moved to Thursday  ")?;
+        let edited = section_of(&ann, &amend.id)?;
+        assert_eq!(edited.text, "Moved to Thursday");
+        assert_eq!(edited.created(), amend.created());
+        assert!(edited.modified.is_some_and(|at| at > edited.created()));
+        assert_eq!(edited.edited_by.map(|p| p.name).as_deref(), Some("Ann"));
+        let order: Vec<String> = notes
+            .sections(&note.id)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(order, [amend.id.clone(), later.id.clone()]);
+        assert!(section_of(&ann, &later.id)?.modified.is_none());
+        let texts: Vec<String> = ann
+            .history(&amend.id)?
+            .into_iter()
+            .filter(|e| e.field == keys::TEXT)
+            .map(|e| StoredText::read(e.value.as_deref()).text)
+            .collect();
+        assert_eq!(texts, ["Moved to Wednesday", "Moved to Thursday"]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_unchanged_section_text_writes_nothing_and_a_blank_one_is_refused() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let note = notes.capture("Dentist", None, None)?;
+        let amend = notes.amend(&note.id, "Bring ☐ the X-ray")?;
+        let mark = ann.current_seq()?;
+        let stored = section_of(&ann, &amend.id)?.text;
+        notes.edit_section(&amend.id, &stored)?;
+        notes.edit_section(&amend.id, &format!(" {stored}\n"))?;
+        assert_eq!(ann.current_seq()?, mark);
+        assert!(section_of(&ann, &amend.id)?.modified.is_none());
+        assert!(notes.edit_section(&amend.id, "  ").is_err());
+        assert!(notes.edit_section("section:none", "Text").is_err());
+        assert!(notes.edit_section(&note.id, "Text").is_err());
+        assert!(notes.edit_section_as(&amend.id, "Text", "x-later").is_err());
+        assert_eq!(ann.current_seq()?, mark);
+        Ok(())
+    }
+
+    #[test]
+    fn a_section_edit_keeps_the_format_and_the_boxes_as_a_note_edit_does() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let note = notes.capture("Trip", None, None)?;
+        let amend = notes.amend(&note.id, "Tent")?;
+        notes.edit_section_as(&amend.id, "**Tent** ☐", text_format::MARKDOWN)?;
+        let section = section_of(&ann, &amend.id)?;
+        assert_eq!(section.text_format, text_format::MARKDOWN);
+        assert_eq!(section.boxes.len(), 1);
+        assert_eq!(section.shown_text(), "**Tent** ☐");
+        let id = section.boxes[0].id.clone();
+        notes.edit_section_as(
+            &amend.id,
+            &format!("{} torch", section.text),
+            text_format::PLAIN,
+        )?;
+        let section = section_of(&ann, &amend.id)?;
+        assert_eq!(section.text_format, text_format::MARKDOWN);
+        assert_eq!(section.boxes[0].id, id);
+        assert_eq!(section.shown_text(), "**Tent** ☐ torch");
+        // A text in a format not known here is never overwritten.
+        ann.append(
+            &amend.id,
+            keys::TEXT,
+            Some(r##"{"format":"x-future","text":"# Tent"}"##),
+            None,
+        )?;
+        assert!(!notes.may_edit_section(&amend.id)?);
+        let mark = ann.current_seq()?;
+        assert!(notes.edit_section(&amend.id, "Tent").is_err());
+        assert_eq!(ann.current_seq()?, mark);
+        Ok(())
+    }
+
+    #[test]
+    fn a_merged_note_is_edited_as_a_section_of_its_target() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let host = notes.capture("Dentist number", None, None)?;
+        let merged = notes.capture("Ask about the crown", None, None)?;
+        notes.merge(&merged.id, &host.id)?;
+        assert!(notes.may_edit_section(&merged.id)?);
+        notes.edit_section(&merged.id, "Ask about the bridge")?;
+        let sections = notes.sections(&host.id)?;
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].id, merged.id);
+        assert_eq!(sections[0].text, "Ask about the bridge");
+        assert!(sections[0].modified.is_some());
+        assert_eq!(
+            sections[0].edited_by.as_ref().map(|p| p.name.as_str()),
+            Some("Ann")
+        );
+        assert_eq!(note(&ann, &merged.id)?.text, "Ask about the bridge");
+        Ok(())
+    }
+
+    #[test]
+    fn a_member_edits_their_own_amend_and_a_manager_anyones() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let note = Notes::new(&ann).capture("Buy milk", Some(&area), None)?;
+        exchange(&ben, &ann, None)?;
+        let own = Notes::new(&ben).amend(&note.id, "Oat milk please")?;
+        assert!(Notes::new(&ben).may_edit_section(&own.id)?);
+        Notes::new(&ben).edit_section(&own.id, "Oat milk, two litres")?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let section = section_of(store, &own.id)?;
+            assert_eq!(section.text, "Oat milk, two litres");
+            assert_eq!(section.edited_by.map(|p| p.name).as_deref(), Some("Ben"));
+        }
+        assert!(Notes::new(&ann).may_edit_section(&own.id)?);
+        Notes::new(&ann).edit_section(&own.id, "Oat milk, three litres")?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let section = section_of(store, &own.id)?;
+            assert_eq!(section.text, "Oat milk, three litres");
+            assert_eq!(section.created(), own.created());
+            assert_eq!(section.edited_by.map(|p| p.name).as_deref(), Some("Ann"));
+        }
+        assert_eq!(
+            section_of(&ann, &own.id)?.modified,
+            section_of(&ben, &own.id)?.modified
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_edit_of_anothers_amend_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let note = Notes::new(&ann).capture("Buy milk", Some(&area), None)?;
+        let theirs = Notes::new(&ann).amend(&note.id, "Two litres")?;
+        exchange(&ben, &ann, None)?;
+        let mark = ben.current_seq()?;
+        assert!(!Notes::new(&ben).may_edit_section(&theirs.id)?);
+        assert!(
+            Notes::new(&ben)
+                .edit_section(&theirs.id, "Ten litres")
+                .is_err()
+        );
+        assert_eq!(ben.current_seq()?, mark);
+        // As a modified app would write it.
+        let forged =
+            StoredText::of(text_format::PLAIN, "Ten litres", text_format::VERSION).encode();
+        ben.append(&theirs.id, keys::TEXT, Some(&forged), None)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let section = section_of(store, &theirs.id)?;
+            assert_eq!(section.text, "Two litres");
+            assert!(section.modified.is_none() && section.edited_by.is_none());
         }
         Ok(())
     }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -247,6 +248,18 @@ List<MediaRemoval> mediaRemovals(
   ];
 }
 
+/// The text of the Note [noteId] and of each of its Sections, oldest
+/// first, as they show, the ids of their boxes left out, a blank line
+/// between them, for "Copy text" (#183); a text that is empty is left out.
+String noteCopyText(Notes notes, String noteId) {
+  final note = notes.byId(noteId);
+  if (note == null) return '';
+  return [
+    note.shownText,
+    for (final section in notes.sections(noteId)) section.shownText,
+  ].map((text) => text.trim()).where((text) => text.isNotEmpty).join('\n\n');
+}
+
 /// The ⋮ menu of [placed]'s card: [onEdit] opening the editor, and what
 /// the Note editor offers beyond filing, scheduling and merging, as far
 /// as this Device may (ADR 0013).
@@ -266,14 +279,12 @@ NoteActions noteActions(
   );
   return NoteActions(
     onEdit: onEdit,
-    onImportance: placed.changes
-        ? (picked) {
-            notes.setImportance(id, picked);
-            changed();
-          }
-        : null,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
+    // Copied says nothing: the text is on the screen (UI laws).
+    onCopy: () => unawaited(
+      Clipboard.setData(ClipboardData(text: noteCopyText(notes, id))),
+    ),
     calendar: () => noteCalendar(context, Routines(notes.store), placed.note),
     onAmend: placed.amends
         ? () => then(
@@ -327,6 +338,7 @@ NoteActions noteActions(
               }
             : null,
         showOnAgenda: showOnAgendaEntry(lists, id, changed),
+        shoppingOnAgenda: shoppingOnAgendaEntry(shopping, id, changed),
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
@@ -374,6 +386,26 @@ BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
     on: on,
     toggle: () {
       lists.setShowOnAgenda(noteId, !on);
+      changed();
+    },
+  );
+}
+
+/// The "Show on the Agenda" choice of the Shopping List [noteId] (#186):
+/// how it shows on this person's Agenda, and choosing another way; null
+/// unless it is a Shopping List not in the trash nor merged. It is
+/// offered while no Line is open too, for when Lines come back.
+/// [changed] runs after a choice.
+ShoppingOnAgendaChoice? shoppingOnAgendaEntry(
+  ShoppingLists lists,
+  String noteId,
+  VoidCallback changed,
+) {
+  if (!lists.mayShowOnAgenda(noteId)) return null;
+  return (
+    shows: lists.onAgenda(noteId),
+    choose: (shows) {
+      lists.setOnAgenda(noteId, shows);
       changed();
     },
   );
@@ -439,13 +471,17 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// text for its settings (#160), its Importance, where it is filed, its
 /// Capture Context, its Routines and Reminders, its kind, Show on the
 /// Agenda and Show ticks, each opening its small editor, and its
-/// Sections, each with its own Capture Context. "Add to Note" amends it;
-/// the "+" badge spawns a Routine, Reminder, Frog or Session from it, as
-/// the card's menu does; the calendar button adds it, or its Routines and
-/// Reminders, to the calendar; the send button sends it as a Sent Item;
-/// "merge into…" merges it into another Note; the trash button deletes
-/// it. A photo or recording with a text, of the Note or a Section, has a
-/// button under it that removes it and keeps the text (ADR 0020).
+/// Sections, each with its own Capture Context. A Section this Device may
+/// edit, while the Note is not in the trash, is edited in a field of its
+/// own as the Note's text is and saved with it; the others are only read,
+/// their text selected and copied with a long press (#183). "Add to
+/// Note" amends it; the "+" badge spawns a Routine, Reminder, Frog or
+/// Session from it, as the card's menu does; the calendar button adds it,
+/// or its Routines and Reminders, to the calendar; the send button sends
+/// it as a Sent Item; "merge into…" merges it into another Note; the
+/// trash button deletes it. A photo or recording with a text, of the
+/// Note or a Section, has a button under it that removes it and keeps the
+/// text (ADR 0020).
 ///
 /// Under each Transcript and Photo Text, "Replace Note text" and "Append
 /// to Note text" take it over into the text of its Note or Section, and
@@ -529,6 +565,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The Note and Sections whose text this Device may change, by id.
   Set<String> _textChangeable = const {};
 
+  /// The fields of the Sections whose text this Device may edit (#183),
+  /// by the Section's id, each holding its text as stored, the ids of its
+  /// boxes in it, as [_text] holds the Note's.
+  final _sectionTexts = <String, TagTextController>{};
+
   /// How the boxes of the Note's text and of each Section's, by its id,
   /// are ticked (ADR 0035), and whether any of them has one.
   BoxTicking? _ticking;
@@ -558,6 +599,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// (#143); null for any other Note.
   ({bool on, VoidCallback toggle})? _onAgenda;
 
+  /// How a Shopping List shows on this person's Agenda (#186); null for
+  /// any other Note.
+  ShoppingOnAgendaChoice? _shoppingOnAgenda;
+
   @override
   void initState() {
     super.initState();
@@ -573,6 +618,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
+    for (final field in _sectionTexts.values) {
+      field.dispose();
+    }
     super.dispose();
   }
 
@@ -633,6 +681,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final shopping = ShoppingLists(widget.notes.store);
     _makesShopping = shopping.mayMake(widget.noteId);
     _isShopping = shopping.isShoppingList(widget.noteId);
+    _shoppingOnAgenda = shoppingOnAgendaEntry(shopping, widget.noteId, _reload);
     _isTally = Tallies(widget.notes.store).isTally(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
@@ -700,6 +749,38 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _hasBoxes =
         (note?.boxes.isNotEmpty ?? false) ||
         _sections.any((section) => section.boxes.isNotEmpty);
+    _loadSectionTexts(editable: note != null && !note.isTrashed);
+  }
+
+  /// Gives each Section this Device may edit its field, and only those
+  /// ([Notes.mayEditSection]), none while the Note is in the trash
+  /// ([editable] false). What is typed in a field stays when the Sections
+  /// are read again; only saving puts their stored text back into it.
+  void _loadSectionTexts({required bool editable}) {
+    final notes = widget.notes;
+    final ids = {
+      if (editable)
+        for (final section in _sections)
+          if (notes.mayEditSection(section.id)) section.id,
+    };
+    for (final id in [..._sectionTexts.keys]) {
+      if (ids.contains(id)) continue;
+      final gone = _sectionTexts.remove(id);
+      // Its field lets go of it in the next frame.
+      if (gone != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => gone.dispose());
+      }
+    }
+    for (final section in _sections) {
+      if (!ids.contains(section.id)) continue;
+      final field = _sectionTexts.putIfAbsent(
+        section.id,
+        () => TagTextController(hideMarks: _twoRows)
+          ..markdown = section.textFormat == TextFormats.markdown
+          ..text = section.text,
+      );
+      field.boxes = _sectionTicking[section.id];
+    }
   }
 
   void _reload() => setState(_load);
@@ -713,10 +794,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Writes the text when it changed; a blank text keeps the old one.
   /// The draft goes either way: the log now holds what counts. What was
-  /// typed into the Lines is stored first, by anyone who may add them.
+  /// typed into the Lines is stored first, by anyone who may add them;
+  /// the Sections' texts after it ([_saveSections]).
   void _saveText() {
     _draftTimer?.cancel();
     _lines.keep();
+    _saveNoteText();
+    _saveSections();
+  }
+
+  void _saveNoteText() {
     final note = _placed?.note;
     if (note == null || !(_placed?.changes ?? false)) return;
     unawaited(widget.drafts.delete(note.id));
@@ -732,17 +819,45 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       format: _text.markdown ? TextFormats.markdown : null,
     );
     _load();
-    _takeStored();
+    _takeStored(_text, _placed?.note.text);
   }
 
-  /// Takes the text as it was kept back into the field, its new boxes
-  /// with their ids, so the next save keeps them and their ticks (ADR
-  /// 0035); the cursor stays where it was in the text around it, the
+  /// Writes the text of each Section whose field changed, as the Note's
+  /// (#183): fixed in place, a blank text keeping the old one; each field
+  /// then holds the text as it was kept.
+  void _saveSections() {
+    final notes = widget.notes;
+    var saved = false;
+    for (final MapEntry(key: id, value: field) in _sectionTexts.entries) {
+      final section = notes.section(id);
+      if (section == null || !notes.mayEditSection(id)) continue;
+      final text = field.text.trim();
+      final formats =
+          field.markdown && section.textFormat != TextFormats.markdown;
+      if (text.isEmpty || (text == section.text && !formats)) continue;
+      notes.editSection(
+        id,
+        text,
+        format: field.markdown ? TextFormats.markdown : null,
+      );
+      saved = true;
+    }
+    if (!saved) return;
+    _load();
+    for (final section in _sections) {
+      if (_sectionTexts[section.id] case final field?) {
+        _takeStored(field, section.text);
+      }
+    }
+  }
+
+  /// Takes the text as it was kept ([stored]) back into [field], its new
+  /// boxes with their ids, so the next save keeps them and their ticks
+  /// (ADR 0035); the cursor stays where it was in the text around it, the
   /// spaces around the text as typed.
-  void _takeStored() {
-    final stored = _placed?.note.text;
+  void _takeStored(TagTextController field, String? stored) {
     if (stored == null) return;
-    final value = _text.value;
+    final value = field.value;
     final typed = value.text;
     final body = typed.trim();
     if (body == stored) return;
@@ -750,7 +865,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final next =
         typed.substring(0, lead) + stored + typed.substring(lead + body.length);
     if (withoutIds(next) != withoutIds(typed)) {
-      _text.value = TextEditingValue(
+      field.value = TextEditingValue(
         text: stored,
         selection: TextSelection.collapsed(offset: stored.length),
       );
@@ -760,7 +875,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         offset < 0 ? offset : idFreeOffset(next, idFreeCount(typed, offset));
     final selection = value.selection;
     final composing = value.composing;
-    _text.value = TextEditingValue(
+    field.value = TextEditingValue(
       text: next,
       selection: selection.copyWith(
         baseOffset: moved(selection.baseOffset),
@@ -772,24 +887,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// A tap on the box at [start] of the field, the finger at [at]: the
-  /// text is kept first, so the box is the one stored, then its menu
-  /// opens there (ADR 0035).
-  Future<void> _tapBox(int start, Offset at) async {
-    final before = _text.text;
-    final id = TextBoxes.find(before)
+  /// A tap on the box at [start] of the field, the Note's or that of the
+  /// Section [section], the finger at [at]: the text is kept first, so
+  /// the box is the one stored, then its menu opens there (ADR 0035).
+  Future<void> _tapBox(int start, Offset at, {String? section}) async {
+    final field = section == null ? _text : _sectionTexts[section];
+    if (field == null) return;
+    final id = TextBoxes.find(field.text)
         .where((box) => box.start == start)
         .firstOrNull
         ?.id;
     if (id == null) return;
     _saveText();
     setState(() {});
-    final box = TextBoxes.find(_text.text)
+    final box = TextBoxes.find(field.text)
         .where((box) => box.id == id)
         .firstOrNull;
-    final ticking = _ticking;
+    final ticking = section == null ? _ticking : _sectionTicking[section];
     // Only a box of the text as stored can be ticked.
-    final kept = _placed?.note.boxes.any((b) => b.id == id) ?? false;
+    final stored = section == null
+        ? _placed?.note.boxes
+        : _sections.where((s) => s.id == section).firstOrNull?.boxes;
+    final kept = stored?.any((b) => b.id == id) ?? false;
     if (box == null || ticking == null || !kept) return;
     await openBoxMenu(
       context,
@@ -814,6 +933,34 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final lists = Checklists(widget.notes.store);
     lists.setShowOnAgenda(widget.noteId, !lists.showsOnAgenda(widget.noteId));
     _reload();
+  }
+
+  /// The Shopping List's "Show on the Agenda" badge's editor (#186): the
+  /// three ways as radio buttons, the one it has marked; a tap on another
+  /// writes it and closes.
+  Future<void> _editShoppingOnAgenda(ShoppingOnAgendaChoice agenda) async {
+    final t = context.t;
+    final picked = await showDialog<ShoppingOnAgenda>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.checklistShowOnAgenda,
+        icon: Icons.today_outlined,
+        content: RadioColumn<ShoppingOnAgenda>(
+          value: agenda.shows,
+          options: [
+            for (final (value, label) in shoppingOnAgendaOptions(t))
+              RadioOption(
+                key: ValueKey('shopping-agenda-${value.name}'),
+                value: value,
+                title: Text(label),
+              ),
+          ],
+          onChanged: (picked) => Navigator.of(context).pop(picked),
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    agenda.choose(picked);
   }
 
   void _setImportance(Importance picked) {
@@ -1115,6 +1262,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               _toggleOnAgenda,
             ),
           ),
+        if (_shoppingOnAgenda case final agenda?)
+          SettingBadge(
+            key: const ValueKey('badge-agenda'),
+            setting: t.checklistShowOnAgenda,
+            icon: Icons.today_outlined,
+            value: switch (agenda.shows) {
+              ShoppingOnAgenda.off => t.settingOff,
+              ShoppingOnAgenda.count => t.shoppingOnAgendaCount,
+              ShoppingOnAgenda.lines => t.shoppingOnAgendaLines,
+            },
+            onTap: (_) => _editShoppingOnAgenda(agenda),
+          ),
         if (_hasBoxes)
           SettingBadge(
             key: const ValueKey('badge-ticks'),
@@ -1253,6 +1412,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     widget.notes.takeOver(id, generated, append: append);
     setState(_load);
     if (id == widget.noteId) _show();
+    // A Section's field shows the text it has now, or the next save
+    // would put the old one back.
+    if ((_sectionTexts[id], widget.notes.section(id)) case (
+      final field?,
+      final section?,
+    )) {
+      field
+        ..markdown = section.textFormat == TextFormats.markdown
+        ..text = section.text;
+    }
   }
 
   /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
@@ -1509,6 +1678,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TwoRowTextField(
+                  key: const ValueKey('note-text'),
                   controller: _text,
                   twoRows: _twoRows,
                   readOnly: !changes || !note.textEditable,
@@ -1541,7 +1711,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
-              focusAdd: widget.typeLines,
+              startLine: widget.typeLines,
             ),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
@@ -1631,14 +1801,38 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       NewerFormatNote(key: ValueKey('newer:${section.id}')),
                       const SizedBox(height: 8),
                     ],
-                    if (section.text.isNotEmpty)
-                      MarkedText(
-                        section.shownText,
-                        format: section.textFormat,
+                    // Edited in place as the Note's text, by the same
+                    // people (#183); otherwise selected and copied with a
+                    // long press, a tap on a box or tag still going to it.
+                    if (_sectionTexts[section.id] case final field?)
+                      TwoRowTextField(
+                        key: ValueKey('section-text:${section.id}'),
+                        controller: field,
+                        twoRows: _twoRows,
+                        boxes: true,
+                        onBox: (start, at) =>
+                            _tapBox(start, at, section: section.id),
+                        formats: true,
+                        onFormatted: () => setState(_saveText),
                         style: Theme.of(context).textTheme.bodyLarge,
-                        boxes: section.boxes,
-                        source: section.text,
-                        ticking: _sectionTicking[section.id],
+                        // It sits where its text was read before.
+                        decoration: const InputDecoration(
+                          filled: false,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      )
+                    else if (section.text.isNotEmpty)
+                      SelectionArea(
+                        child: MarkedText(
+                          section.shownText,
+                          format: section.textFormat,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          boxes: section.boxes,
+                          source: section.text,
+                          ticking: _sectionTicking[section.id],
+                        ),
                       ),
                     for (final hash in section.photos) ...[
                       const SizedBox(height: 8),
@@ -1713,9 +1907,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       ),
                     ],
                     const SizedBox(height: 8),
-                    CaptureContextLines(
+                    CaptureContextLines.ofSection(
+                      section,
                       key: ValueKey('captured-details:${section.id}'),
-                      capture: section.context,
                       when: when,
                       removable: _capturedOf(section.id),
                       onRemove: (detail) => _removeCaptured(section.id, detail),

@@ -3,16 +3,17 @@
 //! its checkbox and its text, struck through in place once checked, the
 //! group of a Line drawn as one frame under it; on a full card checkable,
 //! on a compact one "x of y checked"; and the Checklist part of a Note's
-//! editor.
+//! editor. A Line with a group is drawn in one frame with its group
+//! under it (#184).
 //!
-//! The editor's part lists the Lines with their boxes, each typed in
-//! place where this Device may change it (#141, `line_editing`); for who
-//! may change a Line, ⋮ and a right-click on its box's row with Move up,
-//! Move down, putting it under the Line above or back to the top level,
-//! and Delete; "Add Line" for anyone with a role in its Area, starting an
-//! empty Line at the end; and "Uncheck all" while one is checked. "Show
-//! on the Agenda" and "Back to a plain Note" are badges of the Note
-//! dialog (#160).
+//! The editor's part lists the Lines with their boxes, close together as
+//! one block of text, each typed in place where this Device may change it
+//! and new ones typed by anyone with a role in its Area (#141, #184,
+//! `line_editing`); for who may change a Line, ⋮ and a right-click on its
+//! box's row with Move up, Move down, putting it under the Line above or
+//! back to the top level, and Delete; and "Uncheck all" while one is
+//! checked. "Show on the Agenda" and "Back to a plain Note" are badges of
+//! the Note dialog (#160).
 //!
 //! A Checklist with a Routine or Reminder (#121) shows on its card and in
 //! its editor as checked for the Occurrence it is on now, and on the
@@ -28,7 +29,8 @@ use std::collections::HashSet;
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, Store, WallClock,
+    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, ShoppingOnAgenda, Store,
+    WallClock,
 };
 
 use crate::app::{check, embossed, icon_button};
@@ -114,8 +116,6 @@ pub enum ChecklistAction {
     /// Checks the Line with this id, or unchecks it: for the Occurrence
     /// given, or by its own checks without one.
     Check(String, bool, Option<RoutineOccurrence>),
-    /// "Add Line": an empty Line at the end of the Note's Checklist.
-    AddLine(String),
     /// What a Line's field asked as it was typed in (#141).
     Typed(Typing),
     /// A step of the menu of the Line with this id.
@@ -191,9 +191,9 @@ fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<
 }
 
 /// What the menu of a Note's card offers of a Checklist (#120) and a
-/// Shopping List (#122), read as it opens: making it one, a Checklist's
-/// "Show on the Agenda" (#143), unchecking all of its Lines and turning
-/// either back into a plain Note.
+/// Shopping List (#122), read as it opens: making it one, "Show on the
+/// Agenda" of a Checklist (#143) and of a Shopping List (#186),
+/// unchecking all of its Lines and turning either back into a plain Note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardMenu {
     pub note: String,
@@ -202,6 +202,9 @@ pub struct CardMenu {
     /// Whether the Checklist shows on this person's Agenda, while the
     /// switch applies to it.
     pub on_agenda: Option<bool>,
+    /// How the Shopping List shows on this person's Agenda, while the
+    /// choice applies to it (#186).
+    pub shopping_on_agenda: Option<ShoppingOnAgenda>,
     pub uncheck_all: bool,
     pub to_plain: bool,
 }
@@ -227,6 +230,7 @@ pub fn card_menu(
         make: list.is_none() && lists.may_make(&note.id)?,
         make_shopping: shopping.may_make(&note.id)?,
         on_agenda: on_agenda(&lists, &note.id)?,
+        shopping_on_agenda: shopping_view::on_agenda(&shopping, &note.id)?,
         uncheck_all,
         to_plain,
     })
@@ -350,42 +354,41 @@ fn line_text(ui: &Ui, line: &ShownLine) -> RichText {
     }
 }
 
-/// The frame a group is drawn in, under its parent.
-fn group_frame(ui: &Ui) -> Frame {
+/// The frame a Line with a group is drawn in, `gap` around its rows.
+fn group_frame(ui: &Ui, gap: f32) -> Frame {
     let stroke = ui.visuals().weak_text_color().gamma_multiply(0.5);
     Frame::NONE
         .stroke(egui::Stroke::new(1.0, stroke))
         .corner_radius(12.0)
-        .inner_margin(egui::Margin::same(4))
+        .inner_margin(egui::Margin::same(gap.max(2.0) as i8))
 }
 
-/// Draws `lines` one after another, each group as one frame under its
-/// parent, every Line by `row`.
-fn grouped(ui: &mut Ui, lines: &[ShownLine], row: &mut dyn FnMut(&mut Ui, &ShownLine)) {
+/// Draws `lines` one after another, `gap` apart, a Line with a group in
+/// one frame with its group indented under it, every Line by `row`.
+fn grouped(ui: &mut Ui, lines: &[ShownLine], gap: f32, row: &mut dyn FnMut(&mut Ui, &ShownLine)) {
+    ui.spacing_mut().item_spacing.y = gap;
     let mut at = 0;
     while at < lines.len() {
-        if !lines[at].in_group {
-            row(ui, &lines[at]);
-            at += 1;
-        }
-        let start = at;
-        while at < lines.len() && lines[at].in_group {
-            at += 1;
-        }
-        if start == at {
+        let head = &lines[at];
+        let end = at + 1 + lines[at + 1..].iter().take_while(|l| l.in_group).count();
+        let group = &lines[at + 1..end];
+        at = end;
+        if group.is_empty() {
+            row(ui, head);
             continue;
         }
-        let group = &lines[start..at];
-        ui.horizontal(|ui| {
-            ui.add_space(20.0);
-            group_frame(ui).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    for line in group {
-                        row(ui, line);
-                    }
-                });
+        // The frame holds the Line of the group and the Lines under it.
+        group_frame(ui, gap).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            row(ui, head);
+            let under = egui::Margin {
+                left: 20,
+                ..egui::Margin::ZERO
+            };
+            Frame::NONE.inner_margin(under).show(ui, |ui| {
+                for line in group {
+                    row(ui, line);
+                }
             });
         });
     }
@@ -442,6 +445,13 @@ pub fn lines(
     }
 }
 
+/// How high a Line's box is.
+const BOX: f32 = 28.0;
+
+/// How far a Line's words lie below the top of its box, so their line of
+/// text stands beside the middle of the box.
+const TO_MIDDLE: f32 = 5.0;
+
 /// The Lines `shown`, each with its checkbox, checkable with `checks`,
 /// its text, or the field `field` draws for it, and what shows under it;
 /// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
@@ -456,9 +466,12 @@ pub fn line_rows<P>(
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
+    // Typed in place, the rows lie close together, as one block of text
+    // (#184).
+    let gap = if field.is_some() { 0.0 } else { 4.0 };
+    let top_down = egui::Layout::top_down(egui::Align::Min);
     ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 4.0;
-        grouped(ui, shown, &mut |ui, line| {
+        grouped(ui, shown, gap, &mut |ui, line| {
             ui.horizontal(|ui| {
                 let toggled = ui
                     .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
@@ -479,7 +492,9 @@ pub fn line_rows<P>(
                     Sense::hover()
                 };
                 let words = ui
-                    .allocate_ui(egui::vec2(room, 0.0), |ui| {
+                    // As high as the box, the words beside its middle.
+                    .allocate_ui_with_layout(egui::vec2(room, BOX), top_down, |ui| {
+                        ui.add_space(TO_MIDDLE);
                         words_or_field(ui, line, sense, (field.as_deref_mut(), room))
                     })
                     .inner;
@@ -558,8 +573,7 @@ pub struct CardBox {
 pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox> {
     let mut boxes = Vec::new();
     ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 4.0;
-        grouped(ui, shown, &mut |ui, line| {
+        grouped(ui, shown, 4.0, &mut |ui, line| {
             ui.horizontal(|ui| {
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
                 paint_box(ui, tones, rect, line.checked, false);
@@ -636,7 +650,7 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
 
 /// The Checklist part of a Note's editor (#120), under its text: its
 /// Lines, each typed in place in `typed` where this Device may change it
-/// (#141), "Add Line", and "Uncheck all" as `shown` allows.
+/// (#141, #184), and "Uncheck all" as `shown` allows.
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -682,12 +696,11 @@ pub fn section(
             let at = fields.iter().position(|k| *k == key);
             let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
             let below = at.and_then(|at| fields.get(at + 1)).copied();
-            let look = (line.checked, t.checklist_new_line(), width);
             line_editing::field(
                 ui,
                 typed,
                 (key, FieldOf::Checklist),
-                look,
+                (line.checked, width),
                 (above, below),
                 &mut typing,
             );
@@ -703,13 +716,6 @@ pub fn section(
             actions,
         );
         actions.extend(typing.into_iter().map(ChecklistAction::Typed));
-        if shown.adds
-            && ui
-                .button(RichText::new(t.checklist_add_line()).color(text))
-                .clicked()
-        {
-            actions.push(ChecklistAction::AddLine(note.clone()));
-        }
         // Show on the Agenda and Back to a plain Note are the Note
         // dialog's badges (#160).
         if shown.checks

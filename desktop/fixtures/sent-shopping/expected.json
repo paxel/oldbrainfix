@@ -78,16 +78,6 @@
       "making": "00000000000000000000000000000b02",
       "lines": [
         {
-          "id": "line:00000000000000000000000000000e01",
-          "text": "Tea",
-          "reappear": "1w",
-          "struck": false,
-          "checkedAt": null,
-          "backOn": null,
-          "cameBackOn": null,
-          "order": "Y"
-        },
-        {
           "id": "line:00000000000000000000000000000c01",
           "text": "Coffee",
           "reappear": "1w",
@@ -96,6 +86,16 @@
           "backOn": null,
           "cameBackOn": null,
           "order": "X"
+        },
+        {
+          "id": "line:00000000000000000000000000000e01",
+          "text": "Tea",
+          "reappear": "1w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "Y"
         },
         {
           "id": "line:00000000000000000000000000000b03",
@@ -125,7 +125,7 @@
     ]
   },
   "third": {
-    "text": "Groceries\nTea\nFree-range eggs",
+    "text": "Groceries\nFree-range eggs\nTea",
     "unsorted": true,
     "list": {
       "making": "00000000000000000000000000000b02",

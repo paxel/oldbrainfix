@@ -2,13 +2,16 @@
 //! a Note's editor and in its card's ⋮ turns its lines into Lines, one
 //! indented under the Line above; the editor checks them, moves, indents
 //! and deletes them after asking once, unchecks all and goes back to a
-//! plain Note; the Lines are typed in place (#141): "Add Line" starts an
-//! empty one, Enter splits, Backspace at the start joins, Tab and
+//! plain Note; the Lines are typed in place as one block of text (#141,
+//! #184): no "Add Line", Enter at the end of a Line starts an empty one
+//! and in its middle splits it, Backspace at the start joins, Tab and
 //! Shift+Tab move a Line into a group and out, and leaving keeps what
-//! was typed and drops the empty ones; full cards check them in place,
-//! compact cards count them; a Member checks and adds Lines but changes
-//! only their own; a Line Conflict is offered on the Conflicts view; and
-//! a Sent Item's preview shows its Lines and what an update changes.
+//! was typed and drops the empty ones; the frame of a group holds the
+//! group's own Line; full cards check them in place, compact cards count
+//! them; a Member checks and adds Lines but changes only their own, an
+//! empty Line waiting for him under the others'; a Line Conflict is
+//! offered on the Conflicts view; and a Sent Item's preview shows its
+//! Lines and what an update changes.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -168,13 +171,13 @@ fn make_it_a_checklist_in_the_editor_turns_the_lines_into_lines() -> TestResult 
     assert!(!shows(&harness, "Make it a Checklist"));
     // A Checklist is no Tally.
     assert!(!shows(&harness, "Make it a Tally"));
-    // The group lies in its frame under its parent, further in.
+    // The group lies in one frame with its parent, further in.
     let x = |text: &str| -> Result<f32, Box<dyn std::error::Error>> {
         let node = boxes(&harness, text).pop().ok_or(format!("{text:?}"))?;
         Ok(node.rect().left())
     };
     assert!(x("Charger")? > x("Passport")? + 10.0);
-    assert_eq!(x("Ticket")?, x("Passport")?);
+    assert!(x("Passport")? > x("Ticket")?);
     Ok(())
 }
 
@@ -208,7 +211,12 @@ fn line_field<'a>(
     value: &'a str,
 ) -> Result<egui_kittest::Node<'a>, Box<dyn std::error::Error>> {
     Ok(harness
-        .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some(value))
+        .query_all_by(|n| {
+            // Not the search field, which has its hint.
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.value().as_deref() == Some(value)
+        })
         .next()
         .ok_or(format!("a field holding {value:?}"))?)
 }
@@ -247,22 +255,19 @@ fn leave_for(harness: &mut Harness<'_, App>, other: &str) {
 }
 
 #[test]
-fn add_line_starts_an_empty_line_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
+fn enter_at_the_end_starts_an_empty_line_and_leaving_keeps_what_was_typed() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;
     let other = Notes::new(&store).capture("Other", None, None)?.id;
     let mut harness = window(&store, Some(&note));
-    // The separate field is gone; the Lines are typed in place.
+    // The Lines are typed in place; there is no button to add one, and
+    // no empty Line while every Line can be typed in.
     assert!(line_field(&harness, "Passport").is_ok());
-    assert!(
-        harness
-            .query_all_by(
-                |n| n.role() == Role::MultilineTextInput && n.placeholder() == Some("New Line")
-            )
-            .next()
-            .is_none()
-    );
-    click(&mut harness, "Add Line")?;
+    assert!(!shows(&harness, "Add Line"));
+    assert!(!shows(&harness, "Add"));
+    assert!(line_field(&harness, "").is_err());
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Enter);
     // An empty Line exists only on screen until it holds text.
     assert_eq!(list(&harness, &note)?.count(), 3);
     assert_eq!(focused(&harness).as_deref(), Some(""));
@@ -280,7 +285,9 @@ fn add_line_starts_an_empty_line_in_place_and_leaving_keeps_what_was_typed() -> 
     assert_eq!(focused(&harness).as_deref(), Some("Window"));
     // An emptied Line and a new empty one go on leaving; what was typed
     // is kept.
-    click(&mut harness, "Add Line")?;
+    press(&mut harness, egui::Key::End);
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
     into_line(&mut harness, "Ticket")?;
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
     harness.run();
@@ -365,7 +372,9 @@ fn backspace_at_the_start_joins_with_the_line_above_which_keeps_its_box() -> Tes
         ["Passport", "  Charger", "  Ticket", "  Rail card"]
     );
     // An empty Line simply goes, the cursor at the end of the one above.
-    click(&mut harness, "Add Line")?;
+    into_line(&mut harness, "Rail card")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
     press(&mut harness, egui::Key::Backspace);
     assert_eq!(focused(&harness).as_deref(), Some("Rail card"));
     assert_eq!(list(&harness, &note)?.count(), 4);
@@ -398,6 +407,26 @@ fn tab_and_shift_tab_move_a_line_into_a_group_and_out() -> TestResult {
     press(&mut harness, egui::Key::Tab);
     assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
     assert_eq!(focused(&harness).as_deref(), Some("Passport"));
+    Ok(())
+}
+
+#[test]
+fn the_frame_of_a_group_holds_the_groups_own_line() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    // On a full card, and in the editor over it.
+    for open in [None, Some(note.as_str())] {
+        let harness = window(&store, open);
+        let left = |text: &str| -> Result<f32, Box<dyn std::error::Error>> {
+            let found = boxes(&harness, text).pop().ok_or(format!("{text:?}"))?;
+            Ok(found.rect().left())
+        };
+        let (passport, charger, ticket) = (left("Passport")?, left("Charger")?, left("Ticket")?);
+        // Passport stands inside the frame of its group, a little in from
+        // Ticket, which has none; Charger is indented under it.
+        assert!(passport > ticket && passport < ticket + 10.0, "{open:?}");
+        assert!(charger >= passport + 20.0, "{open:?}");
+    }
     Ok(())
 }
 
@@ -621,9 +650,12 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     tick(&mut harness, "Ticket")?;
     assert!(list(&harness, &note)?.lines[2].checked);
     assert!(shows(&harness, "Uncheck all"));
-    // Ann's Lines show as words, not to be typed in.
+    // Ann's Lines show as words, not to be typed in; an empty Line waits
+    // under them.
     assert!(line_field(&harness, "Ticket").is_err());
-    click(&mut harness, "Add Line")?;
+    assert!(!shows(&harness, "Add Line"));
+    line_field(&harness, "")?.click();
+    harness.run();
     type_in(&mut harness, "Water");
     press(&mut harness, egui::Key::Enter);
     // His own Line is his to change.

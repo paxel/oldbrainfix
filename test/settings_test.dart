@@ -161,47 +161,20 @@ void main() {
       expect(store.chosenUnitSystem, isNull);
     });
 
-    testWidgets('show Shopping Lists on the Agenda one row per list with '
-        'Lines back until another way is picked as a radio button', (
-      tester,
-    ) async {
+    testWidgets('have no choice of how the Agenda shows Shopping Lists, '
+        'each list has its own (#186)', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);
-      final column = find.byKey(const ValueKey('shoppingAgenda'));
+      // The section stood between the units and the alarms.
       await tester.scrollUntilVisible(
-        column,
+        find.text('Alarms'),
         200,
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: column,
-          matching: find.byType(RadioListTile<ShoppingAgenda>),
-        ),
-        findsNWidgets(4),
-      );
-      expect(
-        tester
-            .widget<RadioGroup<ShoppingAgenda>>(
-              find.descendant(
-                of: column,
-                matching: find.byType(RadioGroup<ShoppingAgenda>),
-              ),
-            )
-            .groupValue,
-        ShoppingAgenda.back,
-      );
-      for (final way in [
-        ShoppingAgenda.lines,
-        ShoppingAgenda.open,
-        ShoppingAgenda.off,
-        ShoppingAgenda.back,
-      ]) {
-        await tap(tester, find.byKey(ValueKey('shoppingAgenda-${way.name}')));
-        expect(store.shoppingAgenda, way);
-      }
-      expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+      expect(find.byKey(const ValueKey('unitSystem-metric')), findsOneWidget);
+      expect(find.text('Shopping Lists on the Agenda'), findsNothing);
+      expect(find.byKey(const ValueKey('shoppingAgenda')), findsNothing);
     });
 
     testWidgets('are kept on this Device and never logged', (tester) async {

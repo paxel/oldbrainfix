@@ -1,16 +1,22 @@
 //! Shopping Lists in the window (#122, ADR 0030): "Make it a Shopping
 //! List" in a Note's editor and in its card's ⋮ turns its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
-//! it comes back, and at the start of that day it is open at the top
-//! again; the field at the top adds Lines on Enter and on leaving, a name
-//! already there bringing its Line back, and the Lines are renamed in
-//! place (#141); the Line menu sets the reappear time and deletes for
-//! good after asking once; full cards check, compact cards
-//! count the open Lines; a Member checks and adds but changes only their
-//! own Lines; and a Line Conflict is named as a Shopping List's. Today's
-//! Agenda shows the Shopping Lists the way Settings of this Device choose
-//! (#123): each Line back today with its box, one row per list with the
-//! Lines back or open, or none; a click on a row opens the Note.
+//! it comes back, and at the start of that day it is open in its place
+//! again; the Lines are typed in place as one block of text, as a
+//! Checklist's (#141, #184): no field and no "Add" at the top, Enter adds
+//! a Line where it was typed, a name already there bringing its Line
+//! back, Backspace at the start joins, the rows stay where they are while
+//! the editor is open, and the typed order is kept the next time; the
+//! Line menu sets the reappear time and deletes for good after asking
+//! once; full cards check, compact cards count the open Lines; a Member
+//! checks and adds but changes only their own Lines; and a Line Conflict
+//! is named as a Shopping List's. Today's
+//! Agenda shows each Shopping List with open Lines as chosen for it
+//! (#186), in the card's ⋮ and with the Note dialog's badge: one row with
+//! the number of open Lines, the default, each open Line with its box, or
+//! none; a list nobody chose for shows as this Device showed Shopping
+//! Lists before, the Settings no longer choose it, and a click on a row
+//! opens the Note.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -22,9 +28,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
-    AreaRole, ClockTime, Day, DeviceSettings, ImportReport, Invite, Notes, OwnProfile,
-    PairedDevice, Places, Reappear, Routines, Schedule, ShoppingAgenda, ShoppingList,
-    ShoppingLists, SigningKey, Store,
+    AreaRole, ClockTime, Day, ImportReport, Invite, Notes, OwnProfile, PairedDevice, Places,
+    Reappear, Routines, Schedule, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -176,20 +181,46 @@ fn line_id(store: &Store, note: &str, text: &str) -> Result<String, Box<dyn std:
         .clone())
 }
 
-/// Types `text` into the add field.
+/// Types `text` into the Line with the keyboard while it is empty, else
+/// into the first empty Line.
 fn type_line(harness: &mut Harness<'_, App>, text: &str) {
     let field = |n: &egui_kittest::kittest::AccessKitNode<'_>| {
-        n.role() == Role::MultilineTextInput && n.placeholder() == Some("New Line")
+        n.role() == Role::TextInput
+            && n.placeholder().unwrap_or_default().is_empty()
+            && n.value().as_deref() == Some("")
     };
     if !harness
         .query_all_by(|n| n.is_focused() && field(n))
         .any(|_| true)
     {
-        harness.get_by(field).click();
+        if let Some(empty) = harness.query_all_by(field).next() {
+            empty.click();
+        }
         harness.run();
     }
     harness.get_by(|n| n.is_focused()).type_text(text);
     harness.run();
+}
+
+/// What the Lines' fields in the editor hold, top to bottom.
+fn rows(harness: &Harness<'_, App>) -> Vec<String> {
+    let mut fields: Vec<(f32, String)> = harness
+        .query_all_by(|n| {
+            n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+        })
+        .map(|n| (n.rect().top(), n.value().unwrap_or_default()))
+        .collect();
+    fields.sort_by(|a, b| a.0.total_cmp(&b.0));
+    fields.into_iter().map(|(_, value)| value).collect()
+}
+
+/// Clicks into the field of the Line `value`, the cursor at its end.
+fn to_end_of(harness: &mut Harness<'_, App>, value: &str) -> TestResult {
+    line_field(harness, value)?.click();
+    harness.run();
+    press(harness, egui::Key::End);
+    assert_eq!(focused(harness).as_deref(), Some(value));
+    Ok(())
 }
 
 /// What the field with the keyboard holds.
@@ -211,7 +242,12 @@ fn line_field<'a>(
     value: &'a str,
 ) -> Result<egui_kittest::Node<'a>, Box<dyn std::error::Error>> {
     Ok(harness
-        .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some(value))
+        .query_all_by(|n| {
+            // Not the search field, which has its hint.
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.value().as_deref() == Some(value)
+        })
         .next()
         .ok_or(format!("a field holding {value:?}"))?)
 }
@@ -255,7 +291,7 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
 }
 
 #[test]
-fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_to_the_top() -> TestResult {
+fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
@@ -272,7 +308,7 @@ fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_to_the_top() -
 }
 
 #[test]
-fn a_struck_line_is_open_again_at_the_top_from_the_start_of_its_day() -> TestResult {
+fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestResult {
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
@@ -292,77 +328,155 @@ fn a_struck_line_is_open_again_at_the_top_from_the_start_of_its_day() -> TestRes
     harness.run();
     assert!(!checked(&harness, "Bread")?);
     assert!(!shows_part(&harness, "back Sat"));
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Milk", "Apples"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     Ok(())
 }
 
 #[test]
-fn the_add_field_adds_at_the_top_and_a_name_there_brings_its_line_back() -> TestResult {
+fn enter_adds_a_line_where_it_was_typed_and_a_name_there_brings_its_line_back() -> TestResult {
     let (store, note, _) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
     lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
     let mut harness = window(&store, Some(&note));
-    // The field and "Add" sit above the Lines.
-    let field = harness
-        .get_by(|n| n.placeholder() == Some("New Line"))
-        .rect()
-        .top();
-    // The editor's, over the card's in the Note dialog.
-    let milk = boxes(&harness, "Milk").into_iter().last().ok_or("Milk")?;
-    assert!(field < milk.rect().top());
-    // Enter adds what was typed and leaves the field ready for the next.
+    // No field and no "Add" at the top: the Lines are typed in place.
+    assert!(!shows(&harness, "Add"));
+    assert!(!shows(&harness, "Add Line"));
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Bread"]);
+    // Enter at the end of a Line starts an empty one under it, and the
+    // Line typed there is added among the open Lines where it stands.
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert_eq!(list(&harness, &note)?.count(), 3);
     type_line(&mut harness, "Eggs");
     press(&mut harness, egui::Key::Enter);
     assert_eq!(
         texts(&harness, &note)?,
-        ["Eggs", "Milk", "Apples", "✓ Bread"]
+        ["Milk", "Apples", "Eggs", "✓ Bread"]
     );
     assert_eq!(focused(&harness).as_deref(), Some(""));
-    // Bread comes back, at the top, not twice.
+    // Bread comes back, in its place, not twice; its row stays where it
+    // is while the editor is open.
     type_line(&mut harness, "  bread ");
     press(&mut harness, egui::Key::Enter);
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
-    // An open name stays as it is; so does "Add".
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Eggs", "", "Bread"]);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    // An open name stays as it is.
     type_line(&mut harness, "MILK");
-    click(&mut harness, "Add")?;
-    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
-    assert!(
-        harness
-            .query_all_by(|n| n.role() == Role::MultilineTextInput
-                && n.value().is_some_and(|v| v.contains("MILK")))
-            .next()
-            .is_none(),
-        "the field is empty again"
-    );
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Eggs", "", "Bread"]);
     Ok(())
 }
 
 #[test]
-fn text_left_in_the_field_is_added_and_lines_are_renamed_in_place() -> TestResult {
+fn enter_mid_line_moves_the_rest_down_and_backspace_at_the_start_joins() -> TestResult {
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    to_end_of(&mut harness, "Bread")?;
+    harness.get_by(|n| n.is_focused()).type_text("Butter");
+    harness.run();
+    for _ in 0.."Butter".len() {
+        press(&mut harness, egui::Key::ArrowLeft);
+    }
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Bread", "Butter", "Apples"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Butter"));
+    // Up and Down go between the Lines.
+    press(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(focused(&harness).as_deref(), Some("Bread"));
+    press(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(focused(&harness).as_deref(), Some("Butter"));
+    // Backspace at the start: the text goes to the end of the Line above,
+    // and the Line joined goes, its checks staying in the log.
+    let lists = ShoppingLists::new(&store);
+    let butter = line_id(&store, &note, "Butter")?;
+    lists.check(&butter, &utc)?;
+    harness.run();
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "BreadButter", "Apples"]);
+    assert_eq!(focused(&harness).as_deref(), Some("BreadButter"));
+    assert!(store.current(&butter, "checked")?.is_some());
+    assert!(store.current(&butter, "trashed")?.is_some());
+    // At the very top there is nothing to join with.
+    to_end_of(&mut harness, "Milk")?;
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "BreadButter", "Apples"]);
+    Ok(())
+}
+
+#[test]
+fn a_new_list_starts_with_one_line_and_keeps_the_order_typed_the_next_time() -> TestResult {
+    let (store, _, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    let note = Notes::new(&store).capture("Market", None, None)?.id;
+    lists.make(&note)?;
+    let other = Notes::new(&store).capture("Other", None, None)?.id;
+    let mut harness = window(&store, Some(&note));
+    assert_eq!(rows(&harness), [""]);
+    for (i, text) in ["Leeks", "Pears", "Cheese"].into_iter().enumerate() {
+        if i > 0 {
+            press(&mut harness, egui::Key::Enter);
+        }
+        type_line(&mut harness, text);
+    }
+    // One more, typed between the first two.
+    to_end_of(&mut harness, "Leeks")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Eggs");
+    // Checked in the editor, a Line stays in its row while it is open.
+    tick(&mut harness, "Pears")?;
+    assert_eq!(rows(&harness), ["Leeks", "Eggs", "Pears", "Cheese"]);
+    harness.state_mut().select_note(&other);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Leeks", "Eggs", "Cheese", "✓ Pears"]
+    );
+    // The next time the open Lines show in the order typed, the checked
+    // one below them.
+    harness.state_mut().select_note(&note);
+    harness.run();
+    assert_eq!(rows(&harness), ["Leeks", "Eggs", "Cheese", "Pears"]);
+    Ok(())
+}
+
+#[test]
+fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let other = Notes::new(&store).capture("Other", None, None)?.id;
     let mut harness = window(&store, Some(&note));
-    // Enter ends a rename.
+    // Enter at the end stores the rename and starts a new Line.
     into_line(&mut harness, "Bread")?;
     harness.get_by(|n| n.is_focused()).type_text("Rye bread");
     harness.run();
     press(&mut harness, egui::Key::Enter);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Rye bread", "Apples"]);
-    assert_eq!(focused(&harness), None);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
     // A rename the cursor leaves is stored; a Line left empty goes on
-    // leaving, and what is left in the field is added.
+    // leaving, and a new one typed is added.
     into_line(&mut harness, "Milk")?;
     harness.get_by(|n| n.is_focused()).type_text("Oat milk");
     harness.run();
     into_line(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Oat milk", "Rye bread", "Apples"]);
     press(&mut harness, egui::Key::Backspace);
+    assert_eq!(rows(&harness), ["Oat milk", "Rye bread", "", ""]);
+    line_field(&harness, "")?.click();
+    harness.run();
     type_line(&mut harness, "Butter");
     harness.state_mut().select_note(&other);
     harness.run();
-    assert_eq!(texts(&harness, &note)?, ["Butter", "Oat milk", "Rye bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Oat milk", "Rye bread", "Butter"]);
     Ok(())
 }
 
@@ -705,10 +819,11 @@ fn the_reappear_time_reads_in_both_languages() {
 const BACK: &str = "2026-10-31T00:00:01Z";
 
 /// [`SHOPPING`] made a Shopping List with "Bread" checked at [`NOW`],
-/// the clock at [`BACK`] so "Bread" came back today, and the Agenda
-/// showing it the way `way`: the window on the Agenda and the Note's id.
-fn agenda(
-    way: ShoppingAgenda,
+/// the clock at [`BACK`] so all three Lines are open again, and
+/// `prepare` run on the store and the Note: the window on the Agenda and
+/// the Note's id.
+fn agenda_with(
+    prepare: impl FnOnce(&Store, &str) -> TestResult,
 ) -> Result<(Harness<'static, App>, String), Box<dyn std::error::Error>> {
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
@@ -718,24 +833,42 @@ fn agenda(
         DateTime::parse_from_rfc3339(BACK)?.timestamp(),
         Ordering::SeqCst,
     );
-    DeviceSettings::new(&store).set_shopping_agenda(way)?;
+    prepare(&store, &note)?;
     let mut harness = window(&store, None);
     harness.state_mut().select(Selection::Agenda);
     harness.run();
     Ok((harness, note))
 }
 
+/// As [`agenda_with`], the list showing on the Agenda as `shows` was
+/// chosen for it, or as nobody chose.
+fn agenda(
+    shows: Option<ShoppingOnAgenda>,
+) -> Result<(Harness<'static, App>, String), Box<dyn std::error::Error>> {
+    agenda_with(|store, note| {
+        if let Some(shows) = shows {
+            ShoppingLists::new(store).set_on_agenda(note, shows)?;
+        }
+        Ok(())
+    })
+}
+
 /// The Agenda's message for a day with nothing due.
 const NOTHING_TODAY: &str = "Nothing due today. Click + to capture a thought.";
 
+/// The words of the three ways onto the Agenda.
+const OFF: &str = "Off";
+const COUNT: &str = "One row with the number of open Lines";
+const LINES: &str = "Each open Line on its own row";
+
 #[test]
-fn by_default_the_agenda_has_a_row_per_list_with_the_lines_back_today() -> TestResult {
-    let (mut harness, note) = agenda(ShoppingAgenda::STANDARD)?;
-    assert!(shows(&harness, "Weekly: 1 back"));
+fn by_default_the_agenda_has_one_row_with_the_open_lines_of_the_list() -> TestResult {
+    let (mut harness, note) = agenda(None)?;
+    assert!(shows(&harness, "Weekly: 3 open"));
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(!shows(&harness, NOTHING_TODAY));
     harness
-        .get_by_role_and_label(Role::Button, "Weekly: 1 back")
+        .get_by_role_and_label(Role::Button, "Weekly: 3 open")
         .click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
@@ -743,31 +876,25 @@ fn by_default_the_agenda_has_a_row_per_list_with_the_lines_back_today() -> TestR
 }
 
 #[test]
-fn the_open_way_counts_every_line_not_struck() -> TestResult {
-    let (harness, _) = agenda(ShoppingAgenda::Open)?;
-    assert!(shows(&harness, "Weekly: 3 open"));
-    assert!(!shows(&harness, "Weekly: 1 back"));
-    Ok(())
-}
-
-#[test]
-fn the_lines_way_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
-    let (mut harness, note) = agenda(ShoppingAgenda::Lines)?;
-    assert!(shows(&harness, "Weekly: Bread"));
-    assert!(!shows(&harness, "Weekly: Milk"));
+fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    for line in ["Milk", "Bread", "Apples"] {
+        assert!(shows(&harness, &format!("Weekly: {line}")), "{line}");
+    }
+    assert!(!shows_part(&harness, "open"));
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
     assert!(!shows(&harness, "Weekly: Bread"));
-    assert!(shows(&harness, NOTHING_TODAY));
+    assert!(shows(&harness, "Weekly: Milk"));
     Ok(())
 }
 
 #[test]
 fn a_line_row_opens_its_note() -> TestResult {
-    let (mut harness, note) = agenda(ShoppingAgenda::Lines)?;
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
     harness
-        .get_by_role_and_label(Role::Button, "Weekly: Bread")
+        .get_by_role_and_label(Role::Button, "Weekly: Milk")
         .click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
@@ -775,8 +902,8 @@ fn a_line_row_opens_its_note() -> TestResult {
 }
 
 #[test]
-fn the_off_way_shows_no_shopping_list() -> TestResult {
-    let (harness, _) = agenda(ShoppingAgenda::Off)?;
+fn the_off_choice_shows_no_shopping_list() -> TestResult {
+    let (harness, _) = agenda(Some(ShoppingOnAgenda::Off))?;
     assert!(!shows_part(&harness, "Weekly:"));
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(shows(&harness, NOTHING_TODAY));
@@ -784,8 +911,45 @@ fn the_off_way_shows_no_shopping_list() -> TestResult {
 }
 
 #[test]
+fn a_list_without_open_lines_never_shows() -> TestResult {
+    for shows_as in [None, Some(ShoppingOnAgenda::Lines)] {
+        let (harness, _) = agenda_with(|store, note| {
+            let lists = ShoppingLists::new(store);
+            if let Some(shows) = shows_as {
+                lists.set_on_agenda(note, shows)?;
+            }
+            for line in ["Milk", "Bread", "Apples"] {
+                lists.check(&line_id(store, note, line)?, &utc)?;
+            }
+            Ok(())
+        })?;
+        assert!(!shows_part(&harness, "Weekly:"), "{shows_as:?}");
+        assert!(shows(&harness, NOTHING_TODAY), "{shows_as:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_list_nobody_chose_for_shows_as_this_device_showed_shopping_lists() -> TestResult {
+    // As a version before #186 kept it on this Device.
+    let old = |way: &'static str| {
+        move |store: &Store, _: &str| -> TestResult {
+            store.set_local_setting("shoppingAgenda", way)?;
+            Ok(())
+        }
+    };
+    let (harness, _) = agenda_with(old("off"))?;
+    assert!(!shows_part(&harness, "Weekly:"));
+    let (harness, _) = agenda_with(old("lines"))?;
+    assert!(shows(&harness, "Weekly: Bread"));
+    let (harness, _) = agenda_with(old("back"))?;
+    assert!(shows(&harness, "Weekly: 3 open"));
+    Ok(())
+}
+
+#[test]
 fn the_shopping_rows_sit_after_the_all_day_occurrences_before_the_timed() -> TestResult {
-    let (mut harness, _) = agenda(ShoppingAgenda::Back)?;
+    let (mut harness, _) = agenda(None)?;
     let day = Day::new(2026, 10, 31);
     let nine: Vec<ClockTime> = ClockTime::new(9, 0).into_iter().collect();
     let routines = Routines::new(harness.state().store());
@@ -801,53 +965,126 @@ fn the_shopping_rows_sit_after_the_all_day_occurrences_before_the_timed() -> Tes
     harness.run();
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    let top = |label: &str| -> Result<f32, Box<dyn std::error::Error>> {
-        Ok(harness
-            .query_all_by_label(label)
-            .next()
-            .ok_or(format!("{label:?}"))?
-            .rect()
-            .top())
-    };
-    let shopping = top("Weekly: 1 back")?;
-    assert!(top("Water the plants")? < shopping);
-    assert!(shopping < top("Call Dana")?);
+    let shopping = top(&harness, "Weekly: 3 open")?;
+    assert!(top(&harness, "Water the plants")? < shopping);
+    assert!(shopping < top(&harness, "Call Dana")?);
+    Ok(())
+}
+
+/// The top of the first widget labelled `label`.
+fn top(harness: &Harness<'_, App>, label: &str) -> Result<f32, Box<dyn std::error::Error>> {
+    Ok(harness
+        .query_all_by_label(label)
+        .next()
+        .ok_or(format!("{label:?}"))?
+        .rect()
+        .top())
+}
+
+/// Whether the last radio button `label` shows chosen, or `None` while
+/// none shows.
+fn radio(harness: &Harness<'_, App>, label: &str) -> Option<bool> {
+    harness
+        .query_all_by_role_and_label(Role::RadioButton, label)
+        .last()
+        .map(|n| n.accesskit_node().toggled() == Some(Toggled::True))
+}
+
+/// Clicks the last radio button `label`.
+fn pick(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::RadioButton, label)
+        .last()
+        .ok_or(format!("{label:?}"))?
+        .click_accesskit();
+    harness.run();
     Ok(())
 }
 
 #[test]
-fn settings_choose_how_the_agenda_shows_shopping_lists() -> TestResult {
+fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    let mut harness = window(&store, None);
+    click(&mut harness, "More: Weekly")?;
+    assert!(shows(&harness, "Show on the Agenda"));
+    assert_eq!(radio(&harness, OFF), Some(false));
+    assert_eq!(radio(&harness, COUNT), Some(true));
+    assert_eq!(radio(&harness, LINES), Some(false));
+    // No switch as a Checklist's, and before "Back to a plain Note".
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::CheckBox, "Show on the Agenda")
+            .next()
+            .is_none()
+    );
+    let plain = top(&harness, "Back to a plain Note")?;
+    let off = harness
+        .query_all_by_role_and_label(Role::RadioButton, OFF)
+        .last()
+        .ok_or("Off")?
+        .rect()
+        .top();
+    assert!(off < plain);
+    pick(&mut harness, LINES)?;
+    assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Lines);
+    assert_eq!(radio(&harness, LINES), None, "the menu closed");
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(shows(&harness, "Weekly: Milk"));
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    click(&mut harness, "More: Weekly")?;
+    assert_eq!(radio(&harness, LINES), Some(true));
+    pick(&mut harness, OFF)?;
+    assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Off);
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(!shows_part(&harness, "Weekly:"));
+    Ok(())
+}
+
+#[test]
+fn the_note_dialogs_badge_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    let badge = |words: &str| format!("Show on the Agenda: {words}");
+    assert!(shows(&harness, &badge(COUNT)));
+    click(&mut harness, &badge(COUNT))?;
+    assert_eq!(radio(&harness, COUNT), Some(true));
+    pick(&mut harness, LINES)?;
+    assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Lines);
+    // A pick closes it, and the badge follows.
+    assert_eq!(radio(&harness, COUNT), None);
+    assert!(shows(&harness, &badge(LINES)));
+    click(&mut harness, &badge(LINES))?;
+    pick(&mut harness, OFF)?;
+    assert!(shows(&harness, &badge(OFF)));
+    assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Off);
+    Ok(())
+}
+
+#[test]
+fn a_plain_note_has_no_shopping_choice() -> TestResult {
+    let (store, note, _) = with_note()?;
+    let harness = window(&store, Some(&note));
+    assert!(!shows_part(&harness, "Show on the Agenda"));
+    let mut harness = window(&store, None);
+    click(&mut harness, "More: Weekly")?;
+    assert_eq!(radio(&harness, COUNT), None);
+    Ok(())
+}
+
+#[test]
+fn the_settings_have_no_shopping_lists_on_the_agenda_any_more() -> TestResult {
     let (store, _, _) = with_note()?;
     let mut harness = window(&store, None);
     harness.state_mut().open(Page::Settings);
     harness.run();
-    assert!(shows(&harness, "Shopping Lists on the Agenda"));
-    let radio =
-        |harness: &Harness<'_, App>, label: &str| -> Result<bool, Box<dyn std::error::Error>> {
-            let node = harness
-                .query_all_by_role_and_label(Role::RadioButton, label)
-                .next()
-                .ok_or(format!("{label:?}"))?;
-            Ok(node.accesskit_node().toggled() == Some(Toggled::True))
-        };
-    assert!(radio(
-        &harness,
-        "One row per Shopping List on a day when Lines came back"
-    )?);
-    assert!(!radio(&harness, "Not at all")?);
-    click(&mut harness, "Not at all")?;
-    assert!(radio(&harness, "Not at all")?);
-    assert_eq!(
-        DeviceSettings::new(harness.state().store()).shopping_agenda()?,
-        ShoppingAgenda::Off
-    );
-    click(
-        &mut harness,
-        "Each Line that came back today, on its own row",
-    )?;
-    assert_eq!(
-        DeviceSettings::new(harness.state().store()).shopping_agenda()?,
-        ShoppingAgenda::Lines
-    );
+    assert!(!shows(&harness, "Shopping Lists on the Agenda"));
+    assert!(!shows_part(&harness, "One row per Shopping List"));
     Ok(())
 }

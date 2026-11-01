@@ -1085,6 +1085,26 @@ void main() {
             expect(groceries, findsOneWidget);
           });
 
+          frame('list-editor', (tester) async {
+            await household(tester);
+            // The packing Checklist in the editor (#184): one block of
+            // text with boxes, the group in a frame with its own Line.
+            final packing = find.text(texts.packing.split('\n').first);
+            await tester.scrollUntilVisible(
+              packing,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            await tester.longPress(packing);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final lines = find.byKey(const ValueKey('checklist'));
+            Scrollable.ensureVisible(tester.element(lines), alignment: 0.2);
+            await tester.pumpAndSettle();
+            expect(lines, findsOneWidget);
+          });
+
           frame('tally', (tester) async {
             await household(tester);
             final reading = find.text(texts.reading);

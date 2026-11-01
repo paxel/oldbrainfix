@@ -21,7 +21,7 @@
 </figure>
 <ul>
   <li><strong>Note</strong> opens the capture screen, as the Agenda's "+" does.</li>
-  <li><strong>Checklist</strong> and <strong>Shopping List</strong> ask for the list's name; <strong>Create</strong> opens the Note's editor with the cursor in its first Line, or in the field at the top of a Shopping List, to type the Lines in place.</li>
+  <li><strong>Checklist</strong> and <strong>Shopping List</strong> ask for the list's name; <strong>Create</strong> opens the Note's editor with the cursor in its first Line, to type the Lines in place.</li>
   <li><strong>Frog</strong> asks for its name only and makes the Frog with its Note.</li>
   <li><strong>Tally</strong> opens one page: its <strong>Name</strong>, then a row per field, one at first, and <strong>Add field</strong> for the next. A field's row is its name and three badges: how a day with several entries counts ("Σ Sum" or "Largest"), its unit and its target. A tap on a badge opens its small editor; the unit is typed with the known units it may mean as suggestions, and the rule follows the kind of unit until it is picked. <strong>Save</strong> makes the Tally with every field that has a name; rows left without one are dropped.</li>
   <li><strong>Session</strong> opens one page: its <strong>Name</strong>; its <strong>Pool</strong>, a checkbox per Tally, ending in <strong>New Tally</strong>, which opens the Tally page and comes back with the new Tally ticked; then three badges: how many it picks each time, set with − and +, how it picks, and its schedule, every day, all day, at first, which opens the Routine editor's schedule. <strong>Save</strong> makes the Session; its weekdays' counts and the order for Rolling are set later in its editor.</li>
@@ -52,10 +52,18 @@
 <ul>
   <li>On a full card every Line has its checkbox; a checked Line is struck through in place. A compact card shows "2 of 5 checked".</li>
   <li>A Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks the Line above it, checking that Line checks its whole group, and unchecking one Line of the group unchecks it again.</li>
-  <li>In the editor every Line is typed in place, beside its box. Return splits a Line at the cursor, and at its end starts a new empty Line under it; <strong>Add Line</strong> starts one at the end. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; an empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard move the Line with the cursor into a group and out.</li>
+  <li>A group shows in a frame with the Line it is under.</li>
+  <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard, Tab and Shift+Tab on the desktop, move the Line with the cursor into a group and out.</li>
   <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>.</li>
   <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card and, in the editor, behind the badge "Checklist", turns it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
 </ul>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/list-editor.png" alt="A packing Checklist in the Note editor, every Line a row of text after its box, the group in a frame with its own Line" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/list-editor.png" alt="A packing Checklist in the Note editor, every Line a row of text after its box, the group in a frame with its own Line" width="648" height="1152" loading="lazy">
+  <figcaption>A Checklist in the editor, edited as one block of text.</figcaption>
+</figure>
+
 <p>
   In a Shared Area anyone with a role adds and checks Lines; renaming, moving and deleting a Line
   stay with the author of the Note or of the Line and the Managers.
@@ -89,10 +97,11 @@
   Shopping Lists have no groups, and a line marked "✓ " is struck.
 </p>
 <ul>
-  <li>Checking a Line strikes it through and moves it to the end, showing the day it comes back, such as "back Sat, Oct 31". At the start of that day it is open again, at the top.</li>
+  <li>Checking a Line strikes it through and moves it to the end, showing the day it comes back, such as "back Sat, Oct 31". At the start of that day it is open again, in its place.</li>
   <li>Each Line has its <strong>Reappear time</strong>: <strong>Once</strong>, or 1, 2, 3 or 4 weeks; a new Line has 1 week. It comes back on the same weekday as many weeks on, by the Device's clock. A Line Once is gone when checked.</li>
-  <li>In the editor, a field at the top adds Lines: Return adds what was typed and leaves the field ready for the next, and so does <strong>Add</strong>; text left in the field is added on leaving. A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, at the top, and an open one stays.</li>
-  <li>The Lines are renamed in place; one left empty is dropped on leaving. ⋮ on a Line offers the reappear time as a choice and <strong>Delete</strong>.</li>
+  <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in, also the next time. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones.</li>
+  <li>A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, and an open one stays.</li>
+  <li>A Line left empty is dropped on leaving. ⋮ on a Line offers the reappear time as a choice and <strong>Delete</strong>.</li>
   <li>On a full card the Lines show with their checkboxes, open ones first; a compact card shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card and behind the editor's badge "Shopping List", writes the Lines into the text, the struck ones marked "✓ ".</li>
 </ul>
 
@@ -104,18 +113,22 @@
 
 <h3>Shopping Lists on the Agenda</h3>
 <p>
-  Settings under "Shopping Lists on the Agenda" choose how today's Agenda shows them, on this Device
-  only:
+  <strong>Show on the Agenda</strong> in the ⋮ of the Shopping List's card, and as a badge in its
+  editor, chooses how today's Agenda shows the list:
 </p>
 <ul>
-  <li>Each Line that came back today, on its own row, checkable there.</li>
-  <li>One row per Shopping List on a day when Lines came back, such as "Weekly shopping: 3 back". This is the default.</li>
-  <li>One row per Shopping List on every day it has open Lines, such as "Weekly shopping: 4 open".</li>
-  <li>Not at all.</li>
+  <li><strong>Off</strong>: not at all.</li>
+  <li><strong>One row with the number of open Lines</strong>, such as "Weekly shopping: 4 open". This is the default.</li>
+  <li><strong>Each open Line on its own row</strong>, checkable there.</li>
 </ul>
 <p>
-  The rows come after today's all-day Occurrences; a tap opens the list. A Routine or Reminder
-  spawned from a Shopping List is Done only when checked off.
+  A list without open Lines does not show, whatever the choice, until a Line comes back or is added.
+  The rows come after today's all-day Occurrences; a tap opens the list. The choice is yours alone:
+  it goes to your own Devices, and in a Shared Area each person decides for their own Agenda. A list
+  nobody chose for starts as the Device's earlier setting for all Shopping Lists showed them: Off
+  where it said "Not at all", each open Line where it said "Each Line that came back today". A list
+  of a locked Area set to Masked shows as "Private Shopping List" with its count. A Routine or
+  Reminder spawned from a Shopping List is Done only when checked off.
 </p>
 
 <h3>Capturing into a Shopping List</h3>
@@ -220,8 +233,9 @@
 <ul>
   <li><strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong> and <strong>Make it a Tally</strong> are in the Note dialog, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session; the kind's badge holds <strong>Back to a plain Note</strong>.</li>
   <li>A Checklist shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. <strong>Show on the Agenda</strong> is a checkbox in the card's menu, before <strong>Uncheck all</strong>, and a badge in the Note dialog.</li>
+  <li>A Shopping List shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. Its <strong>Show on the Agenda</strong> is three radio buttons in the card's menu, before <strong>Back to a plain Note</strong>, and a badge in the Note dialog whose dialog offers the same three; a click on one closes it.</li>
   <li>The "+" at the top of All Notes, an Area or a Topic opens a menu with Note, Checklist, Shopping List, Tally, Session and Frog, Session and Frog for who may set them up. The New Tally page and the New Session page are dialogs over the window. On the New Tally page each field's rule, unit and target are badges whose click opens their small editor; the unit is typed with the known units as small buttons under it. The New Session page is the Routine editor's page for a Session: its name, its pool with <strong>New Tally</strong> at its end, which opens the New Tally page over it and comes back with the new Tally ticked, its count and rule, and its schedule, every day, all day, at first.</li>
-  <li>A Line is typed in place as on the phone: Enter splits it, Backspace at its start joins it with the Line above, and Tab and Shift+Tab move it into a group and out, in place of the buttons above the keyboard; Up and Down move to the Line above and below. In a Shopping List's field Enter adds the Line, and in one of its Lines it ends the rename.</li>
+  <li>The Lines of a Checklist and a Shopping List are typed in place as on the phone, as one block of text: Enter adds a Line below or moves the rest of a Line into it, Backspace at its start joins it with the Line above, and on a Checklist Tab and Shift+Tab move it into a group and out, in place of the buttons above the keyboard; Up and Down move to the Line above and below.</li>
   <li>The menus of Lines and entries open with ⋮, and with a right-click where the Line is not typed in. Tally entries show 30 at a time.</li>
   <li>The suggestions under a field's unit are small buttons, picked with a click; the pointer resting on one shows its kind of unit, such as Mass.</li>
   <li>A Session's pool is ordered for Rolling with arrow buttons instead of handles, and a weekday gets its own count with a checkbox instead of a switch.</li>

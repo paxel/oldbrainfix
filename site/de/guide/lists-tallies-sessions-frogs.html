@@ -22,7 +22,7 @@
 </figure>
 <ul>
   <li><strong>Notiz</strong> öffnet den Erfassungsbildschirm, wie das „+“ der Agenda.</li>
-  <li><strong>Checkliste</strong> und <strong>Einkaufsliste</strong> fragen nach dem Namen der Liste; <strong>Anlegen</strong> öffnet den Editor der Notiz mit dem Cursor in ihrer ersten Zeile, bei einer Einkaufsliste im Feld oben, um die Zeilen an ihrem Platz zu tippen.</li>
+  <li><strong>Checkliste</strong> und <strong>Einkaufsliste</strong> fragen nach dem Namen der Liste; <strong>Anlegen</strong> öffnet den Editor der Notiz mit dem Cursor in ihrer ersten Zeile, um die Zeilen an ihrem Platz zu tippen.</li>
   <li><strong>Frosch</strong> fragt nur nach seinem Namen und legt den Frosch mit seiner Notiz an.</li>
   <li><strong>Strichliste</strong> öffnet eine Seite: ihr <strong>Name</strong>, dann eine Reihe je Feld, anfangs eine, und <strong>Feld hinzufügen</strong> für das nächste. Die Reihe eines Felds ist sein Name mit drei Plaketten: wie ein Tag mit mehreren Einträgen zählt („Σ Summe“ oder „Größter Wert“), seine Maßeinheit und sein Ziel. Ein Tippen auf eine Plakette öffnet ihren kleinen Editor; die Maßeinheit wird getippt, mit den bekannten Maßeinheiten, die gemeint sein können, als Vorschlägen, und die Regel folgt der Art der Maßeinheit, bis sie gewählt wird. <strong>Speichern</strong> legt die Strichliste mit jedem Feld an, das einen Namen hat; Reihen ohne Namen fallen weg.</li>
   <li><strong>Einheit</strong> öffnet eine Seite: ihr <strong>Name</strong>; ihr <strong>Vorrat</strong>, ein Kästchen je Strichliste, am Ende <strong>Neue Strichliste</strong>, das die Seite der Strichliste öffnet und mit der neuen Strichliste angehakt zurückkommt; dann drei Plaketten: wie viele sie jedes Mal auswählt, mit − und + eingestellt, wie sie auswählt und ihr Zeitplan, anfangs jeden Tag ganztägig, der den Zeitplan des Routinen-Editors öffnet. <strong>Speichern</strong> legt die Einheit an; die Anzahl je Wochentag und die Reihenfolge für Reihum werden später in ihrem Editor eingestellt.</li>
@@ -55,10 +55,18 @@
 <ul>
   <li>Auf einer vollen Karte hat jede Zeile ihr Kästchen; eine abgehakte Zeile wird an ihrem Platz durchgestrichen. Eine kompakte Karte zeigt „2 von 5 abgehakt“.</li>
   <li>Eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Sind alle Zeilen einer Gruppe abgehakt, ist auch die Zeile darüber abgehakt; wird diese abgehakt, ist ihre ganze Gruppe abgehakt; wird eine Zeile der Gruppe wieder freigegeben, ist es auch die Zeile darüber.</li>
-  <li>Im Editor wird jede Zeile an ihrem Platz getippt, neben ihrem Kästchen. Die Eingabetaste teilt eine Zeile am Cursor und beginnt an ihrem Ende eine neue leere Zeile darunter; <strong>Zeile hinzufügen</strong> beginnt eine am Ende. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
+  <li>Eine Gruppe steht in einem Rahmen mit der Zeile, unter der sie steht.</li>
+  <li>Im Editor werden die Zeilen wie ein zusammenhängender Text bearbeitet, jede Zeile beginnt mit ihrem Kästchen; eine neue Liste beginnt mit einer leeren Zeile. Die Eingabetaste fügt unter der Zeile mit dem Cursor eine neue Zeile mit leerem Kästchen ein; mitten in einer Zeile nimmt die neue Zeile den Rest der Zeile mit. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; die Haken der angehängten Zeile bleiben im Protokoll. Eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur, auf dem Desktop Tab und Umschalt+Tab, nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
   <li>Alles Getippte bleibt beim Verlassen des Editors erhalten; leer gebliebene Zeilen fallen weg. ⋮ an einer Zeile bietet <strong>Nach oben</strong>, <strong>Nach unten</strong>, <strong>Unter die Zeile darüber</strong> oder <strong>Zurück auf die oberste Ebene</strong> und <strong>Löschen</strong>.</li>
   <li><strong>Alle Haken entfernen</strong> erscheint, solange eine Zeile abgehakt ist, um die Liste wieder zu benutzen. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte und im Editor hinter der Plakette „Checkliste“, macht sie zurück: Jede Zeile wird eine Zeile des Notiztexts, eine abgehakte mit „✓ “ davor.</li>
 </ul>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/de/light/list-editor.png" alt="Eine Packliste als Checkliste im Notiz-Editor, jede Zeile eine Textzeile nach ihrem Kästchen, die Gruppe in einem Rahmen mit ihrer eigenen Zeile" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/de/dark/list-editor.png" alt="Eine Packliste als Checkliste im Notiz-Editor, jede Zeile eine Textzeile nach ihrem Kästchen, die Gruppe in einem Rahmen mit ihrer eigenen Zeile" width="648" height="1152" loading="lazy">
+  <figcaption>Eine Checkliste im Editor, bearbeitet wie ein zusammenhängender Text.</figcaption>
+</figure>
+
 <p>
   In einem geteilten Bereich fügt jeder mit einer Rolle Zeilen hinzu und hakt sie ab; Umbenennen,
   Verschieben und Löschen einer Zeile bleiben beim Verfasser der Notiz oder der Zeile und bei den
@@ -96,10 +104,11 @@
   durchgestrichen.
 </p>
 <ul>
-  <li>Eine abgehakte Zeile wird durchgestrichen und rückt ans Ende, mit dem Tag, an dem sie wiederkommt, etwa „wieder Sa., 31. Okt.“. Zu Beginn dieses Tages ist sie wieder offen, ganz oben.</li>
+  <li>Eine abgehakte Zeile wird durchgestrichen und rückt ans Ende, mit dem Tag, an dem sie wiederkommt, etwa „wieder Sa., 31. Okt.“. Zu Beginn dieses Tages ist sie wieder offen, an ihrem Platz.</li>
   <li>Jede Zeile hat ihre <strong>Wiederkehr</strong>: <strong>Einmal</strong> oder 1, 2, 3 oder 4 Wochen; eine neue Zeile hat 1 Woche. Sie kommt am selben Wochentag so viele Wochen später wieder, nach der Uhr des Geräts. Eine Zeile mit Einmal ist nach dem Abhaken weg.</li>
-  <li>Im Editor fügt ein Feld oben Zeilen hinzu: Die Eingabetaste fügt das Getippte hinzu und lässt das Feld für die nächste bereit, ebenso <strong>Hinzufügen</strong>; was im Feld stehen bleibt, wird beim Verlassen hinzugefügt. Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, ganz oben, und eine offene bleibt.</li>
-  <li>Die Zeilen werden an ihrem Platz umbenannt; eine leer gelassene fällt beim Verlassen weg. ⋮ an einer Zeile bietet die Wiederkehr zur Wahl und <strong>Löschen</strong>.</li>
+  <li>Im Editor werden die Zeilen wie bei einer Checkliste bearbeitet: ein zusammenhängender Text, jede Zeile beginnt mit ihrem Kästchen, die Eingabetaste für eine neue Zeile, die Rücktaste am Anfang, um eine Zeile an die darüber anzuhängen. Die Zeilen bleiben in der Reihenfolge, in der sie getippt wurden, auch beim nächsten Mal. Solange der Editor offen ist, bleibt eine dort abgehakte Zeile an ihrer Stelle; beim nächsten Mal steht sie unter den offenen.</li>
+  <li>Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, und eine offene bleibt.</li>
+  <li>Eine leer gelassene Zeile fällt beim Verlassen weg. ⋮ an einer Zeile bietet die Wiederkehr zur Wahl und <strong>Löschen</strong>.</li>
   <li>Auf einer vollen Karte stehen die Zeilen mit ihren Kästchen, die offenen zuerst; eine kompakte Karte zeigt „3 offen“. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte und hinter der Plakette „Einkaufsliste“ im Editor, schreibt die Zeilen in den Text, die durchgestrichenen mit „✓ “ davor.</li>
 </ul>
 
@@ -111,18 +120,24 @@
 
 <h3>Einkaufslisten in der Agenda</h3>
 <p>
-  Die Einstellungen unter „Einkaufslisten in der Agenda“ wählen, wie die Agenda sie heute zeigt, nur
-  auf diesem Gerät:
+  <strong>Auf der Agenda zeigen</strong> im ⋮ der Karte der Einkaufsliste und als Plakette in ihrem
+  Editor wählt, wie die Agenda die Liste heute zeigt:
 </p>
 <ul>
-  <li>Jede heute wiedergekommene Zeile in einer eigenen Reihe, dort abhakbar.</li>
-  <li>Eine Reihe je Einkaufsliste an Tagen, an denen Zeilen wiederkommen, etwa „Wocheneinkauf: 3 wieder da“. Das ist die Voreinstellung.</li>
-  <li>Eine Reihe je Einkaufsliste an jedem Tag mit offenen Zeilen, etwa „Wocheneinkauf: 4 offen“.</li>
-  <li>Gar nicht.</li>
+  <li><strong>Aus</strong>: gar nicht.</li>
+  <li><strong>Eine Reihe mit der Zahl der offenen Zeilen</strong>, etwa „Wocheneinkauf: 4 offen“. Das ist die Voreinstellung.</li>
+  <li><strong>Jede offene Zeile in einer eigenen Reihe</strong>, dort abhakbar.</li>
 </ul>
 <p>
-  Die Reihen stehen nach den ganztägigen Fälligkeiten von heute; ein Tipp öffnet die Liste. Eine
-  Routine oder Erinnerung aus einer Einkaufsliste ist nur erledigt, wenn sie abgehakt wird.
+  Eine Liste ohne offene Zeilen erscheint nicht, gleich was gewählt ist, bis eine Zeile wiederkommt
+  oder hinzugefügt wird. Die Reihen stehen nach den ganztägigen Fälligkeiten von heute; ein Tipp
+  öffnet die Liste. Die Wahl ist nur für dich: Sie geht an deine eigenen Geräte, und in einem
+  geteilten Bereich entscheidet jede Person für ihre eigene Agenda. Eine Liste, für die niemand
+  gewählt hat, beginnt so, wie die frühere Einstellung des Geräts für alle Einkaufslisten sie
+  zeigte: mit Aus, wo sie „Gar nicht“ lautete, mit jeder offenen Zeile, wo sie „Jede heute
+  wiedergekommene Zeile in einer eigenen Reihe“ lautete. Eine Liste aus einem gesperrten Bereich,
+  der auf maskiert steht, erscheint als „Private Einkaufsliste“ mit ihrer Zahl. Eine Routine oder
+  Erinnerung aus einer Einkaufsliste ist nur erledigt, wenn sie abgehakt wird.
 </p>
 
 <h3>In eine Einkaufsliste erfassen</h3>
@@ -237,8 +252,9 @@
 <ul>
   <li><strong>Zur Checkliste machen</strong>, <strong>Zur Einkaufsliste machen</strong> und <strong>Zur Strichliste machen</strong> stehen im Notiz-Dialog, und das Menü der Karte bietet die Listen ebenfalls. Die Plakette „+“ des Notiz-Dialogs enthält Routine, Erinnerung, Frosch und Einheit; die Plakette der Art enthält <strong>Wieder eine einfache Notiz</strong>.</li>
   <li>Eine Checkliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. <strong>Auf der Agenda zeigen</strong> ist ein Kästchen im Menü der Karte, vor <strong>Alle Haken entfernen</strong>, und eine Plakette im Notiz-Dialog.</li>
+  <li>Eine Einkaufsliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. Ihr <strong>Auf der Agenda zeigen</strong> bietet das Menü der Karte mit drei Optionsfeldern an, vor <strong>Wieder eine einfache Notiz</strong>, und der Notiz-Dialog als Plakette, deren Dialog dieselben drei anbietet; ein Klick auf eines schließt ihn.</li>
   <li>Das „+“ oben in Alle Notizen, einem Bereich oder einem Thema öffnet ein Menü mit Notiz, Checkliste, Einkaufsliste, Strichliste, Einheit und Frosch, Einheit und Frosch für den, der sie einrichten darf. Die Seiten Neue Strichliste und Neue Einheit sind Dialoge über dem Fenster. Auf der Seite Neue Strichliste sind Regel, Maßeinheit und Ziel jedes Felds Plaketten, deren Klick ihren kleinen Editor öffnet; die Maßeinheit wird getippt, die bekannten als kleine Knöpfe darunter. Die Seite Neue Einheit ist die Seite des Routinen-Editors für eine Einheit: ihr Name, ihr Vorrat mit <strong>Neue Strichliste</strong> am Ende, das die Seite Neue Strichliste darüber öffnet und mit der neuen Strichliste angehakt zurückkommt, ihre Anzahl und Regel und ihr Plan, anfangs jeden Tag, ganztägig.</li>
-  <li>Eine Zeile wird wie auf dem Handy an ihrem Platz getippt: Enter teilt sie, die Rücktaste an ihrem Anfang hängt sie an die Zeile darüber an, und Tab und Umschalt+Tab nehmen sie in eine Gruppe auf und wieder heraus, anstelle der Knöpfe über der Tastatur; Pfeil hoch und Pfeil runter gehen zur Zeile darüber und darunter. Im Feld einer Einkaufsliste fügt Enter die Zeile hinzu, und in einer ihrer Zeilen beendet es das Umbenennen.</li>
+  <li>Die Zeilen einer Checkliste und einer Einkaufsliste werden wie auf dem Handy an ihrem Platz getippt, als zusammenhängender Text: Enter fügt darunter eine Zeile ein oder nimmt den Rest einer Zeile in sie mit, die Rücktaste an ihrem Anfang hängt sie an die Zeile darüber an, und bei einer Checkliste nehmen Tab und Umschalt+Tab sie in eine Gruppe auf und wieder heraus, anstelle der Knöpfe über der Tastatur; Pfeil hoch und Pfeil runter gehen zur Zeile darüber und darunter.</li>
   <li>Die Menüs von Zeilen und Einträgen öffnen mit ⋮, und mit einem Rechtsklick, wo die Zeile nicht getippt wird. Die Einträge einer Strichliste erscheinen 30 auf einmal.</li>
   <li>Die Vorschläge unter der Maßeinheit eines Felds sind kleine Knöpfe, gewählt mit einem Klick; ruht der Mauszeiger auf einem, zeigt er die Art seiner Maßeinheit, etwa Masse.</li>
   <li>Der Vorrat einer Einheit wird für Reihum mit Pfeilknöpfen statt Griffen geordnet, und ein Wochentag bekommt seine eigene Anzahl mit einem Kästchen statt eines Schalters.</li>

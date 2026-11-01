@@ -997,16 +997,20 @@ final _scenarios = <Scenario>[
     about:
         'Shopping Lists made from Notes: every line not blank a Line, '
         'indented or not, a marked one struck; reappear times of Once and one '
-        'to four weeks; Lines checked to the end and back at the top at the '
-        'start of the same weekday as many weeks on on the European wall '
+        'to four weeks; Lines checked to the end and back in their places at '
+        'the start of the same weekday as many weeks on on the European wall '
         'clock, one checked late on a UTC evening that is the next day there; '
         'names added again in another case bringing a struck and a gone Line '
         'back, an open one and one back by its time staying, a new one at '
-        'the top; a Line renamed, one deleted and restored, one checked again '
+        'the end, one second from the top and two lines of a text after them; '
+        'a Line renamed, one deleted and restored, one checked again '
         'after it came back, reappear times, a check and a key no app '
         'writes; back to a plain Note and made again, a kind no app writes; a '
         'Reminder spawned from one with a check for its Occurrence no app '
-        'writes; an Unsorted Note beside them.',
+        'writes; how each shows on the Agenda (#186): one left to the '
+        'Device\'s old setting, one each open Line and struck until a week '
+        'on, one off after one row with the count, one with the count, one '
+        'with a choice no app writes; an Unsorted Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1031,6 +1035,8 @@ final _scenarios = <Scenario>[
       lists.add(week, ' MILK ', wall);
       lists.add(week, 'tea', wall);
       lists.add(week, 'Oat milk', wall);
+      lists.add(week, 'Butter', wall, at: 1);
+      lists.addLines(week, 'Pasta\n\nFlour', wall);
       lists.add(week, 'eggs', wall);
       lists.check(line(week, 'Eggs'), wall);
       lists.rename(line(week, 'Oat milk'), 'Soy milk');
@@ -1069,6 +1075,25 @@ final _scenarios = <Scenario>[
       lists.check(line(hardware, 'Nails'), wall);
       lists.toPlain(hardware, wall);
       lists.make(hardware);
+      lists.setOnAgenda(hardware, ShoppingOnAgenda.lines);
+      final pharmacy = notes.capture('Pharmacy\nPlasters').id;
+      lists
+        ..make(pharmacy)
+        ..setOnAgenda(pharmacy, ShoppingOnAgenda.count)
+        ..setOnAgenda(pharmacy, ShoppingOnAgenda.off);
+      final garden = notes.capture('Garden\nSeeds\nTwine').id;
+      lists
+        ..make(garden)
+        ..setOnAgenda(garden, ShoppingOnAgenda.count)
+        ..setOnAgenda(garden, ShoppingOnAgenda.count);
+      final candles = notes.capture('Candles\nWicks').id;
+      lists.make(candles);
+      // As a later version or a modified app would write it.
+      store.append(
+        '${ChecklistKeys.agendaPrefix}$candles',
+        ShoppingKeys.agenda,
+        'later',
+      );
       final odd = notes.capture('Odd kind\nOne').id;
       store.append(odd, ChecklistKeys.kind, 'shopping:a:b');
       final errand = Routines(store)
@@ -1161,6 +1186,58 @@ final _scenarios = <Scenario>[
       sessions.pickToday(_frogDay(4));
       Routines(store).create('Walk the dog', daily([_at(8)]));
       notes.capture('Unsorted thought');
+    },
+  ),
+  (
+    name: 'session-swap',
+    about:
+        'A Session picking two of Push-ups, Half bridge and a Tally added '
+        'to its pool later: Half bridge recorded, Push-ups swapped for the '
+        'new one with "Another one" and that recorded, then the first pick '
+        'another Device of the user\'s wrote later winning on the field, '
+        'the Tally recorded kept in its place all the same; the next day '
+        'the second pick swapped, recorded and lost alike, and today\'s '
+        'picks writing it back once.',
+    build: (store) {
+      final notes = Notes(store);
+      final tallies = Tallies(store);
+      final sessions = Sessions(store);
+      String tally(String name) {
+        final id = notes.capture(name).id;
+        tallies.addField(id, name: name, unit: 'times', target: 10);
+        return id;
+      }
+
+      final pushUps = tally('Push-ups');
+      final bridge = tally('Half bridge');
+      final sport = sessions.create(
+        'Sport',
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(7)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pushUps, bridge],
+        count: 2,
+        rule: SessionRule.rolling,
+      );
+      sessions.pickToday(_frogDay(0));
+      final morning = Occurrence(Day(2026, 1, 1), _at(7));
+      sessions.record(sport.id, morning, bridge, line: 'Shaky');
+      final march = tally('Long march');
+      sessions.setPool(sport.id, [pushUps, bridge, march]);
+      sessions.another(sport.id, morning, pushUps);
+      sessions.record(sport.id, morning, march, line: 'Slow');
+      // As another Device of the user's writes its first pick, having
+      // shown the day before it synced.
+      store.append(sport.id, SessionKeys.pick(morning), '$pushUps,$bridge');
+      sessions.pickToday(_frogDay(1));
+      final next = Occurrence(Day(2026, 1, 2), _at(7));
+      sessions.another(sport.id, next, march);
+      sessions.record(sport.id, next, bridge, line: 'Better');
+      store.append(sport.id, SessionKeys.pick(next), '$pushUps,$march');
+      sessions.pickToday(_frogDay(1));
+      sessions.pickToday(_frogDay(1));
     },
   ),
   (
@@ -1954,6 +2031,33 @@ Map<String, Object?> _checklists(Store store) {
   };
 }
 
+/// Today's Shopping List rows of [store] on UTC: each list, how it shows
+/// and its open Lines.
+List<Map<String, Object?>> _shoppingRows(Store store) => [
+  for (final (:list, :shows, :lines) in ShoppingLists(
+    store,
+  ).agendaRows((utc) => utc))
+    {
+      'note': list.noteId,
+      'shows': shows.code,
+      'lines': [for (final l in lines) l.id],
+    },
+];
+
+/// What [read] gives with the old Device setting of #123 set to [old], or
+/// unset for null; unset again after.
+T _withOldShoppingAgenda<T>(Store store, String? old, T Function() read) {
+  const key = 'shoppingAgenda';
+  if (old == null) {
+    store.removeLocalSetting(key);
+  } else {
+    store.setLocalSetting(key, old);
+  }
+  final out = read();
+  store.removeLocalSetting(key);
+  return out;
+}
+
 /// A Shopping List as the fixtures list it.
 Map<String, Object?> _shoppingList(ShoppingList list) => {
   'making': list.making,
@@ -1988,11 +2092,17 @@ final _shoppingMoments = [
   DateTime.utc(2026, 1, 28, 23),
 ];
 
+/// The values of the Device setting before #186 the Shopping Lists'
+/// Agenda rows are read with: none, each one, and one no app writes.
+const _oldShoppingAgenda = [null, 'lines', 'back', 'open', 'off', 'sideways'];
+
 /// Each Shopping List of [store] at each of [_shoppingMoments] on the
 /// European wall clock, with the text each goes back to as a plain Note
-/// and the lists on the Agenda each way,
+/// and the lists on the Agenda by each value of the old Device setting,
+/// how each list shows there and whether the choice applies to it,
 /// which Notes may become one, the Routines with what is Done, and how
-/// reappear times and names are read. Leaves the clock held as it was.
+/// reappear times and names are read. Leaves the clock held as it was,
+/// and the old Device setting unset.
 Map<String, Object?> _shoppingLists(Store store) {
   final lists = ShoppingLists(store);
   final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
@@ -2013,11 +2123,16 @@ Map<String, Object?> _shoppingLists(Store store) {
               key: ShoppingLists.plainText(Notes(store).byId(key)!.text, value),
           },
           'agenda': {
-            for (final way in ShoppingAgenda.values)
-              way.name: [
-                for (final (:list, :lines) in lists.agenda(way, _frogDay(0)))
+            for (final old in _oldShoppingAgenda)
+              old ?? 'none': [
+                for (final (:list, :shows, :lines) in _withOldShoppingAgenda(
+                  store,
+                  old,
+                  () => lists.agendaRows(_frogDay(0)),
+                ))
                   {
                     'note': list.noteId,
+                    'shows': shows.code,
                     'lines': [for (final l in lines) l.id],
                   },
               ],
@@ -2030,6 +2145,16 @@ Map<String, Object?> _shoppingLists(Store store) {
     'at': at,
     'isShoppingList': {for (final id in ids) id: lists.isShoppingList(id)},
     'mayMake': {for (final id in ids) id: lists.mayMake(id)},
+    'onAgenda': {
+      for (final old in _oldShoppingAgenda)
+        old ?? 'none': _withOldShoppingAgenda(store, old, () {
+          return {
+            for (final id in ids)
+              if (lists.isShoppingList(id)) id: lists.onAgenda(id).code,
+          };
+        }),
+    },
+    'mayShowOnAgenda': {for (final id in ids) id: lists.mayShowOnAgenda(id)},
     'routines': [
       for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
         if (Routines(store).byId(id) case final routine?) _routine(routine),
@@ -2430,6 +2555,11 @@ Map<String, Object?> _section(Section section) => {
   'removedRecordings': section.removedRecordings,
   'removedTranscripts': section.removedTranscripts,
   'removedPhotoTexts': section.removedPhotoTexts,
+  'modified': section.modified?.toUtc().toIso8601String(),
+  'editedBy': switch (section.editedBy) {
+    final by? => {'id': by.id, 'name': by.name},
+    null => null,
+  },
 };
 
 /// The photos and recordings of [note] this Device may remove and keep
@@ -4742,7 +4872,9 @@ Future<void> _sharedFixture(Directory root) async {
     );
     final blood = Notes(ann).capture('Blood results', place: health);
     final loose = Notes(ann).capture('Fix the tap');
-    Notes(ann).amend(loose.id, 'The hot one');
+    final hot = Notes(ann).amend(loose.id, 'The hot one').id;
+    // Ann's Amend in the Area, which Ben may not edit (#183).
+    final litres = Notes(ann).amend(milk.id, 'Two litres').id;
     // A Note in the Area with every captured detail (ADR 0037), at a
     // Named Place of Ann's own.
     NamedPlaces(ann).add('Work', Coordinates(52.52, 13.405), radius: 100);
@@ -4846,7 +4978,8 @@ Future<void> _sharedFixture(Directory root) async {
     };
 
     // Ann makes a Checklist in the Area and takes it off her own Agenda
-    // (#143): a choice kept like an Override, so it stays on Ben's.
+    // (#143), and a Shopping List she shows each open Line of (#186):
+    // choices kept like an Override, so Ben's Agenda shows them his way.
     final agendaAt = DateTime.utc(2026, 2, 1, 10, 20);
     _held = agendaAt;
     ids = 0x200;
@@ -4855,6 +4988,12 @@ Future<void> _sharedFixture(Directory root) async {
     Checklists(ann)
       ..make(trip)
       ..setShowOnAgenda(trip, false);
+    final groceries = Notes(ann)
+        .capture('Groceries\nMilk\nEggs', place: area)
+        .id;
+    ShoppingLists(ann)
+      ..make(groceries)
+      ..setOnAgenda(groceries, ShoppingOnAgenda.lines);
     _writeAfter(ann, mark, File('${out.path}/agenda.jsonl'));
 
     // Ann renames herself and syncs through a shared folder: her Profile
@@ -4883,34 +5022,57 @@ Future<void> _sharedFixture(Directory root) async {
     };
 
     // Ann removes the place and the calendar event from her Note in the
-    // Area: two nulls, no ids drawn (ADR 0037).
+    // Area: two nulls, no ids drawn (ADR 0037); and edits her Amend of the
+    // Note she keeps private for now (#183), no Box in it, no id drawn.
     final capturedAt = DateTime.utc(2026, 2, 1, 10, 45);
     _held = capturedAt;
     mark = ann.currentSeq();
     Notes(ann)
       ..removeCaptured(toner, CapturedDetail.place)
-      ..removeCaptured(toner, CapturedDetail.event);
+      ..removeCaptured(toner, CapturedDetail.event)
+      ..editSection(hot, 'The hot one, it drips');
     _writeAfter(ann, mark, File('${out.path}/captured.jsonl'));
 
-    // Ben, a Member: his own Note, an Amend, a Done and a text his
-    // machine read count; editing and trashing Ann's Note, removing that
-    // text or a captured detail of Ann's, renaming the Area, rescheduling
-    // and a Topic and a Routine of his own are ignored everywhere.
+    // Ben, a Member: his own Note, an Amend and its edit, a Done and a
+    // text his machine read count; editing and trashing Ann's Note,
+    // editing her Amend, removing that text or a captured detail of
+    // Ann's, renaming the Area, rescheduling and a Topic and a Routine of
+    // his own are ignored everywhere.
     _held = DateTime.utc(2026, 2, 1, 11);
     mark = ben.currentSeq();
     if (Notes(ben).mayRemoveCaptured(toner, CapturedDetail.device)) {
       throw StateError('a Member may remove a detail of Ann\'s Note');
     }
+    if (Notes(ben).mayEditSection(litres)) {
+      throw StateError('a Member may edit Ann\'s Amend');
+    }
+    try {
+      Notes(ben).editSection(litres, 'Ten litres');
+      throw StateError('a Member edited Ann\'s Amend');
+    } on StateError catch (e) {
+      if (e.message.startsWith('a Member')) rethrow;
+    }
+    if (ben.currentSeq() != mark) {
+      throw StateError('a refused edit wrote something');
+    }
     final topic = Places(ben).topics(area).single.id;
+    // A Member's own choice for Ann's Shopping List, on his Agenda alone.
+    ShoppingLists(ben).setOnAgenda(groceries, ShoppingOnAgenda.count);
     final own = Notes(ben).capture('Ben buys bread', place: topic);
     Notes(ben).edit(own.id, 'Ben buys rye bread');
-    Notes(ben).amend(milk.id, 'Oat milk please');
+    final oat = Notes(ben).amend(milk.id, 'Oat milk please').id;
+    Notes(ben).editSection(oat, 'Oat milk, two litres');
     Routines(ben).markDone(bins.id, Occurrence(Day(2026, 2, 1), _at(8)));
     // As a modified app would write them: a Photo Text on Ann's Note,
     // which a Member's machine may add, and its removal, which it may not.
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), 'Oat milk 1,29');
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), null);
     ben.append(toner, NoteKeys.bluetooth, null);
+    ben.append(
+      litres,
+      SectionKeys.text,
+      StoredText.of(TextFormats.plain, 'Ten litres').encode(),
+    );
     Notes(ben).edit(milk.id, 'Buy beer');
     Notes(ben).trash(milk.id);
     Places(ben).rename(area, "Ben's");
@@ -4964,6 +5126,8 @@ Future<void> _sharedFixture(Directory root) async {
       'joinerRoles': _roles(ben, area, checked),
       'hostAgenda': [for (final l in Checklists(ann).agenda()) l.noteId],
       'joinerAgenda': [for (final l in Checklists(ben).agenda()) l.noteId],
+      'hostShopping': _shoppingRows(ann),
+      'joinerShopping': _shoppingRows(ben),
     };
     // What no role allows of the Topic and the Routine Ben made up lies
     // nowhere for him, so it never even went to Ann.
@@ -4971,17 +5135,37 @@ Future<void> _sharedFixture(Directory root) async {
       throw StateError('Ann\'s Override reached Ben');
     }
     if (ben.allEntries().any(
-          (e) => e.entity.startsWith(ChecklistKeys.agendaPrefix),
+          (e) =>
+              e.entity.startsWith(ChecklistKeys.agendaPrefix) &&
+              e.device != ben.deviceId,
         ) ||
         Checklists(ann).showsOnAgenda(trip) ||
         !Checklists(ben).showsOnAgenda(trip) ||
         Notes(ben).byId(trip) == null) {
       throw StateError('Ann\'s Agenda choice reached Ben');
     }
+    if (ann.allEntries().any(
+          (e) =>
+              e.entity.startsWith(ChecklistKeys.agendaPrefix) &&
+              e.device == ben.deviceId,
+        ) ||
+        ShoppingLists(ann).onAgenda(groceries) != ShoppingOnAgenda.lines ||
+        ShoppingLists(ben).onAgenda(groceries) != ShoppingOnAgenda.count) {
+      throw StateError('a Shopping List\'s Agenda choice reached the other');
+    }
     if (Notes(ben).byId(blood.id) != null ||
         Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
         Notes(ann).byId(milk.id)?.text != 'Buy milk') {
       throw StateError('the two Devices of the shared fixture disagree');
+    }
+    for (final store in [ann, ben]) {
+      final notes = Notes(store);
+      if (notes.section(litres)?.text != 'Two litres' ||
+          notes.section(litres)?.modified != null ||
+          notes.section(oat)?.editedBy?.id != ben.ownProfile?.id ||
+          notes.section(hot)?.editedBy?.id != ann.ownProfile?.id) {
+        throw StateError('an edit of an Amend went wrong');
+      }
     }
     for (final store in [ann, ben]) {
       final context = Notes(store).byId(toner)?.context;
@@ -5065,7 +5249,7 @@ Future<void> _sharedFixture(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'capturedAt': capturedAt.toIso8601String(), 'capturedNote': toner, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'agendaShopping': groceries, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'capturedAt': capturedAt.toIso8601String(), 'capturedNote': toner, 'editedSection': hot, 'refusedSection': litres, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -7623,10 +7807,13 @@ Future<void> main(List<String> args) async {
     '`shopping-lists` log with its Lines in the order they show, their '
     'reappear times, which are struck, the day each comes back and the day '
     'an open one came back, the text each goes back to as a plain Note, and '
-    'the lists on the Agenda each way it may show them, read at moments '
+    'the lists on the Agenda with how each shows there and its open Lines '
+    'by each value of the Device setting before #186, read at moments '
     'around the '
     'starts of the days they come back on the same clock; which Notes are '
-    'one and may become one, the Routines with what is Done, reappear '
+    'one and may become one, how each list shows on the Agenda by each '
+    'value of that setting and whether the choice applies to each Note, '
+    'the Routines with what is Done, reappear '
     'times read, and names as an added one is compared.\n'
     '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
     '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
@@ -7647,7 +7834,8 @@ Future<void> main(List<String> args) async {
     'adds one; Ada renames, deletes and adds Lines and sends the update; '
     'she turns it back into a plain Note and sends that. Read on a UTC '
     'wall clock.\n'
-    '- `sessions/sessions.json`: each Session of the `sessions` log with '
+    '- `sessions/sessions.json`, `session-swap/sessions.json`: each '
+    'Session of the log with '
     'its pool, counts and rule, the Tallies it picks from and may pick, '
     'its Routine with what is Done, from entries too, and today\'s '
     'Occurrences with their picks, their targets and the entries recorded '
@@ -7766,14 +7954,17 @@ Future<void> main(List<String> args) async {
     'each then keeps, Ann giving Ben a name and picture for herself alone '
     '(`override.jsonl` with `override.jpg`, an Override that never reaches '
     'him), Ann making a Checklist in the Area and taking it off her own '
-    'Agenda (`agenda.jsonl`, ids counted from 0x201; a choice that never '
-    'reaches him, so it stays on his), Ann renamed and publishing the Area\'s Profiles '
+    'Agenda and a Shopping List she shows each open Line of '
+    '(`agenda.jsonl`, ids counted from 0x201; choices that never '
+    'reach him, so his Agenda shows them his way), Ann renamed and publishing the Area\'s Profiles '
     'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
     'from 2000) and what Ben keeps after reading it, Ann removing the '
     'place and the calendar event from a Note in the Area that also '
-    'holds a Bluetooth device and an app (`captured.jsonl`), what Ben '
-    'wrote, allowed and not, his removal of that Bluetooth device among '
-    'it (`member.jsonl`), Ann filing a Note in '
+    'holds a Bluetooth device and an app and editing her Amend of a '
+    'private Note (`captured.jsonl`), what Ben wrote, allowed and not, '
+    'his removal of that Bluetooth device, the edit of his own Amend and '
+    'of one of Ann\'s among it and his own Agenda choice for her Shopping '
+    'List (`member.jsonl`), Ann filing a Note in '
     '(`owner.jsonl`), the paired session after (`request2.json`, '
     '`answer2.json`), Ben made Manager (`role.jsonl`) and writing as one '
     '(`manager.jsonl`), then removed '

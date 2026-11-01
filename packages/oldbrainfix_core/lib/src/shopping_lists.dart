@@ -1,6 +1,8 @@
 import 'checklists.dart';
+import 'device_settings.dart';
 import 'entry.dart';
 import 'notes.dart';
+import 'profiles.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
 import 'store.dart';
@@ -21,6 +23,12 @@ abstract final class ShoppingKeys {
   /// On a Line: how long it stays struck once checked, a [Reappear]'s
   /// code.
   static const reappear = 'reappear';
+
+  /// On the user's own `agenda:<note id>` entity
+  /// ([ChecklistKeys.agendaPrefix]), beside a Checklist's field: how the
+  /// Shopping List shows on their Agenda (#186), a [ShoppingOnAgenda]'s
+  /// code.
+  static const agenda = 'shopping';
 }
 
 /// How long a checked Line of a Shopping List stays struck through
@@ -54,8 +62,9 @@ enum Reappear {
   }
 }
 
-/// How the Agenda of a Device shows Shopping Lists (#123), a setting of
-/// that Device.
+/// How the Agenda of a Device showed Shopping Lists (#123), a setting of
+/// that Device until each Shopping List had its own choice (#186). It is
+/// read only for the default of [ShoppingOnAgenda] on this Device.
 enum ShoppingAgenda {
   /// Each Line that came back today on its own row, checkable there.
   lines,
@@ -77,9 +86,44 @@ enum ShoppingAgenda {
       values.asNameMap()[code] ?? standard;
 }
 
-/// A Shopping List on today's Agenda with the Lines its row stands for:
-/// those that came back today, or for [ShoppingAgenda.open] those open.
-typedef ShoppingAgendaList = ({ShoppingList list, List<ShoppingLine> lines});
+/// How a Shopping List shows on today's Agenda (#186), each person's own
+/// choice for each list, kept as an Override is (ADR 0030).
+enum ShoppingOnAgenda {
+  /// Never.
+  off,
+
+  /// One row with the number of its open Lines, such as "Groceries: 4
+  /// open".
+  count,
+
+  /// Each open Line on a row of its own, checkable there.
+  lines;
+
+  /// How it is stored.
+  String get code => name;
+
+  /// The choice [code] names; null for none known here.
+  static ShoppingOnAgenda? parse(String? code) => values.asNameMap()[code];
+
+  /// What a list nobody chose for shows as on a Device whose Agenda
+  /// showed Shopping Lists the way [old] before: off for "Not at all",
+  /// each open Line for "Each Line that came back today", else one row
+  /// with the count.
+  static ShoppingOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
+    ShoppingAgenda.off => off,
+    ShoppingAgenda.lines => lines,
+    ShoppingAgenda.back || ShoppingAgenda.open => count,
+  };
+}
+
+/// A Shopping List on today's Agenda (#186), how it shows there and its
+/// open Lines: one row with their number for [ShoppingOnAgenda.count],
+/// one row each for [ShoppingOnAgenda.lines].
+typedef ShoppingAgendaRow = ({
+  ShoppingList list,
+  ShoppingOnAgenda shows,
+  List<ShoppingLine> lines,
+});
 
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
@@ -132,8 +176,8 @@ class ShoppingList {
   /// The id of its making, as the Note's `kind` names it.
   final String making;
 
-  /// Every Line that shows: the open ones first, the one that came last
-  /// at the top, then the struck ones, the one checked last at the end.
+  /// Every Line that shows: the open ones first, in the order they were
+  /// placed in, then the struck ones, the one checked last at the end.
   final List<ShoppingLine> lines;
 
   /// The Lines checked Once: gone, but a name added again brings them
@@ -232,35 +276,92 @@ class ShoppingLists {
     };
   }
 
-  /// The Shopping Lists on today's Agenda by [wallClock] when it shows
-  /// them the way [way]: each list not in the trash nor merged with the
-  /// Lines that came back today, or for [ShoppingAgenda.open] those
-  /// open, where there are any; oldest capture first. For
-  /// [ShoppingAgenda.lines] each of those Lines is a row of its own.
-  List<ShoppingAgendaList> agenda(ShoppingAgenda way, WallClock wallClock) {
-    if (way == ShoppingAgenda.off) return const [];
+  /// The Shopping Lists on today's Agenda by [wallClock] (#186): each
+  /// list not in the trash nor merged that has an open Line and that
+  /// this person does not keep [ShoppingOnAgenda.off], with how it shows
+  /// ([onAgenda]) and its open Lines; oldest capture first. A list whose
+  /// Lines are all struck or gone shows whatever the choice. Reading
+  /// writes nothing.
+  List<ShoppingAgendaRow> agendaRows(WallClock wallClock) {
     final notes = Notes(store);
-    final shown = <Note>[];
+    final standard = ShoppingOnAgenda.fromDevice(store.shoppingAgenda);
+    final own = <String, bool>{};
+    final shown = <(Note, ShoppingOnAgenda)>[];
     for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
       if (making(id) == null) continue;
+      final shows = _onAgenda(id, standard, own);
+      if (shows == ShoppingOnAgenda.off) continue;
       if (notes.byId(id) case final note?
           when !note.isTrashed && !note.isMerged) {
-        shown.add(note);
+        shown.add((note, shows));
       }
     }
     shown.sort((a, b) {
-      final byCapture = a.captured.compareTo(b.captured);
-      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+      final byCapture = a.$1.captured.compareTo(b.$1.captured);
+      return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
     });
-    final lists = ofNotes([for (final n in shown) n.id], wallClock);
-    final today = Day.today(store.clock(), wallClock);
+    final lists = ofNotes([for (final (n, _) in shown) n.id], wallClock);
     return [
-      for (final note in shown)
+      for (final (note, shows) in shown)
         if (lists[note.id] case final list?)
-          if (way == ShoppingAgenda.open ? list.open : list.cameBack(today)
-              case final lines when lines.isNotEmpty)
-            (list: list, lines: lines),
+          if (list.open case final open when open.isNotEmpty)
+            (list: list, shows: shows, lines: open),
     ];
+  }
+
+  /// How the Shopping List of [noteId] shows on today's Agenda for this
+  /// person: as one of the user's own Devices chose last; for a list
+  /// nobody chose for, as this Device showed Shopping Lists before
+  /// (#186, [ShoppingOnAgenda.fromDevice]). What another person's Device
+  /// wrote counts for nothing, so in a Shared Area each person decides
+  /// for their own Agenda; a value no app writes reads as
+  /// [ShoppingOnAgenda.count], so it hides no list.
+  ShoppingOnAgenda onAgenda(String noteId) =>
+      _onAgenda(noteId, ShoppingOnAgenda.fromDevice(store.shoppingAgenda), {});
+
+  ShoppingOnAgenda _onAgenda(
+    String noteId,
+    ShoppingOnAgenda standard,
+    Map<String, bool> own,
+  ) {
+    final code = _chosen(noteId, own);
+    if (code == null) return standard;
+    return ShoppingOnAgenda.parse(code) ?? ShoppingOnAgenda.count;
+  }
+
+  String? _chosen(String noteId, Map<String, bool> own) => store.currentByOwn(
+    '${ChecklistKeys.agendaPrefix}$noteId',
+    ShoppingKeys.agenda,
+    own,
+  );
+
+  /// Whether "Show on the Agenda" applies to the Note [noteId]: a
+  /// Shopping List not in the trash nor merged. One with a Routine or
+  /// Reminder shows too, as its Lines keep their own checks.
+  bool mayShowOnAgenda(String noteId) {
+    final note = Notes(store).byId(noteId);
+    return note != null &&
+        !note.isTrashed &&
+        !note.isMerged &&
+        making(noteId) != null;
+  }
+
+  /// Sets how the Shopping List of [noteId] shows on the Agenda for this
+  /// person alone, kept like an Override: on the user's own Devices
+  /// only, whatever their role in its Area. The choice is written even
+  /// when the list already shows that way by this Device's default, so
+  /// every own Device shows it alike; the same choice again writes
+  /// nothing.
+  void setOnAgenda(String noteId, ShoppingOnAgenda shows) {
+    if (making(noteId) == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Shopping List');
+    }
+    if (_chosen(noteId, {}) == shows.code) return;
+    store.append(
+      '${ChecklistKeys.agendaPrefix}$noteId',
+      ShoppingKeys.agenda,
+      shows.code,
+    );
   }
 
   /// The Notes that are a Shopping List this Device may add Lines to:
@@ -404,12 +505,14 @@ class ShoppingLists {
   /// its reappear time: as for a Checklist's Line.
   bool mayEdit(String lineId) => Checklists(store).mayEdit(lineId);
 
-  /// Adds [text] to the Shopping List of [noteId], at the top. A name it
-  /// has already, in another case or with spaces around it, adds
-  /// nothing: a struck or gone Line of that name comes back now, at the
-  /// top, an open one stays. Anyone with a role in its Area may. Returns
-  /// the id of the Line added, brought back or found.
-  String add(String noteId, String text, WallClock wallClock) {
+  /// Adds [text] to the Shopping List of [noteId] at [at], an index in
+  /// the order its open Lines show, or after every other. A name it has
+  /// already, in another case or with spaces around it, adds nothing: a
+  /// struck or gone Line of that name comes back now, in its place, an
+  /// open one stays. Anyone with a role in its Area may. Returns the id
+  /// of the Line added, brought back or found.
+  String add(String noteId, String text, WallClock wallClock, {int? at}) {
+    if (at != null && at < 0) throw RangeError.value(at, 'at');
     final (_, list) = _requireList(noteId, wallClock);
     if (!mayCheck(noteId)) {
       throw StateError('no role in the Shared Area of $noteId');
@@ -426,36 +529,61 @@ class ShoppingLists {
       store.append(line.id, ChecklistKeys.checked, null);
       return line.id;
     }
-    String? last;
+    final key = _keyAt(list, at);
+    return store.batch(() => _writeLine(noteId, list.making, named, key));
+  }
+
+  /// The key for a new Line at the place [at] of the open Lines of
+  /// [list], or after every key with none or one past them: between the
+  /// last valid key above it and the first valid key of any Line after
+  /// that one, a struck or gone Line too.
+  static String _keyAt(ShoppingList list, int? at) {
+    final open = list.open;
+    String? a;
+    if (at == null || at >= open.length) {
+      for (final line in [...list.lines, ...list._gone]) {
+        final key = line.order;
+        if (key != null &&
+            LineOrder.isValid(key) &&
+            (a == null || key.compareTo(a) > 0)) {
+          a = key;
+        }
+      }
+      return LineOrder.place(a, null);
+    }
+    for (var i = at - 1; i >= 0; i--) {
+      if (LineOrder.isValid(open[i].order)) {
+        a = open[i].order;
+        break;
+      }
+    }
+    String? b;
     for (final line in [...list.lines, ...list._gone]) {
       final key = line.order;
       if (key != null &&
           LineOrder.isValid(key) &&
-          (last == null || key.compareTo(last) > 0)) {
-        last = key;
+          (a == null || key.compareTo(a) > 0) &&
+          (b == null || key.compareTo(b) < 0)) {
+        b = key;
       }
     }
-    final key = LineOrder.place(last, null);
-    return store.batch(() => _writeLine(noteId, list.making, named, key));
+    return LineOrder.place(a, b);
   }
 
   /// Adds every line of [text] that is not blank to the Shopping List of
-  /// [noteId] as [add] does, all in one batch, the first line ending at
-  /// the top: what a capture sorted into the list becomes (#124). Returns
-  /// the ids of the Lines added, brought back or found, in the order of
-  /// the lines; none for a blank [text].
+  /// [noteId] as [add] does, all in one batch, in the order of the lines
+  /// after every other: what a capture sorted into the list becomes
+  /// (#124). Returns the ids of the Lines added, brought back or found,
+  /// in the order of the lines; none for a blank [text].
   List<String> addLines(String noteId, String text, WallClock wallClock) {
     final rows = [
       for (final row in splitLines(text))
         if (row.trim().isNotEmpty) row,
     ];
     if (rows.isEmpty) return const [];
-    return store.batch(() {
-      final ids = [
-        for (final row in rows.reversed) add(noteId, row, wallClock),
-      ];
-      return ids.reversed.toList();
-    });
+    return store.batch(
+      () => [for (final row in rows) add(noteId, row, wallClock)],
+    );
   }
 
   /// Renames the Line [lineId].
@@ -514,7 +642,7 @@ class ShoppingLists {
     );
   }
 
-  /// Brings the struck Line [lineId] back now, at the top. An open one
+  /// Brings the struck Line [lineId] back now, in its place. An open one
   /// stays as it is.
   void uncheck(String lineId, WallClock wallClock) {
     final (list, line) = _requireShown(lineId, wallClock);
@@ -547,8 +675,12 @@ class ShoppingLists {
       for (final r in lines)
         if (r.gone) r,
     ];
+    // In the order of their keys; one without a valid key, which no app
+    // writes, after them, the one that came last first.
     open.sort((a, b) {
-      final byAt = b.at.compareTo(a.at);
+      final valid = LineOrder.isValid(a.line.order);
+      if (valid != LineOrder.isValid(b.line.order)) return valid ? -1 : 1;
+      final byAt = valid ? 0 : b.at.compareTo(a.at);
       return byAt != 0 ? byAt : byOrder(a, b);
     });
     int byCheck(_Read a, _Read b) {
@@ -643,8 +775,9 @@ class ShoppingLists {
 }
 
 /// A Line of a Shopping List as read from its latest entries, with the
-/// moment it sorts by: a struck or gone one by its check, an open one by
-/// when it came to the top, on the wall clock.
+/// moment it sorts by: a struck or gone one by its check, an open one
+/// without a valid key by when it came back or was added, on the wall
+/// clock.
 class _Read {
   final ShoppingLine line;
   final bool gone;

@@ -38,7 +38,7 @@ class AgendaWidgetService : RemoteViewsService() {
         override fun getLoadingView(): RemoteViews? = null
 
         /** A row with its box, a line of text, and the Unsorted count. */
-        override fun getViewTypeCount(): Int = 3
+        override fun getViewTypeCount(): Int = AgendaWidget.ROW_LAYOUTS.size
 
         override fun getItemId(position: Int): Long = position.toLong()
 

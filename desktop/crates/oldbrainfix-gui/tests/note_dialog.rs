@@ -518,6 +518,44 @@ fn a_checklist_from_plus_is_named_then_typed_in_place_and_a_frog_only_named() ->
 }
 
 #[test]
+fn a_shopping_list_from_plus_starts_with_one_line_the_cursor_in_it() -> TestResult {
+    let (store, household) = store()?;
+    let mut harness = window(&store, Selection::Place(household));
+    harness.get_by_label("Add here").click();
+    harness.run();
+    click(&mut harness, "Shopping List");
+    typed(&mut harness, "Market");
+    click(&mut harness, "Create");
+    let market = Notes::new(&store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Market")
+        .ok_or("the Shopping List")?;
+    // One empty Line, the cursor in it; no field and no "Add" above it.
+    harness.run();
+    let focused = harness.get_by(|n| n.is_focused());
+    assert_eq!(focused.accesskit_node().role(), Role::TextInput);
+    assert_eq!(focused.value().as_deref(), Some(""));
+    let lines = harness.query_all_by(|n| {
+        n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+    });
+    assert_eq!(lines.count(), 1);
+    assert!(!shows(&harness, "Add"));
+    typed(&mut harness, "Leeks");
+    harness.key_press(egui::Key::Enter);
+    harness.run();
+    typed(&mut harness, "Pears");
+    harness.state_mut().close_note();
+    harness.run();
+    let list = ShoppingLists::new(&store)
+        .by_note(&market.id, &|utc: DateTime<Utc>| utc.naive_utc())?
+        .ok_or("the Shopping List")?;
+    let texts: Vec<&str> = list.lines.iter().map(|l| l.text.as_str()).collect();
+    assert_eq!(texts, ["Leeks", "Pears"]);
+    Ok(())
+}
+
+#[test]
 fn a_tally_with_its_fields_takes_one_page_and_one_save_in_their_order() -> TestResult {
     let (store, household) = store()?;
     let mut harness = window(&store, Selection::Place(household.clone()));

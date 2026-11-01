@@ -298,7 +298,14 @@ void main() {
     }
 
     TagTextController field(WidgetTester tester) =>
-        tester.widget<EditableText>(find.byType(EditableText)).controller
+        tester
+                .widget<EditableText>(
+                  find.descendant(
+                    of: key('note-text'),
+                    matching: find.byType(EditableText),
+                  ),
+                )
+                .controller
             as TagTextController;
 
     Future<void> showKeyboard(WidgetTester tester) async {

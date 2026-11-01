@@ -1033,6 +1033,19 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get copyText => 'Text kopieren';
+
+  @override
+  String sectionEdited(String when) {
+    return 'Bearbeitet $when';
+  }
+
+  @override
+  String sectionEditedBy(String when, String name) {
+    return 'Bearbeitet $when von $name';
+  }
+
+  @override
   String get moreCaptureContext => 'Mehr zur Erfassung';
 
   @override
@@ -3316,12 +3329,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get checklistNewLine => 'Neue Zeile';
-
-  @override
-  String get checklistAddLine => 'Zeile hinzufügen';
-
-  @override
   String get checklistRenameTitle => 'Zeile umbenennen';
 
   @override
@@ -4337,33 +4344,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Lade eines der aufgeführten Modelle herunter oder wähl die Datei eines davon.';
 
   @override
-  String get settingsShoppingAgenda => 'Einkaufslisten in der Agenda';
-
-  @override
-  String get settingsShoppingAgendaDetail =>
-      'Nur für heute und nur auf diesem Gerät.';
-
-  @override
-  String get shoppingAgendaLines =>
-      'Jede heute wiedergekommene Zeile in einer eigenen Reihe';
-
-  @override
-  String get shoppingAgendaBack =>
-      'Eine Reihe je Einkaufsliste an Tagen, an denen Zeilen wiederkommen';
-
-  @override
-  String get shoppingAgendaOpen =>
-      'Eine Reihe je Einkaufsliste an jedem Tag mit offenen Zeilen';
-
-  @override
-  String get shoppingAgendaOff => 'Gar nicht';
-
-  @override
-  String shoppingRowBack(String list, int count) {
-    return '$list: $count wieder da';
-  }
-
-  @override
   String shoppingRowOpen(String list, int count) {
     return '$list: $count offen';
   }
@@ -4381,6 +4361,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get checklistShowOnAgenda => 'Auf der Agenda zeigen';
+
+  @override
+  String get shoppingOnAgendaCount =>
+      'Eine Reihe mit der Zahl der offenen Zeilen';
+
+  @override
+  String get shoppingOnAgendaLines =>
+      'Jede offene Zeile in einer eigenen Reihe';
 
   @override
   String get textMarkCheck => 'Abhaken';

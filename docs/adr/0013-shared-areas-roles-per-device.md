@@ -56,3 +56,7 @@ Amended by ADR 0028 (#103): a Tally's fields lie on its Note and are changed as 
 ## Sessions (ADR 0029)
 
 Amended by ADR 0029 (#104): a Member writes a Session's picks and the marks of the entries recorded for them (`pick@` and `entry@` on its Routine) as they write `done@`, so everyone in the Area gets the same picks and shares one Done; the pool, counts and rule are the Manager's.
+
+## Editing a Section (#183)
+
+Amended by #183: the text of a Section, an Amend or a Note merged into another, is edited in place as a Note's text is: a new `text` entry on the Section's own entity, judged as any other edit of it, so only its author or a Manager of its Area changes it, and the old texts stay in the log. Both cores refuse the edit where this Device may not change the Section (`Notes.mayEditSection`/`may_edit_section`), and the judge ignores one written all the same. A Section reads when its text was last edited and by whom from the `text` entries that count, never from a field: once there is more than one, the one that wins by latest wins gives the date (`modified`) and, through the key of its Device and in a Shared Area the person its grant names, the Profile (`editedBy`/`edited_by`), the own one for the user's Devices. Latest wins, not the order of the log, decides, so every Device shows the same. A Section accepted from a Sent Item has one text and shows as never edited, though its text is dated when it was accepted. Its capture time and its place among the Sections stay.

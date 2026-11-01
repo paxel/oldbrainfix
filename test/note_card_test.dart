@@ -62,11 +62,7 @@ void main() {
                 onFile: () {},
                 onMerge: () {},
                 onSchedule: (_) {},
-                actions: NoteActions(
-                  onImportance: (_) {},
-                  onSend: () {},
-                  onDelete: () {},
-                ),
+                actions: NoteActions(onSend: () {}, onDelete: () {}),
               ),
             ],
           ),
@@ -267,16 +263,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('offers Importance, sending, the calendar, adding and '
-        'deleting with words', (tester) async {
+    testWidgets('offers sending, the calendar, adding and deleting with '
+        'words', (tester) async {
       notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
 
       for (final words in [
-        'Importance',
-        'Important',
-        'Normal',
-        'Unimportant',
         'Send to a person',
         'Add to calendar',
         'Add to Note',
@@ -286,26 +278,28 @@ void main() {
       }
       // Without Routines there are no events to share as a file.
       expect(find.text('Share as calendar file'), findsNothing);
-      expect(
-        tester
-            .widget<Icon>(
-              find.descendant(
-                of: find.byKey(const ValueKey('importance-normal')),
-                matching: find.byType(Icon),
-              ),
-            )
-            .icon,
-        Icons.radio_button_checked,
-      );
     });
 
-    testWidgets('Importance sets it on the Note and the card', (tester) async {
-      final note = notes.capture('Buy milk');
+    testWidgets('has no Importance: its badge in the editor changes it '
+        '(#182)', (tester) async {
+      notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
-      await pick(tester, 'importance-important');
 
-      expect(notes.byId(note.id)!.importance, Importance.important);
-      expect(find.byIcon(Icons.label_important), findsOneWidget);
+      for (final words in [
+        'Importance',
+        'Important',
+        'Normal',
+        'Unimportant',
+      ]) {
+        expect(find.text(words), findsNothing, reason: words);
+      }
+      for (final value in Importance.values) {
+        expect(
+          find.byKey(ValueKey('importance-${value.name}')),
+          findsNothing,
+          reason: value.name,
+        );
+      }
     });
 
     testWidgets('Send to a person sends it as a Sent Item', (tester) async {

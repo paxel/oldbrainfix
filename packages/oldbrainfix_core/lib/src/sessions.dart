@@ -138,8 +138,12 @@ class SessionOccurrence {
 /// Area what the roles allow (ADR 0013), anywhere else what the user's
 /// own Devices wrote.
 class SessionMarks {
-  /// The current pick of each Occurrence.
+  /// The current pick of each Occurrence: the one its field holds, with
+  /// every Tally that has an entry recorded for it in it.
   final Map<String, List<String>> picks;
+
+  /// The pick each Occurrence's field holds, as written.
+  final Map<String, List<String>> stored;
 
   /// Every Tally a pick of each Occurrence ever held.
   final Map<String, Set<String>> offered;
@@ -148,7 +152,8 @@ class SessionMarks {
   /// id.
   final Map<String, Map<String, String>> entries;
 
-  const SessionMarks._(this.picks, this.offered, this.entries);
+  SessionMarks._(this.stored, this.offered, this.entries)
+    : picks = {for (final MapEntry(:key, :value) in stored.entries) key: value};
 
   /// Reads the marks of the Routine [id] from [history], its own by
   /// default.
@@ -158,6 +163,8 @@ class SessionMarks {
     final own = <String, bool>{};
     final latest = <String, Entry>{};
     final offered = <String, Set<String>>{};
+    // The place each Tally had in the latest pick that held it.
+    final places = <String, Map<String, (Entry, int)>>{};
     for (final e in history ?? store.history(id)) {
       final pick = e.field.startsWith(SessionKeys.pickPrefix);
       if (!pick && !e.field.startsWith(SessionKeys.entryPrefix)) continue;
@@ -171,10 +178,18 @@ class SessionMarks {
           ? _occurrenceKey(e.field.substring(SessionKeys.pickPrefix.length))
           : null;
       if (key != null) {
-        offered.putIfAbsent(key, () => {}).addAll(_noteIds(e.value));
+        final ids = _noteIds(e.value);
+        offered.putIfAbsent(key, () => {}).addAll(ids);
+        final placed = places.putIfAbsent(key, () => {});
+        for (final (i, noteId) in ids.indexed) {
+          final was = placed[noteId];
+          if (was == null || Store.latestWins(e, was.$1) > 0) {
+            placed[noteId] = (e, i);
+          }
+        }
       }
     }
-    final picks = <String, List<String>>{};
+    final stored = <String, List<String>>{};
     final entries = <String, Map<String, String>>{};
     for (final MapEntry(key: field, value: e) in latest.entries) {
       if (field.startsWith(SessionKeys.pickPrefix)) {
@@ -182,7 +197,7 @@ class SessionMarks {
           field.substring(SessionKeys.pickPrefix.length),
         );
         final ids = _noteIds(e.value);
-        if (key != null && ids.isNotEmpty) picks[key] = ids;
+        if (key != null && ids.isNotEmpty) stored[key] = ids;
         continue;
       }
       final rest = field.substring(SessionKeys.entryPrefix.length);
@@ -199,7 +214,36 @@ class SessionMarks {
       }
       entries.putIfAbsent(key, () => {})[entryId] = note;
     }
-    return SessionMarks._(picks, offered, entries);
+    return SessionMarks._(stored, offered, entries).._heal(store, places);
+  }
+
+  /// Puts each Tally with an entry recorded for an Occurrence back into
+  /// its current pick when the field no longer holds it, as when a pick
+  /// another Device wrote later wins over the one it was recorded for:
+  /// in the place it had in the latest pick that held it, while the
+  /// Tally there has no entry, else at the end.
+  void _heal(Store store, Map<String, Map<String, (Entry, int)>> places) {
+    for (final MapEntry(:key, value: recorded) in entries.entries) {
+      final pick = [...?picks[key]];
+      final missing = {
+        for (final noteId in recorded.values)
+          if (!pick.contains(noteId)) noteId,
+      }.toList()..sort();
+      var healed = false;
+      for (final noteId in missing) {
+        if (entriesFor(store, key, noteId).isEmpty) continue;
+        final place = places[key]?[noteId]?.$2;
+        if (place != null &&
+            place < pick.length &&
+            entriesFor(store, key, pick[place]).isEmpty) {
+          pick[place] = noteId;
+        } else {
+          pick.add(noteId);
+        }
+        healed = true;
+      }
+      if (healed) picks[key] = pick;
+    }
   }
 
   /// The entries recorded for [noteId] in the Occurrence [key], not
@@ -440,7 +484,7 @@ class Sessions {
   /// of the Session [id] for the next by the Session's rule, in its
   /// place: one this Occurrence has not offered yet, else the first not
   /// picked. The one swapped out keeps its place in the rule. Nothing
-  /// happens when the pool holds no other.
+  /// happens when the pool holds no other, or when the pick has an entry.
   void another(String id, Occurrence occurrence, String noteId) {
     final session = _requireDue(id, occurrence);
     _requireCheckOff(id);
@@ -450,6 +494,8 @@ class Sessions {
     if (!wanted.contains(noteId)) {
       throw ArgumentError.value(noteId, 'noteId', 'not picked then');
     }
+    // A pick with an entry stays in the pick.
+    if (marks.entriesFor(store, occurrence.key, noteId).isNotEmpty) return;
     final offered = {...?marks.offered[occurrence.key], ...wanted};
     final order = _order(session, occurrence, pool, marks);
     final next =
@@ -638,8 +684,8 @@ class Sessions {
     });
   }
 
-  /// Writes [ids] as the pick of [occurrence], unless that is the pick
-  /// already or there is nothing to pick; whether it wrote.
+  /// Writes [ids] as the pick of [occurrence], unless its field holds
+  /// that pick already or there is nothing to pick; whether it wrote.
   bool _writePick(
     String id,
     Occurrence occurrence,
@@ -647,7 +693,7 @@ class Sessions {
     SessionMarks marks,
   ) {
     if (ids.isEmpty) return false;
-    final held = marks.picks[occurrence.key];
+    final held = marks.stored[occurrence.key];
     if (held != null &&
         held.length == ids.length &&
         Iterable<int>.generate(ids.length).every((i) => held[i] == ids[i])) {

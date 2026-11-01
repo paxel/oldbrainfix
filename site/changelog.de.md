@@ -2,7 +2,21 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.3.0]
+## [0.3.1]
+
+### Geändert
+
+- Das ⋮ der Notizkarte enthält die Wichtigkeit nicht mehr; sie wird über ihre Plakette im Notiz-Editor geändert.
+
+### Behoben
+
+- Eine Strichliste, die „Noch eine“ in die Auswahl einer Einheit getauscht hat und die danach ihren Eintrag bekam, bleibt erledigt an ihrem Platz in der Auswahl, auch wenn ein anderes Gerät die erste Auswahl des Tages später geschrieben hat, und eine Fälligkeit, die eine solche Strichliste verloren hat, zeigt sie wieder, sodass sie erledigt ist, sobald jede ausgewählte Strichliste ihren Eintrag hat.
+- Das Agenda-Widget zeigt jede Reihe des Tages, auch die verpassten Fälligkeiten, die Fälligkeiten, Zeilen, Frösche, Einkaufslisten und Checklisten mit ihren Kästchen, wo es außer den Textreihen nur graue Balken mit der Meldung des Startbildschirms zeigte, das Widget lasse sich nicht hinzufügen.
+- Der Text der Abschnitte einer Notiz, ihrer Ergänzungen und der in sie zusammengeführten Notizen, lässt sich auf dem Telefon und dem Desktop im Notiz-Editor bearbeiten wie der Text der Notiz selbst, vom Verfasser des Abschnitts und in einem geteilten Bereich von dessen Verwaltern, und ein bearbeiteter Abschnitt behält seinen Platz und seine Erfassungszeit und zeigt, wann er erstellt und wann er zuletzt geändert wurde, mit „bearbeitet von“ und dem Namen dessen, der ihn bearbeitet hat, der KI-Port auf dem Desktop bearbeitet einen als Änderung, die auf die Prüfung wartet, und der Text einer Notiz und jedes ihrer Abschnitte lässt sich auf dem Telefon mit „Text kopieren“ im ⋮ ihrer Karte und auf dem Desktop mit „Als Text kopieren“ kopieren und dort, wo der Editor ihn nur zeigt, auswählen und kopieren.
+- Auf dem Telefon und dem Desktop werden eine Checkliste und eine Einkaufsliste im Notiz-Editor auf dieselbe Weise bearbeitet, als zusammenhängender Text, dessen Zeilen jeweils mit einem leeren Kästchen beginnen, wobei eine neue Liste mit einer leeren Zeile beginnt, die Eingabetaste eine Zeile darunter einfügt oder den Rest einer Zeile in sie verschiebt, die Rücktaste am Anfang einer Zeile sie an die Zeile darüber anhängt, die Einkaufsliste oben kein Feld und keine Schaltfläche „Hinzufügen“ mehr hat und die Checkliste keine Schaltfläche „Zeile hinzufügen“, und der Rahmen um eine Gruppe von Zeilen auch die Zeile der Gruppe selbst umschließt, und die offenen Zeilen einer Einkaufsliste behalten die Reihenfolge, in der sie eingegeben wurden, wobei eine neue Zeile ans Ende kommt und eine Zeile, die wiederkommt, an ihren Platz, wo die neueste oben stand.
+- Auf dem Telefon und dem Desktop hat jede Einkaufsliste „Auf der Agenda zeigen“ im ⋮ ihrer Karte und als Plakette im Notiz-Editor, wie eine Checkliste, mit Aus, einer Reihe mit der Zahl ihrer offenen Zeilen, so ist es voreingestellt, oder jeder offenen Zeile in einer eigenen Reihe, von jeder Person für ihre eigene Agenda und das Agenda-Widget gewählt und auf ihren eigenen Geräten gehalten, wo eine Einstellung jedes Geräts in den Einstellungen für alle Listen entschied; eine Liste ohne offene Zeilen erscheint nie, und ein Gerät, dessen Einstellung „Gar nicht“ oder „Jede heute wiedergekommene Zeile in einer eigenen Reihe“ war, beginnt seine Listen mit Aus oder mit jeder offenen Zeile.
+
+## [0.3.0] - 2026-11-01
 
 ### Neu
 

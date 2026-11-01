@@ -32,15 +32,16 @@ use oldbrainfix_core::{
     Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, Note, Notes,
     NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
     RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
-    ShoppingAgenda, ShoppingList, ShoppingLists, SigningKey, SimpleRepeat, Store, Tallies,
-    TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, SimpleRepeat,
+    Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso,
+    parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 21] = [
+const SCENARIOS: [&str; 22] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -58,6 +59,7 @@ const SCENARIOS: [&str; 21] = [
     "places",
     "routines",
     "sections",
+    "session-swap",
     "sessions",
     "shopping-lists",
     "tallies",
@@ -236,6 +238,8 @@ fn section_json(section: &Section) -> Value {
         "removedRecordings": section.removed_recordings,
         "removedTranscripts": section.removed_transcripts,
         "removedPhotoTexts": section.removed_photo_texts,
+        "modified": section.modified.map(dart_iso),
+        "editedBy": section.edited_by.as_ref().map(|by| json!({"id": by.id, "name": by.name})),
     })
 }
 
@@ -1828,7 +1832,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 21] = [
+    let writers: [(&str, Writer); 22] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1846,6 +1850,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("places", write_places),
         ("routines", write_routines),
         ("sections", write_sections),
+        ("session-swap", write_session_swap),
         ("sessions", write_sessions),
         ("shopping-lists", write_shopping_lists),
         ("tallies", write_tallies),
@@ -2310,9 +2315,57 @@ fn write_sessions(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `session-swap` scenario.
+fn write_session_swap(store: &Store) -> Built {
+    use oldbrainfix_core::sessions::keys::pick;
+    let notes = Notes::new(store);
+    let tallies = Tallies::new(store);
+    let sessions = Sessions::new(store);
+    let tally = |name: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let id = notes.capture(name, None, None)?.id;
+        tallies.add_field(&id, name, "times", Some(10.0), None)?;
+        Ok(id)
+    };
+    let none = BTreeMap::new();
+    let push_ups = tally("Push-ups")?;
+    let bridge = tally("Half bridge")?;
+    let every_day =
+        Schedule::new(Day::new(2026, 1, 1), &[at(7, 0)?], daily()).ok_or("a schedule")?;
+    let sport = sessions.create(
+        "Sport",
+        &every_day,
+        &[push_ups.clone(), bridge.clone()],
+        2,
+        SessionRule::Rolling,
+    )?;
+    sessions.pick_today(&frog_day(0))?;
+    let morning = Occurrence::new(Day::new(2026, 1, 1), Some(at(7, 0)?));
+    sessions.record(sport.id(), &morning, &bridge, &none, "Shaky")?;
+    let march = tally("Long march")?;
+    sessions.set_pool(
+        sport.id(),
+        &[push_ups.clone(), bridge.clone(), march.clone()],
+    )?;
+    sessions.another(sport.id(), &morning, &push_ups)?;
+    sessions.record(sport.id(), &morning, &march, &none, "Slow")?;
+    // As another Device of the user's writes its first pick, having
+    // shown the day before it synced.
+    let first = format!("{push_ups},{bridge}");
+    store.append(sport.id(), &pick(&morning), Some(&first), None)?;
+    sessions.pick_today(&frog_day(1))?;
+    let next = Occurrence::new(Day::new(2026, 1, 2), Some(at(7, 0)?));
+    sessions.another(sport.id(), &next, &march)?;
+    sessions.record(sport.id(), &next, &bridge, &none, "Better")?;
+    let lost = format!("{push_ups},{march}");
+    store.append(sport.id(), &pick(&next), Some(&lost), None)?;
+    sessions.pick_today(&frog_day(1))?;
+    sessions.pick_today(&frog_day(1))?;
+    Ok(())
+}
+
 #[test]
 fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["history", "sessions"] {
+    for scenario in ["history", "session-swap", "sessions"] {
         sessions_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
@@ -3133,6 +3186,8 @@ fn write_shopping_lists(store: &Store) -> Built {
     lists.add(&week, " MILK ", &wall)?;
     lists.add(&week, "tea", &wall)?;
     lists.add(&week, "Oat milk", &wall)?;
+    lists.add_at(&week, "Butter", &wall, Some(1))?;
+    lists.add_lines(&week, "Pasta\n\nFlour", &wall)?;
     lists.add(&week, "eggs", &wall)?;
     lists.check(&line(&week, "Eggs")?, &wall)?;
     lists.rename(&line(&week, "Oat milk")?, "Soy milk")?;
@@ -3185,6 +3240,24 @@ fn write_shopping_lists(store: &Store) -> Built {
     lists.check(&line(&hardware, "Nails")?, &wall)?;
     lists.to_plain(&hardware, &wall)?;
     lists.make(&hardware)?;
+    lists.set_on_agenda(&hardware, ShoppingOnAgenda::Lines)?;
+    let pharmacy = notes.capture("Pharmacy\nPlasters", None, None)?.id;
+    lists.make(&pharmacy)?;
+    lists.set_on_agenda(&pharmacy, ShoppingOnAgenda::Count)?;
+    lists.set_on_agenda(&pharmacy, ShoppingOnAgenda::Off)?;
+    let garden = notes.capture("Garden\nSeeds\nTwine", None, None)?.id;
+    lists.make(&garden)?;
+    lists.set_on_agenda(&garden, ShoppingOnAgenda::Count)?;
+    lists.set_on_agenda(&garden, ShoppingOnAgenda::Count)?;
+    let candles = notes.capture("Candles\nWicks", None, None)?.id;
+    lists.make(&candles)?;
+    // As a later version or a modified app would write it.
+    store.append(
+        &format!("{}{candles}", keys::AGENDA_PREFIX),
+        shopping_keys::AGENDA,
+        Some("later"),
+        None,
+    )?;
     let odd = notes.capture("Odd kind\nOne", None, None)?.id;
     store.append(&odd, keys::KIND, Some("shopping:a:b"), None)?;
     let errand = Routines::new(store).spawn(&week, &schedule(Day::new(2026, 1, 9), &[], None)?)?;
@@ -3195,6 +3268,49 @@ fn write_shopping_lists(store: &Store) -> Built {
     store.append(&errand.id, &check, Some("2026-01-09T09:00:00.000Z"), None)?;
     notes.capture("Unsorted thought", None, None)?;
     Ok(())
+}
+
+/// The values of the Device setting before #186 the generator's
+/// `_oldShoppingAgenda` reads the Shopping Lists' Agenda rows with.
+const OLD_SHOPPING_AGENDA: [Option<&str>; 6] = [
+    None,
+    Some("lines"),
+    Some("back"),
+    Some("open"),
+    Some("off"),
+    Some("sideways"),
+];
+
+/// What `read` gives with the old Device setting of #123 set to `old`, or
+/// unset for none; unset again after, as the generator's
+/// `_withOldShoppingAgenda`.
+fn with_old_shopping_agenda(
+    store: &Store,
+    old: Option<&str>,
+    read: impl FnOnce() -> Result<Value, Box<dyn std::error::Error>>,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    const KEY: &str = "shoppingAgenda";
+    match old {
+        Some(old) => store.set_local_setting(KEY, old)?,
+        None => store.remove_local_setting(KEY)?,
+    }
+    let out = read();
+    store.remove_local_setting(KEY)?;
+    out
+}
+
+/// Today's Shopping List rows as the generator's `_shoppingRows` lists
+/// them.
+fn shopping_rows_json(rows: &[ShoppingAgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!({
+                "lines": r.lines.iter().map(|l| l.id.clone()).collect::<Vec<_>>(),
+                "note": r.list.note_id,
+                "shows": r.shows.code(),
+            }))
+            .collect::<Vec<_>>()
+    )
 }
 
 /// A Shopping List as the generator's `_shoppingList` lists it.
@@ -3240,18 +3356,11 @@ fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
             shown.insert(id, shopping_list_json(&list));
         }
         let mut agenda = serde_json::Map::new();
-        for way in ShoppingAgenda::ALL {
-            let rows: Vec<Value> = lists
-                .agenda(way, &wall)?
-                .iter()
-                .map(|a| {
-                    json!({
-                        "lines": a.lines.iter().map(|l| l.id.clone()).collect::<Vec<_>>(),
-                        "note": a.list.note_id,
-                    })
-                })
-                .collect();
-            agenda.insert(way.code().to_string(), json!(rows));
+        for old in OLD_SHOPPING_AGENDA {
+            let rows = with_old_shopping_agenda(&store, old, || {
+                Ok(shopping_rows_json(&lists.agenda_rows(&wall)?))
+            })?;
+            agenda.insert(old.unwrap_or("none").to_string(), rows);
         }
         assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
         at.push(json!({"now": now, "lists": shown, "plain": plain, "agenda": agenda}));
@@ -3270,6 +3379,25 @@ fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
     }
     assert_eq!(Value::Object(is), expected["isShoppingList"]);
     assert_eq!(Value::Object(may), expected["mayMake"]);
+    let mut on_agenda = serde_json::Map::new();
+    for old in OLD_SHOPPING_AGENDA {
+        let shows = with_old_shopping_agenda(&store, old, || {
+            let mut shows = serde_json::Map::new();
+            for id in &ids {
+                if lists.is_shopping_list(id)? {
+                    shows.insert(id.clone(), json!(lists.on_agenda(id)?.code()));
+                }
+            }
+            Ok(Value::Object(shows))
+        })?;
+        on_agenda.insert(old.unwrap_or("none").to_string(), shows);
+    }
+    assert_eq!(Value::Object(on_agenda), expected["onAgenda"]);
+    let mut may_show = serde_json::Map::new();
+    for id in &ids {
+        may_show.insert(id.clone(), json!(lists.may_show_on_agenda(id)?));
+    }
+    assert_eq!(Value::Object(may_show), expected["mayShowOnAgenda"]);
     // A check for an Occurrence makes no Routine of a Shopping List Done.
     let routines = Routines::new(&store);
     let mut routine_ids = store.entities_of_type("routine")?;
@@ -4606,6 +4734,17 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(trip, expected["agendaNote"].as_str().ok_or("agendaNote")?);
     Checklists::new(&ann).make(&trip)?;
     Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+    let groceries = Notes::new(&ann)
+        .capture("Groceries\nMilk\nEggs", Some(&area), None)?
+        .id;
+    assert_eq!(
+        groceries,
+        expected["agendaShopping"]
+            .as_str()
+            .ok_or("agendaShopping")?
+    );
+    ShoppingLists::new(&ann).make(&groceries)?;
+    ShoppingLists::new(&ann).set_on_agenda(&groceries, ShoppingOnAgenda::Lines)?;
     assert_eq!(
         lines_after(&ann, mark)?,
         lines_of(&dir.join("agenda.jsonl"))?
@@ -4634,13 +4773,19 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(people_json(&ben)?, after_folder["joinerPeople"]);
 
     // Ann removes the place and the calendar event from her Note in the
-    // Area: the same entries. Ben, a Member, may not remove its Bluetooth
-    // device, and writes nothing when he tries.
+    // Area and edits her Amend of a private Note: the same entries. Ben, a
+    // Member, may not remove its Bluetooth device nor edit Ann's Amend in
+    // the Area, and writes nothing when he tries.
     *clock.lock() = at("capturedAt")?;
     let toner = expected["capturedNote"].as_str().ok_or("capturedNote")?;
+    let hot = expected["editedSection"].as_str().ok_or("editedSection")?;
+    let litres = expected["refusedSection"]
+        .as_str()
+        .ok_or("refusedSection")?;
     let mark = ann.current_seq()?;
     Notes::new(&ann).remove_captured(toner, CapturedDetail::Place)?;
     Notes::new(&ann).remove_captured(toner, CapturedDetail::Event)?;
+    Notes::new(&ann).edit_section(hot, "The hot one, it drips")?;
     assert_eq!(
         lines_after(&ann, mark)?,
         lines_of(&dir.join("captured.jsonl"))?
@@ -4652,6 +4797,9 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
             .remove_captured(toner, CapturedDetail::Device)
             .is_err()
     );
+    assert!(Notes::new(&ben).section_by_id(litres)?.is_some());
+    assert!(!Notes::new(&ben).may_edit_section(litres)?);
+    assert!(Notes::new(&ben).edit_section(litres, "Ten litres").is_err());
     assert_eq!(ben.current_seq()?, mark);
 
     // What Ben wrote, allowed and not, and Ann filing a Note in; then a
@@ -4670,11 +4818,25 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
             .all(|e| !e.entity.starts_with(oldbrainfix_core::overrides::PREFIX)),
         "Ann's Override reached Ben"
     );
+    let ben_device = ben.device_id()?;
+    let choices = |store: &Store| -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(store
+            .all_entries()?
+            .into_iter()
+            .filter(|e| {
+                e.entity
+                    .starts_with(oldbrainfix_core::checklists::keys::AGENDA_PREFIX)
+            })
+            .map(|e| e.device)
+            .collect())
+    };
     assert!(
-        ben.all_entries()?.iter().all(|e| !e
-            .entity
-            .starts_with(oldbrainfix_core::checklists::keys::AGENDA_PREFIX)),
+        choices(&ben)?.iter().all(|d| *d == ben_device),
         "Ann's Agenda choice reached Ben"
+    );
+    assert!(
+        choices(&ann)?.iter().all(|d| *d != ben_device),
+        "Ben's Agenda choice reached Ann"
     );
     let after = &expected["after"];
     let ids: Vec<String> = after["hostRoles"]["mayChange"]
@@ -4694,6 +4856,11 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
             .map(|l| l.note_id)
             .collect();
         assert_eq!(json!(shown), after[key], "{key}");
+    }
+    let utc = |at: DateTime<Utc>| at.naive_utc();
+    for (store, key) in [(&ann, "hostShopping"), (&ben, "joinerShopping")] {
+        let rows = ShoppingLists::new(store).agenda_rows(&utc)?;
+        assert_eq!(shopping_rows_json(&rows), after[key], "{key}");
     }
 
     // Ann makes Ben a Manager, then removes him: the same entries, and

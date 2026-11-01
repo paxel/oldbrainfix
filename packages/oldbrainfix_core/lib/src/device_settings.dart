@@ -253,13 +253,13 @@ extension DeviceSettings on Store {
   UnitSystem unitSystem(String? region) =>
       chosenUnitSystem ?? TallyUnits.systemForRegion(region);
 
-  /// How this Device's Agenda shows Shopping Lists; one row per list on
-  /// a day when Lines came back unless another way was chosen.
+  /// How this Device's Agenda showed Shopping Lists before each list had
+  /// its own choice (#186); one row per list on a day when Lines came
+  /// back unless another way was chosen. Read only for the default of a
+  /// list nobody chose for ([ShoppingOnAgenda.fromDevice]); no app offers
+  /// it any more.
   ShoppingAgenda get shoppingAgenda =>
       ShoppingAgenda.read(localSetting(_shoppingAgenda));
-
-  set shoppingAgenda(ShoppingAgenda way) =>
-      setLocalSetting(_shoppingAgenda, way.name);
 
   /// How fast this Device plays voice recordings: one of
   /// [playbackSpeeds], normal speed when none was chosen. The one Device
