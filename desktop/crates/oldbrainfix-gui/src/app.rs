@@ -7216,7 +7216,7 @@ impl App {
                 }
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
-                let trash = Some((icons::TRASH, text));
+                let trash = Some((icons::OPEN_TRASH, text));
                 if row(ui, tones, on, 0.0, trash, t.trash_title(), false).clicked() {
                     actions.push(Action::Select(Selection::Trash));
                 }

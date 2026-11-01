@@ -12,6 +12,8 @@ pub const FAMILY: &str = "icons";
 pub const ALL_NOTES: char = '\u{e44c}';
 pub const UNSORTED: char = '\u{e33a}';
 pub const TRASH: char = '\u{e1bb}';
+/// Opens the Trash: a bin with an arrow up, the plain bin deletes (#166).
+pub const OPEN_TRASH: char = '\u{e535}';
 pub const IMPORTANT: char = '\u{e361}';
 pub const NO_AREA_ICON: char = '\u{f091}';
 pub const ADD: char = '\u{e047}';

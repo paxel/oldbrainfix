@@ -93,6 +93,19 @@ void main() {
             .whereType<String>(),
         ['Back', 'All Notes', 'Frogs', 'Trash'],
       );
+      // The Trash opens with a bin and an arrow up, not the bin that
+      // deletes (#166).
+      final trash = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.restore_from_trash),
+      );
+      expect(trash.tooltip, 'Trash');
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.delete_outline),
+        ),
+        findsNothing,
+      );
       expect(profileButton, findsNothing);
     });
   });

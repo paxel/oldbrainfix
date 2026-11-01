@@ -363,7 +363,9 @@ class _AreasScreenState extends State<AreasScreen>
               IconButton(
                 tooltip: t.trashTitle,
                 onPressed: _openTrash,
-                icon: const Icon(Icons.delete_outline),
+                // A bin with an arrow up opens the Trash; the plain bin
+                // deletes (#166).
+                icon: const Icon(Icons.restore_from_trash),
               ),
             ],
           ),
