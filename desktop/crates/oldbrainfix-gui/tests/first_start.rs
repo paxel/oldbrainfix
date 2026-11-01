@@ -17,8 +17,8 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::join::{SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{Host, PairInfo, decode_pair_code};
 use oldbrainfix_core::{Error, Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_gui::App;
 use oldbrainfix_gui::backup_view::restore_due;
-use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -120,7 +120,7 @@ fn the_other_devices_profile(harness: &mut Harness<'_, App>, theirs: &str) -> Te
     assert_eq!((own.id.as_str(), own.name.as_str()), (theirs, "Ada"));
     assert!(OwnProfile::new(desk).question()?.is_none());
     assert!(!shows(harness, "Which one is you?"));
-    assert_ne!(harness.state().selection(), &Selection::Profile);
+    assert_eq!(harness.state().page(), None);
     let areas: Vec<String> = Places::new(desk)
         .areas()?
         .into_iter()

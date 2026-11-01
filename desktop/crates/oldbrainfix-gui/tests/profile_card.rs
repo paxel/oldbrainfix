@@ -22,7 +22,7 @@ use oldbrainfix_core::profile::{SignedProfile, record_bytes};
 use oldbrainfix_core::sent;
 use oldbrainfix_core::signing::KeyRecord;
 use oldbrainfix_core::{CardTaken, OwnProfile, SigningKey, Store};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page};
 use serde_json::json;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -70,8 +70,10 @@ fn window_saving(ann: Store, dir: &Path, named: Option<&str>) -> (Harness<'stati
     (window_of(app), asked)
 }
 
+/// The window with the Profile dialog open over it, where the own card
+/// is sent from (#145).
 fn window_of(mut app: App) -> Harness<'static, App> {
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
@@ -99,6 +101,9 @@ fn click(harness: &mut Harness<'_, App>, label: &str) {
 /// Pastes `link` into "Their Profile link" and clicks "Add a person
 /// from a link".
 fn add_from(harness: &mut Harness<'_, App>, link: &str) {
+    // In People (#145).
+    harness.state_mut().open(Page::People);
+    harness.run();
     let field = harness.get_by_role_and_label(Role::TextInput, "Their Profile link");
     field.focus();
     harness.run();
@@ -134,6 +139,8 @@ fn card_file(store: &Store, back: bool) -> Result<Vec<u8>, Box<dyn std::error::E
 /// Drops the file `bytes` onto the window and opens why it added
 /// nobody, announced at the top.
 fn drop_refused(harness: &mut Harness<'_, App>, dir: &Path, bytes: &[u8]) -> TestResult {
+    // Onto the window itself, its announcement clickable.
+    harness.state_mut().close_page();
     drop_file(harness, &file(dir, "card.obfcard", bytes)?);
     assert_eq!(
         harness.state().notice(),
@@ -514,10 +521,12 @@ fn a_card_naming_a_kept_person_under_other_keys_is_refused() -> TestResult {
 #[test]
 fn the_profile_card_speaks_german() -> TestResult {
     let ann = device(1, "Ann")?;
-    let harness = window(ann, "de");
+    let mut harness = window(ann, "de");
     assert!(shows(&harness, "Mein Profil senden"));
     assert!(shows(&harness, "Als kleine Datei"));
     assert!(shows(&harness, "Meinen QR-Code zeigen"));
+    harness.state_mut().open(Page::People);
+    harness.run();
     assert!(shows(&harness, "Person über einen Link hinzufügen"));
     assert!(shows(&harness, "Profil-Link der Person"));
     assert!(shows(

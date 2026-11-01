@@ -21,7 +21,7 @@ use oldbrainfix_core::lan::{
 use oldbrainfix_core::{
     AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store,
 };
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -243,7 +243,7 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
     harness.get_by_label("Show the code").click();
     harness.step();
     harness.step();
-    assert_eq!(harness.state().selection(), &Selection::Sync);
+    assert_eq!(harness.state().page(), Some(Page::Pair));
     assert!(harness.state().store().is_shared(&house.id)?);
     assert!(shows(
         &harness,
@@ -257,6 +257,10 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
         .clone()
         .ok_or("an invite")?;
     assert_eq!(invite.role, AreaRole::Manager);
+    // The dialog settled where it shows.
+    for _ in 0..5 {
+        harness.step();
+    }
     harness.get_by_label("Stop inviting").click();
     harness.step();
     assert!(harness.state().sync_host().inviting.is_none());

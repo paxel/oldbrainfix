@@ -17,7 +17,7 @@ use oldbrainfix_core::{
 };
 use oldbrainfix_gui::history_view;
 use oldbrainfix_gui::schedule_text::schedule_text;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -227,7 +227,7 @@ fn a_reminders_editor_has_no_history() -> TestResult {
 fn the_settings_switch_hides_the_streak_and_the_adherence_stays() -> TestResult {
     let (store, pills) = store()?;
     let mut app = App::new(store, "en");
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = window(app);
     harness
         .get_by_label("Show Streaks on this computer")

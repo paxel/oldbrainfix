@@ -20,7 +20,7 @@ use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::media::{self, Clipboard, Player, Recorder};
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 use oldbrainfix_whisper::model::{ModelDir, Outcome as ModelOutcome, WhisperModel, copy_hashing};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -525,7 +525,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         assert_eq!(title, "Use a file of my own");
         Some(picked.clone())
     }));
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = settings(app);
     harness.run();
     std::thread::sleep(StdDuration::from_millis(100));
@@ -608,7 +608,7 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     );
     let mut app = App::new(store.clone(), "en");
     app.set_enrichers(Some(transcripts), None, Some(speech.clone()));
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = settings(app);
     harness.run();
     harness.get_by_label("Base, 148 MB").click();

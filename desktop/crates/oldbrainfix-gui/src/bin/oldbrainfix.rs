@@ -169,6 +169,21 @@ impl eframe::App for Native {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.app.show(ui);
+        let ctx = ui.ctx();
+        // File ▸ Quick note: the popup, as the hotkey opens it.
+        if self.app.take_quick_note() {
+            match &mut self.popup {
+                Some(popup) => popup.refocus(),
+                None => self.popup = Some((self.new_popup)()),
+            }
+            ctx.request_repaint();
+        }
+        // File ▸ Quit: the app ends, not into the tray.
+        if self.app.take_quit() {
+            self.quit.store(true, Ordering::SeqCst);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            ctx.request_repaint();
+        }
     }
 
     fn on_exit(&mut self) {

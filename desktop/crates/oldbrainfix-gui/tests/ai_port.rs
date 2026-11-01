@@ -18,7 +18,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -49,7 +49,7 @@ fn window(app: App) -> Harness<'static, App> {
 
 fn settings(store: &Arc<Store>) -> Harness<'static, App> {
     let mut app = App::new(store.clone(), "en");
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     window(app)
 }
 
@@ -148,7 +148,9 @@ fn a_tool_call_is_answered_while_the_window_idles_and_kept_on_accept() -> TestRe
 
     click(&mut harness, t.ai_port_done());
     assert!(harness.state().ai_port().is_none());
+    // In the list, the Settings closed.
     assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert_eq!(harness.state().page(), None);
     assert!(shows(&harness, t.ai_kind_place()));
     assert!(shows(&harness, "Garden"));
     assert!(shows(&harness, t.ai_review_banner()));
@@ -213,7 +215,7 @@ fn a_task_that_changed_nothing_is_declined_without_a_review() -> TestResult {
     click(&mut harness, t.ai_port_done());
     assert!(store.ai_task()?.is_none());
     assert!(!store.sync_paused()?);
-    assert_eq!(harness.state().selection(), &Selection::Settings);
+    assert_eq!(harness.state().page(), Some(Page::Settings));
     assert!(!shows(&harness, t.ai_review_title()));
     Ok(())
 }

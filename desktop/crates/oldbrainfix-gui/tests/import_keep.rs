@@ -1,5 +1,5 @@
 //! The import from Google Keep driven headless (ADR 0036, Google Keep):
-//! "Import from Google Keep…" in the Sync view asks whether the Takeout
+//! File ▸ Import… ▸ "Google Keep…" (#145) asks whether the Takeout
 //! export is a zip or a folder, the system's dialog picks it, and its
 //! Keep notes become Notes in the new Area "From Google Keep": dated when
 //! made in Keep, labels as #tags, a list as a Checklist with its checked
@@ -8,7 +8,6 @@
 //! way into the Area; an export of nothing usable and one that cannot be
 //! read say why.
 
-use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -26,8 +25,8 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 /// An entry of a Takeout: its path and its bytes.
 type Entry = (String, Vec<u8>);
 
-/// The button in the Sync view.
-const OPEN: &str = "Import from Google Keep…";
+/// The button in the Import dialog.
+const OPEN: &str = "Google Keep…";
 
 fn store() -> Result<Store, Box<dyn std::error::Error>> {
     Ok(Store::in_memory(Box::new(chrono::Utc::now), || {
@@ -50,15 +49,14 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
 }
 
-/// The Sync view, its zip dialog answering `zip` and its folder dialog
+/// The window, its zip dialog answering `zip` and its folder dialog
 /// `folder`.
-fn sync_view(
+fn window(
     store: Store,
     zip: Option<PathBuf>,
     folder: Option<PathBuf>,
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
     let mut app = App::new(store, "en");
-    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
     app.set_import_zip_picker(Box::new(move |title| {
         assert_eq!(title, "Choose the Takeout zip file");
         zip.clone()
@@ -67,7 +65,6 @@ fn sync_view(
         assert_eq!(title, "Choose the folder unpacked from the Takeout zip");
         folder.clone()
     }));
-    app.select(Selection::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1600.0))
         .build_ui_state(
@@ -77,9 +74,23 @@ fn sync_view(
             },
             app,
         );
-    step_until(&mut harness, |app| app.sync_host().hosting())?;
     harness.step();
     Ok(harness)
+}
+
+/// Opens File ▸ Import….
+fn import_dialog(harness: &mut Harness<'_, App>) {
+    harness.get_by_label("File").click();
+    harness.step();
+    harness.get_by_label("Import…").click();
+    harness.step();
+    harness.step();
+}
+
+/// Picks "Google Keep…" in File ▸ Import….
+fn open_keep(harness: &mut Harness<'_, App>) {
+    import_dialog(harness);
+    harness.get_by_label(OPEN).click_accesskit();
 }
 
 fn at(y: i32, m: u32, d: u32) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
@@ -186,7 +197,7 @@ fn folder_of(dir: &Path, entries: &[Entry]) -> TestResult {
 /// Asks for the import from Google Keep, answers `answer` ("Zip file" or
 /// "Folder") and waits for the announcement.
 fn import(harness: &mut Harness<'_, App>, answer: &str) -> TestResult {
-    harness.get_by_label(OPEN).click_accesskit();
+    open_keep(harness);
     harness.step();
     harness.step();
     assert!(shows(
@@ -271,11 +282,14 @@ fn a_takeout_zip_becomes_notes_in_from_google_keep_and_the_click_opens_it() -> T
     let root = tempfile::tempdir()?;
     let zip = root.path().join("takeout-20261101T000000Z-001.zip");
     zip_of(&zip, &takeout()?)?;
-    let mut harness = sync_view(store()?, Some(zip), None)?;
+    let mut harness = window(store()?, Some(zip), None)?;
+    import_dialog(&mut harness);
     assert!(shows(
         &harness,
         "The notes, lists and photos of a Google Takeout export become Notes"
     ));
+    harness.get_by_label("Close").click_accesskit();
+    harness.step();
     import(&mut harness, "Zip file")?;
     // Only that it finished; the click shows what went where.
     assert_eq!(harness.state().notice(), Some("Import finished."));
@@ -304,7 +318,7 @@ fn an_unpacked_takeout_folder_imports_the_same() -> TestResult {
         root.path().join("nowhere.jpg"),
         dir.join("Takeout/Google Photos/Gone.jpg"),
     )?;
-    let mut harness = sync_view(store()?, None, Some(dir))?;
+    let mut harness = window(store()?, None, Some(dir))?;
     import(&mut harness, "Folder")?;
     assert_eq!(harness.state().notice(), Some("Import finished."));
     made_as_keep_says(&harness)?;
@@ -316,7 +330,7 @@ fn an_imported_checklist_stays_off_the_agenda_until_switched_on() -> TestResult 
     let root = tempfile::tempdir()?;
     let zip = root.path().join("takeout.zip");
     zip_of(&zip, &takeout()?)?;
-    let mut harness = sync_view(store()?, Some(zip), None)?;
+    let mut harness = window(store()?, Some(zip), None)?;
     import(&mut harness, "Zip file")?;
     harness.state_mut().select(Selection::Agenda);
     harness.step();
@@ -358,7 +372,7 @@ fn a_name_leaving_the_zip_is_refused_and_counted() -> TestResult {
             ("Takeout/../Keep/Evil.json".to_string(), evil.into_bytes()),
         ],
     )?;
-    let mut harness = sync_view(store()?, Some(zip), None)?;
+    let mut harness = window(store()?, Some(zip), None)?;
     import(&mut harness, "Zip file")?;
     let notes = Notes::new(harness.state().store()).all()?;
     assert_eq!(notes.len(), 1);
@@ -393,7 +407,7 @@ fn an_export_without_a_keep_note_changes_nothing() -> TestResult {
             ),
         ],
     )?;
-    let mut harness = sync_view(store()?, Some(zip), None)?;
+    let mut harness = window(store()?, Some(zip), None)?;
     import(&mut harness, "Zip file")?;
     assert_eq!(harness.state().notice(), Some("No Keep note found."));
     let desk = harness.state().store();
@@ -419,7 +433,7 @@ fn a_zip_that_cannot_be_read_fails_and_writes_nothing() -> TestResult {
     let root = tempfile::tempdir()?;
     let zip = root.path().join("takeout.zip");
     std::fs::write(&zip, b"not a zip at all")?;
-    let mut harness = sync_view(store()?, Some(zip), None)?;
+    let mut harness = window(store()?, Some(zip), None)?;
     import(&mut harness, "Zip file")?;
     assert_eq!(
         harness.state().notice(),
@@ -442,8 +456,8 @@ fn a_zip_that_cannot_be_read_fails_and_writes_nothing() -> TestResult {
 
 #[test]
 fn cancel_or_a_cancelled_dialog_imports_nothing() -> TestResult {
-    let mut harness = sync_view(store()?, None, None)?;
-    harness.get_by_label(OPEN).click_accesskit();
+    let mut harness = window(store()?, None, None)?;
+    open_keep(&mut harness);
     harness.step();
     harness.step();
     harness.get_by_label("Cancel").click_accesskit();
@@ -459,7 +473,7 @@ fn cancel_or_a_cancelled_dialog_imports_nothing() -> TestResult {
 
 /// Answers `answer` in the dialog, whose system dialog picks nothing.
 fn import_cancelled(harness: &mut Harness<'_, App>, answer: &str) -> TestResult {
-    harness.get_by_label(OPEN).click_accesskit();
+    open_keep(harness);
     harness.step();
     harness.step();
     harness.get_by_label(answer).click_accesskit();

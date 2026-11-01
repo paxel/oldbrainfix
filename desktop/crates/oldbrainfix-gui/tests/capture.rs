@@ -13,7 +13,7 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{DeviceSettings, Note, Notes, SigningKey, Store, dart_iso, parse_time};
 use oldbrainfix_gui::hotkey::{Chord, Control, Status};
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -234,7 +234,7 @@ fn settings(status: Status) -> Result<Settings, Box<dyn std::error::Error>> {
     let mut app = App::new(store()?, "en");
     let control: Rc<RefCell<dyn Control>> = fake.clone();
     app.set_hotkey(Some(control));
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1600.0))
         .build_ui_state(

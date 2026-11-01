@@ -1,6 +1,6 @@
 //! The user's own Profile on the desktop's screen (ADR 0017): its
-//! picture, or the initials on a circle coloured by its id, where the
-//! settings gear was; and the top of the Profile page with the picture,
+//! picture, or the initials on a circle coloured by its id; and the top
+//! of the Profile dialog (#145) with the picture,
 //! the name and the short code, and the square the user picks of a new
 //! picture; the own Profile card as a file or a QR, and a person added
 //! from theirs (#107, #144).
@@ -16,7 +16,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::media::pixels;
 
-/// What the user asked for on the Profile page.
+/// What the user asked for in the Profile dialog.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProfileAction {
     /// Choose a picture file with the system's dialog.
@@ -33,7 +33,7 @@ pub enum ProfileAction {
     Ask,
     /// "Which one is you?": this Device's Profile (true) or the other's.
     Answer(bool),
-    /// "Which one is you?" waits on the Profile page.
+    /// "Which one is you?" waits in the Profile dialog.
     Later,
     /// Save the own Profile card as a file to send (#144).
     SendCard,
@@ -43,7 +43,7 @@ pub enum ProfileAction {
     OpenCard,
 }
 
-/// The Profile cards on the Profile page (#107): whether the own card's
+/// The Profile cards in the Profile dialog (#107): whether the own card's
 /// file was saved (#144), the link of another person's being pasted, and
 /// what opening the last one came to when it added nobody.
 #[derive(Debug, Default)]
@@ -292,7 +292,7 @@ pub fn avatar(
     response.on_hover_text(label)
 }
 
-/// The top of the Profile page: the picture with the buttons that change
+/// The top of the Profile dialog: the picture with the buttons that change
 /// it, the name field and the short code. A Profile a `newer` version of
 /// the app saved shows its picture and name, saying so, and nothing to
 /// change them (ADR 0034).
@@ -470,7 +470,7 @@ pub fn qr_page(ui: &mut Ui, t: &L10n, link: &str) {
 
 /// "Which one is you?" (ADR 0017): this Device's Profile and the other
 /// one, each with its picture, name and short code and a button that
-/// keeps it, and "Later", which leaves the question on the Profile page.
+/// keeps it, and "Later", which leaves the question in the Profile dialog.
 pub fn question_form(
     ui: &mut Ui,
     t: &L10n,

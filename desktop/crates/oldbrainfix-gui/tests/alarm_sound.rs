@@ -12,7 +12,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{DeviceSettings, SigningKey, Store};
 use oldbrainfix_gui::ring::OWN_SOUND;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -26,7 +26,7 @@ fn harness(
     let mut app = App::new(store.clone(), locale);
     let picked = Rc::new(RefCell::new(picked.into_iter()));
     app.set_sound_picker(Box::new(move |_title| picked.borrow_mut().next()));
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1600.0))
         .build_ui_state(

@@ -1,4 +1,4 @@
-//! The About view driven headless: reached from the Settings, it links
+//! The About dialog driven headless: reached from the Settings, it links
 //! the documentation site and its privacy policy, and opens the licences
 //! page, which lists every third-party component and opens its licence on
 //! a click.
@@ -6,7 +6,7 @@
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{SigningKey, Store};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -15,7 +15,7 @@ fn harness(locale: &str) -> Result<Harness<'static, App>, Box<dyn std::error::Er
         Ok(SigningKey::from_seed([3; 32]))
     })?;
     let mut app = App::new(store, locale);
-    app.select(Selection::Settings);
+    app.open(Page::Settings);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
@@ -40,7 +40,7 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
         .get_by_label("About Old Brain Fix")
         .click_accesskit();
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::About);
+    assert_eq!(harness.state().page(), Some(Page::About));
     assert!(shows(
         &harness,
         &format!("Version {}", env!("CARGO_PKG_VERSION"))
@@ -51,7 +51,7 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
         .get_by_label("Open-source licenses")
         .click_accesskit();
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Licences);
+    assert_eq!(harness.state().page(), Some(Page::Licences));
     for name in [
         "PP-OCRv6 Tiny models",
         "OpenAI Whisper base model",

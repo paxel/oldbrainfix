@@ -21,7 +21,7 @@ use oldbrainfix_core::{
     AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonFilter, Places,
     SigningKey, Store, profile,
 };
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -114,6 +114,13 @@ fn app(store: Store, selection: Selection) -> App {
     let mut app = App::new(store, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
     app.select(selection);
+    app
+}
+
+/// The window over `store` with People open over it (#145).
+fn people(store: Store) -> App {
+    let mut app = app(store, Selection::Agenda);
+    app.open(Page::People);
     app
 }
 
@@ -251,10 +258,10 @@ fn an_areas_people_open_their_profile() -> TestResult {
 }
 
 #[test]
-fn people_on_the_profile_page_lists_every_stored_profile() -> TestResult {
+fn people_lists_every_stored_profile() -> TestResult {
     let Shared { ann, ben_id, .. } = shared()?;
     ann.set_override_name(&ben_id, "Mum")?;
-    let mut harness = window(app(ann, Selection::Profile));
+    let mut harness = window(people(ann));
     assert!(shows(&harness, "People"));
     click(&mut harness, "Open the Profile of Mum");
     assert!(shows(&harness, "Name and picture for me"));
@@ -262,7 +269,7 @@ fn people_on_the_profile_page_lists_every_stored_profile() -> TestResult {
     assert!(shows(&harness, "Ben"));
 
     let ticks = Arc::new(AtomicI64::new(0));
-    let alone = window(app(device(5, "Cid", &ticks)?, Selection::Profile));
+    let alone = window(people(device(5, "Cid", &ticks)?));
     assert!(shows(&alone, "Nobody yet."));
     Ok(())
 }
@@ -429,7 +436,7 @@ fn drop_bytes(
 #[test]
 fn blocking_from_a_profile_deletes_their_notes_and_folds_them_into_blocked() -> TestResult {
     let Shared { ann, ben_id, .. } = shared()?;
-    let mut harness = window(app(ann, Selection::Profile));
+    let mut harness = window(people(ann));
     click(&mut harness, "Open the Profile of Ben");
     click(&mut harness, "Block");
     assert!(shows(&harness, "Block Ben?"));
@@ -480,7 +487,7 @@ fn the_blocked_fold_stays_as_left() -> TestResult {
     let Shared { ann, ben_id, .. } = shared()?;
     ann.block_person(&ben_id, false)?;
     ann.set_local_setting("peopleBlockedOpen", "true")?;
-    let mut harness = window(app(ann, Selection::Profile));
+    let mut harness = window(people(ann));
     assert!(harness.query_by_label("Open the Profile of Ben").is_some());
     click(&mut harness, "Blocked");
     assert!(harness.query_by_label("Open the Profile of Ben").is_none());
@@ -495,7 +502,7 @@ fn the_blocked_fold_stays_as_left() -> TestResult {
 fn blocking_a_manager_leaves_the_areas_they_manage() -> TestResult {
     let Shared { ann, ben, area, .. } = shared()?;
     let ann_id = OwnProfile::new(&ann).get()?.ok_or("a Profile")?.id;
-    let mut harness = window(app(ben, Selection::Profile));
+    let mut harness = window(people(ben));
     click(&mut harness, "Open the Profile of Ann");
     click(&mut harness, "Block");
     assert!(shows(

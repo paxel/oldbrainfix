@@ -12,7 +12,7 @@ use std::rc::Rc;
 use oldbrainfix_core::backup::{self, EXTENSION, Kdf, system_random};
 use oldbrainfix_core::{DeviceSettings, Notes, Places, SigningKey, Store};
 use oldbrainfix_gui::media::Player;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -101,7 +101,7 @@ fn backups_are_set_up_the_sheet_saved_and_a_folder_gets_one_at_once() -> TestRes
         assert_eq!(title, "Choose the folder for Backups");
         Some(picked.clone())
     }));
-    app.select(Selection::Profile);
+    app.open(Page::Backups);
     let mut harness = window(app);
     assert!(shows(&harness, "Set up Backups"));
 
@@ -170,7 +170,7 @@ fn backups_set_up_on_a_paired_phone_show_with_the_same_recovery_sheet() -> TestR
         Box::new(move |_, _| Some(saved.clone())),
         Box::new(|_| None),
     );
-    app.select(Selection::Profile);
+    app.open(Page::Backups);
     let mut harness = window(app);
     // Set up already: no passphrase asked, the sheet offered.
     assert!(!shows(&harness, "Set up Backups"));
@@ -330,8 +330,8 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
     // The playback speed came with it, for what plays from now on.
     assert_eq!(DeviceSettings::new(store).playback_speed()?, 1.5);
     assert_eq!(speeds.borrow().last(), Some(&1.5));
-    // The Profile came back with it, and the Profile page shows it.
-    harness.state_mut().select(Selection::Profile);
+    // The Profile came back with it, and the Profile dialog shows it.
+    harness.state_mut().open(Page::Profile);
     harness.step();
     harness.step();
     assert!(harness.query_all_by_value("Ada").next().is_some());

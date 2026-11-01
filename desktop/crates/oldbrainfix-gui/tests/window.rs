@@ -853,10 +853,19 @@ fn deleting_a_place_asks_where_its_notes_go() -> TestResult {
 }
 
 #[test]
-fn back_and_forward_keys_walk_the_areas_and_topics() -> TestResult {
+fn back_and_forward_walk_the_places_shown_and_the_path_leads_up() -> TestResult {
+    // On All Notes, from the Agenda.
     let mut harness = harness("places", "en")?;
     let household = Selection::Place(place(harness.state(), "Household")?);
     let kitchen = Selection::Place(place(harness.state(), "Kitchen")?);
+    assert!(!harness.state().can_go_forward());
+    // The sidebar's row, ahead of the cards naming the Area.
+    harness
+        .get_all_by_label("Household")
+        .next()
+        .ok_or("Household")?
+        .click();
+    harness.run();
     harness.get_by_label("Kitchen").click();
     harness.run();
     let mut press = |modifiers, key| {
@@ -866,7 +875,9 @@ fn back_and_forward_keys_walk_the_areas_and_topics() -> TestResult {
     };
     assert_eq!(press(Modifiers::ALT, Key::ArrowLeft), household);
     assert_eq!(press(Modifiers::ALT, Key::ArrowLeft), Selection::All);
-    assert_eq!(press(Modifiers::ALT, Key::ArrowLeft), Selection::All);
+    assert_eq!(press(Modifiers::ALT, Key::ArrowLeft), Selection::Agenda);
+    assert_eq!(press(Modifiers::ALT, Key::ArrowLeft), Selection::Agenda);
+    assert_eq!(press(Modifiers::ALT, Key::ArrowRight), Selection::All);
     assert_eq!(press(Modifiers::ALT, Key::ArrowRight), household);
     assert_eq!(press(Modifiers::ALT, Key::ArrowRight), kitchen);
     assert_eq!(press(Modifiers::ALT, Key::ArrowRight), kitchen);
@@ -880,14 +891,37 @@ fn back_and_forward_keys_walk_the_areas_and_topics() -> TestResult {
     assert_eq!(button(PointerButton::Extra1), household);
     assert_eq!(button(PointerButton::Extra2), kitchen);
 
-    // Unsorted and the trash go back to All Notes, and forward into the
-    // last Area.
+    // So do the buttons at the top of the list, greyed where they lead
+    // nowhere.
+    assert!(!harness.state().can_go_forward());
+    harness.get_by_label("Back").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &household);
+    harness.get_by_label("Forward").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &kitchen);
+    harness.get_by_label("Forward").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &kitchen);
+
+    // The path leads up: "Areas › Household › Kitchen"; a click there is
+    // a place visited, which back returns from.
+    harness.get_by_label("Up to Household").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &household);
+    assert!(!harness.state().can_go_forward());
+    harness.get_by_label("Up to Areas").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::All);
+    assert!(harness.query_by_label("Up to Areas").is_none());
+    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().selection(), &household);
+
+    // The trash, back where it came from.
     harness.get_by_label("Trash").click();
     harness.run();
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert_eq!(harness.state().selection(), &Selection::All);
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowRight);
     harness.run();
     assert_eq!(harness.state().selection(), &household);
 

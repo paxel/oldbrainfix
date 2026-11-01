@@ -30,7 +30,7 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
     ClockTime, Day, Importance, Notes, Places, Routines, Schedule, SigningKey, Store, parse_time,
 };
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 use parking_lot::Mutex;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -70,6 +70,8 @@ struct Texts {
     /// A Note with a typo, and its text as an AI Task fixes it.
     typo: &'static str,
     fixed: &'static str,
+    /// The menu bar's Note menu.
+    note_menu: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -94,6 +96,7 @@ const EN: Texts = Texts {
     capture: "Ask Dana if she still needs the ladder",
     typo: "Pick up the parcel for Dana at the post office tomorow",
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
+    note_menu: "Note",
 };
 
 const DE: Texts = Texts {
@@ -118,6 +121,7 @@ const DE: Texts = Texts {
     capture: "Dana fragen, ob sie die Leiter noch braucht",
     typo: "Packet für Dana morgen bei der Post abhohlen",
     fixed: "Paket für Dana morgen bei der Post abholen",
+    note_menu: "Notiz",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -246,7 +250,7 @@ fn render_the_screenshots() -> TestResult {
     harness.state_mut().select_note(&ids[0]);
     shoot(&mut harness, FILES[1])?;
 
-    harness.state_mut().select(Selection::Settings);
+    harness.state_mut().open(Page::Settings);
     shoot(&mut harness, FILES[2])?;
     Ok(())
 }
@@ -417,10 +421,18 @@ fn guide_frames() -> TestResult {
             harness.state_mut().select(Selection::Place(household.id));
             harness.state_mut().select_note(&tap);
             problems.extend(match_frame(&mut harness, &frame("window"))?);
-            // The Settings with this computer's switches, the AI port
-            // and the hotkey.
+            // The menu bar's Note menu over it, for that Note.
+            harness
+                .get_all_by_label(texts.note_menu)
+                .next()
+                .ok_or("the Note menu")?
+                .click();
+            harness.run();
+            problems.extend(match_frame(&mut harness, &frame("menu"))?);
+            // The Settings dialog with this computer's switches, the AI
+            // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;
-            harness.state_mut().select(Selection::Settings);
+            harness.state_mut().open(Page::Settings);
             problems.extend(match_frame(&mut harness, &frame("settings"))?);
         }
     }

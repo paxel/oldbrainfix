@@ -18,7 +18,7 @@ use oldbrainfix_core::{
     parse_time,
 };
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -220,7 +220,9 @@ fn each_switch_brings_its_control_back_and_takes_it_away_again() -> TestResult {
 #[test]
 fn the_settings_switch_what_the_window_capture_shows() -> TestResult {
     let (store, _) = store()?;
-    let mut harness = window(&store, Selection::Settings);
+    let mut harness = window(&store, Selection::Agenda);
+    harness.state_mut().open(Page::Settings);
+    harness.run();
     assert!(shows(&harness, "Quick note"));
     harness
         .get_by_role_and_label(Role::CheckBox, "File into…")
@@ -237,21 +239,21 @@ fn the_settings_switch_what_the_window_capture_shows() -> TestResult {
         .click_accesskit();
     harness.run();
     assert!(!settings.quick_note_nudge_buttons_on()?);
-    harness.state_mut().select(Selection::Agenda);
+    harness.state_mut().close_page();
     harness.run();
     type_in_window(&mut harness, "Buy stamps");
     assert!(shows(&harness, "File into…"));
     assert!(!shows(&harness, "10 min"));
     assert!(shows(&harness, "Save"));
     // Off again, it goes.
-    harness.state_mut().select(Selection::Settings);
+    harness.state_mut().open(Page::Settings);
     harness.run();
     harness
         .get_by_role_and_label(Role::CheckBox, "File into…")
         .click_accesskit();
     harness.run();
     assert!(!settings.quick_note_shows(QuickNoteControl::FileInto)?);
-    harness.state_mut().select(Selection::Agenda);
+    harness.state_mut().close_page();
     harness.run();
     assert!(!shows(&harness, "File into…"));
     Ok(())

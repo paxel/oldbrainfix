@@ -25,6 +25,12 @@ pub fn documentation_url(locale: &str) -> String {
     format!("{SITE}/{}/", site_language(locale))
 }
 
+/// The user guide's page on the desktop app, in the app's language where
+/// the site has one, English otherwise: Help ▸ User guide (#145).
+pub fn guide_url(locale: &str) -> String {
+    format!("{SITE}/{}/guide/desktop-app.html", site_language(locale))
+}
+
 /// The privacy policy on the documentation site, in the app's language
 /// where the site has one, English otherwise.
 pub fn privacy_policy_url(locale: &str) -> String {
@@ -149,6 +155,14 @@ mod tests {
         assert_eq!(
             documentation_url("fr"),
             "https://paxel.github.io/oldbrainfix/en/"
+        );
+        assert_eq!(
+            guide_url("de"),
+            "https://paxel.github.io/oldbrainfix/de/guide/desktop-app.html"
+        );
+        assert_eq!(
+            guide_url("fr"),
+            "https://paxel.github.io/oldbrainfix/en/guide/desktop-app.html"
         );
         assert_eq!(
             privacy_policy_url("de"),

@@ -24,7 +24,7 @@ use oldbrainfix_core::{
     SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -680,7 +680,7 @@ fn two_renames_apart_are_a_line_conflict_on_the_conflicts_view() -> TestResult {
 
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Sync);
+    app.open(Page::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(

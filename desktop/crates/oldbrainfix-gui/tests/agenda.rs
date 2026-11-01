@@ -15,7 +15,7 @@ use oldbrainfix_core::{
     SimpleRepeat, Store, WireEntry, parse_time,
 };
 use oldbrainfix_gui::autostart::Autostart;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -645,14 +645,13 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     DeviceSettings::new(harness.state().store())
         .set_renag_interval(chrono::Duration::minutes(20))?;
     DeviceSettings::new(harness.state().store()).set_nudge_repeat(chrono::Duration::minutes(45))?;
-    // The Profile picture sits where the gear was; the settings are on
-    // the Profile page.
-    harness.get_by_label("Profile").click();
+    // The settings open from the menu bar, as a dialog over the Agenda.
+    harness.get_by_label("Edit").click();
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Profile);
-    harness.get_by_label("Settings").click();
+    harness.get_by_label("Settings… Ctrl+,").click();
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Settings);
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
     assert!(shows(
         &harness,
         "These settings belong to this computer and are never synced."
@@ -693,12 +692,10 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     assert_eq!(repeat, chrono::Duration::minutes(60));
     let renag = DeviceSettings::new(harness.state().store()).renag_interval()?;
     assert_eq!(renag, chrono::Duration::minutes(15));
-    // Back to the Profile page, and to the Agenda.
+    // Back closes it, the Agenda under it.
     harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Profile);
-    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
-    harness.run();
+    assert_eq!(harness.state().page(), None);
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     Ok(())
 }

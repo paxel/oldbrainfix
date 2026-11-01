@@ -1,5 +1,5 @@
-//! Backups on the desktop's screen (ADR 0010, 0016): the card on the
-//! Profile page that sets them up with a passphrase, or shows them set
+//! Backups on the desktop's screen (ADR 0010, 0016): the card in the
+//! Backups dialog (#145) that sets them up with a passphrase, or shows them set
 //! up on another of the user's Devices, the backup key belonging to the
 //! Profile; saves the Recovery Sheet, picks the folder, switches the
 //! weekly Backup and writes one now; and the first start's view that
@@ -283,7 +283,7 @@ fn choice(ui: &mut Ui, detail: &str, label: &str) -> bool {
 }
 
 /// The first start's view's content, but for the adding of a Device of
-/// one's own, which the Sync view's pieces draw.
+/// one's own, which the Sync dialogs' pieces draw.
 pub fn welcome(
     ui: &mut Ui,
     t: &L10n,

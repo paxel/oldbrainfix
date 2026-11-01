@@ -19,7 +19,7 @@ use oldbrainfix_core::lan::{
     decode_pair_code, encode_pair_code, sync_request,
 };
 use oldbrainfix_core::{Error, Notes, SigningKey, Store};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -108,12 +108,11 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
 }
 
 #[test]
-fn the_sync_view_hosts_asks_pairs_and_forgets() -> TestResult {
+fn the_sync_dialog_hosts_asks_pairs_and_forgets() -> TestResult {
     let desk = store(1)?;
     Notes::new(&desk).capture("From the desk", None, None)?;
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Profile);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(
@@ -124,10 +123,13 @@ fn the_sync_view_hosts_asks_pairs_and_forgets() -> TestResult {
             app,
         );
     harness.step();
-    harness
-        .get_by_label("Sync with another Device")
-        .click_accesskit();
+    assert!(!harness.state().sync_host().hosting());
+    // Sync ▸ Sync now opens the dialog, which hosts while it shows.
+    harness.get_by_label("Sync").click();
+    harness.step();
+    harness.get_by_label("Sync now").click();
     step_until(&mut harness, |app| app.sync_host().hosting())?;
+    assert_eq!(harness.state().page(), Some(Page::Sync));
     harness.step();
     let host = harness.state().sync_host().host().ok_or("hosting")?;
     let (port, pin) = (host.port(), host.pin().to_string());
@@ -188,9 +190,10 @@ fn the_sync_view_hosts_asks_pairs_and_forgets() -> TestResult {
     harness.step();
     assert!(harness.state().store().paired_devices()?.is_empty());
 
-    // Leaving the view stops the session.
-    harness.state_mut().select(Selection::Agenda);
+    // Closing the dialog stops the session.
+    harness.key_press(egui::Key::Escape);
     harness.step();
+    assert_eq!(harness.state().page(), None);
     assert!(!harness.state().sync_host().hosting());
     Ok(())
 }
@@ -219,7 +222,7 @@ fn the_sync_view_lists_the_conflicts_and_keeps_the_version_clicked() -> TestResu
 
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Sync);
+    app.open(Page::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(
@@ -268,7 +271,7 @@ fn a_conflict_with_a_text_in_an_unknown_format_cannot_be_picked_here() -> TestRe
 
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Sync);
+    app.open(Page::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(
@@ -370,7 +373,7 @@ fn a_paired_device_can_be_kept_from_syncing_on_its_own() -> TestResult {
     pair(&desk, "phone")?;
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Sync);
+    app.open(Page::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(
@@ -423,7 +426,7 @@ fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestR
         .click_accesskit();
     step_until(&mut harness, |app| app.sync_host().hosting())?;
     harness.step();
-    assert_eq!(harness.state().selection(), &Selection::Sync);
+    assert_eq!(harness.state().page(), Some(Page::Sync));
     assert!(shows(&harness, "Note text"));
     assert!(!harness.state().store().conflicts_arrived()?);
     assert_eq!(harness.state().arrived_conflicts(), 0);
@@ -450,6 +453,19 @@ fn sync_view(
     desk: Store,
     dir: &std::path::Path,
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    dialog(desk, dir, Page::Sync)
+}
+
+/// The Pair a Device dialog, where another Device's code is typed.
+fn pair_view(desk: Store) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    dialog(desk, std::path::Path::new("/nonexistent"), Page::Pair)
+}
+
+fn dialog(
+    desk: Store,
+    dir: &std::path::Path,
+    page: Page,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
     let path = dir.to_path_buf();
@@ -457,7 +473,7 @@ fn sync_view(
         assert_eq!(title, "Choose the shared folder");
         Some(path.clone())
     }));
-    app.select(Selection::Sync);
+    app.open(page);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
@@ -596,7 +612,7 @@ fn texts_of(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn a_bundle_is_imported_and_one_saved_in_the_sync_view() -> TestResult {
+fn a_bundle_is_imported_and_one_saved_in_the_sync_dialog() -> TestResult {
     use oldbrainfix_core::bundle::{import_bundle, write_bundle_now};
     let desk = store(1)?;
     let phone = paired_phone(&desk)?;
@@ -838,7 +854,7 @@ fn the_desktop_joins_a_phone_by_its_code_and_waits_while_the_phone_asks() -> Tes
 
     let desk = store(1)?;
     Notes::new(&desk).capture("From the desk", None, None)?;
-    let mut harness = sync_view(desk, std::path::Path::new("/nonexistent"))?;
+    let mut harness = pair_view(desk)?;
     assert!(shows(&harness, "Sync with a Device that shows its code"));
     type_code(&mut harness, &code);
     assert!(harness.state().sync_host().joining());
@@ -872,7 +888,7 @@ fn the_desktop_joins_a_phone_by_its_code_and_waits_while_the_phone_asks() -> Tes
 
 #[test]
 fn a_typed_text_that_is_no_code_says_so_under_the_field() -> TestResult {
-    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let mut harness = pair_view(store(1)?)?;
     harness
         .get_by_role(egui::accesskit::Role::TextInput)
         .click();
@@ -889,7 +905,7 @@ fn a_typed_text_that_is_no_code_says_so_under_the_field() -> TestResult {
 
 #[test]
 fn a_code_of_a_later_version_says_an_update_is_needed() -> TestResult {
-    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let mut harness = pair_view(store(1)?)?;
     let code = encode_pair_code(
         Ipv4Addr::new(192, 168, 1, 20),
         4000,
@@ -918,7 +934,7 @@ fn a_code_of_a_later_version_says_an_update_is_needed() -> TestResult {
 
 #[test]
 fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
-    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let mut harness = pair_view(store(1)?)?;
     let code = encode_pair_code(
         Ipv4Addr::new(192, 168, 1, 20),
         4000,
@@ -994,7 +1010,7 @@ fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
 
 #[test]
 fn a_phone_that_joined_the_desktop_is_remembered_with_its_certificate() -> TestResult {
-    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let mut harness = pair_view(store(1)?)?;
     let code = harness
         .state()
         .sync_host()

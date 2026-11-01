@@ -1,6 +1,6 @@
 //! The shared folder on the desktop (ADR 0003, 0012): for as long as the
 //! app runs, the window open or closed into the tray, the folder chosen
-//! in the Sync view is synced every [`EVERY`] and whenever the view asks
+//! in the Sync dialogs is synced every [`EVERY`] and whenever the view asks
 //! for it at once. One round at a time, whoever starts it.
 
 use std::sync::atomic::{AtomicBool, Ordering};

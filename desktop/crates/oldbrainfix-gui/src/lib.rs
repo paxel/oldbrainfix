@@ -6,7 +6,7 @@
 //! notifications, the tray, the login start, the one-instance rule, the
 //! command line, the capture popup and its hotkey, voice recordings and
 //! photos, Paste in the capture, the Transcripts and Photo Texts made of
-//! them, the LAN sync it hosts, for pairing in the Sync view and for paired Devices on their
+//! them, the LAN sync it hosts, for pairing in the Sync dialogs and for paired Devices on their
 //! own, the shared folder it syncs through, the folders and Google Keep
 //! exports it imports Notes from, the Backups it writes and
 //! restores, the About view with every third-party component's
@@ -44,6 +44,7 @@ pub mod login;
 pub mod media;
 pub mod media_view;
 pub mod names;
+pub mod navigation;
 pub mod notify;
 pub mod paste;
 pub mod person_view;
@@ -68,7 +69,7 @@ pub mod text_marks_view;
 pub mod theme;
 pub mod tray;
 
-pub use app::{App, Selection, Wall, local_wall};
+pub use app::{App, Page, Selection, Wall, local_wall};
 
 use std::path::PathBuf;
 

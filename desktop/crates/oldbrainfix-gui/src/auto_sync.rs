@@ -4,7 +4,7 @@
 //! on every address of this computer, its port kept from run to run,
 //! and its mDNS record says where it is. Paired phones sync with it
 //! without the PIN, proven by their keys ([`Store::serve_paired`]); the
-//! PIN stays for the first Pairing in the Sync view.
+//! PIN stays for the first Pairing in the Sync dialogs.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, Ordering};

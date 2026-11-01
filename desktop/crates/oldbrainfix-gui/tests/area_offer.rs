@@ -26,7 +26,7 @@ use oldbrainfix_core::{Alarms, AreaRole, Notes, OwnProfile, Places, SigningKey, 
 use oldbrainfix_gui::app::FileSaver;
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::sync_view::offer_refusal;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -88,6 +88,13 @@ fn window(app: App) -> Harness<'static, App> {
         );
     harness.run();
     harness
+}
+
+/// The window over `store` with People open over it (#145).
+fn people(store: Store) -> App {
+    let mut app = app(store, Selection::Agenda, "en");
+    app.open(Page::People);
+    app
 }
 
 fn app(store: Store, selection: Selection, locale: &str) -> App {
@@ -475,7 +482,7 @@ fn send_changes_saves_a_bundle_for_the_person_or_says_nothing_is_new() -> TestRe
     let (file, _) = offered(&ann, &area, &ben_id, Transport::Bundle, dir.path())?;
     let changes = dir.path().join("changes.obfsync");
     let titles = Arc::new(Mutex::new(Vec::new()));
-    let mut desk = app(ann, Selection::Profile, "en");
+    let mut desk = people(ann);
     desk.set_bundle_dialogs(saver(changes.clone(), titles.clone()), Box::new(|_| None));
     let mut harness = window(desk);
     click(&mut harness, "Open the Profile of Ben");
@@ -508,7 +515,7 @@ fn no_send_changes_while_changes_travel_by_a_folder() -> TestResult {
     let (ann, _ben, area, ben_id) = met()?;
     let dir = tempfile::tempdir()?;
     offered(&ann, &area, &ben_id, Transport::Folder, dir.path())?;
-    let mut harness = window(app(ann, Selection::Profile, "en"));
+    let mut harness = window(people(ann));
     click(&mut harness, "Open the Profile of Ben");
     assert!(shows(&harness, "Name and picture for me"));
     assert!(!shows(&harness, "Send changes to Ben"));
@@ -677,7 +684,7 @@ fn send_changes_on_the_profile_ends_the_wait_only_once_saved() -> TestResult {
     let dir = tempfile::tempdir()?;
     let for_ben = dir.path().join("for-ben.obfsync");
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let mut desk = app(ann, Selection::Profile, "en");
+    let mut desk = people(ann);
     desk.set_bundle_dialogs(
         answering(vec![None, Some(for_ben.clone())], asked.clone()),
         Box::new(|_| None),

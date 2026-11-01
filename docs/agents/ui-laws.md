@@ -21,7 +21,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   picture in the Agenda's top corner**, where the settings gear was. It
   opens the Profile page: picture, name and short code; Backups and
   recovery; Your Devices; People; Settings of this Device, with About
-  inside. No hamburger menu, no ⋮ menu for them.
+  inside. No hamburger menu, no ⋮ menu for them. On the desktop the
+  menu bar leads to them instead (see Desktop).
 - The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
   level above the Areas list**. **Swipe left on the Agenda opens the
   Areas list**, as the magnifier does. In the notes browser, **swipe
@@ -480,14 +481,35 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 ## Desktop
 
-- The desktop window is multi-pane: Areas and Topics on the left, Notes
-  in the middle, the selected Note's editor on the right, the Agenda as
-  a panel or view.
+- The desktop window is a classic desktop window (#145): **the menu
+  bar** on top (File, Edit, View, Note, Sync, Help); **the sidebar** on
+  the left with the Agenda, Unsorted, All Notes, Frogs, the Areas with
+  their Topics and the Trash, marking the place shown; **the list** in
+  the middle. The selected Note's editor sits on the right until the
+  Note opens as a dialog (#146).
+- **Every menu entry acts on what it names and closes its menu**, also
+  when picked by keyboard or screen reader; the Note menu acts on the
+  Note in the editor and is greyed while there is none, each entry as
+  far as the editor offers it. Its keys (Ctrl+N, Ctrl+F, Ctrl+M,
+  Ctrl+,; Cmd on macOS) stand beside the entries and work while typing,
+  not while a dialog is open.
+- **The Settings, About and everything under Sync (Sync, Pair a Device,
+  People, Profile, Backups) open as dialogs over the window**, never as
+  views replacing the list, and no button on the main window leads to
+  them. A dialog opened from another has a way back to it; the cross,
+  Esc and a click beside it close it. While a dialog is open,
+  announcements show at its top.
+- **Back and forward go through the places the list showed**, as a
+  browser does: the arrows at the top of the list, Alt+Left and
+  Alt+Right, and the mouse's back and forward buttons; the keys rest
+  while text is being typed. Showing a new place forgets what lay
+  ahead. Over a dialog, back leads to the dialog it was opened from, or
+  closes it; over a photo or table full screen, it closes that.
+- **The path beside the arrows leads up the levels**, such as "Areas ›
+  Household › Repairs"; a click on a level shows it, "Areas" leading to
+  All Notes.
 - In the Note lists a click unfolds a compact Note; a double-click or
   Edit opens the editor.
-- Keys replace swipes: one for back, one for forward. They are Alt+Left
-  and Alt+Right, and the mouse's back and forward buttons; the keys
-  rest while text is being typed.
 
 ## User guide
 

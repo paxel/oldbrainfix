@@ -1,7 +1,6 @@
-//! The own Profile driven headless (ADR 0017): its picture where the
-//! settings gear was, the Profile page in its order, the name typed, a
-//! picture chosen and its square picked, and the way on to Backups, the
-//! user's Devices and this Device's settings.
+//! The own Profile driven headless (ADR 0017): the Profile dialog of the
+//! Sync menu (#145) in its order, the name typed, a picture chosen and its
+//! square picked, and Backups and People in dialogs of their own.
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -9,7 +8,7 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::profile::{self, OwnProfile};
 use oldbrainfix_core::{SigningKey, Store};
 use oldbrainfix_gui::login::{self, Login};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -65,15 +64,27 @@ fn halves(width: u32, height: u32) -> Result<Vec<u8>, Box<dyn std::error::Error>
     Ok(out.into_inner())
 }
 
+/// Picks `entry` of the menu bar's `menu`.
+fn menu(harness: &mut Harness<'_, App>, menu: &str, entry: &str) {
+    harness.get_by_label(menu).click();
+    harness.run();
+    harness.get_by_label(entry).click();
+    harness.step();
+    harness.step();
+}
+
 #[test]
-fn the_profile_picture_sits_where_the_gear_was_and_opens_the_profile_page() -> TestResult {
+fn the_sync_menu_opens_the_profile_and_backups_and_people_on_their_own() -> TestResult {
     let mut harness = window(App::new(store()?, "en"));
     assert_eq!(harness.state().selection(), &Selection::Agenda);
+    // Nothing of it on the main window.
     assert!(!shows(&harness, "Settings"));
-    click(&mut harness, "Profile");
-    assert_eq!(harness.state().selection(), &Selection::Profile);
+    assert!(!shows(&harness, "Change the picture"));
+    menu(&mut harness, "Sync", "Profile");
+    assert_eq!(harness.state().page(), Some(Page::Profile));
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
 
-    // Picture, name and code; then Backups, the Devices and the settings.
+    // Picture, name and code, without Backups, Devices or settings.
     let code = OwnProfile::new(harness.state().store())
         .code()?
         .ok_or("a code")?;
@@ -86,31 +97,34 @@ fn the_profile_picture_sits_where_the_gear_was_and_opens_the_profile_page() -> T
             .rect()
             .top(),
         top(&code),
-        top("Backups and recovery"),
-        top("Your Devices"),
-        top("Settings of this Device"),
     ];
     let mut sorted = order;
     sorted.sort_by(f32::total_cmp);
     assert_eq!(order, sorted);
     assert!(harness.query_all_by_value("Ada Lovelace").next().is_some());
-    assert!(shows(&harness, "Set up Backups"));
+    for gone in [
+        "Set up Backups",
+        "Your Devices",
+        "Settings of this Device",
+        "Sync with another Device",
+    ] {
+        assert!(!shows(&harness, gone), "{gone}");
+    }
 
-    // The Devices and the settings are a click away, and back leads here.
-    click(&mut harness, "Sync with another Device");
-    assert_eq!(harness.state().selection(), &Selection::Sync);
-    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
-    harness.step();
-    harness.step();
-    assert_eq!(harness.state().selection(), &Selection::Profile);
-    click(&mut harness, "Settings");
-    assert_eq!(harness.state().selection(), &Selection::Settings);
-    // Sync and Backups left the settings.
-    assert!(!shows(&harness, "Sync with another Device"));
-    assert!(!shows(&harness, "Set up Backups"));
-    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    // Closed, Backups and People open from the menu the same way.
+    click(&mut harness, "Close Profile");
+    assert_eq!(harness.state().page(), None);
+    menu(&mut harness, "Sync", "Backups…");
+    assert_eq!(harness.state().page(), Some(Page::Backups));
+    assert!(shows(&harness, "Set up Backups"));
+    assert!(!shows(&harness, "Change the picture"));
+    harness.key_press(egui::Key::Escape);
     harness.run();
-    assert_eq!(harness.state().selection(), &Selection::Profile);
+    assert_eq!(harness.state().page(), None);
+    menu(&mut harness, "Sync", "People");
+    assert_eq!(harness.state().page(), Some(Page::People));
+    assert!(shows(&harness, "Add a person from a link"));
+    assert!(!shows(&harness, "Set up Backups"));
     Ok(())
 }
 
@@ -119,7 +133,9 @@ fn the_login_name_gives_the_initials_of_the_placeholder() -> TestResult {
     let store = store()?;
     let profile = OwnProfile::new(&store).get()?.ok_or("a Profile")?;
     assert_eq!(profile::initials(&profile.name), "AL");
-    let harness = window(App::new(store, "en"));
+    let mut app = App::new(store, "en");
+    app.open(Page::Profile);
+    let harness = window(app);
     assert!(shows(&harness, "Profile"));
     Ok(())
 }
@@ -127,7 +143,7 @@ fn the_login_name_gives_the_initials_of_the_placeholder() -> TestResult {
 #[test]
 fn a_typed_name_is_kept_sanitised() -> TestResult {
     let mut app = App::new(store()?, "en");
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let mut harness = window(app);
     harness
         .get_by_role_and_label(Role::TextInput, "Name")
@@ -177,7 +193,7 @@ fn a_chosen_picture_is_cropped_to_a_square_and_kept() -> TestResult {
         assert_eq!(title, "Choose a picture");
         Some(picked.clone())
     }));
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let mut harness = window(app);
     click(&mut harness, "Choose a picture");
     assert!(shows(&harness, "Choose the square"));
@@ -218,7 +234,7 @@ fn a_file_that_is_no_picture_is_refused() -> TestResult {
     std::fs::write(&file, b"not a picture")?;
     let mut app = App::new(store()?, "en");
     app.set_picture_picker(Box::new(move |_| Some(file.clone())));
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let mut harness = window(app);
     click(&mut harness, "Choose a picture");
     // Only that it was not set; the click opens why and what to do.
@@ -234,17 +250,11 @@ fn a_file_that_is_no_picture_is_refused() -> TestResult {
 }
 
 #[test]
-fn the_profile_page_speaks_german() -> TestResult {
+fn the_profile_dialog_speaks_german() -> TestResult {
     let mut app = App::new(store()?, "de");
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let harness = window(app);
-    for label in [
-        "Profil",
-        "Dein Code",
-        "Sicherungen und Wiederherstellung",
-        "Deine Geräte",
-        "Einstellungen dieses Geräts",
-    ] {
+    for label in ["Profil", "Dein Code", "Profil schließen"] {
         assert!(shows(&harness, label), "{label}");
     }
     Ok(())
@@ -319,7 +329,7 @@ fn two_profiles_meeting_ask_which_one_is_you_showing_both() -> TestResult {
 }
 
 #[test]
-fn later_leaves_the_question_on_the_profile_page() -> TestResult {
+fn later_leaves_the_question_in_the_profile_dialog() -> TestResult {
     let (desk, phone) = met()?;
     let mut harness = window(App::new(desk, "en"));
     click(&mut harness, "Later");
@@ -330,7 +340,7 @@ fn later_leaves_the_question_on_the_profile_page() -> TestResult {
             .is_some()
     );
 
-    click(&mut harness, "Profile");
+    menu(&mut harness, "Sync", "Profile");
     assert!(shows(
         &harness,
         "Your Devices have two Profiles. Pick yours."
@@ -364,7 +374,7 @@ fn a_name_changed_on_the_phone_shows_here_at_once() -> TestResult {
     let changes = Arc::new(AtomicU64::new(0));
     let mut app = App::new(desk.clone(), "en");
     app.watch_changes(changes.clone());
-    app.select(Selection::Profile);
+    app.open(Page::Profile);
     let mut harness = window(app);
     assert!(harness.query_all_by_value("Ada").next().is_some());
 

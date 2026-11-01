@@ -101,6 +101,8 @@ pub const OUTDENT: char = '\u{e2b4}';
 /// `table_chart_outlined`, and `arrow_back` to leave it.
 pub const TABLE: char = '\u{f41d}';
 pub const ARROW_BACK: char = '\u{e092}';
+/// Forward through the places the list showed (#145), beside `arrow_back`.
+pub const ARROW_FORWARD: char = '\u{e09b}';
 /// The frog that marks Frogs, from the emoji font, as there is none
 /// among the Material icons ([`crate::frogs_view::FROG`]).
 pub const FROG: char = '\u{1F438}';

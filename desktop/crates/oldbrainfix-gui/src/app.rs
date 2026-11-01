@@ -1,7 +1,11 @@
-//! The window (UI laws, "Desktop"): the Agenda, Areas and Topics on the
-//! left, the capture field and the Agenda or the Notes of the selection
-//! in the middle as embossed cards, the selected Note's editor or a
-//! Routine's editor on the right.
+//! The window (UI laws, "Desktop"), a classic desktop window (#145): the
+//! menu bar on top; the sidebar on the left with the Agenda, Unsorted,
+//! All Notes, Frogs, the Areas and their Topics, marking the place shown;
+//! the list in the middle, under the back and forward buttons and the
+//! path to the place; the selected Note's editor or a Routine's editor on
+//! the right, until the Note opens as a dialog (#146). The Settings and
+//! everything under Sync (Sync, Pair a Device, People, Profile, Backups)
+//! open as dialogs over the window from the menu bar.
 //!
 //! The window opens on the Agenda (UI laws, "Agenda"): the Missed
 //! Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
@@ -9,18 +13,19 @@
 //! shared Areas waiting" line while an Area shared from afar waits for
 //! Accept or Decline, today's
 //! all-day and then timed Occurrences, a gap, and tomorrow's dimmed,
-//! then the five days after it under their weekdays and dates, all of them checkable. Its gear leads to this Device's Settings, its alarm button
+//! then the five days after it under their weekdays and dates, all of them checkable. Its alarm button leads
 //! to a new Routine. A Note spawns Routines and Reminders from its
-//! editor; deleting a Note that spawned some asks whether they go too.
+//! editor and from the Note menu; deleting a Note that spawned some asks
+//! whether they go too.
 //!
 //! Every change goes through `oldbrainfix_core`, which writes the entries
 //! the phone's core writes. A card dragged onto an Area or Topic on the
-//! left is filed there. Keys replace swipes (UI laws, "Navigation"):
-//! Alt+Left or the mouse's back button goes back one level, a Topic to
-//! its Area and an Area, Unsorted or the trash to All Notes; Alt+Right or
-//! the mouse's forward button goes forward into the last selected Area,
-//! and from an Area into its last selected Topic. The keys rest while
-//! text is being typed, where Alt+arrows move the cursor.
+//! left is filed there. Back and forward go through the places the list
+//! showed, as a browser's do ([`Navigation`]): the buttons, Alt+Left and
+//! Alt+Right, and the mouse's back and forward buttons; the path leads up
+//! the levels. The keys rest while text is being typed, where Alt+arrows
+//! move the cursor; over a dialog opened from another they lead back to
+//! that one.
 //!
 //! The capture field records voice too: the microphone's button starts
 //! at once and one big stop button ends it and leaves it on the field,
@@ -118,6 +123,7 @@ use crate::media_view::{
     self, Generated, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
+use crate::navigation::Navigation;
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
@@ -148,19 +154,6 @@ pub enum Selection {
     /// The Occurrences of today and the six days after, the Missed
     /// Summary and the Unsorted count.
     Agenda,
-    /// The user's own Profile with Backups, the user's Devices and the
-    /// way to this Device's settings, reached from the Profile picture in
-    /// the Agenda's corner, where the settings gear was.
-    Profile,
-    /// This Device's settings, reached from the Profile page.
-    Settings,
-    /// The LAN sync this Device hosts while it shows, reached from the
-    /// Profile page.
-    Sync,
-    /// The version and the source, reached from the Settings.
-    About,
-    /// Every third-party component and its licence, reached from About.
-    Licences,
     /// The strangers' Sent Items waiting for "Show", Accept or Decline
     /// (#91), reached from the Agenda's "x Sent Items waiting" line.
     SentItemsWaiting,
@@ -168,8 +161,8 @@ pub enum Selection {
     /// reached from the Agenda's "x shared Areas waiting" line.
     AreaOffersWaiting,
     /// The review of the AI Task (#112): its changes by kind, Accept all
-    /// and Reject all; reached by "Done, review" in the Settings, and on
-    /// start while one waits.
+    /// and Reject all; reached by "Done, review" in the Settings dialog,
+    /// and on start while one waits.
     AiReview,
     /// The Frog view (#101): the open Frogs, oldest first, and the
     /// folded "Done" section; reached from the Agenda's "Eat a frog".
@@ -188,6 +181,42 @@ pub enum Selection {
     /// Topic, and its search also finds its Topics' Notes.
     Place(String),
     Trash,
+}
+
+/// A dialog over the window that holds what was a view of its own
+/// (#145): opened from the menu bar, the Settings and Sync dialogs among
+/// them, while the list stays where it was below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Page {
+    /// This Device's settings: Edit ▸ Settings… (Ctrl+,).
+    Settings,
+    /// The version and the source: Help ▸ About, and from the Settings.
+    About,
+    /// Every third-party component and its licence, reached from About.
+    Licences,
+    /// The user's own Profile: its picture, name and short code, and its
+    /// card; Sync ▸ Profile.
+    Profile,
+    /// Every Profile kept here, the blocked ones apart, and "Add a person
+    /// from a link"; Sync ▸ People.
+    People,
+    /// The Backups and the recovery sheet; Sync ▸ Backups….
+    Backups,
+    /// The LAN sync this Device hosts while it shows, the Conflicts, the
+    /// shared folder, the bundles and the paired Devices; Sync ▸ Sync now.
+    Sync,
+    /// Pairing either way round: the question about a Device asking,
+    /// this Device's code and the field for the other's; Sync ▸ Pair a
+    /// Device. It hosts while it shows, as Sync does.
+    Pair,
+}
+
+/// Which of Edit's Cut, Copy and Paste the field the cursor was in gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Clip {
+    Cut,
+    Copy,
+    Paste,
 }
 
 /// What a card carries while it is dragged: the Note's id.
@@ -474,16 +503,6 @@ struct UpdateNotice {
     details: String,
 }
 
-/// The last selected Area and Topic, where forward leads, as the phone's
-/// `BrowserTrail` keeps them; and where back leads from a History.
-#[derive(Debug, Clone, Default)]
-struct Trail {
-    area: Option<String>,
-    topic: Option<String>,
-    /// What a Routine's History was opened from, where back leads.
-    history: Option<Selection>,
-}
-
 /// A dialog over the window.
 #[derive(Debug, Clone, PartialEq)]
 enum Dialog {
@@ -655,6 +674,15 @@ enum Dialog {
     /// Whether the Google Takeout export to import from Google Keep is
     /// still its zip or a folder unpacked from it (ADR 0036).
     ImportKeep,
+    /// File ▸ Import… (#145): a folder of Markdown or text files, or a
+    /// Google Keep export, each with what it does, or that it reads
+    /// while it runs.
+    Import,
+    /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Note
+    /// `note` goes into.
+    FileInto {
+        note: String,
+    },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
@@ -733,6 +761,35 @@ struct Deleting {
 #[derive(Debug, Clone, PartialEq)]
 enum Action {
     Select(Selection),
+    /// Opens this dialog over the window, in place of any open (#145).
+    OpenPage(Page),
+    /// Opens this dialog from the one open, which back leads to again.
+    PageInto(Page),
+    /// Back to the dialog this one was opened from, or none.
+    PageBack,
+    ClosePage,
+    /// File ▸ New Note (Ctrl+N): the cursor into the capture field, of
+    /// the Agenda where the list has none.
+    NewNote,
+    /// File ▸ Quick note: the capture popup, as the hotkey opens it.
+    QuickNote,
+    /// File ▸ Quit: the app ends, also where the tray would keep it.
+    Quit,
+    /// Edit ▸ Find (Ctrl+F): the cursor into the list's search, of All
+    /// Notes where the list has none.
+    Find,
+    /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
+    Clip(Clip),
+    /// Help ▸ User guide: the guide's desktop page in the browser.
+    OpenGuide,
+    /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
+    /// once if one is chosen.
+    SyncNow,
+    /// Asks where the Note with this id is filed (Note ▸ File into…,
+    /// Ctrl+M).
+    AskFileInto(String),
+    /// File ▸ Import…: asks which Import.
+    AskImport,
     /// Opens the Note's editor on the right: a double-click on its card
     /// or Edit (#114).
     SelectNote(String),
@@ -1022,9 +1079,9 @@ enum Action {
     ShowError,
     /// Shows which Device needs an update, announced at the top.
     ShowUpdate,
-    /// Something asked of the Backups card on the Profile page.
+    /// Something asked of the Backups dialog.
     Backup(BackupAction),
-    /// Something asked of the own Profile on the Profile page.
+    /// Something asked of the own Profile in the Profile dialog.
     Profile(ProfileAction),
     /// Opens another person's Profile (#52).
     OpenPerson(String),
@@ -1063,6 +1120,9 @@ enum Setting {
     QuickNoteNudgeButtons(bool),
 }
 
+/// Opens an address in the browser; tests hand in one that keeps it.
+pub type UrlOpener = Box<dyn Fn(&str)>;
+
 /// The wall clock the window shows days on.
 pub type Wall = Arc<dyn Fn(DateTime<Utc>) -> NaiveDateTime + Send + Sync>;
 
@@ -1094,7 +1154,27 @@ pub struct App {
     /// Whether that table is in the Amend field's text, which it is
     /// written back into, instead of a Note's.
     table_amends: bool,
-    trail: Trail,
+    /// Where back and forward lead through the places the list showed
+    /// (#145).
+    nav: Navigation<Selection>,
+    /// The dialogs holding what were views of their own, the one shown
+    /// last; back leads through the others (#145).
+    pages: Vec<Page>,
+    /// The text field the cursor was in last, for Edit's Cut, Copy and
+    /// Paste, which take the cursor out of it, and what of them waits.
+    last_field: Option<Id>,
+    clip: Option<Clip>,
+    /// Whether File ▸ New Note or Edit ▸ Find wants the cursor in the
+    /// capture field or the search, once it shows.
+    capture_focus: bool,
+    search_focus: bool,
+    /// File ▸ Quit and File ▸ Quick note, for the native window to do.
+    quit_wanted: bool,
+    quick_note_wanted: bool,
+    /// The address the browser is to open, and who opens it; egui's
+    /// `open_url` when none.
+    open_url: Option<String>,
+    url_opener: Option<UrlOpener>,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
     capture: String,
@@ -1190,12 +1270,12 @@ pub struct App {
     query: String,
     /// Whose Notes show (#53); each view has its own, as its search.
     people: PersonFilter,
-    /// The LAN session hosted while the Sync view shows, and the name
+    /// The LAN session hosted while the Sync dialogs show, and the name
     /// this computer goes by in it.
     sync: SyncHost,
     sync_name: String,
     /// The Conflicts an automatic sync brought, to be announced at the
-    /// top until the Sync view shows them.
+    /// top until the Sync dialog shows them.
     arrived: usize,
     /// Asks the system's dialog for the shared folder, titled as given.
     folder_picker: FolderPicker,
@@ -1267,7 +1347,7 @@ pub struct App {
     again_failed: Option<bool>,
     /// The dialog a person's Profile opened over, shown again after it.
     dialog_behind: Option<Dialog>,
-    /// "Which one is you?" was put off until the Profile page asks again.
+    /// "Which one is you?" was put off until the Profile dialog asks again.
     question_later: bool,
     /// Asks the system's dialog for a picture file, titled as given.
     picture_picker: FolderPicker,
@@ -1463,7 +1543,16 @@ impl App {
             viewer: None,
             table: None,
             table_amends: false,
-            trail: Trail::default(),
+            nav: Navigation::default(),
+            pages: Vec::new(),
+            last_field: None,
+            clip: None,
+            capture_focus: false,
+            search_focus: false,
+            quit_wanted: false,
+            quick_note_wanted: false,
+            open_url: None,
+            url_opener: None,
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
             edit_wanted: None,
@@ -1602,7 +1691,7 @@ impl App {
         self.refresh();
     }
 
-    /// Hosts the Sync view on `bind` instead of the LAN address, as this
+    /// Hosts the Sync dialogs on `bind` instead of the LAN address, as this
     /// computer named `name`; tests use the loopback.
     pub fn set_sync_host(&mut self, bind: Option<std::net::IpAddr>, name: &str) {
         self.sync.bind = bind;
@@ -2623,12 +2712,14 @@ impl App {
                 return Ok(());
             }
         };
-        if self.selection == Selection::Place(area.clone()) {
-            self.selection = Selection::Place(shared.clone());
+        let (old, new) = (
+            Selection::Place(area.clone()),
+            Selection::Place(shared.clone()),
+        );
+        if self.selection == old {
+            self.selection = new.clone();
         }
-        if self.trail.area.as_deref() == Some(area.as_str()) {
-            self.trail.area = Some(shared.clone());
-        }
+        self.nav.replace(&old, &new);
         match bundle::write_area_offer_now(&self.store, &path, &shared, &person) {
             Ok(_) => self.notice = Some(t.sent_saved().to_string()),
             Err(e) => self.announce_afar_failed(&e),
@@ -3026,10 +3117,12 @@ impl App {
         if self.store.ai_review(&task)?.is_empty() {
             self.store.decline_pending(&task)?;
             if self.selection == Selection::AiReview {
-                self.selection = Selection::Settings;
+                self.go(Selection::Agenda);
             }
         } else {
-            self.selection = Selection::AiReview;
+            // In the list, the dialogs over it closed.
+            self.pages.clear();
+            self.go(Selection::AiReview);
         }
         Ok(())
     }
@@ -3043,8 +3136,9 @@ impl App {
                     self.ai_port = Some(AiPort::open(&self.store)?);
                     self.ai_copied = None;
                 }
+                // The review waits again until "Done, review".
                 if self.selection == Selection::AiReview {
-                    self.selection = Selection::Settings;
+                    self.go(Selection::Agenda);
                 }
             }
             AiAction::Copy(client) => {
@@ -3075,7 +3169,7 @@ impl App {
                     self.store.accept_pending(&task)?;
                     self.notice = Some(t.ai_accepted().to_string());
                 }
-                self.selection = Selection::Agenda;
+                self.go(Selection::Agenda);
             }
             AiAction::AskReject => self.dialog = Some(Dialog::RejectAi),
             AiAction::Reject => {
@@ -3087,7 +3181,7 @@ impl App {
                     self.store.decline_pending(&task)?;
                     self.notice = Some(t.ai_rejected().to_string());
                 }
-                self.selection = Selection::Agenda;
+                self.go(Selection::Agenda);
             }
         }
         Ok(())
@@ -3112,7 +3206,7 @@ impl App {
         }
     }
 
-    /// The LAN session the Sync view hosts.
+    /// The LAN session the Sync dialogs host.
     pub fn sync_host(&self) -> &SyncHost {
         &self.sync
     }
@@ -3235,9 +3329,53 @@ impl App {
         self.error.as_deref()
     }
 
-    /// Shows `selection` in the middle pane.
+    /// Shows `selection` in the middle pane, where back then leads from.
     pub fn select(&mut self, selection: Selection) {
         self.apply(Action::Select(selection));
+    }
+
+    /// Opens the dialog `page` over the window, in place of any open, as
+    /// the menu bar does (#145).
+    pub fn open(&mut self, page: Page) {
+        self.apply(Action::OpenPage(page));
+    }
+
+    /// Closes the dialogs opened with [`App::open`], as their close
+    /// button does.
+    pub fn close_page(&mut self) {
+        self.apply(Action::ClosePage);
+    }
+
+    /// The dialog shown over the window, if one is (#145).
+    pub fn page(&self) -> Option<Page> {
+        self.pages.last().copied()
+    }
+
+    /// Whether back and forward lead anywhere (#145).
+    pub fn can_go_back(&self) -> bool {
+        self.nav.can_go_back()
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        self.nav.can_go_forward()
+    }
+
+    /// Whether File ▸ Quit was picked since asked last: the app is to
+    /// end, also where closing the window leaves it in the tray.
+    pub fn take_quit(&mut self) -> bool {
+        std::mem::take(&mut self.quit_wanted)
+    }
+
+    /// Whether File ▸ Quick note was picked since asked last: the capture
+    /// popup is to open, as the hotkey opens it.
+    pub fn take_quick_note(&mut self) -> bool {
+        std::mem::take(&mut self.quick_note_wanted)
+    }
+
+    /// Opens Help ▸ User guide's address with `opener` instead of egui's
+    /// `open_url`.
+    pub fn set_url_opener(&mut self, opener: UrlOpener) {
+        self.url_opener = Some(opener);
     }
 
     /// Shows the Note `id` on the right.
@@ -3304,15 +3442,27 @@ impl App {
             && view.area(id).is_none()
             && view.topic(id).is_none()
         {
-            self.selection = Selection::All;
+            self.arrive(Selection::All);
             read = self.read();
         }
-        // A Routine gone meanwhile has no History to show.
+        // A Routine gone meanwhile has no History to show: back where it
+        // was opened from.
         if let (Ok(view), Selection::History(_)) = (&read, &self.selection)
             && view.history.is_none()
         {
-            self.selection = self.trail.history.take().unwrap_or(Selection::Agenda);
+            let back = self.nav.back(self.selection.clone());
+            self.arrive(back.unwrap_or(Selection::Agenda));
             read = self.read();
+        }
+        // Back and forward lead to no place gone meanwhile.
+        if let Ok(view) = &read {
+            let routines = Routines::new(&self.store);
+            let current = self.selection.clone();
+            self.nav.retain(&current, |place| match place {
+                Selection::Place(id) => view.area(id).is_some() || view.topic(id).is_some(),
+                Selection::History(id) => routines.by_id(id).ok().flatten().is_some(),
+                _ => true,
+            });
         }
         match read {
             Ok(view) => {
@@ -3370,7 +3520,7 @@ impl App {
         if self.view.profile_question.is_none() {
             self.question_later = false;
         }
-        if self.selection == Selection::Sync {
+        if self.pages.contains(&Page::Sync) {
             // What an automatic sync brought meanwhile.
             self.sync.reload_conflicts(&self.store);
         }
@@ -3450,8 +3600,8 @@ impl App {
         if !self.store.conflicts_arrived().unwrap_or(false) {
             return 0;
         }
-        // The Sync view lists them: announced.
-        if self.selection == Selection::Sync {
+        // The Sync dialog lists them: announced.
+        if self.pages.contains(&Page::Sync) {
             drop(self.store.set_conflicts_arrived(false));
             return 0;
         }
@@ -3497,11 +3647,6 @@ impl App {
         let search = Search::new(&self.store);
         let shown = match &self.selection {
             Selection::Agenda
-            | Selection::Profile
-            | Selection::Settings
-            | Selection::Sync
-            | Selection::About
-            | Selection::Licences
             | Selection::SentItemsWaiting
             | Selection::AreaOffersWaiting
             | Selection::AiReview
@@ -4058,10 +4203,14 @@ impl App {
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
         let done = self.act(action);
-        // The session runs exactly while the Sync view shows, or the
-        // first start's adding of a Device of one's own.
+        // The session runs exactly while the Sync or Pair dialog shows,
+        // or the first start's adding of a Device of one's own.
         let adding = self.welcome.as_ref().is_some_and(|w| w.adding);
-        if (self.selection == Selection::Sync || adding) != self.sync.hosting() {
+        let shown = self
+            .pages
+            .iter()
+            .any(|p| matches!(p, Page::Sync | Page::Pair));
+        if (shown || adding) != self.sync.hosting() {
             if self.sync.hosting() {
                 self.sync.stop();
             } else {
@@ -4100,28 +4249,51 @@ impl App {
         match action {
             Action::Select(selection) => {
                 self.save_text()?;
-                // Every level has a search and a person filter of its
-                // own, as on the phone.
-                if selection != self.selection {
-                    self.query.clear();
-                    self.people = PersonFilter::default();
-                }
-                // Back from a History leads where it was opened from.
-                if matches!(selection, Selection::History(_))
-                    && !matches!(self.selection, Selection::History(_))
-                {
-                    self.trail.history = Some(self.selection.clone());
-                }
-                if let Selection::Place(id) = &selection {
-                    if let Some(topic) = self.view.topic(id) {
-                        self.trail.area = Some(topic.area_id.clone());
-                        self.trail.topic = Some(topic.id.clone());
-                    } else {
-                        self.trail.area = Some(id.clone());
-                    }
-                }
-                self.selection = selection;
+                self.go(selection);
             }
+            Action::OpenPage(page) => {
+                self.save_text()?;
+                self.pages = vec![page];
+            }
+            Action::PageInto(page) => self.pages.push(page),
+            Action::PageBack => {
+                self.pages.pop();
+            }
+            Action::ClosePage => self.pages.clear(),
+            Action::NewNote => {
+                // The capture field tops the Agenda and every list of Notes
+                // but the trash.
+                let captures = matches!(
+                    self.selection,
+                    Selection::Agenda | Selection::All | Selection::Unsorted | Selection::Place(_)
+                );
+                if !captures {
+                    self.save_text()?;
+                    self.go(Selection::Agenda);
+                }
+                self.capture_focus = true;
+            }
+            Action::QuickNote => self.quick_note_wanted = true,
+            Action::Quit => self.quit_wanted = true,
+            Action::Find => {
+                // All Notes, an Area and a Topic have the search.
+                if !matches!(self.selection, Selection::All | Selection::Place(_)) {
+                    self.save_text()?;
+                    self.go(Selection::All);
+                }
+                self.search_focus = true;
+            }
+            Action::Clip(clip) => self.clip = Some(clip),
+            Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
+            Action::SyncNow => {
+                self.save_text()?;
+                self.pages = vec![Page::Sync];
+                if self.store.sync_folder()?.is_some() {
+                    self.folder_now()?;
+                }
+            }
+            Action::AskFileInto(note) => self.dialog = Some(Dialog::FileInto { note }),
+            Action::AskImport => self.dialog = Some(Dialog::Import),
             Action::SelectNote(id) => {
                 self.save_text()?;
                 self.selected_note = Some(id);
@@ -4449,13 +4621,15 @@ impl App {
                 }
             }
             Action::Back => {
-                if let Some(back) = self.back() {
-                    return self.act(Action::Select(back));
+                self.save_text()?;
+                if let Some(to) = self.nav.back(self.selection.clone()) {
+                    self.arrive(to);
                 }
             }
             Action::Forward => {
-                if let Some(forward) = self.forward() {
-                    return self.act(Action::Select(forward));
+                self.save_text()?;
+                if let Some(to) = self.nav.forward(self.selection.clone()) {
+                    self.arrive(to);
                 }
             }
             Action::Toggle(routine, occurrence) => {
@@ -4710,6 +4884,8 @@ impl App {
                     if let Some(source) = source {
                         let area = t.import_keep_area_name().to_string();
                         self.import.start_keep(self.store.clone(), source, area);
+                        // The Import dialog says it reads meanwhile.
+                        self.dialog = Some(Dialog::Import);
                     }
                 }
             }
@@ -4906,8 +5082,8 @@ impl App {
                     let area = self.store.share(&area)?;
                     self.dialog = None;
                     self.save_text()?;
-                    self.query.clear();
-                    self.selection = Selection::Sync;
+                    // Whoever joins with this Device's code gets the Area.
+                    self.pages = vec![Page::Pair];
                     self.sync.start_inviting(&self.store, Invite { area, role });
                 }
             }
@@ -5928,45 +6104,61 @@ impl App {
         Ok(())
     }
 
-    /// One level up: a Topic to its Area; an Area, Unsorted or the trash
-    /// to All Notes.
-    fn back(&self) -> Option<Selection> {
-        match &self.selection {
-            Selection::All | Selection::Agenda => None,
-            Selection::Profile | Selection::SentItemsWaiting | Selection::AreaOffersWaiting => {
-                Some(Selection::Agenda)
-            }
-            Selection::Settings | Selection::Sync => Some(Selection::Profile),
-            Selection::AiReview => Some(Selection::Settings),
-            Selection::Frogs | Selection::AllRoutines => Some(Selection::Agenda),
-            Selection::History(_) => Some(self.trail.history.clone().unwrap_or(Selection::Agenda)),
-            Selection::About => Some(Selection::Settings),
-            Selection::Licences => Some(Selection::About),
-            Selection::Place(id) => Some(match self.view.topic(id) {
-                Some(topic) => Selection::Place(topic.area_id.clone()),
-                None => Selection::All,
-            }),
-            Selection::Unsorted | Selection::Trash => Some(Selection::All),
-        }
+    /// Shows `to` in the list, back leading to the place it leaves
+    /// (#145).
+    fn go(&mut self, to: Selection) {
+        self.nav.went(self.selection.clone(), &to);
+        self.arrive(to);
     }
 
-    /// Into the last selected Area, or from an Area into its last
-    /// selected Topic.
-    fn forward(&self) -> Option<Selection> {
+    /// Shows `to` in the list; every level has a search and a person
+    /// filter of its own, as on the phone.
+    fn arrive(&mut self, to: Selection) {
+        if to != self.selection {
+            self.query.clear();
+            self.people = PersonFilter::default();
+        }
+        self.selection = to;
+    }
+
+    /// The way up to the place the list shows, as the path above it shows
+    /// it (#145): each level with where a click on it leads, the place
+    /// itself last, leading nowhere.
+    fn path(&self) -> Vec<(String, Option<Selection>)> {
+        let t = &self.t;
+        let agenda = || (t.agenda_title().to_string(), Some(Selection::Agenda));
+        let here = |name: &str| (name.to_string(), None);
         match &self.selection {
-            Selection::Place(id) if self.view.area(id).is_some() => self
-                .trail
-                .topic
-                .as_ref()
-                .filter(|t| self.view.topic(t).is_some_and(|t| t.area_id == *id))
-                .map(|t| Selection::Place(t.clone())),
-            Selection::Place(_) => None,
-            _ => self
-                .trail
-                .area
-                .as_ref()
-                .filter(|a| self.view.area(a).is_some())
-                .map(|a| Selection::Place(a.clone())),
+            Selection::Agenda => vec![here(t.agenda_title())],
+            Selection::All => vec![here(t.all_notes_title())],
+            Selection::Unsorted => vec![here(t.unsorted())],
+            Selection::Frogs => vec![here(t.frogs_title())],
+            Selection::Trash => vec![here(t.trash_title())],
+            Selection::AllRoutines => vec![agenda(), here(t.all_routines_title())],
+            Selection::History(_) => vec![
+                agenda(),
+                (
+                    t.all_routines_title().to_string(),
+                    Some(Selection::AllRoutines),
+                ),
+                here(t.history_title()),
+            ],
+            Selection::SentItemsWaiting => vec![agenda(), here(t.sent_items_waiting_title())],
+            Selection::AreaOffersWaiting => vec![agenda(), here(t.area_offers_waiting_title())],
+            Selection::AiReview => vec![agenda(), here(t.ai_review_title())],
+            Selection::Place(id) => {
+                // The Areas live in the sidebar; their Notes in All Notes.
+                let mut path = vec![(t.areas_title().to_string(), Some(Selection::All))];
+                for (area, topics) in &self.view.areas {
+                    if area.id == *id {
+                        path.push(here(&area_name(t, area)));
+                    } else if let Some(topic) = topics.iter().find(|p| p.id == *id) {
+                        path.push((area_name(t, area), Some(Selection::Place(area.id.clone()))));
+                        path.push(here(&topic_name(t, topic)));
+                    }
+                }
+                path
+            }
         }
     }
 
@@ -6016,7 +6208,7 @@ impl App {
     /// The first start's view instead of the panes: the three choices,
     /// the Starter Set, a Backup being restored, or a Device of one's own
     /// being added with
-    /// the Sync view's ways to pair. Back, as key or mouse button, goes
+    /// the Sync dialogs' ways to pair. Back, as key or mouse button, goes
     /// to the choices.
     fn welcome_view(&mut self, ui: &mut Ui, tones: Tones, actions: Vec<Action>) {
         let (t, wall) = (self.t, self.wall.clone());
@@ -6144,7 +6336,7 @@ impl App {
             }
             self.refresh();
         }
-        // A phone's requests are answered while the Sync view shows.
+        // A phone's requests are answered while the Sync dialogs show.
         if self.sync.hosting() {
             let asked = self.sync.asking().is_some();
             if self.sync.poll(&self.store, &self.sync_name) {
@@ -6168,7 +6360,7 @@ impl App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
-        // A typed code being joined, also after leaving the Sync view: its
+        // A typed code being joined, also after leaving the Sync dialogs: its
         // answer is taken in when it comes.
         if self.sync.joining() {
             match self.sync.joined(&self.store, &self.t) {
@@ -6198,11 +6390,16 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
-        // An Import reading its folder, also after leaving the Sync view:
+        // An Import reading its folder, also after its dialog closed:
         // its answer is announced when it comes.
         if self.import.running() {
             match self.import.finished() {
                 Some((kind, imported)) => {
+                    // What it made is announced at the top, clickable once
+                    // the Import dialog is gone.
+                    if self.dialog == Some(Dialog::Import) {
+                        self.dialog = None;
+                    }
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
                     match kind {
                         Importing::Folder(name) => self.announce_folder_imported(&name, imported),
@@ -6324,6 +6521,17 @@ impl App {
             if back {
                 actions.push(Action::ClosePhoto);
             }
+        } else if self.dialog.is_none() && !self.pages.is_empty() {
+            // Back leads from a dialog opened from another to that one,
+            // and closes the first; forward goes nowhere there.
+            let typing = ui.ctx().text_edit_focused();
+            let back = ui.input_mut(|i| {
+                i.pointer.button_pressed(PointerButton::Extra1)
+                    || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+            });
+            if back {
+                actions.push(Action::PageBack);
+            }
         } else if self.dialog.is_none() {
             let typing = ui.ctx().text_edit_focused();
             ui.input_mut(|i| {
@@ -6338,6 +6546,31 @@ impl App {
                 }
             });
         }
+        // The menu bar's keys, over the window only; they are no text
+        // keys, so they work while typing too.
+        let over = self.viewer.is_some() || self.table.is_some() || self.dialog.is_some();
+        if self.welcome.is_none() && !over && self.pages.is_empty() {
+            let note = self.note_menu_note();
+            ui.input_mut(|i| {
+                if i.consume_key(Modifiers::COMMAND, Key::N) {
+                    actions.push(Action::NewNote);
+                }
+                if i.consume_key(Modifiers::COMMAND, Key::F) {
+                    actions.push(Action::Find);
+                }
+                if i.consume_key(Modifiers::COMMAND, Key::Comma) {
+                    actions.push(Action::OpenPage(Page::Settings));
+                }
+                if let Some(note) = note.filter(|_| i.consume_key(Modifiers::COMMAND, Key::M)) {
+                    actions.push(Action::AskFileInto(note));
+                }
+            });
+        }
+        // The field the cursor is in, for Edit's Cut, Copy and Paste,
+        // which take the cursor out of it.
+        if ui.ctx().text_edit_focused() {
+            self.last_field = ui.ctx().memory(|m| m.focused());
+        }
         background::paint(
             ui.painter(),
             ui.max_rect(),
@@ -6345,129 +6578,20 @@ impl App {
             tones.mark,
             self.scrolled * background::PARALLAX,
         );
-        if self.error.is_some() {
-            // Announcements go to the top (UI laws), without the error's
-            // text: the click shows it, with the cause and the fix.
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().error_fg_color;
-                    let text = RichText::new(self.t.action_failed()).color(colour);
-                    let label = egui::Label::new(text).sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::ShowError);
-                    }
-                });
-        } else if !self.untranscribable.is_empty() {
-            // Recordings from files kept but not transcribable; the click
-            // shows why (UI laws, "Announcements").
-            let text = self
-                .t
-                .file_recording_failed(self.untranscribable.len() as i64);
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::ShowUntranscribable);
-                    }
-                });
-        } else if let Some(photo) = self.again_failed {
-            // Reading or transcribing again brought no text; the click
-            // shows why.
-            let text = if photo {
-                self.t.read_text_again_failed()
-            } else {
-                self.t.transcribe_again_failed()
-            };
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::ShowAgainFailed(photo));
-                    }
-                });
-        } else if let Some(notice) = self.notice.clone() {
-            // What a job did, until clicked away; the click opens the
-            // details, a failure's why.
-            let behind = self.dialog_behind_notice().is_some();
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(notice).color(colour))
-                        .sense(egui::Sense::click());
-                    let mut response = ui.add(label);
-                    if !behind {
-                        response = response.on_hover_text(self.t.close());
-                    }
-                    if response.clicked() {
-                        if behind {
-                            actions.push(Action::ShowNoticeDialog);
-                        } else {
-                            self.notice = None;
-                        }
-                    }
-                });
-        } else if !self.updates.is_empty() {
-            // A sync that needs an update, until clicked; the click shows
-            // which Device.
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let headline = if self.updates.front().is_some_and(|n| n.settings) {
-                        self.t.settings_update_needed()
-                    } else {
-                        self.t.update_needed()
-                    };
-                    let text = RichText::new(headline).color(colour);
-                    let label = egui::Label::new(text).sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::ShowUpdate);
-                    }
-                });
-        } else if self.arrived > 0 && self.selection != Selection::Sync {
-            // One at a time: Conflicts from an automatic sync, a click
-            // away from the Sync view that lists them.
-            let text = self.t.sync_conflicts_arrived(self.arrived as i64);
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::Select(Selection::Sync));
-                    }
-                });
-        } else if self.view.sync_paused {
-            // Sync waits for the AI Task, open or waiting for its review,
-            // for as long as it does, below every announcement that goes
-            // by a click; the click leads to where the wait ends.
-            let (text, asked) = if self.ai_port.is_some() {
-                (
-                    self.t.ai_port_open_banner(),
-                    Action::Select(Selection::Settings),
+        // The menu bar tops the window, over the announcements (#145).
+        if self.welcome.is_none() {
+            egui::Panel::top("menu bar")
+                .frame(
+                    Frame::NONE
+                        .inner_margin(Margin::symmetric(8, 4))
+                        .fill(tones.card),
                 )
-            } else {
-                (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
-            };
-            egui::Panel::top("announcement")
-                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
-                .show(ui, |ui| {
-                    let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(asked);
-                    }
-                });
+                .show(ui, |ui| self.menu_bar(ui, &mut actions));
+        }
+        // Announcements go to the top (UI laws): of the window, or of the
+        // dialog over it, where they can be clicked.
+        if self.pages.is_empty() {
+            self.announcements(ui, tones, &mut actions);
         }
         // The first start's view, instead of the panes, until answered.
         if self.welcome.is_some() {
@@ -6480,6 +6604,7 @@ impl App {
             .default_size(260.0)
             .min_size(180.0)
             .show(ui, |ui| self.places_pane(ui, tones, &mut actions));
+        // Until the Note opens as a dialog (#146).
         egui::Panel::right("note")
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .resizable(true)
@@ -6488,7 +6613,12 @@ impl App {
             .show(ui, |ui| self.note_pane(ui, tones, &mut actions));
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
-            .show(ui, |ui| self.notes_pane(ui, tones, &mut actions));
+            .show(ui, |ui| {
+                self.nav_row(ui, &mut actions);
+                self.notes_pane(ui, tones, &mut actions);
+            });
+        // The dialogs of what were views, under the dialogs they open.
+        self.page_dialog(ui.ctx(), tones, &mut actions);
         if !matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
             self.dialog(ui.ctx(), tones, &mut actions);
         }
@@ -6524,6 +6654,24 @@ impl App {
         if let Some(text) = self.copy.take() {
             ui.ctx().copy_text(text);
         }
+        // Edit's Cut, Copy and Paste: the cursor back into its field, and
+        // the system's clipboard asked as the keys ask it.
+        if let Some(clip) = self.clip.take()
+            && let Some(field) = self.last_field
+        {
+            ui.ctx().memory_mut(|m| m.request_focus(field));
+            ui.ctx().send_viewport_cmd(match clip {
+                Clip::Cut => egui::ViewportCommand::RequestCut,
+                Clip::Copy => egui::ViewportCommand::RequestCopy,
+                Clip::Paste => egui::ViewportCommand::RequestPaste,
+            });
+        }
+        if let Some(url) = self.open_url.take() {
+            match &self.url_opener {
+                Some(opener) => opener(&url),
+                None => ui.ctx().open_url(egui::OpenUrl::new_tab(url)),
+            }
+        }
     }
 
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
@@ -6534,8 +6682,8 @@ impl App {
                 let text = ui.visuals().text_color();
                 let rows = [
                     (Selection::Agenda, icons::AGENDA, t.agenda_title()),
-                    (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Unsorted, icons::UNSORTED, t.unsorted()),
+                    (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Frogs, icons::FROG, t.frogs_title()),
                 ];
                 for (selection, icon, label) in rows {
@@ -6636,15 +6784,494 @@ impl App {
             });
     }
 
+    /// The one announcement at the top (UI laws, "Announcements"), the
+    /// most pressing first: of the window, or of the dialog shown over it
+    /// (#145).
+    fn announcements(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        if self.error.is_some() {
+            // Announcements go to the top (UI laws), without the error's
+            // text: the click shows it, with the cause and the fix.
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().error_fg_color;
+                    let text = RichText::new(self.t.action_failed()).color(colour);
+                    let label = egui::Label::new(text).sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowError);
+                    }
+                });
+        } else if !self.untranscribable.is_empty() {
+            // Recordings from files kept but not transcribable; the click
+            // shows why (UI laws, "Announcements").
+            let text = self
+                .t
+                .file_recording_failed(self.untranscribable.len() as i64);
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowUntranscribable);
+                    }
+                });
+        } else if let Some(photo) = self.again_failed {
+            // Reading or transcribing again brought no text; the click
+            // shows why.
+            let text = if photo {
+                self.t.read_text_again_failed()
+            } else {
+                self.t.transcribe_again_failed()
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowAgainFailed(photo));
+                    }
+                });
+        } else if let Some(notice) = self.notice.clone() {
+            // What a job did, until clicked away; the click opens the
+            // details, a failure's why.
+            let behind = self.dialog_behind_notice().is_some();
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(notice).color(colour))
+                        .sense(egui::Sense::click());
+                    let mut response = ui.add(label);
+                    if !behind {
+                        response = response.on_hover_text(self.t.close());
+                    }
+                    if response.clicked() {
+                        if behind {
+                            actions.push(Action::ShowNoticeDialog);
+                        } else {
+                            self.notice = None;
+                        }
+                    }
+                });
+        } else if !self.updates.is_empty() {
+            // A sync that needs an update, until clicked; the click shows
+            // which Device.
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let headline = if self.updates.front().is_some_and(|n| n.settings) {
+                        self.t.settings_update_needed()
+                    } else {
+                        self.t.update_needed()
+                    };
+                    let text = RichText::new(headline).color(colour);
+                    let label = egui::Label::new(text).sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowUpdate);
+                    }
+                });
+        } else if self.arrived > 0 && !self.pages.contains(&Page::Sync) {
+            // One at a time: Conflicts from an automatic sync, a click
+            // away from the Sync dialog that lists them.
+            let text = self.t.sync_conflicts_arrived(self.arrived as i64);
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::OpenPage(Page::Sync));
+                    }
+                });
+        } else if self.view.sync_paused {
+            // Sync waits for the AI Task, open or waiting for its review,
+            // for as long as it does, below every announcement that goes
+            // by a click; the click leads to where the wait ends.
+            let (text, asked) = if self.ai_port.is_some() {
+                (
+                    self.t.ai_port_open_banner(),
+                    Action::OpenPage(Page::Settings),
+                )
+            } else {
+                (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(asked);
+                    }
+                });
+        }
+    }
+
+    /// What the Note menu may do to the Note shown on the right (#145),
+    /// as its editor's buttons may; none while no Note shows there, or
+    /// one in the trash.
+    fn note_menu(&self) -> Option<NoteMenu> {
+        let (placed, _) = self.view.detail.as_ref()?;
+        let note = &placed.note;
+        if note.is_trashed() {
+            return None;
+        }
+        let may = self.view.may;
+        let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
+        let plain = self.view.tally.is_none()
+            && self.view.checklist.is_none()
+            && self.view.shopping.is_none()
+            && !note.is_merged();
+        Some(NoteMenu {
+            id: note.id.clone(),
+            changes: may.changes,
+            schedules: may.schedules,
+            frog: may.schedules && !frog_open,
+            amends: may.amends,
+            checklist: may.amends && self.view.makes_checklist,
+            shopping: may.amends && self.view.makes_shopping,
+            tally: may.amends && may.changes && plain,
+        })
+    }
+
+    /// The Note Ctrl+M files: the one shown, where it may be filed.
+    fn note_menu_note(&self) -> Option<String> {
+        self.note_menu().filter(|n| n.changes).map(|n| n.id)
+    }
+
+    /// The menu bar (#145): File, Edit, View, Note, Sync and Help, each
+    /// entry with its keys where it has some, the Note menu's greyed
+    /// while no Note is selected. A pick closes its menu, also one by
+    /// keyboard or screen reader.
+    fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let ctx = ui.ctx().clone();
+        // As the system writes them: Ctrl+N, or ⌘N on macOS; the comma as
+        // a comma.
+        let keys = |key: Key| {
+            let shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, key);
+            Some(ctx.format_shortcut(&shortcut).replace("Comma", ","))
+        };
+        let note = self.note_menu();
+        let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
+        let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
+        let field = self.last_field.is_some();
+        // Full or compact where the list has cards.
+        let cards = self.cards_key().is_some();
+        egui::MenuBar::new().ui(ui, |ui| {
+            ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
+                let items = [
+                    (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
+                    (t.settings_quick_note(), None, true, Action::QuickNote),
+                    (t.menu_import(), None, true, Action::AskImport),
+                    (
+                        t.save_as_markdown(),
+                        None,
+                        may(|n| n.amends),
+                        Action::SaveAsMarkdown(id.clone()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
+            });
+            ui.menu_button(RichText::new(t.menu_edit()).color(text), |ui| {
+                let items = [
+                    (t.menu_cut(), None, field, Action::Clip(Clip::Cut)),
+                    (t.menu_copy(), None, field, Action::Clip(Clip::Copy)),
+                    (t.paste(), None, field, Action::Clip(Clip::Paste)),
+                    (t.menu_find(), keys(Key::F), true, Action::Find),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                let settings = Action::OpenPage(Page::Settings);
+                menu_entries(
+                    ui,
+                    [(t.menu_settings(), keys(Key::Comma), true, settings)],
+                    actions,
+                );
+            });
+            ui.menu_button(RichText::new(t.menu_view()).color(text), |ui| {
+                let places = [
+                    (t.agenda_title(), Selection::Agenda),
+                    (t.unsorted(), Selection::Unsorted),
+                    (t.all_notes_title(), Selection::All),
+                    (t.frogs_title(), Selection::Frogs),
+                    (t.all_routines_title(), Selection::AllRoutines),
+                ];
+                for (label, place) in places {
+                    let on = self.selection == place;
+                    let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                    if ui.add(button).clicked() {
+                        actions.push(Action::Select(place));
+                        ui.close();
+                    }
+                }
+                ui.separator();
+                let compact = self.view.compact;
+                for (label, wanted) in
+                    [(t.menu_full_cards(), false), (t.menu_compact_cards(), true)]
+                {
+                    let on = cards && compact == wanted;
+                    let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                    if ui.add_enabled(cards, button).clicked() {
+                        actions.push(Action::Compact(wanted));
+                        ui.close();
+                    }
+                }
+                ui.separator();
+                // It follows the system until it can be chosen (#147).
+                ui.menu_button(RichText::new(t.menu_theme()).color(text), |ui| {
+                    let line = egui::Button::selectable(true, t.menu_theme_system());
+                    ui.add_enabled(false, line);
+                });
+            });
+            ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
+                let items = [
+                    (
+                        t.file_into(),
+                        keys(Key::M),
+                        may(|n| n.changes),
+                        Action::AskFileInto(id.clone()),
+                    ),
+                    (
+                        t.menu_routine(),
+                        None,
+                        may(|n| n.schedules),
+                        Action::NewRoutine {
+                            note: Some(id.clone()),
+                            reminder: false,
+                        },
+                    ),
+                    (
+                        t.menu_reminder(),
+                        None,
+                        may(|n| n.schedules),
+                        Action::NewRoutine {
+                            note: Some(id.clone()),
+                            reminder: true,
+                        },
+                    ),
+                    (
+                        t.frog(),
+                        None,
+                        may(|n| n.frog),
+                        Action::SpawnFrog(id.clone()),
+                    ),
+                    (
+                        t.session(),
+                        None,
+                        may(|n| n.schedules),
+                        Action::NewSession(Some(id.clone())),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                let items = [
+                    (
+                        t.make_checklist(),
+                        None,
+                        may(|n| n.checklist),
+                        Action::Checklist(ChecklistAction::Make(id.clone())),
+                    ),
+                    (
+                        t.make_shopping_list(),
+                        None,
+                        may(|n| n.shopping),
+                        Action::Shopping(ShoppingAction::Make(id.clone())),
+                    ),
+                    (
+                        t.make_tally(),
+                        None,
+                        may(|n| n.tally),
+                        Action::Tally(TallyAction::Make(id.clone())),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                let items = [
+                    (
+                        t.send_to_person(),
+                        None,
+                        may(|n| n.amends),
+                        Action::StartSend(id.clone()),
+                    ),
+                    (
+                        t.copy_as_text(),
+                        None,
+                        may(|n| n.amends),
+                        Action::CopyAsText(id.clone()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                menu_entries(
+                    ui,
+                    [(t.delete(), None, may(|n| n.changes), Action::Trash)],
+                    actions,
+                );
+            });
+            ui.menu_button(RichText::new(t.menu_sync()).color(text), |ui| {
+                let items = [
+                    (t.menu_sync_now(), None, true, Action::SyncNow),
+                    (t.menu_pair(), None, true, Action::OpenPage(Page::Pair)),
+                    (t.people_title(), None, true, Action::OpenPage(Page::People)),
+                    (
+                        t.profile_title(),
+                        None,
+                        true,
+                        Action::OpenPage(Page::Profile),
+                    ),
+                    (
+                        t.menu_backups(),
+                        None,
+                        true,
+                        Action::OpenPage(Page::Backups),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+            });
+            ui.menu_button(RichText::new(t.menu_help()).color(text), |ui| {
+                let items = [
+                    (t.menu_user_guide(), None, true, Action::OpenGuide),
+                    (t.about_title(), None, true, Action::OpenPage(Page::About)),
+                ];
+                menu_entries(ui, items, actions);
+            });
+        });
+    }
+
+    /// Back and forward at the top of the list, and the path to the place
+    /// it shows, each level above it a click away (#145).
+    fn nav_row(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        ui.horizontal(|ui| {
+            let arrows = [
+                (
+                    self.nav.can_go_back(),
+                    icons::ARROW_BACK,
+                    t.nav_back(),
+                    Action::Back,
+                ),
+                (
+                    self.nav.can_go_forward(),
+                    icons::ARROW_FORWARD,
+                    t.nav_forward(),
+                    Action::Forward,
+                ),
+            ];
+            for (may, icon, label, action) in arrows {
+                let colour = if may { text } else { weak };
+                let arrow = ui.add_enabled_ui(may, |ui| icon_button(ui, icon, label, colour));
+                if arrow.inner.clicked() {
+                    actions.push(action);
+                }
+            }
+            ui.add_space(8.0);
+            for (i, (name, to)) in self.path().into_iter().enumerate() {
+                if i > 0 {
+                    crumb(ui, "›", weak, None);
+                }
+                match to {
+                    Some(to) => {
+                        if crumb(ui, &name, text, Some(&t.path_up(&name))) {
+                            actions.push(Action::Select(to));
+                        }
+                    }
+                    None => {
+                        crumb(ui, &name, weak, None);
+                    }
+                }
+            }
+        });
+        ui.add_space(4.0);
+    }
+
+    /// The dialog of what was a view of its own (#145), over the window
+    /// and under the dialogs it opens: on top the way back to the dialog it
+    /// was opened from and its close button; Esc and a click beside it
+    /// close it.
+    fn page_dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
+        let Some(page) = self.page() else {
+            return;
+        };
+        let t = self.t;
+        let parent = self
+            .pages
+            .len()
+            .checked_sub(2)
+            .and_then(|i| self.pages.get(i))
+            .copied();
+        let screen = ctx.content_rect().size();
+        let size = egui::vec2(
+            (screen.x - 120.0).clamp(320.0, 760.0),
+            (screen.y - 100.0).max(240.0),
+        );
+        let frame = Frame::NONE
+            .fill(tones.background)
+            .corner_radius(theme::CARD_RADIUS)
+            .inner_margin(Margin::same(16));
+        let modal = egui::Modal::new(Id::new("page"))
+            .frame(frame)
+            .show(ctx, |ui| {
+                ui.set_width(size.x);
+                ui.set_height(size.y);
+                self.announcements(ui, tones, actions);
+                let text = ui.visuals().text_color();
+                ui.horizontal(|ui| {
+                    if let Some(parent) = parent {
+                        let back = t.page_back(page_title(&t, parent));
+                        if icon_button(ui, icons::ARROW_BACK, &back, text).clicked() {
+                            actions.push(Action::PageBack);
+                        }
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let close = t.page_close(page_title(&t, page));
+                        if icon_button(ui, icons::CLOSE, &close, text).clicked() {
+                            actions.push(Action::ClosePage);
+                        }
+                    });
+                });
+                match page {
+                    Page::Settings => self.settings_pane(ui, tones, actions),
+                    Page::About => {
+                        if about_view::about(ui, &t, tones) {
+                            actions.push(Action::PageInto(Page::Licences));
+                        }
+                    }
+                    Page::Licences => about_view::licences_page(ui, &t),
+                    Page::Profile | Page::People | Page::Backups => {
+                        self.profile_pane(ui, tones, actions, page);
+                    }
+                    Page::Sync | Page::Pair => {
+                        let wall = self.wall.clone();
+                        let pair = page == Page::Pair;
+                        let shown = self.sync.show(ui, &t, tones, (&self.store, &wall), pair);
+                        if let Some(asked) = shown {
+                            actions.push(Action::Sync(asked));
+                        }
+                    }
+                }
+            });
+        if modal.should_close() {
+            actions.push(Action::ClosePage);
+        }
+    }
+
     /// The title of the middle pane.
     fn title(&self) -> String {
         match &self.selection {
             Selection::Agenda => self.t.agenda_title().to_string(),
-            Selection::Profile => self.t.profile_title().to_string(),
-            Selection::Settings => self.t.settings_title().to_string(),
-            Selection::Sync => self.t.sync_title().to_string(),
-            Selection::About => self.t.about_title().to_string(),
-            Selection::Licences => self.t.open_source_licenses().to_string(),
             Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
             Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
             Selection::AiReview => self.t.ai_review_title().to_string(),
@@ -6739,6 +7366,11 @@ impl App {
                     .frame(Frame::NONE),
             );
             name_field(ui, &field, t.capture_field_name());
+            // File ▸ New Note: after the field, so the menu's click does
+            // not take it out again.
+            if std::mem::take(&mut self.capture_focus) {
+                field.request_focus();
+            }
             if field.changed() {
                 self.paste_empty = false;
             }
@@ -6827,15 +7459,6 @@ impl App {
     fn notes_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         match self.selection {
             Selection::Agenda => return self.agenda_pane(ui, tones, actions),
-            Selection::Profile => return self.profile_pane(ui, tones, actions),
-            Selection::Settings => return self.settings_pane(ui, tones, actions),
-            Selection::About => {
-                if about_view::about(ui, &self.t, tones) {
-                    actions.push(Action::Select(Selection::Licences));
-                }
-                return;
-            }
-            Selection::Licences => return about_view::licences_page(ui, &self.t),
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
             Selection::AiReview => return self.ai_review_pane(ui, tones, actions),
@@ -6865,14 +7488,6 @@ impl App {
             }
             Selection::History(_) => {
                 history_view::page(ui, &self.t, tones, self.view.history.as_ref(), &*self.wall);
-                return;
-            }
-            Selection::Sync => {
-                let wall = self.wall.clone();
-                self.sync.importing = self.import.kind().cloned();
-                if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
-                    actions.push(Action::Sync(asked));
-                }
                 return;
             }
             _ => {}
@@ -6919,6 +7534,11 @@ impl App {
                         .text_color(text)
                         .desired_width(ui.available_width() - 32.0),
                 );
+                // Edit ▸ Find: after the field, so the menu's click does
+                // not take it out again.
+                if std::mem::take(&mut self.search_focus) {
+                    field.request_focus();
+                }
                 if field.changed() {
                     actions.push(Action::Search);
                 }
@@ -7917,6 +8537,7 @@ impl App {
         let (own_view, question_view) = (&mut self.profile_view, &mut self.question_view);
         let pictures = &mut self.pictures;
         let person_square = &mut self.person_square;
+        let importing = self.import.kind();
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -8289,6 +8910,83 @@ impl App {
                         }
                         cancel(ui, &t, actions);
                     }
+                    Dialog::Import => {
+                        title(ui, t.settings_import());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        // Each with what it does, or that it reads; both
+                        // greyed while either runs.
+                        let imports = [
+                            (
+                                matches!(importing, Some(Importing::Folder(_))),
+                                (t.import_folder_detail(), t.import_reading()),
+                                t.import_folder_open(),
+                                Action::Sync(SyncAction::ImportFolder),
+                            ),
+                            (
+                                importing == Some(&Importing::Keep),
+                                (t.import_keep_detail(), t.import_keep_reading()),
+                                t.import_keep_open(),
+                                Action::Sync(SyncAction::ImportKeep),
+                            ),
+                        ];
+                        for (running, (detail, reading), label, asked) in imports {
+                            let button = egui::Button::new(RichText::new(label).color(text));
+                            if ui
+                                .add_enabled_ui(importing.is_none(), |ui| {
+                                    ui.add_sized([ui.available_width(), 32.0], button)
+                                })
+                                .inner
+                                .clicked()
+                            {
+                                actions.push(asked);
+                            }
+                            let said = if running { reading } else { detail };
+                            ui.label(RichText::new(said).small().color(weak));
+                        }
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
+                    Dialog::FileInto { note } => {
+                        title(ui, t.file_into());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        egui::ScrollArea::vertical()
+                            .max_height(420.0)
+                            .show(ui, |ui| {
+                                for (area, topics) in &view.areas {
+                                    let places = std::iter::once((
+                                        area.id.clone(),
+                                        area_name(&t, area),
+                                        0.0,
+                                    ))
+                                    .chain(
+                                        topics
+                                            .iter()
+                                            .map(|p| (p.id.clone(), topic_name(&t, p), 24.0)),
+                                    );
+                                    for (place, name, indent) in places {
+                                        ui.horizontal(|ui| {
+                                            ui.add_space(indent);
+                                            let button =
+                                                egui::Button::new(RichText::new(name).color(text));
+                                            if ui.add(button).clicked() {
+                                                actions.push(Action::CloseDialog);
+                                                actions.push(Action::File {
+                                                    note: note.clone(),
+                                                    place,
+                                                });
+                                            }
+                                        });
+                                    }
+                                }
+                                if view.areas.is_empty() {
+                                    ui.label(RichText::new(t.no_areas_yet()).color(weak));
+                                }
+                            });
+                        cancel(ui, &t, actions);
+                    }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
                         profile_view::qr_page(ui, &t, link);
@@ -8327,7 +9025,7 @@ impl App {
                 }
             });
         if modal.should_close() {
-            // Put off, not lost: it waits on the Profile page.
+            // Put off, not lost: it waits in the Profile dialog.
             actions.push(match dialog {
                 Dialog::WhichProfile => Action::Profile(ProfileAction::Later),
                 // A question about blocking goes back to what asked it.
@@ -8354,8 +9052,8 @@ impl App {
     /// opening theirs, today's Occurrences with the Shopping Lists' and
     /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
-    /// its own, a click on one opens its Routine. The Profile picture in the
-    /// corner, where the settings gear was, leads to the Profile page.
+    /// its own, a click on one opens its Routine. Its bar leads to All
+    /// Routines and Reminders and to a new Routine.
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -8363,7 +9061,7 @@ impl App {
             ui.heading(RichText::new(t.agenda_title()).color(text));
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
-            ui.add_space((ui.available_width() - 92.0).max(0.0));
+            ui.add_space((ui.available_width() - 60.0).max(0.0));
             if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
             }
@@ -8372,12 +9070,6 @@ impl App {
                     note: None,
                     reminder: false,
                 });
-            }
-            let profile = self.view.profile.as_ref();
-            if profile_view::avatar(ui, &mut self.profile_view, profile, 28.0, t.profile_title())
-                .clicked()
-            {
-                actions.push(Action::Select(Selection::Profile));
             }
         });
         ui.add_space(8.0);
@@ -8513,17 +9205,20 @@ impl App {
         }
     }
 
-    /// The Profile page (ADR 0017): the own Profile's picture, name and
-    /// short code; the own Profile card as a link or a QR (#107); Backups
-    /// and recovery; the user's Devices; People, with "Add a person from
-    /// a link"; and the way to this Device's settings. While a new
+    /// The dialogs of the Profile page (ADR 0017), as the Sync menu opens
+    /// them (#145): `Page::Profile` the own Profile's picture, name and
+    /// short code and its card as a link or a QR (#107), and "Which one
+    /// is you?" while it waits; `Page::People` People, with "Add a person
+    /// from a link"; `Page::Backups` the Backups and recovery. While a new
     /// picture's square is picked, that alone.
-    fn profile_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+    fn profile_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>, page: Page) {
         let t = self.t;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let mut asked = Vec::new();
-        if let Some(square) = self.profile_view.square.as_mut() {
+        if page == Page::Profile
+            && let Some(square) = self.profile_view.square.as_mut()
+        {
             embossed(ui, tones, false, None, |ui| {
                 profile_view::square_page(ui, &t, square, &mut asked);
             });
@@ -8545,97 +9240,79 @@ impl App {
         let profile_newer = self.view.profile_newer;
         let people_newer = &self.view.people_newer;
         let question = self.view.profile_question.is_some();
-        ui.heading(RichText::new(t.profile_title()).color(text));
+        ui.heading(RichText::new(page_title(&t, page)).color(text));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
-            .id_salt("profile")
+            .id_salt(("profile", page_title(&t, page)))
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
-                embossed(ui, tones, false, None, |ui| {
-                    profile_view::header(ui, &t, view, (profile, profile_newer), code, &mut asked);
-                });
-                if profile.is_some() {
-                    embossed(ui, tones, false, None, |ui| {
-                        profile_view::card_section(ui, &t, card_form.saved, &mut asked);
-                    });
-                }
-                if question {
-                    embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(t.profile_which_waiting()).color(text));
-                        if ui
-                            .button(RichText::new(t.profile_which_title()).color(text))
-                            .clicked()
-                        {
-                            asked.push(ProfileAction::Ask);
-                        }
-                    });
-                }
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.profile_backups()).strong().color(text));
-                    let mut backup = Vec::new();
-                    backup_view::card(ui, &t, store, wall, backup_form, &mut backup);
-                    actions.extend(backup.into_iter().map(Action::Backup));
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.profile_devices()).strong().color(text));
-                    if ui
-                        .button(RichText::new(t.sync_settings_entry()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::Select(Selection::Sync));
-                    }
-                    ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
-                });
-                // People (#52): every Profile kept here, each opening it;
-                // the blocked ones (#90) in a fold of their own, closed
-                // until opened, which this Device remembers.
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.people_title()).strong().color(text));
-                    if people.is_empty() && blocked.is_empty() {
-                        ui.label(RichText::new(t.profile_people_empty()).small().color(weak));
-                    }
-                    for person in people {
-                        let newer = people_newer.contains(&person.id);
-                        people_row(ui, &t, pictures, (person, newer), &mut people_asked);
-                    }
-                    if !blocked.is_empty() {
-                        let fold = egui::CollapsingHeader::new(
-                            RichText::new(t.people_blocked()).color(text),
-                        )
-                        .id_salt("people blocked")
-                        .open(Some(blocked_open))
-                        .show(ui, |ui| {
-                            for person in blocked {
-                                people_row(ui, &t, pictures, (person, false), &mut people_asked);
-                            }
+                match page {
+                    Page::Profile => {
+                        embossed(ui, tones, false, None, |ui| {
+                            let shown = (profile, profile_newer);
+                            profile_view::header(ui, &t, view, shown, code, &mut asked);
                         });
-                        if fold.header_response.clicked() {
-                            actions.push(Action::BlockedOpen(!blocked_open));
+                        if profile.is_some() {
+                            embossed(ui, tones, false, None, |ui| {
+                                profile_view::card_section(ui, &t, card_form.saved, &mut asked);
+                            });
+                        }
+                        if question {
+                            embossed(ui, tones, false, None, |ui| {
+                                ui.label(RichText::new(t.profile_which_waiting()).color(text));
+                                if ui
+                                    .button(RichText::new(t.profile_which_title()).color(text))
+                                    .clicked()
+                                {
+                                    asked.push(ProfileAction::Ask);
+                                }
+                            });
                         }
                     }
-                    ui.separator();
-                    profile_view::add_person(ui, &t, card_form, &mut asked);
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(
-                        RichText::new(t.profile_device_settings())
-                            .strong()
-                            .color(text),
-                    );
-                    if ui
-                        .button(RichText::new(t.settings_title()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::Select(Selection::Settings));
+                    Page::Backups => {
+                        embossed(ui, tones, false, None, |ui| {
+                            let mut backup = Vec::new();
+                            backup_view::card(ui, &t, store, wall, backup_form, &mut backup);
+                            actions.extend(backup.into_iter().map(Action::Backup));
+                        });
                     }
-                    ui.label(
-                        RichText::new(t.profile_device_settings_detail())
-                            .small()
-                            .color(weak),
-                    );
-                });
+                    // People (#52): every Profile kept here, each opening
+                    // it; the blocked ones (#90) in a fold of their own,
+                    // closed until opened, which this Device remembers.
+                    _ => {
+                        embossed(ui, tones, false, None, |ui| {
+                            if people.is_empty() && blocked.is_empty() {
+                                ui.label(
+                                    RichText::new(t.profile_people_empty()).small().color(weak),
+                                );
+                            }
+                            for person in people {
+                                let newer = people_newer.contains(&person.id);
+                                people_row(ui, &t, pictures, (person, newer), &mut people_asked);
+                            }
+                            if !blocked.is_empty() {
+                                let fold = egui::CollapsingHeader::new(
+                                    RichText::new(t.people_blocked()).color(text),
+                                )
+                                .id_salt("people blocked")
+                                .open(Some(blocked_open))
+                                .show(ui, |ui| {
+                                    for person in blocked {
+                                        let shown = (person, false);
+                                        people_row(ui, &t, pictures, shown, &mut people_asked);
+                                    }
+                                });
+                                if fold.header_response.clicked() {
+                                    actions.push(Action::BlockedOpen(!blocked_open));
+                                }
+                            }
+                            ui.separator();
+                            profile_view::add_person(ui, &t, card_form, &mut asked);
+                        });
+                    }
+                }
             });
         actions.extend(asked.into_iter().map(Action::Profile));
         actions.extend(people_asked.into_iter().map(Action::OpenPerson));
@@ -8898,7 +9575,7 @@ impl App {
         Ok(())
     }
 
-    /// Does what was asked of the own Profile on the Profile page.
+    /// Does what was asked of the own Profile in the Profile dialog.
     fn profile_action(&mut self, asked: ProfileAction) -> oldbrainfix_core::Result<()> {
         let own = OwnProfile::new(&self.store);
         // A Profile a newer version of the app saved is changed only there
@@ -9160,7 +9837,7 @@ impl App {
                         .button(RichText::new(t.about_title()).color(text))
                         .clicked()
                     {
-                        actions.push(Action::Select(Selection::About));
+                        actions.push(Action::PageInto(Page::About));
                     }
                     ui.label(RichText::new(t.about_settings_detail()).small().color(weak));
                 });
@@ -9408,6 +10085,85 @@ fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
             note: dragged.0.clone(),
             place: place.to_string(),
         });
+    }
+}
+
+/// What the Note menu may do to the Note shown (#145), by its id.
+struct NoteMenu {
+    id: String,
+    changes: bool,
+    schedules: bool,
+    frog: bool,
+    amends: bool,
+    checklist: bool,
+    shopping: bool,
+    tally: bool,
+}
+
+/// The entries of a menu of the menu bar: each label with its keys, if
+/// any, at its end, greyed unless enabled; a pick asks its action and
+/// closes the menu, also one by keyboard or screen reader.
+fn menu_entries<const N: usize>(
+    ui: &mut Ui,
+    items: [(&str, Option<String>, bool, Action); N],
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    for (label, keys, enabled, action) in items {
+        let mut button = egui::Button::new(RichText::new(label).color(text));
+        if let Some(keys) = keys {
+            button = button.shortcut_text(RichText::new(keys).color(weak));
+        }
+        if ui.add_enabled(enabled, button).clicked() {
+            actions.push(action);
+            ui.close();
+        }
+    }
+}
+
+/// One level of the path above the list, or its sign between two (#145):
+/// drawn, so a screen reader hears the places as the sidebar and the
+/// heading name them, and a level above as the way `up` there, clicked
+/// when it says so. The place shown leads nowhere.
+fn crumb(ui: &mut Ui, name: &str, colour: Color32, up: Option<&str>) -> bool {
+    let galley = ui
+        .painter()
+        .layout_no_wrap(name.to_string(), FontId::proportional(14.0), colour);
+    let sense = if up.is_some() {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let (rect, resp) = ui.allocate_exact_size(galley.size(), sense);
+    if let Some(label) = up {
+        resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    }
+    if ui.is_rect_visible(rect) {
+        ui.painter().galley(rect.min, galley, colour);
+        if up.is_some() && resp.hovered() {
+            let line = egui::Stroke::new(1.0, colour);
+            ui.painter().hline(rect.x_range(), rect.bottom(), line);
+        }
+    }
+    if up.is_none() {
+        return false;
+    }
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
+}
+
+/// The title of the dialog `page` (#145).
+fn page_title(t: &L10n, page: Page) -> &'static str {
+    match page {
+        Page::Settings => t.settings_title(),
+        Page::About => t.about_title(),
+        Page::Licences => t.open_source_licenses(),
+        Page::Profile => t.profile_title(),
+        Page::People => t.people_title(),
+        Page::Backups => t.profile_backups(),
+        Page::Sync => t.sync_title(),
+        Page::Pair => t.menu_pair(),
     }
 }
 

@@ -25,7 +25,7 @@ use oldbrainfix_core::{
 };
 use oldbrainfix_gui::app::region_of;
 use oldbrainfix_gui::tally_view::moved_to;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -608,7 +608,7 @@ fn the_unit_setting_follows_the_region_until_a_system_is_chosen() -> TestResult 
     let store = Arc::new(device(4, "Desk")?);
     let mut harness = window(&store, None);
     harness.state_mut().set_region(Some("US"));
-    harness.state_mut().select(Selection::Settings);
+    harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(shows(&harness, "Units"));
     assert!(radio_on(&harness, "As this computer's region: imperial"));

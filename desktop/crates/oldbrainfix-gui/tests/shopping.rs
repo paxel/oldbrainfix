@@ -27,7 +27,7 @@ use oldbrainfix_core::{
     ShoppingLists, SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -610,7 +610,7 @@ fn two_renames_apart_are_a_conflict_on_a_line_of_a_shopping_list() -> TestResult
     let mut app = App::new(Arc::new(desk), "en");
     app.set_wall_clock(Arc::new(|utc: DateTime<Utc>| utc.naive_utc()));
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Sync);
+    app.open(Page::Sync);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
@@ -823,7 +823,7 @@ fn the_shopping_rows_sit_after_the_all_day_occurrences_before_the_timed() -> Tes
 fn settings_choose_how_the_agenda_shows_shopping_lists() -> TestResult {
     let (store, _, _) = with_note()?;
     let mut harness = window(&store, None);
-    harness.state_mut().select(Selection::Settings);
+    harness.state_mut().open(Page::Settings);
     harness.run();
     assert!(shows(&harness, "Shopping Lists on the Agenda"));
     let radio =

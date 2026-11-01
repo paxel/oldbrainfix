@@ -1,16 +1,16 @@
-//! The Sync view (ADR 0003): the desktop hosts a LAN session while the
-//! view shows, with the pair code as a QR and as text and its PIN. A
-//! phone that is not paired yet gets the user's question first; a
-//! paired one, proven by its key, syncs straight away. Every session's joiner is remembered
-//! as a paired Device, with the certificate it hosts with. The other way
-//! round, the code a phone or tablet shows is typed here and the desktop
-//! joins it, off the window's thread. The paired Devices can be forgotten here, or
-//! kept from syncing on their own. The Conflicts are listed here too,
+//! The Sync and Pair a Device dialogs (ADR 0003, #145): the desktop
+//! hosts a LAN session while either shows, with the pair code as a QR and
+//! as text and its PIN. A phone that is not paired yet gets the user's
+//! question first; a paired one, proven by its key, syncs straight away.
+//! Every session's joiner is remembered as a paired Device, with the
+//! certificate it hosts with. The other way round, the code a phone or
+//! tablet shows is typed into Pair a Device and the desktop joins it, off
+//! the window's thread. In Sync the paired Devices can be forgotten, or
+//! kept from syncing on their own; the Conflicts are listed there too,
 //! each version a button that keeps it, and the shared folder is chosen,
-//! synced and forgotten here, with how its last sync went. A bundle file
-//! for a paired Device, or of everything, is saved and one imported here
-//! too, and so are a folder of Markdown or text files and a Google Keep
-//! export (ADR 0036) until the desktop has its File menu (#145).
+//! synced and forgotten there, with how its last sync went. A bundle file
+//! for a paired Device, or of everything, is saved and one imported there
+//! too.
 
 use std::net::IpAddr;
 use std::path::Path;
@@ -36,7 +36,6 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{Wall, embossed};
-use crate::folder_import::Importing;
 use crate::l10n::L10n;
 use crate::names::area_name;
 use crate::profile_view::{Pictures, display_name, person_picture};
@@ -115,8 +114,6 @@ pub struct SyncHost {
     pub bind: Option<IpAddr>,
     /// The paired Device the next bundle is for; everything when none.
     pub bundle_for: Option<String>,
-    /// Which Import is reading its folder or zip, as the window says.
-    pub importing: Option<Importing>,
     /// The invite to a Shared Area this host hands out while it shows
     /// (ADR 0013): whoever joins with its code gets that Area only.
     pub inviting: Option<Invite>,
@@ -402,20 +399,26 @@ impl SyncHost {
         }
     }
 
-    /// Draws the view.
+    /// Draws the Sync dialog, or with `pair` the Pair a Device dialog
+    /// (#145): both with the question about a Device asking, the invite
+    /// to a Shared Area and this Device's code while it hosts, and what
+    /// the last session brought; Pair a Device with the field for the
+    /// other Device's code, Sync with the Conflicts, the shared folder,
+    /// the bundles and the paired Devices.
     pub fn show(
         &mut self,
         ui: &mut Ui,
         t: &L10n,
         tones: Tones,
-        store: &Store,
-        wall: &Wall,
+        (store, wall): (&Store, &Wall),
+        pair: bool,
     ) -> Option<SyncAction> {
         let mut action = None;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
-        ui.heading(RichText::new(t.sync_title()).color(text));
+        let heading = if pair { t.menu_pair() } else { t.sync_title() };
+        ui.heading(RichText::new(heading).color(text));
         ui.label(RichText::new(t.sync_host_intro()).color(weak));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
@@ -501,7 +504,7 @@ impl SyncHost {
                 self.host_card(ui, t, tones);
                 // Joining another Device by its code; not while inviting,
                 // which hands out this Device's own code.
-                if self.inviting.is_none() && self.join_section(ui, t, tones) {
+                if pair && self.inviting.is_none() && self.join_section(ui, t, tones) {
                     action = Some(SyncAction::Join);
                 }
                 if let Some((name, count)) = &self.last {
@@ -521,13 +524,17 @@ impl SyncHost {
                     if self.refused > 0 {
                         ui.label(RichText::new(t.sync_refused(self.refused as i64)).color(error));
                     }
-                    if self.found > 0 {
+                    // The Conflicts are listed in the Sync dialog.
+                    if self.found > 0 && !pair {
                         ui.label(
                             RichText::new(t.sync_conflicts_below(self.found as i64))
                                 .strong()
                                 .color(text),
                         );
                     }
+                }
+                if pair {
+                    return;
                 }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.conflicts_title()).strong().color(text));
@@ -586,9 +593,6 @@ impl SyncHost {
                     action = Some(asked);
                 }
                 if let Some(asked) = bundle_section(ui, t, tones, store, &mut self.bundle_for) {
-                    action = Some(asked);
-                }
-                if let Some(asked) = import_section(ui, t, tones, self.importing.as_ref()) {
                     action = Some(asked);
                 }
                 embossed(ui, tones, false, None, |ui| {
@@ -952,51 +956,6 @@ fn bundle_section(
         ui.label(RichText::new(t.bundle_drop()).small().color(weak));
     });
     action
-}
-
-/// The Imports, of a folder and of a Google Keep export: what each does
-/// and its button, or that it reads meanwhile, both buttons greyed while
-/// either runs. Returns the one the user asked for.
-fn import_section(
-    ui: &mut Ui,
-    t: &L10n,
-    tones: Tones,
-    importing: Option<&Importing>,
-) -> Option<SyncAction> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    let mut asked = None;
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.settings_import()).strong().color(text));
-        let imports = [
-            (
-                matches!(importing, Some(Importing::Folder(_))),
-                (t.import_folder_detail(), t.import_reading()),
-                t.import_folder_open(),
-                SyncAction::ImportFolder,
-            ),
-            (
-                importing == Some(&Importing::Keep),
-                (t.import_keep_detail(), t.import_keep_reading()),
-                t.import_keep_open(),
-                SyncAction::ImportKeep,
-            ),
-        ];
-        for (running, (detail, reading), button, action) in imports {
-            let said = if running { reading } else { detail };
-            ui.label(RichText::new(said).small().color(weak));
-            if ui
-                .add_enabled(
-                    importing.is_none(),
-                    egui::Button::new(RichText::new(button).color(text)),
-                )
-                .clicked()
-            {
-                asked = Some(action);
-            }
-        }
-    });
-    asked
 }
 
 /// Imports the bundle at `path` into `store` and says what came in, or
