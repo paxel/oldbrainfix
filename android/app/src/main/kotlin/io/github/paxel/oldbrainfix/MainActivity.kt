@@ -66,6 +66,9 @@ class MainActivity : FlutterActivity() {
     /** The answer to the shared folder's "pickTree", until the picker comes back. */
     private var folderAnswer: MethodChannel.Result? = null
 
+    /** The answer to the Import's "pickZip", until the file picker comes back. */
+    private var zipAnswer: MethodChannel.Result? = null
+
     private var bundleChannel: MethodChannel? = null
 
     /** The answer to the bundle's "pick", until the file picker comes back. */
@@ -342,6 +345,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when {
                     call.method == "pickTree" -> pickFolder(result)
+                    call.method == "pickZip" -> pickZip(result)
                     !FolderChannel.handle(this, call, result) -> result.notImplemented()
                 }
             }
@@ -723,6 +727,31 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Opens the system's file picker for a zip to import, such as a
+     * Google Takeout export; the answer comes in [onActivityResult]. Its
+     * grant lasts while the app runs, none is kept.
+     */
+    private fun pickZip(result: MethodChannel.Result) {
+        zipAnswer?.success(null)
+        zipAnswer = result
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/zip")
+            // Some providers name a zip by an older type.
+            .putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf("application/zip", "application/x-zip-compressed", "application/x-zip"),
+            )
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_ZIP)
+        } catch (_: ActivityNotFoundException) {
+            zipAnswer = null
+            result.success(null)
+        }
+    }
+
     @Deprecated("The Flutter activity has no Activity Result API.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -742,6 +771,12 @@ class MainActivity : FlutterActivity() {
                     // works while the app runs.
                 }
             }
+            return answer.success(uri?.toString())
+        }
+        if (requestCode == REQUEST_ZIP) {
+            val answer = zipAnswer ?: return
+            zipAnswer = null
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
             return answer.success(uri?.toString())
         }
         if (requestCode == REQUEST_BUNDLE) {
@@ -969,6 +1004,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_MICROPHONE = 12
         private const val REQUEST_CALENDAR_MIRROR = 13
         private const val REQUEST_SOUND = 14
+        private const val REQUEST_ZIP = 15
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */

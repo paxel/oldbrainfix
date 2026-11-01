@@ -53,6 +53,19 @@ class FakeFolders implements FolderPlatform {
   Future<void> release(String folder, List<String> keep) async {}
 
   @override
+  Future<String?> pickZip() async => null;
+
+  @override
+  Future<List<String>> zipEntries(String zip) async => const [];
+
+  @override
+  Future<List<FolderFile>> unzip(String zip, Map<String, int> wanted) async =>
+      const [];
+
+  @override
+  Future<void> dropUnzipped() async {}
+
+  @override
   Future<String?> autoBackupDir() async => null;
 
   @override

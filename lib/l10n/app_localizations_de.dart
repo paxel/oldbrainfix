@@ -4590,4 +4590,94 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get importFailedFix =>
       'Es wurde nichts importiert. Kopiere den Ordner auf das Telefon und importiere ihn von dort.';
+
+  @override
+  String get importKeep => 'Aus Google Keep importieren';
+
+  @override
+  String get importKeepDetail =>
+      'Die Notizen, Listen und Fotos eines Exports von Google Takeout werden Notizen in einem neuen Bereich, datiert auf ihre Erstellung in Keep.';
+
+  @override
+  String get importKeepReading => 'Der Export wird gelesen …';
+
+  @override
+  String get importKeepAsk =>
+      'Ist der Takeout-Export eine ZIP-Datei oder ein daraus entpackter Ordner?';
+
+  @override
+  String get importKeepZip => 'ZIP-Datei';
+
+  @override
+  String get importKeepFolder => 'Ordner';
+
+  @override
+  String get importKeepAreaName => 'Aus Google Keep';
+
+  @override
+  String importKeepChecklists(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count davon sind Checklisten. Checklisten stehen nicht auf der Agenda, bis du sie dort einschaltest.',
+      one: '1 davon ist eine Checkliste. Checklisten stehen nicht auf der Agenda, bis du sie dort einschaltest.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Fotos kamen mit ihnen in den Bereich.',
+      one: '1 Foto kam mit ihnen in den Bereich.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen oder Dateien wurden übersprungen:',
+      one: '1 Notiz oder Datei wurde übersprungen:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepSkippedDetails(
+    int trashed,
+    int missing,
+    int notPhoto,
+    int tooLarge,
+    int notText,
+  ) {
+    return 'Im Papierkorb von Keep: $trashed\nFehlender Anhang: $missing\nKein Foto: $notPhoto\nZu groß: $tooLarge\nKein Text: $notText';
+  }
+
+  @override
+  String get importKeepNothing => 'Keine Notiz aus Keep gefunden.';
+
+  @override
+  String get importKeepNothingCause =>
+      'Der Export enthält keine Notiz aus Google Keep, die sich übernehmen ließ; Notizen im Papierkorb von Keep und zu große Dateien werden übersprungen.';
+
+  @override
+  String get importKeepNothingFix =>
+      'Wähle die ZIP-Datei von Takeout oder den daraus entpackten Ordner mit dem Ordner Keep darin. Es wurde nichts geändert.';
+
+  @override
+  String get importKeepFailed => 'Der Export konnte nicht importiert werden.';
+
+  @override
+  String get importKeepFailedCause =>
+      'Die ZIP-Datei oder der Ordner oder eine der Dateien darin ließ sich nicht lesen.';
+
+  @override
+  String get importKeepFailedFix =>
+      'Es wurde nichts importiert. Lade den Export noch einmal herunter, kopiere ihn auf das Telefon und importiere ihn von dort.';
 }

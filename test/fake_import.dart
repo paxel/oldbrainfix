@@ -5,8 +5,10 @@ import 'dart:typed_data';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
-/// A folder to import, in memory: the picker answers [picks], and its
-/// files are those [put] in, by their path inside it.
+/// A folder or a zip to import, in memory: the folder picker answers
+/// [picks], and its files are those [put] in, by their path inside it;
+/// the file picker answers [zipPicks], and the zip's files are those
+/// [putZip] in.
 class FakeImportFolders implements FolderPlatform {
   /// What the picker answers; null backs out.
   String? picks = 'content://tree/primary%3ANotes';
@@ -19,6 +21,20 @@ class FakeImportFolders implements FolderPlatform {
 
   /// Holds the listing until it completes, as a slow drive does.
   Completer<void>? hold;
+
+  /// What the file picker answers; null backs out.
+  String? zipPicks = 'content://downloads/takeout-20261101.zip';
+
+  /// Throws on listing the zip, as one that is no zip does.
+  bool zipFails = false;
+
+  final _zip = <String, Uint8List>{};
+
+  /// The paths and limits asked of [unzip], each time.
+  final unzipped = <Map<String, int>>[];
+
+  /// How often the copies of [unzip] were deleted.
+  var dropped = 0;
 
   final _files = <FolderFile>[];
   final _bytes = <String, Uint8List>{};
@@ -43,6 +59,10 @@ class FakeImportFolders implements FolderPlatform {
     );
     _bytes['doc:$path'] = Uint8List.fromList(bytes);
   }
+
+  /// Puts a file at [path] inside the zip, holding [bytes].
+  void putZip(String path, List<int> bytes) =>
+      _zip[path] = Uint8List.fromList(bytes);
 
   @override
   bool get available => true;
@@ -78,6 +98,41 @@ class FakeImportFolders implements FolderPlatform {
     released.add(folder);
     kept.add(keep);
   }
+
+  @override
+  Future<String?> pickZip() async => zipPicks;
+
+  @override
+  Future<List<String>> zipEntries(String zip) async {
+    await hold?.future;
+    if (zipFails) throw FileSystemException('Not a zip', zip);
+    return [..._zip.keys];
+  }
+
+  @override
+  Future<List<FolderFile>> unzip(String zip, Map<String, int> wanted) async {
+    unzipped.add(wanted);
+    return [
+      for (final MapEntry(key: path, value: bytes) in _zip.entries)
+        if (wanted[path] case final limit?)
+          () {
+            // At most the limit and one byte more is copied.
+            final copied = bytes.length > limit + 1
+                ? Uint8List.sublistView(bytes, 0, limit + 1)
+                : bytes;
+            _bytes['zip:$path'] = copied;
+            return FolderFile(
+              path: path,
+              modified: null,
+              size: copied.length,
+              ref: 'zip:$path',
+            );
+          }(),
+    ];
+  }
+
+  @override
+  Future<void> dropUnzipped() async => dropped++;
 
   @override
   Future<String?> autoBackupDir() async => null;

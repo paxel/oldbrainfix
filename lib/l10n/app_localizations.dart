@@ -7435,6 +7435,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing was imported. Copy the folder onto the phone and import it from there.'**
   String get importFailedFix;
+
+  /// Settings row under 'importFolder' that imports a Google Takeout export of Google Keep (ADR 0036); also the title of the dialog behind it. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Google Keep'**
+  String get importKeep;
+
+  /// Subtitle of 'importKeep'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The notes, lists and photos of a Google Takeout export become Notes in a new Area, dated when they were made in Keep.'**
+  String get importKeepDetail;
+
+  /// Subtitle of 'importKeep' while the picked export is read and imported. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the export…'**
+  String get importKeepReading;
+
+  /// The question in the dialog behind 'importKeep', above 'importKeepZip' and 'importKeepFolder'.
+  ///
+  /// In en, this message translates to:
+  /// **'Is the Takeout export a zip file, or a folder unpacked from it?'**
+  String get importKeepAsk;
+
+  /// Button in the dialog behind 'importKeep' that opens the system's file picker for the Takeout zip.
+  ///
+  /// In en, this message translates to:
+  /// **'Zip file'**
+  String get importKeepZip;
+
+  /// Button in the dialog behind 'importKeep' that opens the system's folder picker for the unpacked Takeout export.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get importKeepFolder;
+
+  /// Name of the new Area the import from Google Keep makes. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'From Google Keep'**
+  String get importKeepAreaName;
+
+  /// In the dialog behind 'importFinished' after an import from Google Keep that made Checklists, under 'importFinishedNotes'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 of them is a Checklist. Checklists stay off the Agenda until you switch them on.} other{{count} of them are Checklists. Checklists stay off the Agenda until you switch them on.}}'**
+  String importKeepChecklists(int count);
+
+  /// In the dialog behind 'importFinished' after an import from Google Keep that brought photos. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 photo went into the Area with them.} other{{count} photos went into the Area with them.}}'**
+  String importKeepPhotos(int count);
+
+  /// In the dialog behind 'importFinished' after an import from Google Keep that skipped some, above 'importKeepSkippedDetails'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note or file was skipped:} other{{count} notes or files were skipped:}}'**
+  String importKeepSkipped(int count);
+
+  /// What an import from Google Keep skipped, by reason, in the dialogs behind 'importFinished' and 'importKeepNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'In Keep\'s trash: {trashed}\nMissing attachment: {missing}\nNot a photo: {notPhoto}\nToo large: {tooLarge}\nNot text: {notText}'**
+  String importKeepSkippedDetails(
+    int trashed,
+    int missing,
+    int notPhoto,
+    int tooLarge,
+    int notText,
+  );
+
+  /// Announced when an import from Google Keep found no note to make a Note of; the tap opens the dialog with the cause and the fix, titled 'importNothingTitle'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'No Keep note found.'**
+  String get importKeepNothing;
+
+  /// The cause in the dialog behind 'importKeepNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The export holds no note of Google Keep that could be taken; notes in Keep\'s trash and files that are too large are skipped.'**
+  String get importKeepNothingCause;
+
+  /// The fix in the dialog behind 'importKeepNothing'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the Takeout zip file, or the folder unpacked from it, with the folder Keep inside. Nothing was changed.'**
+  String get importKeepNothingFix;
+
+  /// Announced when the picked Google Keep export or one of its files could not be read; the tap opens the dialog with the cause and the fix, titled 'importFailedTitle'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The export could not be imported.'**
+  String get importKeepFailed;
+
+  /// The cause in the dialog behind 'importKeepFailed'. Shared with the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'The zip file or the folder, or one of the files in it, could not be read.'**
+  String get importKeepFailedCause;
+
+  /// The fix in the dialog behind 'importKeepFailed' on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was imported. Download the export again, copy it onto the phone and import it from there.'**
+  String get importKeepFailedFix;
 }
 
 class _AppLocalizationsDelegate

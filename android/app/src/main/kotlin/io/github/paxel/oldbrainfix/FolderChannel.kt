@@ -10,8 +10,11 @@ import androidx.documentfile.provider.DocumentFile
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.Executors
+import java.util.zip.ZipInputStream
 
 /**
  * The shared sync folder through the document tree the folder picker
@@ -23,7 +26,11 @@ import java.util.concurrent.Executors
  * and the one Auto Backup may take lies in the app's own files
  * ([AutoBackup]). An Import lists every file of the picked folder and
  * its folders ([files]), reads them one by one ([readDoc]) and gives up
- * the folder's lasting grant afterwards ([releases]).
+ * the folder's lasting grant afterwards ([releases]). The import from
+ * Google Keep takes a Takeout zip as well: it lists the zip's files
+ * ([zipNames]), then copies those the core reads into the app's cache,
+ * each at most its limit and one byte more ([unzip]), read from there as
+ * any other file and deleted afterwards ("dropUnzipped").
  * Everything here needs only a [Context], so the background
  * sync's engine (SyncWorker) answers it as the app does; picking the
  * tree is the Activity's ([MainActivity]). The files are read and
@@ -38,7 +45,7 @@ object FolderChannel {
 
     /** Answers [call] and returns true, or false when it is not one of these. */
     fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup", "files", "readDoc", "release")) {
+        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup", "files", "readDoc", "release", "zipNames", "unzip", "dropUnzipped")) {
             return false
         }
         val app = context.applicationContext
@@ -90,6 +97,20 @@ object FolderChannel {
             val input = context.contentResolver.openInputStream(doc)
                 ?: throw IllegalStateException("cannot read $doc")
             input.use { readAtMost(it, limit) }
+        }
+        "zipNames" -> zipStream(context, call).use { zipNames(it) }
+        "unzip" -> {
+            val wanted = call.argument<Map<String, Int>>("wanted") ?: throw IllegalArgumentException("no wanted")
+            val into = unzipped(context)
+            into.deleteRecursively()
+            if (!into.mkdirs()) throw IllegalStateException("cannot make $into")
+            zipStream(context, call).use { unzip(it, wanted, into) }.map { (path, file, size) ->
+                mapOf("path" to path, "doc" to Uri.fromFile(file).toString(), "size" to size)
+            }
+        }
+        "dropUnzipped" -> {
+            unzipped(context).deleteRecursively()
+            null
         }
         "list" -> dir(context, call, create = false)?.listFiles()
             ?.filter { it.isFile }?.mapNotNull { it.name } ?: emptyList<String>()
@@ -220,6 +241,62 @@ object FolderChannel {
             if (out.size() + read > limit) return null
             out.write(buffer, 0, read)
         }
+    }
+
+    /** The zip document the call names, opened; one that cannot be opened fails the Import. */
+    private fun zipStream(context: Context, call: MethodCall): InputStream {
+        val doc = Uri.parse(call.argument<String>("zip") ?: throw IllegalArgumentException("no zip"))
+        return context.contentResolver.openInputStream(doc) ?: throw IllegalStateException("cannot read $doc")
+    }
+
+    /** Where [unzip] puts the files it copies out of a zip, in the app's cache. */
+    private fun unzipped(context: Context): File = File(context.cacheDir, "import-zip")
+
+    /** The paths of the files inside the zip [input], folders left out, in the zip's order. */
+    fun zipNames(input: InputStream): List<String> {
+        val names = mutableListOf<String>()
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory) names += entry.name
+            }
+        }
+        return names
+    }
+
+    /**
+     * Copies each file of the zip [input] whose path [wanted] names into
+     * [into], as a file named by its number, so no path from inside the
+     * zip is ever one on the phone; of each at most its limit and one
+     * byte more, so a larger file is never copied whole. Answers each
+     * copy's path inside the zip, its file and its size.
+     */
+    fun unzip(input: InputStream, wanted: Map<String, Int>, into: File): List<Triple<String, File, Long>> {
+        val copied = mutableListOf<Triple<String, File, Long>>()
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val limit = wanted[entry.name] ?: continue
+                if (entry.isDirectory) continue
+                val file = File(into, copied.size.toString())
+                val size = file.outputStream().use { copyAtMost(zip, it, limit + 1L) }
+                copied += Triple(entry.name, file, size)
+            }
+        }
+        return copied
+    }
+
+    /** Copies [input] into [out] until it ends or [most] bytes are copied; answers how many were. */
+    fun copyAtMost(input: InputStream, out: OutputStream, most: Long): Long {
+        val buffer = ByteArray(8192)
+        var copied = 0L
+        while (copied < most) {
+            val read = input.read(buffer, 0, minOf(buffer.size.toLong(), most - copied).toInt())
+            if (read < 0) break
+            out.write(buffer, 0, read)
+            copied += read
+        }
+        return copied
     }
 
     private fun tree(context: Context, call: MethodCall): DocumentFile? {

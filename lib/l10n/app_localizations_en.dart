@@ -4530,4 +4530,94 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importFailedFix =>
       'Nothing was imported. Copy the folder onto the phone and import it from there.';
+
+  @override
+  String get importKeep => 'Import from Google Keep';
+
+  @override
+  String get importKeepDetail =>
+      'The notes, lists and photos of a Google Takeout export become Notes in a new Area, dated when they were made in Keep.';
+
+  @override
+  String get importKeepReading => 'Reading the export…';
+
+  @override
+  String get importKeepAsk =>
+      'Is the Takeout export a zip file, or a folder unpacked from it?';
+
+  @override
+  String get importKeepZip => 'Zip file';
+
+  @override
+  String get importKeepFolder => 'Folder';
+
+  @override
+  String get importKeepAreaName => 'From Google Keep';
+
+  @override
+  String importKeepChecklists(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count of them are Checklists. Checklists stay off the Agenda until you switch them on.',
+      one: '1 of them is a Checklist. Checklists stay off the Agenda until you switch them on.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos went into the Area with them.',
+      one: '1 photo went into the Area with them.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes or files were skipped:',
+      one: '1 note or file was skipped:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importKeepSkippedDetails(
+    int trashed,
+    int missing,
+    int notPhoto,
+    int tooLarge,
+    int notText,
+  ) {
+    return 'In Keep\'s trash: $trashed\nMissing attachment: $missing\nNot a photo: $notPhoto\nToo large: $tooLarge\nNot text: $notText';
+  }
+
+  @override
+  String get importKeepNothing => 'No Keep note found.';
+
+  @override
+  String get importKeepNothingCause =>
+      'The export holds no note of Google Keep that could be taken; notes in Keep\'s trash and files that are too large are skipped.';
+
+  @override
+  String get importKeepNothingFix =>
+      'Pick the Takeout zip file, or the folder unpacked from it, with the folder Keep inside. Nothing was changed.';
+
+  @override
+  String get importKeepFailed => 'The export could not be imported.';
+
+  @override
+  String get importKeepFailedCause =>
+      'The zip file or the folder, or one of the files in it, could not be read.';
+
+  @override
+  String get importKeepFailedFix =>
+      'Nothing was imported. Download the export again, copy it onto the phone and import it from there.';
 }

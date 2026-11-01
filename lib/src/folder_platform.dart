@@ -6,7 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// The platform seam for the shared folder (android/…/FolderChannel.kt):
 /// picking it, its name for people, and the folder itself; the Backup
-/// folder; the files of a folder to import (ADR 0036); and the directory
+/// folder; the files of a folder or a zip to import (ADR 0036); and the directory
 /// Auto Backup takes the newest Backup from (android/…/AutoBackup.kt).
 /// Widget tests hand in a fake.
 abstract interface class FolderPlatform {
@@ -38,6 +38,24 @@ abstract interface class FolderPlatform {
   /// unless it is one of the folders the app keeps, in [keep] (the sync
   /// and the Backup folder). Never fails.
   Future<void> release(String folder, List<String> keep);
+
+  /// Opens the system's file picker for a zip to import, such as a
+  /// Google Takeout export; the zip, or null when the user backed out.
+  /// No lasting access to it is taken.
+  Future<String?> pickZip();
+
+  /// The paths of the files inside the [zip] picked by [pickZip], folders
+  /// separated by `/`.
+  Future<List<String>> zipEntries(String zip);
+
+  /// Copies the files of [zip] that [wanted] names by their paths aside
+  /// for [readFile], each at most its limit there and one byte more, so a
+  /// larger one is never copied whole; the copies stay until
+  /// [dropUnzipped].
+  Future<List<FolderFile>> unzip(String zip, Map<String, int> wanted);
+
+  /// Deletes the copies [unzip] made. Never fails.
+  Future<void> dropUnzipped();
 
   /// The app's own directory the platform's backup (Android's Auto
   /// Backup to the user's Google account, ADR 0010) takes the newest
@@ -103,6 +121,19 @@ class NoFolders implements FolderPlatform {
 
   @override
   Future<void> release(String folder, List<String> keep) async {}
+
+  @override
+  Future<String?> pickZip() async => null;
+
+  @override
+  Future<List<String>> zipEntries(String zip) async => const [];
+
+  @override
+  Future<List<FolderFile>> unzip(String zip, Map<String, int> wanted) async =>
+      const [];
+
+  @override
+  Future<void> dropUnzipped() async {}
 
   @override
   Future<String?> autoBackupDir() async => null;
@@ -190,6 +221,49 @@ class AndroidFolders implements FolderPlatform {
       // The grant stays; it gives no access beyond the folder picked.
     } on MissingPluginException {
       // No grants here.
+    }
+  }
+
+  @override
+  Future<String?> pickZip() async {
+    try {
+      return await channel.invokeMethod<String>('pickZip');
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  @override
+  Future<List<String>> zipEntries(String zip) async {
+    final names = await _call<List<Object?>>('zipNames', {'zip': zip}, zip);
+    return [...?names?.whereType<String>()];
+  }
+
+  @override
+  Future<List<FolderFile>> unzip(String zip, Map<String, int> wanted) async {
+    final copied = await _call<List<Object?>>('unzip', {
+      'zip': zip,
+      'wanted': wanted,
+    }, zip);
+    return [
+      for (final f in copied ?? const [])
+        if (f case {
+          'path': final String path,
+          'doc': final String doc,
+          'size': final int size,
+        })
+          FolderFile(path: path, modified: null, size: size, ref: doc),
+    ];
+  }
+
+  @override
+  Future<void> dropUnzipped() async {
+    try {
+      await channel.invokeMethod<void>('dropUnzipped');
+    } on PlatformException {
+      // The cache is the system's to clear as well.
+    } on MissingPluginException {
+      // Nothing was copied here.
     }
   }
 

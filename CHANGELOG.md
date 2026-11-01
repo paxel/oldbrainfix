@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - On the phone, the ⋮ of a photo shown full screen offers Save, which puts it into the phone's Pictures in the album "Old Brain Fix" from Android 10 on, Copy, which puts the picture on the clipboard, and Share, which hands it to the app picked on the share sheet, and on the desktop a right-click on a photo in the Note editor or shown full screen offers "Save image as…", which saves its file where the user says, "Copy image", which puts the picture on the clipboard, and "Open in another program", which opens it in the computer's program for pictures.
 - On the phone under Settings ▸ Import and on the desktop with "Import a folder…" in Sync, a folder of Markdown and text files becomes Notes, each dated when its file was last changed, in a new Area named after the folder, none of them Nudged.
+- On the phone, "Import from Google Keep" under Settings ▸ Import takes a Google Takeout export of Keep, as its zip file or unpacked folder, and makes each of its notes a Note in a new Area "From Google Keep", dated when it was made in Keep, with its labels as #tags, a list as a Checklist with its checked Lines that stays off the Agenda until switched on, and its photos as photos, none of them Nudged and none from Keep's trash.
 
 ### Changed
 

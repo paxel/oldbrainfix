@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
@@ -15,6 +16,7 @@ import 'context_platform.dart';
 import 'failure_dialog.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
+import 'keep_import.dart';
 import 'l10n.dart';
 import 'lock_settings.dart';
 import 'look.dart';
@@ -32,15 +34,18 @@ import 'system_bars.dart';
 /// does, or a system chosen.
 enum _UnitChoice { region, metric, imperial }
 
+/// The Imports in Settings: a folder of files, or Google Keep's export.
+enum _Importing { folder, keep }
+
 /// This Device's settings (ADR 0008), reached only through the Profile
 /// page: the theme; the units of Tallies; how the Agenda shows Shopping
 /// Lists; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
-/// the Area Locks; whether Streaks show; the Import of a folder; and
-/// About. Each is a local setting, never synced, and applies at once;
-/// the alarms are armed again after each change.
+/// the Area Locks; whether Streaks show; the Import of a folder or of a
+/// Google Keep export; and About. Each is a local setting, never synced,
+/// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
@@ -130,61 +135,198 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _twoRows = on);
   }
 
-  /// Whether an Import is reading its folder.
-  var _importing = false;
+  /// Which Import is reading its folder or zip, null while none is.
+  _Importing? _importing;
 
   /// Picks a folder with the system's picker and makes Notes of its
-  /// Markdown and text files in a new Area (ADR 0036), announced at the
-  /// top once done, even after this page closed, without values (UI
-  /// laws); its tap shows what went where, with a way into the Area.
+  /// Markdown and text files in a new Area (ADR 0036), announced as
+  /// [_runImport] does.
   Future<void> _import() async {
-    if (_importing) return;
+    if (_importing != null) return;
     final t = context.t;
     final folders = FolderScope.of(context);
     final announcements = AnnouncementsScope.of(context);
     final navigator = Navigator.of(context, rootNavigator: true);
     final store = widget.store;
-    final trail = widget.trail ?? BrowserTrail();
     final folder = await folders.pick();
     if (folder == null) return;
-    if (mounted) setState(() => _importing = true);
-    try {
-      final name = await folders.displayName(folder);
-      final summary = await importFolder(
-        store,
-        folders,
-        folder,
-        t.importAreaName(name),
-      );
-      final area = switch (summary.areaId) {
-        final id? => Places(store).areaById(id),
-        null => null,
-      };
-      if (area == null) {
-        announceFailureWith(
-          announcements,
-          navigator,
-          t.importNothing,
-          title: t.importNothingTitle,
-          cause: t.importNothingCause,
-          fix: t.importNothingFix,
-          details: t.importSkippedDetails(
-            name,
-            summary.notText,
-            summary.tooLarge,
-          ),
-        );
-        return;
-      }
-      final shown = areaName(t, area);
-      final details = [
-        t.importFinishedNotes(summary.notes, shown),
+    var name = '';
+    await _runImport(
+      _Importing.folder,
+      t,
+      announcements,
+      navigator,
+      run: () async {
+        name = await folders.displayName(folder);
+        return importFolder(store, folders, folder, t.importAreaName(name));
+      },
+      finished: (summary, area) => [
+        t.importFinishedNotes(summary.notes, area),
         if (summary.skipped > 0) ...[
           '',
           t.importFinishedSkipped(summary.skipped),
           t.importSkippedDetails(name, summary.notText, summary.tooLarge),
         ],
-      ].join('\n');
+      ].join('\n'),
+      nothing: (summary) => (
+        announced: t.importNothing,
+        cause: t.importNothingCause,
+        fix: t.importNothingFix,
+        details: t.importSkippedDetails(
+          name,
+          summary.notText,
+          summary.tooLarge,
+        ),
+      ),
+      failed: (
+        announced: t.importFailed,
+        cause: t.importFailedCause,
+        fix: t.importFailedFix,
+      ),
+      // The folder was picked for this Import alone: its lasting access
+      // goes, unless the app syncs or backs up through it.
+      release: () =>
+          folders.release(folder, [?store.syncFolder, ?store.backupFolder]),
+    );
+  }
+
+  /// Asks whether the Google Takeout export is still a zip or an unpacked
+  /// folder, picks it with the system's picker and makes Notes of its
+  /// Google Keep notes in the new Area "From Google Keep" (ADR 0036),
+  /// announced as [_runImport] does.
+  Future<void> _importKeep() async {
+    if (_importing != null) return;
+    final t = context.t;
+    final folders = FolderScope.of(context);
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final store = widget.store;
+    final zip = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.t.importKeep),
+        // The two answers stacked full width, Cancel below (UI laws).
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(context.t.importKeepAsk),
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                key: const ValueKey('importKeepZip'),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(context.t.importKeepZip),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.tonal(
+                key: const ValueKey('importKeepFolder'),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(context.t.importKeepFolder),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.t.cancel),
+          ),
+        ],
+      ),
+    );
+    if (zip == null || !mounted || _importing != null) return;
+    final source = zip ? await folders.pickZip() : await folders.pick();
+    if (source == null) return;
+    await _runImport(
+      _Importing.keep,
+      t,
+      announcements,
+      navigator,
+      run: () => zip
+          ? importKeepZip(store, folders, source, t.importKeepAreaName)
+          : importKeepFolder(store, folders, source, t.importKeepAreaName),
+      finished: (summary, area) => [
+        t.importFinishedNotes(summary.notes, area),
+        if (summary.checklists > 0) t.importKeepChecklists(summary.checklists),
+        if (summary.photos > 0) t.importKeepPhotos(summary.photos),
+        if (summary.skipped > 0) ...[
+          '',
+          t.importKeepSkipped(summary.skipped),
+          _keepSkipped(t, summary),
+        ],
+      ].join('\n'),
+      nothing: (summary) => (
+        announced: t.importKeepNothing,
+        cause: t.importKeepNothingCause,
+        fix: t.importKeepNothingFix,
+        details: _keepSkipped(t, summary),
+      ),
+      failed: (
+        announced: t.importKeepFailed,
+        cause: t.importKeepFailedCause,
+        fix: t.importKeepFailedFix,
+      ),
+      // A zip leaves no lasting access behind, only the copies of its
+      // files; a folder's goes as for any Import.
+      release: () => zip
+          ? Future<void>.value()
+          : folders.release(source, [?store.syncFolder, ?store.backupFolder]),
+    );
+  }
+
+  static String _keepSkipped(AppLocalizations t, ImportSummary summary) =>
+      t.importKeepSkippedDetails(
+        summary.trashed,
+        summary.missing,
+        summary.notPhoto,
+        summary.tooLarge,
+        summary.notText,
+      );
+
+  /// Runs the Import [kind] by [run], its row showing that it reads
+  /// meanwhile, and announces at the top in [t], taken before any await,
+  /// once done, even after this page closed, without values (UI laws):
+  /// its tap shows what went where, [finished] says it of the new Area,
+  /// with a way into the Area; or, with nothing to import, why
+  /// ([nothing]); or that it [failed]. Then gives up what was picked for
+  /// it ([release]).
+  Future<void> _runImport(
+    _Importing kind,
+    AppLocalizations t,
+    Announcements? announcements,
+    NavigatorState navigator, {
+    required Future<ImportSummary> Function() run,
+    required String Function(ImportSummary summary, String area) finished,
+    required ({String announced, String cause, String fix, String details})
+    Function(ImportSummary summary)
+    nothing,
+    required ({String announced, String cause, String fix}) failed,
+    required Future<void> Function() release,
+  }) async {
+    final store = widget.store;
+    final trail = widget.trail ?? BrowserTrail();
+    if (mounted) setState(() => _importing = kind);
+    try {
+      final summary = await run();
+      final area = switch (summary.areaId) {
+        final id? => Places(store).areaById(id),
+        null => null,
+      };
+      if (area == null) {
+        final why = nothing(summary);
+        announceFailureWith(
+          announcements,
+          navigator,
+          why.announced,
+          title: t.importNothingTitle,
+          cause: why.cause,
+          fix: why.fix,
+          details: why.details,
+        );
+        return;
+      }
+      final details = finished(summary, areaName(t, area));
       announcements?.announce(
         t.importFinished,
         onTap: () => unawaited(
@@ -215,19 +357,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       announceFailureWith(
         announcements,
         navigator,
-        t.importFailed,
+        failed.announced,
         title: t.importFailedTitle,
-        cause: t.importFailedCause,
-        fix: t.importFailedFix,
+        cause: failed.cause,
+        fix: failed.fix,
         details: '$e',
       );
     } finally {
-      // The folder was picked for this Import alone: its lasting access
-      // goes, unless the app syncs or backs up through it.
-      unawaited(
-        folders.release(folder, [?store.syncFolder, ?store.backupFolder]),
-      );
-      if (mounted) setState(() => _importing = false);
+      unawaited(release());
+      if (mounted) setState(() => _importing = null);
     }
   }
 
@@ -265,6 +403,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// The row of the Import [kind]: [title] over [detail], or over
+  /// [reading] with a spinner while it runs; no row takes a tap while
+  /// any Import runs.
+  Widget _importRow(
+    _Importing kind, {
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String detail,
+    required String reading,
+    required VoidCallback onTap,
+  }) {
+    final running = _importing == kind;
+    return ListTile(
+      key: key,
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(running ? reading : detail),
+      trailing: running
+          ? const SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            )
+          : null,
+      enabled: _importing == null,
+      onTap: onTap,
     );
   }
 
@@ -508,21 +675,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SettingsHeading(t.settingsImport),
               SettingsSection(
                 children: [
-                  ListTile(
+                  _importRow(
+                    _Importing.folder,
                     key: const ValueKey('importFolder'),
-                    leading: const Icon(Icons.drive_folder_upload_outlined),
-                    title: Text(t.importFolder),
-                    subtitle: Text(
-                      _importing ? t.importReading : t.importFolderDetail,
-                    ),
-                    trailing: _importing
-                        ? const SizedBox.square(
-                            dimension: 24,
-                            child: CircularProgressIndicator(strokeWidth: 3),
-                          )
-                        : null,
-                    enabled: !_importing,
+                    icon: Icons.drive_folder_upload_outlined,
+                    title: t.importFolder,
+                    detail: t.importFolderDetail,
+                    reading: t.importReading,
                     onTap: _import,
+                  ),
+                  _importRow(
+                    _Importing.keep,
+                    key: const ValueKey('importKeep'),
+                    icon: Icons.sticky_note_2_outlined,
+                    title: t.importKeep,
+                    detail: t.importKeepDetail,
+                    reading: t.importKeepReading,
+                    onTap: _importKeep,
                   ),
                 ],
               ),
