@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 20] = [
+const SCENARIOS: [&str; 21] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -50,6 +50,7 @@ const SCENARIOS: [&str; 20] = [
     "frogs",
     "history",
     "import",
+    "keep",
     "markdown",
     "markers",
     "media",
@@ -1574,23 +1575,132 @@ fn write_import(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `_keepTakeout`: the Takeout the `keep` scenario
+/// imports, as an app hands its entries over.
+fn keep_takeout() -> Vec<ImportFile> {
+    let file = |name: &str, bytes: Vec<u8>| ImportFile {
+        name: name.into(),
+        modified: None,
+        bytes,
+    };
+    let text = |name: &str, text: &str| file(name, text.as_bytes().to_vec());
+    vec![
+        text("Takeout/archive_browser.html", "<html></html>"),
+        text(
+            "Takeout/Fit/Walk.json",
+            r#"{"title":"Walk","createdTimestampUsec":1709280000000000}"#,
+        ),
+        text(
+            "Takeout/Keep/Labels.txt",
+            "Errands\nHome Garden\n2024\nshopping\n",
+        ),
+        text(
+            "Takeout/Keep/Dentist.json",
+            concat!(
+                r#"{"color":"DEFAULT","isTrashed":false,"isPinned":true,"#,
+                r#""isArchived":false,"#,
+                r#""textContent":"Tuesday 9:00\nbring the X-ray #errands","#,
+                r#""textContentHtml":"<p dir=\"ltr\">Tuesday 9:00</p>","#,
+                r#""title":"Dentist","userEditedTimestampUsec":1717320600000000,"#,
+                r#""createdTimestampUsec":1709280000000250,"#,
+                r#""labels":[{"name":"Errands"},{"name":"Home Garden"},"#,
+                r#"{"name":"2024"}],"#,
+                r#""attachments":[{"filePath":"1a2b3c.png","mimetype":"image/png"},"#,
+                r#"{"filePath":"4d5e6f.jpeg","mimetype":"image/jpeg"},"#,
+                r#"{"filePath":"gone.jpg","mimetype":"image/jpeg"},"#,
+                r#"{"filePath":"7a8b9c.3gp","mimetype":"audio/3gpp"}]}"#,
+            ),
+        ),
+        text(
+            "Takeout/Keep/Dentist.html",
+            "<html><body>Dentist</body></html>",
+        ),
+        file("Takeout/Keep/1a2b3c.png", KEEP_PNG.to_vec()),
+        file("Takeout/Keep/4d5e6f.jpg", vec![0xff, 0xd8, 0xff, 0xd9]),
+        file("Takeout/Keep/7a8b9c.3gp", vec![0, 0, 0, 0x18]),
+        text(
+            "Takeout/Keep/Groceries.json",
+            concat!(
+                r#"{"color":"GREEN","isTrashed":false,"isPinned":false,"#,
+                r#""isArchived":false,"title":"Groceries","#,
+                r#""userEditedTimestampUsec":1736510400000000,"#,
+                r#""createdTimestampUsec":1730827800000000,"#,
+                r#""listContent":[{"textHtml":"Milk","text":"Milk","isChecked":true},"#,
+                r#"{"textHtml":"Eggs","text":"Eggs","isChecked":false},"#,
+                r#"{"text":"Über-Brot","isChecked":false},"#,
+                r#"{"text":" ","isChecked":true}],"#,
+                r#""labels":[{"name":"shopping"}]}"#,
+            ),
+        ),
+        text(
+            "Takeout/Keep/Locker.json",
+            concat!(
+                r#"{"isTrashed":false,"isArchived":true,"title":"","#,
+                r#""textContent":"Locker code 4711\n","#,
+                r#""userEditedTimestampUsec":1692081900000000,"#,
+                r#""createdTimestampUsec":0}"#,
+            ),
+        ),
+        text(
+            "Takeout/Keep/Old idea.json",
+            concat!(
+                r#"{"isTrashed":true,"title":"Old idea","textContent":"gone","#,
+                r#""userEditedTimestampUsec":1692081900000000,"#,
+                r#""createdTimestampUsec":1692081900000000}"#,
+            ),
+        ),
+        text("Takeout/Keep/Broken.json", r#"{"title":"Broken","#),
+    ]
+}
+
+/// The generator's `_keepPng`: a PNG of one transparent pixel.
+const KEEP_PNG: [u8; 67] = [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+    0x42, 0x60, 0x82,
+];
+
+/// The Import of the generator's `keep` scenario.
+fn keep_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
+    Ok(vec![
+        Imports::new(store).keep("From Google Keep", &keep_takeout())?,
+    ])
+}
+
+/// The generator's `keep` scenario.
+fn write_keep(store: &Store) -> Built {
+    keep_into(store)?;
+    Ok(())
+}
+
+/// What an Import came to, as the generator's `_summary` writes it.
+fn summary_json(s: &ImportSummary) -> Value {
+    json!({
+        "areaId": s.area_id,
+        "checklists": s.checklists,
+        "missing": s.missing,
+        "notPhoto": s.not_photo,
+        "notText": s.not_text,
+        "notes": s.notes,
+        "photos": s.photos,
+        "skipped": s.skipped(),
+        "tooLarge": s.too_large,
+        "trashed": s.trashed,
+    })
+}
+
 #[test]
 fn imports_come_to_what_the_dart_core_says() -> TestResult {
-    let store = writer_store()?;
-    let summaries: Vec<Value> = import_into(&store)?
-        .iter()
-        .map(|s| {
-            json!({
-                "areaId": s.area_id,
-                "notes": s.notes,
-                "notText": s.not_text,
-                "tooLarge": s.too_large,
-                "skipped": s.skipped(),
-            })
-        })
-        .collect();
-    let expected = read_json(&fixtures().join("import").join("import.json"))?;
-    assert_eq!(json!({ "imports": summaries }), expected);
+    type Into = fn(&Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>>;
+    let scenarios: [(&str, Into); 2] = [("import", import_into), ("keep", keep_into)];
+    for (scenario, into) in scenarios {
+        let store = writer_store()?;
+        let summaries: Vec<Value> = into(&store)?.iter().map(summary_json).collect();
+        let expected = read_json(&fixtures().join(scenario).join(format!("{scenario}.json")))?;
+        assert_eq!(json!({ "imports": summaries }), expected, "{scenario}");
+    }
     Ok(())
 }
 
@@ -1701,12 +1811,24 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
         assert!(!theirs.is_empty(), "{sub}");
         assert_eq!(ours, theirs, "{sub}");
     }
+    // The photos the import from Google Keep keeps.
+    let dir = tempfile::tempdir()?;
+    let store = Store::open(
+        &dir.path().join("oldbrainfix.db"),
+        Box::new(Utc::now),
+        || Ok(writer_key()),
+    )?;
+    write_keep(&store)?;
+    let ours = files(&dir.path().join("photos"))?;
+    let theirs = files(&fixtures().join("keep").join("photos"))?;
+    assert_eq!(theirs.len(), 2);
+    assert_eq!(ours, theirs);
     Ok(())
 }
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 20] = [
+    let writers: [(&str, Writer); 21] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1716,6 +1838,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("frogs", write_frogs),
         ("history", write_history),
         ("import", write_import),
+        ("keep", write_keep),
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),
@@ -2817,6 +2940,7 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
         "checklist-routines",
         "checklists",
         "history",
+        "keep",
     ] {
         checklists_come_to_what_the_dart_core_says(scenario)?;
     }

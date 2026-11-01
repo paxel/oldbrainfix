@@ -2,24 +2,39 @@
   "imports": [
     {
       "areaId": "area:00000000000000000000000000000002",
-      "notes": 8,
+      "checklists": 0,
+      "missing": 0,
+      "notPhoto": 0,
       "notText": 3,
+      "notes": 8,
+      "photos": 0,
+      "skipped": 4,
       "tooLarge": 1,
-      "skipped": 4
+      "trashed": 0
     },
     {
       "areaId": null,
-      "notes": 0,
+      "checklists": 0,
+      "missing": 0,
+      "notPhoto": 0,
       "notText": 2,
+      "notes": 0,
+      "photos": 0,
+      "skipped": 2,
       "tooLarge": 0,
-      "skipped": 2
+      "trashed": 0
     },
     {
       "areaId": "area:0000000000000000000000000000000c",
-      "notes": 1,
+      "checklists": 0,
+      "missing": 0,
+      "notPhoto": 0,
       "notText": 0,
+      "notes": 1,
+      "photos": 0,
+      "skipped": 0,
       "tooLarge": 0,
-      "skipped": 0
+      "trashed": 0
     }
   ]
 }

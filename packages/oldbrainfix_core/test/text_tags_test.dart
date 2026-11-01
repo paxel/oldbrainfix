@@ -101,6 +101,28 @@ void main() {
     expect(_written('☐ #call mum\n✅#done'), ['#call', '#done']);
   });
 
+  test('a label becomes a tag of its words, the same in both cores', () {
+    const cases = {
+      'Errands': '#Errands',
+      'Home Garden': '#Home-Garden',
+      '  Home & Garden!  ': '#Home-Garden',
+      'to-do': '#to-do',
+      '#Work': '#Work',
+      'Über_Ideen 日記': '#Über_Ideen-日記',
+      'C#': '#C',
+      '2024': '#2024',
+      '🛒 - !': null,
+      '': null,
+    };
+    for (final MapEntry(:key, :value) in cases.entries) {
+      expect(TextTags.fromLabel(key), value, reason: key);
+    }
+    for (final name in ['Errands', 'Home Garden', 'to-do', 'Über_Ideen 日記']) {
+      final tag = TextTags.fromLabel(name) ?? '';
+      expect(_written(tag), [tag], reason: name);
+    }
+  });
+
   test('offsets are UTF-16 code units, an astral character counting two', () {
     final [tag] = TextTags.find('🧠 #𝔸');
     expect((tag.start, tag.end), (3, 6));

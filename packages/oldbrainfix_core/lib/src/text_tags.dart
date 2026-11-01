@@ -49,6 +49,26 @@ abstract final class TextTags {
     return found;
   }
 
+  /// The label [name] of another app as a tag, such as "Home & Garden"
+  /// as "#Home-Garden": each run of characters that are no letter, digit
+  /// or `_` becomes one `-`, and a `-` at either end goes; the case stays
+  /// as written. Null when nothing is left. A name without a letter, such
+  /// as "2024", comes to "#2024", which reads as a number, not a tag.
+  static String? fromLabel(String name) {
+    final out = StringBuffer();
+    var gap = false;
+    for (final c in name.runes) {
+      if (_inTag(c) && c != _dash) {
+        if (gap && out.isNotEmpty) out.write('-');
+        out.writeCharCode(c);
+        gap = false;
+      } else {
+        gap = true;
+      }
+    }
+    return out.isEmpty ? null : '#$out';
+  }
+
   static const _hash = 0x23;
   static const _dash = 0x2D;
   static const _underscore = 0x5F;

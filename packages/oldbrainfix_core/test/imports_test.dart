@@ -249,6 +249,264 @@ void main() {
     });
   });
 
+  group('Google Keep', () {
+    final made = DateTime.utc(2024, 3, 1, 8, 0, 0, 0, 250);
+    final changed = DateTime.utc(2024, 6, 2, 9, 30);
+    final png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2];
+
+    /// A Keep note's `.json` at `Takeout/Keep/<name>.json`.
+    ImportFile note(String name, Map<String, Object?> json) =>
+        file('Takeout/Keep/$name.json', jsonEncode(json));
+
+    Map<String, Object?> times([DateTime? created, DateTime? edited]) => {
+      'createdTimestampUsec': (created ?? made).microsecondsSinceEpoch,
+      'userEditedTimestampUsec': (edited ?? changed).microsecondsSinceEpoch,
+    };
+
+    Note only(ImportSummary summary) => notes.inside(summary.areaId!).single;
+
+    test('a note keeps its title, text and date, its labels as tags', () {
+      final summary = imports.keep('From Google Keep', [
+        note('Dentist', {
+          ...times(),
+          'title': 'Dentist',
+          'textContent': 'Tuesday 9:00\r\nbring the X-ray #errands',
+          'textContentHtml': '<p>ignored</p>',
+          'isPinned': true,
+          'color': 'RED',
+          'labels': [
+            {'name': 'Errands'},
+            {'name': 'Home Garden'},
+            {'name': 'home-garden'},
+            {'name': '2024'},
+            {'name': '🛒'},
+            {'nom': 'x'},
+          ],
+        }),
+      ]);
+      expect(summary.notes, 1);
+      expect(summary.skipped, 0);
+      expect(places.areaById(summary.areaId!)!.name, 'From Google Keep');
+      final dentist = only(summary);
+      expect(
+        dentist.text,
+        'Dentist\nTuesday 9:00\nbring the X-ray #errands\n#Home-Garden #2024',
+      );
+      expect(dentist.textFormat, TextFormats.plain);
+      expect(dentist.captured, made);
+      expect(store.history(dentist.id).map((e) => e.date).toSet(), {made});
+      expect(notes.unsorted(), isEmpty);
+      expect(store.current(dentist.id, NoteKeys.nudge), isNull);
+    });
+
+    test('a list becomes a Checklist, its Lines checked when the note '
+        'last changed', () {
+      final summary = imports.keep('From Google Keep', [
+        note('Groceries', {
+          ...times(),
+          'title': 'Groceries',
+          'textContent': '',
+          'listContent': [
+            {'text': 'Milk', 'isChecked': true},
+            {'text': ' Eggs\nlarge ', 'isChecked': false},
+            {'text': '  ', 'isChecked': true},
+            {'text': 'Bread', 'isChecked': 'yes'},
+            {'isChecked': true},
+          ],
+          'labels': [
+            {'name': 'shopping'},
+          ],
+        }),
+      ]);
+      expect(summary.checklists, 1);
+      final groceries = only(summary);
+      expect(groceries.text, 'Groceries\n#shopping');
+      final list = Checklists(store).byNote(groceries.id)!;
+      expect(list.lines.map((l) => (l.text, l.checked)), [
+        ('Milk', true),
+        ('Eggs large', false),
+        ('Bread', false),
+      ]);
+      expect(list.lines.first.checkedAt, changed);
+      final milk = store.history(list.lines.first.id);
+      expect({
+        for (final e in milk) e.field: e.date,
+      }, containsPair(ChecklistKeys.checked, changed));
+      expect({for (final e in milk) e.field: e.date}[ChecklistKeys.type], made);
+      expect(groceries.spawned, isFalse);
+    });
+
+    test('a list starts off the Agenda until switched on', () {
+      final summary = imports.keep('From Google Keep', [
+        note('Groceries', {
+          ...times(),
+          'title': 'Groceries',
+          'listContent': [
+            {'text': 'Milk', 'isChecked': false},
+          ],
+        }),
+      ]);
+      final lists = Checklists(store);
+      final id = only(summary).id;
+      expect(lists.showsOnAgenda(id), isFalse);
+      expect(lists.agenda(), isEmpty);
+      lists.setShowOnAgenda(id, true);
+      expect(lists.agenda().map((l) => l.noteId), [id]);
+    });
+
+    test('a list checked before it was made is checked when it was made', () {
+      final summary = imports.keep('From Google Keep', [
+        note('Odd', {
+          ...times(made, DateTime.utc(2020)),
+          'title': 'Odd',
+          'listContent': [
+            {'text': 'Milk', 'isChecked': true},
+          ],
+        }),
+      ]);
+      final list = Checklists(store).byNote(only(summary).id)!;
+      expect(list.lines.single.checkedAt, made);
+    });
+
+    test('a note in the trash is skipped, an archived one is made', () {
+      final summary = imports.keep('From Google Keep', [
+        note('Old', {...times(), 'title': 'Old', 'isTrashed': true}),
+        note('Kept', {...times(), 'title': 'Kept', 'isArchived': true}),
+        note('Odd', {...times(), 'title': 'Odd', 'isTrashed': 'yes'}),
+      ]);
+      expect(summary.trashed, 1);
+      expect(summary.skipped, 1);
+      expect(summary.notes, 2);
+      final texts = notes.inside(summary.areaId!).map((n) => n.text);
+      expect(texts, unorderedEquals(['Kept', 'Odd']));
+    });
+
+    test('photos it names are its photos; missing ones, other kinds and '
+        'those too large are counted', () {
+      final jpeg = [0xff, 0xd8, 0xff, 0xd9];
+      final summary = imports.keep('From Google Keep', [
+        note('Garden', {
+          ...times(),
+          'title': 'Garden',
+          'attachments': [
+            {'filePath': 'a1.png', 'mimetype': 'image/png'},
+            {'filePath': 'b2.jpeg', 'mimetype': 'image/jpeg'},
+            {'filePath': 'a1.png', 'mimetype': 'image/png'},
+            {'filePath': 'gone.webp', 'mimetype': 'image/webp'},
+            {'filePath': 'hum.3gp', 'mimetype': 'audio/3gpp'},
+            {'filePath': 'big.GIF', 'mimetype': 'image/gif'},
+            {'mimetype': 'image/png'},
+          ],
+        }),
+        note('Shed', {
+          ...times(),
+          'attachments': [
+            {'filePath': 'a1.png', 'mimetype': 'image/png'},
+          ],
+        }),
+        raw('Takeout/Keep/a1.png', png),
+        raw('Takeout/Keep/b2.jpg', jpeg),
+        raw('Takeout/Keep/hum.3gp', [1, 2, 3]),
+        raw('Takeout/Keep/big.GIF', List.filled(Imports.maxPhotoBytes + 1, 0)),
+      ]);
+      expect(summary.notes, 2);
+      expect(summary.photos, 3);
+      expect(summary.missing, 2);
+      expect(summary.notPhoto, 1);
+      expect(summary.tooLarge, 1);
+      expect(summary.skipped, 4);
+      final [shed, garden] = notes.inside(summary.areaId!)
+        ..sort((a, b) => a.text.compareTo(b.text));
+      expect(garden.photos, hasLength(2));
+      expect(notes.photoBytes(garden.photos.first), png);
+      expect(notes.photoBytes(garden.photos.last), jpeg);
+      // A Note of a photo alone has no text, as at Capture.
+      expect(shed.text, '');
+      expect(shed.photos, [garden.photos.first]);
+    });
+
+    test('only the entries of a Keep folder count when there is one; '
+        'its .html twins and Labels.txt are not read', () {
+      final keep = note('Dentist', {...times(), 'title': 'Dentist'});
+      final other = file(
+        'Takeout/Fit/Walk.json',
+        jsonEncode({...times(), 'title': 'Walk'}),
+      );
+      final summary = imports.keep('From Google Keep', [
+        keep,
+        file('Takeout/Keep/Dentist.html', '<html>Dentist</html>'),
+        file('Takeout/Keep/Labels.txt', 'Errands\n'),
+        other,
+        file('Takeout/archive_browser.html', '<html></html>'),
+      ]);
+      expect((summary.notes, summary.skipped), (1, 0));
+      expect(only(summary).text, 'Dentist');
+      final loose = imports.keep('From Google Keep', [
+        file('Dentist.json', utf8.decode(keep.bytes)),
+        file(r'sub\Walk.json', utf8.decode(other.bytes)),
+      ]);
+      expect(loose.notes, 2);
+    });
+
+    test('what is no Keep note or holds nothing is no text', () {
+      final summary = imports.keep('From Google Keep', [
+        file('Takeout/Keep/Broken.json', '{"title": "Broken"'),
+        file('Takeout/Keep/List.json', '[1, 2]'),
+        note('Untimed', {'title': 'Untimed'}),
+        note('Float', {
+          'title': 'Float',
+          'createdTimestampUsec': 1.7e15,
+          'userEditedTimestampUsec': 1.7e15,
+        }),
+        note('Empty', {...times(), 'title': ' ', 'textContent': '\n'}),
+        note('Labels', {
+          ...times(),
+          'labels': [
+            {'name': 'Errands'},
+          ],
+        }),
+        note('No lines', {...times(), 'listContent': <Object?>[]}),
+        raw('Takeout/Keep/Wide.json', [0xff, 0xfe, 0x7b, 0x00]),
+        raw(
+          'Takeout/Keep/Big.json',
+          List.filled(Imports.maxFileBytes + 1, 0x20),
+        ),
+      ]);
+      expect(summary.areaId, isNull);
+      expect(summary.notText, 8);
+      expect(summary.tooLarge, 1);
+      expect(store.allEntries(), isEmpty);
+    });
+
+    test('a note is captured when made, else when last changed, else now', () {
+      final later = now.add(const Duration(days: 1));
+      final summary = imports.keep('From Google Keep', [
+        note('Zero', {...times(DateTime.utc(1970)), 'title': 'Zero'}),
+        note('Later', {...times(later, later), 'title': 'Later'}),
+        note('Text', {
+          'createdTimestampUsec': '${made.microsecondsSinceEpoch}',
+          'userEditedTimestampUsec': changed.microsecondsSinceEpoch,
+          'title': 'Text',
+        }),
+      ]);
+      final dates = {
+        for (final n in notes.inside(summary.areaId!)) n.text: n.captured,
+      };
+      expect(dates, {'Zero': changed, 'Later': now, 'Text': changed});
+    });
+
+    test('says which files it reads, and how much of them', () {
+      expect(Imports.keepReads('Takeout/Keep/a.json'), Imports.maxFileBytes);
+      expect(Imports.keepReads('Takeout/Keep/A.JSON'), Imports.maxFileBytes);
+      for (final photo in ['a.jpg', 'a.JPEG', 'a.png', 'a.webp', 'a.gif']) {
+        expect(Imports.keepReads('Keep/$photo'), Imports.maxPhotoBytes);
+      }
+      for (final other in ['a.html', 'Labels.txt', 'a.3gp', '._a.json', 'a']) {
+        expect(Imports.keepReads('Keep/$other'), isNull, reason: other);
+      }
+    });
+  });
+
   test('takes only formats known here', () {
     expect(
       () => imports.notes('From Keep', [

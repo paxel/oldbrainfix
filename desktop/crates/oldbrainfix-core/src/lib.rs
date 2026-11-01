@@ -6,7 +6,7 @@
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
-//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files. The Dart core
+//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files and of a Google Keep export. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
@@ -79,7 +79,7 @@ pub use frogs::{Frog, Frogs, FrogsToday};
 pub use history::{
     Adherence, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory, ScheduleSpan,
 };
-pub use imports::{ImportFile, ImportSummary, ImportedNote, Imports};
+pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
 pub use notes::{Blob, CaptureContext, Importance, Note, Notes, Section, SourceApp, Wordless};
 pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};

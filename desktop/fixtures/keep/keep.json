@@ -1,0 +1,16 @@
+{
+  "imports": [
+    {
+      "areaId": "area:00000000000000000000000000000001",
+      "checklists": 1,
+      "missing": 1,
+      "notPhoto": 1,
+      "notText": 1,
+      "notes": 3,
+      "photos": 2,
+      "skipped": 4,
+      "tooLarge": 0,
+      "trashed": 1
+    }
+  ]
+}

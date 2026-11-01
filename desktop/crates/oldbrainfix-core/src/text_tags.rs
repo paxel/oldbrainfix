@@ -61,6 +61,28 @@ pub fn find(text: &str) -> Vec<FoundTag> {
     found
 }
 
+/// The label `name` of another app as a tag, such as "Home & Garden" as
+/// "#Home-Garden": each run of characters that are no letter, digit or
+/// `_` becomes one `-`, and a `-` at either end goes; the case stays as
+/// written. `None` when nothing is left. A name without a letter, such as
+/// "2024", comes to "#2024", which reads as a number, not a tag.
+pub fn from_label(name: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut gap = false;
+    for c in name.chars() {
+        if in_tag(c) && c != '-' {
+            if gap && !out.is_empty() {
+                out.push('-');
+            }
+            out.push(c);
+            gap = false;
+        } else {
+            gap = true;
+        }
+    }
+    (!out.is_empty()).then(|| format!("#{out}"))
+}
+
 fn in_tag(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '-'
 }
@@ -110,6 +132,29 @@ mod tests {
                 ("#ΟΔΟΣ", "#οδοσ".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn a_label_becomes_a_tag_of_its_words() {
+        let cases = [
+            ("Errands", Some("#Errands")),
+            ("Home Garden", Some("#Home-Garden")),
+            ("  Home & Garden!  ", Some("#Home-Garden")),
+            ("to-do", Some("#to-do")),
+            ("#Work", Some("#Work")),
+            ("Über_Ideen 日記", Some("#Über_Ideen-日記")),
+            ("C#", Some("#C")),
+            ("2024", Some("#2024")),
+            ("🛒 - !", None),
+            ("", None),
+        ];
+        for (name, tag) in cases {
+            assert_eq!(from_label(name).as_deref(), tag, "{name}");
+        }
+        for name in ["Errands", "Home Garden", "to-do", "Über_Ideen 日記"] {
+            let tag = from_label(name).unwrap_or_default();
+            assert_eq!(written(&tag), vec![tag.as_str()], "{name}");
+        }
     }
 
     #[test]

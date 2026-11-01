@@ -200,6 +200,22 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'keep',
+    about:
+        'The import from Google Keep (ADR 0036): a Takeout of a note with a '
+        'title, a tag in its text and labels, one of them already a tag '
+        'there, one with a space and one of digits, a photo, one named '
+        '.jpeg and held as .jpg, one missing and a voice recording; a list '
+        'with a Line checked, dated when the note last changed, starting off '
+        'the Agenda; an archived '
+        'note without a time of making; a note in the trash, one that is '
+        'no JSON, its .html twin, Labels.txt and a note of another product '
+        'outside the Keep folder.',
+    build: (store) {
+      _imported = [Imports(store).keep('From Google Keep', _keepTakeout())];
+    },
+  ),
+  (
     name: 'markdown',
     about:
         'Formatted texts: one captured so and edited, a plain one formatted '
@@ -3314,11 +3330,94 @@ var _imported = <ImportSummary>[];
 
 Map<String, Object?> _summary(ImportSummary s) => {
   'areaId': s.areaId,
-  'notes': s.notes,
+  'checklists': s.checklists,
+  'missing': s.missing,
+  'notPhoto': s.notPhoto,
   'notText': s.notText,
-  'tooLarge': s.tooLarge,
+  'notes': s.notes,
+  'photos': s.photos,
   'skipped': s.skipped,
+  'tooLarge': s.tooLarge,
+  'trashed': s.trashed,
 };
+
+/// The Takeout the `keep` scenario imports, as an app hands its entries
+/// over.
+List<ImportFile> _keepTakeout() {
+  ImportFile text(String path, String text) =>
+      ImportFile(path, null, Uint8List.fromList(utf8.encode(text)));
+  return [
+    text('Takeout/archive_browser.html', '<html></html>'),
+    text(
+      'Takeout/Fit/Walk.json',
+      '{"title":"Walk","createdTimestampUsec":1709280000000000}',
+    ),
+    text('Takeout/Keep/Labels.txt', 'Errands\nHome Garden\n2024\nshopping\n'),
+    text(
+      'Takeout/Keep/Dentist.json',
+      '{"color":"DEFAULT","isTrashed":false,"isPinned":true,'
+          '"isArchived":false,'
+          '"textContent":"Tuesday 9:00\\nbring the X-ray #errands",'
+          '"textContentHtml":"<p dir=\\"ltr\\">Tuesday 9:00</p>",'
+          '"title":"Dentist","userEditedTimestampUsec":1717320600000000,'
+          '"createdTimestampUsec":1709280000000250,'
+          '"labels":[{"name":"Errands"},{"name":"Home Garden"},'
+          '{"name":"2024"}],'
+          '"attachments":[{"filePath":"1a2b3c.png","mimetype":"image/png"},'
+          '{"filePath":"4d5e6f.jpeg","mimetype":"image/jpeg"},'
+          '{"filePath":"gone.jpg","mimetype":"image/jpeg"},'
+          '{"filePath":"7a8b9c.3gp","mimetype":"audio/3gpp"}]}',
+    ),
+    text('Takeout/Keep/Dentist.html', '<html><body>Dentist</body></html>'),
+    ImportFile('Takeout/Keep/1a2b3c.png', null, Uint8List.fromList(_keepPng)),
+    ImportFile(
+      'Takeout/Keep/4d5e6f.jpg',
+      null,
+      Uint8List.fromList(const [0xff, 0xd8, 0xff, 0xd9]),
+    ),
+    ImportFile(
+      'Takeout/Keep/7a8b9c.3gp',
+      null,
+      Uint8List.fromList(const [0, 0, 0, 0x18]),
+    ),
+    text(
+      'Takeout/Keep/Groceries.json',
+      '{"color":"GREEN","isTrashed":false,"isPinned":false,'
+          '"isArchived":false,"title":"Groceries",'
+          '"userEditedTimestampUsec":1736510400000000,'
+          '"createdTimestampUsec":1730827800000000,'
+          '"listContent":[{"textHtml":"Milk","text":"Milk","isChecked":true},'
+          '{"textHtml":"Eggs","text":"Eggs","isChecked":false},'
+          '{"text":"Über-Brot","isChecked":false},'
+          '{"text":" ","isChecked":true}],'
+          '"labels":[{"name":"shopping"}]}',
+    ),
+    text(
+      'Takeout/Keep/Locker.json',
+      '{"isTrashed":false,"isArchived":true,"title":"",'
+          '"textContent":"Locker code 4711\\n",'
+          '"userEditedTimestampUsec":1692081900000000,'
+          '"createdTimestampUsec":0}',
+    ),
+    text(
+      'Takeout/Keep/Old idea.json',
+      '{"isTrashed":true,"title":"Old idea","textContent":"gone",'
+          '"userEditedTimestampUsec":1692081900000000,'
+          '"createdTimestampUsec":1692081900000000}',
+    ),
+    text('Takeout/Keep/Broken.json', '{"title":"Broken",'),
+  ];
+}
+
+/// A PNG of one transparent pixel.
+const _keepPng = [
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, //
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, //
+  0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, //
+  0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82, //
+];
 
 /// The folder the `import` scenario imports, as an app hands it over.
 List<ImportFile> _importFolder() {
@@ -7524,6 +7623,9 @@ Future<void> main(List<String> args) async {
     'clock.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
     '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
+    '- `keep/keep.json`: the same of the import from Google Keep of the '
+    '`keep` log: the Area made, the Notes, Checklists and photos made, '
+    'and what was skipped, by reason.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `later_formats.json`: what files and values of a later version '
@@ -7864,9 +7966,9 @@ Future<void> main(List<String> args) async {
           '${_json.convert(_boxesOf(store))}\n',
         );
       }
-      if (scenario.name == 'import') {
+      if (scenario.name == 'import' || scenario.name == 'keep') {
         _write(
-          File('${out.path}/import.json'),
+          File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
         );
       }
