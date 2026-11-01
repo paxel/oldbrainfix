@@ -438,7 +438,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
   at the top. On the desktop **Tab and Shift+Tab** do it, in place of
-  the buttons.
+  the buttons, and Up and Down move the cursor to the Line above and
+  below.
 - **The frame around a group holds the group's own Line** and the Lines
   under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when

@@ -121,7 +121,7 @@ use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::keep_import::KeepSource;
 use crate::l10n::{self, L10n};
-use crate::line_editing::TypedLines;
+use crate::line_editing::{Listed, TypedLines};
 use crate::login;
 use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
@@ -3710,26 +3710,17 @@ impl App {
         // The Lines shown keep what is typed into them.
         let view = &self.view;
         let detail = view.detail.as_ref().map(|(p, _)| p.note.id.as_str());
-        let editable = |id: &str| {
-            view.shopping
-                .as_ref()
-                .is_some_and(|s| s.editable.contains(id))
+        let none = HashSet::new();
+        let (listed, rights) = match (&view.checklist, &view.shopping) {
+            (Some(s), _) => (Some(Listed::Checklist(&s.list)), (s.adds, &s.editable)),
+            (None, Some(s)) => (Some(Listed::Shopping(&s.list)), (s.checks, &s.editable)),
+            (None, None) => (None, (false, &none)),
         };
-        let shopping = view
-            .shopping
-            .as_ref()
-            .map(|s| (&s.list, &editable as &dyn Fn(&str) -> bool));
-        let checklist = view.checklist.as_ref().map(|s| &s.list);
-        self.lines.arrange(detail, checklist, shopping);
-        // A list just made: its first Line, or its field at the top,
-        // takes the keyboard (#161).
+        self.lines.arrange(detail, listed, rights);
+        // A list just made: its first Line takes the keyboard (#161).
         if self.start_lines && self.lines.note.is_some() && self.lines.note == self.selected_note {
             self.start_lines = false;
-            if self.view.checklist.is_some() {
-                self.lines.add_empty();
-            } else if self.view.shopping.is_some() {
-                self.lines.add_focus = true;
-            }
+            self.lines.focus_empty_row();
         }
         if self.view.detail.is_none() {
             self.badge = None;
@@ -5727,7 +5718,7 @@ impl App {
             ChecklistAction::Check(line, checked, on) => {
                 // A new Line is stored first; an empty one has nothing to
                 // check.
-                let Some(line) = self.lines.stored_id(&self.store, &line)? else {
+                let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
                     return Ok(());
                 };
                 // A sync meanwhile may have taken it.
@@ -5744,16 +5735,11 @@ impl App {
                     }
                 }
             }
-            ChecklistAction::AddLine(note) => {
-                if self.lines.note.as_deref() == Some(note.as_str()) {
-                    self.lines.add_empty();
-                }
-            }
-            ChecklistAction::Typed(asked) => self.lines.typing(&self.store, asked)?,
+            ChecklistAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ChecklistAction::Step(id, step) => {
                 // What was typed is stored first, so the step sees the
                 // list as shown.
-                self.lines.keep(&self.store)?;
+                self.lines.keep(&self.store, &*self.wall)?;
                 let Some((list, line)) = self.line_of(&id)? else {
                     return Ok(());
                 };
@@ -5789,6 +5775,11 @@ impl App {
             ShoppingAction::Make(note) => self.change_kind(&note, Kind::ShoppingList)?,
             ShoppingAction::ToPlain(note) => self.change_kind(&note, Kind::Plain)?,
             ShoppingAction::Check(line, checked) => {
+                // A new Line is stored first; an empty one has nothing to
+                // check.
+                let Some(line) = self.lines.stored_id(&self.store, &*self.wall, &line)? else {
+                    return Ok(());
+                };
                 // A sync meanwhile may have taken it.
                 if let Some(shown) = self.shopping_line_of(&line)?
                     && lists.may_check(&shown.note_id)?
@@ -5800,14 +5791,9 @@ impl App {
                     }
                 }
             }
-            ShoppingAction::Add(note) => {
-                if self.lines.note.as_deref() == Some(note.as_str()) {
-                    self.lines.add_typed(&self.store, &*self.wall)?;
-                }
-            }
-            ShoppingAction::Typed(asked) => self.lines.typing(&self.store, asked)?,
+            ShoppingAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ShoppingAction::Step(id, step) => {
-                self.lines.keep(&self.store)?;
+                self.lines.keep(&self.store, &*self.wall)?;
                 if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
                     return Ok(());
                 }
@@ -6412,7 +6398,7 @@ impl App {
 
     /// Makes the Checklist, Shopping List or Frog the name dialog asked
     /// for, filed where the list is: a list then opens in the Note dialog
-    /// with the cursor in its first Line or its field at the top.
+    /// with the cursor in its first Line.
     fn create_named(&mut self) -> oldbrainfix_core::Result<()> {
         let Some(Dialog::NewKind { kind, name }) = self.dialog.take() else {
             return Ok(());
@@ -6548,7 +6534,7 @@ impl App {
     fn save_text(&mut self) -> oldbrainfix_core::Result<()> {
         // What was typed into its Lines first, by anyone who may add them
         // (#141).
-        self.lines.keep(&self.store)?;
+        self.lines.keep(&self.store, &*self.wall)?;
         self.save_note_text()?;
         self.save_sections()
     }

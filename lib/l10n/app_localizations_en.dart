@@ -3292,12 +3292,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get checklistNewLine => 'New Line';
-
-  @override
-  String get checklistAddLine => 'Add Line';
-
-  @override
   String get checklistRenameTitle => 'Rename Line';
 
   @override

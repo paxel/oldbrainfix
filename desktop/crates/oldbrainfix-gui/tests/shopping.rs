@@ -2,12 +2,15 @@
 //! List" in a Note's editor and in its card's ⋮ turns its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
 //! it comes back, and at the start of that day it is open in its place
-//! again; the field at the top adds Lines at the end on Enter and on
-//! leaving, a name already there bringing its Line back, and the Lines
-//! are renamed in place (#141); the Line menu sets the reappear time and
-//! deletes for good after asking once; full cards check, compact cards
-//! count the open Lines; a Member checks and adds but changes only their
-//! own Lines; and a Line Conflict is named as a Shopping List's. Today's
+//! again; the Lines are typed in place as one block of text, as a
+//! Checklist's (#141, #184): no field and no "Add" at the top, Enter adds
+//! a Line where it was typed, a name already there bringing its Line
+//! back, Backspace at the start joins, the rows stay where they are while
+//! the editor is open, and the typed order is kept the next time; the
+//! Line menu sets the reappear time and deletes for good after asking
+//! once; full cards check, compact cards count the open Lines; a Member
+//! checks and adds but changes only their own Lines; and a Line Conflict
+//! is named as a Shopping List's. Today's
 //! Agenda shows the Shopping Lists the way Settings of this Device choose
 //! (#123): each Line back today with its box, one row per list with the
 //! Lines back or open, or none; a click on a row opens the Note.
@@ -176,20 +179,46 @@ fn line_id(store: &Store, note: &str, text: &str) -> Result<String, Box<dyn std:
         .clone())
 }
 
-/// Types `text` into the add field.
+/// Types `text` into the Line with the keyboard while it is empty, else
+/// into the first empty Line.
 fn type_line(harness: &mut Harness<'_, App>, text: &str) {
     let field = |n: &egui_kittest::kittest::AccessKitNode<'_>| {
-        n.role() == Role::MultilineTextInput && n.placeholder() == Some("New Line")
+        n.role() == Role::TextInput
+            && n.placeholder().unwrap_or_default().is_empty()
+            && n.value().as_deref() == Some("")
     };
     if !harness
         .query_all_by(|n| n.is_focused() && field(n))
         .any(|_| true)
     {
-        harness.get_by(field).click();
+        if let Some(empty) = harness.query_all_by(field).next() {
+            empty.click();
+        }
         harness.run();
     }
     harness.get_by(|n| n.is_focused()).type_text(text);
     harness.run();
+}
+
+/// What the Lines' fields in the editor hold, top to bottom.
+fn rows(harness: &Harness<'_, App>) -> Vec<String> {
+    let mut fields: Vec<(f32, String)> = harness
+        .query_all_by(|n| {
+            n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+        })
+        .map(|n| (n.rect().top(), n.value().unwrap_or_default()))
+        .collect();
+    fields.sort_by(|a, b| a.0.total_cmp(&b.0));
+    fields.into_iter().map(|(_, value)| value).collect()
+}
+
+/// Clicks into the field of the Line `value`, the cursor at its end.
+fn to_end_of(harness: &mut Harness<'_, App>, value: &str) -> TestResult {
+    line_field(harness, value)?.click();
+    harness.run();
+    press(harness, egui::Key::End);
+    assert_eq!(focused(harness).as_deref(), Some(value));
+    Ok(())
 }
 
 /// What the field with the keyboard holds.
@@ -211,7 +240,12 @@ fn line_field<'a>(
     value: &'a str,
 ) -> Result<egui_kittest::Node<'a>, Box<dyn std::error::Error>> {
     Ok(harness
-        .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some(value))
+        .query_all_by(|n| {
+            // Not the search field, which has its hint.
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.value().as_deref() == Some(value)
+        })
         .next()
         .ok_or(format!("a field holding {value:?}"))?)
 }
@@ -297,21 +331,22 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
 }
 
 #[test]
-fn the_add_field_adds_at_the_end_and_a_name_there_brings_its_line_back() -> TestResult {
+fn enter_adds_a_line_where_it_was_typed_and_a_name_there_brings_its_line_back() -> TestResult {
     let (store, note, _) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
     lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
     let mut harness = window(&store, Some(&note));
-    // The field and "Add" sit above the Lines.
-    let field = harness
-        .get_by(|n| n.placeholder() == Some("New Line"))
-        .rect()
-        .top();
-    // The editor's, over the card's in the Note dialog.
-    let milk = boxes(&harness, "Milk").into_iter().last().ok_or("Milk")?;
-    assert!(field < milk.rect().top());
-    // Enter adds what was typed and leaves the field ready for the next.
+    // No field and no "Add" at the top: the Lines are typed in place.
+    assert!(!shows(&harness, "Add"));
+    assert!(!shows(&harness, "Add Line"));
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Bread"]);
+    // Enter at the end of a Line starts an empty one under it, and the
+    // Line typed there is added among the open Lines where it stands.
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert_eq!(list(&harness, &note)?.count(), 3);
     type_line(&mut harness, "Eggs");
     press(&mut harness, egui::Key::Enter);
     assert_eq!(
@@ -319,46 +354,123 @@ fn the_add_field_adds_at_the_end_and_a_name_there_brings_its_line_back() -> Test
         ["Milk", "Apples", "Eggs", "✓ Bread"]
     );
     assert_eq!(focused(&harness).as_deref(), Some(""));
-    // Bread comes back, in its place, not twice.
+    // Bread comes back, in its place, not twice; its row stays where it
+    // is while the editor is open.
     type_line(&mut harness, "  bread ");
     press(&mut harness, egui::Key::Enter);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
-    // An open name stays as it is; so does "Add".
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Eggs", "", "Bread"]);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    // An open name stays as it is.
     type_line(&mut harness, "MILK");
-    click(&mut harness, "Add")?;
+    press(&mut harness, egui::Key::Enter);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Eggs"]);
-    assert!(
-        harness
-            .query_all_by(|n| n.role() == Role::MultilineTextInput
-                && n.value().is_some_and(|v| v.contains("MILK")))
-            .next()
-            .is_none(),
-        "the field is empty again"
-    );
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Eggs", "", "Bread"]);
     Ok(())
 }
 
 #[test]
-fn text_left_in_the_field_is_added_and_lines_are_renamed_in_place() -> TestResult {
+fn enter_mid_line_moves_the_rest_down_and_backspace_at_the_start_joins() -> TestResult {
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    to_end_of(&mut harness, "Bread")?;
+    harness.get_by(|n| n.is_focused()).type_text("Butter");
+    harness.run();
+    for _ in 0.."Butter".len() {
+        press(&mut harness, egui::Key::ArrowLeft);
+    }
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Bread", "Butter", "Apples"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Butter"));
+    // Up and Down go between the Lines.
+    press(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(focused(&harness).as_deref(), Some("Bread"));
+    press(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(focused(&harness).as_deref(), Some("Butter"));
+    // Backspace at the start: the text goes to the end of the Line above,
+    // and the Line joined goes, its checks staying in the log.
+    let lists = ShoppingLists::new(&store);
+    let butter = line_id(&store, &note, "Butter")?;
+    lists.check(&butter, &utc)?;
+    harness.run();
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "BreadButter", "Apples"]);
+    assert_eq!(focused(&harness).as_deref(), Some("BreadButter"));
+    assert!(store.current(&butter, "checked")?.is_some());
+    assert!(store.current(&butter, "trashed")?.is_some());
+    // At the very top there is nothing to join with.
+    to_end_of(&mut harness, "Milk")?;
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "BreadButter", "Apples"]);
+    Ok(())
+}
+
+#[test]
+fn a_new_list_starts_with_one_line_and_keeps_the_order_typed_the_next_time() -> TestResult {
+    let (store, _, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    let note = Notes::new(&store).capture("Market", None, None)?.id;
+    lists.make(&note)?;
+    let other = Notes::new(&store).capture("Other", None, None)?.id;
+    let mut harness = window(&store, Some(&note));
+    assert_eq!(rows(&harness), [""]);
+    for (i, text) in ["Leeks", "Pears", "Cheese"].into_iter().enumerate() {
+        if i > 0 {
+            press(&mut harness, egui::Key::Enter);
+        }
+        type_line(&mut harness, text);
+    }
+    // One more, typed between the first two.
+    to_end_of(&mut harness, "Leeks")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Eggs");
+    // Checked in the editor, a Line stays in its row while it is open.
+    tick(&mut harness, "Pears")?;
+    assert_eq!(rows(&harness), ["Leeks", "Eggs", "Pears", "Cheese"]);
+    harness.state_mut().select_note(&other);
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Leeks", "Eggs", "Cheese", "✓ Pears"]
+    );
+    // The next time the open Lines show in the order typed, the checked
+    // one below them.
+    harness.state_mut().select_note(&note);
+    harness.run();
+    assert_eq!(rows(&harness), ["Leeks", "Eggs", "Cheese", "Pears"]);
+    Ok(())
+}
+
+#[test]
+fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let other = Notes::new(&store).capture("Other", None, None)?.id;
     let mut harness = window(&store, Some(&note));
-    // Enter ends a rename.
+    // Enter at the end stores the rename and starts a new Line.
     into_line(&mut harness, "Bread")?;
     harness.get_by(|n| n.is_focused()).type_text("Rye bread");
     harness.run();
     press(&mut harness, egui::Key::Enter);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Rye bread", "Apples"]);
-    assert_eq!(focused(&harness), None);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
     // A rename the cursor leaves is stored; a Line left empty goes on
-    // leaving, and what is left in the field is added.
+    // leaving, and a new one typed is added.
     into_line(&mut harness, "Milk")?;
     harness.get_by(|n| n.is_focused()).type_text("Oat milk");
     harness.run();
     into_line(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Oat milk", "Rye bread", "Apples"]);
     press(&mut harness, egui::Key::Backspace);
+    assert_eq!(rows(&harness), ["Oat milk", "Rye bread", "", ""]);
+    line_field(&harness, "")?.click();
+    harness.run();
     type_line(&mut harness, "Butter");
     harness.state_mut().select_note(&other);
     harness.run();

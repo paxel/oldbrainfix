@@ -5,26 +5,27 @@
 //! on a full card checkable, on a compact one "N open"; and the Shopping
 //! List part of a Note's editor.
 //!
-//! The editor's part has at the top a field and "Add" for anyone with a
-//! role in its Area, where Enter adds what was typed and leaves the field
-//! ready for the next, every line pasted one Line, in their order at the end;
-//! then the Lines to check, each renamed in place where this Device may
-//! change it (#141, `line_editing`); for those, ⋮ and a right-click on
-//! its box's row with its reappear time as radio buttons and "Delete for
-//! good". "Back to a plain Note" is a badge of the Note dialog (#160).
+//! The editor's part lists the Lines with their boxes, typed in place as
+//! one block of text as a Checklist's are (#141, #184, `line_editing`):
+//! each where this Device may change it, new ones by anyone with a role
+//! in its Area, every one staying in its row while the editor is open; a
+//! new list starts with one empty Line. For a Line this Device may
+//! change, ⋮ and a right-click on its box's row with its reappear time as
+//! radio buttons and "Delete for good". "Back to a plain Note" is a badge
+//! of the Note dialog (#160).
 //! Nothing is written when a struck Line comes back: the window
 //! reads the list again every half minute, so it shows open soon after
 //! the start of its day.
 
 use std::collections::HashSet;
 
-use egui::{Id, Key, Modifiers, RichText, TextEdit, Ui};
+use egui::{RichText, Ui};
 use oldbrainfix_core::{Note, Reappear, ShoppingList, ShoppingLists, Store, WallClock};
 
 use crate::app::embossed;
 use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
 use crate::l10n::L10n;
-use crate::line_editing::{self, FieldOf, TypedLines, Typing};
+use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
 use crate::theme::Tones;
 
@@ -44,9 +45,7 @@ pub enum ShoppingAction {
     ToPlain(String),
     /// Checks the Line with this id, striking it, or unchecks it.
     Check(String, bool),
-    /// Adds every line typed into the add field to the Note's list.
-    Add(String),
-    /// What a Line's field asked as it was renamed in place (#141).
+    /// What a Line's field asked as it was typed in (#141, #184).
     Typed(Typing),
     /// A step of the menu of the Line with this id.
     Step(String, ShopStep),
@@ -151,9 +150,9 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 
-/// The Shopping List part of a Note's editor (#122), under its text: the
-/// field and "Add" at the top, then its Lines, a new one at the end, each
-/// renamed in place in `typed` where this Device may (#141).
+/// The Shopping List part of a Note's editor (#122), under its text: its
+/// Lines as they are typed in `typed`, in their rows, each typed in place
+/// where this Device may (#141, #184).
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -163,42 +162,8 @@ pub fn section(
 ) {
     let text = ui.visuals().text_color();
     let list = &shown.list;
-    let note = &list.note_id;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.shopping_heading()).strong().color(text));
-        if shown.checks {
-            let id = Id::new("shopping add");
-            // Enter adds, and the field stays ready for the next.
-            if ui.memory(|m| m.has_focus(id))
-                && ui.input_mut(|i| {
-                    i.consume_key(Modifiers::NONE, Key::Enter)
-                        || i.consume_key(Modifiers::COMMAND, Key::Enter)
-                })
-                && !typed.add.trim().is_empty()
-            {
-                actions.push(ShoppingAction::Add(note.clone()));
-            }
-            let field = ui.add(
-                TextEdit::multiline(&mut typed.add)
-                    .id(id)
-                    .hint_text(t.checklist_new_line())
-                    .text_color(text)
-                    .desired_rows(1)
-                    .desired_width(f32::INFINITY),
-            );
-            // A list just made: what is bought first goes in here (#161).
-            if typed.add_focus {
-                field.request_focus();
-                typed.add_focus = !field.has_focus();
-            }
-            let add = ui.add_enabled(
-                !typed.add.trim().is_empty(),
-                egui::Button::new(RichText::new(t.add()).color(text)),
-            );
-            if add.clicked() {
-                actions.push(ShoppingAction::Add(note.clone()));
-            }
-        }
         let menu = |ui: &mut Ui, id: &str| {
             let current = list.line(id).map_or(Reappear::STANDARD, |l| l.reappear);
             line_menu(ui, t, current)
@@ -207,25 +172,54 @@ pub fn section(
             &shown.editable,
             &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>,
         );
-        let rows = shown_lines(t, list);
-        let fields: Vec<u64> = rows
+        let lines = shown_lines(t, list);
+        let rows: Vec<ShownLine> = typed
+            .rows
             .iter()
-            .filter_map(|line| typed.shown(&line.id).map(|r| r.key))
+            .map(|row| {
+                let line = row
+                    .id
+                    .as_ref()
+                    .and_then(|id| lines.iter().find(|l| &l.id == id));
+                match line {
+                    Some(line) => ShownLine {
+                        text: row.typed(),
+                        ..line.clone()
+                    },
+                    // New, or gone from the list a moment ago.
+                    None => ShownLine {
+                        id: row.shown_id(),
+                        text: row.typed(),
+                        in_group: false,
+                        checked: false,
+                        below: None,
+                    },
+                }
+            })
+            .collect();
+        // A new Line, and one this Device may change, by anyone who may add.
+        let in_place = |row: &TypedLine| {
+            shown.checks && row.id.as_ref().is_none_or(|id| shown.editable.contains(id))
+        };
+        let fields: Vec<u64> = typed
+            .rows
+            .iter()
+            .filter(|r| in_place(r))
+            .map(|r| r.key)
             .collect();
         let mut typing = Vec::new();
         let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
-            let Some(key) = typed.shown(&line.id).map(|r| r.key) else {
+            let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
                 return false;
             };
             let at = fields.iter().position(|k| *k == key);
             let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
             let below = at.and_then(|at| fields.get(at + 1)).copied();
-            let look = (line.checked, t.checklist_new_line(), width);
             line_editing::field(
                 ui,
                 typed,
                 (key, FieldOf::Shopping),
-                look,
+                (line.checked, width),
                 (above, below),
                 &mut typing,
             );

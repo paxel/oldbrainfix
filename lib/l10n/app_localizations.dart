@@ -5288,18 +5288,6 @@ abstract class AppLocalizations {
   /// **'{checked} of {count} checked'**
   String checklistCount(int checked, int count);
 
-  /// The hint of the field that adds Lines to a Checklist; each line typed becomes one.
-  ///
-  /// In en, this message translates to:
-  /// **'New Line'**
-  String get checklistNewLine;
-
-  /// No description provided for @checklistAddLine.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Line'**
-  String get checklistAddLine;
-
   /// No description provided for @checklistRenameTitle.
   ///
   /// In en, this message translates to:

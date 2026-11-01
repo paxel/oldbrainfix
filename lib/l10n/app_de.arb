@@ -874,8 +874,6 @@
   "checklistUncheckAll": "Alle Haken entfernen",
   "checklistHeading": "Checkliste",
   "checklistCount": "{checked} von {count} abgehakt",
-  "checklistNewLine": "Neue Zeile",
-  "checklistAddLine": "Zeile hinzufügen",
   "checklistRenameTitle": "Zeile umbenennen",
   "checklistMoveUp": "Nach oben",
   "checklistMoveDown": "Nach unten",

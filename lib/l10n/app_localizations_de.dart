@@ -3329,12 +3329,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get checklistNewLine => 'Neue Zeile';
-
-  @override
-  String get checklistAddLine => 'Zeile hinzufügen';
-
-  @override
   String get checklistRenameTitle => 'Zeile umbenennen';
 
   @override
