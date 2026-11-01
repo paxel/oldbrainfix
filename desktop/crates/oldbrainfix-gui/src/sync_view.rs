@@ -9,8 +9,8 @@
 //! each version a button that keeps it, and the shared folder is chosen,
 //! synced and forgotten here, with how its last sync went. A bundle file
 //! for a paired Device, or of everything, is saved and one imported here
-//! too, and so is a folder of Markdown or text files (ADR 0036) until the
-//! desktop has its File menu (#145).
+//! too, and so are a folder of Markdown or text files and a Google Keep
+//! export (ADR 0036) until the desktop has its File menu (#145).
 
 use std::net::IpAddr;
 use std::path::Path;
@@ -36,6 +36,7 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{Wall, embossed};
+use crate::folder_import::Importing;
 use crate::l10n::L10n;
 use crate::names::area_name;
 use crate::profile_view::{Pictures, display_name, person_picture};
@@ -71,6 +72,9 @@ pub enum SyncAction {
     /// Import a folder of Markdown or text files chosen with the
     /// system's dialog (ADR 0036).
     ImportFolder,
+    /// Import a Google Keep export, a zip or a folder, as the dialog
+    /// asking which then says (ADR 0036, Google Keep).
+    ImportKeep,
     /// End the invite to a Shared Area; hosting goes on with a fresh
     /// code.
     StopInviting,
@@ -111,8 +115,8 @@ pub struct SyncHost {
     pub bind: Option<IpAddr>,
     /// The paired Device the next bundle is for; everything when none.
     pub bundle_for: Option<String>,
-    /// Whether an Import is reading its folder, as the window says.
-    pub importing: bool,
+    /// Which Import is reading its folder or zip, as the window says.
+    pub importing: Option<Importing>,
     /// The invite to a Shared Area this host hands out while it shows
     /// (ADR 0013): whoever joins with its code gets that Area only.
     pub inviting: Option<Invite>,
@@ -584,8 +588,8 @@ impl SyncHost {
                 if let Some(asked) = bundle_section(ui, t, tones, store, &mut self.bundle_for) {
                     action = Some(asked);
                 }
-                if import_section(ui, t, tones, self.importing) {
-                    action = Some(SyncAction::ImportFolder);
+                if let Some(asked) = import_section(ui, t, tones, self.importing.as_ref()) {
+                    action = Some(asked);
                 }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
@@ -950,26 +954,47 @@ fn bundle_section(
     action
 }
 
-/// The Import of a folder: what it does and its button, or that it reads
-/// the folder meanwhile. Returns whether the user asked for one.
-fn import_section(ui: &mut Ui, t: &L10n, tones: Tones, importing: bool) -> bool {
+/// The Imports, of a folder and of a Google Keep export: what each does
+/// and its button, or that it reads meanwhile, both buttons greyed while
+/// either runs. Returns the one the user asked for.
+fn import_section(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    importing: Option<&Importing>,
+) -> Option<SyncAction> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let mut asked = false;
+    let mut asked = None;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.settings_import()).strong().color(text));
-        let said = if importing {
-            t.import_reading()
-        } else {
-            t.import_folder_detail()
-        };
-        ui.label(RichText::new(said).small().color(weak));
-        asked = ui
-            .add_enabled(
-                !importing,
-                egui::Button::new(RichText::new(t.import_folder_open()).color(text)),
-            )
-            .clicked();
+        let imports = [
+            (
+                matches!(importing, Some(Importing::Folder(_))),
+                (t.import_folder_detail(), t.import_reading()),
+                t.import_folder_open(),
+                SyncAction::ImportFolder,
+            ),
+            (
+                importing == Some(&Importing::Keep),
+                (t.import_keep_detail(), t.import_keep_reading()),
+                t.import_keep_open(),
+                SyncAction::ImportKeep,
+            ),
+        ];
+        for (running, (detail, reading), button, action) in imports {
+            let said = if running { reading } else { detail };
+            ui.label(RichText::new(said).small().color(weak));
+            if ui
+                .add_enabled(
+                    importing.is_none(),
+                    egui::Button::new(RichText::new(button).color(text)),
+                )
+                .clicked()
+            {
+                asked = Some(action);
+            }
+        }
     });
     asked
 }

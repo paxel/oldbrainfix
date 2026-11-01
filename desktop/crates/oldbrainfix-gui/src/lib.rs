@@ -7,8 +7,8 @@
 //! command line, the capture popup and its hotkey, voice recordings and
 //! photos, Paste in the capture, the Transcripts and Photo Texts made of
 //! them, the LAN sync it hosts, for pairing in the Sync view and for paired Devices on their
-//! own, the shared folder it syncs through, the folders it imports
-//! Notes from, the Backups it writes and
+//! own, the shared folder it syncs through, the folders and Google Keep
+//! exports it imports Notes from, the Backups it writes and
 //! restores, the About view with every third-party component's
 //! licence, and the view in place of the window for a database of a
 //! newer version.
@@ -35,6 +35,7 @@ pub mod history_view;
 pub mod hotkey;
 pub mod icons;
 pub mod instance;
+pub mod keep_import;
 pub mod l10n;
 #[cfg(target_os = "linux")]
 pub mod launcher;

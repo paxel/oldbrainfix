@@ -99,13 +99,14 @@ use crate::capture_choices::{
 };
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
-use crate::folder_import::{FolderImport, Imported, folder_name};
+use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
 use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
+use crate::keep_import::KeepSource;
 use crate::l10n::{self, L10n};
 use crate::line_editing::TypedLines;
 use crate::login;
@@ -651,6 +652,9 @@ enum Dialog {
         details: String,
         area: String,
     },
+    /// Whether the Google Takeout export to import from Google Keep is
+    /// still its zip or a folder unpacked from it (ADR 0036).
+    ImportKeep,
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
@@ -955,6 +959,9 @@ enum Action {
     DeclineOffer,
     /// Asks for the shared folder after an Area was accepted.
     OfferFolder,
+    /// Asks for the Google Takeout export the Import dialog says, its
+    /// zip (`true`) or the folder unpacked from it, and imports it.
+    ImportKeep(bool),
     /// Shares the Area of the Share dialog and hosts its invite.
     StartInvite,
     /// Shows who shares the Area.
@@ -1208,6 +1215,8 @@ pub struct App {
     /// Asks the system's dialog for a folder to import (ADR 0036), and
     /// the Import reading it off the window's thread.
     import_picker: FolderPicker,
+    /// Asks the system's dialog for the zip of a Google Takeout export.
+    import_zip_picker: FolderPicker,
     import: FolderImport,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
@@ -1330,6 +1339,13 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
         oldbrainfix_core::APP_NAME,
         &[bundle::EXTENSION, sent::EXTENSION, cards::EXTENSION],
     )
+}
+
+/// The open dialog's filter for the zip of a Google Takeout export.
+fn zip_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(title, &["zip"])
 }
 
 /// The open dialog's filter for a Profile picture.
@@ -1506,6 +1522,7 @@ impl App {
             }),
             bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
             import_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
+            import_zip_picker: Box::new(|title| zip_dialog(title).pick_file()),
             import: FolderImport::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
@@ -1635,7 +1652,13 @@ impl App {
         self.import_picker = picker;
     }
 
-    /// Whether an Import is reading its folder.
+    /// Asks `picker` for the zip of a Google Takeout export instead of
+    /// the system's dialog; tests hand in a path.
+    pub fn set_import_zip_picker(&mut self, picker: FolderPicker) {
+        self.import_zip_picker = picker;
+    }
+
+    /// Whether an Import is reading its folder or zip.
     pub fn importing(&self) -> bool {
         self.import.running()
     }
@@ -2896,6 +2919,67 @@ impl App {
         self.notice_dialog = Some((
             t.import_finished().to_string(),
             Dialog::Imported { details, area },
+        ));
+    }
+
+    /// Announces how the import from Google Keep ended, as
+    /// [`App::announce_folder_imported`] does: what went where behind the
+    /// click, the Checklists and photos among it and what was skipped
+    /// and why, in the phone's order; that the export held no note to
+    /// take; or that it failed.
+    fn announce_keep_imported(&mut self, imported: Imported) {
+        let t = self.t;
+        let summary = match imported {
+            Ok(summary) => summary,
+            Err(details) => {
+                self.announce_failure(
+                    t.import_keep_failed(),
+                    t.import_failed_title(),
+                    (t.import_keep_failed_cause(), t.import_keep_failed_fix()),
+                    details,
+                );
+                return;
+            }
+        };
+        let skipped = t.import_keep_skipped_details(
+            summary.trashed as i64,
+            summary.missing as i64,
+            summary.not_photo as i64,
+            summary.too_large as i64,
+            summary.not_text as i64,
+        );
+        let Some(area) = summary.area_id.clone() else {
+            self.announce_failure(
+                t.import_keep_nothing(),
+                t.import_nothing_title(),
+                (t.import_keep_nothing_cause(), t.import_keep_nothing_fix()),
+                skipped,
+            );
+            return;
+        };
+        let shown = match Places::new(&self.store).area_by_id(&area) {
+            Ok(Some(made)) => area_name(&t, &made),
+            _ => t.import_keep_area_name().to_string(),
+        };
+        let mut details = vec![t.import_finished_notes(summary.notes as i64, &shown)];
+        if summary.checklists > 0 {
+            details.push(t.import_keep_checklists(summary.checklists as i64));
+        }
+        if summary.photos > 0 {
+            details.push(t.import_keep_photos(summary.photos as i64));
+        }
+        if summary.skipped() > 0 {
+            details.push(String::new());
+            details.push(t.import_keep_skipped(summary.skipped() as i64));
+            details.push(skipped);
+        }
+        self.notice = Some(t.import_finished().to_string());
+        self.notice_dialog = Some((
+            t.import_finished().to_string(),
+            Dialog::Imported {
+                details: details.join("\n"),
+                area,
+            },
         ));
     }
 
@@ -4608,6 +4692,27 @@ impl App {
                     self.import.start(self.store.clone(), folder, name, area);
                 }
             }
+            Action::Sync(SyncAction::ImportKeep) => {
+                if !self.import.running() {
+                    self.dialog = Some(Dialog::ImportKeep);
+                }
+            }
+            Action::ImportKeep(zip) => {
+                self.dialog = None;
+                // One Import at a time; its button is greyed meanwhile.
+                if !self.import.running() {
+                    let t = self.t;
+                    let source = if zip {
+                        (self.import_zip_picker)(t.import_keep_zip_title()).map(KeepSource::Zip)
+                    } else {
+                        (self.import_picker)(t.import_keep_folder_title()).map(KeepSource::Folder)
+                    };
+                    if let Some(source) = source {
+                        let area = t.import_keep_area_name().to_string();
+                        self.import.start_keep(self.store.clone(), source, area);
+                    }
+                }
+            }
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
@@ -6097,9 +6202,12 @@ impl App {
         // its answer is announced when it comes.
         if self.import.running() {
             match self.import.finished() {
-                Some((name, imported)) => {
+                Some((kind, imported)) => {
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
-                    self.announce_folder_imported(&name, imported);
+                    match kind {
+                        Importing::Folder(name) => self.announce_folder_imported(&name, imported),
+                        Importing::Keep => self.announce_keep_imported(imported),
+                    }
                     if made {
                         self.refresh();
                         if let Some(wake) = &self.wake {
@@ -6761,7 +6869,7 @@ impl App {
             }
             Selection::Sync => {
                 let wall = self.wall.clone();
-                self.sync.importing = self.import.running();
+                self.sync.importing = self.import.kind().cloned();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
                     actions.push(Action::Sync(asked));
                 }
@@ -8159,6 +8267,27 @@ impl App {
                         if open {
                             actions.push(Action::Select(Selection::Place(area.clone())));
                         }
+                    }
+                    Dialog::ImportKeep => {
+                        title(ui, t.import_keep());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.import_keep_ask()).color(text));
+                        // The two answers stacked full width, Cancel below
+                        // (UI laws), as on the phone.
+                        let wide = |ui: &mut Ui, label: &str| {
+                            ui.add_sized(
+                                [ui.available_width(), 32.0],
+                                egui::Button::new(RichText::new(label).color(text)),
+                            )
+                            .clicked()
+                        };
+                        if wide(ui, t.import_keep_zip()) {
+                            actions.push(Action::ImportKeep(true));
+                        }
+                        if wide(ui, t.import_keep_folder()) {
+                            actions.push(Action::ImportKeep(false));
+                        }
+                        cancel(ui, &t, actions);
                     }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);

@@ -37,8 +37,9 @@ parking_lot = "0.12"
 rodio = { version = "0.22", default-features = false, features = ["playback", "recording", "wav", "mp4", "mp3", "vorbis"] }
 # Pictures pasted in.
 arboard = "3.6"
-# Photos pasted or dropped in, kept as the phone keeps them, and shown.
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+# Photos pasted or dropped in, kept as the phone keeps them, and shown;
+# GIF too, as an Import from Google Keep keeps them.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 # Photo Texts with the phone's engine and models (ADR 0007), as
 # android/ocr builds them: RustO without its UniFFI bindings, and rten,
 # rten-tensor and ndarray at RustO's own versions to load the models
@@ -54,6 +55,10 @@ qrcode = { version = "0.14", default-features = false }
 # portal on Linux, which inside the Flatpak hands back a document portal
 # path that stays valid across restarts.
 rfd = "0.17"
+# The Google Takeout zip an Import from Google Keep reads (ADR 0036):
+# the core's zip, which also reads Deflate here, through the flate2 the
+# PNG decoder brings already.
+zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]

@@ -711,7 +711,7 @@ pub fn recording_extension(bytes: &[u8]) -> &'static str {
     }
 }
 
-/// The picture file `bytes` (JPEG, PNG or WebP) as a photo to keep,
+/// The picture file `bytes` (JPEG, PNG, WebP or GIF) as a photo to keep,
 /// turned upright as its Exif says; `None` when it is no picture.
 pub fn photo_from_file(bytes: &[u8]) -> Option<Vec<u8>> {
     let mut decoder = ImageReader::new(Cursor::new(bytes))
@@ -942,6 +942,18 @@ mod tests {
         assert_eq!(pixels(&kept, 15).map(|p| p.dimensions()), Some((15, 10)));
         assert_eq!(photo_from_file(b"not a picture"), None);
         assert_eq!(pixels(b"not a picture", 100), None);
+    }
+
+    #[test]
+    fn a_gif_photo_shows_as_imported_from_keep() {
+        let picture = RgbaImage::from_pixel(8, 4, image::Rgba([0, 0, 255, 255]));
+        let mut gif = Vec::new();
+        DynamicImage::ImageRgba8(picture)
+            .write_to(&mut Cursor::new(&mut gif), image::ImageFormat::Gif)
+            .unwrap();
+        assert_eq!(photo_extension(&gif), "gif");
+        assert_eq!(dimensions(&gif), Some([8, 4]));
+        assert_eq!(pixels(&gif, 1024).map(|p| p.dimensions()), Some((8, 4)));
     }
 
     /// The phone's test voice message: 0.2 s of a 440 Hz tone in Ogg
