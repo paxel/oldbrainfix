@@ -12,6 +12,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Eine Strichliste, die „Noch eine“ in die Auswahl einer Einheit getauscht hat und die danach ihren Eintrag bekam, bleibt erledigt an ihrem Platz in der Auswahl, auch wenn ein anderes Gerät die erste Auswahl des Tages später geschrieben hat, und eine Fälligkeit, die eine solche Strichliste verloren hat, zeigt sie wieder, sodass sie erledigt ist, sobald jede ausgewählte Strichliste ihren Eintrag hat.
 - Das Agenda-Widget zeigt jede Reihe des Tages, auch die verpassten Fälligkeiten, die Fälligkeiten, Zeilen, Frösche, Einkaufslisten und Checklisten mit ihren Kästchen, wo es außer den Textreihen nur graue Balken mit der Meldung des Startbildschirms zeigte, das Widget lasse sich nicht hinzufügen.
+- Der Text der Abschnitte einer Notiz, ihrer Ergänzungen und der in sie zusammengeführten Notizen, lässt sich auf dem Telefon und dem Desktop im Notiz-Editor bearbeiten wie der Text der Notiz selbst, vom Verfasser des Abschnitts und in einem geteilten Bereich von dessen Verwaltern, und ein bearbeiteter Abschnitt behält seinen Platz und seine Erfassungszeit und zeigt, wann er erstellt und wann er zuletzt geändert wurde, mit „bearbeitet von“ und dem Namen dessen, der ihn bearbeitet hat, der KI-Port auf dem Desktop bearbeitet einen als Änderung, die auf die Prüfung wartet, und der Text einer Notiz und jedes ihrer Abschnitte lässt sich auf ihrer Karte und im Editor auswählen und kopieren.
 
 ## [0.3.0] - 2026-11-01
 

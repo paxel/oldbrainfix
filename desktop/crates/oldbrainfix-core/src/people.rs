@@ -771,6 +771,29 @@ impl Store {
         }
     }
 
+    /// The person the Device `device` wrote an edit of the text of the
+    /// Note or Section `entity` for, as their Profile shows, as the Dart
+    /// core's `editorOf` (#183): the own Profile for the user's own
+    /// Devices; another person's as for [`Store::ticked_by`], through the
+    /// key of the Device, in a Shared Area the person its grant names.
+    /// None for a writer not known, for a blocked person, and for the
+    /// user's own while there is no own Profile yet.
+    pub fn editor_of(&self, entity: &str, device: &str) -> Result<Option<Profile>> {
+        match self.device_writer(device, entity)? {
+            Writer::Own => OwnProfile::new(self).get(),
+            Writer::Theirs(author) => {
+                if self
+                    .blocked_ids()?
+                    .contains(&self.resolve_person(&author.id)?)
+                {
+                    return Ok(None);
+                }
+                Ok(Some(self.with_override(author)?))
+            }
+            Writer::Unknown => Ok(None),
+        }
+    }
+
     /// Whether the person filter of the browser keeps the Note or
     /// Section `entity` (#53), as the Dart core's `wroteBy`: with
     /// `filter.me`, the user's own, written on any of their Devices or

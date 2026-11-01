@@ -34,7 +34,7 @@ Text recognised in a Note's photo or screenshot, kept next to the photo. Only th
 _Avoid_: OCR (in the UI), caption
 
 **Section**:
-A dated part of a Note, added by Amend or Merge, carrying its own Capture Context.
+A dated part of a Note, added by Amend or Merge, carrying its own Capture Context. Its text is fixed in place as the Note's is, by the same people; it keeps its date and its place, and shows when it was last modified and who edited it.
 _Avoid_: comment, update, revision
 
 **Amend**:

@@ -32,7 +32,7 @@ Der in einem Foto oder Bildschirmfoto einer Notiz erkannte Text, neben dem Foto 
 _Avoid_: OCR (in der App), Bildunterschrift
 
 **Abschnitt** [Section]:
-Ein datierter Teil einer Notiz, angelegt durch Ergänzen oder Zusammenführen, mit seinem eigenen Erfassungskontext.
+Ein datierter Teil einer Notiz, angelegt durch Ergänzen oder Zusammenführen, mit seinem eigenen Erfassungskontext. Sein Text wird an Ort und Stelle verbessert wie der Text der Notiz, von denselben Personen; er behält sein Datum und seinen Platz und zeigt, wann er zuletzt geändert wurde und wer ihn bearbeitet hat.
 _Avoid_: Kommentar, Aktualisierung, Revision
 
 **Ergänzen** [Amend]:

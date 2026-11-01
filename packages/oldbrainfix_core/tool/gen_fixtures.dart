@@ -2482,6 +2482,11 @@ Map<String, Object?> _section(Section section) => {
   'removedRecordings': section.removedRecordings,
   'removedTranscripts': section.removedTranscripts,
   'removedPhotoTexts': section.removedPhotoTexts,
+  'modified': section.modified?.toUtc().toIso8601String(),
+  'editedBy': switch (section.editedBy) {
+    final by? => {'id': by.id, 'name': by.name},
+    null => null,
+  },
 };
 
 /// The photos and recordings of [note] this Device may remove and keep
@@ -4794,7 +4799,9 @@ Future<void> _sharedFixture(Directory root) async {
     );
     final blood = Notes(ann).capture('Blood results', place: health);
     final loose = Notes(ann).capture('Fix the tap');
-    Notes(ann).amend(loose.id, 'The hot one');
+    final hot = Notes(ann).amend(loose.id, 'The hot one').id;
+    // Ann's Amend in the Area, which Ben may not edit (#183).
+    final litres = Notes(ann).amend(milk.id, 'Two litres').id;
     // A Note in the Area with every captured detail (ADR 0037), at a
     // Named Place of Ann's own.
     NamedPlaces(ann).add('Work', Coordinates(52.52, 13.405), radius: 100);
@@ -4935,34 +4942,55 @@ Future<void> _sharedFixture(Directory root) async {
     };
 
     // Ann removes the place and the calendar event from her Note in the
-    // Area: two nulls, no ids drawn (ADR 0037).
+    // Area: two nulls, no ids drawn (ADR 0037); and edits her Amend of the
+    // Note she keeps private for now (#183), no Box in it, no id drawn.
     final capturedAt = DateTime.utc(2026, 2, 1, 10, 45);
     _held = capturedAt;
     mark = ann.currentSeq();
     Notes(ann)
       ..removeCaptured(toner, CapturedDetail.place)
-      ..removeCaptured(toner, CapturedDetail.event);
+      ..removeCaptured(toner, CapturedDetail.event)
+      ..editSection(hot, 'The hot one, it drips');
     _writeAfter(ann, mark, File('${out.path}/captured.jsonl'));
 
-    // Ben, a Member: his own Note, an Amend, a Done and a text his
-    // machine read count; editing and trashing Ann's Note, removing that
-    // text or a captured detail of Ann's, renaming the Area, rescheduling
-    // and a Topic and a Routine of his own are ignored everywhere.
+    // Ben, a Member: his own Note, an Amend and its edit, a Done and a
+    // text his machine read count; editing and trashing Ann's Note,
+    // editing her Amend, removing that text or a captured detail of
+    // Ann's, renaming the Area, rescheduling and a Topic and a Routine of
+    // his own are ignored everywhere.
     _held = DateTime.utc(2026, 2, 1, 11);
     mark = ben.currentSeq();
     if (Notes(ben).mayRemoveCaptured(toner, CapturedDetail.device)) {
       throw StateError('a Member may remove a detail of Ann\'s Note');
     }
+    if (Notes(ben).mayEditSection(litres)) {
+      throw StateError('a Member may edit Ann\'s Amend');
+    }
+    try {
+      Notes(ben).editSection(litres, 'Ten litres');
+      throw StateError('a Member edited Ann\'s Amend');
+    } on StateError catch (e) {
+      if (e.message.startsWith('a Member')) rethrow;
+    }
+    if (ben.currentSeq() != mark) {
+      throw StateError('a refused edit wrote something');
+    }
     final topic = Places(ben).topics(area).single.id;
     final own = Notes(ben).capture('Ben buys bread', place: topic);
     Notes(ben).edit(own.id, 'Ben buys rye bread');
-    Notes(ben).amend(milk.id, 'Oat milk please');
+    final oat = Notes(ben).amend(milk.id, 'Oat milk please').id;
+    Notes(ben).editSection(oat, 'Oat milk, two litres');
     Routines(ben).markDone(bins.id, Occurrence(Day(2026, 2, 1), _at(8)));
     // As a modified app would write them: a Photo Text on Ann's Note,
     // which a Member's machine may add, and its removal, which it may not.
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), 'Oat milk 1,29');
     ben.append(milk.id, NoteKeys.ocr('cd' * 32), null);
     ben.append(toner, NoteKeys.bluetooth, null);
+    ben.append(
+      litres,
+      SectionKeys.text,
+      StoredText.of(TextFormats.plain, 'Ten litres').encode(),
+    );
     Notes(ben).edit(milk.id, 'Buy beer');
     Notes(ben).trash(milk.id);
     Places(ben).rename(area, "Ben's");
@@ -5034,6 +5062,15 @@ Future<void> _sharedFixture(Directory root) async {
         Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
         Notes(ann).byId(milk.id)?.text != 'Buy milk') {
       throw StateError('the two Devices of the shared fixture disagree');
+    }
+    for (final store in [ann, ben]) {
+      final notes = Notes(store);
+      if (notes.section(litres)?.text != 'Two litres' ||
+          notes.section(litres)?.modified != null ||
+          notes.section(oat)?.editedBy?.id != ben.ownProfile?.id ||
+          notes.section(hot)?.editedBy?.id != ann.ownProfile?.id) {
+        throw StateError('an edit of an Amend went wrong');
+      }
     }
     for (final store in [ann, ben]) {
       final context = Notes(store).byId(toner)?.context;
@@ -5117,7 +5154,7 @@ Future<void> _sharedFixture(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'capturedAt': capturedAt.toIso8601String(), 'capturedNote': toner, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'agendaAt': agendaAt.toIso8601String(), 'agendaIds': 0x200, 'agendaNote': trip, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'capturedAt': capturedAt.toIso8601String(), 'capturedNote': toner, 'editedSection': hot, 'refusedSection': litres, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -7824,9 +7861,10 @@ Future<void> main(List<String> args) async {
     'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
     'from 2000) and what Ben keeps after reading it, Ann removing the '
     'place and the calendar event from a Note in the Area that also '
-    'holds a Bluetooth device and an app (`captured.jsonl`), what Ben '
-    'wrote, allowed and not, his removal of that Bluetooth device among '
-    'it (`member.jsonl`), Ann filing a Note in '
+    'holds a Bluetooth device and an app and editing her Amend of a '
+    'private Note (`captured.jsonl`), what Ben wrote, allowed and not, '
+    'his removal of that Bluetooth device, the edit of his own Amend and '
+    'of one of Ann\'s among it (`member.jsonl`), Ann filing a Note in '
     '(`owner.jsonl`), the paired session after (`request2.json`, '
     '`answer2.json`), Ben made Manager (`role.jsonl`) and writing as one '
     '(`manager.jsonl`), then removed '

@@ -237,6 +237,8 @@ fn section_json(section: &Section) -> Value {
         "removedRecordings": section.removed_recordings,
         "removedTranscripts": section.removed_transcripts,
         "removedPhotoTexts": section.removed_photo_texts,
+        "modified": section.modified.map(dart_iso),
+        "editedBy": section.edited_by.as_ref().map(|by| json!({"id": by.id, "name": by.name})),
     })
 }
 
@@ -4684,13 +4686,19 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(people_json(&ben)?, after_folder["joinerPeople"]);
 
     // Ann removes the place and the calendar event from her Note in the
-    // Area: the same entries. Ben, a Member, may not remove its Bluetooth
-    // device, and writes nothing when he tries.
+    // Area and edits her Amend of a private Note: the same entries. Ben, a
+    // Member, may not remove its Bluetooth device nor edit Ann's Amend in
+    // the Area, and writes nothing when he tries.
     *clock.lock() = at("capturedAt")?;
     let toner = expected["capturedNote"].as_str().ok_or("capturedNote")?;
+    let hot = expected["editedSection"].as_str().ok_or("editedSection")?;
+    let litres = expected["refusedSection"]
+        .as_str()
+        .ok_or("refusedSection")?;
     let mark = ann.current_seq()?;
     Notes::new(&ann).remove_captured(toner, CapturedDetail::Place)?;
     Notes::new(&ann).remove_captured(toner, CapturedDetail::Event)?;
+    Notes::new(&ann).edit_section(hot, "The hot one, it drips")?;
     assert_eq!(
         lines_after(&ann, mark)?,
         lines_of(&dir.join("captured.jsonl"))?
@@ -4702,6 +4710,9 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
             .remove_captured(toner, CapturedDetail::Device)
             .is_err()
     );
+    assert!(Notes::new(&ben).section_by_id(litres)?.is_some());
+    assert!(!Notes::new(&ben).may_edit_section(litres)?);
+    assert!(Notes::new(&ben).edit_section(litres, "Ten litres").is_err());
     assert_eq!(ben.current_seq()?, mark);
 
     // What Ben wrote, allowed and not, and Ann filing a Note in; then a

@@ -4,8 +4,8 @@
   "name": "Phone",
   "proof": "h2abveNbJ58jdblj9aIX7Jy9G9gvc7pEVFOWWYW1tJD8Vlv5JJEUo+U1hYUYCe4dcGe0odqeM9UKvmPdHCfmCQ==",
   "vector": {
-    "65b60673d6ed884bf01c2c222d82ada0": 77,
-    "c945cbf2a5602002141e2fb9d17054d6": 28
+    "65b60673d6ed884bf01c2c222d82ada0": 81,
+    "c945cbf2a5602002141e2fb9d17054d6": 30
   },
   "entries": [
     {
@@ -111,116 +111,140 @@
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
       "dseq": 13,
+      "entity": "section:00000000000000000000000000000206",
+      "field": "text",
+      "value": "{\"format\":\"plain\",\"text\":\"Oat milk, two litres\"}",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "",
+      "sig": "XjFdpcJz62PcaGLy1cXOHXAS5jPe+WH8awRnTBRHaawcaz9YHipt1MaY/6GRVB2eLM5F2aqM5JvdOzVbVohgAg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 14,
       "entity": "routine:00000000000000000000000000000002",
       "field": "done@2026-02-01T08:00",
       "value": "2026-02-01T11:00:00.000Z",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "WQfX4wKwJ0OCeAO4Ki7pmxNvNcEkoxV3Q2X7itYJIaQI3pUSH0k7JN8jYnkHWqBGoDC+9osSQeVsTch/Ws1TCw=="
-    },
-    {
-      "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 14,
-      "entity": "note:00000000000000000000000000000001",
-      "field": "ocr:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
-      "value": "Oat milk 1,29",
-      "date": "2026-02-01T11:00:00.000Z",
-      "author": "Ada",
-      "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "QVK7tgR7NODvfnRo9uT+6c17OW8cKk6MI/K1wC/dCfVOJyvFW46xYK11T0Kg36PR2TpNELRwJT4UTrLpSgynBw=="
+      "sig": "cRZAUkvSFI5iNrWzsZkRUviw7hvElQ5o7qriKqwt0DDruEP32TxDwW8kpua4UYxeZsH3qc1aVl9RshWt0hMPDA=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
       "dseq": 15,
       "entity": "note:00000000000000000000000000000001",
       "field": "ocr:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
-      "value": null,
+      "value": "Oat milk 1,29",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "5Rvyjxxg8f2iV1DEumsHHuoN6j7He61VYAkjW9U73gam7texbryJksyDGXb3VV1YQlp5K6X48BqbYLQXs4GLCg=="
+      "sig": "LeRIEfZvu0ymaLpfGVCY+gcO0tQn7zcYbHm7HDh6XCxZLIVl748dqKNxKbJomH0lWcBUgw+5Lh30JIkxI+tNDw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
       "dseq": 16,
-      "entity": "note:00000000000000000000000000000007",
+      "entity": "note:00000000000000000000000000000001",
+      "field": "ocr:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "value": null,
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "UW/biSlCwT0D7tJ/uMO6tzDZlk5+le4+Zi1S6AOoTb4qY797V61y5794hwXMsPmCAzBThWyNLPbQ/LiJBj1DBw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 17,
+      "entity": "note:00000000000000000000000000000008",
       "field": "bluetooth",
       "value": null,
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "HWib82liXdsCrfYaM7VhIwb8EuDMTvTXuDKRo6nr5cpyzkNq+vl2z7f4Rmedv0L5qZ7czTyfejKUV+5ctxiHBw=="
+      "sig": "igYJR5YA2e4pAbHZSO8Cx2qzJFWfVvYBhqj17mp324+bAyEP4D9W+5k8oVWS7ZEVMarg41CvoDHzY/vzf+WRAw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 17,
+      "dseq": 18,
+      "entity": "section:00000000000000000000000000000006",
+      "field": "text",
+      "value": "{\"format\":\"plain\",\"text\":\"Ten litres\"}",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:81",
+      "sig": "j/MoCwGn/6uaf2F0RHVfuwV3KR6/iFXcxJphdNEVGXYslj2yebYDg8ufN3q/1CofbjtAf/U/Mx86wDECEzGPAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 19,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
       "value": "{\"format\":\"plain\",\"text\":\"Buy beer\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "ctx": "65b60673d6ed884bf01c2c222d82ada0:77",
-      "sig": "EWxHSgTmBWCHUNY2OsSncjDoWqSz5gDsd69Q63RmWNGIU2KLuVRIwOA3JTu/x8QqoPBsNLEaWqTevVrkEo17Ag=="
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:81",
+      "sig": "88ktSlJf3nCHWkGVhsy4cH0B2n0ZGdxWrIs0yOJc4A3r/pHNMFuKMocufMx+Y1zjwTn3Q5t7Fs52RuQyqnl6Dg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 18,
+      "dseq": 20,
       "entity": "note:00000000000000000000000000000001",
       "field": "trashed",
       "value": "2026-02-01T11:00:00.000Z",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "bVrWwVTykiFvKWLScsMbeM5j6oqob1Mwgijz0BSTubuq/7y0TvSNpUUNEZMp20svpiuF+cBMfQif9FwKUfKvBg=="
+      "sig": "PNYlT9cNBwwaM4MnBWlljHKlZM28MqI8HYHMf9R1iW2zh9fJGGzWpG4cBF14D5DZL+ZM46WeEm5OiiJ8DVr0Aw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 19,
+      "dseq": 21,
       "entity": "area:00000000000000000000000000000101",
       "field": "name",
       "value": "Ben's",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "ctx": "65b60673d6ed884bf01c2c222d82ada0:77",
-      "sig": "ZT8CXcDJ6onxB0O0kH2K6EeEPMBZ0+vDygJG5jNGn6enQHFdA2ygXXQOqc59ZclRJfO6k9FPWnq2/Ps196tfAw=="
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:81",
+      "sig": "5MgUW+nM1QVWrxPm0qzNo70oSYOwiZFfekV/uzgG5KMNPhsLo0HzL0cgrYo7tkAmHfZK9HxVD0dgNou6LaJeAA=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 20,
+      "dseq": 22,
       "entity": "routine:00000000000000000000000000000002",
       "field": "times",
       "value": "06:00",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "ctx": "65b60673d6ed884bf01c2c222d82ada0:77",
-      "sig": "sihsrrhdTwlIFQxPN0shdl6RF0PwjsJGUey55+MQfFMQ+rxIB5kxgUlpQBOga+YPTXpSftUoOkixfR8MwfZWBw=="
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:81",
+      "sig": "t1amIv0kgF/ytwdSv4kHWXV5gyXn7ExChdOny10jcKasJykQKBd6ac5kqjLpUbzA00/en60Aa/GWlrat/UZADw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 21,
+      "dseq": 23,
       "entity": "routine:00000000000000000000000000000002",
       "field": "rule",
       "value": null,
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "ctx": "65b60673d6ed884bf01c2c222d82ada0:77",
-      "sig": "343e0/FmAmFQSDj3HJyMtAYJ7cX+U8LZMNwj7jI7xvDwfp6DaC5XVpW1SiKy/QnrD5fZ2nGBXCe2DvHodEHAAg=="
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:81",
+      "sig": "fK1u4sRgJ1EXqoavgUGcsDrAF1nSJyVa/OubSlxh6RD4YR3ShZgNHtxZIx6mwvZN2fmJ06VgZY5YdJ76++pLBw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 28,
+      "dseq": 30,
       "entity": "area:00000000000000000000000000000101",
       "field": "role:c945cbf2a5602002141e2fb9d17054d6",
       "value": "{\"profile\":\"nobody\",\"role\":\"manager\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "EC0XZJAZvL/yhBU3v1cRER1ohWGw5xDB/PRcc5vv3w2OsHlq3mv/A5TJI7sRUqv2bxgcqxF+HnQPun91xCw/CQ=="
+      "sig": "688QHCHwfnrQtCcfzI7bo18QxwLx7kP8fGQR6XB/U8KGIMp5IhWB1dw07ySug9x0jTBmXjE4KvfFMDDAID2fDw=="
     }
   ],
   "keys": [
@@ -250,16 +274,16 @@
       "aliases": [],
       "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
       "keys": [],
-      "record": "{\"id\":\"00000000000000000000000000000009\",\"name\":\"Ann Lovelace\",\"version\":3}",
-      "sig": "fi5nHJtnHAH8vYnOqhDfESfhRxJUS1RWoQBRcY/zKR5N5Cy60J8/hJFRhePj0kkrexcozgDOf4p1mOowl+5XDg==",
+      "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ann Lovelace\",\"version\":3}",
+      "sig": "2hPcobdaWW02AVG/lDUFQQPeuhzRB9INUf5aq/hUPVNFoM4JsxxnNYf36Nouc0RqCjWR9KHQZHbEIUul0/a5AA==",
       "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
     },
     {
       "aliases": [],
       "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
       "keys": [],
-      "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ben\",\"version\":1}",
-      "sig": "oRBY6vVmH9gZC0JaJ1DLsYyU3DBUXEuqEXJ2Ng6150XCUvq0ROaUrqIYgPpIXt2RFMzd6P8AKJCezyuLK/wdCA==",
+      "record": "{\"id\":\"0000000000000000000000000000000b\",\"name\":\"Ben\",\"version\":1}",
+      "sig": "7PAQPvhOG5VQ7AxTiKw/9RohR+9CSbnhA4Q4KFwMrtBERwOELVzYznswJyjT+VGMpYgrrIHmaJQoFTyQd1k3CA==",
       "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
     }
   ]

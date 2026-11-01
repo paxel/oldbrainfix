@@ -130,7 +130,9 @@
         "removedPhotos": [],
         "removedRecordings": [],
         "removedTranscripts": [],
-        "removedPhotoTexts": []
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       },
       {
         "id": "note:0000000000000000000000000000000d",
@@ -155,7 +157,9 @@
         "removedPhotos": [],
         "removedRecordings": [],
         "removedTranscripts": [],
-        "removedPhotoTexts": []
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       }
     ]
   },

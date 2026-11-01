@@ -227,6 +227,13 @@ pub fn tools() -> Vec<Value> {
             &["id", "text"],
         ),
         tool(
+            "edit_section",
+            "Replaces the text of one Section of a Note, an Amend or a merged Note, by the id read_note lists for it. The Section keeps its place and its capture time; read_note shows when its text was last modified and by whom.",
+            false,
+            json!({"id": id("Section"), "text": string("The new text")}),
+            &["id", "text"],
+        ),
+        tool(
             "file_note",
             "Files a Note into an Area or Topic, out of Unsorted or wherever it was.",
             false,
@@ -1039,17 +1046,20 @@ impl Store {
                     .sections(id)?
                     .iter()
                     .map(|s| {
-                        json!({
+                        Ok(json!({
                             "captured": dart_iso(s.captured),
+                            "editedBy": s.edited_by.as_ref().map(|p| p.name.clone()),
                             "id": s.id,
                             "boxes": boxes_json(&s.boxes),
+                            "mayEdit": notes.may_edit_section(&s.id)?,
+                            "modified": s.modified.map(dart_iso),
                             "photoTexts": texts_of(&s.photo_texts, "photo"),
                             "photos": s.photos,
                             "text": s.text,
                             "transcripts": texts_of(&s.transcripts, "recording"),
-                        })
+                        }))
                     })
-                    .collect();
+                    .collect::<Result<_>>()?;
                 let routines = self.routines_value(&Routines::new(self).of_note(id)?)?;
                 let frogs: Vec<Value> = Frogs::new(self)
                     .of_note(id)?
@@ -1389,6 +1399,10 @@ impl Store {
                 id()?.to_string()
             }
             "amend_note" => notes.amend(id()?, text_arg(args, "text")?)?.id,
+            "edit_section" => {
+                notes.edit_section(id()?, text_arg(args, "text")?)?;
+                id()?.to_string()
+            }
             "file_note" => {
                 notes.file(id()?, text_arg(args, "place")?)?;
                 id()?.to_string()
@@ -1952,6 +1966,61 @@ mod tests {
     }
 
     #[test]
+    fn a_sections_text_is_edited_as_a_pending_change() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let note = notes.capture("Dentist", None, None)?;
+        let amend = notes.amend(&note.id, "Moved to Wednesday")?;
+        let later = notes.amend(&note.id, "Later")?;
+        store.append(
+            &later.id,
+            crate::notes::keys::TEXT,
+            Some(r##"{"format":"x-future","text":"# Later"}"##),
+            None,
+        )?;
+        let task = store.open_ai_task()?;
+        let logged = store.all_entries()?.len();
+        let out = call(
+            &store,
+            &task,
+            "edit_section",
+            &json!({"id": amend.id, "text": "Moved to Thursday"}),
+        )?;
+        assert!(!out.is_error, "{out:?}");
+        // A text in a format not known here, and no Section at all.
+        for id in [&later.id, &note.id] {
+            let refused = call(
+                &store,
+                &task,
+                "edit_section",
+                &json!({"id": id, "text": "Overwritten"}),
+            )?;
+            assert!(refused.is_error, "{id}");
+        }
+        assert_eq!(store.all_entries()?.len(), logged);
+        let read = call(&store, &task, "read_note", &json!({"id": note.id}))?;
+        let [ToolContent::Text(text)] = &read.content[..] else {
+            return Err("a text".into());
+        };
+        let read: Value = serde_json::from_str(text)?;
+        assert_eq!(
+            read.pointer("/sections/0/text"),
+            Some(&json!("Moved to Thursday"))
+        );
+        assert_eq!(read.pointer("/sections/0/mayEdit"), Some(&json!(true)));
+        assert!(
+            read.pointer("/sections/0/modified")
+                .is_some_and(Value::is_string)
+        );
+        assert_eq!(read.pointer("/sections/1/mayEdit"), Some(&json!(false)));
+        let review = store.ai_review(&task)?;
+        assert!(review.groups.iter().any(|(kind, items)| {
+            *kind == crate::ai_task::AiChangeKind::NoteText && items[0].entity == amend.id
+        }));
+        Ok(())
+    }
+
+    #[test]
     fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
         let store = store();
         let milk = Notes::new(&store).capture("Milk", None, None)?;
@@ -2300,6 +2369,7 @@ mod tests {
             "capture_note",
             "edit_note",
             "amend_note",
+            "edit_section",
             "file_note",
             "merge_notes",
             "set_importance",

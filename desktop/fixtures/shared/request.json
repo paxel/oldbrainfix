@@ -21,8 +21,8 @@
     "aliases": [],
     "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
     "keys": [],
-    "record": "{\"id\":\"0000000000000000000000000000000a\",\"name\":\"Ben\",\"version\":1}",
-    "sig": "oRBY6vVmH9gZC0JaJ1DLsYyU3DBUXEuqEXJ2Ng6150XCUvq0ROaUrqIYgPpIXt2RFMzd6P8AKJCezyuLK/wdCA==",
+    "record": "{\"id\":\"0000000000000000000000000000000b\",\"name\":\"Ben\",\"version\":1}",
+    "sig": "7PAQPvhOG5VQ7AxTiKw/9RohR+9CSbnhA4Q4KFwMrtBERwOELVzYznswJyjT+VGMpYgrrIHmaJQoFTyQd1k3CA==",
     "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
   },
   "invited": true

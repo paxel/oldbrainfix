@@ -49,6 +49,10 @@ A tool that changes something runs through the same calls the screens use, insid
 
 Amended by ADR 0037 (#162): a tool removes one detail of a Note's or Section's Capture Context (`remove_captured`), and an AI Task may write the fields of a Capture Context (`location`, `sourcePackage`, `sourceLabel`, `calendar`, `bluetooth`) only as null, where this Device may change the Note or Section. Such a removal is reviewed among anything else.
 
+## Editing a Section (#183)
+
+Amended by #183: `edit_section` replaces the text of one Section, an Amend or a merged Note, by the id `read_note` lists, which also shows for each Section whether this Device may edit it and when and by whom it was last modified. It writes the `text` the field list already allowed on a Section where this Device may change it, so no trust rule changed; the edit is reviewed with the other text changes.
+
 ## Who may connect (#167)
 
 Amended by #167: the port is no longer on the loopback only when the user chooses so. An AI client in a Docker container, such as Claude Code in a sandbox, cannot reach 127.0.0.1 of the computer, which inside the container is the container itself. The AI port's card offers **Who may connect**, kept in the local setting `ai:reach` (`local` or `docker`) and changed only while the port is closed; the port still stays closed at every start.

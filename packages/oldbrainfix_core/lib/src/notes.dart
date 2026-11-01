@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'boxes.dart';
+import 'entry.dart';
 import 'named_places.dart';
 import 'places.dart';
+import 'profiles.dart';
 import 'shared_areas.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -401,11 +403,24 @@ class Section {
   /// The boxes of [text] as they show now, as for [Note.boxes].
   final List<ShownBox> boxes;
 
+  /// When [text] was last edited (#183): the date of the text that shows,
+  /// once more than the text it was captured with is kept; null while it
+  /// was never edited. Whatever date it shows, [created] stays.
+  final DateTime? modified;
+
+  /// Who edited [text] last, as their Profile shows ([People.editorOf]):
+  /// the user's own Profile for an edit on one of their Devices; null
+  /// while it was never edited ([modified] is null) and for a writer not
+  /// known.
+  final Profile? editedBy;
+
   const Section({
     required this.id,
     required this.noteId,
     required this.text,
     required this.context,
+    this.modified,
+    this.editedBy,
     this.textFormat = TextFormats.plain,
     this.textVersion = TextFormats.version,
     this.textEditable = true,
@@ -419,6 +434,10 @@ class Section {
     this.removedPhotoTexts = const [],
     this.boxes = const [],
   });
+
+  /// When the Section was captured, by Amend or as the merged Note; an
+  /// edit of its text leaves it as it is.
+  DateTime get created => context.captured;
 
   /// [text] as it shows, as for [Note.shownText].
   String get shownText => _shownText(text, textEditable, boxes);
@@ -860,6 +879,39 @@ class Notes {
     return _section(id)!;
   }
 
+  /// Whether this Device may edit the text of the Section [id], an Amend
+  /// or a Note merged into another (#183), as the text of a Note: it is
+  /// in a format known here (ADR 0018), and the Section is this Device's
+  /// to change ([SharedAreas.mayChange]), its author's or, in a Shared
+  /// Area, a Manager's.
+  bool mayEditSection(String id) =>
+      section(id)?.textEditable == true && store.mayChange(id);
+
+  /// Fixes the text of the Section [id] in place, as [edit] fixes the
+  /// text of a Note: a new entry on the Section, the old text stays in
+  /// the log only, and the Section keeps its place and its Capture
+  /// Context. The text keeps the Section's format, or takes [format]
+  /// when one is given; a formatted text stays formatted (ADR 0033), and
+  /// its bare glyphs become Boxes (ADR 0035). Nothing is written when
+  /// the text stays as it is. Refused unless [mayEditSection].
+  void editSection(String id, String text, {String? format}) {
+    if (format != null) _requireFormat(format);
+    final section = this.section(id);
+    if (section == null) {
+      throw ArgumentError.value(id, 'id', 'not a Section');
+    }
+    if (!mayEditSection(id)) {
+      throw StateError('the text of $id may not be edited here');
+    }
+    final written = section.textFormat == TextFormats.markdown
+        ? TextFormats.markdown
+        : format ?? section.textFormat;
+    // A Note merged into another keeps its text under the same key.
+    final value = StoredText.of(written, _boxed(_text(text), written)).encode();
+    if (value == store.current(id, SectionKeys.text)) return;
+    store.append(id, SectionKeys.text, value);
+  }
+
   /// Merges the Note [noteId] into the Note [intoId]: it becomes a dated
   /// Section of it, with its own Capture Context, and leaves every list
   /// and Unsorted.
@@ -935,24 +987,46 @@ class Notes {
   }
 
   /// The Note [note], merged into [noteId], as a Section of it.
-  static Section _merged(Note note, String noteId) => Section(
-    id: note.id,
-    noteId: noteId,
-    text: note.text,
-    textFormat: note.textFormat,
-    textVersion: note.textVersion,
-    textEditable: note.textEditable,
-    context: note.context,
-    photos: note.photos,
-    recordings: note.recordings,
-    transcripts: note.transcripts,
-    photoTexts: note.photoTexts,
-    removedPhotos: note.removedPhotos,
-    removedRecordings: note.removedRecordings,
-    removedTranscripts: note.removedTranscripts,
-    removedPhotoTexts: note.removedPhotoTexts,
-    boxes: note.boxes,
-  );
+  Section _merged(Note note, String noteId) {
+    final edit = _lastEdit(note.id);
+    return Section(
+      id: note.id,
+      noteId: noteId,
+      text: note.text,
+      textFormat: note.textFormat,
+      textVersion: note.textVersion,
+      textEditable: note.textEditable,
+      context: note.context,
+      photos: note.photos,
+      recordings: note.recordings,
+      transcripts: note.transcripts,
+      photoTexts: note.photoTexts,
+      removedPhotos: note.removedPhotos,
+      removedRecordings: note.removedRecordings,
+      removedTranscripts: note.removedTranscripts,
+      removedPhotoTexts: note.removedPhotoTexts,
+      boxes: note.boxes,
+      modified: edit?.at,
+      editedBy: edit?.by,
+    );
+  }
+
+  /// When the text of the Note or Section [id] was last edited, and who
+  /// edited it (#183): the text that wins by latest wins, among those that
+  /// count, once there is more than one; null while there is only the
+  /// text it was captured with. Ordered by latest wins, not by the log,
+  /// so every Device finds the same.
+  ({DateTime at, Profile? by})? _lastEdit(String id) {
+    Entry? latest;
+    var texts = 0;
+    for (final e in store.history(id)) {
+      if (e.field != SectionKeys.text) continue;
+      texts++;
+      if (latest == null || Store.latestWins(e, latest) > 0) latest = e;
+    }
+    if (latest == null || texts < 2) return null;
+    return (at: latest.date, by: store.editorOf(id, latest.device));
+  }
 
   /// Records where the Note or Section [id] was captured. The position
   /// arrives after Capture, so it is attached later and never holds the
@@ -1282,6 +1356,7 @@ class Notes {
     final captured = fields[SectionKeys.captured];
     if (owner == null || captured == null) return null;
     final text = StoredText.read(fields[SectionKeys.text]);
+    final edit = _lastEdit(id);
     return Section(
       id: id,
       noteId: noteId ?? owner,
@@ -1291,6 +1366,8 @@ class Notes {
       textEditable: text.editable,
       context: _context(captured, fields),
       boxes: _boxes(id, text, fields),
+      modified: edit?.at,
+      editedBy: edit?.by,
     );
   }
 
