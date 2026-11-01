@@ -587,6 +587,31 @@
       }
     }
   },
+  "copyText": "Copy text",
+  "@copyText": {
+    "description": "In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard."
+  },
+  "sectionEdited": "Edited {when}",
+  "@sectionEdited": {
+    "description": "Under a Section of a Note whose text was edited: when it was edited last.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionEditedBy": "Edited {when} by {name}",
+  "@sectionEditedBy": {
+    "description": "Under a Section of a Note whose text was edited: when it was edited last and the Profile name of who edited it.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "moreCaptureContext": "More about the capture",
   "recordVoice": "Record voice",
   "recording": "Recording…",

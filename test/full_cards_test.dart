@@ -1,7 +1,7 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -183,6 +183,43 @@ void main() {
       await tester.longPress(find.text('Amended later'));
       await tester.pumpAndSettle();
       expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('Copy text in ⋮ copies the Note and its Sections as they '
+        'show, a blank line between them, and says nothing (#183)', (
+      tester,
+    ) async {
+      final copied = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final note = notes.capture('Pack ☐ the tent');
+      Boxes(store).tick(note.id, note.boxes.single.id, BoxState.done);
+      now = now.add(const Duration(hours: 1));
+      final merged = notes.capture('Merged in');
+      notes.merge(merged.id, note.id);
+      now = now.add(const Duration(hours: 1));
+      notes.amend(note.id, '  Amended later\n');
+      await start(tester);
+      await openAllNotes(tester);
+
+      await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-copy')));
+      expect(copied, ['Pack ✅ the tent\n\nMerged in\n\nAmended later']);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.byType(PopupMenuItem<VoidCallback>), findsNothing);
     });
 
     testWidgets('Edit in ⋮ opens the editor', (tester) async {

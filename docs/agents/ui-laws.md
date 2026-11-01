@@ -285,6 +285,16 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note's first line, its media and the action row.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
+- **Copy text** in a card's ⋮ puts the text of the Note and of each
+  Section on the clipboard as they show, oldest first, a blank line
+  between them, and says nothing (#183). In the Note editor a text that
+  is only read, the Note's or a Section's, selects with a long press,
+  with Copy in the system's menu.
+- **A Section's text is edited in place in the Note editor** (#183), in
+  the same field and with the same format bar as the Note's text, by the
+  same people (the Section's author, in a Shared Area also the
+  Managers); others read it. Under its time it says, small and grey,
+  when it was last edited and by whom, once it was.
 - **The Note editor shows each setting of the Note as a badge** (#160),
   in one wrapping row under the text: the setting's icon and its value,
   like a shield. Importance; Area and Topic in one; Captured (time, place,

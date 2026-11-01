@@ -1664,6 +1664,24 @@ abstract class AppLocalizations {
   /// **'Connected: {devices}'**
   String contextBluetooth(String devices);
 
+  /// In the ⋮ of a Note's card: puts the text of the Note and of its Sections on the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy text'**
+  String get copyText;
+
+  /// Under a Section of a Note whose text was edited: when it was edited last.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited {when}'**
+  String sectionEdited(String when);
+
+  /// Under a Section of a Note whose text was edited: when it was edited last and the Profile name of who edited it.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited {when} by {name}'**
+  String sectionEditedBy(String when, String name);
+
   /// No description provided for @moreCaptureContext.
   ///
   /// In en, this message translates to:

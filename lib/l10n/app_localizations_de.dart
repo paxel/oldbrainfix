@@ -1033,6 +1033,19 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get copyText => 'Text kopieren';
+
+  @override
+  String sectionEdited(String when) {
+    return 'Bearbeitet $when';
+  }
+
+  @override
+  String sectionEditedBy(String when, String name) {
+    return 'Bearbeitet $when von $name';
+  }
+
+  @override
   String get moreCaptureContext => 'Mehr zur Erfassung';
 
   @override

@@ -84,7 +84,15 @@ void main() {
       await edit(tester, find.text('nees mor sauce'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byKey(const ValueKey('note-text')),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller
+            ?.text,
         'nees mor sauce',
       );
       expect(find.text(shown(DateTime.utc(2026, 10, 24, 8))), findsOneWidget);

@@ -117,6 +117,10 @@ class NoteActions {
   /// Hands the Note's text, photos and recordings to another app.
   final VoidCallback? onShare;
 
+  /// Puts the text of the Note and of its Sections on the clipboard
+  /// (#183).
+  final VoidCallback? onCopy;
+
   /// The calendar choices, read as the menu opens; only shown with a
   /// calendar.
   final NoteCalendar Function()? calendar;
@@ -162,6 +166,7 @@ class NoteActions {
     this.onImportance,
     this.onSend,
     this.onShare,
+    this.onCopy,
     this.calendar,
     this.onAmend,
     this.removals,
@@ -643,7 +648,7 @@ class NoteActionRow extends StatelessWidget {
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with Edit, then, for a Note being captured, its Importance as radio
-/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, the calendar, adding to the Note, "Add entry" of
+/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" and "Uncheck all" (a
 /// Checklist's) and "Back to a plain Note", removing a photo or recording while its
@@ -729,6 +734,8 @@ class _MoreButton extends StatelessWidget {
             item('note-send', Icons.send_outlined, t.sendToPerson, send),
           if (actions.onShare case final share?)
             item('note-share', Icons.share_outlined, t.shareToApp, share),
+          if (actions.onCopy case final copy?)
+            item('note-copy', Icons.copy_outlined, t.copyText, copy),
           if (calendar != null && calendar.add.isNotEmpty)
             item(
               'note-calendar',
@@ -982,11 +989,16 @@ class _AuthorLineState extends State<_AuthorLine> {
 /// coordinates alone; the app it was shared in from; the calendar events
 /// running; the Bluetooth devices connected. Each detail in [removable]
 /// ends in a Remove that calls [onRemove] (ADR 0037); the time has none.
+///
+/// A Section whose text was [edited] says under its time, small and
+/// grey, when that was and, when known, who did it ([editedBy], #183).
 class CaptureContextLines extends StatelessWidget {
   final CaptureContext capture;
   final DateFormat when;
   final Set<CapturedDetail> removable;
   final void Function(CapturedDetail detail)? onRemove;
+  final DateTime? edited;
+  final String? editedBy;
 
   const CaptureContextLines({
     super.key,
@@ -994,7 +1006,25 @@ class CaptureContextLines extends StatelessWidget {
     required this.when,
     this.removable = const {},
     this.onRemove,
+    this.edited,
+    this.editedBy,
   });
+
+  /// The lines of [section]: its Capture Context and when its text was
+  /// edited, and by whom.
+  CaptureContextLines.ofSection(
+    Section section, {
+    super.key,
+    required this.when,
+    this.removable = const {},
+    this.onRemove,
+  }) : capture = section.context,
+       edited = section.modified,
+       editedBy = switch (section.editedBy?.name.trim()) {
+         // A Profile without a name says nothing of who it is.
+         final name? when name.isNotEmpty => name,
+         _ => null,
+       };
 
   @override
   Widget build(BuildContext context) {
@@ -1034,6 +1064,7 @@ class CaptureContextLines extends StatelessWidget {
       children: [
         for (final (i, (icon, line, detail)) in lines.indexed) ...[
           if (i > 0) const SizedBox(height: 4),
+          if (i == 1) ?_edited(context),
           if (remove != null && detail != null && removable.contains(detail))
             Row(
               children: [
@@ -1062,7 +1093,41 @@ class CaptureContextLines extends StatelessWidget {
               ],
             ),
         ],
+        if (lines.length == 1) ?_edited(context),
       ],
+    );
+  }
+
+  /// When the text was edited and by whom, one line under the time; none
+  /// while it never was.
+  Widget? _edited(BuildContext context) {
+    final at = edited;
+    if (at == null) return null;
+    final t = context.t;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final shown = when.format(at.toLocal());
+    final by = editedBy;
+    return Padding(
+      key: const ValueKey('section-edited'),
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            child: Icon(Icons.edit_outlined, size: 16, color: muted),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              by == null
+                  ? t.sectionEdited(shown)
+                  : t.sectionEditedBy(shown, by),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: muted),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1146,7 +1211,7 @@ class _FullNoteState extends State<_FullNote> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 24),
-              CaptureContextLines(capture: section.context, when: widget.when),
+              CaptureContextLines.ofSection(section, when: widget.when),
               const SizedBox(height: 8),
               _Whole(
                 id: section.id,

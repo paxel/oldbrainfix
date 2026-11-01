@@ -1027,6 +1027,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get copyText => 'Copy text';
+
+  @override
+  String sectionEdited(String when) {
+    return 'Edited $when';
+  }
+
+  @override
+  String sectionEditedBy(String when, String name) {
+    return 'Edited $when by $name';
+  }
+
+  @override
   String get moreCaptureContext => 'More about the capture';
 
   @override
