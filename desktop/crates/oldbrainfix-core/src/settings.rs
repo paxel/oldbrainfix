@@ -27,6 +27,39 @@ const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
+const THEME: &str = "theme";
+
+/// Which theme this Device shows: the system's, or a fixed one, as the
+/// Dart core's `ThemeChoice`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ThemeChoice {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl ThemeChoice {
+    /// All of them, in the menu's order.
+    pub const ALL: [ThemeChoice; 3] = [ThemeChoice::System, ThemeChoice::Light, ThemeChoice::Dark];
+
+    /// How it is stored, as the Dart core's enum names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            ThemeChoice::System => "system",
+            ThemeChoice::Light => "light",
+            ThemeChoice::Dark => "dark",
+        }
+    }
+
+    /// The choice `name` names; anything unknown follows the system.
+    pub fn read(name: Option<&str>) -> ThemeChoice {
+        ThemeChoice::ALL
+            .into_iter()
+            .find(|c| Some(c.name()) == name)
+            .unwrap_or_default()
+    }
+}
 
 /// What the quick note (the capture field and popup on the desktop)
 /// shows beyond its text, its buttons that add a recording, a picture or
@@ -322,6 +355,17 @@ impl<'a> DeviceSettings<'a> {
             .unwrap_or_else(|| tally_units::system_for_region(region)))
     }
 
+    /// The theme this Device shows; the system's unless one was chosen.
+    pub fn theme(&self) -> Result<ThemeChoice> {
+        Ok(ThemeChoice::read(
+            self.store.local_setting(THEME)?.as_deref(),
+        ))
+    }
+
+    pub fn set_theme(&self, choice: ThemeChoice) -> Result<()> {
+        self.store.set_local_setting(THEME, choice.name())
+    }
+
     /// How this Device's Agenda shows Shopping Lists; one row per list on
     /// a day when Lines came back unless another way was chosen.
     pub fn shopping_agenda(&self) -> Result<ShoppingAgenda> {
@@ -382,6 +426,9 @@ mod tests {
         assert!(settings.quick_note_nudge_buttons_on()?);
         assert_eq!(settings.capture_hotkey()?, DEFAULT_CAPTURE_HOTKEY);
         assert_eq!(settings.missed_seen()?, None);
+        assert_eq!(settings.theme()?, ThemeChoice::System);
+        store.set_local_setting(THEME, "sepia")?;
+        assert_eq!(settings.theme()?, ThemeChoice::System);
         store.set_local_setting(RENAG_MINUTES, "0")?;
         assert_eq!(settings.renag_interval()?, Duration::minutes(10));
         store.set_local_setting(QUIET_HOURS, "23:00")?;
@@ -449,6 +496,12 @@ mod tests {
         assert_eq!(settings.missed_seen()?, Some(now));
         settings.set_missed_seen(None)?;
         assert_eq!(settings.missed_seen()?, None);
+        for choice in ThemeChoice::ALL {
+            settings.set_theme(choice)?;
+            assert_eq!(settings.theme()?, choice);
+        }
+        settings.set_theme(ThemeChoice::Light)?;
+        assert_eq!(store.local_setting(THEME)?.as_deref(), Some("light"));
         Ok(())
     }
 

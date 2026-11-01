@@ -18,6 +18,7 @@ use oldbrainfix_core::markdown::{self, BlockKind, Change, Span, SpanKind};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::text_marks_view::line_at;
+use crate::theme;
 
 /// A button of the format bar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -345,7 +346,7 @@ fn button(
     if ui.is_rect_visible(rect) {
         let fg = if holds {
             ui.painter().rect_filled(rect, 6.0, accent);
-            Color32::BLACK
+            theme::on_accent(ui.visuals().dark_mode)
         } else {
             if resp.hovered() {
                 let fill = ui.visuals().widgets.hovered.weak_bg_fill;

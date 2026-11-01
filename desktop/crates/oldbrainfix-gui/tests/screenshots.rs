@@ -366,6 +366,8 @@ fn window_with(
             },
             app,
         );
+    // The window follows the system's theme (#147).
+    harness.input_mut().system_theme = Some(theme);
     harness.run_steps(4);
     Ok(harness)
 }

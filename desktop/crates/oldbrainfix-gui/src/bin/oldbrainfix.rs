@@ -37,7 +37,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
-use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store};
+use oldbrainfix_core::{
+    APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
+};
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
@@ -57,6 +59,8 @@ use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
 use oldbrainfix_gui::store_needs_update::StoreNeedsUpdateView;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
+use oldbrainfix_gui::system_theme::SystemTheme;
+use oldbrainfix_gui::theme;
 use oldbrainfix_gui::tray::{self, Command, OnClose, Tray};
 use oldbrainfix_gui::{App, instance, local_wall};
 
@@ -110,12 +114,14 @@ struct Native {
     start_hidden: bool,
     new_popup: NewPopup,
     popup: Option<CapturePopup>,
+    system_theme: SystemTheme,
 }
 
 impl eframe::App for Native {
     /// Runs while the window is hidden too, which `ui` does not.
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         App::install(ctx);
+        self.system_theme.hand_to(ctx);
         for command in waiting(&self.commands) {
             match command {
                 Command::Open => focus(ctx),
@@ -203,11 +209,18 @@ struct PopupWindow {
     /// The Note "To full editor" saved, for the window to open in its
     /// Note editor.
     edit: Rc<RefCell<Option<String>>>,
+    /// The theme this Device chose, until it is shown.
+    theme: Option<ThemeChoice>,
+    system_theme: SystemTheme,
 }
 
 impl eframe::App for PopupWindow {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         App::install(ui.ctx());
+        self.system_theme.hand_to(ui.ctx());
+        if let Some(choice) = self.theme.take() {
+            theme::prefer(ui.ctx(), choice);
+        }
         let mut outcome = Outcome::Open;
         for command in waiting(&self.commands) {
             match command {
@@ -272,6 +285,7 @@ struct Shell {
     /// The Note the popup's "To full editor" saved while the window was
     /// closed, for the window to open in its Note editor.
     edit: Rc<RefCell<Option<String>>>,
+    system_theme: SystemTheme,
 }
 
 impl Shell {
@@ -348,6 +362,7 @@ impl Shell {
             start_hidden: hidden,
             new_popup: self.new_popup.clone(),
             popup: None,
+            system_theme: self.system_theme.clone(),
         };
         self.run(viewport, Box::new(native))?;
         // Where the tray lives in the window's event loop, its end is the
@@ -366,6 +381,9 @@ impl Shell {
             commands: self.commands.clone(),
             next: next.clone(),
             edit: self.edit.clone(),
+            // The system's when it cannot be read.
+            theme: Some(DeviceSettings::new(&self.store).theme().unwrap_or_default()),
+            system_theme: self.system_theme.clone(),
         };
         self.run(viewport, Box::new(window))?;
         Ok(next.get())
@@ -748,6 +766,7 @@ fn run() -> Result<i32, String> {
         pressed,
     )));
 
+    let system_theme = SystemTheme::follow(waker(&window));
     let shell = Shell {
         store,
         locale,
@@ -768,6 +787,7 @@ fn run() -> Result<i32, String> {
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),
         edit: Rc::new(RefCell::new(None)),
+        system_theme,
     };
     if tray::IN_EVENT_LOOP {
         // Windows, macOS: the window runs for as long as the app, hidden

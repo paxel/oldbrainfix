@@ -92,8 +92,8 @@ use oldbrainfix_core::{
     Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo,
     Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl, QuietHours,
     Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda, ShoppingLine,
-    ShoppingList, ShoppingLists, ShownBox, Store, Tallies, Topic, UnitSystem, bundle, markdown,
-    text_format,
+    ShoppingList, ShoppingLists, ShownBox, Store, Tallies, ThemeChoice, Topic, UnitSystem, bundle,
+    markdown, text_format,
 };
 
 use crate::about_view;
@@ -890,6 +890,9 @@ enum Action {
     /// Switches the list shown to compact cards or full ones and keeps
     /// the choice for that list on this Device (#114).
     Compact(bool),
+    /// Shows the theme chosen in View ▸ Theme at once and keeps it on
+    /// this Device (#147).
+    Theme(ThemeChoice),
     /// Shows this photo full screen, to zoom and move (#114).
     ViewPhoto(String),
     /// Closes the photo shown full screen.
@@ -1262,6 +1265,10 @@ pub struct App {
     /// File ▸ Quit and File ▸ Quick note, for the native window to do.
     quit_wanted: bool,
     quick_note_wanted: bool,
+    /// The theme this Device chose (#147), and whether the window shows
+    /// it yet.
+    theme: ThemeChoice,
+    theme_shown: bool,
     /// The address the browser is to open, and who opens it; egui's
     /// `open_url` when none.
     open_url: Option<String>,
@@ -1630,6 +1637,8 @@ impl App {
         let read_at = store.now();
         // Normal speed when it cannot be read.
         let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
+        // The system's when it cannot be read.
+        let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -1652,6 +1661,8 @@ impl App {
             search_focus: false,
             quit_wanted: false,
             quick_note_wanted: false,
+            theme,
+            theme_shown: false,
             open_url: None,
             url_opener: None,
             capture: String::new(),
@@ -3471,6 +3482,15 @@ impl App {
         std::mem::take(&mut self.quit_wanted)
     }
 
+    /// Shows the theme chosen, once on start and once after each choice:
+    /// set every frame it would undo a theme set from outside.
+    fn show_theme(&mut self, ctx: &egui::Context) {
+        if !std::mem::replace(&mut self.theme_shown, true) {
+            theme::prefer(ctx, self.theme);
+            ctx.request_repaint();
+        }
+    }
+
     /// Whether File ▸ Quick note was picked since asked last: the capture
     /// popup is to open, as the hotkey opens it.
     pub fn take_quick_note(&mut self) -> bool {
@@ -3693,6 +3713,11 @@ impl App {
     fn cards_key(&self) -> Option<String> {
         let area = matches!(&self.selection, Selection::Place(id) if self.view.area(id).is_some());
         cards_key(&self.selection, &self.people, area)
+    }
+
+    /// The theme this Device chose (#147).
+    pub fn theme(&self) -> ThemeChoice {
+        self.theme
     }
 
     /// Whether the Note list shown shows its Notes compact (#114).
@@ -4561,6 +4586,12 @@ impl App {
             Action::Table(asked) => self.table_asked(asked)?,
             Action::Unfold(id) => {
                 self.unfolded.insert(id);
+            }
+            Action::Theme(choice) => {
+                // Shown even when it cannot be kept.
+                self.theme = choice;
+                self.theme_shown = false;
+                DeviceSettings::new(&self.store).set_theme(choice)?;
             }
             Action::Compact(on) => {
                 if let Some(key) = self.cards_key() {
@@ -6582,6 +6613,7 @@ impl App {
 
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
+        self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
         // A notification's Done or a new minute changes what shows.
@@ -6937,6 +6969,7 @@ impl App {
         for action in actions {
             self.apply(action);
         }
+        self.show_theme(ui.ctx());
         if let Some(text) = self.copy.take() {
             ui.ctx().copy_text(text);
         }
@@ -7314,10 +7347,20 @@ impl App {
                     }
                 }
                 ui.separator();
-                // It follows the system until it can be chosen (#147).
+                // The system's light or dark, or one of them (#147).
                 ui.menu_button(RichText::new(t.menu_theme()).color(text), |ui| {
-                    let line = egui::Button::selectable(true, t.menu_theme_system());
-                    ui.add_enabled(false, line);
+                    for (label, choice) in [
+                        (t.theme_system(), ThemeChoice::System),
+                        (t.theme_light(), ThemeChoice::Light),
+                        (t.theme_dark(), ThemeChoice::Dark),
+                    ] {
+                        let on = self.theme == choice;
+                        let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                        if ui.add(button).clicked() {
+                            actions.push(Action::Theme(choice));
+                            ui.close();
+                        }
+                    }
                 });
             });
             ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
@@ -9286,7 +9329,7 @@ impl App {
                         held,
                         compared,
                         blocking: None,
-                    } => area_offer_form(ui, &t, tones, (held, *compared), pictures, actions),
+                    } => area_offer_form(ui, &t, (held, *compared), pictures, actions),
                     Dialog::OfferFolder { area } => {
                         title(ui, t.area_offer_folder_question());
                         let text = ui.visuals().text_color();
@@ -9341,7 +9384,7 @@ impl App {
                     Dialog::HeldSentItem {
                         held,
                         blocking: None,
-                    } => held_sent_item_form(ui, &t, tones, held, actions),
+                    } => held_sent_item_form(ui, &t, held, actions),
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
@@ -11238,7 +11281,6 @@ fn offer_line(t: &L10n, held: &HeldAreaOffer) -> String {
 fn area_offer_form(
     ui: &mut Ui,
     t: &L10n,
-    tones: Tones,
     (held, compared): (&HeldAreaOffer, Compared),
     pictures: &mut profile_view::Pictures,
     actions: &mut Vec<Action>,
@@ -11287,7 +11329,9 @@ fn area_offer_form(
             );
         }
         Compared::Differ => {
-            ui.label(RichText::new(t.sent_item_codes_differed()).color(tones.accent));
+            ui.label(
+                RichText::new(t.sent_item_codes_differed()).color(ui.visuals().hyperlink_color),
+            );
         }
         Compared::Asking => {
             ui.label(RichText::new(t.sent_item_compare_hint(&name, code)).color(text));
@@ -11480,7 +11524,9 @@ fn sent_item_form(
             );
         }
         Compared::Differ => {
-            ui.label(RichText::new(t.sent_item_codes_differed()).color(tones.accent));
+            ui.label(
+                RichText::new(t.sent_item_codes_differed()).color(ui.visuals().hyperlink_color),
+            );
         }
         Compared::Asking => {
             ui.label(RichText::new(t.sent_item_compare_hint(&name, code)).color(text));
@@ -11519,7 +11565,7 @@ fn sent_item_form(
     match opened.state {
         SentItemState::Fresh => {}
         SentItemState::Update => {
-            ui.label(RichText::new(t.sent_item_update()).color(tones.accent));
+            ui.label(RichText::new(t.sent_item_update()).color(ui.visuals().hyperlink_color));
         }
         SentItemState::Cancel => {
             ui.label(
@@ -11527,15 +11573,17 @@ fn sent_item_form(
                     t.sent_item_cancelled(&text_format::visible(&item.text_format, &item.text)),
                 )
                 .strong()
-                .color(tones.accent),
+                .color(ui.visuals().hyperlink_color),
             );
             ui.label(RichText::new(t.sent_item_cancel_detail()).color(text));
         }
         SentItemState::UpToDate => {
-            ui.label(RichText::new(t.sent_item_already()).color(tones.accent));
+            ui.label(RichText::new(t.sent_item_already()).color(ui.visuals().hyperlink_color));
         }
         SentItemState::NothingToCancel => {
-            ui.label(RichText::new(t.sent_item_nothing_to_cancel()).color(tones.accent));
+            ui.label(
+                RichText::new(t.sent_item_nothing_to_cancel()).color(ui.visuals().hyperlink_color),
+            );
         }
     }
     let accept = match opened.state {
@@ -11738,17 +11786,11 @@ pub(crate) fn banded_clickable_card(
 /// the preview as for anybody else; Accept, Decline and "Decline and
 /// block" work before it too. Leaving decides nothing: the item waits
 /// behind the Agenda's "x Sent Items waiting".
-fn held_sent_item_form(
-    ui: &mut Ui,
-    t: &L10n,
-    tones: Tones,
-    held: &HeldSentItem,
-    actions: &mut Vec<Action>,
-) {
+fn held_sent_item_form(ui: &mut Ui, t: &L10n, held: &HeldSentItem, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let name = profile_view::display_name(t, &held.sender.name);
     title(ui, &t.sent_item_from(name));
-    ui.label(RichText::new(t.sent_item_stranger()).color(tones.accent));
+    ui.label(RichText::new(t.sent_item_stranger()).color(ui.visuals().hyperlink_color));
     ui.label(RichText::new(t.sent_item_hidden()).color(text));
     let wide = |ui: &mut Ui, label: RichText| {
         ui.add_sized([ui.available_width(), 32.0], egui::Button::new(label))

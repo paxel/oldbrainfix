@@ -412,7 +412,7 @@ pub fn review_page(
                 let content = |ui: &mut Ui| {
                     ui.label(RichText::new(&item.title).strong().color(text));
                     for change in &item.changes {
-                        change_rows(ui, t, tones, change);
+                        change_rows(ui, t, change);
                     }
                 };
                 match &item.note {
@@ -435,7 +435,7 @@ pub fn review_page(
 
 /// One change of an item: what changes, before and after, and "Your
 /// edit stays" where the user's own later edit is kept.
-fn change_rows(ui: &mut Ui, t: &L10n, tones: Tones, change: &ReviewChange) {
+fn change_rows(ui: &mut Ui, t: &L10n, change: &ReviewChange) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.label(RichText::new(&change.label).small().color(weak));
@@ -449,7 +449,7 @@ fn change_rows(ui: &mut Ui, t: &L10n, tones: Tones, change: &ReviewChange) {
         ui.label(
             RichText::new(t.ai_your_edit_stays())
                 .small()
-                .color(tones.accent),
+                .color(ui.visuals().hyperlink_color),
         );
     }
 }

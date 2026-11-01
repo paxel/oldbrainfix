@@ -182,7 +182,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, and what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, and what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), and the theme (system, light or dark). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -611,6 +611,7 @@ impl Store {
                         "until": quiet.end.to_string(),
                     },
                     "renagMinutes": settings.renag_interval()?.num_minutes(),
+                    "theme": settings.theme()?.name(),
                 }))
             }
             _ => return Err(Error::Invalid(format!("no tool {name}"))),
@@ -851,6 +852,7 @@ mod tests {
         assert_eq!(read.pointer("/quickNote/fileInto"), Some(&json!(true)));
         assert_eq!(read.pointer("/quickNote/formatBar"), Some(&json!(false)));
         assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
+        assert_eq!(read.pointer("/theme"), Some(&json!("system")));
         Ok(())
     }
 }

@@ -199,11 +199,13 @@ fn the_view_menu_shows_the_places_and_switches_the_cards() -> TestResult {
     pick(&mut harness, "View", "Full cards");
     harness.run();
     assert!(!harness.state().compact());
-    // The theme follows the system until it can be chosen.
+    // The theme: the system's, light or dark (#147).
     open(&mut harness, "View");
     last(&harness, "Theme ⏵").hover();
     harness.run();
-    assert!(shows(&harness, "Light or dark, as the system is set"));
+    for entry in ["System", "Light", "Dark"] {
+        assert!(shows(&harness, entry), "{entry}");
+    }
     Ok(())
 }
 
