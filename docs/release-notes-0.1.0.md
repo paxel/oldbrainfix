@@ -4,8 +4,6 @@
 
 First release; nothing is live on Google Play yet. This covers the 0.1.0 changelog section, phone features only. The eight phone frames per language are new, rendered by the screenshot generator. Play only: no App Store.
 
-- Play Kit — https://claude.ai/artifact/Sey69kjoaAhnUVxvHrst77
-
 <!-- store-kit
 live_play: none
 live_appstore: none

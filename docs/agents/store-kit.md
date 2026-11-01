@@ -55,8 +55,8 @@ are uploaded in the Play Console by hand.
 
 ## Pages
 
-- Play Kit: https://claude.ai/artifact/Sey69kjoaAhnUVxvHrst77
-- App Store Kit: not used.
+The Play Kit page is a private page of the person running the release; its
+link stays out of this public repo. There is no App Store Kit.
 
 ## Glossary
 

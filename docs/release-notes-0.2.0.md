@@ -4,9 +4,6 @@
 
 Version 0.2.0 after 0.1.1, which is on Google Play's internal track and on F-Droid. It covers the 0.2.0 section of the changelog. Phone highlights: Checklists and Shopping Lists, formatted text with tables, boxes and #tags, Tallies, Sessions and Frogs, Paste and Share to an app, sorting while capturing, adding a Device of one's own at the first start, and sharing an Area from afar. Desktop-only changes stay out of the phone texts. The store frames were regenerated: capture, editor and fan changed.
 
-- Play Kit — https://claude.ai/artifact/Sey69kjoaAhnUVxvHrst77
-- App Store Kit — not used
-
 <!-- store-kit
 live_play: 0.1.1 (internal)
 live_appstore: none
