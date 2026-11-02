@@ -3710,6 +3710,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionPoolMissing => 'Choose at least one Tally.';
 
   @override
+  String sessionPoolHidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more ticked, hidden by the filter',
+      one: '1 more ticked, hidden by the filter',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get sessionSchedule => 'Schedule';
 
   @override

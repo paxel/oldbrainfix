@@ -468,6 +468,89 @@ void main() {
       );
     });
 
+    testWidgets('the tags of the pool\'s Tallies filter it by any picked; '
+        'ticks hidden stay and are counted, and New Tally carries the tags '
+        '(#220)', (tester) async {
+      final pushUps = tally('Push-ups #sport');
+      final mop = tally('Mop #Cleaning');
+      final dust = tally('Dust #cleaning #home');
+      final made = session([pushUps], count: 1);
+      await start(tester);
+      await edit(tester, made.noteId);
+      // Sorted by how many Tallies carry them, then by name.
+      final chips = tester
+          .widgetList<FilterChip>(find.byType(FilterChip))
+          .map((c) => (c.label as Text).data)
+          .toList();
+      expect(chips, ['#cleaning', '#home', '#sport']);
+      expect(key('session-pool-hidden'), findsNothing);
+      expect(key('session-move-$mop'), findsOneWidget);
+
+      await tap(tester, key('session-tag-#cleaning'));
+      // Rolling's order is dragged only in the whole list.
+      expect(key('session-move-$mop'), findsNothing);
+      expect(key('session-pool-$pushUps'), findsNothing);
+      expect(key('session-pool-$mop'), findsOneWidget);
+      expect(key('session-pool-$dust'), findsOneWidget);
+      expect(find.text('1 more ticked, hidden by the filter'), findsOneWidget);
+      // A tick while filtered is written, and the filter stays.
+      await tap(tester, key('session-pool-$mop'));
+      expect(sessions.setupOf(made.noteId)?.pool, [pushUps, mop]);
+      expect(key('session-pool-$pushUps'), findsNothing);
+      // Any of the picked tags.
+      await tap(tester, key('session-tag-#sport'));
+      expect(key('session-pool-$pushUps'), findsOneWidget);
+      expect(key('session-pool-$dust'), findsOneWidget);
+      expect(key('session-pool-hidden'), findsNothing);
+
+      await tap(tester, key('session-new-tally'));
+      expect(
+        tester.widget<TextField>(key('tally-form-name')).controller?.text,
+        '#cleaning #sport ',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tap(tester, key('session-tag-#cleaning'));
+      await tap(tester, key('session-tag-#sport'));
+      expect(key('session-pool-$pushUps'), findsOneWidget);
+      expect(key('session-pool-$dust'), findsOneWidget);
+      expect(sessions.setupOf(made.noteId)?.pool, [pushUps, mop]);
+    });
+
+    testWidgets('the New Session page filters its pool by tag, and New Tally '
+        'there carries the tags (#220)', (tester) async {
+      final pushUps = tally('Push-ups #sport');
+      final mop = tally('Mop #cleaning');
+      final id = notes.capture('Morning').id;
+      await start(tester);
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-session'));
+      expect(find.byType(SessionFormScreen), findsOneWidget);
+      await tap(tester, key('session-pool-$pushUps'));
+      await tap(tester, key('session-tag-#cleaning'));
+      expect(key('session-pool-$pushUps'), findsNothing);
+      expect(find.text('1 more ticked, hidden by the filter'), findsOneWidget);
+      await tap(tester, key('session-new-tally'));
+      expect(
+        tester.widget<TextField>(key('tally-form-name')).controller?.text,
+        '#cleaning ',
+      );
+      await tester.enterText(key('tally-form-name'), '#cleaning Dust');
+      await tester.enterText(key('tally-form-field-name-0'), 'Rooms');
+      await tap(tester, key('tally-form-save'));
+      final dust = notes.all().firstWhere((n) => n.text == '#cleaning Dust').id;
+      // Back on the page, still filtered, the new Tally ticked in it.
+      expect(key('session-pool-$pushUps'), findsNothing);
+      expect(
+        tester.widget<CheckboxListTile>(key('session-pool-$dust')).value,
+        isTrue,
+      );
+      expect(key('session-pool-$mop'), findsOneWidget);
+      await tap(tester, key('session-form-save'));
+      expect(sessions.setupOf(id)?.pool, [dust, pushUps]);
+    });
+
     testWidgets('"+" on a Session Note offers no Session; a Routine added '
         'there runs it, and a Routine\'s editor only schedules', (
       tester,

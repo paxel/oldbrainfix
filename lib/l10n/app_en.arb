@@ -1963,6 +1963,8 @@
   "sessionPoolOrder": "Rolling goes through them from the top; drag a handle to change the order.",
   "sessionPoolNone": "No Tallies yet. \"Make it a Tally\" in a Note's ⋮ makes one.",
   "sessionPoolMissing": "Choose at least one Tally.",
+  "sessionPoolHidden": "{count, plural, =1{1 more ticked, hidden by the filter} other{{count} more ticked, hidden by the filter}}",
+  "@sessionPoolHidden": {"description": "Under a Session's pool filtered by tags (#220): how many ticked Tallies the filter hides; they stay ticked.", "placeholders": {"count": {"type": "int"}}},
   "sessionSchedule": "Schedule",
   "sessionMove": "Move {name}",
   "@sessionMove": {"description": "The drag handle of a Tally in a Session's pool.", "placeholders": {"name": {"type": "String"}}},

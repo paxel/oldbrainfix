@@ -1,7 +1,8 @@
 //! The Session's part of the Routine editor (#104, ADR 0029), as the
 //! phone's `session_editor.dart` draws it, on top of the schedule: the
-//! pool as a checkbox per Tally, ordered with up and down buttons for
-//! Rolling; the count's − / + stepper; the weekdays in a fold, each with
+//! pool as a checkbox per Tally, filtered by the pills of its Tallies'
+//! tags (#220), ordered with up and down buttons for Rolling while it is
+//! not filtered; the count's − / + stepper; the weekdays in a fold, each with
 //! a checkbox for its own count and then its stepper, open as last left
 //! on this Device; and the rule as radio buttons. Nothing is written
 //! before Save. For a Note being captured (#113) Save hands the draft
@@ -15,9 +16,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
 use oldbrainfix_core::sessions::keys::MAX_COUNT;
-use oldbrainfix_core::{Notes, Schedule, SessionRule, SessionSetup, Sessions, Store};
+use oldbrainfix_core::{Notes, Schedule, SessionRule, SessionSetup, Sessions, Store, text_tags};
 
-use crate::app::{embossed, icon_button, row_title};
+use crate::app::{embossed, icon_button, pill, row_title};
 use crate::capture_choices::SessionChoice;
 use crate::icons;
 use crate::l10n::L10n;
@@ -49,6 +50,13 @@ pub struct SessionDraft {
     pub chosen: BTreeSet<String>,
     /// What each Tally of [`SessionDraft::order`] shows as.
     names: BTreeMap<String, String>,
+    /// The tags in the text of each Tally of [`SessionDraft::order`]
+    /// (ADR 0032).
+    tags: BTreeMap<String, BTreeSet<String>>,
+    /// The tags picked to filter the pool by (#220), a view only: it
+    /// shows the Tallies carrying any of them. Kept while the page is
+    /// open, never stored.
+    pub picked: BTreeSet<String>,
     pub rule: SessionRule,
     /// How many it picks each time, 1 to 99.
     pub count: i64,
@@ -83,15 +91,19 @@ impl SessionDraft {
         }
         let notes = Notes::new(store);
         let mut names = BTreeMap::new();
+        let mut tags = BTreeMap::new();
         for id in &order {
             let note = notes.by_id(id)?;
             names.insert(id.clone(), row_title(t, note.as_ref()));
+            tags.insert(id.clone(), tags_of(note.map(|n| n.text).as_deref()));
         }
         let counts = setup.map(|s| s.counts.clone()).unwrap_or_default();
         Ok(SessionDraft {
             chosen: held.into_iter().collect(),
             order,
             names,
+            tags,
+            picked: BTreeSet::new(),
             rule: setup.map_or(SessionRule::Rolling, |s| s.rule),
             count: setup.map_or(1, |s| s.count),
             counts: std::array::from_fn(|i| counts.get(&(i as u32 + 1)).copied()),
@@ -121,13 +133,63 @@ impl SessionDraft {
         self.counts.iter().flatten().count() as i64
     }
 
-    /// Puts the Tally `id`, shown as `name`, just made, first in the
-    /// picker, ticked.
+    /// Puts the Tally `id`, shown as `name`, its text, just made, first
+    /// in the picker, ticked.
     pub fn add_made(&mut self, id: &str, name: &str) {
         self.order.retain(|held| held != id);
         self.order.insert(0, id.to_string());
         self.chosen.insert(id.to_string());
         self.names.insert(id.to_string(), name.to_string());
+        self.tags.insert(id.to_string(), tags_of(Some(name)));
+    }
+
+    /// The tags of the Tallies of [`SessionDraft::order`], those most of
+    /// them carry first, then by name.
+    pub fn tag_list(&self) -> Vec<String> {
+        let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+        for id in &self.order {
+            for tag in self.tags.get(id).into_iter().flatten() {
+                *counts.entry(tag).or_default() += 1;
+            }
+        }
+        let mut tags: Vec<(&str, usize)> = counts.into_iter().collect();
+        // Stable, so ties stay by name.
+        tags.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+        tags.into_iter().map(|(tag, _)| tag.to_string()).collect()
+    }
+
+    /// The tags [`SessionDraft::picked`] that a Tally still carries, in
+    /// the order of [`SessionDraft::tag_list`].
+    pub fn filter(&self) -> Vec<String> {
+        self.tag_list()
+            .into_iter()
+            .filter(|tag| self.picked.contains(tag))
+            .collect()
+    }
+
+    /// Whether the Tally `id` shows under `filter`: with no tag in it
+    /// always, else when it carries any of them.
+    fn shows(&self, id: &str, filter: &[String]) -> bool {
+        filter.is_empty()
+            || self
+                .tags
+                .get(id)
+                .is_some_and(|tags| filter.iter().any(|tag| tags.contains(tag)))
+    }
+
+    /// How many Tallies ticked the filter hides.
+    pub fn hidden_ticked(&self) -> usize {
+        let filter = self.filter();
+        self.order
+            .iter()
+            .filter(|id| self.chosen.contains(*id) && !self.shows(id, &filter))
+            .count()
+    }
+
+    /// What a Tally made from the filtered pool starts its name with: the
+    /// filter's tags, each followed by a space; empty without one.
+    pub fn new_tally_text(&self) -> String {
+        self.filter().iter().map(|tag| format!("{tag} ")).collect()
     }
 
     pub fn valid(&self) -> bool {
@@ -269,6 +331,7 @@ impl SessionDraft {
             if self.order.is_empty() && !self.new_tally {
                 ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
             } else if !self.order.is_empty() {
+                self.tag_chips(ui, tones);
                 self.pool_rows(ui, t, page);
             }
             // Making one stays inside the list, on this page (#161).
@@ -285,7 +348,15 @@ impl SessionDraft {
                 None => self.order.len(),
                 Some(_) => self.chosen.len(),
             };
-            if self.rule == SessionRule::Rolling && changes && ordered > 1 {
+            let hidden = self.hidden_ticked();
+            if hidden > 0 {
+                ui.label(RichText::new(t.session_pool_hidden(hidden as i64)).color(weak));
+            }
+            if self.rule == SessionRule::Rolling
+                && changes
+                && ordered > 1
+                && self.filter().is_empty()
+            {
                 ui.label(
                     RichText::new(t.session_pool_order_desk())
                         .small()
@@ -343,15 +414,40 @@ impl SessionDraft {
         }
     }
 
-    /// A checkbox per Tally; for Rolling each with buttons to move it up
-    /// or down, a drag's place on a desk without a long press. On a
-    /// Session Note's page (`page`, with whether this Device may change
-    /// it) only those ticked move, being the pool's order, and the last
-    /// one ticked stays.
+    /// The tags of the pool's Tallies as pills (#220), those most of them
+    /// carry first; a click picks one to show only the Tallies carrying
+    /// any of those picked, and again takes it back. Nothing without a
+    /// tag.
+    fn tag_chips(&mut self, ui: &mut Ui, tones: Tones) {
+        let tags = self.tag_list();
+        if tags.is_empty() {
+            return;
+        }
+        ui.horizontal_wrapped(|ui| {
+            for tag in tags {
+                let on = self.picked.contains(&tag);
+                if pill(ui, tones, on, &tag).clicked() {
+                    if on {
+                        self.picked.remove(&tag);
+                    } else {
+                        self.picked.insert(tag);
+                    }
+                }
+            }
+        });
+    }
+
+    /// A checkbox per Tally the filter shows; for Rolling, while nothing
+    /// is filtered, each with buttons to move it up or down, a drag's
+    /// place on a desk without a long press. On a Session Note's page
+    /// (`page`, with whether this Device may change it) only those ticked
+    /// move, being the pool's order, and the last one ticked stays.
     fn pool_rows(&mut self, ui: &mut Ui, t: &L10n, page: Option<bool>) {
         let text = ui.visuals().text_color();
         let changes = page.unwrap_or(true);
-        let rolling = self.rule == SessionRule::Rolling && changes;
+        let filter = self.filter();
+        // Rolling's order is set in the whole list, never a filtered one.
+        let rolling = self.rule == SessionRule::Rolling && changes && filter.is_empty();
         // The rows that move: every one on the Session page, those
         // ticked, which come first, on a Note's.
         let moving = match page {
@@ -360,6 +456,9 @@ impl SessionDraft {
         };
         let mut moved = None;
         for (i, id) in self.order.iter().enumerate() {
+            if !self.shows(id, &filter) {
+                continue;
+            }
             let name = self.names.get(id).cloned().unwrap_or_default();
             ui.horizontal(|ui| {
                 let mut on = self.chosen.contains(id);
@@ -424,4 +523,12 @@ impl SessionDraft {
             }
         }
     }
+}
+
+/// The tags in `text`, each once; none for a Note that is gone.
+fn tags_of(text: Option<&str>) -> BTreeSet<String> {
+    text_tags::find(text.unwrap_or_default())
+        .into_iter()
+        .map(|found| found.tag)
+        .collect()
 }

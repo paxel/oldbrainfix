@@ -6014,6 +6014,12 @@ abstract class AppLocalizations {
   /// **'Choose at least one Tally.'**
   String get sessionPoolMissing;
 
+  /// Under a Session's pool filtered by tags (#220): how many ticked Tallies the filter hides; they stay ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more ticked, hidden by the filter} other{{count} more ticked, hidden by the filter}}'**
+  String sessionPoolHidden(int count);
+
   /// No description provided for @sessionSchedule.
   ///
   /// In en, this message translates to:

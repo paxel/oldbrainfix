@@ -3824,11 +3824,20 @@ impl App {
                 self.view = view;
                 self.error = None;
                 // The page's draft of a Session Note, read again with it
-                // (#191).
+                // (#191); its tag filter stays while the page is open
+                // (#220).
+                let picked = self
+                    .session_draft
+                    .take()
+                    .map(|d| d.picked)
+                    .unwrap_or_default();
                 self.session_draft = match &self.view.session_setup {
                     Some(setup) => {
                         match SessionDraft::of(&self.store, &self.t, &setup.note_id, Some(setup)) {
-                            Ok(draft) => Some(draft),
+                            Ok(mut draft) => {
+                                draft.picked = picked;
+                                Some(draft)
+                            }
                             Err(e) => {
                                 self.error = Some(e.to_string());
                                 None
@@ -5395,7 +5404,12 @@ impl App {
                     .and_then(|n| n.place);
                 self.save_text()?;
                 let system = self.unit_system()?;
-                self.tally_page = Some(TallyPage::new(place, true, system));
+                let text = self
+                    .session_draft
+                    .as_ref()
+                    .map(SessionDraft::new_tally_text)
+                    .unwrap_or_default();
+                self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
             }
             Action::Editor(intent) => match intent {
                 Intent::Save => match &mut self.editor {
@@ -5422,7 +5436,13 @@ impl App {
                 Intent::Session(SessionIntent::NewTally) => {
                     let place = self.editor.as_ref().and_then(|e| e.place.clone());
                     let system = self.unit_system()?;
-                    self.tally_page = Some(TallyPage::new(place, true, system));
+                    let text = self
+                        .editor
+                        .as_ref()
+                        .and_then(RoutineEditor::session)
+                        .map(SessionDraft::new_tally_text)
+                        .unwrap_or_default();
+                    self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
                 }
                 Intent::Delete => {
                     let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);

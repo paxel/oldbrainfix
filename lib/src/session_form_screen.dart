@@ -89,7 +89,11 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   Future<void> _newTally() async {
     final made = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) => TallyFormScreen(notes: widget.notes, place: _place),
+        builder: (_) => TallyFormScreen(
+          notes: widget.notes,
+          place: _place,
+          text: _draft.newTallyText,
+        ),
       ),
     );
     if (!mounted || made == null) return;
@@ -192,11 +196,12 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(t.sessionPoolExplain),
+          SessionPoolTags(draft: _draft, onChanged: () => setState(() {})),
           Material(
             type: MaterialType.transparency,
             child: Column(
               children: [
-                for (final id in _draft.order)
+                for (final id in _draft.shown)
                   CheckboxListTile(
                     key: ValueKey('session-pool-$id'),
                     contentPadding: EdgeInsets.zero,
@@ -223,6 +228,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               ],
             ),
           ),
+          SessionPoolHidden(draft: _draft),
           if (_draft.checked && _draft.pool.isEmpty)
             Text(
               t.sessionPoolMissing,

@@ -3746,6 +3746,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sessionPoolMissing => 'Wähle mindestens eine Strichliste.';
 
   @override
+  String sessionPoolHidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weitere angehakt, vom Filter ausgeblendet',
+      one: '1 weitere angehakt, vom Filter ausgeblendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get sessionSchedule => 'Zeitplan';
 
   @override

@@ -797,11 +797,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ? Sessions(widget.notes.store).setupOf(widget.noteId)
         : null;
     _setsUp = setup != null && listed;
-    // Its controller is in no widget: the weekdays are a badge here.
+    // Its controller is in no widget: the weekdays are a badge here. The
+    // pool's tag filter stays while the page is open (#220).
+    final picked = _sessionDraft?.picked ?? const <String>{};
     _sessionDraft?.dispose();
     _sessionDraft = setup == null
         ? null
-        : SessionDraft.of(widget.notes.store, widget.noteId, setup);
+        : (SessionDraft.of(widget.notes.store, widget.noteId, setup)
+            ..picked.addAll(picked));
     _kinds = switch (_kind) {
       NoteKind.plain => {
         if (lists.mayMake(widget.noteId)) NoteKind.checklist,
@@ -1353,7 +1356,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// "New Tally" in the Session's pool.
   Future<void> _newPoolTally() async {
     _saveText();
-    await addPoolTally(context, widget.notes, widget.noteId);
+    await addPoolTally(
+      context,
+      widget.notes,
+      widget.noteId,
+      text: _sessionDraft?.newTallyText ?? '',
+    );
     if (!mounted) return;
     _reload();
   }

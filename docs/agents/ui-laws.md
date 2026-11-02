@@ -50,7 +50,14 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   ending in "New Tally", which opens the Tally page and comes back with
   that Tally ticked, then its count, rule and schedule as badges, the
   schedule every day, all day, at first; it makes the Session's Note
-  with its first Routine (#191). Leaving a name dialog or one of
+  with its first Routine (#191). **Every Session pool list filters by
+  tag** (#220), on this page, the Session Note's page and the Routine
+  editor: the #tags of its Tallies' texts as filter chips above it,
+  those most Tallies carry first; the Tallies carrying any chip picked
+  show, ticks the filter hides stay and a line counts them, "New Tally"
+  starts its name with the tags picked, and Rolling's order moves only
+  unfiltered. The filter is a view, kept while the page is open, never
+  stored. Leaving a name dialog or one of
   the pages without Create or Save makes nothing. **On the desktop "+"
   sits at the end of the list's heading** (#146, #161) and opens a menu
   of the same kinds, Note first, each with its icon and words; the

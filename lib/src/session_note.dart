@@ -31,17 +31,22 @@ Future<bool> makeSession(
     null;
 
 /// "New Tally" in the pool of the Session [noteId]: the New Tally page,
-/// filed where the Note is; the Tally made there comes first in the pool,
-/// ticked. Whether one was made.
+/// filed where the Note is, its name starting with [text], the tags the
+/// pool is filtered by (#220); the Tally made there comes first in the
+/// pool, ticked. Whether one was made.
 Future<bool> addPoolTally(
   BuildContext context,
   Notes notes,
-  String noteId,
-) async {
+  String noteId, {
+  String text = '',
+}) async {
   final made = await Navigator.of(context).push<String>(
     MaterialPageRoute(
-      builder: (_) =>
-          TallyFormScreen(notes: notes, place: notes.byId(noteId)?.place),
+      builder: (_) => TallyFormScreen(
+        notes: notes,
+        place: notes.byId(noteId)?.place,
+        text: text,
+      ),
     ),
   );
   if (made == null) return false;
@@ -97,10 +102,7 @@ class SessionNoteSetup extends StatelessWidget {
                 keepOne: true,
                 enabled: changes,
               ),
-              if (changes &&
-                  draft.rule == SessionRule.rolling &&
-                  draft.order.length > 1)
-                Text(t.sessionPoolOrder),
+              if (changes && draft.ordersByHand) Text(t.sessionPoolOrder),
               if (changes)
                 // Making one stays inside the list, on this page.
                 Material(

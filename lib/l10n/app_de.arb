@@ -995,6 +995,7 @@
   "sessionPoolOrder": "Reihum geht sie von oben nach unten durch; zum Ändern der Reihenfolge an einem Griff ziehen.",
   "sessionPoolNone": "Noch keine Strichlisten. „Zur Strichliste machen“ im ⋮ einer Notiz macht eine.",
   "sessionPoolMissing": "Wähle mindestens eine Strichliste.",
+  "sessionPoolHidden": "{count, plural, =1{1 weitere angehakt, vom Filter ausgeblendet} other{{count} weitere angehakt, vom Filter ausgeblendet}}",
   "sessionSchedule": "Zeitplan",
   "sessionMove": "{name} verschieben",
   "sessionCount": "Wie viele sie jedes Mal auswählt",

@@ -43,6 +43,11 @@ class SessionDraft {
   /// from then on.
   var checked = false;
 
+  /// The tags picked to filter the pool picker by (#220), a view only:
+  /// it shows the Tallies carrying any of them. Kept while the page is
+  /// open, never stored.
+  final Set<String> picked = {};
+
   SessionDraft._(
     this.store, {
     required this.order,
@@ -77,6 +82,58 @@ class SessionDraft {
 
   void dispose() => weekdays.dispose();
 
+  /// The tags in the text of the Tally [id], each once.
+  Set<String> tagsOf(String id) => {
+    for (final found in TextTags.find(notes[id]?.text ?? '')) found.tag,
+  };
+
+  /// The tags of the Tallies of [order], those most of them carry first,
+  /// then by name.
+  List<String> get tags {
+    final counts = <String, int>{};
+    for (final id in order) {
+      for (final tag in tagsOf(id)) {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+    }
+    return counts.keys.toList()..sort(
+      (a, b) => switch (counts[b]!.compareTo(counts[a]!)) {
+        0 => a.compareTo(b),
+        final by => by,
+      },
+    );
+  }
+
+  /// The tags [picked] that a Tally still carries, in the order of
+  /// [tags].
+  List<String> get filter => [
+    for (final tag in tags)
+      if (picked.contains(tag)) tag,
+  ];
+
+  /// The Tallies of [order] the picker shows: with a [filter] those
+  /// carrying any of its tags, else all.
+  List<String> get shown {
+    final filter = this.filter;
+    if (filter.isEmpty) return order;
+    return [
+      for (final id in order)
+        if (tagsOf(id).any(filter.contains)) id,
+    ];
+  }
+
+  /// How many Tallies ticked the [filter] hides.
+  int get hiddenTicked {
+    final shown = this.shown.toSet();
+    return order
+        .where((id) => chosen.contains(id) && !shown.contains(id))
+        .length;
+  }
+
+  /// What a Tally made from the filtered picker starts its text with: the
+  /// [filter]'s tags, each followed by a space; empty without one.
+  String get newTallyText => [for (final tag in filter) '$tag '].join();
+
   /// The chosen Tallies in their order.
   List<String> get pool => [
     for (final id in order)
@@ -89,6 +146,11 @@ class SessionDraft {
       own ? counts[day] = count : counts.remove(day);
 
   bool get valid => pool.isNotEmpty;
+
+  /// Whether the picker is ordered by hand for Rolling: with more than
+  /// one Tally and no [filter].
+  bool get ordersByHand =>
+      rule == SessionRule.rolling && order.length > 1 && filter.isEmpty;
 
   /// What the draft holds as plain values, kept after it is disposed;
   /// read while it is [valid].
@@ -153,8 +215,7 @@ class SessionFields extends StatelessWidget {
                 )
               else
                 SessionPoolList(draft: draft, onChanged: onChanged),
-              if (draft.rule == SessionRule.rolling && draft.order.length > 1)
-                Text(t.sessionPoolOrder),
+              if (draft.ordersByHand) Text(t.sessionPoolOrder),
               if (draft.checked && draft.pool.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -287,9 +348,10 @@ class SessionWeekdayRow extends StatelessWidget {
   }
 }
 
-/// The pool picker of [draft]: a checkbox per Tally; for Rolling each
-/// with a handle to drag it to its place, never a long press, which only
-/// opens menus. With [keepOne] the last Tally ticked cannot be unticked;
+/// The pool picker of [draft]: its tags as filter chips (#220), then a
+/// checkbox per Tally the filter shows, and how many ticked it hides; for
+/// Rolling, while nothing is filtered, each with a handle to drag it to
+/// its place, never a long press, which only opens menus. With [keepOne] the last Tally ticked cannot be unticked;
 /// with [enabled] false it is only shown. [onChanged] runs after each
 /// change of [draft].
 class SessionPoolList extends StatelessWidget {
@@ -314,26 +376,33 @@ class SessionPoolList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final rolling =
-        enabled && draft.rule == SessionRule.rolling && draft.order.length > 1;
+    // Rolling's order is dragged in the whole list, never a filtered one.
+    final rolling = enabled && draft.ordersByHand;
     final rows = [
-      for (final (index, id) in draft.order.indexed)
+      for (final (index, id) in draft.shown.indexed)
         _poolRow(t, index, id, handle: rolling),
     ];
-    return Material(
-      type: MaterialType.transparency,
-      child: rolling
-          ? ReorderableListView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              onReorderItem: (from, to) => _change(() {
-                final id = draft.order.removeAt(from);
-                draft.order.insert(to, id);
-              }),
-              children: rows,
-            )
-          : Column(children: rows),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SessionPoolTags(draft: draft, onChanged: onChanged),
+        Material(
+          type: MaterialType.transparency,
+          child: rolling
+              ? ReorderableListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  onReorderItem: (from, to) => _change(() {
+                    final id = draft.order.removeAt(from);
+                    draft.order.insert(to, id);
+                  }),
+                  children: rows,
+                )
+              : Column(children: rows),
+        ),
+        SessionPoolHidden(draft: draft),
+      ],
     );
   }
 
@@ -369,6 +438,67 @@ class SessionPoolList extends StatelessWidget {
               ),
             )
           : null,
+    );
+  }
+}
+
+/// The tags of the Tallies of [draft]'s pool picker as filter chips
+/// (#220), those most of them carry first; picking one or more shows only
+/// the Tallies carrying any of them, and a tap again takes a tag back.
+/// Nothing without a tag. [onChanged] runs after each pick.
+class SessionPoolTags extends StatelessWidget {
+  final SessionDraft draft;
+  final VoidCallback onChanged;
+
+  const SessionPoolTags({
+    super.key,
+    required this.draft,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tags = draft.tags;
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: [
+          for (final tag in tags)
+            FilterChip(
+              key: ValueKey('session-tag-$tag'),
+              label: Text(tag),
+              selected: draft.picked.contains(tag),
+              onSelected: (on) {
+                on ? draft.picked.add(tag) : draft.picked.remove(tag);
+                onChanged();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// How many Tallies ticked the filter of [draft] hides (#220); they stay
+/// ticked. Nothing while it hides none.
+class SessionPoolHidden extends StatelessWidget {
+  final SessionDraft draft;
+
+  const SessionPoolHidden({super.key, required this.draft});
+
+  @override
+  Widget build(BuildContext context) {
+    final hidden = draft.hiddenTicked;
+    if (hidden == 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Text(
+        context.t.sessionPoolHidden(hidden),
+        key: const ValueKey('session-pool-hidden'),
+      ),
     );
   }
 }

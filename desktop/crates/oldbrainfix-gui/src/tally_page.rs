@@ -140,6 +140,13 @@ impl TallyPage {
         }
     }
 
+    /// The page with its name starting as `name`, such as the tags a
+    /// Session's pool is filtered by (#220).
+    pub fn with_name(mut self, name: String) -> TallyPage {
+        self.name = name;
+        self
+    }
+
     /// The name as typed, without the blanks around it.
     pub fn name(&self) -> &str {
         self.name.trim()

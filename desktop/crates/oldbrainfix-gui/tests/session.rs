@@ -15,7 +15,9 @@
 //! and one a plain Note again; its page in the Note dialog writes the pool
 //! and the count at once, its badges the rule and the weekdays' counts;
 //! "+" there offers no Session, its Routine running it, and the Routine
-//! editor of one only schedules.
+//! editor of one only schedules. The pool filters by its Tallies' tags,
+//! any picked, keeping the ticks it hides and counting them, and New
+//! Tally from it carries the tags (#220).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -697,6 +699,121 @@ fn new_tally_on_the_session_page_comes_first_in_its_pool() -> TestResult {
     assert_eq!(pool.first(), Some(&plank.id));
     assert_eq!(pool.len(), 4);
     assert!(checked(&harness, Role::CheckBox, "Plank"));
+    Ok(())
+}
+
+/// Whether the pool lists the Tally `name`.
+fn listed(harness: &Harness<'_, App>, name: &str) -> bool {
+    harness
+        .query_all_by_role_and_label(Role::CheckBox, name)
+        .next()
+        .is_some()
+}
+
+/// What the text field with the keyboard holds.
+fn focused_value(harness: &Harness<'_, App>) -> Option<String> {
+    harness.get_by(|n| n.is_focused()).accesskit_node().value()
+}
+
+/// Adds a Tally `text` of one field "Done" to the device; its Note's id.
+fn tagged(device: &Device, text: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let note = Notes::new(&device.store).capture(text, None, None)?;
+    Tallies::new(&device.store).add_field(&note.id, "Done", "times", None, None)?;
+    Ok(note.id)
+}
+
+#[test]
+fn the_pools_tags_filter_it_by_any_picked_keeping_hidden_ticks() -> TestResult {
+    let device = device()?;
+    let mop = tagged(&device, "Mop #Cleaning")?;
+    tagged(&device, "Dust #cleaning #home")?;
+    spawn(&device)?;
+    let t = L10n::new("en");
+    let sport = device.sport.as_str();
+    let mut harness = window(&device.store, Some(sport));
+    // Those most Tallies carry first.
+    let chips: Vec<String> = harness
+        .query_all_by_role(Role::Button)
+        .filter_map(|n| n.accesskit_node().label())
+        .filter(|l| l.starts_with('#'))
+        .collect();
+    assert_eq!(chips, ["#cleaning", "#home"]);
+    assert!(shows(&harness, &t.session_move_up("Wall sit")));
+    click_button(&mut harness, "#cleaning");
+    assert!(checked(&harness, Role::Button, "#cleaning"));
+    assert!(!listed(&harness, "Push-ups"));
+    assert!(listed(&harness, "Mop #Cleaning"));
+    assert!(listed(&harness, "Dust #cleaning #home"));
+    assert!(shows(&harness, &t.session_pool_hidden(3)));
+    // Rolling's order is set only in the whole list.
+    assert!(!shows(&harness, &t.session_move_up("Wall sit")));
+    // A tick while filtered is written, and the filter stays.
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Mop #Cleaning")
+        .click_accesskit();
+    harness.run();
+    let mut pool = device.tallies.clone();
+    pool.push(mop.clone());
+    assert_eq!(setup_of(&device, sport)?.pool, pool);
+    assert!(!listed(&harness, "Push-ups"));
+    assert!(!shows(&harness, &t.session_move_up("Mop #Cleaning")));
+    // New Tally carries the tags picked.
+    click_button(&mut harness, t.new_tally());
+    assert_eq!(focused_value(&harness).as_deref(), Some("#cleaning "));
+    harness.get_by(|n| n.is_focused()).type_text("Plank");
+    harness.run();
+    harness
+        .get_all_by_role_and_label(Role::TextInput, t.kind_name())
+        .last()
+        .ok_or("the field's name")?
+        .click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("Seconds");
+    harness.run();
+    click_button(&mut harness, t.save());
+    let plank = Notes::new(&device.store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "#cleaning Plank")
+        .ok_or("the Tally's Note")?;
+    assert_eq!(setup_of(&device, sport)?.pool.first(), Some(&plank.id));
+    assert!(checked(&harness, Role::CheckBox, "#cleaning Plank"));
+    assert!(!listed(&harness, "Push-ups"));
+    // A click again takes the tag back.
+    click_button(&mut harness, "#cleaning");
+    assert!(listed(&harness, "Push-ups"));
+    assert!(!shows(&harness, &t.session_pool_hidden(3)));
+    Ok(())
+}
+
+#[test]
+fn the_setup_page_of_a_new_session_filters_its_pool_by_tag() -> TestResult {
+    let device = device()?;
+    tagged(&device, "Mop #cleaning")?;
+    tagged(&device, "Squats #sport")?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(&device.legs));
+    open_badge(&mut harness, &t, t.badge_kind(), t.kind_plain());
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.session())
+        .click_accesskit();
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Push-ups")
+        .click_accesskit();
+    harness.run();
+    click_button(&mut harness, "#cleaning");
+    click_button(&mut harness, "#sport");
+    // Any of the tags picked.
+    assert!(listed(&harness, "Mop #cleaning"));
+    assert!(listed(&harness, "Squats #sport"));
+    assert!(!listed(&harness, "Wall sit"));
+    assert!(shows(&harness, &t.session_pool_hidden(1)));
+    click_button(&mut harness, t.new_tally());
+    assert_eq!(
+        focused_value(&harness).as_deref(),
+        Some("#cleaning #sport ")
+    );
     Ok(())
 }
 
