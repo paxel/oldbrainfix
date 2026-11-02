@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 
 import 'agenda_rows.dart';
+import 'agenda_widget.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
@@ -344,19 +345,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
     // Done; the log's change they make is no reason to read again.
     final sessions = _sessions.pickToday(deviceWallClock);
     final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
-    _show(
-      AgendaDays.read(
-        store: widget.notes.store,
-        places: widget.places,
-        wallClock: deviceWallClock,
-        days: AgendaScreen.days,
-        sessions: sessions,
-        frogsToday: frogs,
-        appointments: _appointments,
-      ),
+    final days = AgendaDays.read(
+      store: widget.notes.store,
+      places: widget.places,
+      wallClock: deviceWallClock,
+      days: AgendaScreen.days,
+      sessions: sessions,
+      frogsToday: frogs,
+      appointments: _appointments,
     );
+    _show(days);
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
+    // The widget's snapshot is made of this read, not of one of its own
+    // (#204); it reads the calendar itself.
+    widget.alarms.agendaRead(
+      AgendaRead(
+        wallClock: deviceWallClock,
+        days: days.withAppointments(const []),
+        frogs: frogs,
+        missed: _missed,
+        unsorted: _unsorted,
+      ),
+    );
     // Counted from the pending sets, without reading each held file.
     _waiting = widget.notes.store.pendingSets
         .where((s) => s.kind == sentItemPendingKind)

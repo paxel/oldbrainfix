@@ -551,8 +551,18 @@ class Tallies {
   }
 
   /// The entry [id], removed or not, or null.
-  TallyEntry? entryById(String id) {
-    final fields = store.currentFields(id);
+  TallyEntry? entryById(String id) => _entryFrom(id, store.currentFields(id));
+
+  /// The entries of [ids], removed or not, by id, read in one query
+  /// (#204); what is no entry is left out.
+  Map<String, TallyEntry> entriesById(Iterable<String> ids) => {
+    for (final MapEntry(key: id, value: fields)
+        in store.currentFieldsOf(ids).entries)
+      id: ?_entryFrom(id, fields),
+  };
+
+  /// The entry [id] its current [fields] hold, or null.
+  static TallyEntry? _entryFrom(String id, Map<String, String?> fields) {
     if (fields[TallyKeys.type] != TallyKeys.typeEntry) return null;
     final noteId = fields[TallyKeys.note];
     final at = DateTime.tryParse(fields[TallyKeys.at] ?? '');

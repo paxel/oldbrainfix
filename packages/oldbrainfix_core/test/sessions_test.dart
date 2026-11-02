@@ -684,6 +684,53 @@ void main() {
       expect(sessions.setupOf(note), isNull);
     });
 
+    test('reads its marks once per change, its entries in one query '
+        '(#204)', () {
+      final [a, b, c] = tallies(ann, ['A', 'B', 'C']);
+      final s = session(ann, [a, b, c]);
+
+      /// The reads of the Session's marks and of its Routine, twice as
+      /// an Agenda load reads them (its Done, its picks), after a change,
+      /// with [days] days of picks recorded before.
+      int readsAfter(int days) {
+        Notes(ann).capture('A change');
+        final before = ann.historyReads;
+        // Its history, then its entries in one query.
+        SessionMarks.of(ann, s.id);
+        expect(ann.historyReads - before, 2);
+        for (var i = 0; i < 2; i++) {
+          Routines(ann).byId(s.id);
+          SessionMarks.of(ann, s.id);
+        }
+        return ann.historyReads - before;
+      }
+
+      for (var k = 0; k < 3; k++) {
+        for (final p in picked(ann, s, k)) {
+          record(ann, s, k, p);
+        }
+      }
+      final short = readsAfter(3);
+      for (var k = 3; k < 10; k++) {
+        for (final p in picked(ann, s, k)) {
+          record(ann, s, k, p);
+        }
+      }
+      // Seven more days of entries, not one read more.
+      expect(readsAfter(10), short);
+      // Then kept until the log changes.
+      final kept = ann.historyReads;
+      SessionMarks.of(ann, s.id);
+      expect(ann.historyReads, kept);
+      // What it shares is what a read of its own holds.
+      final marks = SessionMarks.of(ann, s.id);
+      final read = SessionMarks.read(ann, s.id);
+      expect(marks.picks, read.picks);
+      expect(marks.entries, read.entries);
+      expect(marks.doneFromEntries(ann), read.doneFromEntries(ann));
+      expect(marks.doneFromEntries(ann), hasLength(10));
+    });
+
     test('sees what another store on the same file wrote (#203)', () {
       final dir = Directory.systemTemp.createTempSync('sessions');
       addTearDown(() => dir.deleteSync(recursive: true));

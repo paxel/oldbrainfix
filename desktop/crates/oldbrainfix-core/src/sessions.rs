@@ -10,6 +10,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
@@ -196,7 +197,7 @@ impl SessionOccurrence {
 /// recorded for them, by Occurrence key, only what counts: in a Shared
 /// Area what the roles allow (ADR 0013), anywhere else what the user's
 /// own Devices wrote.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct SessionMarks {
     /// The current pick of each Occurrence: the one its field holds,
     /// with every Tally that has an entry recorded for it in it.
@@ -208,13 +209,32 @@ pub struct SessionMarks {
     /// The entries recorded for each Occurrence: the Tally's Note by
     /// entry id.
     pub entries: BTreeMap<String, BTreeMap<String, String>>,
+    /// The entries of `entries` not removed, by Occurrence key and the
+    /// Tally's Note, oldest first: read with the marks, in one query.
+    recorded: BTreeMap<String, BTreeMap<String, Vec<TallyEntry>>>,
 }
 
+/// The marks [`SessionMarks::of`] read since the log changed, by Routine.
+#[derive(Default)]
+struct HeldMarks(parking_lot::Mutex<HashMap<String, Arc<SessionMarks>>>);
+
 impl SessionMarks {
-    /// The marks of the Routine `id`, read from its history.
-    pub fn of(store: &Store, id: &str) -> Result<SessionMarks> {
+    /// The marks of the Routine `id`, read from its history once until
+    /// the log changes (#204) and shared by every caller, as the Dart
+    /// core's `SessionMarks.of`.
+    pub fn of(store: &Store, id: &str) -> Result<Arc<SessionMarks>> {
+        let held = store.worked_out("sessions:marks", || Ok(HeldMarks::default()))?;
+        if let Some(marks) = held.0.lock().get(id) {
+            return Ok(marks.clone());
+        }
+        // Read without the lock held.
         let history = store.history(id)?;
-        Self::read(store, id, &history)
+        let marks = Arc::new(Self::read(store, id, &history)?);
+        held.0
+            .lock()
+            .entry(id.to_string())
+            .or_insert_with(|| marks.clone());
+        Ok(marks)
     }
 
     /// The marks of the Routine `id`, read from `history`.
@@ -288,6 +308,28 @@ impl SessionMarks {
                 .or_default()
                 .insert(entry_id.to_string(), note.to_string());
         }
+        let found = Tallies::new(store).entries_by_id(
+            marks
+                .entries
+                .values()
+                .flat_map(|recorded| recorded.keys().map(String::as_str)),
+        )?;
+        for (key, recorded) in &marks.entries {
+            for (entry_id, note) in recorded {
+                if let Some(entry) = found.get(entry_id).filter(|e| !e.is_trashed()) {
+                    marks
+                        .recorded
+                        .entry(key.clone())
+                        .or_default()
+                        .entry(note.clone())
+                        .or_default()
+                        .push(entry.clone());
+                }
+            }
+        }
+        for list in marks.recorded.values_mut().flat_map(BTreeMap::values_mut) {
+            list.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| utf16_cmp(&a.id, &b.id)));
+        }
         marks.picks = marks.stored.clone();
         marks.heal(store, &places)?;
         Ok(marks)
@@ -335,20 +377,14 @@ impl SessionMarks {
     }
 
     /// The entries recorded for `note_id` in the Occurrence `key`, not
-    /// removed, oldest first.
-    pub fn entries_for(&self, store: &Store, key: &str, note_id: &str) -> Result<Vec<TallyEntry>> {
-        let tallies = Tallies::new(store);
-        let mut out = Vec::new();
-        for (id, note) in self.entries.get(key).into_iter().flatten() {
-            if note != note_id {
-                continue;
-            }
-            if let Some(entry) = tallies.entry_by_id(id)?.filter(|e| !e.is_trashed()) {
-                out.push(entry);
-            }
-        }
-        out.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| utf16_cmp(&a.id, &b.id)));
-        Ok(out)
+    /// removed, oldest first, as they were read with the marks.
+    pub fn entries_for(&self, _store: &Store, key: &str, note_id: &str) -> Result<Vec<TallyEntry>> {
+        Ok(self
+            .recorded
+            .get(key)
+            .and_then(|by_note| by_note.get(note_id))
+            .cloned()
+            .unwrap_or_default())
     }
 
     /// The Occurrences whose every pick has an entry, by key, each with
@@ -1033,7 +1069,7 @@ impl<'a> Sessions<'a> {
         // The picks of the Occurrences before this one of every Routine
         // that runs the Session, in schedule order, those at the same
         // moment by their Routine (ADR 0039).
-        let mut held: Vec<(String, SessionMarks)> = Vec::new();
+        let mut held: Vec<(String, Arc<SessionMarks>)> = Vec::new();
         for runner in runners {
             if runner != session.id() {
                 let marks = SessionMarks::of(self.store, runner)?;
@@ -1041,8 +1077,10 @@ impl<'a> Sessions<'a> {
             }
         }
         let mut before: Vec<(Occurrence, &str, &[String])> = Vec::new();
-        let runners = std::iter::once((session.id(), marks))
-            .chain(held.iter().map(|(runner, marks)| (runner.as_str(), marks)));
+        let runners = std::iter::once((session.id(), marks)).chain(
+            held.iter()
+                .map(|(runner, marks)| (runner.as_str(), &**marks)),
+        );
         for (runner, marks) in runners {
             for (key, ids) in &marks.picks {
                 let Some(o) = Occurrence::parse(key) else {
@@ -1823,7 +1861,7 @@ mod tests {
         record(&ann, &s, 0, &march)?;
         assert_eq!(picked(&desk, &s, 0)?, [push_ups.clone(), bridge.clone()]);
         exchange(&desk, &ann, false)?;
-        let stored = SessionMarks::of(&ann, s.id())?.stored;
+        let stored = SessionMarks::of(&ann, s.id())?.stored.clone();
         assert_eq!(
             stored.get(&today.key()),
             Some(&vec![push_ups.clone(), bridge.clone()])
@@ -1847,7 +1885,7 @@ mod tests {
         assert_eq!(ann.all_entries()?.len(), before + 1);
         assert_eq!(picked(&ann, &s, 0)?, [march.clone(), bridge.clone()]);
         assert_eq!(ann.all_entries()?.len(), before + 1);
-        let stored = SessionMarks::of(&ann, s.id())?.stored;
+        let stored = SessionMarks::of(&ann, s.id())?.stored.clone();
         assert_eq!(stored.get(&today.key()), Some(&vec![march, bridge]));
         Ok(())
     }
@@ -1898,7 +1936,7 @@ mod tests {
     /// on, by Occurrence key.
     fn picks_of(store: &Store, id: &str, days: i64) -> Made<BTreeMap<String, Vec<String>>> {
         Sessions::new(store).pick_today(&on_day(days))?;
-        Ok(SessionMarks::of(store, id)?.picks)
+        Ok(SessionMarks::of(store, id)?.picks.clone())
     }
 
     /// A Session as an older version spawned it from `note`: the setup on
@@ -2003,7 +2041,7 @@ mod tests {
         );
         let next = picks_of(&ann, &first, 1)?;
         assert_eq!(next.get(&at(&ann, 1, 7).key()), Some(&vec![t[2].clone()]));
-        let later = SessionMarks::of(&ann, &second)?.picks;
+        let later = SessionMarks::of(&ann, &second)?.picks.clone();
         assert_eq!(later.get(&at(&ann, 1, 18).key()), Some(&vec![t[0].clone()]));
         // Done per Occurrence, each on its Routine.
         sessions.record(&first, &morning, &t[0], &BTreeMap::new(), "Done")?;
@@ -2173,6 +2211,51 @@ mod tests {
         assert_eq!(ann.history_reads.load(SeqCst), kept);
         sessions.unmake(&note)?;
         assert_eq!(sessions.setup_of(&note)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn it_reads_its_marks_once_per_change_and_its_entries_in_one_query() -> TestResult {
+        use std::sync::atomic::Ordering::SeqCst;
+        let ann = device(1, "Ann")?;
+        let t = tallies(&ann, &["A", "B", "C"], None)?;
+        let s = session(&ann, &t, 2, SessionRule::Rolling, None)?;
+        // The reads of the Session's marks and of its Routine, twice as
+        // an Agenda load reads them (its Done, its picks), after a change.
+        let reads_after = || -> Made<usize> {
+            Notes::new(&ann).capture("A change", None, None)?;
+            let before = ann.history_reads.load(SeqCst);
+            // Its history, then its entries in one query.
+            SessionMarks::of(&ann, s.id())?;
+            assert_eq!(ann.history_reads.load(SeqCst) - before, 2);
+            for _ in 0..2 {
+                Routines::new(&ann).by_id(s.id())?;
+                SessionMarks::of(&ann, s.id())?;
+            }
+            Ok(ann.history_reads.load(SeqCst) - before)
+        };
+        let record_days = |days: std::ops::Range<i64>| -> TestResult {
+            for k in days {
+                for p in picked(&ann, &s, k)? {
+                    record(&ann, &s, k, &p)?;
+                }
+            }
+            Ok(())
+        };
+        record_days(0..3)?;
+        let short = reads_after()?;
+        record_days(3..10)?;
+        // Seven more days of entries, not one read more.
+        assert_eq!(reads_after()?, short);
+        // Then kept until the log changes.
+        let kept = ann.history_reads.load(SeqCst);
+        SessionMarks::of(&ann, s.id())?;
+        assert_eq!(ann.history_reads.load(SeqCst), kept);
+        // What it shares is what a read of its own holds.
+        let marks = SessionMarks::of(&ann, s.id())?;
+        let read = SessionMarks::read(&ann, s.id(), &ann.history(s.id())?)?;
+        assert_eq!(*marks, read);
+        assert_eq!(marks.done_from_entries(&ann)?.len(), 10);
         Ok(())
     }
 

@@ -49,6 +49,19 @@ class AlarmSync extends ChangeNotifier {
   /// The Agenda widget's snapshot handed over last, likewise.
   String? _lastShown;
 
+  /// The Agenda's read handed over last ([agendaRead]), with the log's
+  /// mark it was read at; null once the log changed since.
+  ({AgendaRead read, int seq})? _agendaRead;
+
+  /// Set while the snapshot waits for the Agenda's next read, or for
+  /// [showDelay] without one; whether it is handed over even unchanged.
+  bool? _showWaiting;
+  Timer? _showTimer;
+
+  /// How long the snapshot waits for the Agenda's read before it reads
+  /// the log itself, as when the Agenda is not up.
+  static const showDelay = Duration(milliseconds: 500);
+
   /// Whether any Routine escalates, as of the last arming.
   var _escalating = false;
   Ringing? _ringing;
@@ -61,7 +74,7 @@ class AlarmSync extends ChangeNotifier {
     required this.platform,
     required this.wallClock,
   }) {
-    store.addListener(_changed);
+    store.addListener(_logChanged);
     store.addProfileListener(_changed);
     _arrivals = platform.actionsArrived.listen((_) => refresh());
   }
@@ -239,6 +252,25 @@ class AlarmSync extends ChangeNotifier {
     await refresh();
   }
 
+  /// The Agenda read [read] as it loaded (#204): the widget's snapshot
+  /// takes it while the log has not changed since, rather than reading
+  /// the log a second time.
+  void agendaRead(AgendaRead read) {
+    if (_disposed) return;
+    _agendaRead = (read: read, seq: store.currentSeq());
+    final force = _showWaiting;
+    if (force == null) return;
+    _showWaiting = null;
+    _showTimer?.cancel();
+    unawaited(_serial(() => _showNow(force: force)));
+  }
+
+  /// The log changed: the Agenda's read is not current any more.
+  void _logChanged() {
+    _agendaRead = null;
+    _changed();
+  }
+
   void _changed() {
     if (_changeQueued) return;
     _changeQueued = true;
@@ -311,7 +343,7 @@ class AlarmSync extends ChangeNotifier {
       if (changes != null)
         '${changes.nudge}|${changes.title}|${changes.body}|${changes.public}',
     ].join('\n');
-    await _show(t, force: force);
+    await _show(force: force);
     if (!force && signature == _lastArmed) return;
     _lastArmed = signature;
     await platform.arm(
@@ -341,9 +373,45 @@ class AlarmSync extends ChangeNotifier {
 
   /// Hands the Agenda widget its snapshot when it changed: the
   /// Unsorted count, a Note's text or a Done change it without changing
-  /// the alarms.
-  Future<void> _show(AppLocalizations t, {required bool force}) async {
-    final snapshot = AgendaSnapshot.of(store, wallClock, t, _locale);
+  /// the alarms. Made of the Agenda's read while that is current (#204);
+  /// else it waits for the Agenda's next read, or reads the log itself
+  /// after [showDelay], once however many changes came meanwhile.
+  Future<void> _show({required bool force}) async {
+    if (_current() == null) {
+      _showWaiting = (_showWaiting ?? false) || force;
+      _showTimer?.cancel();
+      _showTimer = Timer(showDelay, () {
+        final force = _showWaiting;
+        _showWaiting = null;
+        if (force != null && !_disposed) {
+          unawaited(_serial(() => _showNow(force: force)));
+        }
+      });
+      return;
+    }
+    await _showNow(force: force);
+  }
+
+  /// The Agenda's read while the log has not changed since and it shows
+  /// today, on this wall clock; else null.
+  AgendaRead? _current() {
+    final held = _agendaRead;
+    if (held == null ||
+        held.read.wallClock != wallClock ||
+        held.seq != store.currentSeq() ||
+        held.read.days.today != Day.today(store.clock(), wallClock)) {
+      return null;
+    }
+    return held.read;
+  }
+
+  Future<void> _showNow({required bool force}) async {
+    final t = _t;
+    if (t == null || _disposed) return;
+    final read = _current();
+    final snapshot = read == null
+        ? AgendaSnapshot.of(store, wallClock, t, _locale)
+        : AgendaSnapshot.from(store, read, t, _locale);
     final signature = jsonEncode(snapshot.toMap());
     if (!force && signature == _lastShown) return;
     _lastShown = signature;
@@ -366,7 +434,8 @@ class AlarmSync extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    store.removeListener(_changed);
+    _showTimer?.cancel();
+    store.removeListener(_logChanged);
     store.removeProfileListener(_changed);
     unawaited(_arrivals?.cancel());
     super.dispose();

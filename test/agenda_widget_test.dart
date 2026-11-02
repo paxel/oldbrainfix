@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_widget.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
+import 'package:oldbrainfix/src/alarm_sync.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -528,6 +529,44 @@ void main() {
       notes.trash(note.id);
       await tester.pumpAndSettle();
       expect(alarms.agendas.last.unsorted, 0);
+    });
+
+    testWidgets('is made of the Agenda\'s read, not a read of its own '
+        '(#204)', (tester) async {
+      routines.create('pills', daily([ClockTime(20, 0)]));
+      AgendaSnapshot.reads = 0;
+      await start(tester);
+      expect(titles(alarms.agendas.last.days['2026-10-24']), ['pills']);
+
+      notes.capture('nees mor sauce');
+      await tester.pumpAndSettle();
+      expect(alarms.agendas.last.unsorted, 1);
+      expect(AgendaSnapshot.reads, 0);
+    });
+
+    testWidgets('without the Agenda, reads the log once the changes stop '
+        '(#204)', (tester) async {
+      final sync = AlarmSync(
+        store: store,
+        platform: alarms,
+        wallClock: deviceWallClock,
+      );
+      addTearDown(sync.dispose);
+      sync.setTexts(en, 'en');
+      await tester.pump(AlarmSync.showDelay);
+      expect(alarms.agendas, hasLength(1));
+      AgendaSnapshot.reads = 0;
+
+      routines.create('pills', daily([ClockTime(20, 0)]));
+      await tester.pump();
+      notes.capture('nees mor sauce');
+      await tester.pump();
+      expect(alarms.agendas, hasLength(1));
+      await tester.pump(AlarmSync.showDelay);
+      expect(AgendaSnapshot.reads, 1);
+      expect(alarms.agendas, hasLength(2));
+      expect(titles(alarms.agendas.last.days['2026-10-24']), ['pills']);
+      expect(alarms.agendas.last.unsorted, 1);
     });
 
     testWidgets('does not hand over the same snapshot again', (tester) async {

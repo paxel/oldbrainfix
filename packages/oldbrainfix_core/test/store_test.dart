@@ -23,6 +23,38 @@ void main() {
     expect(store.deviceId, deviceIdFromKey(store.signingKey.publicKey));
   });
 
+  test('reads the fields of many entities in one query as one by one '
+      '(#204)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    store.append('note:a', 'text', 'new', date: DateTime.utc(2026, 5, 2));
+    store.append('note:a', 'text', 'old', date: DateTime.utc(2026, 5, 1));
+    store.append('note:a', 'place', 'home');
+    store.append('note:b', 'text', 'b');
+    store.append('note:b', 'text', null);
+    final ids = [for (var i = 0; i < 1200; i++) 'note:x$i'];
+    for (final id in ids) {
+      store.append(id, 'text', id);
+    }
+    // Shown pending changes count as they do one by one.
+    final set = store.openPending('ai-task', shown: true);
+    store.draftPending(set, 'note:a', 'place', 'work');
+    store.draftPending(set, 'note:c', 'text', 'drafted');
+    final all = ['note:a', 'note:b', 'note:c', 'note:none', ...ids];
+    final before = store.historyReads;
+    final read = store.currentFieldsOf(all);
+    expect(store.historyReads - before, 1);
+    expect(read.keys, isNot(contains('note:none')));
+    expect(read, {
+      for (final id in all)
+        if (store.currentFields(id) case final fields when fields.isNotEmpty)
+          id: fields,
+    });
+    expect(read['note:a'], {'text': 'new', 'place': 'work'});
+    expect(read['note:c'], {'text': 'drafted'});
+    expect(store.currentFieldsOf(const []), isEmpty);
+  });
+
   test('the latest date wins, not the latest append', () {
     final store = Store.inMemory();
     addTearDown(store.close);

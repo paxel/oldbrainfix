@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -112,6 +113,28 @@ class WidgetRow {
   };
 }
 
+/// What the Agenda read of the log as it loaded, all the widget's
+/// snapshot needs of it (#204): its days, today's Frogs, the Missed
+/// Summary and the Unsorted count, on [wallClock].
+class AgendaRead {
+  final WallClock wallClock;
+
+  /// Today's and tomorrow's rows at least, without the calendar's
+  /// appointments, which the widget reads itself.
+  final AgendaDays days;
+  final FrogsToday frogs;
+  final MissedSummary missed;
+  final int unsorted;
+
+  const AgendaRead({
+    required this.wallClock,
+    required this.days,
+    required this.frogs,
+    required this.missed,
+    required this.unsorted,
+  });
+}
+
 /// What the home-screen Agenda widget shows, handed to the platform
 /// whenever the alarms are synced: the Missed Summary, and today's rows
 /// in Agenda order as [AgendaDays] reads them for the Agenda, and
@@ -169,6 +192,12 @@ class AgendaSnapshot {
     required this.until,
   });
 
+  /// How many times a snapshot read the log itself ([AgendaSnapshot.of]),
+  /// for the tests that count them: not while the Agenda's read is
+  /// current (#204).
+  @visibleForTesting
+  static var reads = 0;
+
   /// The snapshot of [store] now, with days as [wallClock] shows them.
   /// It writes nothing: a Session's or the Frogs' pick not made yet
   /// shows as the Agenda will make it.
@@ -178,15 +207,39 @@ class AgendaSnapshot {
     AppLocalizations t,
     String locale,
   ) {
+    reads++;
     final frogs = Frogs(store).today(wallClock);
-    final read = AgendaDays.read(
-      store: store,
-      places: Places(store),
-      wallClock: wallClock,
-      days: 2,
-      sessions: Sessions(store).today(wallClock),
-      frogsToday: frogs,
+    return AgendaSnapshot.from(
+      store,
+      AgendaRead(
+        wallClock: wallClock,
+        days: AgendaDays.read(
+          store: store,
+          places: Places(store),
+          wallClock: wallClock,
+          days: 2,
+          sessions: Sessions(store).today(wallClock),
+          frogsToday: frogs,
+        ),
+        frogs: frogs,
+        missed: Alarms(store).missed(wallClock),
+        unsorted: Notes(store).unsorted().length,
+      ),
+      t,
+      locale,
     );
+  }
+
+  /// The snapshot of what [read] holds, as the Agenda read it (#204): no
+  /// read of the log again but the words.
+  factory AgendaSnapshot.from(
+    Store store,
+    AgendaRead agenda,
+    AppLocalizations t,
+    String locale,
+  ) {
+    final frogs = agenda.frogs;
+    final read = agenda.days;
     final words = _Words(
       t,
       locale,
@@ -194,7 +247,7 @@ class AgendaSnapshot {
       read.system,
       NumberFormat.decimalPattern(locale).symbols.DECIMAL_SEP,
     );
-    final unsorted = Notes(store).unsorted().length;
+    final unsorted = agenda.unsorted;
     return AgendaSnapshot(
       days: {
         '${read.today}': [
@@ -203,7 +256,7 @@ class AgendaSnapshot {
         ],
         '${read.tomorrow}': words.day(read.tomorrow, read.tomorrowRows),
       },
-      missed: words.missed(Alarms(store).missed(wallClock)),
+      missed: words.missed(agenda.missed),
       unsorted: unsorted,
       calendars: store.agendaCalendarOn
           ? ([...store.agendaCalendars]..sort())

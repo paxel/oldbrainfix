@@ -56,6 +56,10 @@ pub type IdMaker = Box<dyn Fn() -> Result<String> + Send + Sync>;
 /// `_applied`: those of a later structure are only held and passed on.
 const APPLIED: &str = "(v IS NULL OR v <= 1)";
 
+/// How many entities one query of [`Store::current_fields_of`] names,
+/// well under SQLite's limit of bound values.
+const IN_CHUNK: usize = 500;
+
 /// The version of the tables this version keeps the log in, recorded as
 /// the database's `user_version` (ADR 0034), as the Dart core's
 /// `storeVersion`. 0, SQLite's own default, is a database from before the
@@ -1329,6 +1333,73 @@ impl Store {
         ))
     }
 
+    /// What [`Store::current_fields`] gives for each of `entities`, read
+    /// in one query rather than one per entity (#204), as the Dart
+    /// core's `currentFieldsOf`; those without an entry that counts are
+    /// left out. It counts as one [`Store::history`] read.
+    pub fn current_fields_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+    ) -> Result<HashMap<String, Fields>> {
+        let mut ids: Vec<&str> = Vec::new();
+        let mut wanted = std::collections::HashSet::new();
+        for id in entities {
+            if wanted.insert(id) {
+                ids.push(id);
+            }
+        }
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let shown = self.shown()?;
+        let mut all = Vec::new();
+        for chunk in ids.chunks(IN_CHUNK) {
+            let marks = vec!["?"; chunk.len()].join(", ");
+            all.extend(self.entries(
+                &format!(
+                    "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
+                ),
+                rusqlite::params_from_iter(chunk.iter()),
+            )?);
+        }
+        all.extend(
+            shown
+                .iter()
+                .filter(|e| wanted.contains(e.entity.as_str()))
+                .cloned(),
+        );
+        let judged = if shown.is_empty() {
+            self.judged()?
+        } else {
+            self.display_judged(&shown)?
+        };
+        let mut latest: HashMap<String, Vec<Entry>> = HashMap::new();
+        for e in all {
+            if judged.ignored.contains(&e.id()) {
+                continue;
+            }
+            let fields = latest.entry(e.entity.clone()).or_default();
+            match fields.iter_mut().find(|held| held.field == e.field) {
+                Some(held) => {
+                    if Self::latest_wins(&e, held) == Ordering::Greater {
+                        *held = e;
+                    }
+                }
+                None => fields.push(e),
+            }
+        }
+        Ok(latest
+            .into_iter()
+            .map(|(id, fields)| {
+                let fields = fields.into_iter().map(|e| (e.field, e.value)).collect();
+                (id, Fields(fields))
+            })
+            .collect())
+    }
+
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
@@ -1688,6 +1759,48 @@ pub(crate) mod tests {
             Ok(s) => s,
             Err(e) => panic!("store: {e}"),
         }
+    }
+
+    #[test]
+    fn it_reads_the_fields_of_many_entities_in_one_query_as_one_by_one() -> Result<()> {
+        let store = store();
+        let on = |d: u32| Utc.with_ymd_and_hms(2026, 5, d, 0, 0, 0).single();
+        store.append("note:a", "text", Some("new"), on(2))?;
+        store.append("note:a", "text", Some("old"), on(1))?;
+        store.append("note:a", "place", Some("home"), None)?;
+        store.append("note:b", "text", Some("b"), None)?;
+        store.append("note:b", "text", None, None)?;
+        let ids: Vec<String> = (0..1200).map(|i| format!("note:x{i}")).collect();
+        for id in &ids {
+            store.append(id, "text", Some(id), None)?;
+        }
+        // Shown pending changes count as they do one by one.
+        let set = store.open_pending("ai-task", true, None)?;
+        store.draft_pending(&set, "note:a", "place", Some("work"), None)?;
+        store.draft_pending(&set, "note:c", "text", Some("drafted"), None)?;
+        let mut all = vec!["note:a", "note:b", "note:c", "note:none"];
+        all.extend(ids.iter().map(String::as_str));
+        let before = store.history_reads.load(AtomicOrdering::SeqCst);
+        let read = store.current_fields_of(all.iter().copied())?;
+        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
+        let mut one_by_one = HashMap::new();
+        for id in &all {
+            let fields = store.current_fields(id)?;
+            if fields.iter().next().is_some() {
+                one_by_one.insert(id.to_string(), fields);
+            }
+        }
+        assert!(!read.contains_key("note:none"));
+        assert_eq!(read, one_by_one);
+        assert_eq!(
+            read.get("note:a"),
+            Some(&Fields::new(vec![
+                ("text".into(), Some("new".into())),
+                ("place".into(), Some("work".into())),
+            ]))
+        );
+        assert!(store.current_fields_of([])?.is_empty());
+        Ok(())
     }
 
     #[test]

@@ -429,7 +429,7 @@ impl<'a> Routines<'a> {
             .iter()
             .any(|(key, _)| key.starts_with(session_keys::PICK_PREFIX))
         {
-            SessionMarks::read(self.store, id, &history)?.done_from_entries(self.store)?
+            SessionMarks::of(self.store, id)?.done_from_entries(self.store)?
         } else {
             BTreeMap::new()
         };

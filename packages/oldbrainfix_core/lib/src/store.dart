@@ -1059,6 +1059,46 @@ class Store {
     };
   }
 
+  /// What [currentFields] gives for each of [entities], read in one
+  /// query rather than one per entity (#204); those without an entry
+  /// that counts are left out. It counts as one [history] read.
+  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+    final ids = entities.toSet();
+    if (ids.isEmpty) return {};
+    historyReads++;
+    final list = ids.toList();
+    final shown = _shown;
+    final all = [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entries(
+          'SELECT * FROM entries WHERE $_applied AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          list.sublist(i, min(i + _inChunk, list.length)),
+        ),
+      for (final e in shown)
+        if (ids.contains(e.entity)) e,
+    ];
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    final latest = <String, Map<String, Entry>>{};
+    for (final e in all) {
+      if (ignored.contains(e.id)) continue;
+      final fields = latest.putIfAbsent(e.entity, () => {});
+      final held = fields[e.field];
+      if (held == null || _newer(e, held)) fields[e.field] = e;
+    }
+    return {
+      for (final MapEntry(key: id, value: fields) in latest.entries)
+        id: {
+          for (final MapEntry(:key, :value) in fields.entries) key: value.value,
+        },
+    };
+  }
+
+  /// How many entities one query of [currentFieldsOf] names, well under
+  /// SQLite's limit of bound values.
+  static const _inChunk = 500;
+
   /// Entities whose current `$type` is [type].
   List<String> entitiesOfType(String type) {
     final ids = {

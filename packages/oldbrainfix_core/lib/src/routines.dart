@@ -407,7 +407,7 @@ class Routines {
         // Session or not (ADR 0039); a check-off, written below, keeps
         // its moment.
         if (fields.keys.any((k) => k.startsWith(SessionKeys.pickPrefix)))
-          ...SessionMarks.read(store, id, history).doneFromEntries(store),
+          ...SessionMarks.of(store, id).doneFromEntries(store),
         // Spawned from a Checklist, once every Line is checked for it
         // (ADR 0030).
         if (fields.keys.any((k) => k.startsWith(ChecklistKeys.checkPrefix)))

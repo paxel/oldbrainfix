@@ -14,7 +14,7 @@ use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Notes, keys as note_keys};
 use crate::people::PersonFilter;
 use crate::schedule::{Day, WallClock};
-use crate::store::{Store, utf16_cmp};
+use crate::store::{Fields, Store, utf16_cmp};
 use crate::tally_units::{self, TallyRule, UnitKind};
 use crate::{Error, Result};
 
@@ -644,16 +644,30 @@ impl<'a> Tallies<'a> {
 
     /// The entry `id`, removed or not.
     pub fn entry_by_id(&self, id: &str) -> Result<Option<TallyEntry>> {
-        let fields = self.store.current_fields(id)?;
+        Ok(Self::entry_from(id, &self.store.current_fields(id)?))
+    }
+
+    /// The entries of `ids`, removed or not, by id, read in one query
+    /// (#204); what is no entry is left out.
+    pub fn entries_by_id<'i>(
+        &self,
+        ids: impl IntoIterator<Item = &'i str>,
+    ) -> Result<HashMap<String, TallyEntry>> {
+        Ok(self
+            .store
+            .current_fields_of(ids)?
+            .into_iter()
+            .filter_map(|(id, fields)| Some((id.clone(), Self::entry_from(&id, &fields)?)))
+            .collect())
+    }
+
+    /// The entry `id` its current `fields` hold, or `None`.
+    fn entry_from(id: &str, fields: &Fields) -> Option<TallyEntry> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_ENTRY) {
-            return Ok(None);
+            return None;
         }
-        let Some(note_id) = fields.get(keys::NOTE) else {
-            return Ok(None);
-        };
-        let Some(at) = fields.get(keys::AT).and_then(|v| parse_time(v).ok()) else {
-            return Ok(None);
-        };
+        let note_id = fields.get(keys::NOTE)?;
+        let at = fields.get(keys::AT).and_then(|v| parse_time(v).ok())?;
         let values = fields
             .iter()
             .filter_map(|(key, value)| {
@@ -661,14 +675,14 @@ impl<'a> Tallies<'a> {
                 Some((field.to_string(), tally_units::decode_number(value)?))
             })
             .collect();
-        Ok(Some(TallyEntry {
+        Some(TallyEntry {
             id: id.to_string(),
             note_id: note_id.to_string(),
             at,
             values,
             line: fields.get(keys::LINE).unwrap_or("").to_string(),
             trashed: fields.get(keys::TRASHED).and_then(|v| parse_time(v).ok()),
-        }))
+        })
     }
 
     /// The entries of the Tally of `note_id`, those of the Notes merged

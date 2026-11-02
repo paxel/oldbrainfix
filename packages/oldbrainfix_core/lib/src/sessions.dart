@@ -191,8 +191,17 @@ class SessionMarks {
   /// id.
   final Map<String, Map<String, String>> entries;
 
-  SessionMarks._(this.stored, this.offered, this.entries)
+  /// The entries of [entries] not removed, by Occurrence key and the
+  /// Tally's Note, oldest first: read with the marks, in one query.
+  final Map<String, Map<String, List<TallyEntry>>> _recorded;
+
+  SessionMarks._(this.stored, this.offered, this.entries, this._recorded)
     : picks = {for (final MapEntry(:key, :value) in stored.entries) key: value};
+
+  /// The marks of the Routine [id], read once until the log changes
+  /// (#204) and shared by every caller, so nobody changes them.
+  static SessionMarks of(Store store, String id) =>
+      store.workedOut((SessionMarks, id), () => SessionMarks.read(store, id));
 
   /// Reads the marks of the Routine [id] from [history], its own by
   /// default.
@@ -253,7 +262,29 @@ class SessionMarks {
       }
       entries.putIfAbsent(key, () => {})[entryId] = note;
     }
-    return SessionMarks._(stored, offered, entries).._heal(store, places);
+    final found = Tallies(store)
+        .entriesById({for (final recorded in entries.values) ...recorded.keys});
+    final recorded = <String, Map<String, List<TallyEntry>>>{};
+    for (final MapEntry(:key, value: byEntry) in entries.entries) {
+      for (final MapEntry(key: entryId, value: note) in byEntry.entries) {
+        if (found[entryId] case final entry? when !entry.isTrashed) {
+          recorded
+              .putIfAbsent(key, () => {})
+              .putIfAbsent(note, () => [])
+              .add(entry);
+        }
+      }
+    }
+    for (final byNote in recorded.values) {
+      for (final list in byNote.values) {
+        list.sort((a, b) {
+          final byAt = a.at.compareTo(b.at);
+          return byAt != 0 ? byAt : a.id.compareTo(b.id);
+        });
+      }
+    }
+    return SessionMarks._(stored, offered, entries, recorded)
+      .._heal(store, places);
   }
 
   /// Puts each Tally with an entry recorded for an Occurrence back into
@@ -286,22 +317,10 @@ class SessionMarks {
   }
 
   /// The entries recorded for [noteId] in the Occurrence [key], not
-  /// removed, oldest first.
-  List<TallyEntry> entriesFor(Store store, String key, String noteId) {
-    final tallies = Tallies(store);
-    final list = [
-      for (final MapEntry(key: id, value: note)
-          in (entries[key] ?? const <String, String>{}).entries)
-        if (note == noteId)
-          if (tallies.entryById(id) case final entry? when !entry.isTrashed)
-            entry,
-    ];
-    list.sort((a, b) {
-      final byAt = a.at.compareTo(b.at);
-      return byAt != 0 ? byAt : a.id.compareTo(b.id);
-    });
-    return list;
-  }
+  /// removed, oldest first, as they were read with the marks.
+  List<TallyEntry> entriesFor(Store store, String key, String noteId) => [
+    ...?_recorded[key]?[noteId],
+  ];
 
   /// The Occurrences whose every pick has an entry, by key, each with
   /// the moment the last of them got its first.
@@ -580,7 +599,7 @@ class Sessions {
   /// nowhere.
   SessionOccurrence on(String id, Occurrence occurrence) {
     final session = _requireDue(id, occurrence);
-    final marks = SessionMarks.read(store, id);
+    final marks = SessionMarks.of(store, id);
     final pool = this.pool(session.setup);
     final picks = _wanted(session, occurrence, pool, marks, _runners(session));
     return _shown(session, occurrence, picks, pool, marks);
@@ -606,7 +625,7 @@ class Sessions {
   void another(String id, Occurrence occurrence, String noteId) {
     final session = _requireDue(id, occurrence);
     _requireCheckOff(id);
-    final marks = SessionMarks.read(store, id);
+    final marks = SessionMarks.of(store, id);
     final pool = this.pool(session.setup);
     final runners = _runners(session);
     final wanted = _wanted(session, occurrence, pool, marks, runners);
@@ -646,7 +665,7 @@ class Sessions {
   }) {
     final session = _requireDue(id, occurrence);
     _requireCheckOff(id);
-    final marks = SessionMarks.read(store, id);
+    final marks = SessionMarks.of(store, id);
     final pool = this.pool(session.setup);
     final wanted = _wanted(session, occurrence, pool, marks, _runners(session));
     if (!wanted.contains(noteId)) {
@@ -681,13 +700,13 @@ class Sessions {
     final shown = <SessionOccurrence>[];
     for (final (session, occurrence) in due) {
       final pool = this.pool(session.setup);
-      var marks = SessionMarks.read(store, session.id);
+      var marks = SessionMarks.of(store, session.id);
       final runners = _runners(session, routines);
       final picks = _wanted(session, occurrence, pool, marks, runners);
       if (write &&
           store.mayCheckOff(session.id) &&
           _writePick(session.id, occurrence, picks, marks)) {
-        marks = SessionMarks.read(store, session.id);
+        marks = SessionMarks.of(store, session.id);
       }
       shown.add(_shown(session, occurrence, picks, pool, marks));
     }
@@ -793,7 +812,7 @@ class Sessions {
     for (final runner in runners) {
       final held = runner == session.id
           ? marks
-          : SessionMarks.read(store, runner);
+          : SessionMarks.of(store, runner);
       for (final MapEntry(:key, value: ids) in held.picks.entries) {
         final o = Occurrence.tryParse(key);
         if (o == null) continue;
