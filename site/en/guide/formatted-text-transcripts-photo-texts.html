@@ -98,6 +98,21 @@
   Area, stays text.
 </p>
 
+<h2>Code text</h2>
+<p>
+  A plain Note's whole text can be code, such as a script: it shows exactly as written, in a
+  fixed-width font on a grey ground, without wrapping its lines. Nothing in it is a format, a table,
+  a #tag or a box. In the Note editor a long line moves sideways under the finger; on a card it is
+  cut off at the edge, and the editor shows it whole.
+</p>
+<ul>
+  <li>The <strong>Text format</strong> badge in the Note editor shows the text's format and switches it between <strong>Plain text</strong>, <strong>Formatted text</strong> and <strong>Code</strong>. A formatted text can become Code, its Markdown kept as written, but never plain again; a Code text can become plain or formatted.</li>
+  <li>When a pasted text looks like a script or code, such as one starting with <code>#!/</code>, or lines ending in <code>;</code>, <code>{</code> or <code>}</code> or indented by a tab or four spaces, the editor says "This looks like code." under the text with <strong>Keep as code</strong>; the cross lets the paste be. Such a paste does not format the text. Capture never asks.</li>
+  <li>A Code text has no format bar and no ☐. Its ☐ stays a character; a box of a text made Code keeps the state it shows as its character.</li>
+  <li>Search finds the words of a Code text as written. Share and Copy text give it as written.</li>
+  <li>A Note whose text is Code is no Checklist, Shopping List, Tally or Session; its <strong>Kind</strong> badge only shows it until the text format is changed back.</li>
+</ul>
+
 <h2>Tables</h2>
 <p>
   In the text, a table is drawn as a grid, made smaller to fit the width, its header row in bold. A
@@ -248,6 +263,7 @@
   <li>A formatted text shows as it reads; a click on it edits its Markdown, the marks dimmed. Leaving the field or Ctrl+Enter saves it.</li>
   <li>Add to Note has the format bar too, without ☐, which only the Note's text puts in; a table edited from it full screen goes back into the field, and nothing is kept before <strong>Add to Note</strong>.</li>
   <li>A click on a link opens it in the browser or the mail program; the mouse over it shows its address.</li>
+  <li>The <strong>Text format</strong> badge sits among the Note dialog's badges. A Code text scrolls sideways with Shift and the wheel or its scroll bar; "Keep as code" shows under the text after a paste that looks like code.</li>
   <li>A table full screen scrolls with the mouse wheel, Shift and the wheel, or the scroll bars. A click on a cell edits its words, framed: Enter or a click elsewhere writes them, Tab goes on to the next cell, Shift+Tab back, and Esc leaves the cell as it was. The rows' numbers and the columns' letters open their menus on a click or a right-click. Alt+Left, the mouse's back button, Esc or the arrow at the top leave the table.</li>
   <li>A tag's click searches all Notes, as on the phone; in the field being edited it places the cursor.</li>
   <li>A click on a box opens Check, Fail, Open and, once it has been ticked, History at the mouse pointer, also in the field being edited. There the arrow keys step over a box as one character, and Backspace after it or Delete before it removes it with its id.</li>

@@ -7975,6 +7975,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done and move to trash'**
   String get doneAndTrash;
+
+  /// The name of the Note editor's badge that shows the format of a Plain Note's text (#213): plain, formatted or code.
+  ///
+  /// In en, this message translates to:
+  /// **'Text format'**
+  String get badgeTextFormat;
+
+  /// A value of the text format badge (#213): the text as typed, without formatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain text'**
+  String get textFormatPlain;
+
+  /// A value of the text format badge (#213): Markdown formatting, as the format bar applies it.
+  ///
+  /// In en, this message translates to:
+  /// **'Formatted text'**
+  String get textFormatFormatted;
+
+  /// A value of the text format badge (#213): the whole text as code, in a fixed-width font exactly as written, unwrapped, nothing in it read as a format, a box or a #tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get textFormatCode;
+
+  /// Under the Note's text in the Note editor after a paste that looks like a script or code (#213), before the button keepAsCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This looks like code.'**
+  String get codePasted;
+
+  /// The button under the Note's text in the Note editor after a paste that looks like code (#213): makes the whole text a Code text.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as code'**
+  String get keepAsCode;
 }
 
 class _AppLocalizationsDelegate

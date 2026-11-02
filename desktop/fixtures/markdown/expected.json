@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:54.000Z",
+  "now": "2026-01-02T10:01:11.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -182,9 +182,102 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "text": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+      "textFormat": "code",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:55.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "text": "# comment\nls -l",
+      "textFormat": "code",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "int x;\nx = 1; ☐󠁪󠀹󠀰󠁰󠁿",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:06.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:0000000000000000000000000000000d",
+    "note:0000000000000000000000000000000c",
+    "note:0000000000000000000000000000000b",
     "note:0000000000000000000000000000000a",
     "note:00000000000000000000000000000006",
     "note:00000000000000000000000000000004",
@@ -197,11 +290,17 @@
     "note:00000000000000000000000000000002",
     "note:00000000000000000000000000000003",
     "note:00000000000000000000000000000004",
-    "note:0000000000000000000000000000000a"
+    "note:0000000000000000000000000000000a",
+    "note:0000000000000000000000000000000b",
+    "note:0000000000000000000000000000000c",
+    "note:0000000000000000000000000000000d"
   ],
   "trashed": [],
   "inside": {},
   "sections": {
+    "note:0000000000000000000000000000000d": [],
+    "note:0000000000000000000000000000000c": [],
+    "note:0000000000000000000000000000000b": [],
     "note:0000000000000000000000000000000a": [],
     "note:00000000000000000000000000000006": [],
     "note:00000000000000000000000000000004": [],
@@ -241,6 +340,24 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:0000000000000000000000000000000d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "int x;\nx = 1; ☐"
+    },
+    "note:0000000000000000000000000000000c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "# comment\nls -l"
+    },
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\""
+    },
     "note:0000000000000000000000000000000a": {
       "html": "<table><thead><tr><th align=\"left\">Item</th><th align=\"right\">Qty</th></tr></thead><tbody><tr><td align=\"left\"><strong>Milk</strong></td><td align=\"right\">3 | 4</td></tr></tbody></table>\n",
       "photos": [],
@@ -280,6 +397,9 @@
   },
   "search": {
     "": [
+      "note:0000000000000000000000000000000d",
+      "note:0000000000000000000000000000000c",
+      "note:0000000000000000000000000000000b",
       "note:0000000000000000000000000000000a",
       "note:00000000000000000000000000000006",
       "note:00000000000000000000000000000004",
@@ -299,6 +419,8 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:0000000000000000000000000000000c",
+      "note:0000000000000000000000000000000b",
       "note:0000000000000000000000000000000a",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000003",
@@ -307,6 +429,7 @@
     "heading": [],
     "format": [],
     "**": [
+      "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000001"
     ],
     "milk #code": [

@@ -305,9 +305,13 @@ NoteActions noteActions(
         ? () => mediaRemovals(context, notes, id, then)
         : null,
     isTally: () => Tallies(notes.store).isTally(id),
-    // Only a Note in the lists becomes a Tally (ADR 0028).
+    // Only a Note in the lists becomes a Tally (ADR 0028), and no Code
+    // text (#213).
     onMakeTally:
-        placed.changes && !placed.note.isTrashed && !placed.note.isMerged
+        placed.changes &&
+            !placed.note.isTrashed &&
+            !placed.note.isMerged &&
+            placed.note.textFormat != TextFormats.code
         ? () => then(makeTally(context, notes, id))
         : null,
     onAddEntry: placed.amends
@@ -617,6 +621,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   NoteKind _kind = NoteKind.plain;
   Set<NoteKind> _kinds = const {};
 
+  /// Whether a paste that looks like code waits for "Keep as code"
+  /// under the text (#213), until it is taken or closed.
+  bool _offersCode = false;
+
   /// A Session Note's setup (#191), and its pool and count as its page
   /// edits them; null for any other Note.
   SessionSetup? _setup;
@@ -806,6 +814,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         : (SessionDraft.of(widget.notes.store, widget.noteId, setup)
             ..picked.addAll(picked));
     _kinds = switch (_kind) {
+      // A Code text becomes no other kind (#213).
+      NoteKind.plain when note?.textFormat == TextFormats.code => const {},
       NoteKind.plain => {
         if (lists.mayMake(widget.noteId)) NoteKind.checklist,
         if (shopping.mayMake(widget.noteId)) NoteKind.shoppingList,
@@ -945,6 +955,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final markdown = note?.textFormat == TextFormats.markdown;
     _text.markdown = markdown;
     _name.markdown = markdown;
+    _text.code = !_named && note?.textFormat == TextFormats.code;
     _setTyped(note?.text ?? '');
   }
 
@@ -1303,6 +1314,51 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     await _changeKind(picked);
   }
 
+  /// The text format badge's editor (#213): the formats the text may
+  /// take, a formatted text never plain again (ADR 0033).
+  Future<void> _editFormat() async {
+    final current = _placed?.note.textFormat;
+    if (current == null) return;
+    final t = context.t;
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.badgeTextFormat,
+        icon: textFormatBadgeIcon,
+        content: RadioColumn<String>(
+          value: current,
+          options: [
+            for (final format in [
+              TextFormats.plain,
+              TextFormats.markdown,
+              TextFormats.code,
+            ])
+              if (format != TextFormats.plain ||
+                  current != TextFormats.markdown)
+                RadioOption(
+                  key: ValueKey('format-$format'),
+                  value: format,
+                  title: Text(textFormatName(t, format)),
+                ),
+          ],
+          onChanged: (picked) => Navigator.of(context).pop(picked),
+        ),
+      ),
+    );
+    if (!mounted || picked == null || picked == current) return;
+    _setFormat(picked);
+  }
+
+  /// Puts the Note's text, as typed, into [format] (#213) and shows it
+  /// so.
+  void _setFormat(String format) {
+    _saveText();
+    widget.notes.setFormat(widget.noteId, format);
+    _offersCode = false;
+    setState(_load);
+    _show();
+  }
+
   /// Makes the Note the kind [kind], its text and Lines as typed kept
   /// first, then shows it as it is now: a list made of a plain Note's text
   /// has its first line as name and the rest as Lines, a plain Note made
@@ -1414,7 +1470,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             t.reminder,
           ),
           (Spawn.frog, const FrogIcon(), t.frog),
-          if (_kind != NoteKind.session)
+          // A Code text becomes no Session (#213).
+          if (_kind != NoteKind.session &&
+              _placed?.note.textFormat != TextFormats.code)
             (Spawn.session, const Icon(Icons.event_repeat), t.session),
         ])
           PopupMenuItem(
@@ -1439,6 +1497,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The icon of Area and Topic, in its badge, the Area's colour.
   static const _placeIcon = Icons.folder_outlined;
+
+  /// Under the text after a paste that looks like code (#213): says so
+  /// and offers to keep the whole text as code; Close lets it be.
+  Widget _codeOffer(AppLocalizations t) => Padding(
+    key: const ValueKey('code-offer'),
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        Icon(textFormatIcon(TextFormats.code), size: 20),
+        const SizedBox(width: 8),
+        Expanded(child: Text(t.codePasted)),
+        TextButton(
+          key: const ValueKey('keep-as-code'),
+          onPressed: () => _setFormat(TextFormats.code),
+          child: Text(t.keepAsCode),
+        ),
+        IconButton(
+          key: const ValueKey('code-offer-close'),
+          tooltip: t.close,
+          onPressed: () => setState(() => _offersCode = false),
+          icon: const Icon(Icons.close),
+        ),
+      ],
+    ),
+  );
 
   /// The row of badges under the text (#160): each setting of the Note
   /// as its icon and its value, an icon for a fixed set of values, short
@@ -1515,6 +1598,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           valueIcon: kindIcon(_kind),
           onTap: _kinds.isEmpty ? null : (_) => _editKind(),
         ),
+        // A Plain Note's text is plain, formatted or code (#213).
+        if (_kind == NoteKind.plain && note.textEditable)
+          SettingBadge(
+            key: const ValueKey('badge-format'),
+            setting: t.badgeTextFormat,
+            icon: textFormatBadgeIcon,
+            value: textFormatName(t, note.textFormat),
+            valueIcon: textFormatIcon(note.textFormat),
+            onTap: changes ? (_) => _editFormat() : null,
+          ),
         // A Session's rule and weekdays' counts (#191).
         if (_setup case final setup?)
           ...sessionBadges(
@@ -2102,6 +2195,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         // The first format is written at once (ADR 0033).
                         formats: true,
                         onFormatted: () => setState(_saveText),
+                        // A paste that looks like code offers it (#213).
+                        onCodePasted:
+                            editable &&
+                                _kind == NoteKind.plain &&
+                                note.textFormat != TextFormats.code
+                            ? () => setState(() => _offersCode = true)
+                            : null,
                         style: Theme.of(context).textTheme.bodyLarge,
                         decoration: const InputDecoration(
                           filled: false,
@@ -2110,6 +2210,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       ),
               ),
             ),
+            if (_offersCode && !_named) _codeOffer(t),
             // The kind's content right under its name (#188): nothing
             // while the Note is no Checklist, Shopping List or Tally.
             ChecklistSection(
@@ -2360,6 +2461,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 }
+
+/// The icon of the text format badge (#213), the same for every format;
+/// the badge shows the format itself as [textFormatIcon].
+const textFormatBadgeIcon = Icons.text_format;
+
+/// The value icon of the text format [format] in its badge (#213).
+IconData textFormatIcon(String format) => switch (format) {
+  TextFormats.markdown => Icons.format_bold,
+  TextFormats.code => Icons.code,
+  _ => Icons.short_text,
+};
+
+/// The text format [format] in words (#213).
+String textFormatName(AppLocalizations t, String format) => switch (format) {
+  TextFormats.markdown => t.textFormatFormatted,
+  TextFormats.code => t.textFormatCode,
+  _ => t.textFormatPlain,
+};
 
 /// The icon of the kind badge (#192), the same for every kind; the
 /// badge shows the kind itself as [kindIcon].

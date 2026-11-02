@@ -85,6 +85,10 @@ _Avoid_: Paket (ein Paket bringt Kopien von Old-Brain-Fix-Notizen), Einfügen, B
 Der Text einer Notiz oder eines Abschnitts, als Markdown in der eigenen Auswahl der App gespeichert: fett, kursiv, durchgestrichen, zwei Überschriftenebenen, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate, Links, Code im Text, Codeblöcke und Tabellen. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, über die Formatleiste, durch getipptes Markdown oder durch Einfügen eines Texts, der ein Format verwendet, und bleibt von da an formatiert. Transkripte und Fototexte bleiben unformatiert.
 _Avoid_: Rich Text, gestalteter Text
 
+**Code-Text** [Code text]:
+Der ganze Text einer einfachen Notiz als Code: in der Schrift fester Breite genau so gezeigt, wie er geschrieben ist, ohne Zeilenumbruch, nichts darin als Markdown, Statuskästchen oder #Wort gelesen; im Notiz-Editor lässt er sich seitwärts schieben. Er wird an der Plakette „Textformat“ im Notiz-Editor eingestellt, die ihn auch wieder zu einem unformatierten oder formatierten Text macht, und der Editor bietet ihn an, wenn ein eingefügter Text wie ein Skript oder Code aussieht. Die Suche findet seine Wörter; Teilen und Text kopieren geben ihn, wie er ist. Ein Code-Text ist keine Checkliste oder Einkaufsliste und wird zu keiner anderen Art.
+_Avoid_: Skript, Schnipsel, Codeblock (ein Codeblock ist Teil eines formatierten Texts)
+
 **Formatleiste** [Format bar]:
 Die Reihe von Tasten, die die Auswahl oder das Wort am Cursor formatiert, oder die Zeilen, die die Auswahl berührt, und ein ☐ oder eine Tabelle einsetzt: auf dem Handy auf der Tastatur im Notiz-Editor und in Zur Notiz hinzufügen, am Computer über dem Textfeld des Notiz-Editors.
 _Avoid_: Werkzeugleiste, Symbolleiste

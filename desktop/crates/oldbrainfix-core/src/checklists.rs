@@ -847,8 +847,8 @@ impl<'a> Checklists<'a> {
     }
 
     /// Whether this Device may make the Note `note_id` a Checklist: a Note
-    /// in the lists, of a text known here, neither a Tally nor a list
-    /// already, which it may change.
+    /// in the lists, of a text known here and not code, neither a Tally
+    /// nor a list already, which it may change.
     pub fn may_make(&self, note_id: &str) -> Result<bool> {
         let Some(note) = Notes::new(self.store).by_id(note_id)? else {
             return Ok(false);
@@ -856,6 +856,7 @@ impl<'a> Checklists<'a> {
         Ok(!note.is_trashed()
             && !note.is_merged()
             && note.text_editable
+            && note.text_format != crate::text_format::CODE
             && parse_list_kind(self.store.current(note_id, keys::KIND)?.as_deref()).is_none()
             && !Tallies::new(self.store).is_tally(note_id)?
             && !crate::sessions::Sessions::new(self.store).is_session_note(note_id)?

@@ -831,6 +831,8 @@ enum NoteBadge {
     SectionCaptured(usize),
     /// The kind, with "Back to a plain Note".
     Kind,
+    /// A Plain Note's text format: plain, formatted or code (#213).
+    Format,
     OnAgenda,
     /// A Shopping List's "Show on the Agenda", its three ways (#186).
     ShoppingOnAgenda,
@@ -1058,6 +1060,11 @@ enum Action {
     /// Keeps it as a formatted text, its first format just applied
     /// (#127, ADR 0033): the Note's, or the Section's of this id (#183).
     FormatText(Option<String>),
+    /// Puts the Note's text, as typed, into this format (#213).
+    SetTextFormat(&'static str),
+    /// A paste that looks like code into the Note's text: "Keep as code"
+    /// under it (#213), or, without, that offer closed.
+    OfferCode(bool),
     /// Asks for the address of a link on the bytes `start..end` of the
     /// edited text, of the Amend field's with `amend` or of the field of
     /// the Section `section` (#183), `url` the link's there is one
@@ -1478,6 +1485,9 @@ pub struct App {
     quick_open: bool,
     /// The badge of the Note dialog whose small editor is open (#160).
     badge: Option<NoteBadge>,
+    /// The Note whose text took a paste that looks like code, while
+    /// "Keep as code" waits under it (#213).
+    code_offer: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161).
     start_lines: bool,
@@ -1856,6 +1866,7 @@ impl App {
             session_draft: None,
             quick_open: false,
             badge: None,
+            code_offer: None,
             start_lines: false,
             tally_whose: HashMap::new(),
             lines: TypedLines::default(),
@@ -5069,6 +5080,10 @@ impl App {
             Action::SaveText => self.save_text()?,
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
+            Action::SetTextFormat(format) => self.set_text_format(format)?,
+            Action::OfferCode(offer) => {
+                self.code_offer = offer.then(|| self.text_of.clone()).flatten()
+            }
             Action::AskLink {
                 start,
                 end,
@@ -7138,6 +7153,24 @@ impl App {
         Ok(())
     }
 
+    /// Puts the shown Note's text into `format` (#213), what is typed kept
+    /// first: a plain or formatted text becomes code and back, a formatted
+    /// one never plain ([`Notes::set_format`]); the field then holds it as
+    /// stored.
+    fn set_text_format(&mut self, format: &str) -> oldbrainfix_core::Result<()> {
+        self.save_text()?;
+        self.code_offer = None;
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        let notes = Notes::new(&self.store);
+        notes.set_format(&id, format)?;
+        if let Some(now) = notes.by_id(&id)? {
+            self.put_typed(now.text);
+        }
+        Ok(())
+    }
+
     /// Keeps the selected Note's edited text as a formatted text, at
     /// once, as its first format is applied (ADR 0033); the field keeps
     /// what is typed as it is, spaces at its end included.
@@ -8012,14 +8045,16 @@ impl App {
         }
         let may = self.view.may;
         let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
-        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged();
+        // A Code text becomes no Tally or Session (#213).
+        let code = note.text_format == text_format::CODE;
+        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
             schedules: may.schedules,
             frog: may.schedules && !frog_open,
             // A Routine of a Session Note runs it already (#191).
-            session: may.schedules && self.view.kind == Some(NoteKind::Plain),
+            session: may.schedules && self.view.kind == Some(NoteKind::Plain) && !code,
             amends: may.amends,
             checklist: may.amends && self.view.makes_checklist,
             shopping: may.amends && self.view.makes_shopping,
@@ -8606,6 +8641,29 @@ impl App {
                     if radio_column(ui, &mut picked, options) {
                         if picked != current {
                             actions.push(kind_action(&note.id, current, picked));
+                        }
+                        actions.push(Action::Badge(None));
+                    }
+                })
+            }
+            // The formats the text may take, a formatted one never plain
+            // again (ADR 0033); a pick sets it at once and closes (#213).
+            NoteBadge::Format => {
+                let known = [text_format::PLAIN, text_format::MARKDOWN, text_format::CODE];
+                let current = known
+                    .into_iter()
+                    .find(|f| *f == note.text_format)
+                    .unwrap_or(text_format::PLAIN);
+                let setting = t.badge_text_format();
+                badge_dialog(ctx, shown, (icons::TEXT_FORMAT, None), setting, |ui| {
+                    let mut picked = current;
+                    let options = known
+                        .into_iter()
+                        .filter(|f| *f != text_format::PLAIN || current != text_format::MARKDOWN)
+                        .map(|f| (f, text_format_look(&t, f).1.to_string()));
+                    if radio_column(ui, &mut picked, options) {
+                        if picked != current {
+                            actions.push(Action::SetTextFormat(picked));
                         }
                         actions.push(Action::Badge(None));
                     }
@@ -9458,6 +9516,10 @@ impl App {
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
+        // "Keep as code" under a paste that looks like code (#213).
+        let offers_code = self.code_offer.is_some()
+            && self.code_offer == self.text_of
+            && note.text_format != text_format::CODE;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let edited = &mut self.text;
@@ -9541,6 +9603,18 @@ impl App {
                         // to be copied (#183).
                         ui.style_mut().interaction.selectable_labels = true;
                         let all = (0, note.text.len());
+                        // A Code text moves sideways (#213).
+                        if note.text_format == text_format::CODE {
+                            let look = (Some(18.0), text);
+                            text_marks_view::code_text_label(
+                                ui,
+                                &note.text,
+                                all,
+                                look,
+                                (false, true),
+                            );
+                            return;
+                        }
                         let spots = text_marks_view::formatted_label(
                             ui,
                             (&note.text, &note.text_format, boxes),
@@ -9572,12 +9646,16 @@ impl App {
                         text_marks_view::link_clicks(ui, of, &spots.links);
                         return;
                     }
+                    let code = note.text_format == text_format::CODE;
                     let field = EditedText {
                         id: Id::new("note text"),
                         of: &note.id,
                         section: false,
                         stored: &note.text,
                         formatted,
+                        code,
+                        // A paste that looks like code offers it (#213).
+                        offers_code: !code,
                         boxes,
                         ticks: (ticks, &ticked),
                         name: t.note_text_field_name(),
@@ -9586,6 +9664,9 @@ impl App {
                     };
                     let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
                     edited_text(ui, (t, tones), field, state, actions);
+                    if offers_code {
+                        code_offer(ui, &t, actions);
+                    }
                 });
                 // The kind's content under its name and description (#188),
                 // as the Lines are under them on a card; nothing while the
@@ -9681,6 +9762,8 @@ impl App {
                                 section: true,
                                 stored: &section.text,
                                 formatted: section.text_format == text_format::MARKDOWN,
+                                code: false,
+                                offers_code: false,
                                 boxes: look,
                                 ticks: (section_ticks, &section_ticked),
                                 name: t.section_text_field_name(),
@@ -9896,6 +9979,7 @@ impl App {
                     && shopping.is_none()
                     && session_setup.is_none()
                     && !note.is_merged()
+                    && note.text_format != text_format::CODE
                     && ui
                         .button(RichText::new(t.make_tally()).color(text))
                         .clicked()
@@ -14087,6 +14171,8 @@ impl KindShown {
             let plain = |list_plain: bool| list_plain.then_some(NoteKind::Plain);
             let switch = |to: NoteKind| view.switches_list.then_some(to);
             match kind {
+                // A Code text becomes no other kind (#213).
+                NoteKind::Plain if note.text_format == text_format::CODE => {}
                 NoteKind::Plain => {
                     // As the Note menu offers them (#145).
                     let tally = may.amends && may.changes && !note.is_merged();
@@ -14135,6 +14221,35 @@ fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
 
 /// The icon and the name of the kind `kind` (#188), the value of its
 /// badge (#192); the phone's `kindIcon` and `kindName`.
+/// Under the Note's text after a paste that looks like code (#213): says
+/// so and offers to keep the whole text as code; the cross lets it be.
+fn code_offer(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    ui.horizontal(|ui| {
+        icons::show(ui, icons::CODE, 18.0, text);
+        ui.label(RichText::new(t.code_pasted()).color(text));
+        if ui
+            .button(RichText::new(t.keep_as_code()).color(text))
+            .clicked()
+        {
+            actions.push(Action::SetTextFormat(text_format::CODE));
+        }
+        if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
+            actions.push(Action::OfferCode(false));
+        }
+    });
+}
+
+/// The value icon of the text format `format` in its badge, and the
+/// format in words (#213).
+fn text_format_look(t: &L10n, format: &str) -> (char, &'static str) {
+    match format {
+        text_format::MARKDOWN => (icons::FORMAT_BOLD, t.text_format_formatted()),
+        text_format::CODE => (icons::CODE, t.text_format_code()),
+        _ => (icons::SHORT_TEXT, t.text_format_plain()),
+    }
+}
+
 fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
     match kind {
         NoteKind::Plain => (icons::ALL_NOTES, t.kind_plain()),
@@ -14226,6 +14341,15 @@ fn note_badges(
         if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
+        // A Plain Note's text is plain, formatted or code (#213).
+        if shown.kind.kind == NoteKind::Plain && note.text_editable {
+            let (icon, name) = text_format_look(t, &note.text_format);
+            let value = Some(BadgeValue::Icon(icon, name));
+            let setting = (icons::TEXT_FORMAT, None);
+            if badge(ui, look, setting, t.badge_text_format(), value, changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::Format)));
+            }
+        }
         // A Session's rule and its weekdays' counts (#191).
         if let Some((setup, changes)) = shown.session {
             let rule = session_view::rule_name(t, setup.rule);
@@ -14315,9 +14439,9 @@ fn note_badges(
             if !shown.frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
-            // Only a plain Note becomes a Session; a Routine of a Session
-            // Note runs it already (#191).
-            if shown.kind.kind == NoteKind::Plain {
+            // Only a plain Note becomes a Session, and no Code text
+            // (#213); a Routine of a Session Note runs it already (#191).
+            if shown.kind.kind == NoteKind::Plain && note.text_format != text_format::CODE {
                 entries.push((
                     icons::SESSION,
                     t.session(),
@@ -14633,6 +14757,10 @@ struct EditedText<'a> {
     /// Its text as stored, and whether it is a formatted one.
     stored: &'a str,
     formatted: bool,
+    /// Whether it is a Code text (#213), and whether a paste that looks
+    /// like code offers it.
+    code: bool,
+    offers_code: bool,
     /// How its boxes show, whether this Device may tick them and which
     /// were ticked (ADR 0035).
     boxes: &'a BoxLook,
@@ -14682,8 +14810,13 @@ fn edited_text(
     // Ctrl+I as its bold and italic while typing.
     let selected = format_bar::selection(ui, id, edited);
     let at = format_bar::At::of(edited, selected, formatted);
-    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL);
-    if focused {
+    // A Code text has none (#213).
+    let as_code = edit.code;
+    let mut picked = match as_code {
+        true => None,
+        false => format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL),
+    };
+    if focused && !as_code {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::B) {
                 picked = Some(Format::Bold);
@@ -14746,6 +14879,12 @@ fn edited_text(
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(size);
+            // A Code text as written in the fixed-width font, unwrapped.
+            if as_code {
+                let format = egui::TextFormat::simple(FontId::monospace(size * 0.9), written);
+                let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                return ui.fonts_mut(|f| f.layout_job(job));
+            }
             let job = if formatted {
                 text_marks_view::source_job(typed, font, (written, accent, weak, code))
             } else {
@@ -14760,9 +14899,19 @@ fn edited_text(
             job.wrap.max_width = width;
             ui.fonts_mut(|f| f.layout_job(job))
         };
-        // Pasted with a format, a plain text becomes a
-        // formatted one (ADR 0033).
-        let pasted = focused
+        // Pasted, a text that looks like code offers it and formats
+        // nothing (#213); else pasted with a format, a plain text
+        // becomes a formatted one (ADR 0033).
+        let pasted_code = edit.offers_code
+            && focused
+            && ui.input(|i| {
+                i.events.iter().any(|e| {
+                    matches!(e, egui::Event::Paste(p)
+                        if p.chars().nth(1).is_some() && text_format::looks_like_code(p))
+                })
+            });
+        let pasted = !pasted_code
+            && focused
             && ui.input(|i| {
                 i.events
                     .iter()
@@ -14788,6 +14937,13 @@ fn edited_text(
         // A box goes whole, its id with it, and the cursor
         // stays where it was as a save gives boxes ids.
         let cut = text_marks_view::guard_field(ui, id, edited, !placed);
+        // As wide as its longest line, for a Code text, which moves
+        // sideways (#213).
+        let widest = as_code.then(|| {
+            let font = FontId::monospace(size * 0.9);
+            let galley = ui.fonts_mut(|f| f.layout_no_wrap(edited.clone(), font, written));
+            galley.size().x + 8.0
+        });
         let mut field = TextEdit::multiline(edited)
             .id(id)
             .font(FontId::proportional(size))
@@ -14798,7 +14954,30 @@ fn edited_text(
         if let Some(hint) = edit.hint {
             field = field.hint_text(RichText::new(hint).size(size).color(weak));
         }
-        let output = field.show(ui);
+        let output = match widest {
+            None => field.show(ui),
+            Some(widest) => {
+                Frame::NONE
+                    .fill(code)
+                    .corner_radius(4.0)
+                    .inner_margin(egui::Margin::symmetric(8, 6))
+                    .show(ui, |ui| {
+                        egui::ScrollArea::horizontal()
+                            .id_salt(("code", of))
+                            .show(ui, |ui| {
+                                let width = widest.max(ui.available_width());
+                                let room = egui::vec2(width, ui.available_height());
+                                let rect = egui::Rect::from_min_size(ui.cursor().min, room);
+                                ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                                    field.show(ui)
+                                })
+                                .inner
+                            })
+                            .inner
+                    })
+                    .inner
+            }
+        };
         text_marks_view::guard_cursor(ui, id, edited);
         if cut {
             ui.ctx().request_repaint();
@@ -14809,9 +14988,12 @@ fn edited_text(
             *editing = false;
             actions.push(Action::SaveText);
         }
+        if output.response.response.changed() && pasted_code {
+            actions.push(Action::OfferCode(true));
+        }
         // A shortcut typed makes a plain text a formatted
         // one, as the first format from the bar does.
-        if output.response.response.changed() && !formatted {
+        if output.response.response.changed() && !formatted && !as_code {
             let cursor = output.cursor_range.map_or(0, |range| range.primary.index.0);
             let byte = edited
                 .char_indices()
@@ -15019,6 +15201,8 @@ fn kinded_text(
             section: false,
             stored: note_kinds::description(&note.text),
             formatted,
+            code: false,
+            offers_code: false,
             boxes: shown.boxes,
             ticks: shown.ticks,
             name: t.note_description(),

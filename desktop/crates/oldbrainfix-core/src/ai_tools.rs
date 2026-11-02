@@ -158,7 +158,7 @@ pub fn tools() -> Vec<Value> {
     let mut all = vec![
         tool(
             "list_notes",
-            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList, tally or session), its open Frog and the Routines that run its Session.",
+            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList, tally or session), the format of its text (textFormat: plain, markdown for formatted text, or code for a text shown as written in a fixed-width font), its open Frog and the Routines that run its Session.",
             true,
             json!({
                 "place": string("Only the Notes in this Area or Topic (an Area's Topics included)"),
@@ -169,7 +169,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -260,6 +260,16 @@ pub fn tools() -> Vec<Value> {
                 "importance": {"enum": ["unimportant", "normal", "important"], "type": "string"},
             }),
             &["id", "importance"],
+        ),
+        tool(
+            "set_text_format",
+            "Sets the format of a plain Note's text: plain, markdown (formatted text) or code (the whole text shown as written in a fixed-width font, unwrapped, nothing in it read as a format, a box or a tag). The text stays as written; a formatted text is never made plain, and a Note whose text is code becomes no other kind.",
+            false,
+            json!({
+                "id": id("Note"),
+                "format": {"enum": ["plain", "markdown", "code"], "type": "string"},
+            }),
+            &["id", "format"],
         ),
         tool(
             "remove_captured",
@@ -725,6 +735,17 @@ fn setup_json(setup: &SessionSetup, routines: Option<Vec<String>>) -> Value {
     out
 }
 
+/// An error when the text of the Note `note` is code (#213): it becomes
+/// no other kind, as the editors offer none.
+fn refuse_code(notes: &Notes, note: &str) -> Result<()> {
+    match notes.by_id(note)? {
+        Some(n) if n.text_format == text_format::CODE => Err(Error::Invalid(format!(
+            "the text of {note} is code: set_text_format makes it plain first"
+        ))),
+        _ => Ok(()),
+    }
+}
+
 fn note_summary(note: &Note, kind: &NoteKind) -> Value {
     json!({
         "captured": dart_iso(note.captured),
@@ -736,6 +757,7 @@ fn note_summary(note: &Note, kind: &NoteKind) -> Value {
         "place": note.place,
         "sessions": kind.sessions,
         "text": note.text,
+        "textFormat": note.text_format,
         "trashed": note.is_trashed(),
         "unsorted": note.is_unsorted(),
     })
@@ -1529,6 +1551,22 @@ impl Store {
                 notes.set_importance(id()?, importance)?;
                 id()?.to_string()
             }
+            "set_text_format" => {
+                let format = text_arg(args, "format")?;
+                let format = text_format::KNOWN
+                    .into_iter()
+                    .find(|f| *f == format)
+                    .ok_or_else(|| Error::Invalid(format!("no text format {format}")))?;
+                let note = notes
+                    .by_id(id()?)?
+                    .ok_or_else(|| Error::Invalid(format!("not a Note: {}", id().unwrap_or(""))))?;
+                // As the editor's badge: a plain Note's text only (#213).
+                if self.kind_of(&self.kinds()?, &note)?.kind != "plain" {
+                    return Err(Error::Invalid(format!("not a plain Note: {}", note.id)));
+                }
+                notes.set_format(&note.id, format)?;
+                note.id
+            }
             "remove_captured" => {
                 let detail = text_arg(args, "detail")?;
                 let detail = CapturedDetail::parse(detail)
@@ -1628,6 +1666,7 @@ impl Store {
         Ok(match name {
             "make_tally" => {
                 let note = id()?;
+                refuse_code(&Notes::new(self), note)?;
                 if tallies.is_tally(note)? {
                     return Err(Error::Invalid(format!(
                         "{note} is a Tally already: add_tally_field adds a field"
@@ -1712,10 +1751,12 @@ impl Store {
                 let text = optional_text(args, "text");
                 let (note, routine) = match (note, text, &schedule) {
                     (Some(note), _, Some(schedule)) => {
+                        refuse_code(&Notes::new(self), note)?;
                         let made = sessions.spawn(note, schedule, &pool, count, rule)?;
                         (made.setup.note_id, Some(made.routine.id))
                     }
                     (Some(note), _, None) => {
+                        refuse_code(&Notes::new(self), note)?;
                         sessions.make(note, &pool, count, rule)?;
                         (note.to_string(), None)
                     }
@@ -2157,6 +2198,72 @@ mod tests {
             note.get("captureContext"),
             Some(&json!({"calendar": r#"["Katzenklo"]"#}))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_text_format_is_read_and_set_as_a_pending_change() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        let script = notes.capture("# comment\necho hi", None, None)?;
+        let task = store.open_ai_task()?;
+        let format_of = |id: &str| -> std::result::Result<Value, Box<dyn std::error::Error>> {
+            let read = call(&store, &task, "read_note", &json!({"id": id}))?;
+            let [ToolContent::Text(text)] = &read.content[..] else {
+                return Err("a text".into());
+            };
+            let read: Value = serde_json::from_str(text)?;
+            Ok(read["textFormat"].clone())
+        };
+        assert_eq!(format_of(&script.id)?, json!("plain"));
+        let set = call(
+            &store,
+            &task,
+            "set_text_format",
+            &json!({"id": script.id, "format": "code"}),
+        )?;
+        assert!(!set.is_error, "{set:?}");
+        assert_eq!(format_of(&script.id)?, json!("code"));
+        let listed = call(&store, &task, "list_notes", &json!({}))?;
+        assert!(format!("{listed:?}").contains(r#"\"textFormat\":\"code\""#));
+        // A Code text becomes no Tally or Session.
+        let fields = json!([{"name": "Run", "target": 5, "unit": "km"}]);
+        let made = call(
+            &store,
+            &task,
+            "make_tally",
+            &json!({"fields": fields, "id": script.id}),
+        )?;
+        assert!(made.is_error, "{made:?}");
+        let (pool, _) = tally(&store, "Push-ups")?;
+        let session = call(
+            &store,
+            &task,
+            "make_session",
+            &json!({"note": script.id, "pool": [pool]}),
+        )?;
+        assert!(session.is_error, "{session:?}");
+        // No such format, and no Note of another kind.
+        let refused = call(
+            &store,
+            &task,
+            "set_text_format",
+            &json!({"id": script.id, "format": "x-future"}),
+        )?;
+        assert!(refused.is_error);
+        let list = notes.capture("Trip\nSocks", None, None)?;
+        Checklists::new(&store).make(&list.id)?;
+        let refused = call(
+            &store,
+            &task,
+            "set_text_format",
+            &json!({"id": list.id, "format": "code"}),
+        )?;
+        assert!(refused.is_error);
+        let review = store.ai_review(&task)?;
+        assert!(review.groups.iter().any(|(kind, items)| {
+            *kind == crate::ai_task::AiChangeKind::NoteText && items[0].entity == script.id
+        }));
         Ok(())
     }
 
@@ -2712,6 +2819,7 @@ mod tests {
             "file_note",
             "merge_notes",
             "set_importance",
+            "set_text_format",
             "remove_captured",
             "trash_note",
             "restore_note",

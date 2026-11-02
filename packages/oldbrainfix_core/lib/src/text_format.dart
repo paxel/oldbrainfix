@@ -4,8 +4,8 @@ import 'markdown.dart';
 import 'text_boxes.dart';
 
 /// The formats of user text (ADR 0018): the text of a Note or a Section
-/// is stored with the format it is in. This version knows [plain] and
-/// [markdown].
+/// is stored with the format it is in. This version knows [plain],
+/// [markdown] and [code].
 abstract final class TextFormats {
   /// Text as typed, without formatting.
   static const plain = 'plain';
@@ -15,8 +15,13 @@ abstract final class TextFormats {
   /// from then on.
   static const markdown = 'markdown';
 
+  /// A Note's whole text as code (#213): shown in the fixed-width font
+  /// exactly as written, unwrapped, nothing in it read as a format, a
+  /// box or a tag.
+  static const code = 'code';
+
   /// Every format this version reads and writes.
-  static const known = {plain, markdown};
+  static const known = {plain, markdown, code};
 
   /// The newest structure of the stored value this version knows: `v` 1
   /// holds `format` and `text` and nothing else.
@@ -27,7 +32,7 @@ abstract final class TextFormats {
   /// other format as it is.
   static String visible(String format, String text) => switch (format) {
     markdown => Markdown.plain(TextBoxes.strip(text)),
-    plain => TextBoxes.strip(text),
+    plain || code => TextBoxes.strip(text),
     _ => text,
   };
 
@@ -35,6 +40,40 @@ abstract final class TextFormats {
   /// read as itself, such as a Transcript put into a Note's text.
   static String literal(String format, String text) =>
       format == markdown ? Markdown.escape(text) : text;
+
+  /// Whether a pasted [text] looks like a script or code, for the editor
+  /// to offer it as [code] (#213), the same in both cores: it starts
+  /// with `#!/`, or it has at least three lines that are not blank, at
+  /// least half of them ending in `;`, `{` or `}`, starting with `}`, or
+  /// indented by a tab or four spaces and not starting with `-`, `*` or
+  /// `+` after it. Only spaces and tabs count as blank and as
+  /// indentation.
+  static bool looksLikeCode(String text) {
+    if (text.startsWith('#!/')) return true;
+    var lines = 0;
+    var code = 0;
+    for (final line in text.split(RegExp(r'\r\n|\r|\n'))) {
+      var start = 0;
+      while (start < line.length && _blank(line.codeUnitAt(start))) {
+        start++;
+      }
+      if (start == line.length) continue;
+      var end = line.length;
+      while (_blank(line.codeUnitAt(end - 1))) {
+        end--;
+      }
+      lines++;
+      final first = line[start];
+      final last = line[end - 1];
+      final indented =
+          (line.startsWith('\t') || line.startsWith('    ')) &&
+          !'-*+'.contains(first);
+      if (';{}'.contains(last) || first == '}' || indented) code++;
+    }
+    return lines >= 3 && 2 * code >= lines;
+  }
+
+  static bool _blank(int c) => c == 0x20 || c == 0x09;
 }
 
 /// A user text as stored: its [format], its [text], the source text for a

@@ -276,6 +276,10 @@ pub fn formatted_label(
     look: (Option<f32>, Color32),
     truncate: bool,
 ) -> Spots {
+    if format == text_format::CODE {
+        code_text_label(ui, text, shown, look, (truncate, false));
+        return Spots::default();
+    }
     if format != text_format::MARKDOWN {
         return marked_label(ui, (text, boxes), shown, look, truncate);
     }
@@ -314,6 +318,52 @@ pub fn formatted_label(
         }
     });
     spots
+}
+
+/// Draws the bytes `shown` of a Code text (#213) as written in the
+/// fixed-width font, unwrapped, nothing in it a format, a tag or a box:
+/// on the background of code, cut off at the edge, or moved sideways
+/// with `sideways`; one line cut off without the background with
+/// `truncate`, as a compact card shows it.
+pub fn code_text_label(
+    ui: &mut Ui,
+    text: &str,
+    (from, to): (usize, usize),
+    look: (Option<f32>, Color32),
+    (truncate, sideways): (bool, bool),
+) {
+    let Some(part) = text.get(from..to) else {
+        return;
+    };
+    let look = Look::of(ui, look);
+    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let job = LayoutJob::single_section(text_boxes::strip(part), format);
+    if truncate {
+        ui.add(egui::Label::new(job).truncate());
+        return;
+    }
+    egui::Frame::NONE
+        .fill(look.code)
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(8, 6))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            if sideways {
+                egui::ScrollArea::horizontal()
+                    .id_salt(("code text", from))
+                    .show(ui, |ui| ui.add(egui::Label::new(job).extend()));
+                return;
+            }
+            // Cut off at the edge, every line kept.
+            let galley = ui.fonts_mut(|f| f.layout_job(job));
+            let size = Vec2::new(ui.available_width(), galley.size().y);
+            let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+            let said = galley.text().to_string();
+            response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, &said));
+            ui.painter()
+                .with_clip_rect(rect.intersect(ui.clip_rect()))
+                .galley(rect.min, galley, look.colour);
+        });
 }
 
 /// Draws the lines of `code`, among `blocks` of `text`, from the line

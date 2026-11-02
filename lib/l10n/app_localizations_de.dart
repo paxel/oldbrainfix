@@ -4967,4 +4967,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get doneAndTrash => 'Erledigt und in den Papierkorb';
+
+  @override
+  String get badgeTextFormat => 'Textformat';
+
+  @override
+  String get textFormatPlain => 'Unformatierter Text';
+
+  @override
+  String get textFormatFormatted => 'Formatierter Text';
+
+  @override
+  String get textFormatCode => 'Code';
+
+  @override
+  String get codePasted => 'Das sieht nach Code aus.';
+
+  @override
+  String get keepAsCode => 'Als Code behalten';
 }

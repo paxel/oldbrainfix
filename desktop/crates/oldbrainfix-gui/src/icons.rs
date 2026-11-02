@@ -99,6 +99,11 @@ pub const LINK: char = '\u{e380}';
 pub const CODE: char = '\u{e176}';
 /// The format bar's code block (#212), as the phone's: `data_object`.
 pub const CODE_BLOCK: char = '\u{f04e6}';
+/// The text format badge (#213), as the phone's: `text_format` for the
+/// setting, `short_text` for a plain text; [`FORMAT_BOLD`] and [`CODE`]
+/// for the others.
+pub const TEXT_FORMAT: char = '\u{e64a}';
+pub const SHORT_TEXT: char = '\u{e59d}';
 pub const INDENT: char = '\u{e2b5}';
 pub const OUTDENT: char = '\u{e2b4}';
 /// The format bar's table and the table view's, as the phone's (#128):

@@ -222,8 +222,11 @@ final _scenarios = <Scenario>[
         'at an edit that stays formatted when edited as plain, one '
         'formatted as it is, an Amend formatted, a Transcript\'s words '
         'taken over escaped, a formatted Note made a Checklist and back, '
-        'a plain text holding marks, searched as written, and a table '
-        'whose cell was set, written anew.',
+        'a plain text holding marks, searched as written, a table '
+        'whose cell was set, written anew; a script captured as code, its '
+        'glyph no box, that stays code when edited as formatted, a '
+        'formatted text set to code, and a plain one set to code and back '
+        '(#213).',
     build: (store) {
       final notes = Notes(store);
       const markdown = TextFormats.markdown;
@@ -254,6 +257,22 @@ final _scenarios = <Scenario>[
         table.id,
         MarkdownTables.setCell(table.text, 0, 1, 1, '3 | 4').text,
       );
+      const code = TextFormats.code;
+      final script = notes.capture(
+        '#!/bin/sh\n# ☐ no box\necho "#tag"',
+        format: code,
+      );
+      notes.edit(
+        script.id,
+        '#!/bin/sh\n# ☐ no box\necho "#tag **x**"',
+        format: markdown,
+      );
+      final pasted = notes.capture('# comment\nls -l');
+      notes.setFormat(pasted.id, markdown);
+      notes.setFormat(pasted.id, code);
+      final back = notes.capture('int x;\nx = 1; ☐');
+      notes.setFormat(back.id, code);
+      notes.setFormat(back.id, TextFormats.plain);
     },
   ),
   (
@@ -7585,6 +7604,32 @@ Map<String, Object?> _markdown() {
       ])
         url: Markdown.mayOpen(url),
     },
+    // Whether a pasted text looks like code (#213).
+    'looksLikeCode': {
+      for (final text in [
+        '',
+        '#!/bin/bash\necho hi',
+        '#!',
+        ' #!/bin/bash',
+        'int main() {\n  return 0;\n}',
+        'def f(x):\n    y = x\n    return y',
+        '{\n  "a": 1,\n  "b": [1, 2]\n}\n',
+        'for f in *; do\n\techo "\$f"\n\tls "\$f"\ndone',
+        '.card {\r\n  color: red;\r\n}',
+        'x;\r    y\rz',
+        'a;\nb;',
+        'one;\ntwo\nthree\nfour',
+        'Milk\nEggs\nBread',
+        '- milk\n- eggs\n    - free range\n    - brown',
+        '* a;\n+ b;\n\t- c',
+        'Recipe:\n    1 cup flour\n    2 eggs\nMix well.\nBake.',
+        '# Shopping\n- **milk**\n- eggs',
+        'x\n\u00a0\u00a0\u00a0\u00a0y\nz;',
+        'ä;\nö {\n} ü',
+        '\n\n   \n\t\n',
+      ])
+        text: TextFormats.looksLikeCode(text),
+    },
   };
 }
 
@@ -8259,8 +8304,10 @@ Future<void> main(List<String> args) async {
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
     'moved and deleted, its first column marked, a new table put in, with '
-    'the text and the selection they gave; and which link destinations '
-    'may be opened. Offsets are counted in '
+    'the text and the selection they gave; which link destinations '
+    'may be opened; and which pasted texts look like code (#213): a '
+    'shebang, lines of code punctuation or indented, and lists, prose, '
+    'Markdown and short texts that do not. Offsets are counted in '
     'code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '

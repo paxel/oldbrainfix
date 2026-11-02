@@ -601,13 +601,15 @@ class NoteCard extends StatelessWidget {
                         onSchedule: onSchedule,
                         onMerge: onMerge,
                         actions: actions,
-                        // Only a plain Note becomes a Session (ADR 0039);
-                        // a Routine of a Session Note runs it already.
+                        // Only a plain Note becomes a Session (ADR 0039),
+                        // and no Code text (#213); a Routine of a Session
+                        // Note runs it already.
                         spawnsNow: switch (kind) {
                           final kind? => () => [
                             for (final spawn in Spawn.values)
                               if (spawn != Spawn.session ||
-                                  kind() == NoteKind.plain)
+                                  (kind() == NoteKind.plain &&
+                                      note.textFormat != TextFormats.code))
                                 spawn,
                           ],
                           null => null,

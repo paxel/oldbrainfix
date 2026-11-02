@@ -411,14 +411,15 @@ class ShoppingLists {
   static String nameKey(String text) => text.trim().toLowerCase();
 
   /// Whether this Device may make the Note [noteId] a Shopping List: a
-  /// Note in the lists, of a text known here, neither a Tally nor a list
-  /// already, which it may change.
+  /// Note in the lists, of a text known here and not code, neither a
+  /// Tally nor a list already, which it may change.
   bool mayMake(String noteId) {
     final note = Notes(store).byId(noteId);
     return note != null &&
         !note.isTrashed &&
         !note.isMerged &&
         note.textEditable &&
+        note.textFormat != TextFormats.code &&
         parseListKind(store.current(noteId, ChecklistKeys.kind)) == null &&
         !Tallies(store).isTally(noteId) &&
         !Sessions(store).isSessionNote(noteId) &&

@@ -1320,5 +1320,11 @@
   "trashDoneReminderDetail": "„Erledigt“ bei einer einmaligen Erinnerung, der einzigen Routine oder Erinnerung einer einfachen Notiz, legt die Notiz mit ihr in den Papierkorb, wo auch immer du sie abhakst. Listen, Strichlisten und Einheiten bleiben. Auf allen deinen eigenen Geräten gleich; Zurücknehmen holt die Notiz nicht zurück, der Papierkorb 30 Tage lang schon.",
   "occurrenceDue": "Fällig {when}",
   "occurrenceMissedAt": "Verpasst {when}",
-  "doneAndTrash": "Erledigt und in den Papierkorb"
+  "doneAndTrash": "Erledigt und in den Papierkorb",
+  "badgeTextFormat": "Textformat",
+  "textFormatPlain": "Unformatierter Text",
+  "textFormatFormatted": "Formatierter Text",
+  "textFormatCode": "Code",
+  "codePasted": "Das sieht nach Code aus.",
+  "keepAsCode": "Als Code behalten"
 }

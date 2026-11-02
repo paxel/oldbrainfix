@@ -856,6 +856,19 @@ fn write_markdown(store: &Store) -> Built {
     let table = notes.capture_as("Item | Qty\n:-|-:\n**Milk** | 2", MARKDOWN, None, None)?;
     let set = oldbrainfix_core::markdown::table::set_cell(&table.text, 0, 1, 1, "3 | 4");
     notes.edit(&table.id, &set.text)?;
+    use oldbrainfix_core::text_format::CODE;
+    let script = notes.capture_as("#!/bin/sh\n# ☐ no box\necho \"#tag\"", CODE, None, None)?;
+    notes.edit_as(
+        &script.id,
+        "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+        MARKDOWN,
+    )?;
+    let pasted = notes.capture("# comment\nls -l", None, None)?;
+    notes.set_format(&pasted.id, MARKDOWN)?;
+    notes.set_format(&pasted.id, CODE)?;
+    let back = notes.capture("int x;\nx = 1; ☐", None, None)?;
+    notes.set_format(&back.id, CODE)?;
+    notes.set_format(&back.id, PLAIN)?;
     Ok(())
 }
 
@@ -940,7 +953,7 @@ fn tick_json(t: &oldbrainfix_core::text_boxes::BoxTick) -> Value {
 
 #[test]
 fn boxes_show_and_tick_as_the_dart_core_does() -> TestResult {
-    for scenario in ["boxes", "import"] {
+    for scenario in ["boxes", "import", "markdown"] {
         boxes_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
@@ -6452,6 +6465,17 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
+    }
+    let code = fixture["looksLikeCode"]
+        .as_object()
+        .ok_or("looksLikeCode")?;
+    assert!(code.len() > 10);
+    for (text, looks) in code {
+        assert_eq!(
+            Some(oldbrainfix_core::text_format::looks_like_code(text)),
+            looks.as_bool(),
+            "{text:?}"
+        );
     }
     Ok(())
 }

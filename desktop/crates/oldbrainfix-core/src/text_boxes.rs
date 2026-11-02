@@ -325,6 +325,9 @@ pub fn convert(
     format: &str,
     mut new_id: impl FnMut() -> Result<String>,
 ) -> Result<String> {
+    if format == text_format::CODE {
+        return Ok(text.to_string());
+    }
     let found = scan(text);
     if found.iter().all(|b| b.id.is_some() && !b.repeated) {
         return Ok(text.to_string());
@@ -387,6 +390,18 @@ mod tests {
             n += 1;
             Ok(n.to_string())
         }
+    }
+
+    #[test]
+    fn no_glyph_of_a_code_text_becomes_a_box() -> Result<()> {
+        let mut drawn = 0;
+        let text = convert("☐ x ✅", text_format::CODE, || {
+            drawn += 1;
+            Ok(drawn.to_string())
+        })?;
+        assert_eq!(text, "☐ x ✅");
+        assert_eq!(drawn, 0);
+        Ok(())
     }
 
     #[test]

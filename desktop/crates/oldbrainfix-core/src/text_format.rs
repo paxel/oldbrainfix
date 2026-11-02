@@ -1,7 +1,7 @@
 //! The formats of user text (ADR 0018), as the Dart core's
 //! `text_format.dart` reads and writes them: the text of a Note or a
 //! Section is stored with the format it is in. This version knows
-//! [`PLAIN`] and [`MARKDOWN`].
+//! [`PLAIN`], [`MARKDOWN`] and [`CODE`].
 
 use serde_json::{Map, Value};
 
@@ -16,8 +16,13 @@ pub const PLAIN: &str = "plain";
 /// formatted from then on.
 pub const MARKDOWN: &str = "markdown";
 
+/// A Note's whole text as code (#213): shown in the fixed-width font
+/// exactly as written, unwrapped, nothing in it read as a format, a box
+/// or a tag.
+pub const CODE: &str = "code";
+
 /// Every format this version reads and writes.
-pub const KNOWN: [&str; 2] = [PLAIN, MARKDOWN];
+pub const KNOWN: [&str; 3] = [PLAIN, MARKDOWN, CODE];
 
 /// The newest structure of the stored value this version knows: `v` 1
 /// holds `format` and `text` and nothing else.
@@ -29,7 +34,7 @@ pub const VERSION: i64 = 1;
 pub fn visible(format: &str, text: &str) -> String {
     match format {
         MARKDOWN => markdown::plain(&text_boxes::strip(text)),
-        PLAIN => text_boxes::strip(text),
+        PLAIN | CODE => text_boxes::strip(text),
         _ => text.to_string(),
     }
 }
@@ -42,6 +47,35 @@ pub fn literal(format: &str, text: &str) -> String {
     } else {
         text.to_string()
     }
+}
+
+/// Whether a pasted `text` looks like a script or code, for the editor
+/// to offer it as [`CODE`] (#213), the same in both cores: it starts with
+/// `#!/`, or it has at least three lines that are not blank, at least
+/// half of them ending in `;`, `{` or `}`, starting with `}`, or indented
+/// by a tab or four spaces and not starting with `-`, `*` or `+` after
+/// it. Only spaces and tabs count as blank and as indentation.
+pub fn looks_like_code(text: &str) -> bool {
+    if text.starts_with("#!/") {
+        return true;
+    }
+    let blank = |c: &u8| *c == b' ' || *c == b'\t';
+    let (mut lines, mut code) = (0, 0);
+    for line in text.split("\r\n").flat_map(|l| l.split(['\r', '\n'])) {
+        let bytes = line.as_bytes();
+        let Some(start) = bytes.iter().position(|c| !blank(c)) else {
+            continue;
+        };
+        let end = bytes.iter().rposition(|c| !blank(c)).unwrap_or(start);
+        lines += 1;
+        let (first, last) = (bytes[start], bytes[end]);
+        let indented = (line.starts_with('\t') || line.starts_with("    "))
+            && !matches!(first, b'-' | b'*' | b'+');
+        if matches!(last, b';' | b'{' | b'}') || first == b'}' || indented {
+            code += 1;
+        }
+    }
+    lines >= 3 && 2 * code >= lines
 }
 
 /// A user text as stored: its format, its text, the source text for a
@@ -260,5 +294,55 @@ mod tests {
         assert_eq!(StoredText::read(Some(&later.encode())), later);
         assert!(StoredText::of(PLAIN, "x", VERSION).editable);
         assert!(!StoredText::of("x-future", "x", 1).editable);
+    }
+
+    #[test]
+    fn a_shebang_or_lines_mostly_of_code_punctuation_or_indented_look_like_code() {
+        for text in [
+            "#!/bin/bash\necho hi",
+            "#!/usr/bin/env python3",
+            "int main() {\n  return 0;\n}",
+            "a = 1;\nb = 2;\nc = a + b;",
+            "def f(x):\n    y = x\n    return y",
+            "{\n  \"a\": 1,\n  \"b\": [1, 2]\n}\n",
+            "for f in *; do\n\techo \"$f\"\n\tls \"$f\"\ndone",
+            ".card {\r\n  color: red;\r\n}",
+            "x;\n    y\nz",
+        ] {
+            assert!(looks_like_code(text), "{text:?}");
+        }
+        for text in [
+            "",
+            "#!",
+            "echo hi;",
+            "a;\nb;",
+            " #!/bin/bash\necho hi",
+            "Milk\nEggs\nBread",
+            "- milk\n- eggs\n    - free range\n    - brown",
+            "# Shopping\n- **milk**\n- eggs",
+            "Dear Ann,\nsee you at 8 (the usual place).\nBen",
+            "Recipe:\n    1 cup flour\n    2 eggs\nMix well.\nBake.",
+            "one;\ntwo\nthree\nfour",
+            "\n\n   \n\t\n",
+            // A no-break space is no indentation.
+            "x\n\u{a0}\u{a0}\u{a0}\u{a0}y\nz;",
+        ] {
+            assert!(!looks_like_code(text), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_code_text_reads_as_it_is_written() {
+        assert!(KNOWN.contains(&CODE));
+        let text = "# not a heading\n**x** ☐ #tag";
+        assert_eq!(visible(CODE, text), text);
+        assert_eq!(literal(CODE, "*x*"), "*x*");
+        let stored = StoredText::of(CODE, text, VERSION);
+        assert!(stored.editable);
+        assert_eq!(
+            stored.encode(),
+            r##"{"format":"code","text":"# not a heading\n**x** ☐ #tag"}"##
+        );
+        assert_eq!(StoredText::read(Some(&stored.encode())), stored);
     }
 }

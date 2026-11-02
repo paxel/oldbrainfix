@@ -31,6 +31,14 @@ A Sent Item (ADR 0015) carries the format of the Note's text and of every Sectio
 
 Amended by ADR 0033 (#127): this version knows two formats, `plain` and `markdown`, both in structure version 1, and edits a text in either. A plain text becomes `markdown` at its first format and stays so; a Device of 0.1.x, which knows only `plain`, keeps a formatted text read-only as this section describes. Sent Items, the shared folder, bundles and Backups carry `markdown` as they carry any format.
 
+## Code text (#213)
+
+Amended by #213 (Q535 (a)): this version knows a third format, `code`, in structure version 1: a Note's whole text as code, `{"format":"code","text":…}`, the same bytes from both cores (`TextFormats.code`, `text_format::CODE`). Its text is shown exactly as written in the fixed-width font, unwrapped: nothing in it is read as Markdown, a box (ADR 0035) or a tag (ADR 0032), so saving it gives no glyph an id and a box id that came in it shows as nothing. Its visible text, which Search reads, is the text as written; a Transcript taken over into it goes in as it is, and Share and Copy text give it as for a plain text.
+
+The text format badge of the Note editor sets it on a Plain Note, and the editor offers it for a pasted text that looks like a script or code (`TextFormats.looksLikeCode`, `text_format::looks_like_code`, the same in both cores and in the fixture `markdown.json`): one starting with `#!/`, or one of at least three lines that are not blank, at least half of them ending in `;`, `{` or `}`, starting with `}`, or indented by a tab or four spaces and not starting with `-`, `*` or `+` after it; only spaces and tabs count as blank and as indentation. `Notes.setFormat` (`set_format`) changes the format: a plain or formatted text becomes code, a code text plain or formatted, and a formatted text never plain (ADR 0033). Into code the text goes as it shows, each box in the glyph of its current state and without its id; out of it, its glyphs become boxes when it is saved. An edit keeps a code text code, as it keeps a formatted text formatted. A Note whose text is code is made no Checklist or Shopping List (`mayMake`), and the editors offer it no other kind, as a list made of it would read its Lines out of code.
+
+A Device of 0.3.x does not know `code`: it shows the source read-only and overwrites nothing, as this ADR says for any format it does not know. Sent Items, the shared folder, bundles and Backups carry `code` as they carry any format.
+
 ## Other values (ADR 0034)
 
 Amended by ADR 0034 (#131): the same rule holds beyond texts. A Routine's schedule, a grant in a Shared Area, a Profile record and an Override carry the version of their structure, and a value of a later version is kept read-only with the same note, on the phone and on the desktop. Unlike a text, a value whose version is no whole number from 1 counts as of a later version too, as there is no source to show for it.
@@ -49,3 +57,4 @@ Amended by ADR 0034 (#131): the same rule holds beyond texts. A Routine's schedu
 - A Conflict over a text in a format not known here stays open on this Device until a newer Device resolves it.
 - A sender's update whose text the receiver's later version had formatted keeps the receiver's text; the Sections and the Routines of the update still apply.
 - Nothing changes for the user of this version: the note about a newer version shows only once a later version writes another format.
+- A Code text (#213) shows read-only, as its source, on a Device of 0.3.x, until that Device is updated.

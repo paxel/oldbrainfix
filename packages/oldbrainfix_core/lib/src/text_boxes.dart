@@ -207,13 +207,15 @@ abstract final class TextBoxes {
   /// part of another emoji, becomes a box with a new id, and a box whose
   /// id came up before in the text gets a new one. In a formatted text
   /// a glyph in inline code, in a code block or in a link's address stays
-  /// as it is. Each id is drawn from [newId], the store's maker of entity
+  /// as it is; a code text (#213) has no boxes and stays as it is. Each
+  /// id is drawn from [newId], the store's maker of entity
   /// ids, again while it is in the text already.
   static String convert(
     String text, {
     String format = TextFormats.plain,
     required String Function() newId,
   }) {
+    if (format == TextFormats.code) return text;
     final found = _scan(text);
     if (found.every((b) => b.id != null && !b.repeated)) return text;
     final used = {

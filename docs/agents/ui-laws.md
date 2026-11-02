@@ -82,9 +82,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
 - **A horizontal swipe only navigates** (see Navigation); it never
-  changes data or swipes a row or card away. The one exception is the
-  full-screen table: a one-finger drag on its cells moves it sideways,
-  as its bar does.
+  changes data or swipes a row or card away. The exceptions are the
+  full-screen table, where a one-finger drag on its cells moves it
+  sideways, as its bar does, and a Code text in the Note editor (#213),
+  which a one-finger drag moves sideways; on a card a Code text is cut
+  off at the edge instead.
 
 ## Announcements
 
@@ -445,14 +447,17 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note of a kind (#188), like a shield: left an icon for *which
   setting* the badge is, the same for every value (one for the kind,
   one for the Importance, …), right its value (#192), as an **icon**
-  where the setting has a fixed set of values (the kind, the
-  Importance, Show on the Agenda, Show ticks, a Tally field's rule, a
-  Session's rule; an on-or-off setting as `toggle_on` / `toggle_off`),
+  where the setting has a fixed set of values (the kind, the text
+  format, the Importance, Show on the Agenda, Show ticks, a Tally
+  field's rule, a Session's rule; an on-or-off setting as `toggle_on` /
+  `toggle_off`),
   as **short text** otherwise ("Every day · 08:00", "Household",
   "50 pages", "Reps"). **Never an icon plus the same word.** The
   desktop draws the same Material icons as the phone. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
-  its schedule; the kind, Plain Note included (#188); Show on the Agenda for a Checklist without a Routine and for a
+  its schedule; the kind, Plain Note included (#188); the text format of
+  a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
+  `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box. A Tally's setup
   is its fields (#190), each its name with its rule, unit and target as
   badges, as on the Tally page, what it multiplies (#200) while it does
@@ -471,7 +476,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   the kind as radio buttons of the kinds it may become: from a Plain
   Note a Checklist, a Shopping List, a Tally or a Session, from a list
   the other list, keeping its Lines, or a Plain Note, from a Session a
-  Plain Note; a Tally's only shows it;
+  Plain Note; a Tally's and a Code text's only show it; the text format
+  as radio buttons of Plain text, Formatted text and Code, a formatted
+  text never Plain text again;
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
@@ -559,6 +566,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   On the desktop it sits above the field, which shows a formatted text's
   Markdown while it is edited and the text as it reads otherwise. Its ☐
   puts ☐ in at the cursor, also in the middle of a word.
+- **A Code text has no format bar and no ☐** (#213): the field shows it
+  in the fixed-width font on the grey ground of code, unwrapped, and it
+  moves sideways. **A paste that looks like code** into a Plain Note's
+  text in the Note editor formats nothing and puts "Keep as code" under
+  the text, with a cross that lets the paste be; Capture never asks.
 - **On the phone a table in the field is its grid**, the same as on the
   card, never its Markdown; a tap opens it full screen. It is one block:
   the cursor and a selection never end inside it, the bottom row shows

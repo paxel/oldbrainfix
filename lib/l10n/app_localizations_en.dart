@@ -4905,4 +4905,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get doneAndTrash => 'Done and move to trash';
+
+  @override
+  String get badgeTextFormat => 'Text format';
+
+  @override
+  String get textFormatPlain => 'Plain text';
+
+  @override
+  String get textFormatFormatted => 'Formatted text';
+
+  @override
+  String get textFormatCode => 'Code';
+
+  @override
+  String get codePasted => 'This looks like code.';
+
+  @override
+  String get keepAsCode => 'Keep as code';
 }

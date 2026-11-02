@@ -84,8 +84,12 @@ _Avoid_: Pack (a Pack brings copies of Old Brain Fix Notes), Paste, bundle (a bu
 ### Text
 
 **Formatted text**:
-A Note's or Section's text kept as Markdown of the app's own subset: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links, inline code, code blocks and Tables. A text stays plain until it is first formatted, from the Format bar, by typing Markdown or by a Paste that uses a format, and stays formatted from then on. Transcripts and Photo Texts stay plain. German: Formatierter Text.
+A Note's or Section's text kept as Markdown of the app's own subset: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links, inline code, code blocks and Tables. A text stays plain until it is first formatted, from the Format bar, by typing Markdown or by a Paste that uses a format, and stays formatted from then on, unless it is made a Code text. Transcripts and Photo Texts stay plain. German: Formatierter Text.
 _Avoid_: rich text, styled text
+
+**Code text**:
+A Plain Note's whole text kept as code: shown in the fixed-width font exactly as written, unwrapped, nothing in it read as Markdown, a box or a #tag; in the Note editor it moves sideways. It is set in the text format badge of the Note editor, which also turns it back into a plain or formatted text, and the editor offers it when a pasted text looks like a script or code. Search finds its words; Share and Copy text give it as it is. A Code text is no Checklist or Shopping List and becomes no other kind. German: Code-Text.
+_Avoid_: script, snippet, code block (a code block is part of a formatted text)
 
 **Format bar**:
 The row of buttons that formats the selection or the word at the cursor, or the lines the selection touches, and puts in a ☐ or a Table: on the phone on the keyboard in the Note editor and in Add to Note, on the desktop above the text field of the Note editor. German: Formatleiste.

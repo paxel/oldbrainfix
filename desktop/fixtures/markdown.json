@@ -19300,5 +19300,27 @@
     " https://x.org": false,
     "ʜttps://x.org": false,
     "": false
+  },
+  "looksLikeCode": {
+    "": false,
+    "#!/bin/bash\necho hi": true,
+    "#!": false,
+    " #!/bin/bash": false,
+    "int main() {\n  return 0;\n}": true,
+    "def f(x):\n    y = x\n    return y": true,
+    "{\n  \"a\": 1,\n  \"b\": [1, 2]\n}\n": true,
+    "for f in *; do\n\techo \"$f\"\n\tls \"$f\"\ndone": true,
+    ".card {\r\n  color: red;\r\n}": true,
+    "x;\r    y\rz": true,
+    "a;\nb;": false,
+    "one;\ntwo\nthree\nfour": false,
+    "Milk\nEggs\nBread": false,
+    "- milk\n- eggs\n    - free range\n    - brown": false,
+    "* a;\n+ b;\n\t- c": true,
+    "Recipe:\n    1 cup flour\n    2 eggs\nMix well.\nBake.": false,
+    "# Shopping\n- **milk**\n- eggs": false,
+    "x\n    y\nz;": false,
+    "ä;\nö {\n} ü": true,
+    "\n\n   \n\t\n": false
   }
 }

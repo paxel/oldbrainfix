@@ -385,6 +385,17 @@ class TagTextController extends TextEditingController {
     notifyListeners();
   }
 
+  bool _codeText = false;
+
+  /// Whether the text is a Code text (#213): drawn as written in the
+  /// fixed-width font, nothing in it a format, a tag or a box.
+  bool get code => _codeText;
+  set code(bool value) {
+    if (value == _codeText) return;
+    _codeText = value;
+    notifyListeners();
+  }
+
   String? _tablesText;
   List<MarkdownTable> _tablesOf = const [];
 
@@ -437,6 +448,13 @@ class TagTextController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    if (_codeText) {
+      return super.buildTextSpan(
+        context: context,
+        style: (style ?? const TextStyle()).copyWith(fontFamily: 'monospace'),
+        withComposing: withComposing,
+      );
+    }
     final composing = withComposing && value.isComposingRangeValid
         ? value.composing
         : TextRange.empty;
@@ -826,6 +844,9 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// such as a Sent Item's: it is drawn without them, each box in the
 /// glyph it was written with.
 ///
+/// A Code text ([TextFormats.code], #213) is drawn as written in
+/// monospace, unwrapped.
+///
 /// A text in [TextFormats.markdown] is drawn formatted (ADR 0033), each
 /// of its lines that [start] to [end] touches: headings larger, items
 /// after a bullet or their number, quotes beside a bar, bold, italic,
@@ -897,6 +918,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   @override
   Widget build(BuildContext context) {
     if (widget.format == TextFormats.markdown) return _formatted(context);
+    if (widget.format == TextFormats.code) return _code(context);
     final found = _foundIn;
     final text = found.shown;
     final from = (widget.start ?? 0).clamp(0, text.length);
@@ -953,6 +975,38 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       style: widget.style,
       maxLines: widget.maxLines,
       overflow: widget.overflow,
+    );
+  }
+
+  /// A Code text (#213) from [start] to [end] as written, in monospace,
+  /// unwrapped and cut off at the edge: swipes on a card belong to the
+  /// browser, and the Note editor shows it whole. Its lines lie on the
+  /// grey ground of a code block, a compact line ([maxLines]) without
+  /// it.
+  Widget _code(BuildContext context) {
+    final text = widget.text;
+    final from = (widget.start ?? 0).clamp(0, text.length);
+    final to = (widget.end ?? text.length).clamp(from, text.length);
+    final style = DefaultTextStyle.of(context).style
+        .merge(widget.style)
+        .copyWith(fontFamily: 'monospace');
+    final lines = Text(
+      text.substring(from, to),
+      style: style,
+      softWrap: false,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow ?? TextOverflow.clip,
+    );
+    if (widget.maxLines != null) return lines;
+    return Container(
+      key: const ValueKey('code-text'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: lines,
     );
   }
 

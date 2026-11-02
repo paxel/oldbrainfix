@@ -926,8 +926,9 @@ impl<'a> Notes<'a> {
     }
 
     /// Fixes the text of the Note `note_id` as [`Notes::edit`] does, in
-    /// `format`; a formatted text stays formatted, whatever `format` says
-    /// (ADR 0033).
+    /// `format`; a formatted text stays formatted and a code text code,
+    /// whatever `format` says (ADR 0033): [`Notes::set_format`] changes
+    /// them.
     pub fn edit_as(&self, note_id: &str, text: &str, format: &str) -> Result<()> {
         self.edit_in(note_id, text, Some(format))
     }
@@ -944,10 +945,9 @@ impl<'a> Notes<'a> {
                 "the text of {note_id} is in a format not known here"
             )));
         }
-        let written = if note.text_format == text_format::MARKDOWN {
-            text_format::MARKDOWN
-        } else {
-            format.unwrap_or(&note.text_format)
+        let written = match note.text_format.as_str() {
+            text_format::MARKDOWN | text_format::CODE => &note.text_format,
+            _ => format.unwrap_or(&note.text_format),
         };
         let boxed = Self::boxed(self.store, Self::text(text)?, written)?;
         let text = StoredText::of(written, &boxed, text_format::VERSION).encode();
@@ -957,21 +957,37 @@ impl<'a> Notes<'a> {
     }
 
     /// Puts the text of the Note `note_id` in `format` as it is: a plain
-    /// text becomes formatted, for its first format. A formatted text
-    /// stays formatted, and nothing is written when the format is the
-    /// same.
+    /// text becomes formatted, for its first format, and a plain or
+    /// formatted text becomes code and back (#213). A formatted text
+    /// never becomes plain, and nothing is written when the format is the
+    /// same. Into code the text goes as it shows, each box in the glyph of
+    /// its state and without its id; out of it, its glyphs become boxes.
     pub fn set_format(&self, note_id: &str, format: &str) -> Result<()> {
         require_format(format)?;
         let Some(note) = self.by_id(note_id)? else {
             return Err(Error::Invalid(format!("not a Note: {note_id}")));
         };
+        if !note.text_editable {
+            return Err(Error::Invalid(format!(
+                "the text of {note_id} is in a format not known here"
+            )));
+        }
         if note.text_format == format
-            || note.text_format == text_format::MARKDOWN
+            || (note.text_format == text_format::MARKDOWN && format == text_format::PLAIN)
             || note.text.trim().is_empty()
         {
             return Ok(());
         }
-        self.edit_in(note_id, &note.text, Some(format))
+        let text = if format == text_format::CODE {
+            note.shown_text()
+        } else {
+            note.text.clone()
+        };
+        let boxed = Self::boxed(self.store, &text, format)?;
+        let text = StoredText::of(format, &boxed, text_format::VERSION).encode();
+        self.store
+            .append(note_id, keys::TEXT, Some(&text), None)
+            .map(drop)
     }
 
     /// Takes the Transcript or Photo Text `generated` over into the text
@@ -1245,9 +1261,10 @@ impl<'a> Notes<'a> {
     }
 
     /// The boxes of the stored `text` of `id` with the ticks that count
-    /// (ADR 0035); none in a text this version may not change.
+    /// (ADR 0035); none in a text this version may not change, nor in a
+    /// code text (#213).
     fn boxes(&self, id: &str, text: &StoredText, fields: &Fields) -> Result<Vec<ShownBox>> {
-        if !text.editable {
+        if !text.editable || text.format == text_format::CODE {
             return Ok(Vec::new());
         }
         let ticked = fields.iter().any(|(k, _)| k.starts_with(boxes::PREFIX));
@@ -1792,6 +1809,102 @@ mod tests {
         notes.set_format(&list.id, PLAIN)?;
         notes.set_format(&list.id, MARKDOWN)?;
         assert_eq!(store.history(&list.id)?.len(), entries);
+        Ok(())
+    }
+
+    #[test]
+    fn a_code_text_keeps_its_glyphs_its_format_and_has_no_boxes()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use crate::text_format::{CODE, MARKDOWN, PLAIN};
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let stored = |id: &str| store.current(id, keys::TEXT);
+        let note = notes.capture_as("☐ echo", CODE, None, None)?;
+        assert_eq!(
+            stored(&note.id)?.as_deref(),
+            Some(r#"{"format":"code","text":"☐ echo"}"#)
+        );
+        let read = notes.by_id(&note.id)?.ok_or("the Note")?;
+        assert!(read.boxes.is_empty());
+        assert_eq!(read.visible_text(), "☐ echo");
+        // An edit keeps it code, whatever format it asks.
+        notes.edit(&note.id, "ls -l")?;
+        notes.edit_as(&note.id, "**ls**", MARKDOWN)?;
+        notes.edit_as(&note.id, "ls -la", PLAIN)?;
+        assert_eq!(
+            stored(&note.id)?.as_deref(),
+            Some(r#"{"format":"code","text":"ls -la"}"#)
+        );
+        // A box with its id that came in a code text is no box.
+        let boxed = format!("☐{} x", text_boxes::encode_id("ab12"));
+        let came = notes.capture("x", None, None)?;
+        let value = StoredText::of(CODE, &boxed, text_format::VERSION).encode();
+        store.append(&came.id, keys::TEXT, Some(&value), None)?;
+        let came = notes.by_id(&came.id)?.ok_or("the Note")?;
+        assert!(came.boxes.is_empty());
+        assert_eq!(came.visible_text(), "☐ x");
+        // Its words are found.
+        let grep = notes.capture_as("grep -r **needle** .", CODE, None, None)?;
+        let found = crate::search::Search::new(&store).notes("**needle**", None)?;
+        assert_eq!(found.iter().map(|n| &n.id).collect::<Vec<_>>(), [&grep.id]);
+        Ok(())
+    }
+
+    #[test]
+    fn set_format_puts_a_plain_or_formatted_text_into_code_and_back()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use crate::text_format::{CODE, MARKDOWN, PLAIN};
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let stored = |id: &str| store.current(id, keys::TEXT);
+        let format =
+            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
+        let note = notes.capture("# comment\necho hi", None, None)?;
+        notes.set_format(&note.id, MARKDOWN)?;
+        notes.set_format(&note.id, CODE)?;
+        assert_eq!(
+            stored(&note.id)?.as_deref(),
+            Some(r##"{"format":"code","text":"# comment\necho hi"}"##)
+        );
+        let entries = store.history(&note.id)?.len();
+        notes.set_format(&note.id, CODE)?;
+        assert_eq!(store.history(&note.id)?.len(), entries);
+        notes.set_format(&note.id, PLAIN)?;
+        assert_eq!(
+            stored(&note.id)?.as_deref(),
+            Some(r##"{"format":"plain","text":"# comment\necho hi"}"##)
+        );
+        notes.set_format(&note.id, CODE)?;
+        notes.set_format(&note.id, MARKDOWN)?;
+        assert_eq!(format(&note.id)?.as_deref(), Some(MARKDOWN));
+        // A formatted text still never goes back to plain.
+        notes.set_format(&note.id, PLAIN)?;
+        assert_eq!(format(&note.id)?.as_deref(), Some(MARKDOWN));
+        // Into code a text goes as it shows; back, its glyphs are boxes.
+        let list = notes.capture("☐ milk ☐ eggs", None, None)?;
+        Boxes::new(&store).tick(
+            &list.id,
+            &list.boxes[0].id,
+            crate::text_boxes::BoxState::Done,
+        )?;
+        notes.set_format(&list.id, CODE)?;
+        assert_eq!(
+            stored(&list.id)?.as_deref(),
+            Some(r#"{"format":"code","text":"✅ milk ☐ eggs"}"#)
+        );
+        notes.set_format(&list.id, PLAIN)?;
+        let back = notes.by_id(&list.id)?.ok_or("the Note")?;
+        assert_eq!(back.boxes.len(), 2);
+        assert_eq!(back.visible_text(), "✅ milk ☐ eggs");
+        // A code Note becomes no Checklist or Shopping List.
+        let script = notes.capture_as("Script\nls\npwd", CODE, None, None)?;
+        let lists = crate::checklists::Checklists::new(&store);
+        let shopping = crate::shopping_lists::ShoppingLists::new(&store);
+        assert!(!lists.may_make(&script.id)?);
+        assert!(!shopping.may_make(&script.id)?);
+        notes.set_format(&script.id, PLAIN)?;
+        assert!(lists.may_make(&script.id)?);
+        assert!(shopping.may_make(&script.id)?);
         Ok(())
     }
 

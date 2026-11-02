@@ -673,8 +673,8 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// Whether this Device may make the Note `note_id` a Shopping List: a
-    /// Note in the lists, of a text known here, neither a Tally nor a list
-    /// already, which it may change.
+    /// Note in the lists, of a text known here and not code, neither a Tally
+    /// nor a list already, which it may change.
     pub fn may_make(&self, note_id: &str) -> Result<bool> {
         let Some(note) = Notes::new(self.store).by_id(note_id)? else {
             return Ok(false);
@@ -682,6 +682,7 @@ impl<'a> ShoppingLists<'a> {
         Ok(!note.is_trashed()
             && !note.is_merged()
             && note.text_editable
+            && note.text_format != crate::text_format::CODE
             && parse_list_kind(
                 self.store
                     .current(note_id, checklist_keys::KIND)?

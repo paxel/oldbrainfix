@@ -8,7 +8,7 @@ A formatted text is stored as the text marker of ADR 0018 holds any text: `{"for
 
 ## Plain until the first format, formatted from then on
 
-A text stays plain until it is first formatted; the editor decides when: a format applied from the format bar, a shortcut typed (`Markdown.shortcutAt`), or a pasted text that uses a format (`Markdown.uses`). It is then formatted for good. An edit keeps the text's format, an edit asking for plain keeps a formatted text formatted, and making a Note a Checklist or a Shopping List and back keeps the format of its text. The plain text is taken as Markdown as it is, not escaped, so a list typed with "- " becomes a list.
+A text stays plain until it is first formatted; the editor decides when: a format applied from the format bar, a shortcut typed (`Markdown.shortcutAt`), or a pasted text that uses a format (`Markdown.uses`). It is then formatted for good. An edit keeps the text's format, an edit asking for plain keeps a formatted text formatted, and making a Note a Checklist or a Shopping List and back keeps the format of its text. The one way out is a Code text (#213, ADR 0018): a formatted text may be made code, its source kept byte for byte, and a code text plain or formatted again; a pasted script such as one whose comments start with `# ` reads as using a format, so a script pasted at Capture is often formatted already when it is made code. In the Note editor a pasted text that looks like code does not format the text; the editor offers to keep it as code instead. The plain text is taken as Markdown as it is, not escaped, so a list typed with "- " becomes a list.
 
 ## The subset
 

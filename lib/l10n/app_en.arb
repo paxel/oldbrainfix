@@ -2597,5 +2597,17 @@
   "occurrenceMissedAt": "Missed {when}",
   "@occurrenceMissedAt": {"description": "At the top of the Note editor (#215): the latest Missed Occurrence of the Note's Routine or Reminder, with its day and time, before the Done button.", "placeholders": {"when": {"type": "String"}}},
   "doneAndTrash": "Done and move to trash",
-  "@doneAndTrash": {"description": "At the top of the Note editor (#215), beside Done for a one-time Reminder: checks it off and moves the Note with it to the trash."}
+  "@doneAndTrash": {"description": "At the top of the Note editor (#215), beside Done for a one-time Reminder: checks it off and moves the Note with it to the trash."},
+  "badgeTextFormat": "Text format",
+  "@badgeTextFormat": {"description": "The name of the Note editor's badge that shows the format of a Plain Note's text (#213): plain, formatted or code."},
+  "textFormatPlain": "Plain text",
+  "@textFormatPlain": {"description": "A value of the text format badge (#213): the text as typed, without formatting."},
+  "textFormatFormatted": "Formatted text",
+  "@textFormatFormatted": {"description": "A value of the text format badge (#213): Markdown formatting, as the format bar applies it."},
+  "textFormatCode": "Code",
+  "@textFormatCode": {"description": "A value of the text format badge (#213): the whole text as code, in a fixed-width font exactly as written, unwrapped, nothing in it read as a format, a box or a #tag."},
+  "codePasted": "This looks like code.",
+  "@codePasted": {"description": "Under the Note's text in the Note editor after a paste that looks like a script or code (#213), before the button keepAsCode."},
+  "keepAsCode": "Keep as code",
+  "@keepAsCode": {"description": "The button under the Note's text in the Note editor after a paste that looks like code (#213): makes the whole text a Code text."}
 }
