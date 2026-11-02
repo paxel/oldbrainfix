@@ -21,6 +21,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop the AI port reads a Session's setup on its Note with the Routines that run it, and sets up a Note as a Session or changes its setup, as a change that waits for the review.
 - On the desktop the AI port reads the name and description of a Note of a kind, and can turn a Checklist into a Shopping List or back as a change that waits for the review.
 - On the phone and the desktop, an all-day Routine or Reminder rings from 15:00, where it rang from 09:00 and then Re-nagged all day; before that time it only shows on the Agenda. The time is set for each Device in Settings under Alarms, "All-day items remind from". When the Quiet Hours hold that time, its first ring waits until they end. A calendar file from Export or Share gives an all-day event its alarm at the same time, and the AI port's read_settings lists it.
+- On the phone and the desktop, each badge of the Note editor, the Tally setup and the New Tally and New Session pages starts with one icon for its setting, the same whatever the value, such as one for the kind. A setting with a few fixed values shows its value as an icon, such as the kind, the Importance, Show on the Agenda, Show ticks and the rule of a Tally field or a Session; any other value shows as short text, such as "Household". A badge no longer shows an icon next to the same word, the dialog of a badge still names everything in words, and a screen reader still reads each badge as its setting and its value.
 
 ### Fixed
 

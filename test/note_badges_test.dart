@@ -202,6 +202,83 @@ void main() {
     });
   });
 
+  group('each badge is the setting\'s icon and its value (#192)', () {
+    /// The icons and the texts the badge [badge] draws.
+    List<Object> drawn(WidgetTester tester, String badge) => [
+      for (final icon in tester.widgetList<Icon>(
+        find.descendant(of: key(badge), matching: find.byType(Icon)),
+      ))
+        icon.icon!,
+      for (final text in tester.widgetList<Text>(
+        find.descendant(of: key(badge), matching: find.byType(Text)),
+      ))
+        text.data!,
+    ];
+
+    testWidgets('a fixed set of values shows as an icon, never with its '
+        'word; other values as short text', (tester) async {
+      final home = places.addArea('Household');
+      final id = notes.capture('Trip\nPassport\nTickets').id;
+      notes.file(id, home.id);
+      Checklists(store).make(id);
+      notes.setImportance(id, Importance.important);
+      await edit(tester, id);
+      expect(drawn(tester, 'badge-kind'), [
+        Icons.category_outlined,
+        Icons.checklist,
+      ]);
+      expect(drawn(tester, 'badge-importance'), [
+        Icons.label_important_outline,
+        Icons.priority_high,
+      ]);
+      expect(drawn(tester, 'badge-agenda'), [
+        Icons.today_outlined,
+        Icons.toggle_on,
+      ]);
+      // The same folder for every Area, its name as text.
+      expect(drawn(tester, 'badge-place'), [
+        Icons.folder_outlined,
+        'Household',
+      ]);
+      // No badge shows a value both as an icon and in words.
+      for (final badge in tester.widgetList<SettingBadge>(
+        find.byType(SettingBadge),
+      )) {
+        if (badge.valueIcon == null) continue;
+        expect(
+          find.descendant(
+            of: find.byWidget(badge),
+            matching: find.byType(Text),
+          ),
+          findsNothing,
+          reason: badge.setting,
+        );
+      }
+    });
+
+    testWidgets('a screen reader still reads the value in words', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final id = notes.capture('Groceries\nMilk').id;
+      ShoppingLists(store).make(id);
+      notes.setImportance(id, Importance.unimportant);
+      await edit(tester, id);
+      expect(find.bySemanticsLabel('Kind: Shopping List'), findsOneWidget);
+      expect(find.bySemanticsLabel('Importance: Unimportant'), findsOneWidget);
+      expect(
+        drawn(tester, 'badge-agenda').last,
+        isA<IconData>(),
+        reason: 'drawn as an icon',
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(r'^Show on the Agenda: .+')),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+  });
+
   group('a Checklist', () {
     testWidgets('shows its kind, Show on the Agenda and Show ticks; Plain '
         'Note in the kind\'s editor turns it back', (tester) async {
@@ -214,7 +291,7 @@ void main() {
 
       await tap(tester, key('badge-kind'));
       expect(dialogTitle('Kind'), findsOneWidget);
-      expect(inDialog(find.byIcon(Icons.checklist)), findsOneWidget);
+      expect(inDialog(find.byIcon(Icons.category_outlined)), findsOneWidget);
       expect(
         tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
         NoteKind.checklist,
@@ -298,7 +375,7 @@ void main() {
       expect(key('shopping-make'), findsNothing);
       await tap(tester, key('badge-kind'));
       expect(dialogTitle('Kind'), findsOneWidget);
-      expect(inDialog(find.byIcon(Icons.notes)), findsOneWidget);
+      expect(inDialog(find.byIcon(Icons.category_outlined)), findsOneWidget);
       expect(offered(tester), [
         'plain',
         'checklist',
@@ -413,6 +490,13 @@ void main() {
     await tap(tester, key('badge-close'));
     expect(showsTicks(store, id), isTrue);
     expect(value(tester, 'badge-ticks'), 'On');
+    // Its icon, then the switch's as its value (#192).
+    for (final icon in [Icons.history_toggle_off, Icons.toggle_on]) {
+      expect(
+        find.descendant(of: key('badge-ticks'), matching: find.byIcon(icon)),
+        findsOneWidget,
+      );
+    }
   });
 
   testWidgets('a Shopping List and a Tally show their kind', (tester) async {

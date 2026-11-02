@@ -122,6 +122,16 @@ pub fn on_agenda_label(t: &L10n, shows: ShoppingOnAgenda) -> &'static str {
     }
 }
 
+/// The way `shows` as the value icon of its badge (#192), the phone's
+/// `shoppingOnAgendaIcon`.
+pub fn on_agenda_icon(shows: ShoppingOnAgenda) -> char {
+    match shows {
+        ShoppingOnAgenda::Off => crate::setting_badges::switch_icon(false),
+        ShoppingOnAgenda::Count => crate::icons::COUNT,
+        ShoppingOnAgenda::Lines => crate::icons::FORMAT_BULLETS,
+    }
+}
+
 /// The Lines of `list` as they are drawn: open ones first, struck ones at
 /// the end with the day they come back under them, as a short weekday
 /// and date ("back Sat, Oct 31").

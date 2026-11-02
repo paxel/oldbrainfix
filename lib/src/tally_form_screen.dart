@@ -248,6 +248,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
                 value: field.rule == TallyRule.sum
                     ? t.tallyRuleSumShort
                     : t.tallyRuleMaxShort,
+                valueIcon: tallyRuleIcon(field.rule),
                 onTap: (_) => _editRule(field),
               ),
               SettingBadge(

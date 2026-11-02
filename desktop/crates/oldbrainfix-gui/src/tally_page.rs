@@ -16,9 +16,9 @@ use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 use crate::app::{embossed, radio_column};
 use crate::icons;
 use crate::l10n::L10n;
-use crate::setting_badges::{badge, badge_dialog, badge_row};
+use crate::setting_badges::{BadgeValue, badge, badge_dialog, badge_row};
 use crate::tally_unit_match::{self, UnitNames};
-use crate::tally_view::kind_name;
+use crate::tally_view::{self, kind_name};
 use crate::theme::Tones;
 
 /// What was asked of the page.
@@ -263,10 +263,7 @@ impl TallyPage {
                         }
                         let unit = tally_units::shown_unit(&field.unit(system), system);
                         let target = field.target.trim();
-                        let rule = match field.rule {
-                            TallyRule::Sum => t.tally_rule_sum_short(),
-                            TallyRule::Max => t.tally_rule_max_short(),
-                        };
+                        let rule = tally_view::rule_value(t, field.rule);
                         let unit_value = if unit.is_empty() {
                             t.tally_no_unit().to_string()
                         } else {
@@ -281,22 +278,22 @@ impl TallyPage {
                         let mut opened = None;
                         badge_row(ui, |ui| {
                             let badges = [
+                                (icons::TALLY_RULE, t.tally_rule(), rule, Editing::Rule),
                                 (
-                                    icons::TALLY_RULE,
-                                    t.tally_rule(),
-                                    rule.to_string(),
-                                    Editing::Rule,
+                                    icons::TALLY_UNIT,
+                                    t.tally_unit(),
+                                    BadgeValue::Text(&unit_value),
+                                    Editing::Unit,
                                 ),
-                                (icons::TALLY_UNIT, t.tally_unit(), unit_value, Editing::Unit),
                                 (
                                     icons::TALLY_TARGET,
                                     t.tally_target_badge(),
-                                    target_value,
+                                    BadgeValue::Text(&target_value),
                                     Editing::Target,
                                 ),
                             ];
                             for (icon, setting, value, editing) in badges {
-                                if badge(ui, shown, (icon, None), setting, Some(&value), true)
+                                if badge(ui, shown, (icon, None), setting, Some(value), true)
                                     .clicked()
                                 {
                                     opened = Some(editing);

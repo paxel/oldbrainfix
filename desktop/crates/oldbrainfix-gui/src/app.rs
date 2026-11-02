@@ -143,7 +143,9 @@ use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, SessionPart};
-use crate::setting_badges::{badge, badge_dialog, badge_row, badge_switch, menu_entry};
+use crate::setting_badges::{
+    BadgeValue, badge, badge_dialog, badge_row, badge_switch, menu_entry, switch_icon,
+};
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
@@ -8477,8 +8479,7 @@ impl App {
             NoteBadge::Kind => {
                 let shown_kind = KindShown::of(&self.view);
                 let current = shown_kind.kind;
-                let (icon, _) = kind_look(&t, current);
-                badge_dialog(ctx, shown, (icon, None), t.badge_kind(), |ui| {
+                badge_dialog(ctx, shown, (icons::KIND, None), t.badge_kind(), |ui| {
                     // The kinds as radio buttons, the current one picked;
                     // a pick changes it at once and closes (#188).
                     let mut picked = current;
@@ -8531,7 +8532,7 @@ impl App {
             // Each pick written at once, the rule's closing (#191).
             NoteBadge::SessionRule => match (&mut self.session_draft, &self.view.session_setup) {
                 (Some(draft), Some(setup)) => {
-                    let icon = (icons::SESSION_RULE, None);
+                    let icon = (icons::SESSION_RULE_BADGE, None);
                     badge_dialog(ctx, shown, icon, t.session_rule(), |ui| {
                         if draft.rules(ui, &t) {
                             let changed = Box::new((draft.clone(), setup.clone()));
@@ -13801,10 +13802,11 @@ fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
     }
 }
 
-/// The icon and the name of the kind `kind` (#188).
+/// The icon and the name of the kind `kind` (#188), the value of its
+/// badge (#192); the phone's `kindIcon` and `kindName`.
 fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
     match kind {
-        NoteKind::Plain => (icons::NOTE, t.kind_plain()),
+        NoteKind::Plain => (icons::ALL_NOTES, t.kind_plain()),
         NoteKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
         NoteKind::ShoppingList => (icons::SHOPPING_CART, t.shopping_heading()),
         NoteKind::Tally => (icons::TALLY, t.tally_heading()),
@@ -13812,7 +13814,9 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
     }
 }
 
-/// The row of badges under the Note's text (#160), in the phone's order:
+/// The row of badges under the Note's text (#160), each the setting's
+/// icon and its value, an icon for a fixed set of values, short text
+/// otherwise (#192), in the phone's order:
 /// the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
 /// opening its editor, and those a newer version saved, only shown; the
@@ -13833,27 +13837,26 @@ fn note_badges(
     let look = (t, tones);
     badge_row(ui, |ui| {
         let importance = match note.importance {
-            Importance::Unimportant => t.importance_unimportant(),
-            Importance::Normal => t.importance_normal(),
-            Importance::Important => t.importance_important(),
+            Importance::Unimportant => (icons::IMPORTANCE_LOW, t.importance_unimportant()),
+            Importance::Normal => (icons::IMPORTANCE_NORMAL, t.importance_normal()),
+            Importance::Important => (icons::IMPORTANCE_HIGH, t.importance_important()),
         };
         let icon = (icons::IMPORTANCE, None);
-        if badge(ui, look, icon, t.importance(), Some(importance), changes).clicked() {
+        let value = BadgeValue::Icon(importance.0, importance.1);
+        if badge(ui, look, icon, t.importance(), Some(value), changes).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Importance)));
         }
         // Area and Topic in one: File into… picks both at once.
+        // The folder for every place, in the Area's colour.
         let area = placed.area.as_ref();
-        let icon = area
-            .and_then(|a| icons::area_icon(a.icon.as_deref()))
-            .unwrap_or(icons::NO_AREA_ICON);
         let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
         if badge(
             ui,
             look,
-            (icon, colour),
+            (icons::NO_AREA_ICON, colour),
             t.badge_place(),
-            Some(&place),
+            Some(BadgeValue::Text(&place)),
             changes,
         )
         .clicked()
@@ -13862,7 +13865,8 @@ fn note_badges(
         }
         let captured = when(t, note.captured);
         let icon = (icons::CONTEXT_WHEN, None);
-        if badge(ui, look, icon, t.captured_heading(), Some(&captured), true).clicked() {
+        let value = Some(BadgeValue::Text(&captured));
+        if badge(ui, look, icon, t.captured_heading(), value, true).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Captured)));
         }
         for routine in shown.routines {
@@ -13872,42 +13876,51 @@ fn note_badges(
                 (icons::REPEAT, t.routine())
             };
             let schedule = schedule_text(t, &routine.schedule);
-            if badge(ui, look, (icon, None), setting, Some(&schedule), true).clicked() {
+            let value = Some(BadgeValue::Text(&schedule));
+            if badge(ui, look, (icon, None), setting, value, true).clicked() {
                 actions.push(Action::OpenRoutine(routine.id.clone()));
             }
         }
         for _ in 0..shown.newer {
-            let icon = (icons::HISTORY, None);
-            let newer = t.newer_version_needed();
-            badge(ui, look, icon, t.routine(), Some(newer), false);
+            let icon = (icons::REPEAT, None);
+            let newer = Some(BadgeValue::Text(t.newer_version_needed()));
+            badge(ui, look, icon, t.routine(), newer, false);
         }
         // Every Note has its kind, a plain Note too (#188); it opens
         // where there is another to make it.
         let (icon, name) = kind_look(t, shown.kind.kind);
         let choosing = !shown.kind.choices.is_empty();
-        if badge(ui, look, (icon, None), t.badge_kind(), Some(name), choosing).clicked() {
+        let value = Some(BadgeValue::Icon(icon, name));
+        let kind = (icons::KIND, None);
+        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
         // A Session's rule and its weekdays' counts (#191).
         if let Some((setup, changes)) = shown.session {
             let rule = session_view::rule_name(t, setup.rule);
-            let icon = (icons::SESSION_RULE, None);
-            if badge(ui, look, icon, t.session_rule(), Some(rule), changes).clicked() {
+            let rule = Some(BadgeValue::Icon(session_view::rule_icon(setup.rule), rule));
+            let icon = (icons::SESSION_RULE_BADGE, None);
+            if badge(ui, look, icon, t.session_rule(), rule, changes).clicked() {
                 actions.push(Action::Badge(Some(NoteBadge::SessionRule)));
             }
             let own = t.session_weekday_counts_summary(setup.counts.len() as i64);
             let icon = (icons::SESSION_WEEKDAYS, None);
             let setting = t.session_weekday_counts();
-            if badge(ui, look, icon, setting, Some(&own), changes).clicked() {
+            let own = Some(BadgeValue::Text(&own));
+            if badge(ui, look, icon, setting, own, changes).clicked() {
                 actions.push(Action::Badge(Some(NoteBadge::SessionWeekdays)));
             }
         }
         // A Shopping List's three ways, where a Checklist's switch sits.
         if let Some(shows) = shown.shopping_on_agenda {
             let value = shopping_view::on_agenda_label(t, shows);
+            let value = Some(BadgeValue::Icon(
+                shopping_view::on_agenda_icon(shows),
+                value,
+            ));
             let icon = (icons::ON_AGENDA, None);
             let setting = t.checklist_show_on_agenda();
-            if badge(ui, look, icon, setting, Some(value), true).clicked() {
+            if badge(ui, look, icon, setting, value, true).clicked() {
                 actions.push(Action::Badge(Some(NoteBadge::ShoppingOnAgenda)));
             }
         }
@@ -13930,7 +13943,8 @@ fn note_badges(
                 continue;
             };
             let value = if on { t.setting_on() } else { t.setting_off() };
-            if badge(ui, look, (icon, None), setting, Some(value), true).clicked() {
+            let value = Some(BadgeValue::Icon(switch_icon(on), value));
+            if badge(ui, look, (icon, None), setting, value, true).clicked() {
                 actions.push(Action::Badge(Some(open)));
             }
         }

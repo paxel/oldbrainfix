@@ -349,8 +349,15 @@ void main() {
       expect(key('tally-entries'), findsNothing);
       expect(key('tally-period'), findsNothing);
       expect(key('tally-add-entry'), findsNothing);
+      // The rule as its icon (#192), the others as text.
+      expect(
+        find.descendant(
+          of: key('tally-setup-rule-$id'),
+          matching: find.byIcon(Icons.add_circle_outline),
+        ),
+        findsOneWidget,
+      );
       for (final (badge, value) in [
-        ('rule', 'Sum'),
         ('unit', 'times'),
         ('target', '20 times'),
       ]) {

@@ -1276,7 +1276,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       context: context,
       builder: (context) => BadgeDialog(
         setting: t.badgeKind,
-        icon: kindIcon(current),
+        icon: kindBadgeIcon,
         content: RadioColumn<NoteKind>(
           value: current,
           options: [
@@ -1425,8 +1425,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The icon of the Importance, in its badge and its editor.
   static const _importanceIcon = Icons.label_important_outline;
 
+  /// The icon of Area and Topic, in its badge, the Area's colour.
+  static const _placeIcon = Icons.folder_outlined;
+
   /// The row of badges under the text (#160): each setting of the Note
-  /// as its icon and value, a tap opening its small editor; a setting
+  /// as its icon and its value, an icon for a fixed set of values, short
+  /// text otherwise (#192), a tap opening its small editor; a setting
   /// that does not apply has none. "+" ends it.
   Widget _badges(
     PlacedNote placed,
@@ -1453,13 +1457,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             Importance.normal => t.importanceNormal,
             Importance.important => t.importanceImportant,
           },
+          valueIcon: importanceIcon(note.importance),
           onTap: changes ? (_) => _editImportance() : null,
         ),
         // Area and Topic in one: File into… picks both at once.
         SettingBadge(
           key: const ValueKey('badge-place'),
           setting: t.badgePlace,
-          icon: areaIconData(area?.icon) ?? Icons.folder_outlined,
+          icon: _placeIcon,
           iconColour: colour,
           value: place,
           onTap: changes ? (_) => _file() : null,
@@ -1485,7 +1490,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           SettingBadge(
             key: ValueKey('newer-${routine.id}'),
             setting: t.routine,
-            icon: Icons.update,
+            icon: Icons.repeat,
             value: t.newerVersionNeeded,
           ),
         // Every Note has a kind (#188); with nothing to change it to,
@@ -1493,8 +1498,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         SettingBadge(
           key: const ValueKey('badge-kind'),
           setting: t.badgeKind,
-          icon: kindIcon(_kind),
+          icon: kindBadgeIcon,
           value: kindName(t, _kind),
+          valueIcon: kindIcon(_kind),
           onTap: _kinds.isEmpty ? null : (_) => _editKind(),
         ),
         // A Session's rule and weekdays' counts (#191).
@@ -1512,6 +1518,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             setting: t.checklistShowOnAgenda,
             icon: Icons.today_outlined,
             value: agenda.on ? t.settingOn : t.settingOff,
+            valueIcon: switchIcon(agenda.on),
             onTap: (_) => _editSwitch(
               t.checklistShowOnAgenda,
               Icons.today_outlined,
@@ -1529,6 +1536,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ShoppingOnAgenda.count => t.shoppingOnAgendaCount,
               ShoppingOnAgenda.lines => t.shoppingOnAgendaLines,
             },
+            valueIcon: shoppingOnAgendaIcon(agenda.shows),
             onTap: (_) => _editShoppingOnAgenda(agenda),
           ),
         if (_hasBoxes)
@@ -1537,6 +1545,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             setting: t.boxShowTicks,
             icon: Icons.history_toggle_off,
             value: ticks ? t.settingOn : t.settingOff,
+            valueIcon: switchIcon(ticks),
             onTap: (_) => _editSwitch(
               t.boxShowTicks,
               Icons.history_toggle_off,
@@ -2288,7 +2297,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 }
 
-/// The icon of the kind [kind] (#188), in its badge and its editor.
+/// The icon of the kind badge (#192), the same for every kind; the
+/// badge shows the kind itself as [kindIcon].
+const kindBadgeIcon = Icons.category_outlined;
+
+/// The value icon of the Importance [importance] in its badge (#192).
+IconData importanceIcon(Importance importance) => switch (importance) {
+  Importance.important => Icons.priority_high,
+  Importance.normal => Icons.remove,
+  Importance.unimportant => Icons.low_priority,
+};
+
+/// The value icon of a Shopping List's Show on the Agenda [shows] in its
+/// badge (#192).
+IconData shoppingOnAgendaIcon(ShoppingOnAgenda shows) => switch (shows) {
+  ShoppingOnAgenda.off => switchIcon(false),
+  ShoppingOnAgenda.count => Icons.numbers,
+  ShoppingOnAgenda.lines => Icons.format_list_bulleted,
+};
+
+/// The icon of the kind [kind] (#188), the value of its badge.
 IconData kindIcon(NoteKind kind) => switch (kind) {
   NoteKind.plain => Icons.notes,
   NoteKind.checklist => Icons.checklist,

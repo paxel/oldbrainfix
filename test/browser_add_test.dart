@@ -341,13 +341,16 @@ void main() {
       // largest, a time the sum.
       Finder badge(String badge, String text) =>
           find.descendant(of: key(badge), matching: find.text(text));
-      expect(badge('tally-form-rule-0', 'Sum'), findsOneWidget);
-      expect(badge('tally-form-rule-1', 'Largest'), findsOneWidget);
+      // The rule as its icon (#192).
+      Finder rule(String badge, IconData icon) =>
+          find.descendant(of: key(badge), matching: find.byIcon(icon));
+      expect(rule('tally-form-rule-0', Icons.add_circle_outline), findsOne);
+      expect(rule('tally-form-rule-1', Icons.vertical_align_top), findsOne);
       expect(badge('tally-form-unit-1', '°'), findsOneWidget);
       expect(badge('tally-form-target-0', '2 min'), findsOneWidget);
       await tap(tester, key('tally-form-rule-0'));
       await tap(tester, key('tally-rule-max'));
-      expect(badge('tally-form-rule-0', 'Largest'), findsOneWidget);
+      expect(rule('tally-form-rule-0', Icons.vertical_align_top), findsOne);
 
       await tap(tester, key('tally-form-save'));
       final fields = Tallies(store).byNote(only().id)!.fields;

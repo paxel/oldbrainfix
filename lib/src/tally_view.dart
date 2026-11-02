@@ -22,6 +22,12 @@ UnitSystem deviceUnitSystem(Store store) => store.unitSystem(
   WidgetsBinding.instance.platformDispatcher.locale.countryCode,
 );
 
+/// The rule [rule] as the value icon of a field's rule badge (#192).
+IconData tallyRuleIcon(TallyRule rule) => switch (rule) {
+  TallyRule.sum => Icons.add_circle_outline,
+  TallyRule.max => Icons.vertical_align_top,
+};
+
 /// The decimal sign of the app's language, for showing numbers.
 String decimalSign(BuildContext context) =>
     NumberFormat.decimalPattern(Localizations.localeOf(context).toString())
@@ -184,6 +190,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   value: field.rule == TallyRule.sum
                       ? t.tallyRuleSumShort
                       : t.tallyRuleMaxShort,
+                  valueIcon: tallyRuleIcon(field.rule),
                   onTap: open == null ? null : (_) => open(),
                 ),
               SettingBadge(
@@ -217,6 +224,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   setting: t.tallyHideField,
                   icon: Icons.visibility_off_outlined,
                   value: t.tallyFieldHidden,
+                  valueIcon: switchIcon(true),
                   onTap: open == null ? null : (_) => open(),
                 ),
             ],

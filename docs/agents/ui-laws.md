@@ -355,8 +355,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   display, and leaving both unchanged writes nothing.
 - **The Note editor shows each setting of the Note as a badge** (#160),
   in one wrapping row under the text, or under the kind's content for a
-  Note of a kind (#188): the setting's icon and its value,
-  like a shield. Importance; Area and Topic in one; Captured (time, place,
+  Note of a kind (#188), like a shield: left an icon for *which
+  setting* the badge is, the same for every value (one for the kind,
+  one for the Importance, …), right its value (#192), as an **icon**
+  where the setting has a fixed set of values (the kind, the
+  Importance, Show on the Agenda, Show ticks, a Tally field's rule, a
+  Session's rule; an on-or-off setting as `toggle_on` / `toggle_off`),
+  as **short text** otherwise ("Every day · 08:00", "Household",
+  "50 pages", "Reps"). **Never an icon plus the same word.** The
+  desktop draws the same Material icons as the phone. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
   its schedule; the kind, Plain Note included (#188); Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box. A Tally's setup
@@ -370,8 +377,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   and how many it picks with − and +, then its rule and its weekdays'
   counts as badges; each of its Routines is a Routine badge, and the
   Routine editor of one holds only its schedule. A setting that does not apply has no badge. A tap
-  opens its small editor, a dialog with the same icon and the setting's
-  name, which changes it at once: Importance as radio buttons (only
+  opens its small editor, a dialog with the same setting icon and the
+  setting's name, its values in words, which changes it at once: Importance as radio buttons (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the
   Agenda as radio buttons (here and in the card's ⋮), the switches,
   the kind as radio buttons of the kinds it may become: from a Plain
@@ -381,7 +388,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
-  screen reader reads each as "setting: value". The row ends with "+",
+  screen reader reads each as "setting: value" in words, an icon's value
+  too. The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
   there only for who may set them up; on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and

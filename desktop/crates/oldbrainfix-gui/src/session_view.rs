@@ -155,6 +155,16 @@ pub fn rule_name(t: &L10n, rule: SessionRule) -> &'static str {
     }
 }
 
+/// The rule `rule` as the value icon of its badge (#192), the phone's
+/// `sessionRuleIcon`.
+pub fn rule_icon(rule: SessionRule) -> char {
+    match rule {
+        SessionRule::Random => icons::SESSION_RULE,
+        SessionRule::Rolling => icons::FORMAT_NUMBERS,
+        SessionRule::Least => icons::SESSION_LEAST,
+    }
+}
+
 /// Draws a Session Note's detailed card `shown`: its pool, its setup,
 /// today's picks of each Routine under its time, each opening its entry
 /// form and offering "Another one" as on the Agenda, then its last weeks.

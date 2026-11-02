@@ -292,6 +292,32 @@ fn each_setting_is_a_badge_read_as_setting_and_value() -> TestResult {
     Ok(())
 }
 
+/// A badge whose setting has a fixed set of values shows its value as an
+/// icon, never with its word (#192): it is as wide for a long value as for
+/// a short one, and as wide as an icon; other values are text, wider.
+#[test]
+fn a_fixed_set_of_values_shows_as_an_icon_without_its_word() -> TestResult {
+    let (store, household) = store()?;
+    let notes = Notes::new(&store);
+    let tap = notes.capture("Fix the tap ☐", Some(&household), None)?.id;
+    notes.set_importance(&tap, Importance::Unimportant)?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let width = |label: &str| harness.get_by_label(label).rect().width();
+    // The setting's icon part, 38 points, then an 18-point icon padded by
+    // 10 on each side.
+    for label in [
+        "Kind: Plain Note",
+        "Importance: Unimportant",
+        "Show ticks: Off",
+    ] {
+        assert_eq!(width(label), 38.0 + 18.0 + 20.0, "{label}");
+    }
+    assert!(width("Area and Topic: Household") > 38.0 + 18.0 + 20.0);
+    Ok(())
+}
+
 #[test]
 fn each_badge_opens_its_small_editor_and_follows_the_change() -> TestResult {
     let (store, household) = store()?;

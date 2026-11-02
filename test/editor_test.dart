@@ -100,7 +100,14 @@ void main() {
       await reveal(tester, find.text('Update: sauce bought'));
       expect(find.text('Update: sauce bought'), findsOneWidget);
       expect(find.text(shown(DateTime.utc(2026, 10, 25, 8))), findsOneWidget);
-      expect(find.text('Normal'), findsOneWidget);
+      // The Importance as its icon (#192).
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('badge-importance')),
+          matching: find.byIcon(Icons.remove),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('an edit changes the text in place; the log keeps the old', (

@@ -31,7 +31,8 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
-use crate::setting_badges::{badge, badge_row};
+use crate::setting_badges::BadgeValue::{self, Icon, Text};
+use crate::setting_badges::{badge, badge_row, switch_icon};
 use crate::tally_unit_match::{self, UnitNames};
 use crate::theme::Tones;
 
@@ -292,6 +293,15 @@ pub(crate) fn typed_value(
         .unwrap_or_default()
 }
 
+/// The rule `rule` as the value of a field's rule badge (#192): its icon
+/// and its short words, the phone's `tallyRuleIcon`.
+pub(crate) fn rule_value(t: &L10n, rule: TallyRule) -> BadgeValue<'static> {
+    match rule {
+        TallyRule::Sum => Icon(icons::TALLY_SUM, t.tally_rule_sum_short()),
+        TallyRule::Max => Icon(icons::TALLY_MAX, t.tally_rule_max_short()),
+    }
+}
+
 /// The name of a kind of unit; "Another unit" for a typed one.
 pub(crate) fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
     match kind {
@@ -360,10 +370,7 @@ pub fn setup(
                 actions.push(TallyAction::OpenField(Some(field.id.clone())));
             }
             let unit = tally_units::shown_unit(&field.unit, system);
-            let rule = match field.rule {
-                TallyRule::Sum => t.tally_rule_sum_short(),
-                TallyRule::Max => t.tally_rule_max_short(),
-            };
+            let rule = rule_value(t, field.rule);
             let unit_value = if unit.is_empty() {
                 t.tally_no_unit().to_string()
             } else {
@@ -377,29 +384,25 @@ pub fn setup(
             let mut badges = Vec::new();
             // A multiplier counts no value: no rule, no target (#200).
             if multiplies.is_none() {
-                badges.push((icons::TALLY_RULE, t.tally_rule(), rule.to_string()));
+                badges.push((icons::TALLY_RULE, t.tally_rule(), rule));
             }
-            badges.push((icons::TALLY_UNIT, t.tally_unit(), unit_value));
+            badges.push((icons::TALLY_UNIT, t.tally_unit(), Text(&unit_value)));
             if multiplies.is_none() {
-                badges.push((icons::TALLY_TARGET, t.tally_target_badge(), target_value));
+                let target = Text(&target_value);
+                badges.push((icons::TALLY_TARGET, t.tally_target_badge(), target));
             }
             if multiplies.is_some() || !tally.multipliable(Some(&field.id)).is_empty() {
-                let value = multiplies.map_or_else(
-                    || t.tally_multiplies_nothing().to_string(),
-                    |m| m.name.clone(),
-                );
-                badges.push((icons::TALLY_MULTIPLIES, t.tally_multiplies(), value));
+                let value = multiplies.map_or(t.tally_multiplies_nothing(), |m| m.name.as_str());
+                badges.push((icons::TALLY_MULTIPLIES, t.tally_multiplies(), Text(value)));
             }
             if field.hidden {
-                badges.push((
-                    icons::TALLY_HIDDEN,
-                    t.tally_hide_field(),
-                    t.tally_field_hidden().to_string(),
-                ));
+                // Only while on: the switch's on, as the other switches.
+                let hidden = Icon(switch_icon(true), t.tally_field_hidden());
+                badges.push((icons::TALLY_HIDDEN, t.tally_hide_field(), hidden));
             }
             badge_row(ui, |ui| {
                 for (icon, setting, value) in badges {
-                    if badge(ui, (t, tones), (icon, None), setting, Some(&value), changes).clicked()
+                    if badge(ui, (t, tones), (icon, None), setting, Some(value), changes).clicked()
                     {
                         actions.push(TallyAction::OpenField(Some(field.id.clone())));
                     }

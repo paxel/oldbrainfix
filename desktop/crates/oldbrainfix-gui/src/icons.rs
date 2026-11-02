@@ -134,6 +134,27 @@ pub const SESSION: char = '\u{f04fb}';
 pub const SESSION_WEEKDAYS: char = '\u{e125}';
 pub const TALLY: char = '\u{e0cc}';
 pub const NEW_NOTE: char = '\u{f04f6}';
+/// The badges' own icons and their values' (#192): `category_outlined`
+/// for the kind; `priority_high`, `remove` and `low_priority` for
+/// important, normal and unimportant; `toggle_on` and `toggle_off` for an
+/// on-or-off setting; `numbers` for a Shopping List's count on the
+/// Agenda, its Lines `format_list_bulleted` ([`FORMAT_BULLETS`]);
+/// `add_circle_outline` and `vertical_align_top` for a Tally field's Sum
+/// and Max; `alt_route` for a Session's rule, its Random `shuffle`
+/// ([`SESSION_RULE`]), its Rolling `format_list_numbered`
+/// ([`FORMAT_NUMBERS`]) and its Least `balance`; and `folder_outlined`
+/// for Area and Topic ([`NO_AREA_ICON`]).
+pub const KIND: char = '\u{ef37}';
+pub const IMPORTANCE_HIGH: char = '\u{e4ec}';
+pub const IMPORTANCE_NORMAL: char = '\u{e516}';
+pub const IMPORTANCE_LOW: char = '\u{e3bd}';
+pub const TOGGLE_ON: char = '\u{e66c}';
+pub const TOGGLE_OFF: char = '\u{e66b}';
+pub const COUNT: char = '\u{f0542}';
+pub const TALLY_SUM: char = '\u{e050}';
+pub const TALLY_MAX: char = '\u{e69d}';
+pub const SESSION_RULE_BADGE: char = '\u{e080}';
+pub const SESSION_LEAST: char = '\u{f04c6}';
 /// A folded description of a Note of a kind (#188), `expand_more`, and
 /// one unfolded, `expand_less`.
 pub const EXPAND_MORE: char = '\u{e246}';

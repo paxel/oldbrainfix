@@ -158,8 +158,9 @@ List<Widget> sessionBadges(
     SettingBadge(
       key: const ValueKey('badge-session-rule'),
       setting: t.sessionRule,
-      icon: Icons.shuffle,
+      icon: sessionRuleBadgeIcon,
       value: sessionRuleName(t, setup.rule),
+      valueIcon: sessionRuleIcon(setup.rule),
       onTap: changes
           ? (_) async {
               final picked = await pickSessionRule(context, setup.rule);

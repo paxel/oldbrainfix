@@ -283,8 +283,9 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               SettingBadge(
                 key: const ValueKey('session-form-rule'),
                 setting: t.sessionRule,
-                icon: Icons.shuffle,
+                icon: sessionRuleBadgeIcon,
                 value: rule,
+                valueIcon: sessionRuleIcon(_draft.rule),
                 onTap: (_) => _editRule(),
               ),
               if (widget.noteId == null)
@@ -302,6 +303,16 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     );
   }
 }
+
+/// The icon of a Session's rule badge (#192), the same for every rule.
+const sessionRuleBadgeIcon = Icons.alt_route;
+
+/// The rule [rule] as the value icon of its badge (#192).
+IconData sessionRuleIcon(SessionRule rule) => switch (rule) {
+  SessionRule.random => Icons.shuffle,
+  SessionRule.rolling => Icons.format_list_numbered,
+  SessionRule.least => Icons.balance,
+};
 
 /// The rule [rule] in words, the value of its badge.
 String sessionRuleName(AppLocalizations t, SessionRule rule) => switch (rule) {
@@ -322,7 +333,7 @@ Future<SessionRule?> pickSessionRule(
     context: context,
     builder: (context) => BadgeDialog(
       setting: t.sessionRule,
-      icon: Icons.shuffle,
+      icon: sessionRuleBadgeIcon,
       content: RadioColumn<SessionRule>(
         key: const ValueKey('session-rule'),
         value: current,

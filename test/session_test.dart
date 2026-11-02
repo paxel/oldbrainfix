@@ -320,7 +320,10 @@ void main() {
       expect(key('note-name'), findsOneWidget);
       expect(key('session-pool'), findsOneWidget);
       expect(
-        find.descendant(of: key('badge-kind'), matching: find.text('Session')),
+        find.descendant(
+          of: key('badge-kind'),
+          matching: find.byIcon(Icons.event_repeat),
+        ),
         findsOneWidget,
       );
       expect(key('badge-session-rule'), findsOneWidget);
@@ -438,7 +441,7 @@ void main() {
       expect(
         find.descendant(
           of: key('badge-session-rule'),
-          matching: find.text('Least selected'),
+          matching: find.byIcon(Icons.balance),
         ),
         findsOneWidget,
       );
