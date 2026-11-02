@@ -11,7 +11,7 @@ Anything the user captured: text, a voice recording, a photo, or something share
 _Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
 
 **Kind**:
-What a Note is, and with it its page: a Plain Note, a Checklist, a Shopping List or a Tally (a Session joins them later). A Plain Note is its text; every other kind shows its content first, its text only as its Name and Description above it. The kind changes on the kind badge of the Note editor: a Plain Note becomes a Checklist, a Shopping List or a Tally, a list becomes the other list, keeping its Lines, or a Plain Note again; a Tally stays a Tally. What belonged to the old kind stays in the log and shows no more. A Frog is no kind but a mark any Note can carry. German: Art.
+What a Note is, and with it its page: a Plain Note, a Checklist, a Shopping List, a Tally or a Session. A Plain Note is its text; every other kind shows its content first, its text only as its Name and Description above it. The kind changes on the kind badge of the Note editor: a Plain Note becomes a Checklist, a Shopping List, a Tally or a Session, a list becomes the other list, keeping its Lines, or a Plain Note again, as a Session does; a Tally stays a Tally. What belonged to the old kind stays in the log and shows no more. A Frog is no kind but a mark any Note can carry. German: Art.
 _Avoid_: type, template, mode
 
 **Plain Note**:
@@ -27,11 +27,11 @@ The rest of the text of a Note of any Kind but a Plain Note, after its Name: sho
 _Avoid_: body, notes, details
 
 **Compact view**:
-How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total today against its target ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Note that runs a Session its first line, the next run and this week's runs done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
+How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total today against its target ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Session its Name, the next run of any of its Routines and this week's runs of all of them done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
 _Avoid_: folded card, short view, summary
 
 **Detailed view**:
-How a Note's card shows it whole in a list, as its Kind defines it: a Plain Note its whole text, its Amends, photos and recordings, a Checklist all its Lines with their boxes, tickable, in their groups, a Shopping List its open Lines, tickable, the struck ones folded under them, a Tally "Add entry", its charts and its entries, the older folded under the latest five; each part with its Capture Context as one line under its text, the buttons at the bottom of the card. The default of every list. German: Detailansicht.
+How a Note's card shows it whole in a list, as its Kind defines it: a Plain Note its whole text, its Amends, photos and recordings, a Checklist all its Lines with their boxes, tickable, in their groups, a Shopping List its open Lines, tickable, the struck ones folded under them, a Tally "Add entry", its charts and its entries, the older folded under the latest five, a Session its pool, today's picks of each of its Routines, recorded there as on the Agenda, and how often it was done and skipped in each of the last four weeks; each part with its Capture Context as one line under its text, the buttons at the bottom of the card. The default of every list. German: Detailansicht.
 _Avoid_: full card, expanded view, long view
 
 **Capture**:
@@ -134,7 +134,7 @@ The Areas and Topics offered on first start; the user picks which ones to keep.
 ### Routines and Reminders
 
 **Routine**:
-Something to be done on a repeating schedule (pills, homework, cleaning), always spawned from a Note and linked back to it. German: Routine.
+Something to be done on a repeating schedule (pills, homework, cleaning), always spawned from a Note and linked back to it. A Routine of a Session runs it. German: Routine.
 _Avoid_: chore, task, habit, to-do
 
 **Reminder**:
@@ -194,7 +194,7 @@ One record of a Tally: a value for some of its fields, a date, one line of text 
 _Avoid_: Section (a Section is a dated part of a Note's text), record, set
 
 **Session**:
-A Routine that picks a few Tallies from its pool for each Occurrence, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. German: Einheit.
+A Note that picks a few Tallies from its pool for each Occurrence of its Routines, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The Note holds the pool, the count and the rule; each of its Routines, such as Monday and Wednesday at 7:00 and Saturday at 10:00, only says when it runs, and Rolling goes on from one Routine's run to the next. The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. German: Einheit.
 _Avoid_: workout, training, playlist, set
 
 ### Checklists and Shopping Lists

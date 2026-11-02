@@ -4,14 +4,18 @@
 //! Rolling; the count's − / + stepper; the weekdays in a fold, each with
 //! a checkbox for its own count and then its stepper, open as last left
 //! on this Device; and the rule as radio buttons. Nothing is written
-//! before Save, and then only what changed. For a Note being captured
-//! (#113) Save hands the draft back as a [`SessionChoice`].
+//! before Save. For a Note being captured (#113) Save hands the draft
+//! back as a [`SessionChoice`]. On a Session Note's page in the Note
+//! dialog (#191) the pool and the count show the same way, each change
+//! written at once, only what changed, and the rule and the weekdays'
+//! counts are badges whose dialogs draw [`SessionDraft::rules`] and
+//! [`SessionDraft::weekdays`].
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
 use oldbrainfix_core::sessions::keys::MAX_COUNT;
-use oldbrainfix_core::{Notes, Schedule, Session, SessionRule, Sessions, Store};
+use oldbrainfix_core::{Notes, Schedule, SessionRule, SessionSetup, Sessions, Store};
 
 use crate::app::{embossed, icon_button, row_title};
 use crate::capture_choices::SessionChoice;
@@ -37,7 +41,7 @@ pub enum SessionIntent {
 /// What the Routine editor holds of a Session while it is edited: the
 /// Tallies of its pool picker, in the order Rolling goes through them,
 /// those chosen, the count, the weekdays' own counts and the rule.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SessionDraft {
     /// The Tallies the pool picker shows, the chosen ones first in pool
     /// order.
@@ -61,15 +65,16 @@ pub struct SessionDraft {
 }
 
 impl SessionDraft {
-    /// The draft of `session`, or of a new Session spawned from the Note
-    /// `entity`: its pool as held, then the other Tallies it may pick.
+    /// The draft of the Session `setup` of the Note `entity` (#191), or
+    /// of a new Session spawned from the Note `entity`: its pool as held,
+    /// then the other Tallies it may pick.
     pub fn of(
         store: &Store,
         t: &L10n,
         entity: &str,
-        session: Option<&Session>,
+        setup: Option<&SessionSetup>,
     ) -> oldbrainfix_core::Result<SessionDraft> {
-        let held = session.map(|s| s.pool.clone()).unwrap_or_default();
+        let held = setup.map(|s| s.pool.clone()).unwrap_or_default();
         let mut order = held.clone();
         for id in Sessions::new(store).choices(entity)? {
             if !order.contains(&id) {
@@ -82,13 +87,13 @@ impl SessionDraft {
             let note = notes.by_id(id)?;
             names.insert(id.clone(), row_title(t, note.as_ref()));
         }
-        let counts = session.map(|s| s.counts.clone()).unwrap_or_default();
+        let counts = setup.map(|s| s.counts.clone()).unwrap_or_default();
         Ok(SessionDraft {
             chosen: held.into_iter().collect(),
             order,
             names,
-            rule: session.map_or(SessionRule::Rolling, |s| s.rule),
-            count: session.map_or(1, |s| s.count),
+            rule: setup.map_or(SessionRule::Rolling, |s| s.rule),
+            count: setup.map_or(1, |s| s.count),
             counts: std::array::from_fn(|i| counts.get(&(i as u32 + 1)).copied()),
             weekdays_open: store.local_setting(WEEKDAYS_OPEN)?.as_deref() == Some("true"),
             checked: false,
@@ -161,24 +166,24 @@ impl SessionDraft {
         self.choice().spawn(store, note_id, schedule)
     }
 
-    /// Writes what changed of `session`.
-    pub fn save(&self, store: &Store, session: &Session) -> oldbrainfix_core::Result<()> {
+    /// Writes what changed of `setup`, on its Note (ADR 0039).
+    pub fn write(&self, store: &Store, setup: &SessionSetup) -> oldbrainfix_core::Result<()> {
         let sessions = Sessions::new(store);
-        let id = session.id();
+        let id = setup.note_id.as_str();
         let pool = self.pool();
-        if pool != session.pool {
+        if pool != setup.pool {
             sessions.set_pool(id, &pool)?;
         }
-        if self.count != session.count {
+        if self.count != setup.count {
             sessions.set_count(id, self.count)?;
         }
         for (i, own) in self.counts.iter().copied().enumerate() {
             let day = i as u32 + 1;
-            if own != session.counts.get(&day).copied() {
+            if own != setup.counts.get(&day).copied() {
                 sessions.set_count_on(id, day, own)?;
             }
         }
-        if self.rule != session.rule {
+        if self.rule != setup.rule {
             sessions.set_rule(id, self.rule)?;
         }
         Ok(())
@@ -186,39 +191,9 @@ impl SessionDraft {
 
     /// Draws the Session's panels; what was asked beyond typing.
     pub fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<SessionIntent> {
-        let mut intent = None;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        let error = ui.visuals().error_fg_color;
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_pool()).strong().color(text));
-            ui.label(RichText::new(t.session_pool_explain()).color(text));
-            if self.order.is_empty() && !self.new_tally {
-                ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
-            } else if !self.order.is_empty() {
-                self.pool_rows(ui, t);
-            }
-            // Making one stays inside the list, on this page (#161).
-            if self.new_tally {
-                let made = ui.horizontal(|ui| {
-                    icons::show(ui, icons::ADD, 20.0, text);
-                    ui.button(RichText::new(t.new_tally()).color(text))
-                });
-                if made.inner.clicked() {
-                    intent = Some(SessionIntent::NewTally);
-                }
-            }
-            if self.rule == SessionRule::Rolling && self.order.len() > 1 {
-                ui.label(
-                    RichText::new(t.session_pool_order_desk())
-                        .small()
-                        .color(weak),
-                );
-            }
-            if self.checked && self.pool().is_empty() {
-                ui.label(RichText::new(t.session_pool_missing()).color(error));
-            }
-        });
+        let mut intent = self.pool_panel(ui, t, tones, None);
         embossed(ui, tones, false, None, |ui| {
             ui.label(RichText::new(t.session_count()).strong().color(text));
             stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
@@ -229,12 +204,7 @@ impl SessionDraft {
                 egui::CollapsingHeader::new(RichText::new(t.session_weekday_counts()).color(text))
                     .id_salt("session weekdays")
                     .open(Some(open))
-                    .show(ui, |ui| {
-                        ui.label(RichText::new(t.session_weekday_counts_explain()).color(text));
-                        for i in 0..7 {
-                            self.weekday_row(ui, t, i);
-                        }
-                    });
+                    .show(ui, |ui| self.weekdays(ui, t));
             if fold.header_response.clicked() {
                 self.weekdays_open = !open;
                 intent = Some(SessionIntent::WeekdaysOpen(!open));
@@ -246,59 +216,167 @@ impl SessionDraft {
         });
         embossed(ui, tones, false, None, |ui| {
             ui.label(RichText::new(t.session_rule()).strong().color(text));
-            let rules = [
-                (
-                    SessionRule::Random,
-                    t.session_rule_random(),
-                    t.session_rule_random_detail(),
-                ),
-                (
-                    SessionRule::Rolling,
-                    t.session_rule_rolling(),
-                    t.session_rule_rolling_detail(),
-                ),
-                (
-                    SessionRule::Least,
-                    t.session_rule_least(),
-                    t.session_rule_least_detail(),
-                ),
-            ];
-            for (rule, title, detail) in rules {
-                ui.radio_value(&mut self.rule, rule, RichText::new(title).color(text));
-                ui.indent(("session rule", rule.name()), |ui| {
-                    ui.label(RichText::new(detail).small().color(weak));
+            self.rules(ui, t);
+        });
+        intent
+    }
+
+    /// The setup of a Session Note on its page in the Note dialog (#191),
+    /// after its name and description: its pool, the last Tally ticked
+    /// kept, with the arrows of Rolling on those ticked and "New Tally"
+    /// at its end, then how many it picks with − and +; only shown where
+    /// this Device may not `change` them. The caller writes each change
+    /// at once ([`SessionDraft::write`]): whether there was one, and
+    /// what was asked beyond it.
+    pub fn note_page(
+        &mut self,
+        ui: &mut Ui,
+        t: &L10n,
+        tones: Tones,
+        changes: bool,
+    ) -> (bool, Option<SessionIntent>) {
+        let text = ui.visuals().text_color();
+        let before = (self.pool(), self.count);
+        let intent = self.pool_panel(ui, t, tones, Some(changes));
+        embossed(ui, tones, false, None, |ui| {
+            ui.label(RichText::new(t.session_count()).strong().color(text));
+            if changes {
+                stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
+            } else {
+                ui.label(RichText::new(self.count.to_string()).size(16.0).color(text));
+            }
+        });
+        (before != (self.pool(), self.count), intent)
+    }
+
+    /// The pool's panel: for a Session Note's page `page` holds whether
+    /// this Device may change it, `None` on the Session page.
+    fn pool_panel(
+        &mut self,
+        ui: &mut Ui,
+        t: &L10n,
+        tones: Tones,
+        page: Option<bool>,
+    ) -> Option<SessionIntent> {
+        let mut intent = None;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let error = ui.visuals().error_fg_color;
+        let changes = page.unwrap_or(true);
+        embossed(ui, tones, false, None, |ui| {
+            ui.label(RichText::new(t.session_pool()).strong().color(text));
+            ui.label(RichText::new(t.session_pool_explain()).color(text));
+            if self.order.is_empty() && !self.new_tally {
+                ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
+            } else if !self.order.is_empty() {
+                self.pool_rows(ui, t, page);
+            }
+            // Making one stays inside the list, on this page (#161).
+            if self.new_tally && changes {
+                let made = ui.horizontal(|ui| {
+                    icons::show(ui, icons::ADD, 20.0, text);
+                    ui.button(RichText::new(t.new_tally()).color(text))
                 });
+                if made.inner.clicked() {
+                    intent = Some(SessionIntent::NewTally);
+                }
+            }
+            let ordered = match page {
+                None => self.order.len(),
+                Some(_) => self.chosen.len(),
+            };
+            if self.rule == SessionRule::Rolling && changes && ordered > 1 {
+                ui.label(
+                    RichText::new(t.session_pool_order_desk())
+                        .small()
+                        .color(weak),
+                );
+            }
+            if self.checked && self.pool().is_empty() {
+                ui.label(RichText::new(t.session_pool_missing()).color(error));
             }
         });
         intent
     }
 
-    /// A checkbox per Tally; for Rolling each with buttons to move it up
-    /// or down, a drag's place on a desk without a long press.
-    fn pool_rows(&mut self, ui: &mut Ui, t: &L10n) {
+    /// The rules as radio buttons, each with what it does under it;
+    /// whether one was clicked.
+    pub fn rules(&mut self, ui: &mut Ui, t: &L10n) -> bool {
         let text = ui.visuals().text_color();
-        let rolling = self.rule == SessionRule::Rolling;
-        let last = self.order.len() - 1;
+        let weak = ui.visuals().weak_text_color();
+        let rules = [
+            (
+                SessionRule::Random,
+                t.session_rule_random(),
+                t.session_rule_random_detail(),
+            ),
+            (
+                SessionRule::Rolling,
+                t.session_rule_rolling(),
+                t.session_rule_rolling_detail(),
+            ),
+            (
+                SessionRule::Least,
+                t.session_rule_least(),
+                t.session_rule_least_detail(),
+            ),
+        ];
+        let mut clicked = false;
+        for (rule, title, detail) in rules {
+            clicked |= ui
+                .radio_value(&mut self.rule, rule, RichText::new(title).color(text))
+                .clicked();
+            ui.indent(("session rule", rule.name()), |ui| {
+                ui.label(RichText::new(detail).small().color(weak));
+            });
+        }
+        clicked
+    }
+
+    /// What the weekdays' counts are about, then a row per weekday,
+    /// Monday first.
+    pub fn weekdays(&mut self, ui: &mut Ui, t: &L10n) {
+        let text = ui.visuals().text_color();
+        ui.label(RichText::new(t.session_weekday_counts_explain()).color(text));
+        for i in 0..7 {
+            self.weekday_row(ui, t, i);
+        }
+    }
+
+    /// A checkbox per Tally; for Rolling each with buttons to move it up
+    /// or down, a drag's place on a desk without a long press. On a
+    /// Session Note's page (`page`, with whether this Device may change
+    /// it) only those ticked move, being the pool's order, and the last
+    /// one ticked stays.
+    fn pool_rows(&mut self, ui: &mut Ui, t: &L10n, page: Option<bool>) {
+        let text = ui.visuals().text_color();
+        let changes = page.unwrap_or(true);
+        let rolling = self.rule == SessionRule::Rolling && changes;
+        // The rows that move: every one on the Session page, those
+        // ticked, which come first, on a Note's.
+        let moving = match page {
+            None => self.order.len(),
+            Some(_) => self.chosen.len().min(self.order.len()),
+        };
         let mut moved = None;
         for (i, id) in self.order.iter().enumerate() {
             let name = self.names.get(id).cloned().unwrap_or_default();
             ui.horizontal(|ui| {
                 let mut on = self.chosen.contains(id);
-                if ui
-                    .checkbox(&mut on, RichText::new(&name).color(text))
-                    .changed()
-                {
+                let last = page.is_some() && on && self.chosen.len() == 1;
+                let tick = egui::Checkbox::new(&mut on, RichText::new(&name).color(text));
+                if ui.add_enabled(changes && !last, tick).changed() {
                     if on {
                         self.chosen.insert(id.clone());
                     } else {
                         self.chosen.remove(id);
                     }
                 }
-                if !rolling {
+                if !rolling || i >= moving {
                     return;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if i < last
+                    if i + 1 < moving
                         && icon_button(ui, icons::ARROW_DOWN, &t.session_move_down(&name), text)
                             .clicked()
                     {

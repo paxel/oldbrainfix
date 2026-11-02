@@ -53,10 +53,11 @@ class SessionDraft {
     required this.counts,
   });
 
-  /// The draft of [session], or of a new Session spawned from the Note
-  /// [entity]: its pool as held, then the other Tallies it may pick.
-  factory SessionDraft.of(Store store, String entity, [Session? session]) {
-    final held = session?.pool ?? const <String>[];
+  /// The draft of the Session [setup], or of a new Session spawned from
+  /// the Note [entity]: its pool as held, then the other Tallies it may
+  /// pick.
+  factory SessionDraft.of(Store store, String entity, [SessionSetup? setup]) {
+    final held = setup?.pool ?? const <String>[];
     final order = [
       ...held,
       for (final id in Sessions(store).choices(entity))
@@ -68,9 +69,9 @@ class SessionDraft {
       order: order,
       chosen: {...held},
       notes: {for (final id in order) id: notes.byId(id)},
-      rule: session?.rule ?? SessionRule.rolling,
-      count: session?.count ?? 1,
-      counts: {...?session?.counts},
+      rule: setup?.rule ?? SessionRule.rolling,
+      count: setup?.count ?? 1,
+      counts: {...?setup?.counts},
     );
   }
 
@@ -98,18 +99,15 @@ class SessionDraft {
   String spawn(String noteId, Schedule schedule) =>
       spawnSession(store, noteId, schedule, choice);
 
-  /// Writes what changed of [session].
-  void save(Session session) {
+  /// Writes what changed of the pool and the count of [held] onto its
+  /// Note, as the Session Note's page changes them (#191).
+  void write(SessionSetup held) {
     final sessions = Sessions(store);
-    final id = session.id;
     final pool = this.pool;
-    if (pool.join(',') != session.pool.join(',')) sessions.setPool(id, pool);
-    if (count != session.count) sessions.setCount(id, count);
-    for (var day = 1; day <= 7; day++) {
-      final own = counts[day];
-      if (own != session.counts[day]) sessions.setCountOn(id, day, own);
+    if (pool.join(',') != held.pool.join(',')) {
+      sessions.setPool(held.noteId, pool);
     }
-    if (rule != session.rule) sessions.setRule(id, rule);
+    if (count != held.count) sessions.setCount(held.noteId, count);
   }
 }
 
@@ -137,7 +135,6 @@ class SessionFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final locale = Localizations.localeOf(context).toString();
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,7 +152,7 @@ class SessionFields extends StatelessWidget {
                   child: Text(t.sessionPoolNone),
                 )
               else
-                _pool(context),
+                SessionPoolList(draft: draft, onChanged: onChanged),
               if (draft.rule == SessionRule.rolling && draft.order.length > 1)
                 Text(t.sessionPoolOrder),
               if (draft.checked && draft.pool.isEmpty)
@@ -204,7 +201,12 @@ class SessionFields extends StatelessWidget {
               children: [
                 Text(t.sessionWeekdayCountsExplain),
                 for (var day = DateTime.monday; day <= DateTime.sunday; day++)
-                  _weekday(context, locale, day),
+                  SessionWeekdayRow(
+                    day: day,
+                    own: draft.counts[day],
+                    onOwn: (on) => _change(() => draft.setOwn(day, on)),
+                    onCount: (n) => _change(() => draft.counts[day] = n),
+                  ),
               ],
             ),
           ),
@@ -237,11 +239,29 @@ class SessionFields extends StatelessWidget {
       ],
     );
   }
+}
 
-  /// The weekday [day]'s row: a switch for an own count, "As every day"
-  /// while it is off, and the count's stepper once it is on.
-  Widget _weekday(BuildContext context, String locale, int day) {
-    final own = draft.counts[day];
+/// A weekday [day]'s own count (1 for Monday to 7 for Sunday): a switch
+/// for an own count, "As every day" while it is off, and the count's
+/// stepper once it is on ([own]).
+class SessionWeekdayRow extends StatelessWidget {
+  final int day;
+  final int? own;
+  final ValueChanged<bool> onOwn;
+  final ValueChanged<int> onCount;
+
+  const SessionWeekdayRow({
+    super.key,
+    required this.day,
+    required this.own,
+    required this.onOwn,
+    required this.onCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).toString();
+    final own = this.own;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,24 +273,49 @@ class SessionFields extends StatelessWidget {
               ? Text(context.t.sessionWeekdayCountHint)
               : null,
           value: own != null,
-          onChanged: (on) => _change(() => draft.setOwn(day, on)),
+          onChanged: onOwn,
         ),
         if (own != null)
           CountStepper(
             key: ValueKey('session-count-$day'),
             value: own,
             max: SessionKeys.maxCount,
-            onChanged: (n) => _change(() => draft.counts[day] = n),
+            onChanged: onCount,
           ),
       ],
     );
   }
+}
 
-  /// A checkbox per Tally; for Rolling each with a handle to drag it to
-  /// its place, never a long press, which only opens menus.
-  Widget _pool(BuildContext context) {
+/// The pool picker of [draft]: a checkbox per Tally; for Rolling each
+/// with a handle to drag it to its place, never a long press, which only
+/// opens menus. With [keepOne] the last Tally ticked cannot be unticked;
+/// with [enabled] false it is only shown. [onChanged] runs after each
+/// change of [draft].
+class SessionPoolList extends StatelessWidget {
+  final SessionDraft draft;
+  final VoidCallback onChanged;
+  final bool keepOne;
+  final bool enabled;
+
+  const SessionPoolList({
+    super.key,
+    required this.draft,
+    required this.onChanged,
+    this.keepOne = false,
+    this.enabled = true,
+  });
+
+  void _change(VoidCallback change) {
+    change();
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final t = context.t;
-    final rolling = draft.rule == SessionRule.rolling;
+    final rolling =
+        enabled && draft.rule == SessionRule.rolling && draft.order.length > 1;
     final rows = [
       for (final (index, id) in draft.order.indexed)
         _poolRow(t, index, id, handle: rolling),
@@ -300,15 +345,20 @@ class SessionFields extends StatelessWidget {
   }) {
     final note = draft.notes[id];
     final name = note == null ? t.noteGone : noteText(t, note);
+    final chosen = draft.chosen.contains(id);
+    final locked = !enabled || (keepOne && chosen && draft.pool.length == 1);
     return CheckboxListTile(
       key: ValueKey('session-pool-$id'),
       contentPadding: EdgeInsets.zero,
       controlAffinity: ListTileControlAffinity.leading,
-      value: draft.chosen.contains(id),
+      value: chosen,
       title: Text(name),
-      onChanged: (on) => _change(
-        () => on ?? false ? draft.chosen.add(id) : draft.chosen.remove(id),
-      ),
+      onChanged: locked
+          ? null
+          : (on) => _change(
+              () =>
+                  on ?? false ? draft.chosen.add(id) : draft.chosen.remove(id),
+            ),
       secondary: handle
           ? ReorderableDragStartListener(
               key: ValueKey('session-move-$id'),

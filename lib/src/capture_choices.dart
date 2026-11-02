@@ -49,7 +49,10 @@ class ScheduleChoice {
   String spawnFrom(Store store, String noteId) {
     final session = this.session;
     final routines = Routines(store);
-    final id = session == null
+    // Only a plain Note becomes a Session (ADR 0039): made a Tally on the
+    // same capture, its schedule is kept as a plain Routine.
+    final plain = NoteKinds(store).of(noteId) == NoteKind.plain;
+    final id = session == null || !plain
         ? routines.spawn(noteId, schedule).id
         : spawnSession(store, noteId, schedule, session);
     routines.setRenag(id, renag);
@@ -67,17 +70,16 @@ String spawnSession(
   SessionChoice choice,
 ) {
   final sessions = Sessions(store);
-  final id = sessions
-      .spawn(
-        noteId,
-        schedule,
-        pool: choice.pool,
-        count: choice.count,
-        rule: choice.rule,
-      )
-      .id;
+  final session = sessions.spawn(
+    noteId,
+    schedule,
+    pool: choice.pool,
+    count: choice.count,
+    rule: choice.rule,
+  );
+  // The weekdays' counts lie on the Note, as the rest of the setup.
   for (final MapEntry(key: day, value: own) in choice.counts.entries) {
-    sessions.setCountOn(id, day, own);
+    sessions.setCountOn(session.noteId, day, own);
   }
-  return id;
+  return session.id;
 }

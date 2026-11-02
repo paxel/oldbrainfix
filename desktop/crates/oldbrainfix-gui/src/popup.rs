@@ -743,7 +743,7 @@ impl CapturePopup {
                     // The Tallies of where it goes; while Unsorted, any.
                     let entity = self.choices.place.as_deref().unwrap_or("");
                     let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
-                    editor = editor.with_session(draft, None);
+                    editor = editor.with_session(draft);
                 }
                 Ok(Page::Schedule(Box::new(editor)))
             }

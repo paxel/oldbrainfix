@@ -5,6 +5,7 @@ import 'notes.dart';
 import 'profiles.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
+import 'sessions.dart';
 import 'store.dart';
 import 'tallies.dart';
 import 'text_format.dart';
@@ -415,6 +416,7 @@ class ShoppingLists {
         note.textEditable &&
         parseListKind(store.current(noteId, ChecklistKeys.kind)) == null &&
         !Tallies(store).isTally(noteId) &&
+        !Sessions(store).isSessionNote(noteId) &&
         store.mayChange(noteId);
   }
 

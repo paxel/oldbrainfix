@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
     Checklists, Day, Notes, Recurrence, Schedule, SessionRule, Sessions, ShoppingLists, SigningKey,
     Store, Tallies, parse_time,
@@ -188,21 +188,148 @@ fn a_compact_list_or_tally_shows_its_name_and_its_counts() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn a_compact_note_running_a_session_shows_its_next_run_and_this_week() -> TestResult {
-    let store = store()?;
-    let notes = Notes::new(&store);
-    let pool = notes.capture("Push-ups", None, None)?.id;
-    Tallies::new(&store).add_field(&pool, "Done", "times", Some(20.0), None)?;
-    let sport = notes.capture("Sport\nmorning moves", None, None)?.id;
+/// Every day at `hour`:00 from `from`.
+fn daily_at(from: Day, hour: u32) -> Result<Schedule, Box<dyn std::error::Error>> {
     let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
-    let at = [oldbrainfix_core::ClockTime::new(7, 0).ok_or("a time")?];
-    let schedule = Schedule::new(Day::new(2026, 10, 27), &at, Some(rule)).ok_or("a schedule")?;
-    Sessions::new(&store).spawn(&sport, &schedule, &[pool], 1, SessionRule::Rolling)?;
+    let at = [oldbrainfix_core::ClockTime::new(hour, 0).ok_or("a time")?];
+    Ok(Schedule::new(from, &at, Some(rule)).ok_or("a schedule")?)
+}
+
+/// The Tallies "Push-ups" (20 times) and "Wall sit" (30 times), in pool
+/// order, and the plain Note "Sport" with a description.
+fn sport(store: &Store) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
+    let notes = Notes::new(store);
+    let mut pool = Vec::new();
+    for (name, target) in [("Push-ups", 20.0), ("Wall sit", 30.0)] {
+        let note = notes.capture(name, None, None)?.id;
+        Tallies::new(store).add_field(&note, name, "times", Some(target), None)?;
+        pool.push(note);
+    }
+    let sport = notes.capture("Sport\nmorning moves", None, None)?.id;
+    Ok((pool, sport))
+}
+
+/// Whether a plain text `label` shows, no card or button.
+fn says(harness: &Harness<'_, App>, label: &str) -> bool {
+    harness
+        .query_all_by_role_and_label(Role::Label, label)
+        .next()
+        .is_some()
+}
+
+#[test]
+fn a_compact_session_shows_the_next_run_of_its_routines_and_their_week() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    let sessions = Sessions::new(&store);
+    let today = Day::new(2026, 10, 26);
+    // This morning's run Done; the other Routine starts tomorrow, later.
+    let morning = daily_at(today, 7)?;
+    let first = sessions.spawn(&sport, &morning, &pool, 1, SessionRule::Rolling)?;
+    let at = oldbrainfix_core::ClockTime::new(7, 0).ok_or("a time")?;
+    let done = oldbrainfix_core::Occurrence::new(today, Some(at));
+    oldbrainfix_core::Routines::new(&store).mark_done(first.id(), &done, None)?;
+    oldbrainfix_core::Routines::new(&store).spawn(&sport, &daily_at(today.add_days(1), 8)?)?;
     let harness = compact(&store)?;
 
     assert!(shows(&harness, "Sport"));
     assert!(shows(&harness, "Next: Tue, 10/27/2026 07:00"));
+    assert!(shows(&harness, "done 1 / skipped 0 this week"));
+    assert!(!shows(&harness, "morning moves"));
+    Ok(())
+}
+
+#[test]
+fn a_detailed_session_shows_its_pool_todays_picks_of_each_routine_and_four_weeks() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    let sessions = Sessions::new(&store);
+    let today = Day::new(2026, 10, 26);
+    let morning = sessions.spawn(&sport, &daily_at(today, 7)?, &pool, 1, SessionRule::Rolling)?;
+    oldbrainfix_core::Routines::new(&store).spawn(&sport, &daily_at(today, 18)?)?;
+    let mut harness = window(&store);
+
+    // Its name and description, then its pool and setup.
+    assert!(shows(&harness, "Sport"));
+    assert!(says(&harness, "Pool"));
+    assert!(says(&harness, "Push-ups"));
+    assert!(says(&harness, "Wall sit"));
+    assert!(says(&harness, "Picks 1 Tally · Rolling"));
+    // Today's picks under each Routine's time, Rolling going on.
+    assert!(says(&harness, "Today"));
+    assert!(says(&harness, "07:00"));
+    assert!(says(&harness, "18:00"));
+    assert!(shows(&harness, "Push-ups 20 times"));
+    assert!(shows(&harness, "Wall sit 30 times"));
+    assert_eq!(harness.query_all_by_label("Another one").count(), 2);
+    // The last four weeks, this week first, from Sunday.
+    assert!(says(&harness, "Last 4 weeks"));
+    let weeks: Vec<String> = harness
+        .query_all_by_label_contains("Week of ")
+        .filter_map(|n| {
+            let node = n.accesskit_node();
+            node.label().or_else(|| node.value())
+        })
+        .collect();
+    assert_eq!(weeks.len(), 4, "{weeks:?}");
+    assert_eq!(weeks[0], "Week of Sun, 10/25/2026: done 0 / skipped 0");
+
+    // "Another one" swaps the morning's pick there, and selects no card.
+    harness
+        .query_all_by_role_and_label(Role::Button, "Another one")
+        .next()
+        .ok_or("Another one")?
+        .click();
+    harness.run();
+    pause(&mut harness);
+    let marks = oldbrainfix_core::SessionMarks::of(&store, morning.id())?;
+    assert_eq!(marks.picks.values().next(), Some(&vec![pool[1].clone()]));
+    assert!(harness.state().selected_cards().is_empty());
+    // A pick opens its entry form, as on the Agenda.
+    harness
+        .query_all_by_role_and_label(Role::Button, "Wall sit 30 times")
+        .next()
+        .ok_or("the pick")?
+        .click();
+    harness.run();
+    assert!(shows(&harness, "New entry"));
+    Ok(())
+}
+
+#[test]
+fn a_session_without_a_routine_shows_its_pool_alone() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    Sessions::new(&store).make(&sport, &pool[..1], 1, SessionRule::Rolling)?;
+    let harness = window(&store);
+    assert!(says(&harness, "Pool"));
+    assert!(says(&harness, "Picks 1 Tally · Rolling"));
+    assert!(!says(&harness, "Today"));
+    assert!(!says(&harness, "Last 4 weeks"));
+    let harness = compact(&store)?;
+    assert!(shows(&harness, "Picks 1 Tally"));
+    Ok(())
+}
+
+#[test]
+fn an_older_session_set_up_on_its_routine_shows_as_a_session() -> TestResult {
+    let store = store()?;
+    let (pool, sport) = sport(&store)?;
+    // As an older version wrote it: the setup on the Routine (ADR 0039).
+    let schedule = daily_at(Day::new(2026, 10, 26), 18)?;
+    oldbrainfix_core::Routines::new(&store).spawn_with(&sport, &schedule, |id| {
+        store.append(id, "session:pool", Some(&pool.join(",")), None)?;
+        store.append(id, "session:count", Some("1"), None)?;
+        store.append(id, "session:rule", Some(SessionRule::Rolling.name()), None)?;
+        Ok(())
+    })?;
+    assert!(store.current(&sport, "session:pool")?.is_none());
+    let harness = window(&store);
+    assert!(says(&harness, "Pool"));
+    assert!(says(&harness, "18:00"));
+    assert!(shows(&harness, "Push-ups 20 times"));
+    let harness = compact(&store)?;
+    assert!(shows(&harness, "Next: Mon, 10/26/2026 18:00"));
     assert!(shows(&harness, "done 0 / skipped 0 this week"));
     assert!(!shows(&harness, "morning moves"));
     Ok(())

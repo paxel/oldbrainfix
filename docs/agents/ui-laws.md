@@ -47,7 +47,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   **Session is one page**: its name, its pool as a list of checkboxes
   ending in "New Tally", which opens the Tally page and comes back with
   that Tally ticked, then its count, rule and schedule as badges, the
-  schedule every day, all day, at first. Leaving a name dialog or one of
+  schedule every day, all day, at first; it makes the Session's Note
+  with its first Routine (#191). Leaving a name dialog or one of
   the pages without Create or Save makes nothing. **On the desktop "+"
   sits at the end of the list's heading** (#146, #161) and opens a menu
   of the same kinds, Note first, each with its icon and words; the
@@ -299,9 +300,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   and how many are open ("4 open"), a Tally its name and each field's
   total today against its target ("Steps 7000 / 10000 steps"), in a
   Shared Area of the user's own entries, as its detailed view counts at
-  first (#190), a Note
-  that runs a Session its first line, the next run and "done 4 /
-  skipped 1 this week"; a Note without words its photos and recordings.
+  first (#190), a Session
+  its name, the next run of any of its Routines and "done 4 / skipped 1
+  this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
   the card** (File into, Routine, Merge); **its ⋮ sits top right** and
   offers File into… and Merge into… after Edit, as far as the action row
@@ -317,7 +318,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   kept open per Note on this Device; a tap on an entry edits it, a long
   press offers Edit and Delete, and the folded "Removed entries" restore.
   On the desktop the card shows the same, its buttons taking their own
-  clicks. A Session's detailed view grows with #191.
+  clicks. **A Session's detailed view is the Session** (#191): under its
+  name and description its pool, then today's picks of each of its
+  Routines under the Routine's time, each pick opening its entry form
+  and offering "Another one" as on the Agenda, then "done N / skipped
+  M" for each of the last four weeks, this week first; a Session
+  without a Routine shows its pool alone.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
 - **Copy text** in a card's ⋮ puts the text of the Note and of each
@@ -331,13 +337,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Managers); others read it. Under its meta line it says, small and
   grey, when it was last edited and by whom, once it was.
 - **A Note is its kind** (#188): a Plain Note, a Checklist, a Shopping
-  List or a Tally. A Plain Note shows as its text. Every other kind's
+  List, a Tally or a Session (#191). A Plain Note shows as its text. Every other kind's
   page, in the Note editor and in the detailed view, starts with its
   **name**, the text's first line, as a heading, its **description**,
   the rest of the text, small right under it and folded to one line
   until a tap unfolds it (on a card kept open per Note on this Device,
   #189), then **the kind's content** (the Lines; of a Tally its setup in
-  the editor, its chart and entries in the detailed view, #190), then
+  the editor, its chart and entries in the detailed view, #190; of a
+  Session its pool and count in the editor, its picks and history in the
+  detailed view, #191), then
   the badges, the photos and recordings, and the Amends
   below as the dated diary part. In the editor the name is a one-line
   field and the description its own field; nothing is rewritten for the
@@ -352,20 +360,26 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   is its fields (#190), each its name with its rule, unit and target as
   badges, as on the Tally page, and "Hidden" while it is hidden, a tap
   on the name or a badge opening the field's page, then "Add field"; the
-  editor shows no chart and no entries. A setting that does not apply has no badge. A tap
+  editor shows no chart and no entries. A Session's setup (#191) is its
+  pool, a list of checkboxes ending in "New Tally" as on its "+" page,
+  and how many it picks with − and +, then its rule and its weekdays'
+  counts as badges; each of its Routines is a Routine badge, and the
+  Routine editor of one holds only its schedule. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
   name, which changes it at once: Importance as radio buttons (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the
   Agenda as radio buttons (here and in the card's ⋮), the switches,
   the kind as radio buttons of the kinds it may become: from a Plain
-  Note a Checklist, a Shopping List or a Tally, from a list the other
-  list, keeping its Lines, or a Plain Note; a Tally's only shows it;
+  Note a Checklist, a Shopping List, a Tally or a Session, from a list
+  the other list, keeping its Lines, or a Plain Note, from a Session a
+  Plain Note; a Tally's only shows it;
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value". The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
-  there only for who may set them up. The text, the Lines, the photos and
+  there only for who may set them up; on a Session it offers no
+  Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
   recordings and the Sections stay the page's content; the editor has no
   "Make it a Checklist" or "Make it a Shopping List" button of its own,
   the kind badge does it. On the desktop the badges sit in the same place

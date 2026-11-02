@@ -319,7 +319,8 @@ fn change_line(
         (frog_keys::TYPE_FROG, frog_keys::TRASHED) if change.after.is_some() => {
             return Ok(only(t.checklist_to_plain()));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::POOL) => {
+        // The setup of a Session, on its Note (ADR 0039).
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::POOL) => {
             let pool = |v: Option<&str>| -> oldbrainfix_core::Result<String> {
                 let mut names = Vec::new();
                 for id in v.unwrap_or_default().split(',').filter(|id| !id.is_empty()) {
@@ -337,7 +338,7 @@ fn change_line(
                 mine_wins: change.mine_wins,
             }));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::RULE) => {
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::RULE) => {
             return Ok(words(t.session_rule().to_string(), &|v| {
                 match v.and_then(SessionRule::parse) {
                     Some(SessionRule::Random) => t.session_rule_random(),
@@ -347,14 +348,14 @@ fn change_line(
                 .to_string()
             }));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::COUNT) => {
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::COUNT) => {
             return Ok(words(t.session_count().to_string(), &|v| {
                 v.unwrap_or("1").to_string()
             }));
         }
         _ => {}
     }
-    if ty == routine_keys::TYPE_ROUTINE
+    if (ty == routine_keys::TYPE_ROUTINE || ty == note_keys::TYPE_NOTE)
         && let Some(weekday) = (1..=7).find(|d| field == session_keys::count_on(*d))
     {
         let label = t.ai_session_weekday_count(weekday_long(t, weekday));

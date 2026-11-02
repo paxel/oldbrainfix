@@ -6,6 +6,7 @@
 
 use crate::Result;
 use crate::checklists::Checklists;
+use crate::sessions::Sessions;
 use crate::shopping_lists::ShoppingLists;
 use crate::store::Store;
 use crate::tallies::Tallies;
@@ -18,17 +19,22 @@ pub enum NoteKind {
     Checklist,
     ShoppingList,
     Tally,
-    // A Session becomes a kind with #191; until then a Note whose Routine
-    // is a Session reads as the kind its own fields say, plain at most.
+    /// A Note that picks Tallies for each Occurrence of its Routines
+    /// (#191, ADR 0039).
+    Session,
 }
 
 impl NoteKind {
     /// The kind of the Note `note_id`: a Tally while it has a field, which
-    /// wins over a list (ADR 0030), else the list its `kind` names, else a
-    /// plain Note.
+    /// wins over the rest (ADR 0030), else a Session while it has a pool,
+    /// on the Note or as an older version left it on a Routine (ADR 0039),
+    /// else the list its `kind` names, else a plain Note.
     pub fn of(store: &Store, note_id: &str) -> Result<NoteKind> {
         if Tallies::new(store).is_tally(note_id)? {
             return Ok(NoteKind::Tally);
+        }
+        if Sessions::new(store).is_session_note(note_id)? {
+            return Ok(NoteKind::Session);
         }
         if Checklists::new(store).is_checklist(note_id)? {
             return Ok(NoteKind::Checklist);

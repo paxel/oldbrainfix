@@ -94,9 +94,9 @@ use oldbrainfix_core::{
     CaptureContext, CapturedDetail, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day,
     DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes,
     NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingLine,
-    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
-    UnitSystem, bundle, markdown, text_format,
+    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
+    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
+    ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -142,7 +142,7 @@ use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
-use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
+use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, SessionPart};
 use crate::setting_badges::{badge, badge_dialog, badge_row, badge_switch, menu_entry};
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
@@ -424,6 +424,11 @@ struct View {
     /// The Tallies listed whose card shows its detailed view, read for
     /// their chart and entries on it (#190), by their Note.
     card_tallies: HashMap<String, TallyShown>,
+    /// The Notes listed that are a Session, which show their name and
+    /// description (#191), and those whose card shows its detailed view,
+    /// read for their pool, today's picks and last weeks on it.
+    sessions: HashSet<String>,
+    card_sessions: HashMap<String, SessionCardShown>,
     /// The Notes listed whose text this Device may change from their
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
@@ -489,6 +494,11 @@ struct View {
     switches_list: bool,
     /// The kind of the selected Note (#188), plain while none is.
     kind: Option<NoteKind>,
+    /// The setup of the selected Note while it is a Session (#191), and
+    /// whether this Device may make it one, change its setup or make it
+    /// a plain Note again: as it may change the Note, in the lists.
+    session_setup: Option<SessionSetup>,
+    makes_session: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -785,6 +795,9 @@ enum NoteBadge {
     /// A Shopping List's "Show on the Agenda", its three ways (#186).
     ShoppingOnAgenda,
     Ticks,
+    /// A Session's rule and its weekdays' own counts (#191).
+    SessionRule,
+    SessionWeekdays,
 }
 
 /// The dialogs back closes, or leads back from, on top of the others
@@ -1071,8 +1084,23 @@ enum Action {
     /// A new Session from the Note with this id (#104), or with its Note
     /// made behind the scenes.
     NewSession(Option<String>),
-    /// Something asked of a Session's row on the Agenda.
+    /// Something asked of a Session's row on the Agenda, or of the picks
+    /// on a Session Note's card (#191).
     Session(SessionAction),
+    /// The setup's page of a Session made of the plain Note with this id,
+    /// from its kind badge (#191).
+    MakeSession(String),
+    /// Makes the Session Note with this id a plain Note again (#191).
+    UnmakeSession(String),
+    /// Writes what the open Session Note's page or one of its badges
+    /// changed of its setup, at once (#191): the draft as changed, and
+    /// the setup it was read from, which it is compared with. Carried
+    /// along, so a read of the view in between loses nothing.
+    SessionSetup(Box<(SessionDraft, SessionSetup)>),
+    /// "New Tally" in the open Session Note's pool (#191): the New Tally
+    /// page, filed where the Note is, its Tally coming back first and
+    /// ticked.
+    SessionPoolTally,
     Editor(Intent),
     /// Deletes the edited Routine, asked.
     DeleteRoutine,
@@ -1393,6 +1421,9 @@ pub struct App {
     tally_form: Option<TallyForm>,
     /// The New Tally page (#161), in its dialog.
     tally_page: Option<TallyPage>,
+    /// The pool and the count of the selected Session Note as its page
+    /// edits them (#191), read again with the view.
+    session_draft: Option<SessionDraft>,
     /// Whether the quick note's dialog shows (#146).
     quick_open: bool,
     /// The badge of the Note dialog whose small editor is open (#160).
@@ -1772,6 +1803,7 @@ impl App {
             editor: None,
             tally_form: None,
             tally_page: None,
+            session_draft: None,
             quick_open: false,
             badge: None,
             start_lines: false,
@@ -3744,6 +3776,20 @@ impl App {
             Ok(view) => {
                 self.view = view;
                 self.error = None;
+                // The page's draft of a Session Note, read again with it
+                // (#191).
+                self.session_draft = match &self.view.session_setup {
+                    Some(setup) => {
+                        match SessionDraft::of(&self.store, &self.t, &setup.note_id, Some(setup)) {
+                            Ok(draft) => Some(draft),
+                            Err(e) => {
+                                self.error = Some(e.to_string());
+                                None
+                            }
+                        }
+                    }
+                    None => None,
+                };
                 // Only cards still shown stay selected (#148): none hidden
                 // by a search, or filed out of the list, moves unseen.
                 let shown = self.shown_cards();
@@ -4073,6 +4119,14 @@ impl App {
                 tallies.insert(id.clone());
             }
         }
+        // A Tally wins over a Session too (ADR 0039).
+        let session_notes = Sessions::new(store);
+        let mut sessions = HashSet::new();
+        for id in listed.iter().filter(|id| !tallies.contains(*id)) {
+            if session_notes.is_session_note(id)? {
+                sessions.insert(id.clone());
+            }
+        }
         let mut card_changes = HashSet::new();
         for p in &placed {
             let note = &p.note;
@@ -4124,6 +4178,28 @@ impl App {
                 tally_view::read(store, id, whose, self.unit_system()?, &*self.wall)?
             {
                 card_tallies.insert(id.clone(), shown);
+            }
+        }
+        // The Sessions on a detailed card, with their pool, today's picks
+        // and last weeks (#191); today's picks as the Agenda shows them,
+        // written there, not here.
+        let detailed: Vec<&String> = listed
+            .iter()
+            .filter(|id| sessions.contains(*id) && compact == switched.contains(*id))
+            .collect();
+        let mut card_sessions = HashMap::new();
+        if !detailed.is_empty() {
+            let mut today = session_notes.today(&*self.wall)?;
+            for id in detailed {
+                let Some(setup) = session_notes.setup_of(id)? else {
+                    continue;
+                };
+                let (own, rest) = today.into_iter().partition(|o| o.session.note_id() == *id);
+                today = rest;
+                let wall: &oldbrainfix_core::WallClock = &*self.wall;
+                let shown = (self.unit_system()?, wall);
+                let card = SessionCardShown::read(store, &self.t, &setup, own, shown)?;
+                card_sessions.insert(id.clone(), card);
             }
         }
         let kept_open = |prefix: &str| -> oldbrainfix_core::Result<HashSet<String>> {
@@ -4193,6 +4269,21 @@ impl App {
         let kind = match &detail {
             Some((p, _)) => Some(NoteKind::of(store, &p.note.id)?),
             None => None,
+        };
+        // A Session Note becomes no list (ADR 0039).
+        let makes_checklist = makes_checklist && kind != Some(NoteKind::Session);
+        let makes_shopping = makes_shopping && kind != Some(NoteKind::Session);
+        // Its setup only while it is a Session: an older one spawned from
+        // a Tally stays a Tally (ADR 0039).
+        let session_setup = match &detail {
+            Some((p, _)) if kind == Some(NoteKind::Session) && !p.note.is_trashed() => {
+                session_notes.setup_of(&p.note.id)?
+            }
+            _ => None,
+        };
+        let makes_session = match &detail {
+            Some((p, _)) => may.changes && !p.note.is_trashed() && !p.note.is_merged(),
+            None => false,
         };
         let mut removable = HashSet::new();
         let mut text_removable = HashSet::new();
@@ -4518,6 +4609,8 @@ impl App {
             shopping_lists,
             tallies,
             card_tallies,
+            sessions,
+            card_sessions,
             card_changes,
             box_looks,
             box_ticks,
@@ -4545,6 +4638,8 @@ impl App {
             makes_shopping,
             switches_list,
             kind,
+            session_setup,
+            makes_session,
             frogs_open,
             all_routines,
             all_newer,
@@ -5136,12 +5231,9 @@ impl App {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                    let mut editor = RoutineEditor::edit(&routine, note, today, renag);
-                    if let Some(session) = Sessions::new(&self.store).by_id(&id)? {
-                        let draft = SessionDraft::of(&self.store, &self.t, &id, Some(&session))?;
-                        editor = editor.with_session(draft, Some(session));
-                    }
-                    self.editor = Some(editor);
+                    // A Routine of a Session Note only schedules it: the
+                    // setup lies on the Note, on its page (#191).
+                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
                     self.tally_form = None;
                 }
             }
@@ -5162,6 +5254,15 @@ impl App {
                 ));
             }
             Action::NewSession(id) => {
+                // A Routine of a Session Note runs it already (#191).
+                if let Some(note) = &id
+                    && Sessions::new(&self.store).is_session_note(note)?
+                {
+                    return self.act(Action::NewRoutine {
+                        note: id,
+                        reminder: false,
+                    });
+                }
                 self.save_text()?;
                 let note = match &id {
                     Some(id) => Notes::new(&self.store).by_id(id)?,
@@ -5173,9 +5274,48 @@ impl App {
                 let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
                 self.tally_form = None;
                 let editor = RoutineEditor::new(note, false, self.store.now(), &*self.wall, renag);
-                self.editor = Some(editor.with_session(draft, None));
+                self.editor = Some(editor.with_session(draft));
             }
             Action::Session(asked) => self.session_action(asked)?,
+            Action::MakeSession(id) => {
+                self.save_text()?;
+                let Some(note) = Notes::new(&self.store).by_id(&id)? else {
+                    return Ok(());
+                };
+                let draft = SessionDraft::of(&self.store, &self.t, &id, None)?;
+                let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                let now = self.store.now();
+                self.tally_form = None;
+                self.editor = Some(RoutineEditor::make_session(
+                    note,
+                    draft,
+                    now,
+                    &*self.wall,
+                    renag,
+                ));
+            }
+            Action::UnmakeSession(id) => {
+                // A sync while the dialog was open may have changed it.
+                if Sessions::new(&self.store).is_session_note(&id)? {
+                    self.save_text()?;
+                    Sessions::new(&self.store).unmake(&id)?;
+                }
+            }
+            Action::SessionSetup(changed) => {
+                let (draft, setup) = *changed;
+                draft.write(&self.store, &setup)?;
+            }
+            Action::SessionPoolTally => {
+                let Some(setup) = &self.view.session_setup else {
+                    return Ok(());
+                };
+                let place = Notes::new(&self.store)
+                    .by_id(&setup.note_id)?
+                    .and_then(|n| n.place);
+                self.save_text()?;
+                let system = self.unit_system()?;
+                self.tally_page = Some(TallyPage::new(place, true, system));
+            }
             Action::Editor(intent) => match intent {
                 Intent::Save => match &mut self.editor {
                     // Set up for the Note being captured: held with it.
@@ -6500,7 +6640,7 @@ impl App {
                     // The Tallies of where it goes; while Unsorted, any.
                     let entity = place.as_deref().unwrap_or("");
                     let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
-                    editor = editor.with_session(draft, None);
+                    editor = editor.with_session(draft);
                 }
                 self.tally_form = None;
                 self.editor = Some(editor);
@@ -6617,7 +6757,9 @@ impl App {
     }
 
     /// Does what was asked of the New Tally page: Save makes the Tally
-    /// and hands it to the New Session page it was opened from, ticked.
+    /// and hands it to the New Session page it was opened from, ticked,
+    /// or puts it first in the pool of the Session Note whose page it was
+    /// opened from (#191).
     fn tally_page_action(&mut self, intent: PageIntent) -> oldbrainfix_core::Result<()> {
         let Some(page) = &mut self.tally_page else {
             return Ok(());
@@ -6628,10 +6770,17 @@ impl App {
                 let Some(id) = page.save(&self.store)? else {
                     return Ok(());
                 };
-                if page.for_session
-                    && let Some(editor) = &mut self.editor
-                {
-                    editor.add_made_tally(&id, page.name());
+                if page.for_session {
+                    match (&mut self.editor, &self.view.session_setup) {
+                        (Some(editor), _) => editor.add_made_tally(&id, page.name()),
+                        // From a Session Note's page: first in its pool.
+                        (None, Some(setup)) => {
+                            let mut pool = vec![id.clone()];
+                            pool.extend(setup.pool.iter().filter(|p| **p != id).cloned());
+                            Sessions::new(&self.store).set_pool(&setup.note_id, &pool)?;
+                        }
+                        (None, None) => {}
+                    }
                 }
                 self.tally_page = None;
             }
@@ -7740,15 +7889,14 @@ impl App {
         }
         let may = self.view.may;
         let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
-        let plain = self.view.tally.is_none()
-            && self.view.checklist.is_none()
-            && self.view.shopping.is_none()
-            && !note.is_merged();
+        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged();
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
             schedules: may.schedules,
             frog: may.schedules && !frog_open,
+            // A Routine of a Session Note runs it already (#191).
+            session: may.schedules && self.view.kind == Some(NoteKind::Plain),
             amends: may.amends,
             checklist: may.amends && self.view.makes_checklist,
             shopping: may.amends && self.view.makes_shopping,
@@ -7954,7 +8102,7 @@ impl App {
                     (
                         t.session(),
                         None,
-                        may(|n| n.schedules),
+                        may(|n| n.session),
                         Action::NewSession(Some(id.clone())),
                     ),
                 ];
@@ -8376,6 +8524,37 @@ impl App {
                     }
                 })
             }
+            // Each pick written at once, the rule's closing (#191).
+            NoteBadge::SessionRule => match (&mut self.session_draft, &self.view.session_setup) {
+                (Some(draft), Some(setup)) => {
+                    let icon = (icons::SESSION_RULE, None);
+                    badge_dialog(ctx, shown, icon, t.session_rule(), |ui| {
+                        if draft.rules(ui, &t) {
+                            let changed = Box::new((draft.clone(), setup.clone()));
+                            actions.push(Action::SessionSetup(changed));
+                            actions.push(Action::Badge(None));
+                        }
+                    })
+                }
+                // No Session meanwhile.
+                _ => true,
+            },
+            NoteBadge::SessionWeekdays => match (&mut self.session_draft, &self.view.session_setup)
+            {
+                (Some(draft), Some(setup)) => {
+                    let icon = (icons::SESSION_WEEKDAYS, None);
+                    let setting = t.session_weekday_counts();
+                    badge_dialog(ctx, shown, icon, setting, |ui| {
+                        let before = draft.counts;
+                        draft.weekdays(ui, &t);
+                        if draft.counts != before {
+                            let changed = Box::new((draft.clone(), setup.clone()));
+                            actions.push(Action::SessionSetup(changed));
+                        }
+                    })
+                }
+                _ => true,
+            },
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();
@@ -8913,6 +9092,8 @@ impl App {
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                     tally: self.view.tallies.contains(id),
                     tally_shown: self.view.card_tallies.get(id),
+                    session: self.view.sessions.contains(id),
+                    session_shown: self.view.card_sessions.get(id),
                     menu: self.card_menu.as_ref(),
                     changes: self.view.card_changes.contains(id),
                     boxes: CardBoxes {
@@ -8949,6 +9130,7 @@ impl App {
                         .into_iter()
                         .map(|asked| Action::CardTally(id.clone(), asked)),
                 );
+                actions.extend(clicks.session.into_iter().map(Action::Session));
                 if let Some(Action::AskFileInto(_)) = clicks.picked {
                     // The right-click's File into… files the cards selected
                     // with it.
@@ -9152,6 +9334,9 @@ impl App {
         let tally = self.view.tally.as_ref();
         let checklist = self.view.checklist.as_ref();
         let shopping = self.view.shopping.as_ref();
+        let session_setup = self.view.session_setup.as_ref();
+        let makes_session = self.view.makes_session;
+        let session_draft = &mut self.session_draft;
         let typed = &mut self.lines;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
@@ -9294,6 +9479,19 @@ impl App {
                     tally_view::setup(ui, &t, tones, tally, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Tally));
                 }
+                // A Session's pool and count, each change written at once;
+                // its picks and history show on its card (#191).
+                if let (Some(draft), Some(setup)) = (session_draft.as_mut(), session_setup) {
+                    draft.new_tally = makes_session;
+                    let (changed, asked) = draft.note_page(ui, &t, tones, makes_session);
+                    if changed {
+                        let changed = Box::new((draft.clone(), setup.clone()));
+                        actions.push(Action::SessionSetup(changed));
+                    }
+                    if asked == Some(SessionIntent::NewTally) {
+                        actions.push(Action::SessionPoolTally);
+                    }
+                }
                 // Each setting as its badge, in one wrapping row under the
                 // text and the kind's content (#160).
                 let shown = BadgesShown {
@@ -9304,6 +9502,7 @@ impl App {
                     on_agenda: checklist.and_then(|c| c.on_agenda),
                     shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
                     ticks: has_boxes.then_some(show_ticks),
+                    session: session_setup.map(|s| (s, makes_session)),
                     may,
                     frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
                 };
@@ -9564,10 +9763,12 @@ impl App {
                 });
                 // Only a Note in the lists becomes a Tally (ADR 0028); one
                 // that is adds entries in its Tally part above. A
-                // Checklist or Shopping List is no Tally (ADR 0030).
+                // Checklist, a Shopping List or a Session is no Tally (ADR
+                // 0030, ADR 0039).
                 if tally.is_none()
                     && checklist.is_none()
                     && shopping.is_none()
+                    && session_setup.is_none()
                     && !note.is_merged()
                     && ui
                         .button(RichText::new(t.make_tally()).color(text))
@@ -11200,6 +11401,7 @@ struct NoteMenu {
     changes: bool,
     schedules: bool,
     frog: bool,
+    session: bool,
     amends: bool,
     checklist: bool,
     shopping: bool,
@@ -13505,7 +13707,8 @@ pub(crate) fn embossed(
 /// its Routines and Reminders and how many of them a newer version saved,
 /// its kind with whether it may go back to a plain Note, Show on the
 /// Agenda of a Checklist or a Shopping List and Show ticks where they
-/// apply, what this Device may do to it and whether it has an open Frog.
+/// apply, a Session's setup, what this Device may do to it and whether it
+/// has an open Frog.
 struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
@@ -13514,14 +13717,18 @@ struct BadgesShown<'a> {
     on_agenda: Option<bool>,
     shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
+    /// A Session Note's setup, for its rule and weekdays' badges, and
+    /// whether this Device may change them (#191).
+    session: Option<(&'a SessionSetup, bool)>,
     may: NoteMay,
     frog_open: bool,
 }
 
 /// The kind of the Note open (#188), and the kinds this Device may make
 /// it from its kind badge, in the order offered: a plain Note a
-/// Checklist, a Shopping List or a Tally, as it may make it one; a list
-/// a plain Note again or the other list; a Tally none.
+/// Checklist, a Shopping List, a Tally or a Session (#191), as it may make
+/// it one; a list a plain Note again or the other list; a Session a plain
+/// Note again; a Tally none.
 #[derive(Debug, Clone, PartialEq)]
 struct KindShown {
     kind: NoteKind,
@@ -13550,6 +13757,7 @@ impl KindShown {
                     choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
                     choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));
                     choices.extend(tally.then_some(NoteKind::Tally));
+                    choices.extend(view.makes_session.then_some(NoteKind::Session));
                 }
                 NoteKind::Checklist => {
                     choices.extend(plain(view.checklist.as_ref().is_some_and(|l| l.plain)));
@@ -13561,6 +13769,9 @@ impl KindShown {
                 }
                 // No way out of a Tally.
                 NoteKind::Tally => {}
+                NoteKind::Session => {
+                    choices.extend(view.makes_session.then_some(NoteKind::Plain));
+                }
             }
         }
         KindShown { kind, choices }
@@ -13569,10 +13780,12 @@ impl KindShown {
 
 /// What making the Note `id` of the kind `from` one of the kind `to`
 /// asks (#188): the existing ways a Note becomes a list, a Tally or a
-/// plain Note again, a list the other list.
+/// plain Note again, a list the other list; a Session's setup page, and
+/// a Session a plain Note again (#191).
 fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
     let id = id.to_string();
     match to {
+        NoteKind::Plain if from == NoteKind::Session => Action::UnmakeSession(id),
         NoteKind::Plain if from == NoteKind::ShoppingList => {
             Action::Shopping(ShoppingAction::ToPlain(id))
         }
@@ -13580,6 +13793,7 @@ fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
         NoteKind::Checklist => Action::Checklist(ChecklistAction::Make(id)),
         NoteKind::ShoppingList => Action::Shopping(ShoppingAction::Make(id)),
         NoteKind::Tally => Action::Tally(TallyAction::Make(id)),
+        NoteKind::Session => Action::MakeSession(id),
     }
 }
 
@@ -13590,6 +13804,7 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
         NoteKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
         NoteKind::ShoppingList => (icons::SHOPPING_CART, t.shopping_heading()),
         NoteKind::Tally => (icons::TALLY, t.tally_heading()),
+        NoteKind::Session => (icons::SESSION, t.session()),
     }
 }
 
@@ -13597,8 +13812,9 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
 /// opening its editor, and those a newer version saved, only shown; the
-/// kind; Show on the Agenda; Show ticks; and "+" with Routine, Reminder,
-/// Frog and Session, for who may set them up. A setting that does not
+/// kind; a Session's rule and weekdays' counts (#191); Show on the
+/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog and, on a
+/// plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
@@ -13667,6 +13883,20 @@ fn note_badges(
         let choosing = !shown.kind.choices.is_empty();
         if badge(ui, look, (icon, None), t.badge_kind(), Some(name), choosing).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
+        }
+        // A Session's rule and its weekdays' counts (#191).
+        if let Some((setup, changes)) = shown.session {
+            let rule = session_view::rule_name(t, setup.rule);
+            let icon = (icons::SESSION_RULE, None);
+            if badge(ui, look, icon, t.session_rule(), Some(rule), changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::SessionRule)));
+            }
+            let own = t.session_weekday_counts_summary(setup.counts.len() as i64);
+            let icon = (icons::SESSION_WEEKDAYS, None);
+            let setting = t.session_weekday_counts();
+            if badge(ui, look, icon, setting, Some(&own), changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::SessionWeekdays)));
+            }
         }
         // A Shopping List's three ways, where a Checklist's switch sits.
         if let Some(shows) = shown.shopping_on_agenda {
@@ -13737,11 +13967,15 @@ fn note_badges(
             if !shown.frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
-            entries.push((
-                icons::SESSION,
-                t.session(),
-                Action::NewSession(Some(id.clone())),
-            ));
+            // Only a plain Note becomes a Session; a Routine of a Session
+            // Note runs it already (#191).
+            if shown.kind.kind == NoteKind::Plain {
+                entries.push((
+                    icons::SESSION,
+                    t.session(),
+                    Action::NewSession(Some(id.clone())),
+                ));
+            }
             for (icon, label, action) in entries {
                 if menu_entry(ui, (icon, text), label).clicked() {
                     actions.push(action);
@@ -13887,6 +14121,11 @@ struct CardLook<'a> {
     /// The Tally a full card shows under them: its chart, its entries and
     /// "Add entry" (#190).
     tally_shown: Option<&'a TallyShown>,
+    /// Whether the Note is a Session, shown by its name and description as
+    /// a Tally is, and what a full card shows under them: its pool, today's
+    /// picks and last weeks (#191).
+    session: bool,
+    session_shown: Option<&'a SessionCardShown>,
     menu: Option<&'a CardMenu>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
@@ -13951,6 +14190,8 @@ struct CardClicks {
     picked: Option<Action>,
     /// What was asked of the Tally on a full card (#190).
     tally: Vec<TallyAction>,
+    /// What was asked of the picks on a Session Note's full card (#191).
+    session: Vec<SessionAction>,
 }
 
 /// The room after the last row of every list (#158): its last card,
@@ -14789,10 +15030,11 @@ fn note_card(
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
-    // Where the Tally of a full card lies, out of the card's own click,
-    // and what was asked of it (#190).
+    // Where the Tally or the Session of a full card lies, out of the
+    // card's own click, and what was asked of it (#190, #191).
     let mut tally_rect = None;
     let mut tally_asked = Vec::new();
+    let mut session_asked = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -14877,7 +15119,7 @@ fn note_card(
                         (None, Some((list, _))) => Some(shopping_view::shown_lines(t, list)),
                         (None, None) => None,
                     };
-                    if lines.is_some() || look.tally {
+                    if lines.is_some() || look.tally || look.session {
                         // Its name as its title, its description folded
                         // under it (#188), its Lines right under them.
                         let text = (part.text, part.format, look.boxes.look(part.id));
@@ -14904,6 +15146,11 @@ fn note_card(
                         if let Some(shown) = look.tally_shown {
                             let drawn =
                                 ui.scope(|ui| tally_view::card(ui, t, shown, &mut tally_asked));
+                            tally_rect = Some(drawn.response.rect);
+                        }
+                        if let Some(shown) = look.session_shown {
+                            let drawn =
+                                ui.scope(|ui| session_view::card(ui, t, shown, &mut session_asked));
                             tally_rect = Some(drawn.response.rect);
                         }
                         shown.extend(media_view::whole_media(
@@ -14946,9 +15193,9 @@ fn note_card(
                 note.text_format.as_str(),
                 look.boxes.look(&note.id),
             );
-            if look.checklist.is_some() || look.shopping.is_some() || look.tally {
+            if look.checklist.is_some() || look.shopping.is_some() || look.tally || look.session {
                 // Its name, then how many Lines are open, or the Tally's
-                // totals today.
+                // totals today, or the Session's next run and week (#191).
                 let named = note_kinds::name(&note.text).len();
                 if named > 0 {
                     marks = text_marks_view::formatted_label(
@@ -15041,8 +15288,8 @@ fn note_card(
     } else {
         Sense::click()
     };
-    // Around the Tally of a full card, whose own buttons take its clicks
-    // (#190).
+    // Around the Tally or the Session of a full card, whose own buttons
+    // take its clicks (#190, #191).
     let resp = match tally_rect {
         Some(hole) => {
             let above = egui::Rect::from_min_max(rect.min, egui::pos2(rect.max.x, hole.min.y));
@@ -15292,6 +15539,7 @@ fn note_card(
         menu_opened,
         picked,
         tally: tally_asked,
+        session: session_asked,
     }
 }
 

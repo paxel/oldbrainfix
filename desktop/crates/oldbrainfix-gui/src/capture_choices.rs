@@ -63,14 +63,26 @@ impl SessionChoice {
         schedule: &Schedule,
     ) -> oldbrainfix_core::Result<String> {
         let sessions = Sessions::new(store);
-        let id = sessions
-            .spawn(note_id, schedule, &self.pool, self.count, self.rule)?
-            .routine
-            .id;
+        let made = sessions.spawn(note_id, schedule, &self.pool, self.count, self.rule)?;
+        // The weekdays' counts lie on the Note (ADR 0039).
         for (day, own) in &self.counts {
-            sessions.set_count_on(&id, *day, Some(*own))?;
+            sessions.set_count_on(made.note_id(), *day, Some(*own))?;
         }
-        Ok(id)
+        Ok(made.routine.id)
+    }
+
+    /// Makes the plain Note `note_id` a Session of it, without a Routine
+    /// (#191), in one batch.
+    pub fn make(&self, store: &Store, note_id: &str) -> oldbrainfix_core::Result<()> {
+        let sessions = Sessions::new(store);
+        store.batch(|| {
+            sessions.make(note_id, &self.pool, self.count, self.rule)?;
+            // Making it takes away any weekday's count left before.
+            for (day, own) in &self.counts {
+                sessions.set_count_on(note_id, *day, Some(*own))?;
+            }
+            Ok(())
+        })
     }
 }
 

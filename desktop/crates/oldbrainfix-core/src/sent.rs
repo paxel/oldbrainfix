@@ -2191,6 +2191,38 @@ mod tests {
     }
 
     #[test]
+    fn a_session_goes_as_a_plain_note_its_routines_with_it() -> TestResult {
+        use crate::note_kinds::NoteKind;
+        use crate::sessions::{SessionRule, Sessions};
+        let ann = device(1);
+        let ben = device(2);
+        let push = Notes::new(&ann).capture("Push-ups", None, None)?.id;
+        Tallies::new(&ann).add_field(&push, "Times", "times", None, None)?;
+        let note = Notes::new(&ann).capture("Sport", None, None)?.id;
+        Sessions::new(&ann).make(&note, std::slice::from_ref(&push), 1, SessionRule::Rolling)?;
+        for at in [7, 18] {
+            let schedule = Schedule::new(
+                Day::parse("2026-03-06").ok_or("day")?,
+                &[ClockTime::new(at, 0).ok_or("time")?],
+                None,
+            )
+            .ok_or("schedule")?;
+            Routines::new(&ann).spawn(&note, &schedule)?;
+        }
+        let opened = ben
+            .open_sent_item(&ann.send_note(&note, None, false)?)?
+            .map_err(|_| "opened")?;
+        let id = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        // The pool names Tallies Ben does not hold (ADR 0028, 0039).
+        assert_eq!(NoteKind::of(&ben, &id)?, NoteKind::Plain);
+        assert_eq!(Routines::new(&ben).of_note(&id)?.len(), 2);
+        assert!(Sessions::new(&ben).all()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn a_formatted_text_goes_out_and_arrives_editable() -> TestResult {
         let ann = device(1);
         let ben = device(2);

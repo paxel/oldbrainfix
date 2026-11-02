@@ -3,12 +3,19 @@
 //! picks on later days; a click on a pick opens its entry form, prefilled
 //! with the targets and without a date, which records the entry for the
 //! Occurrence, or the entry it has; "Another one" swaps a pick; once every
-//! pick has an entry the box stays checked. "Session" in a Note's editor
-//! opens the Routine editor with the pool, the count's − / + stepper,
-//! the weekdays with a checkbox each for an own count, and the rule on
-//! top, which say what to fix in the pool and write only what changed; "New Session" on All Routines and Reminders makes
-//! one with its Note from the text typed. Without a Tally both still
-//! offer it, the editor says how to make one, and Save makes nothing.
+//! pick has an entry the box stays checked; each Routine of a Session
+//! Note shows its own Occurrences, Rolling going on across them.
+//! "Session" in a plain Note's "+" opens the Routine editor with the pool,
+//! the count's − / + stepper, the weekdays with a checkbox each for an own
+//! count, and the rule on top, which say what to fix in the pool; "New
+//! Session" on All Routines and Reminders makes one with its Note from the
+//! text typed. Without a Tally both still offer it, the editor says how to
+//! make one, and Save makes nothing. A Session is a kind of Note (#191,
+//! ADR 0039): its kind badge makes a plain Note one on the setup's page
+//! and one a plain Note again; its page in the Note dialog writes the pool
+//! and the count at once, its badges the rule and the weekdays' counts;
+//! "+" there offers no Session, its Routine running it, and the Routine
+//! editor of one only schedules.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -19,8 +26,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    Day, Notes, Occurrence, OwnProfile, Recurrence, Schedule, SessionRule, Sessions, SigningKey,
-    Store, Tallies,
+    Day, Notes, Occurrence, OwnProfile, Recurrence, Routines, Schedule, SessionRule, Sessions,
+    SigningKey, Store, Tallies,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::session_editor::WEEKDAYS_OPEN;
@@ -403,99 +410,431 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     };
     assert_eq!(session.routine.note_id, device.legs);
     assert_eq!(
-        session.pool,
+        session.setup.pool,
         vec![device.tallies[0].clone(), device.tallies[1].clone()]
     );
-    assert_eq!(session.count, 2);
-    assert_eq!(session.counts, BTreeMap::from([(6, 1)]));
-    assert_eq!(session.rule, SessionRule::Rolling);
+    assert_eq!(session.setup.count, 2);
+    assert_eq!(session.setup.counts, BTreeMap::from([(6, 1)]));
+    assert_eq!(session.setup.rule, SessionRule::Rolling);
     assert!(session.routine.schedule.times.is_empty());
     assert!(harness.state().routine_editor().is_none());
     Ok(())
 }
 
-#[test]
-fn a_weekday_unchecked_picks_as_many_as_every_day_again() -> TestResult {
-    let device = device()?;
-    let id = spawn(&device)?;
-    Sessions::new(&device.store).set_count_on(&id, 3, Some(4))?;
-    let mut harness = window(&device.store, None);
-    harness.state_mut().open_routine(&id);
-    harness.run();
-    let t = L10n::new("en");
-    assert!(shows(&harness, t.session()));
-    // Folded, the weekday's own count is summed up.
-    assert!(shows(&harness, &t.session_weekday_counts_summary(1)));
-    harness.get_by_label(t.session_weekday_counts()).click();
-    harness.run();
-    assert!(checked(&harness, Role::CheckBox, "Wednesday"));
-    assert_eq!(
-        harness
-            .query_all_by_label(t.session_weekday_count_hint())
-            .count(),
-        6
-    );
-    harness
-        .get_by_role_and_label(Role::CheckBox, "Wednesday")
-        .click_accesskit();
-    harness.run();
-    assert_eq!(
-        harness
-            .query_all_by_label(t.session_weekday_count_hint())
-            .count(),
-        7
-    );
-    harness.get_by_label(t.session_weekday_counts()).click();
-    harness.run();
-    assert!(shows(&harness, &t.session_weekday_counts_summary(0)));
-    click_button(&mut harness, t.save());
-    assert!(harness.state().routine_editor().is_none());
-    let session = Sessions::new(&device.store)
-        .by_id(&id)?
-        .ok_or("a Session")?;
-    assert!(session.counts.is_empty());
-    Ok(())
+/// Clicks the badge of `setting` showing `value` in the Note dialog.
+fn open_badge(harness: &mut Harness<'_, App>, t: &L10n, setting: &str, value: &str) {
+    click_button(harness, &t.setting_badge_label(setting, value));
+}
+
+/// The setup of the Session Note `note`.
+fn setup_of(
+    device: &Device,
+    note: &str,
+) -> Result<oldbrainfix_core::SessionSetup, Box<dyn std::error::Error>> {
+    Ok(Sessions::new(&device.store)
+        .setup_of(note)?
+        .ok_or("a Session")?)
+}
+
+/// How often `field` was written on `entity`.
+fn written(
+    device: &Device,
+    entity: &str,
+    field: &str,
+) -> Result<usize, Box<dyn std::error::Error>> {
+    Ok(device
+        .store
+        .history(entity)?
+        .iter()
+        .filter(|e| e.field == field)
+        .count())
+}
+
+/// Whether the checkbox `label` may be clicked.
+fn enabled(harness: &Harness<'_, App>, label: &str) -> bool {
+    !harness
+        .get_by_role_and_label(Role::CheckBox, label)
+        .accesskit_node()
+        .is_disabled()
 }
 
 #[test]
-fn saving_a_session_writes_only_what_changed() -> TestResult {
+fn the_kind_badge_makes_a_plain_note_a_session_and_back() -> TestResult {
     let device = device()?;
-    let id = spawn(&device)?;
-    let written = |field: &str| -> Result<usize, Box<dyn std::error::Error>> {
-        Ok(device
-            .store
-            .history(&id)?
-            .iter()
-            .filter(|e| e.field == field)
-            .count())
-    };
-    let before: Vec<usize> = ["session:pool", "session:count", "session:rule"]
-        .iter()
-        .map(|f| written(f))
-        .collect::<Result<_, _>>()?;
-    let mut harness = window(&device.store, None);
-    harness.state_mut().open_routine(&id);
-    harness.run();
     let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(&device.legs));
+    open_badge(&mut harness, &t, t.badge_kind(), t.kind_plain());
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.session())
+        .click_accesskit();
+    harness.run();
+    // Its setup alone: the pool, the count, the weekdays and the rule,
+    // no schedule.
+    assert!(
+        harness
+            .state()
+            .routine_editor()
+            .is_some_and(|e| e.makes_session())
+    );
+    assert!(shows(&harness, t.session_pool()));
+    assert!(shows(&harness, t.new_tally()));
+    assert!(!shows(&harness, t.all_day()));
+    assert!(!shows(&harness, t.next_occurrences()));
+    // Without a Tally it says so and makes nothing.
+    click_button(&mut harness, t.save());
+    assert!(shows(&harness, t.session_pool_missing()));
+    assert!(!Sessions::new(&device.store).is_session_note(&device.legs)?);
+
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Wall sit")
+        .click_accesskit();
+    harness.run();
+    click_nth(&mut harness, t.more(), 0)?;
     harness
         .get_by_role_and_label(Role::RadioButton, t.session_rule_least())
         .click_accesskit();
     harness.run();
-    // Without Rolling the order has no arrows.
-    assert!(!shows(&harness, &t.session_move_down("Push-ups")));
     click_button(&mut harness, t.save());
-    let after: Vec<usize> = ["session:pool", "session:count", "session:rule"]
-        .iter()
-        .map(|f| written(f))
-        .collect::<Result<_, _>>()?;
-    assert_eq!(after, vec![before[0], before[1], before[2] + 1]);
-    for day in 1..=7 {
-        assert_eq!(written(&format!("session:count:{day}"))?, 0, "{day}");
+    assert!(harness.state().routine_editor().is_none());
+    let setup = setup_of(&device, &device.legs)?;
+    assert_eq!(setup.pool, vec![device.tallies[1].clone()]);
+    assert_eq!(setup.count, 2);
+    assert_eq!(setup.rule, SessionRule::Least);
+    // It runs nowhere yet: its Routines say when.
+    assert!(
+        Routines::new(&device.store)
+            .of_note(&device.legs)?
+            .is_empty()
+    );
+    // Its page shows the setup, its badges the kind and the rule.
+    assert!(checked(&harness, Role::CheckBox, "Wall sit"));
+    assert!(shows(
+        &harness,
+        &t.setting_badge_label(t.badge_kind(), t.session())
+    ));
+    assert!(shows(
+        &harness,
+        &t.setting_badge_label(t.session_rule(), t.session_rule_least())
+    ));
+
+    // Back to a plain Note: no pool on its page any more.
+    open_badge(&mut harness, &t, t.badge_kind(), t.session());
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.kind_plain())
+        .click_accesskit();
+    harness.run();
+    assert!(!Sessions::new(&device.store).is_session_note(&device.legs)?);
+    assert!(!shows(&harness, t.session_pool()));
+    assert!(shows(
+        &harness,
+        &t.setting_badge_label(t.badge_kind(), t.kind_plain())
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_session_made_plain_again_keeps_its_routines_running_plain() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(&device.sport));
+    open_badge(&mut harness, &t, t.badge_kind(), t.session());
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.kind_plain())
+        .click_accesskit();
+    harness.run();
+    assert!(!Sessions::new(&device.store).is_session_note(&device.sport)?);
+    let routines = Routines::new(&device.store).of_note(&device.sport)?;
+    assert_eq!(routines.len(), 1);
+    assert!(Sessions::new(&device.store).by_id(&id)?.is_none());
+    // A plain Note may become one again.
+    open_badge(&mut harness, &t, t.badge_kind(), t.kind_plain());
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::RadioButton, t.session())
+            .next()
+            .is_some()
+    );
+    Ok(())
+}
+
+#[test]
+fn the_session_page_writes_its_pool_and_count_at_once() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let t = L10n::new("en");
+    let sport = device.sport.as_str();
+    let before = [
+        written(&device, sport, "session:pool")?,
+        written(&device, sport, "session:count")?,
+        written(&device, sport, "session:rule")?,
+    ];
+    let mut harness = window(&device.store, Some(sport));
+    // After its name: the pool, every Tally ticked, and the count.
+    for name in ["Push-ups", "Wall sit", "Half bridge"] {
+        assert!(checked(&harness, Role::CheckBox, name), "{name}");
     }
-    let session = Sessions::new(&device.store)
-        .by_id(&id)?
-        .ok_or("a Session")?;
-    assert_eq!(session.rule, SessionRule::Least);
+    assert!(shows(&harness, t.session_count()));
+    // A Session becomes no Tally.
+    assert!(!shows(&harness, t.make_tally()));
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Half bridge")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(setup_of(&device, sport)?.pool, device.tallies[..2].to_vec());
+    assert_eq!(written(&device, sport, "session:pool")?, before[0] + 1);
+    // Rolling's order: only those ticked move.
+    assert!(!shows(&harness, &t.session_move_up("Half bridge")));
+    click_button(&mut harness, &t.session_move_up("Wall sit"));
+    assert_eq!(
+        setup_of(&device, sport)?.pool,
+        vec![device.tallies[1].clone(), device.tallies[0].clone()]
+    );
+    click_nth(&mut harness, t.more(), 0)?;
+    let setup = setup_of(&device, sport)?;
+    assert_eq!(setup.count, 3);
+    assert_eq!(written(&device, sport, "session:count")?, before[1] + 1);
+    assert_eq!(written(&device, sport, "session:rule")?, before[2]);
+    // The last Tally ticked stays.
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Push-ups")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(
+        setup_of(&device, sport)?.pool,
+        vec![device.tallies[1].clone()]
+    );
+    assert!(!enabled(&harness, "Wall sit"));
+    assert!(enabled(&harness, "Push-ups"));
+    Ok(())
+}
+
+#[test]
+fn a_tick_right_after_typing_the_description_is_written_with_it() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let t = L10n::new("en");
+    let sport = device.sport.as_str();
+    let mut harness = window(&device.store, Some(sport));
+    harness
+        .get_by(|n| n.placeholder() == Some(t.note_description()))
+        .click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("Mornings");
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Half bridge")
+        .click();
+    harness.run();
+    assert_eq!(setup_of(&device, sport)?.pool, device.tallies[..2].to_vec());
+    harness.state_mut().close_note();
+    harness.run();
+    let note = Notes::new(&device.store).by_id(sport)?.ok_or("the Note")?;
+    assert_eq!(note.text, "Sport\nMornings");
+    Ok(())
+}
+
+#[test]
+fn new_tally_on_the_session_page_comes_first_in_its_pool() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(&device.sport));
+    click_button(&mut harness, t.new_tally());
+    harness.get_by(|n| n.is_focused()).type_text("Plank");
+    harness.run();
+    harness
+        .get_all_by_role_and_label(Role::TextInput, t.kind_name())
+        .last()
+        .ok_or("the field's name")?
+        .click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("Seconds");
+    harness.run();
+    click_button(&mut harness, t.save());
+    let plank = Notes::new(&device.store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Plank")
+        .ok_or("the Tally's Note")?;
+    let pool = setup_of(&device, &device.sport)?.pool;
+    assert_eq!(pool.first(), Some(&plank.id));
+    assert_eq!(pool.len(), 4);
+    assert!(checked(&harness, Role::CheckBox, "Plank"));
+    Ok(())
+}
+
+#[test]
+fn the_rule_badge_picks_how_it_picks_at_once() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let t = L10n::new("en");
+    let sport = device.sport.as_str();
+    let before = written(&device, sport, "session:rule")?;
+    let mut harness = window(&device.store, Some(sport));
+    open_badge(&mut harness, &t, t.session_rule(), t.session_rule_rolling());
+    assert!(shows(&harness, t.session_rule_least_detail()));
+    harness
+        .get_by_role_and_label(Role::RadioButton, t.session_rule_least())
+        .click_accesskit();
+    harness.run();
+    let setup = setup_of(&device, sport)?;
+    assert_eq!(setup.rule, SessionRule::Least);
+    assert_eq!(written(&device, sport, "session:rule")?, before + 1);
+    assert_eq!(setup.count, 2);
+    // The pick closes it; without Rolling the pool has no arrows.
+    assert!(!shows(&harness, t.session_rule_least_detail()));
+    assert!(!shows(&harness, &t.session_move_down("Push-ups")));
+    assert!(shows(
+        &harness,
+        &t.setting_badge_label(t.session_rule(), t.session_rule_least())
+    ));
+    Ok(())
+}
+
+#[test]
+fn the_weekdays_badge_gives_and_takes_a_weekdays_own_count_at_once() -> TestResult {
+    let device = device()?;
+    spawn(&device)?;
+    let sport = device.sport.as_str();
+    Sessions::new(&device.store).set_count_on(sport, 3, Some(4))?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(sport));
+    let summary = t.session_weekday_counts_summary(1);
+    open_badge(&mut harness, &t, t.session_weekday_counts(), &summary);
+    assert!(checked(&harness, Role::CheckBox, "Wednesday"));
+    let hints = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by_label(t.session_weekday_count_hint())
+            .count()
+    };
+    assert_eq!(hints(&harness), 6);
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Wednesday")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(hints(&harness), 7);
+    assert!(setup_of(&device, sport)?.counts.is_empty());
+    // Saturday's own count starts from every day's, its stepper last.
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Saturday")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(setup_of(&device, sport)?.counts, BTreeMap::from([(6, 2)]));
+    harness
+        .query_all_by_role_and_label(Role::Button, t.more())
+        .last()
+        .ok_or("Saturday's +")?
+        .click_accesskit();
+    harness.run();
+    assert_eq!(setup_of(&device, sport)?.counts, BTreeMap::from([(6, 3)]));
+    // The dialog's Close, over the Note dialog's.
+    harness
+        .query_all_by_role_and_label(Role::Button, t.close())
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, t.session_weekday_counts_explain()));
+    assert!(shows(
+        &harness,
+        &t.setting_badge_label(t.session_weekday_counts(), &summary)
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_routine_of_a_session_note_only_schedules_it() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    let before = setup_of(&device, &device.sport)?;
+    let mut harness = window(&device.store, None);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    let t = L10n::new("en");
+    assert!(harness.state().routine_editor().is_some());
+    assert!(shows(&harness, t.routine()));
+    assert!(!shows(&harness, t.session_pool()));
+    assert!(!shows(&harness, t.session_rule()));
+    assert!(!shows(&harness, t.session_count()));
+    click_button(&mut harness, t.save());
+    assert!(harness.state().routine_editor().is_none());
+    assert_eq!(setup_of(&device, &device.sport)?, before);
+    Ok(())
+}
+
+#[test]
+fn plus_on_a_session_note_offers_no_session_and_its_routine_runs_it() -> TestResult {
+    let device = device()?;
+    let first = spawn(&device)?;
+    let t = L10n::new("en");
+    let mut harness = window(&device.store, Some(&device.sport));
+    add_menu(&mut harness, &t);
+    for offered in [t.routine(), t.reminder(), t.frog()] {
+        assert!(
+            harness
+                .query_all_by_role_and_label(Role::Button, offered)
+                .next()
+                .is_some(),
+            "{offered}"
+        );
+    }
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, t.session())
+            .next()
+            .is_none()
+    );
+    click_button(&mut harness, t.routine());
+    assert!(
+        harness
+            .state()
+            .routine_editor()
+            .is_some_and(|e| e.session().is_none())
+    );
+    click_button(&mut harness, t.save());
+    let runs = Sessions::new(&device.store).of_note(&device.sport)?;
+    assert_eq!(runs.len(), 2);
+    assert!(runs.iter().any(|r| r.id() == first));
+    // Each Routine is a Routine badge on its page.
+    let badges = harness
+        .query_all_by_label_contains(&format!("{}: ", t.routine()))
+        .count();
+    assert_eq!(badges, 2);
+    Ok(())
+}
+
+#[test]
+fn the_agenda_shows_each_occurrence_of_each_routine_of_a_session() -> TestResult {
+    let device = device()?;
+    let all_day = spawn(&device)?;
+    // A second Routine of the Note, this evening.
+    let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
+    let at = [oldbrainfix_core::ClockTime::new(18, 0).ok_or("a time")?];
+    let evening = Schedule::new(today(), &at, Some(rule)).ok_or("a schedule")?;
+    let later = Routines::new(&device.store)
+        .spawn(&device.sport, &evening)?
+        .id;
+    let harness = window(&device.store, None);
+    let t = L10n::new("en");
+    // Rolling goes on from the morning's pick in the evening (ADR 0039).
+    assert!(shows(&harness, "Push-ups 20 times"));
+    assert!(shows(&harness, "Wall sit 30 times"));
+    assert!(shows(&harness, "Half bridge 15 times"));
+    assert_eq!(harness.query_all_by_label(t.session_another()).count(), 4);
+    let six = oldbrainfix_core::ClockTime::new(18, 0).ok_or("a time")?;
+    let picked = |id: &str, at: Occurrence| -> Result<_, Box<dyn std::error::Error>> {
+        let marks = oldbrainfix_core::SessionMarks::of(&device.store, id)?;
+        Ok(marks.picks.get(&at.key()).cloned())
+    };
+    assert_eq!(
+        picked(&all_day, occurrence())?,
+        Some(device.tallies[..2].to_vec())
+    );
+    assert_eq!(
+        picked(&later, Occurrence::new(today(), Some(six)))?,
+        Some(vec![device.tallies[2].clone(), device.tallies[0].clone()])
+    );
     Ok(())
 }
 
@@ -532,7 +871,7 @@ fn new_session_on_all_routines_makes_one_with_its_note_from_the_text() -> TestRe
         .by_id(&session.routine.note_id)?
         .ok_or("its Note")?;
     assert_eq!(note.text, "Morning sport");
-    assert_eq!(session.pool, vec![device.tallies[0].clone()]);
+    assert_eq!(session.setup.pool, vec![device.tallies[0].clone()]);
     assert!(session.routine.schedule.times.is_empty());
     // Its Note is no Unsorted one, as a new Routine's is not.
     let unsorted = Notes::new(&device.store).unsorted()?;

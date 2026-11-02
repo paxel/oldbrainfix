@@ -1,4 +1,5 @@
 import 'checklists.dart';
+import 'sessions.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
 import 'tallies.dart';
@@ -11,8 +12,10 @@ enum NoteKind {
   checklist,
   shoppingList,
   tally,
-  // A Session becomes a kind with #191; until then a Note whose Routine
-  // is a Session reads as the kind its own fields say, plain at most.
+
+  /// A Note that picks Tallies for each Occurrence of its Routines
+  /// (#191, ADR 0039).
+  session,
 }
 
 /// Reads the kind of Notes, and splits the text of a Note of a kind into
@@ -23,10 +26,12 @@ class NoteKinds {
   NoteKinds(this.store);
 
   /// The kind of the Note [noteId]: a Tally while it has a field, which
-  /// wins over a list (ADR 0030), else the list its `kind` names, else a
-  /// plain Note.
+  /// wins over the rest (ADR 0030), else a Session while it has a pool,
+  /// on the Note or as an older version left it on a Routine (ADR 0039),
+  /// else the list its `kind` names, else a plain Note.
   NoteKind of(String noteId) {
     if (Tallies(store).isTally(noteId)) return NoteKind.tally;
+    if (Sessions(store).isSessionNote(noteId)) return NoteKind.session;
     if (Checklists(store).isChecklist(noteId)) return NoteKind.checklist;
     if (ShoppingLists(store).isShoppingList(noteId)) {
       return NoteKind.shoppingList;

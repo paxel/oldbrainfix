@@ -39,7 +39,11 @@ Future<bool> spawnFromNote(
       places: places,
       noteId: note.id,
       reminder: spawn == Spawn.reminder,
-      session: spawn == Spawn.session,
+      // Only a plain Note becomes a Session (ADR 0039): a Session Note's
+      // new Routine runs it as it is, and one of another kind runs plain.
+      session:
+          spawn == Spawn.session &&
+          NoteKinds(notes.store).of(note.id) == NoteKind.plain,
     ),
   );
 }
@@ -110,9 +114,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
 ///
-/// A Session (#104) has its pool, count, weekdays' counts and rule on top
-/// of the schedule ([SessionFields]); Save says under each field what to
-/// fix there.
+/// A new Session (#104) has its pool, count, weekdays' counts and rule on
+/// top of the schedule ([SessionFields]); Save says under each field what
+/// to fix there. A Routine of a Session Note only says when it runs it:
+/// the setup lies on the Note, on its page (#191).
 class RoutineEditorScreen extends StatefulWidget {
   /// The Re-nag intervals offered, in minutes.
   static const renagChoices = [5, 10, 15, 30, 60];
@@ -176,8 +181,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   Routine? _routine;
   Note? _note;
 
-  /// The Session edited, when it is one.
-  Session? _session;
+  /// The setup of a new Session.
   SessionDraft? _draft;
 
   bool _advanced = false;
@@ -234,10 +238,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         : _routines.byId(widget.routineId ?? '');
     _routine = routine;
     if (routine != null) {
-      final session = _session = Sessions(widget.notes.store).byId(routine.id);
-      if (session != null) {
-        _draft = SessionDraft.of(widget.notes.store, routine.id, session);
-      }
       _note = _routines.note(routine);
       _renag = routine.renag;
       _escalation = routine.escalation;
@@ -472,11 +472,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     }
     final routine = _routine;
     final note = _note;
-    final session = _session;
     final String id;
     if (routine != null) {
       _routines.reschedule(routine.id, schedule);
-      if (draft != null && session != null) draft.save(session);
       id = routine.id;
     } else if (note != null) {
       id = draft == null
@@ -571,7 +569,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     final title =
         widget.title ??
         (_draft != null
-            ? (routine == null ? t.newSession : t.session)
+            ? t.newSession
             : routine == null
             ? (once ? t.newReminder : t.newRoutine)
             : (once ? t.reminder : t.routine));

@@ -29,6 +29,8 @@ import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
+import 'session_editor.dart';
+import 'session_note.dart';
 import 'setting_badges.dart';
 import 'share_note.dart';
 import 'shopping_list_view.dart';
@@ -608,6 +610,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   NoteKind _kind = NoteKind.plain;
   Set<NoteKind> _kinds = const {};
 
+  /// A Session Note's setup (#191), and its pool and count as its page
+  /// edits them; null for any other Note.
+  SessionSetup? _setup;
+  SessionDraft? _sessionDraft;
+
+  /// Whether this Device may change the Session's setup: as it may change
+  /// the Note, in the lists (ADR 0039).
+  bool _setsUp = false;
+
   /// The "Show on the Agenda" switch of a Checklist without a Routine
   /// (#143); null for any other Note.
   ({bool on, VoidCallback toggle})? _onAgenda;
@@ -637,6 +648,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.dispose();
     _name.dispose();
     _descriptionFocus.dispose();
+    _sessionDraft?.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
     }
@@ -775,13 +787,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final changes = _placed?.changes ?? false;
     // Back to a plain Note where its text may change, as the card's ⋮.
     final plainable = changes && (note?.textEditable ?? false);
+    // As the card's "Make it a Tally": only a Note in the lists.
+    final listed = changes && note != null && !note.isTrashed && !note.isMerged;
+    final setup = _setup = _kind == NoteKind.session
+        ? Sessions(widget.notes.store).setupOf(widget.noteId)
+        : null;
+    _setsUp = setup != null && listed;
+    // Its controller is in no widget: the weekdays are a badge here.
+    _sessionDraft?.dispose();
+    _sessionDraft = setup == null
+        ? null
+        : SessionDraft.of(widget.notes.store, widget.noteId, setup);
     _kinds = switch (_kind) {
       NoteKind.plain => {
         if (lists.mayMake(widget.noteId)) NoteKind.checklist,
         if (shopping.mayMake(widget.noteId)) NoteKind.shoppingList,
-        // As the card's "Make it a Tally": only a Note in the lists.
-        if (changes && note != null && !note.isTrashed && !note.isMerged)
-          NoteKind.tally,
+        if (listed) NoteKind.tally,
+        if (listed) NoteKind.session,
       },
       NoteKind.checklist => {
         if (plainable) NoteKind.plain,
@@ -793,6 +815,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       },
       // No way leads out of a Tally.
       NoteKind.tally => const {},
+      NoteKind.session => {if (listed) NoteKind.plain},
     };
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
@@ -1284,17 +1307,51 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final notes = widget.notes;
     final id = widget.noteId;
     final changed = switch ((_kind, kind)) {
+      (NoteKind.session, NoteKind.plain) => _unmakeSession(),
       (NoteKind.shoppingList, NoteKind.plain) => shoppingListToPlain(notes, id),
       (_, NoteKind.plain) => checklistToPlain(notes, id),
       (NoteKind.plain, NoteKind.checklist) => makeChecklist(notes, id),
       (NoteKind.plain, NoteKind.shoppingList) => makeShoppingList(notes, id),
       (NoteKind.plain, NoteKind.tally) => await makeTally(context, notes, id),
+      (NoteKind.plain, NoteKind.session) => await _makeSession(),
       (_, NoteKind.checklist || NoteKind.shoppingList) => _switchList(),
       _ => false,
     };
     if (!mounted || !changed) return;
     setState(_load);
     _show();
+  }
+
+  /// The setup's page of a Session made of the plain Note; whether it
+  /// was made.
+  Future<bool> _makeSession() =>
+      makeSession(context, widget.notes, widget.places, widget.noteId);
+
+  /// Makes the Session a plain Note again; its Routines then run plain,
+  /// their picks and entries kept (ADR 0039). Whether it did.
+  bool _unmakeSession() {
+    final sessions = Sessions(widget.notes.store);
+    // A sync while the dialog was open may have changed it.
+    if (!sessions.isSessionNote(widget.noteId)) return false;
+    sessions.unmake(widget.noteId);
+    return true;
+  }
+
+  /// Writes the pool and the count as the Session's page changed them in
+  /// [draft], the one it shows, read again since or not.
+  void _sessionChanged(SessionDraft draft) {
+    final setup = _setup;
+    if (setup == null) return;
+    draft.write(setup);
+    _reload();
+  }
+
+  /// "New Tally" in the Session's pool.
+  Future<void> _newPoolTally() async {
+    _saveText();
+    await addPoolTally(context, widget.notes, widget.noteId);
+    if (!mounted) return;
+    _reload();
   }
 
   /// Switches a Checklist to a Shopping List or back, its Lines carried
@@ -1323,7 +1380,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   );
 
   /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
-  /// Session, each spawned as the card's menu does.
+  /// Session, each spawned as the card's menu does; on a Session Note no
+  /// Session, as a Routine of it runs it already (#191).
   Future<void> _addMenu(Offset at) async {
     final t = context.t;
     final overlay =
@@ -1344,7 +1402,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             t.reminder,
           ),
           (Spawn.frog, const FrogIcon(), t.frog),
-          (Spawn.session, const Icon(Icons.event_repeat), t.session),
+          if (_kind != NoteKind.session)
+            (Spawn.session, const Icon(Icons.event_repeat), t.session),
         ])
           PopupMenuItem(
             key: ValueKey('spawn-${spawn.name}'),
@@ -1438,6 +1497,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           value: kindName(t, _kind),
           onTap: _kinds.isEmpty ? null : (_) => _editKind(),
         ),
+        // A Session's rule and weekdays' counts (#191).
+        if (_setup case final setup?)
+          ...sessionBadges(
+            context,
+            widget.notes.store,
+            setup,
+            changes: _setsUp,
+            onChanged: _reload,
+          ),
         if (_onAgenda case final agenda?)
           SettingBadge(
             key: const ValueKey('badge-agenda'),
@@ -1527,7 +1595,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       spawn: spawn,
     );
     if (!mounted) return;
+    final named = _named;
     _reload();
+    // Spawning a Session makes a plain Note one (#191).
+    if (named != (_kind != NoteKind.plain)) _show();
   }
 
   Future<void> _openRoutine(Routine routine) async {
@@ -1982,6 +2053,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
             if (_kind == NoteKind.tally) const SizedBox(height: 16),
             TallySetup(notes: widget.notes, noteId: widget.noteId),
+            if (_sessionDraft case final draft?) ...[
+              const SizedBox(height: 16),
+              SessionNoteSetup(
+                draft: draft,
+                changes: _setsUp,
+                onChanged: _sessionChanged,
+                onNewTally: _newPoolTally,
+              ),
+            ],
             // A list's or Tally's panel keeps its own space under it.
             if (!_named) const SizedBox(height: 16),
             _badges(placed, when, place, colour),
@@ -2214,6 +2294,7 @@ IconData kindIcon(NoteKind kind) => switch (kind) {
   NoteKind.checklist => Icons.checklist,
   NoteKind.shoppingList => Icons.shopping_cart_outlined,
   NoteKind.tally => Icons.bar_chart,
+  NoteKind.session => Icons.event_repeat,
 };
 
 /// The kind [kind] in words.
@@ -2222,6 +2303,7 @@ String kindName(AppLocalizations t, NoteKind kind) => switch (kind) {
   NoteKind.checklist => t.checklistHeading,
   NoteKind.shoppingList => t.shoppingHeading,
   NoteKind.tally => t.tallyHeading,
+  NoteKind.session => t.session,
 };
 
 /// Says that a text is in a format this version does not know and shows

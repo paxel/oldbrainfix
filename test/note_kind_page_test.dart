@@ -78,6 +78,11 @@ void main() {
         ShoppingLists(store).make(id);
       case NoteKind.tally:
         Tallies(store).addField(id, name: 'Pages', unit: 'pages');
+      case NoteKind.session:
+        final pool = notes.capture('Stretch').id;
+        Tallies(store).addField(pool, name: 'Times', unit: 'times');
+        Sessions(store)
+            .make(id, pool: [pool], count: 1, rule: SessionRule.rolling);
       case NoteKind.plain:
     }
     notes.edit(id, 'Trip\n$description');
@@ -90,6 +95,7 @@ void main() {
     (NoteKind.checklist, 'checklist'),
     (NoteKind.shoppingList, 'shopping'),
     (NoteKind.tally, 'tally-fields'),
+    (NoteKind.session, 'session-pool'),
   ]) {
     testWidgets('a ${kind.name} shows its name on top, its description '
         'folded under it, then its content, the badges, and its Sections and '

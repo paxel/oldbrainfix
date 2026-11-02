@@ -684,7 +684,7 @@ fn a_session_with_a_new_tally_made_inside_takes_one_page() -> TestResult {
     let session = Sessions::new(&store)
         .by_id(&routine.id)?
         .ok_or("the Session")?;
-    assert_eq!(session.pool, [tally.id]);
+    assert_eq!(session.setup.pool, [tally.id]);
     assert!(routine.schedule.times.is_empty());
     assert!(harness.state().routine_editor().is_none());
     Ok(())

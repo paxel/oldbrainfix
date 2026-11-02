@@ -421,9 +421,14 @@ impl<'a> Routines<'a> {
                 scheduled_at = Some(entry.date_at);
             }
         }
-        // A Session's Occurrence is Done too once every pick has an
-        // entry (ADR 0029); a check-off, written below, keeps its moment.
-        let mut done = if fields.get(session_keys::POOL).is_some() {
+        // An Occurrence of a Routine that ran a Session is Done too once
+        // every pick has an entry (ADR 0029), whether the Note is still a
+        // Session or not (ADR 0039); a check-off, written below, keeps
+        // its moment.
+        let mut done = if fields
+            .iter()
+            .any(|(key, _)| key.starts_with(session_keys::PICK_PREFIX))
+        {
             SessionMarks::read(self.store, id, &history)?.done_from_entries(self.store)?
         } else {
             BTreeMap::new()

@@ -5330,6 +5330,18 @@ abstract class AppLocalizations {
   /// **'done {done} / skipped {skipped} this week'**
   String sessionCardWeek(int done, int skipped);
 
+  /// The heading over a Session Note's history on its detailed card (#191): how often its Routines were Done and Missed in each of the last four weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 4 weeks'**
+  String get sessionHistory;
+
+  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many Missed in it.
+  ///
+  /// In en, this message translates to:
+  /// **'Week of {day}: done {done} / skipped {skipped}'**
+  String sessionHistoryWeek(String day, int done, int skipped);
+
   /// No description provided for @checklistRenameTitle.
   ///
   /// In en, this message translates to:
@@ -5912,7 +5924,7 @@ abstract class AppLocalizations {
   /// **'imperial'**
   String get unitSystemImperialName;
 
-  /// A Routine that picks Tallies from a pool for each Occurrence (CONTEXT.md: Session).
+  /// A Note that picks Tallies from its pool for each Occurrence of its Routines (CONTEXT.md: Session); also the kind's name in the kind badge (#191).
   ///
   /// In en, this message translates to:
   /// **'Session'**

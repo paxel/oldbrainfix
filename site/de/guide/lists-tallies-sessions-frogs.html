@@ -1,8 +1,8 @@
 <!-- page: title="Listen, Strichlisten, Einheiten und Frösche" track="guide" order=4 summary="Checklisten und Einkaufslisten, Strichlisten mit ihren Einträgen und Diagrammen, Einheiten, die Strichlisten auswählen, und Frösche, von denen einer am Tag gegessen wird." -->
 <p class="lede">
-  Eine Notiz kann zur Checkliste, zur Einkaufsliste oder zur Strichliste werden, und sie kann neben
-  Routinen und Erinnerungen eine Einheit oder einen Frosch hervorbringen. Eine Notiz ist höchstens
-  eins von Strichliste, Checkliste und Einkaufsliste.
+  Eine Notiz kann zur Checkliste, zur Einkaufsliste, zur Strichliste oder zur Einheit werden, und
+  sie kann neben Routinen und Erinnerungen einen Frosch hervorbringen. Eine Notiz ist immer nur
+  eine dieser Arten oder eine einfache Notiz.
 </p>
 
 <h2>Aus dem Notizbrowser anlegen</h2>
@@ -25,7 +25,7 @@
   <li><strong>Checkliste</strong> und <strong>Einkaufsliste</strong> fragen nach dem Namen der Liste; <strong>Anlegen</strong> öffnet den Editor der Notiz mit dem Cursor in ihrer ersten Zeile, um die Zeilen an ihrem Platz zu tippen.</li>
   <li><strong>Frosch</strong> fragt nur nach seinem Namen und legt den Frosch mit seiner Notiz an.</li>
   <li><strong>Strichliste</strong> öffnet eine Seite: ihr <strong>Name</strong>, dann eine Reihe je Feld, anfangs eine, und <strong>Feld hinzufügen</strong> für das nächste. Die Reihe eines Felds ist sein Name mit drei Plaketten: wie ein Tag mit mehreren Einträgen zählt („Σ Summe“ oder „Größter Wert“), seine Maßeinheit und sein Ziel. Ein Tippen auf eine Plakette öffnet ihren kleinen Editor; die Maßeinheit wird getippt, mit den bekannten Maßeinheiten, die gemeint sein können, als Vorschlägen, und die Regel folgt der Art der Maßeinheit, bis sie gewählt wird. <strong>Speichern</strong> legt die Strichliste mit jedem Feld an, das einen Namen hat; Reihen ohne Namen fallen weg.</li>
-  <li><strong>Einheit</strong> öffnet eine Seite: ihr <strong>Name</strong>; ihr <strong>Vorrat</strong>, ein Kästchen je Strichliste, am Ende <strong>Neue Strichliste</strong>, das die Seite der Strichliste öffnet und mit der neuen Strichliste angehakt zurückkommt; dann drei Plaketten: wie viele sie jedes Mal auswählt, mit − und + eingestellt, wie sie auswählt und ihr Zeitplan, anfangs jeden Tag ganztägig, der den Zeitplan des Routinen-Editors öffnet. <strong>Speichern</strong> legt die Einheit an; die Anzahl je Wochentag und die Reihenfolge für Reihum werden später in ihrem Editor eingestellt.</li>
+  <li><strong>Einheit</strong> öffnet eine Seite: ihr <strong>Name</strong>; ihr <strong>Vorrat</strong>, ein Kästchen je Strichliste, am Ende <strong>Neue Strichliste</strong>, das die Seite der Strichliste öffnet und mit der neuen Strichliste angehakt zurückkommt; dann drei Plaketten: wie viele sie jedes Mal auswählt, mit − und + eingestellt, wie sie auswählt und ihr Zeitplan, anfangs jeden Tag ganztägig, der den Zeitplan des Routinen-Editors öffnet. <strong>Speichern</strong> legt die Notiz der Einheit mit ihrer ersten Routine an; die Anzahl je Wochentag und die Reihenfolge für Reihum werden später auf der Seite ihrer Notiz eingestellt.</li>
 </ul>
 <p>
   Wer einen Namensdialog mit <strong>Abbrechen</strong> oder die Seite der Strichliste oder der
@@ -60,8 +60,8 @@
   Kompaktansicht zeigt einen Blick nach ihrer Art: eine einfache Notiz ihre erste Zeile und die zwei
   Zeilen danach, eine Checkliste ihren Namen und „3 von 7 offen“, eine Einkaufsliste ihren Namen und
   „4 offen“, eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel, etwa
-  „Seiten 30 / 50 Seiten“, in einem geteilten Bereich aus deinen eigenen Einträgen, und eine Notiz, die eine Einheit ausführt, ihre erste Zeile, ihren
-  nächsten Lauf und „diese Woche 4 erledigt / 1 ausgelassen“. Die Kompaktansicht hat keinen
+  „Seiten 30 / 50 Seiten“, in einem geteilten Bereich aus deinen eigenen Einträgen, und eine Einheit ihren Namen, den
+  nächsten Lauf einer ihrer Routinen und „diese Woche 4 erledigt / 1 ausgelassen“ über alle. Die Kompaktansicht hat keinen
   Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und
   bietet nach Bearbeiten <strong>Ablegen in …</strong> und <strong>Zusammenführen mit …</strong> an. Der
   Knopf in der Leiste der Liste zeigt alle Karten kompakt oder ausführlich. Ein Tippen auf eine
@@ -235,23 +235,34 @@
 
 <h2>Einheiten</h2>
 <p>
-  Eine Einheit ist eine Routine, die für jede Fälligkeit ein paar Strichlisten aus ihrem Vorrat
-  auswählt. Sie entsteht wie eine Routine, mit <strong>Einheit</strong> unter dem Wecker, „Routine,
-  Erinnerung, Frosch oder Einheit“, auf der Karte einer Notiz oder dem Erfassungsbildschirm, oder hinter
-  dem „+“ am Ende der Plaketten im Editor der Notiz. <strong>Neue Einheit</strong> in der Leiste von Alle Routinen und Erinnerungen
-  legt eine an, deren Notiz der in ihrem Editor getippte Text ist. Eine Einheit hat Plan, Erneut
-  erinnern, Eskalation, Serie und Einhaltung einer Routine. Über dem Plan enthält ihr
-  Editor:
+  Eine Einheit ist eine Notiz, die für jede Fälligkeit ihrer Routinen ein paar Strichlisten aus
+  ihrem Vorrat auswählt. Die Notiz hält, woraus und wie sie wählt; jede ihrer Routinen sagt nur,
+  wann sie läuft, etwa Montag und Mittwoch um 7:00 und Samstag um 10:00. Die Plakette „Art“ im
+  Editor der Notiz macht eine einfache Notiz zur Einheit, beginnend mit dem Vorrat, und eine
+  Einheit wieder zur einfachen Notiz; ihre Routinen laufen dann als einfache, und was gewählt und
+  eingetragen wurde, bleibt. <strong>Einheit</strong> unter dem Wecker auf der Karte einer Notiz
+  oder dem Erfassungsbildschirm, oder hinter dem „+“ am Ende der Plaketten im Editor der Notiz,
+  macht die Notiz zur Einheit mit ihrer ersten Routine; <strong>Neue Einheit</strong> in der Leiste
+  von Alle Routinen und Erinnerungen legt eine an, deren Notiz der in ihrem Editor getippte Text ist.
+</p>
+<p>
+  Die Seite einer Einheit im Editor der Notiz enthält nach Name und Beschreibung:
 </p>
 <ul>
-  <li><strong>Vorrat</strong>: ein Kästchen je Strichliste, die sie wählen darf. Solange die Notiz der Einheit in einem geteilten Bereich liegt, stehen nur dessen Strichlisten zur Wahl. Bei Reihum zieht ein Griff an jeder Strichliste sie an ihren Platz in der Reihenfolge. Ohne Strichliste sagt der Vorrat, wie du eine machst; gespeichert wird die Einheit, sobald der Vorrat eine enthält.</li>
+  <li><strong>Vorrat</strong>: ein Kästchen je Strichliste, die sie wählen darf, am Ende <strong>Neue Strichliste</strong>. Solange die Notiz in einem geteilten Bereich liegt, stehen nur dessen Strichlisten zur Wahl. Ohne Strichliste sagt der Vorrat, wie du eine machst; mindestens eine bleibt.</li>
   <li><strong>Wie viele sie jedes Mal auswählt</strong>: 1 bis 99, eingestellt mit − und +.</li>
-  <li><strong>Anzahl je Wochentag</strong>, eingeklappt: jeder Wochentag zeigt „Wie jeden Tag“, bis sein Schalter ihm eine eigene Anzahl gibt, die mit der von jedem Tag beginnt und mit − und + eingestellt wird; wieder ausgeschaltet, wählt er so viele wie jeder Tag.</li>
-  <li><strong>Wie sie auswählt</strong>: <strong>Zufällig</strong>, jedes Mal neu zufällig; <strong>Reihum</strong>, der Reihe nach durch den Vorrat, weiter, wo sie stehen blieb; oder <strong>Am seltensten</strong>, die Strichlisten mit den wenigsten Einträgen zuerst.</li>
+  <li>Unter den Plaketten <strong>Wie sie auswählt</strong>: <strong>Zufällig</strong>, jedes Mal neu zufällig; <strong>Reihum</strong>, der Reihe nach durch den Vorrat, weiter, wo sie stehen blieb; oder <strong>Am seltensten</strong>, die Strichlisten mit den wenigsten Einträgen zuerst. Reihum macht von einem Lauf einer Routine beim nächsten weiter.</li>
+  <li>Unter den Plaketten <strong>Anzahl je Wochentag</strong>: jeder Wochentag wählt so viele wie jeder Tag, bis er eine eigene Anzahl bekommt.</li>
+  <li>Jede ihrer Routinen und Erinnerungen als Plakette. Ein Tipp öffnet ihren Editor mit Plan, Erneut erinnern und Eskalation; das „+“ am Ende der Plaketten fügt eine weitere Routine oder Erinnerung hinzu, die dieselbe Einheit ausführt.</li>
 </ul>
 <p>
-  Die heutige Zeile einer Einheit in der Agenda listet ihre Auswahl unter ihrem Titel, in der
-  gewählten Reihenfolge, jede Strichliste mit ihren Zielen, etwa „Liegestütze 20 Mal“,
+  Die Detailansicht der Karte einer Einheit zeigt ihren Vorrat, die heutige Auswahl jeder ihrer
+  Routinen, dort einzutragen wie in der Agenda, und wie oft sie in jeder der letzten vier Wochen
+  erledigt und ausgelassen wurde. Jede Routine hat ihre eigene Serie und Einhaltung.
+</p>
+<p>
+  Die heutige Zeile jeder Routine einer Einheit in der Agenda listet ihre Auswahl unter ihrem
+  Titel, in der gewählten Reihenfolge, jede Strichliste mit ihren Zielen, etwa „Liegestütze 20 Mal“,
   durchgestrichen, sobald sie einen Eintrag hat. Ein Tipp auf eine Strichliste der Auswahl öffnet ihr
   Eintragsformular, mit den Zielen vorausgefüllt; Speichern hält ihn für diese Fälligkeit fest. Jede
   ohne Eintrag bietet <strong>Noch eine</strong>, solange der Vorrat eine nicht gewählte Strichliste
@@ -259,7 +270,8 @@
   auch immer, oder wenn ihr Kästchen abgehakt wird; ein entfernter Eintrag hebt das wieder auf.
   Morgen und die Tage danach zeigen nur, wie viele sie wählt, etwa „Wählt 3 Strichlisten“: Gewählt
   wird am Tag selbst. Die Auswahl ist auf allen eigenen Geräten und für alle in einem geteilten
-  Bereich dieselbe.
+  Bereich dieselbe. Eine Einheit aus einer früheren Version wird als Einheit-Notiz mit ihrem Vorrat
+  und ihrer Auswahl gelesen.
 </p>
 
 <h2>Frösche</h2>
@@ -291,7 +303,7 @@
 <h2>Auf dem Desktop</h2>
 <ul>
   <li>Der Ansichtsknopf einer Karte, oben rechts neben ⋮ und dem Stift, wechselt diese Karte zwischen ihrer Kompakt- und ihrer Detailansicht, wie ein Tippen auf dem Handy; ein Klick auf die Karte wählt sie nur aus. <strong>Kompaktansichten</strong> und <strong>Detailansichten</strong> im Menü Ansicht tun, was der Knopf in der Leiste der Liste tut.</li>
-  <li>Der Notiz-Dialog zeigt eine Notiz einer Art wie der Editor auf dem Handy: ihren Namen, ihre Beschreibung eingeklappt darunter, dann die Zeilen oder die Einrichtung der Strichliste. Ihre Plakette „Art“ wechselt die Art wie auf dem Handy, und das Menü der Karte bietet die Listen ebenfalls. Die Plakette „+“ des Notiz-Dialogs enthält Routine, Erinnerung, Frosch und Einheit.</li>
+  <li>Der Notiz-Dialog zeigt eine Notiz einer Art wie der Editor auf dem Handy: ihren Namen, ihre Beschreibung eingeklappt darunter, dann die Zeilen oder die Einrichtung der Strichliste oder der Einheit. Ihre Plakette „Art“ wechselt die Art wie auf dem Handy, und das Menü der Karte bietet die Listen ebenfalls. Die Plakette „+“ des Notiz-Dialogs enthält Routine, Erinnerung, Frosch und Einheit; an einer Einheit fügt sie eine Routine oder Erinnerung hinzu, die sie ausführt.</li>
   <li>Eine Checkliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. <strong>Auf der Agenda zeigen</strong> ist ein Kästchen im Menü der Karte, vor <strong>Alle Haken entfernen</strong>, und eine Plakette im Notiz-Dialog.</li>
   <li>Eine Einkaufsliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. Ihr <strong>Auf der Agenda zeigen</strong> bietet das Menü der Karte mit drei Optionsfeldern an, vor <strong>Wieder eine einfache Notiz</strong>, und der Notiz-Dialog als Plakette, deren Dialog dieselben drei anbietet; ein Klick auf eines schließt ihn.</li>
   <li>Das „+“ oben in Alle Notizen, einem Bereich oder einem Thema öffnet ein Menü mit Notiz, Checkliste, Einkaufsliste, Strichliste, Einheit und Frosch, Einheit und Frosch für den, der sie einrichten darf. Die Seiten Neue Strichliste und Neue Einheit sind Dialoge über dem Fenster. Auf der Seite Neue Strichliste sind Regel, Maßeinheit und Ziel jedes Felds Plaketten, deren Klick ihren kleinen Editor öffnet; die Maßeinheit wird getippt, die bekannten als kleine Knöpfe darunter. Die Seite Neue Einheit ist die Seite des Routinen-Editors für eine Einheit: ihr Name, ihr Vorrat mit <strong>Neue Strichliste</strong> am Ende, das die Seite Neue Strichliste darüber öffnet und mit der neuen Strichliste angehakt zurückkommt, ihre Anzahl und Regel und ihr Plan, anfangs jeden Tag, ganztägig.</li>

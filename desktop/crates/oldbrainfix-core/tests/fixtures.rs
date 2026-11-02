@@ -42,7 +42,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 23] = [
+const SCENARIOS: [&str; 24] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -61,6 +61,7 @@ const SCENARIOS: [&str; 23] = [
     "places",
     "routines",
     "sections",
+    "session-legacy",
     "session-swap",
     "sessions",
     "shopping-lists",
@@ -1834,7 +1835,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 23] = [
+    let writers: [(&str, Writer); 24] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1853,6 +1854,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("places", write_places),
         ("routines", write_routines),
         ("sections", write_sections),
+        ("session-legacy", write_session_legacy),
         ("session-swap", write_session_swap),
         ("sessions", write_sessions),
         ("shopping-lists", write_shopping_lists),
@@ -2271,7 +2273,11 @@ fn write_sessions(store: &Store) -> Built {
         3,
         SessionRule::Rolling,
     )?;
-    sessions.set_count_on(sport.id(), 6, Some(1))?;
+    sessions.set_count_on(sport.note_id(), 6, Some(1))?;
+    // A second Routine of the Note runs the same Session (#191).
+    let evening = Routines::new(store)
+        .spawn(sport.note_id(), &every_day(&[at(19, 0)?])?)?
+        .id;
     let learn = sessions.create(
         "Learn",
         &every_day(&[])?,
@@ -2294,6 +2300,15 @@ fn write_sessions(store: &Store) -> Built {
     sessions.record(sport.id(), &morning, &push_ups, &targets(&push_ups)?, "")?;
     sessions.record(sport.id(), &morning, &wall_sit, &targets(&wall_sit)?, "")?;
     sessions.record(sport.id(), &morning, &bridge, &BTreeMap::new(), "Shaky")?;
+    let dusk = Occurrence::new(Day::new(2026, 1, 1), Some(at(19, 0)?));
+    let late = sessions
+        .on(&evening, &dusk)?
+        .picks
+        .first()
+        .ok_or("a pick")?
+        .note_id
+        .clone();
+    sessions.record(&evening, &dusk, &late, &BTreeMap::new(), "Late")?;
     let all_day = Occurrence::new(Day::new(2026, 1, 1), None);
     let first = sessions
         .on(learn.id(), &all_day)?
@@ -2346,7 +2361,7 @@ fn write_session_swap(store: &Store) -> Built {
     sessions.record(sport.id(), &morning, &bridge, &none, "Shaky")?;
     let march = tally("Long march")?;
     sessions.set_pool(
-        sport.id(),
+        sport.note_id(),
         &[push_ups.clone(), bridge.clone(), march.clone()],
     )?;
     sessions.another(sport.id(), &morning, &push_ups)?;
@@ -2366,35 +2381,149 @@ fn write_session_swap(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `session-legacy` scenario: Sessions as an older
+/// version wrote them, the setup on the Routine (ADR 0039).
+fn write_session_legacy(store: &Store) -> Built {
+    use oldbrainfix_core::sessions::keys::{COUNT, POOL, RULE, count_on};
+    let notes = Notes::new(store);
+    let tallies = Tallies::new(store);
+    let sessions = Sessions::new(store);
+    let routines = Routines::new(store);
+    let tally = |name: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let id = notes.capture(name, None, None)?.id;
+        tallies.add_field(&id, name, "times", Some(10.0), None)?;
+        Ok(id)
+    };
+    let every_day = |times: &[ClockTime]| -> Result<Schedule, Box<dyn std::error::Error>> {
+        Ok(Schedule::new(Day::new(2026, 1, 1), times, daily()).ok_or("a schedule")?)
+    };
+    // A Session as an older version spawned it, its setup on the Routine.
+    let old = |note: &str,
+               schedule: &Schedule,
+               pool: &str,
+               count: &str,
+               rule: &str,
+               counts: &[(u32, &str)]|
+     -> Result<String, Box<dyn std::error::Error>> {
+        let routine = routines.spawn_with(note, schedule, |id| {
+            store.append(id, POOL, Some(pool), None)?;
+            store.append(id, COUNT, Some(count), None)?;
+            for (weekday, value) in counts {
+                store.append(id, &count_on(*weekday), Some(value), None)?;
+            }
+            store.append(id, RULE, Some(rule), None)?;
+            Ok(())
+        })?;
+        Ok(routine.id)
+    };
+    let push_ups = tally("Push-ups")?;
+    let sit_ups = tally("Sit-ups")?;
+    let bridge = tally("Half bridge")?;
+    let pages = tally("Reading")?;
+    let sport = notes.capture("Sport", None, None)?.id;
+    old(
+        &sport,
+        &every_day(&[at(7, 0)?])?,
+        &format!("{push_ups},{sit_ups},{bridge}"),
+        "3",
+        "rolling",
+        &[(6, "1")],
+    )?;
+    let stretch = notes.capture("Stretch", None, None)?.id;
+    let evening = every_day(&[at(18, 0)?])?;
+    old(
+        &stretch,
+        &evening,
+        &format!("{bridge},{sit_ups}"),
+        "2",
+        "random",
+        &[],
+    )?;
+    let later = every_day(&[at(20, 0)?])?;
+    let pool = format!("{sit_ups},{bridge},{push_ups}");
+    old(&stretch, &later, &pool, "1", "least", &[])?;
+    let last = every_day(&[at(21, 0)?])?;
+    routines.trash(&old(&stretch, &last, &push_ups, "1", "rolling", &[])?)?;
+    let learn = notes.capture("Learn", None, None)?.id;
+    old(&learn, &every_day(&[])?, &pages, "1", "rolling", &[])?;
+    sessions.pick_today(&frog_day(0))?;
+    sessions.set_count(&learn, 2)?;
+    sessions.set_pool(&learn, &[pages.clone(), push_ups.clone()])?;
+    routines.spawn(&learn, &every_day(&[at(12, 0)?])?)?;
+    let yoga = notes.capture("Yoga", None, None)?.id;
+    old(
+        &yoga,
+        &every_day(&[at(6, 0)?])?,
+        &bridge,
+        "1",
+        "rolling",
+        &[],
+    )?;
+    sessions.unmake(&yoga)?;
+    sessions.pick_today(&frog_day(1))?;
+    Ok(())
+}
+
 #[test]
 fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["history", "session-swap", "sessions"] {
+    for scenario in ["history", "session-legacy", "session-swap", "sessions"] {
         sessions_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
 }
 
 fn sessions_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
+    use oldbrainfix_core::SessionSetup;
+    use oldbrainfix_core::note_kinds::NoteKind;
     let expected = read_json(&fixtures().join(scenario).join("sessions.json"))?;
     let read_at = read_json(&fixtures().join(scenario).join("expected.json"))?;
     let store = load(scenario, read_at["now"].as_str().ok_or("now")?)?;
     let sessions = Sessions::new(&store);
     let routines = Routines::new(&store);
-    let mut every = Vec::new();
-    for s in sessions.all()? {
-        let counts: serde_json::Map<String, Value> = s
+    let counts_of = |setup: &SessionSetup| -> serde_json::Map<String, Value> {
+        setup
             .counts
             .iter()
             .map(|(weekday, count)| (weekday.to_string(), json!(count)))
+            .collect()
+    };
+    let mut note_ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
+    note_ids.sort();
+    let mut kinds = serde_json::Map::new();
+    let mut setups = Vec::new();
+    for id in &note_ids {
+        kinds.insert(id.clone(), json!(kind_name(NoteKind::of(&store, id)?)));
+        let Some(setup) = sessions.setup_of(id)? else {
+            continue;
+        };
+        let runs: Vec<String> = sessions
+            .of_note(id)?
+            .iter()
+            .map(|s| s.id().to_string())
             .collect();
+        setups.push(json!({
+            "noteId": id,
+            "pool": setup.pool,
+            "count": setup.count,
+            "counts": counts_of(&setup),
+            "rule": setup.rule.name(),
+            "heldBy": setup.held_by,
+            "runs": runs,
+            "picksFrom": sessions.pool(&setup)?,
+        }));
+    }
+    assert_eq!(Value::Object(kinds), expected["kinds"], "{scenario}");
+    assert_eq!(json!(setups), expected["setups"], "{scenario}");
+    let mut every = Vec::new();
+    for s in sessions.all()? {
         every.push(json!({
             "id": s.id(),
             "noteId": s.routine.note_id,
-            "pool": s.pool,
-            "count": s.count,
-            "counts": counts,
-            "rule": s.rule.name(),
-            "picksFrom": sessions.pool(&s)?,
+            "pool": s.setup.pool,
+            "count": s.setup.count,
+            "counts": counts_of(&s.setup),
+            "rule": s.setup.rule.name(),
+            "picksFrom": sessions.pool(&s.setup)?,
             "choices": sessions.choices(s.id())?,
         }));
     }
@@ -3192,6 +3321,18 @@ fn write_list_switch(store: &Store) -> Built {
     Ok(())
 }
 
+/// The name the Dart core's `NoteKind` has for `kind`.
+fn kind_name(kind: oldbrainfix_core::note_kinds::NoteKind) -> &'static str {
+    use oldbrainfix_core::note_kinds::NoteKind;
+    match kind {
+        NoteKind::Plain => "plain",
+        NoteKind::Checklist => "checklist",
+        NoteKind::ShoppingList => "shoppingList",
+        NoteKind::Tally => "tally",
+        NoteKind::Session => "session",
+    }
+}
+
 #[test]
 fn every_note_of_the_list_switch_log_is_of_the_kind_the_dart_core_says() -> TestResult {
     use oldbrainfix_core::note_kinds::{self, NoteKind};
@@ -3204,12 +3345,7 @@ fn every_note_of_the_list_switch_log_is_of_the_kind_the_dart_core_says() -> Test
     let mut kinds = serde_json::Map::new();
     for id in ids {
         let text = Notes::new(&store).by_id(&id)?.ok_or("the Note")?.text;
-        let kind = match NoteKind::of(&store, &id)? {
-            NoteKind::Plain => "plain",
-            NoteKind::Checklist => "checklist",
-            NoteKind::ShoppingList => "shoppingList",
-            NoteKind::Tally => "tally",
-        };
+        let kind = kind_name(NoteKind::of(&store, &id)?);
         kinds.insert(
             id,
             json!({

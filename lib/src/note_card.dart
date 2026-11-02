@@ -16,6 +16,7 @@ import 'profile.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
 import 'table_screen.dart';
+import 'session_note.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
@@ -294,13 +295,18 @@ class NoteCard extends StatelessWidget {
   /// nothing when null.
   final Notes? tally;
 
+  /// The Notes the Note's Session is read from, if it is one: on a [full]
+  /// card its pool, today's picks of its Routines and its last weeks
+  /// (#191); nothing when null.
+  final Notes? session;
+
   /// Reads the Note's kind (#188), never while building: a Note of a
   /// kind shows its name as the title, on a [full] card its description
   /// folded under it; a plain Note when null.
   final NoteKind Function()? kind;
 
   /// Reads what the compact view says under the name of the Note's Tally
-  /// or of the Session it runs (#189), never while building; nothing when
+  /// or of its Session (#189, #191), never while building; nothing when
   /// null.
   final List<String> Function()? glance;
 
@@ -344,6 +350,7 @@ class NoteCard extends StatelessWidget {
     this.checklist,
     this.shopping,
     this.tally,
+    this.session,
     this.kind,
     this.glance,
     this.boxes,
@@ -399,10 +406,14 @@ class NoteCard extends StatelessWidget {
     final checklist = this.checklist;
     final shopping = this.shopping;
     final tally = full ? this.tally : null;
+    final session = full ? this.session : null;
     // A Note is at most one of them; the others draw nothing. A Tally's
-    // compact view is its glance.
+    // and a Session's compact view is its glance.
     Widget? lists(bool full) =>
-        checklist == null && shopping == null && tally == null
+        checklist == null &&
+            shopping == null &&
+            tally == null &&
+            session == null
         ? null
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,6 +431,7 @@ class NoteCard extends StatelessWidget {
                   full: full,
                 ),
               if (tally != null) CardTally(notes: tally, noteId: note.id),
+              if (session != null) CardSession(notes: session, noteId: note.id),
             ],
           );
     final acts =
@@ -570,6 +582,17 @@ class NoteCard extends StatelessWidget {
                         onSchedule: onSchedule,
                         onMerge: onMerge,
                         actions: actions,
+                        // Only a plain Note becomes a Session (ADR 0039);
+                        // a Routine of a Session Note runs it already.
+                        spawnsNow: switch (kind) {
+                          final kind? => () => [
+                            for (final spawn in Spawn.values)
+                              if (spawn != Spawn.session ||
+                                  kind() == NoteKind.plain)
+                                spawn,
+                          ],
+                          null => null,
+                        },
                       ),
                     ?footer,
                   ],
@@ -602,6 +625,9 @@ class NoteActionRow extends StatelessWidget {
   /// What the spawn menu offers, in this order.
   final List<Spawn> spawns;
 
+  /// Reads what the spawn menu offers as it opens, in place of [spawns].
+  final List<Spawn> Function()? spawnsNow;
+
   const NoteActionRow({
     super.key = const ValueKey('note-actions'),
     required this.importance,
@@ -610,6 +636,7 @@ class NoteActionRow extends StatelessWidget {
     this.onMerge,
     this.actions,
     this.spawns = Spawn.values,
+    this.spawnsNow,
   });
 
   @override
@@ -630,7 +657,7 @@ class NoteActionRow extends StatelessWidget {
             icon: const Icon(Icons.alarm_add_outlined),
             onSelected: onSchedule,
             itemBuilder: (_) => [
-              for (final spawn in spawns)
+              for (final spawn in spawnsNow?.call() ?? spawns)
                 PopupMenuItem(
                   value: spawn,
                   child: Text(switch (spawn) {
@@ -1239,9 +1266,9 @@ class CaptureLine extends StatelessWidget {
 /// The compact view of a Note's card (#189), by its kind: a Checklist or
 /// a Shopping List shows its name and how many of its Lines are open
 /// ([list]), a Tally its name and each field's total today against its
-/// target ([glance]); a plain Note its first line and the two lines after
-/// it, or, running a Session, its first line, the next run and this
-/// week's runs Done and Missed ([glance]); a Note without words its
+/// target ([glance]), a Session its name, the next run of its Routines
+/// and this week's runs Done and Missed ([glance], #191); a plain Note
+/// its first line and the two lines after it; a Note without words its
 /// photos and recordings. The kind and the glance are read when the Note
 /// is, not while building.
 class _CompactNote extends StatefulWidget {

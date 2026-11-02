@@ -1,7 +1,7 @@
 <!-- page: title="Lists, Tallies, Sessions and Frogs" track="guide" order=4 summary="Checklists and Shopping Lists, Tallies with their entries and charts, Sessions that pick Tallies, and Frogs to eat one a day." -->
 <p class="lede">
-  A Note can become a Checklist, a Shopping List or a Tally, and it can spawn a Session or a Frog
-  besides Routines and Reminders. A Note is at most one of a Tally, a Checklist and a Shopping List.
+  A Note can become a Checklist, a Shopping List, a Tally or a Session, and it can spawn a Frog
+  besides Routines and Reminders. A Note is one of these kinds at a time, or a Plain Note.
 </p>
 
 <h2>Making one from the notes browser</h2>
@@ -24,7 +24,7 @@
   <li><strong>Checklist</strong> and <strong>Shopping List</strong> ask for the list's name; <strong>Create</strong> opens the Note's editor with the cursor in its first Line, to type the Lines in place.</li>
   <li><strong>Frog</strong> asks for its name only and makes the Frog with its Note.</li>
   <li><strong>Tally</strong> opens one page: its <strong>Name</strong>, then a row per field, one at first, and <strong>Add field</strong> for the next. A field's row is its name and three badges: how a day with several entries counts ("Σ Sum" or "Largest"), its unit and its target. A tap on a badge opens its small editor; the unit is typed with the known units it may mean as suggestions, and the rule follows the kind of unit until it is picked. <strong>Save</strong> makes the Tally with every field that has a name; rows left without one are dropped.</li>
-  <li><strong>Session</strong> opens one page: its <strong>Name</strong>; its <strong>Pool</strong>, a checkbox per Tally, ending in <strong>New Tally</strong>, which opens the Tally page and comes back with the new Tally ticked; then three badges: how many it picks each time, set with − and +, how it picks, and its schedule, every day, all day, at first, which opens the Routine editor's schedule. <strong>Save</strong> makes the Session; its weekdays' counts and the order for Rolling are set later in its editor.</li>
+  <li><strong>Session</strong> opens one page: its <strong>Name</strong>; its <strong>Pool</strong>, a checkbox per Tally, ending in <strong>New Tally</strong>, which opens the Tally page and comes back with the new Tally ticked; then three badges: how many it picks each time, set with − and +, how it picks, and its schedule, every day, all day, at first, which opens the Routine editor's schedule. <strong>Save</strong> makes the Session's Note with its first Routine; its weekdays' counts and the order for Rolling are set later on its Note's page.</li>
 </ul>
 <p>
   Leaving a name dialog with <strong>Cancel</strong>, or the Tally or Session page without
@@ -57,8 +57,8 @@
   compact view shows a glance by its kind: a Plain Note its first line and the two lines after it,
   a Checklist its name and "3 of 7 open", a Shopping List its name and "4 open", a Tally its name
   and each field's total today against its target, such as "Pages 30 / 50 pages", in a Shared
-  Area of your own entries, and a Note that
-  runs a Session its first line, its next run and "done 4 / skipped 1 this week". The compact view
+  Area of your own entries, and a Session its name, the next run of any of its Routines and
+  "done 4 / skipped 1 this week" over all of them. The compact view
   has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right
   and offers <strong>File into…</strong> and <strong>Merge into…</strong> after Edit.
   The button on the list's bar shows every card compact or detailed. A tap on a card switches only
@@ -219,28 +219,40 @@
 
 <h2>Sessions</h2>
 <p>
-  A Session is a Routine that picks a few Tallies from its pool for each Occurrence. It is spawned
-  as a Routine is, with <strong>Session</strong> under the alarm clock, "Routine, Reminder, Frog or
-  Session", on a Note's card or the capture screen, or behind the "+" at the end of the Note editor's
-  badges. <strong>New Session</strong> on the bar of All
-  Routines and Reminders makes one whose Note is the text typed in its editor. A Session has a
-  Routine's schedule, Re-nag, Escalation, Streak and Adherence. On top of the schedule, its editor holds:
+  A Session is a Note that picks a few Tallies from its pool for each Occurrence of its Routines.
+  The Note holds what it picks from and how; each of its Routines only says when it runs, such as
+  Monday and Wednesday at 7:00 and Saturday at 10:00. The Note editor's kind badge makes a Plain
+  Note a Session, starting with the pool, and a Session a Plain Note again; its Routines then run
+  as plain ones, and what was picked and recorded stays. <strong>Session</strong> under the alarm
+  clock on a Note's card or the capture screen, or behind the "+" at the end of the Note editor's
+  badges, makes the Note a Session with its first Routine; <strong>New Session</strong> on the bar of
+  All Routines and Reminders makes one whose Note is the text typed in its editor.
+</p>
+<p>
+  A Session's page in the Note editor holds, after its name and description:
 </p>
 <ul>
-  <li><strong>Pool</strong>: a checkbox per Tally it may pick. While the Session's Note lies in a Shared Area, only that Area's Tallies are offered. For Rolling, a handle on each Tally drags it to its place in the order. With no Tally yet, the pool says how to make one; the Session is saved once the pool holds one.</li>
+  <li><strong>Pool</strong>: a checkbox per Tally it may pick, ending in <strong>New Tally</strong>. While the Note lies in a Shared Area, only that Area's Tallies are offered. With no Tally yet, the pool says how to make one; it keeps at least one.</li>
   <li><strong>How many it picks each time</strong>: 1 to 99, set with − and +.</li>
-  <li><strong>Count per weekday</strong>, folded: each weekday shows "As every day" until its switch gives it a count of its own, starting from every day's and set with − and +; switched off again, it picks as many as every day.</li>
-  <li><strong>How it picks</strong>: <strong>Random</strong>, a new random pick each time; <strong>Rolling</strong>, through the pool in its order, continuing where it stopped; or <strong>Least selected</strong>, the Tallies with the fewest entries first.</li>
+  <li>Among the badges, <strong>How it picks</strong>: <strong>Random</strong>, a new random pick each time; <strong>Rolling</strong>, through the pool in its order, continuing where it stopped; or <strong>Least selected</strong>, the Tallies with the fewest entries first. Rolling goes on from one Routine's run to the next.</li>
+  <li>Among the badges, <strong>Count per weekday</strong>: each weekday picks as many as every day until it gets a count of its own.</li>
+  <li>Each of its Routines and Reminders as a badge. A tap opens its editor, which holds its schedule, Re-nag and Escalation; the "+" at the end of the badges adds another Routine or Reminder, which runs the same Session.</li>
 </ul>
 <p>
-  Today's row of a Session on the Agenda lists its picks under its title, in the order picked, each
-  Tally's name with its targets, such as "Push-ups 20 times", struck through once it has an entry. A
-  tap on a pick opens its entry form, prefilled with the targets; saving records it for this
-  Occurrence. Each pick without an entry offers <strong>Another one</strong> while the pool holds a
-  Tally not picked. The Occurrence is Done once every pick has an entry, by anyone, or when its box
-  is checked off; removing an entry undoes that. Tomorrow and the days after show only how many it
-  picks, such as "Picks 3 Tallies": the picks are made on the day. They are the same on all of your
-  own Devices and for everyone in a Shared Area.
+  The detailed view of a Session's card shows its pool, today's picks of each of its Routines, to be
+  recorded there as on the Agenda, and how often it was done and skipped in each of the last four
+  weeks. Each Routine has its own Streak and Adherence.
+</p>
+<p>
+  Today's row of each Routine of a Session on the Agenda lists its picks under its title, in the
+  order picked, each Tally's name with its targets, such as "Push-ups 20 times", struck through
+  once it has an entry. A tap on a pick opens its entry form, prefilled with the targets; saving
+  records it for this Occurrence. Each pick without an entry offers <strong>Another one</strong>
+  while the pool holds a Tally not picked. The Occurrence is Done once every pick has an entry, by
+  anyone, or when its box is checked off; removing an entry undoes that. Tomorrow and the days after
+  show only how many it picks, such as "Picks 3 Tallies": the picks are made on the day. They are
+  the same on all of your own Devices and for everyone in a Shared Area. A Session made with an
+  earlier version reads as a Session Note with its pool and its picks.
 </p>
 
 <h2>Frogs</h2>
@@ -269,7 +281,7 @@
 <h2>On the desktop</h2>
 <ul>
   <li>A card's view button, at its top right beside ⋮ and the pencil, switches that card between its compact and its detailed view, as a tap does on the phone; a click on the card only selects it. <strong>Compact views</strong> and <strong>Detailed views</strong> in the View menu do what the button on the list's bar does.</li>
-  <li>The Note dialog shows a Note of a kind as the phone's editor does: its name, its description folded under it, then the Lines or the Tally's setup. Its kind badge changes the kind, as on the phone, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session.</li>
+  <li>The Note dialog shows a Note of a kind as the phone's editor does: its name, its description folded under it, then the Lines or the setup of the Tally or the Session. Its kind badge changes the kind, as on the phone, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session; on a Session it adds a Routine or Reminder that runs it.</li>
   <li>A Checklist shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. <strong>Show on the Agenda</strong> is a checkbox in the card's menu, before <strong>Uncheck all</strong>, and a badge in the Note dialog.</li>
   <li>A Shopping List shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. Its <strong>Show on the Agenda</strong> is three radio buttons in the card's menu, before <strong>Back to a plain Note</strong>, and a badge in the Note dialog whose dialog offers the same three; a click on one closes it.</li>
   <li>The "+" at the top of All Notes, an Area or a Topic opens a menu with Note, Checklist, Shopping List, Tally, Session and Frog, Session and Frog for who may set them up. The New Tally page and the New Session page are dialogs over the window. On the New Tally page each field's rule, unit and target are badges whose click opens their small editor; the unit is typed with the known units as small buttons under it. The New Session page is the Routine editor's page for a Session: its name, its pool with <strong>New Tally</strong> at its end, which opens the New Tally page over it and comes back with the new Tally ticked, its count and rule, and its schedule, every day, all day, at first.</li>

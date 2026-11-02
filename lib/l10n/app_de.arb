@@ -881,6 +881,8 @@
   "tallyCardTotalOnly": "{field} {total}",
   "sessionCardNext": "Als Nächstes: {when}",
   "sessionCardWeek": "diese Woche {done} erledigt / {skipped} ausgelassen",
+  "sessionHistory": "Letzte 4 Wochen",
+  "sessionHistoryWeek": "Woche ab {day}: {done} erledigt / {skipped} ausgelassen",
   "checklistRenameTitle": "Zeile umbenennen",
   "checklistMoveUp": "Nach oben",
   "checklistMoveDown": "Nach unten",

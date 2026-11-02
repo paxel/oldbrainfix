@@ -4,7 +4,7 @@ Lists and Tallies came into the capture-first model (ADR 0005) as "Make it a …
 
 ## One kind, and it is the page
 
-A Note has exactly one kind: Plain Note, Checklist, Shopping List or Tally; the Session joins them with #191. A Frog is no kind: it stays a mark any Note can carry (ADR 0027). Nothing new is stored: the kind is read from what the Note holds already, a Tally while it has a field, else the list its `kind` names, else a plain Note, the Tally winning over a list as before (ADR 0030). Both cores read it the same way (`NoteKinds.of` in `note_kinds.dart`, `NoteKind::of` in `note_kinds.rs`); a Note whose Routine is a Session reads by its own fields until #191 gives the Session its place on the Note.
+A Note has exactly one kind: Plain Note, Checklist, Shopping List or Tally; the Session joins them with #191 (ADR 0039). A Frog is no kind: it stays a mark any Note can carry (ADR 0027). Nothing new is stored: the kind is read from what the Note holds already, a Tally while it has a field, else the list its `kind` names, else a plain Note, the Tally winning over a list as before (ADR 0030). Both cores read it the same way (`NoteKinds.of` in `note_kinds.dart`, `NoteKind::of` in `note_kinds.rs`); a Note whose Routine is a Session reads by its own fields until #191 gives the Session its place on the Note.
 
 ## The text is the name
 
@@ -45,3 +45,7 @@ Going back to a Plain Note, and making a list, stay as they are (ADR 0030). Swit
 - ADR 0028: a Tally's text shows as its name and description, above its content.
 - ADR 0030: a list's text "stays above as title and description" now as its name, heading the page, and its description folded under it; a Checklist and a Shopping List switch into each other with their Lines.
 - ADR 0026: the AI port reads the name and description and switches a list (`switch_list`).
+
+## The Session (ADR 0039)
+
+Amended by ADR 0039 (#191): the Session is a kind, read after the Tally and before the lists, while the Note holds a pool, or one of its Routines holds one as an older version wrote it. The kind badge offers a Session from a Plain Note and a Plain Note from a Session. A Session's content is its setup: the pool, the count, and the rule and weekday counts as badges.

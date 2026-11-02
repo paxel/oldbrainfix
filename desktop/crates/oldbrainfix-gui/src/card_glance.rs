@@ -1,12 +1,12 @@
 //! What the compact view of a card says under the Note's name of its
-//! Tally or of the Session it runs (#189), as the phone's
-//! `card_glance.dart` writes it.
+//! Tally or of its Session (#189, #191), as the phone's `card_glance.dart`
+//! writes it.
 
 use std::collections::HashMap;
 
 use oldbrainfix_core::{
-    Day, Result, Routine, Routines, Sessions, Store, Tallies, TallyField, TallyPeriod, UnitSystem,
-    WallClock,
+    Day, Occurrence, Result, Routines, Sessions, Store, Tallies, TallyField, TallyPeriod,
+    UnitSystem, WallClock,
 };
 
 use crate::history_view;
@@ -14,12 +14,13 @@ use crate::l10n::L10n;
 use crate::schedule_text::{day_text, occurrence_time};
 use crate::tally_view::{self, decimal_sign, shown_value, typed_value};
 
-/// The lines of each Note of `listed` that is a Tally or runs a Session,
-/// by its id: a Tally's fields shown, each with its total today and its
+/// The lines of each Note of `listed` that is a Tally or a Session, by
+/// its id: a Tally's fields shown, each with its total today and its
 /// target ("Pages 30 / 50 pages"), of the user's own entries in a Shared
 /// Area as its detailed view counts unless another choice is picked
-/// (#190); else for a Note that runs a Session its
-/// next run not Done and how many runs were Done and Missed this week.
+/// (#190); else of a Session Note (#191) the next run of any of its
+/// Routines not Done and how many runs of all of them were Done and
+/// Missed this week, or without a Routine how many it picks.
 pub fn read(
     store: &Store,
     t: &L10n,
@@ -34,18 +35,6 @@ pub fn read(
     let tallies = Tallies::new(store);
     let routines = Routines::new(store);
     let sessions = Sessions::new(store);
-    // The Sessions not in the trash, by the Note they show under.
-    let mut running: HashMap<String, Routine> = HashMap::new();
-    for routine in routines.all()? {
-        if !sessions.is_session(&routine.id)? {
-            continue;
-        }
-        if let Some(note) = routines.note(&routine)? {
-            // #191 makes the Session a kind of its own; until then its
-            // first.
-            running.entry(note.id).or_insert(routine);
-        }
-    }
     let decimal = decimal_sign(t);
     let today = Day::today(store.now(), wall);
     for id in listed {
@@ -67,20 +56,37 @@ pub fn read(
                 lines.push(field_line(t, field, total, system, decimal));
             }
             glances.insert(id.clone(), lines);
-        } else if let Some(routine) = running.get(id) {
-            let history = routines.history(routine, wall, history_view::week_start(t))?;
-            let next = routine
-                .schedule
-                .next(history.today, 64)
-                .into_iter()
-                .find(|o| !routine.done.contains_key(&o.key()));
+        } else if let Some(setup) = sessions.setup_of(id)? {
+            let runs = sessions.of_note(id)?;
+            // Without a Routine it runs never; its count says what it is.
+            if runs.is_empty() {
+                glances.insert(id.clone(), vec![t.session_picks(setup.count)]);
+                continue;
+            }
+            let mut next: Option<Occurrence> = None;
+            let (mut done, mut missed) = (0, 0);
+            for run in &runs {
+                let routine = &run.routine;
+                let history = routines.history(routine, wall, history_view::week_start(t))?;
+                done += history.this_week.done as i64;
+                missed += history.this_week.missed as i64;
+                let first = routine
+                    .schedule
+                    .next(history.today, 64)
+                    .into_iter()
+                    .find(|o| !routine.done.contains_key(&o.key()));
+                if let Some(first) = first
+                    && next.is_none_or(|n| first < n)
+                {
+                    next = Some(first);
+                }
+            }
             let mut lines = Vec::new();
             if let Some(next) = next {
                 let when = format!("{} {}", day_text(t, next.day), occurrence_time(t, &next));
                 lines.push(t.session_card_next(&when));
             }
-            let week = &history.this_week;
-            lines.push(t.session_card_week(week.done as i64, week.missed as i64));
+            lines.push(t.session_card_week(done, missed));
             glances.insert(id.clone(), lines);
         }
     }

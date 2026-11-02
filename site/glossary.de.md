@@ -9,7 +9,7 @@ Alles, was du erfasst hast: Text, eine Sprachaufnahme, ein Foto oder etwas, das 
 _Avoid_: Eintrag, Memo, Element, Karte (eine Karte ist nur, wie eine Notiz gezeichnet wird)
 
 **Art** [Kind]:
-Was eine Notiz ist, und mit ihr ihre Seite: eine einfache Notiz, eine Checkliste, eine Einkaufsliste oder eine Strichliste (eine Einheit kommt später dazu). Eine einfache Notiz ist ihr Text; jede andere Art zeigt zuerst ihren Inhalt, ihren Text nur als ihren Namen und ihre Beschreibung darüber. Die Art wechselt am Abzeichen „Art“ im Notiz-Editor: Eine einfache Notiz wird eine Checkliste, eine Einkaufsliste oder eine Strichliste, eine Liste wird die andere Liste und behält ihre Zeilen, oder wieder eine einfache Notiz; eine Strichliste bleibt eine Strichliste. Was zur alten Art gehörte, bleibt im Protokoll und wird nicht mehr gezeigt. Ein Frosch ist keine Art, sondern ein Zeichen, das jede Notiz tragen kann.
+Was eine Notiz ist, und mit ihr ihre Seite: eine einfache Notiz, eine Checkliste, eine Einkaufsliste, eine Strichliste oder eine Einheit. Eine einfache Notiz ist ihr Text; jede andere Art zeigt zuerst ihren Inhalt, ihren Text nur als ihren Namen und ihre Beschreibung darüber. Die Art wechselt am Abzeichen „Art“ im Notiz-Editor: Eine einfache Notiz wird eine Checkliste, eine Einkaufsliste, eine Strichliste oder eine Einheit, eine Liste wird die andere Liste und behält ihre Zeilen, oder wieder eine einfache Notiz, so wie eine Einheit; eine Strichliste bleibt eine Strichliste. Was zur alten Art gehörte, bleibt im Protokoll und wird nicht mehr gezeigt. Ein Frosch ist keine Art, sondern ein Zeichen, das jede Notiz tragen kann.
 _Avoid_: Typ, Vorlage, Modus
 
 **Einfache Notiz** [Plain Note]:
@@ -25,11 +25,11 @@ Der Rest des Textes einer Notiz jeder Art außer der einfachen Notiz, nach ihrem
 _Avoid_: Inhalt, Notizen, Details
 
 **Kompaktansicht** [Compact view]:
-Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Notiz, die eine Einheit ausführt, ihre erste Zeile, den nächsten Lauf und die Läufe dieser Woche, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
+Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Einheit ihren Namen, den nächsten Lauf einer ihrer Routinen und die Läufe dieser Woche aller ihrer Routinen, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
 _Avoid_: eingeklappte Karte, Kurzansicht, Zusammenfassung
 
 **Detailansicht** [Detailed view]:
-Wie die Karte einer Notiz sie in einer Liste ganz zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihren ganzen Text, ihre Ergänzungen, Fotos und Aufnahmen, eine Checkliste alle Zeilen mit ihren Kästchen, abhakbar, in ihren Gruppen, eine Einkaufsliste ihre offenen Zeilen, abhakbar, die durchgestrichenen darunter eingeklappt, eine Strichliste „Eintrag hinzufügen“, ihre Diagramme und ihre Einträge, die älteren unter den letzten fünf eingeklappt; jeder Teil mit seinem Erfassungskontext als eine Zeile unter seinem Text, die Schaltflächen unten an der Karte. Die Voreinstellung jeder Liste.
+Wie die Karte einer Notiz sie in einer Liste ganz zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihren ganzen Text, ihre Ergänzungen, Fotos und Aufnahmen, eine Checkliste alle Zeilen mit ihren Kästchen, abhakbar, in ihren Gruppen, eine Einkaufsliste ihre offenen Zeilen, abhakbar, die durchgestrichenen darunter eingeklappt, eine Strichliste „Eintrag hinzufügen“, ihre Diagramme und ihre Einträge, die älteren unter den letzten fünf eingeklappt, eine Einheit ihren Vorrat, die heutige Auswahl jeder ihrer Routinen, dort eingetragen wie in der Agenda, und wie oft sie in jeder der letzten vier Wochen erledigt und ausgelassen wurde; jeder Teil mit seinem Erfassungskontext als eine Zeile unter seinem Text, die Schaltflächen unten an der Karte. Die Voreinstellung jeder Liste.
 _Avoid_: volle Karte, aufgeklappte Ansicht, Langansicht
 
 **Erfassen** [Capture]:
@@ -132,7 +132,7 @@ Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, wel
 ## Routinen und Erinnerungen
 
 **Routine** [Routine]:
-Etwas, das nach einem wiederkehrenden Plan zu tun ist (Tabletten, Hausaufgaben, Putzen), immer aus einer Notiz hervorgegangen und mit ihr verknüpft.
+Etwas, das nach einem wiederkehrenden Plan zu tun ist (Tabletten, Hausaufgaben, Putzen), immer aus einer Notiz hervorgegangen und mit ihr verknüpft. Eine Routine einer Einheit führt sie aus.
 _Avoid_: Pflicht, Aufgabe, Gewohnheit, To-do
 
 **Erinnerung** [Reminder]:
@@ -192,7 +192,7 @@ Ein Datensatz einer Strichliste: ein Wert für einige ihrer Felder, ein Datum, e
 _Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz, Satz
 
 **Einheit** [Session]:
-Eine Routine, die für jede Fälligkeit einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst.
+Eine Notiz, die für jede Fälligkeit ihrer Routinen einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Notiz hält den Vorrat, die Anzahl und die Regel; jede ihrer Routinen, etwa Montag und Mittwoch um 7:00 und Samstag um 10:00, sagt nur, wann sie läuft, und Reihum macht von einem Lauf zum nächsten weiter, auch über die Routinen hinweg. Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst.
 _Avoid_: Workout, Training, Playlist, Satz
 
 ## Checklisten und Einkaufslisten

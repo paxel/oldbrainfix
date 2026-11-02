@@ -29,8 +29,8 @@ use std::collections::{HashMap, HashSet};
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, ShoppingOnAgenda, Store,
-    WallClock,
+    Checklist, Checklists, Line, Note, RoutineOccurrence, Sessions, ShoppingLists,
+    ShoppingOnAgenda, Store, WallClock,
 };
 
 use crate::app::{check, embossed, icon_button};
@@ -225,10 +225,12 @@ pub fn card_menu(
     let shopping = ShoppingLists::new(store);
     let is_list = list.is_some() || shopping.is_shopping_list(&note.id)?;
     let to_plain = is_list && note.text_editable && store.may_change(&note.id)?;
+    // A Session Note becomes no list (ADR 0039).
+    let session = Sessions::new(store).is_session_note(&note.id)?;
     Ok(CardMenu {
         note: note.id.clone(),
-        make: list.is_none() && lists.may_make(&note.id)?,
-        make_shopping: shopping.may_make(&note.id)?,
+        make: list.is_none() && !session && lists.may_make(&note.id)?,
+        make_shopping: !session && shopping.may_make(&note.id)?,
         on_agenda: on_agenda(&lists, &note.id)?,
         shopping_on_agenda: shopping_view::on_agenda(&shopping, &note.id)?,
         uncheck_all,

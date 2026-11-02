@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// Every kind has a compact and a detailed view (#189): the list's switch
@@ -185,6 +186,87 @@ void main() {
       expect(find.text('done 0 / skipped 0 this week'), findsOneWidget);
       expect(find.textContaining('morning moves'), findsNothing);
     });
+    testWidgets('of a Session Note shows the next run of any of its Routines '
+        'and this week\'s done and skipped over all of them', (tester) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      final made = Sessions(store).spawn(
+        notes.capture('Sport\nmorning moves').id,
+        Schedule(
+          start: Day(2026, 10, 26),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      // A second Routine whose run comes first.
+      Routines(store).spawn(
+        made.noteId,
+        Schedule(
+          start: Day(2026, 10, 25),
+          times: [ClockTime(18, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      await openCompact(tester);
+
+      expect(find.text('Next: Sun, 10/25/2026 18:00'), findsOneWidget);
+      expect(find.text('done 0 / skipped 0 this week'), findsOneWidget);
+    });
+
+    testWidgets('of a Session Note without a Routine shows how many it picks', (
+      tester,
+    ) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      Sessions(store).make(
+        notes.capture('Sport').id,
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.random,
+      );
+      await openCompact(tester);
+
+      expect(find.text('Sport', findRichText: true), findsOneWidget);
+      expect(find.text('Picks 1 Tally'), findsOneWidget);
+      expect(find.textContaining('this week'), findsNothing);
+    });
+
+    testWidgets('of a Session an older version left on its Routine reads as '
+        'one', (tester) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      final note = notes.capture('Stretch').id;
+      Routines(store).spawn(
+        note,
+        Schedule(
+          start: Day(2026, 10, 25),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        within: (id) {
+          store.append(id, SessionKeys.pool, pool);
+          store.append(id, SessionKeys.count, '1');
+          store.append(id, SessionKeys.rule, 'rolling');
+        },
+      );
+      await openCompact(tester);
+
+      expect(find.text('Next: Sun, 10/25/2026 07:00'), findsOneWidget);
+      expect(find.text('done 0 / skipped 0 this week'), findsOneWidget);
+
+      await tap(tester, find.text('Stretch', findRichText: true));
+      expect(key('card-session'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: key('card-session'),
+          matching: find.text('Push-ups'),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   group('the ⋮ of a compact card', () {
@@ -335,6 +417,141 @@ void main() {
       expect(key('tally-card'), findsNothing);
       expect(key('tally-add-entry'), findsNothing);
       expect(find.text('Pages 30 / 50 pages'), findsOneWidget);
+    });
+    testWidgets('of a Session Note shows its pool, today\'s picks of each '
+        'Routine, recorded there as on the Agenda, and its last four weeks', (
+      tester,
+    ) async {
+      final tallies = Tallies(store);
+      String tally(String name) {
+        now = now.add(const Duration(minutes: 1));
+        final id = notes.capture(name).id;
+        tallies.addField(id, name: 'Done', unit: 'times', target: 20);
+        return id;
+      }
+
+      final pushUps = tally('Push-ups');
+      final wallSit = tally('Wall sit');
+      final bridge = tally('Half bridge');
+      final today = Day.today(now, deviceWallClock);
+      final sessions = Sessions(store);
+      final made = sessions.spawn(
+        notes.capture('Sport').id,
+        Schedule(
+          start: today,
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pushUps, wallSit, bridge],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      final evening = Routines(store).spawn(
+        made.noteId,
+        Schedule(
+          start: today,
+          times: [ClockTime(23, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      await start(tester);
+      await openAllNotes(tester);
+
+      final card = key('card-session');
+      expect(card, findsOneWidget);
+      Finder inCard(Finder finder) =>
+          find.descendant(of: card, matching: finder);
+      for (final name in ['Push-ups', 'Wall sit', 'Half bridge']) {
+        expect(inCard(find.text(name)), findsOneWidget);
+      }
+      expect(inCard(find.text('Picks 1 Tally · Rolling')), findsOneWidget);
+      // Each Routine's own pick, Rolling going on from the earlier.
+      final allDay = made.routine.schedule.on(today).single;
+      final late = evening.schedule.on(today).single;
+      expect(
+        inCard(key('card-session-today-${made.id}@${allDay.key}')),
+        findsOneWidget,
+      );
+      expect(
+        inCard(key('card-session-today-${evening.id}@${late.key}')),
+        findsOneWidget,
+      );
+      expect(inCard(key('session-pick-$pushUps')), findsOneWidget);
+      expect(inCard(key('session-pick-$wallSit')), findsOneWidget);
+      expect(inCard(key('session-pick-$bridge')), findsNothing);
+
+      await tap(tester, inCard(key('session-pick-$pushUps')));
+      expect(find.byType(TallyEntryScreen), findsOneWidget);
+      await tap(tester, key('tally-entry-save'));
+      expect(sessions.on(made.id, allDay).complete, isTrue);
+      expect(
+        tester
+            .widget<Text>(inCard(find.text('Push-ups 20 times')))
+            .style
+            ?.decoration,
+        TextDecoration.lineThrough,
+      );
+
+      for (var week = 0; week < 4; week++) {
+        expect(inCard(key('card-session-week-$week')), findsOneWidget);
+      }
+      expect(inCard(key('card-session-week-4')), findsNothing);
+      expect(
+        tester.widget<Text>(inCard(key('card-session-week-0'))).data,
+        endsWith('done 1 / skipped 0'),
+      );
+    });
+
+    testWidgets('of a Session Note without a Routine shows its pool and setup '
+        'and no picks', (tester) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      Sessions(store).make(
+        notes.capture('Sport').id,
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.random,
+      );
+      await start(tester);
+      await openAllNotes(tester);
+
+      final card = key('card-session');
+      expect(
+        find.descendant(of: card, matching: find.text('Push-ups')),
+        findsOneWidget,
+      );
+      expect(key('card-session-setup'), findsOneWidget);
+      expect(key('session-pick-$pool'), findsNothing);
+      expect(key('card-session-week-0'), findsNothing);
+    });
+    testWidgets('of a Tally an older Session was spawned from stays a Tally, '
+        'and its spawn menu offers no Session', (tester) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      final id = notes.capture('Reading').id;
+      Tallies(store).addField(id, name: 'Pages', unit: 'pages');
+      Routines(store).spawn(
+        id,
+        Schedule(
+          start: Day(2026, 10, 25),
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        within: (routine) {
+          store.append(routine, SessionKeys.pool, pool);
+          store.append(routine, SessionKeys.count, '1');
+          store.append(routine, SessionKeys.rule, 'rolling');
+        },
+      );
+      await start(tester);
+      await openAllNotes(tester);
+
+      expect(key('tally-card'), findsNWidgets(2));
+      expect(key('card-session'), findsNothing);
+      await tap(
+        tester,
+        find.byTooltip('Routine, Reminder, Frog or Session').first,
+      );
+      expect(find.text('Routine'), findsOneWidget);
+      expect(find.text('Session'), findsNothing);
     });
   });
 

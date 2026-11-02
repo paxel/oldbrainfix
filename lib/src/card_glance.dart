@@ -8,12 +8,14 @@ import 'schedule_text.dart';
 import 'tally_view.dart';
 
 /// What the compact view of a card says under the Note's name of its
-/// Tally or of the Session it runs (#189), read once per list: a Tally's
+/// Tally or of its Session (#189), read once per list: a Tally's
 /// fields shown, each with its total today and its target ("Pages 30 / 50
 /// pages"), of the user's own entries in a Shared Area as its detailed
-/// view counts unless another choice is picked (#190); else for a Note that runs a Session its next run not Done and
-/// how many runs were Done and Missed this week, weeks from [weekStart].
-/// Nothing for a Note that is neither.
+/// view counts unless another choice is picked (#190); else of a Session
+/// Note (#191) the next run of any of its Routines not Done and how many
+/// runs of all of them were Done and Missed this week, weeks from
+/// [weekStart], or without a Routine how many it picks. Nothing for a
+/// Note that is neither.
 class CardGlances {
   final Store store;
   final AppLocalizations t;
@@ -51,36 +53,35 @@ class CardGlances {
   late final _sessions = Sessions(store);
   late final _system = deviceUnitSystem(store);
 
-  /// The Sessions not in the trash, by the Note they show under.
-  late final Map<String, List<Routine>> _sessionsByNote = () {
-    final byNote = <String, List<Routine>>{};
-    for (final routine in _routines.all()) {
-      if (!_sessions.isSession(routine.id)) continue;
-      final note = _routines.note(routine)?.id;
-      if (note != null) byNote.putIfAbsent(note, () => []).add(routine);
-    }
-    return byNote;
-  }();
-
   /// The lines of the Note [noteId].
   List<String> of(String noteId) {
     if (_tallies.byNote(noteId) case final tally?) {
       return [for (final field in tally.shown) _fieldLine(noteId, field)];
     }
-    final sessions = _sessionsByNote[noteId];
-    if (sessions == null || sessions.isEmpty) return const [];
-    // #191 makes the Session a kind of its own; until then its first.
-    final routine = sessions.first;
-    final history = _routines.history(
-      routine,
-      deviceWallClock,
-      weekStart: weekStart,
-    );
+    final setup = _sessions.setupOf(noteId);
+    if (setup == null) return const [];
+    final runs = _sessions.ofNote(noteId);
+    // Without a Routine it runs never; its count says what it is.
+    if (runs.isEmpty) return [t.sessionPicks(setup.count)];
     Occurrence? next;
-    for (final occurrence in routine.schedule.next(history.today, 64)) {
-      if (!routine.done.containsKey(occurrence.key)) {
-        next = occurrence;
-        break;
+    var done = 0;
+    var missed = 0;
+    for (final run in runs) {
+      final routine = run.routine;
+      final history = _routines.history(
+        routine,
+        deviceWallClock,
+        weekStart: weekStart,
+      );
+      done += history.thisWeek.done;
+      missed += history.thisWeek.missed;
+      for (final occurrence in routine.schedule.next(history.today, 64)) {
+        if (!routine.done.containsKey(occurrence.key)) {
+          if (next == null || occurrence.compareTo(next) < 0) {
+            next = occurrence;
+          }
+          break;
+        }
       }
     }
     return [
@@ -88,7 +89,7 @@ class CardGlances {
         t.sessionCardNext(
           '${dayText(locale, next.day)} ${occurrenceTime(t, locale, next)}',
         ),
-      t.sessionCardWeek(history.thisWeek.done, history.thisWeek.missed),
+      t.sessionCardWeek(done, missed),
     ];
   }
 

@@ -35,7 +35,7 @@ use crate::places::{NotesGo, Places};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
 use crate::search::Search;
-use crate::sessions::{SessionMarks, SessionRule, Sessions};
+use crate::sessions::{SessionMarks, SessionRule, SessionSetup, Sessions};
 use crate::settings::{DeviceSettings, QuickNoteControl};
 use crate::shopping_lists::{Reappear, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys};
 use crate::store::Store;
@@ -155,7 +155,7 @@ pub fn tools() -> Vec<Value> {
     let mut all = vec![
         tool(
             "list_notes",
-            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList or tally), its open Frog and the Sessions spawned from it.",
+            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList, tally or session), its open Frog and the Routines that run its Session.",
             true,
             json!({
                 "place": string("Only the Notes in this Area or Topic (an Area's Topics included)"),
@@ -166,7 +166,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
+            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -465,24 +465,24 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "make_session",
-            "Makes a Session: a Routine that picks Tallies from its pool for each Occurrence, spawned from a Note, or from a new Note with the text given.",
+            "Sets up a Note as a Session, which picks Tallies from its pool for each Occurrence of every Routine and Reminder of the Note: a plain Note by its id, or a new Note with the text given. With a schedule (start and times) it also spawns a Routine that runs it; without one the Session runs on no Agenda until add_routine gives the Note one.",
             false,
             schedule_properties(json!({
                 "count": count,
-                "note": id("Note it is spawned from"),
+                "note": id("plain Note to set up"),
                 "picking": picking,
                 "pool": pool,
-                "text": string("The text of a new Note to spawn it from, when no note is given"),
+                "text": string("The text of a new Note to set up, when no note is given"),
             })),
-            &["pool", "start", "times"],
+            &["pool"],
         ),
         tool(
             "set_session",
-            "Changes a Session's pool, count, picking rule or the count of single weekdays; what is left out stays. Its schedule is changed with reschedule_routine.",
+            "Changes the setup of a Session's Note, for every Routine that runs it: its pool, count, picking rule or the count of single weekdays; what is left out stays. The schedules are its Routines', changed with reschedule_routine.",
             false,
             json!({
                 "count": count,
-                "id": id("Session"),
+                "id": id("Session's Note"),
                 "picking": picking,
                 "pool": pool,
                 "weekdayCounts": {"additionalProperties": {"type": ["integer", "null"]}, "description": "The count of single weekdays, 1 for Monday to 7 for Sunday, such as {\"6\": 2}; null takes a weekday's own count away", "type": "object"},
@@ -688,6 +688,26 @@ fn schedule_arg(args: &Value) -> Result<Schedule> {
         .ok_or_else(|| Error::Invalid("that schedule never happens".into()))
 }
 
+/// The setup of a Session as a tool hands it out, with the Routines
+/// that run it when `routines` holds them.
+fn setup_json(setup: &SessionSetup, routines: Option<Vec<String>>) -> Value {
+    let weekdays: BTreeMap<String, i64> = setup
+        .counts
+        .iter()
+        .map(|(day, count)| (day.to_string(), *count))
+        .collect();
+    let mut out = json!({
+        "count": setup.count,
+        "picking": setup.rule.name(),
+        "pool": setup.pool,
+        "weekdayCounts": weekdays,
+    });
+    if let (Some(routines), Some(all)) = (routines, out.as_object_mut()) {
+        all.insert("routines".into(), json!(routines));
+    }
+    out
+}
+
 fn note_summary(note: &Note, kind: &NoteKind) -> Value {
     json!({
         "captured": dart_iso(note.captured),
@@ -704,9 +724,9 @@ fn note_summary(note: &Note, kind: &NoteKind) -> Value {
     })
 }
 
-/// What a Note is besides its text: `plain`, `checklist`, `shoppingList`
-/// or `tally` (a Note is at most one of the last three), its open Frog,
-/// and the Sessions spawned from it.
+/// What a Note is besides its text: `plain`, `checklist`,
+/// `shoppingList`, `tally` or `session` (a Note is one of them), its
+/// open Frog, and the Routines that run its Session.
 struct NoteKind {
     kind: &'static str,
     frog: Option<String>,
@@ -735,6 +755,7 @@ fn list_of(store: &Store, note: &str) -> Result<Option<&'static str>> {
 
 const CHECKLIST: &str = "checklist";
 const SHOPPING_LIST: &str = "shoppingList";
+const SESSION: &str = "session";
 const PENDING: &str = "kept once the user accepts the AI Task";
 
 /// The days an answer is narrowed to, both included.
@@ -936,9 +957,12 @@ impl Store {
     fn kind_of(&self, kinds: &Kinds, note: &Note) -> Result<NoteKind> {
         let tally = kinds.tallies.contains(&note.id)
             || (note.is_trashed() && Tallies::new(self).is_tally(&note.id)?);
-        let kind = match tally {
-            true => "tally",
-            false => list_of(self, &note.id)?.unwrap_or("plain"),
+        let kind = if tally {
+            "tally"
+        } else if Sessions::new(self).is_session_note(&note.id)? {
+            SESSION
+        } else {
+            list_of(self, &note.id)?.unwrap_or("plain")
         };
         Ok(NoteKind {
             kind,
@@ -954,20 +978,7 @@ impl Store {
         if let (Some(session), Some(all)) =
             (Sessions::new(self).by_id(&routine.id)?, out.as_object_mut())
         {
-            let weekdays: BTreeMap<String, i64> = session
-                .counts
-                .iter()
-                .map(|(day, count)| (day.to_string(), *count))
-                .collect();
-            all.insert(
-                "session".into(),
-                json!({
-                    "count": session.count,
-                    "picking": session.rule.name(),
-                    "pool": session.pool,
-                    "weekdayCounts": weekdays,
-                }),
-            );
+            all.insert("session".into(), setup_json(&session.setup, None));
         }
         Ok(out)
     }
@@ -1088,6 +1099,15 @@ impl Store {
                     })
                     .collect();
                 let tally = Tallies::new(self).by_note(id)?.map(|t| tally_json(&t));
+                let sessions = Sessions::new(self);
+                let session = match sessions.setup_of(id)? {
+                    Some(setup) => {
+                        let runs = sessions.of_note(id)?;
+                        let runs = runs.iter().map(|s| s.id().to_string()).collect();
+                        setup_json(&setup, Some(runs))
+                    }
+                    None => Value::Null,
+                };
                 let lines = self.lines_value(id, wall)?;
                 let shopping = ShoppingLists::new(self);
                 let agenda = match shopping.is_shopping_list(id)? {
@@ -1122,6 +1142,7 @@ impl Store {
                     all.insert("routines".into(), json!(routines));
                     all.insert("sections".into(), json!(sections));
                     all.insert("tally".into(), json!(tally));
+                    all.insert("session".into(), session);
                     all.insert(
                         "transcripts".into(),
                         json!(texts_of(&note.transcripts, "recording")),
@@ -1619,32 +1640,59 @@ impl Store {
                 done(id()?)
             }
             "make_session" => {
-                let schedule = schedule_arg(args)?;
                 let pool = strings_arg(args, "pool")?;
                 let count = count_arg(args)?.unwrap_or(1);
                 let rule = picking_arg(args)?.unwrap_or(SessionRule::Rolling);
-                let session = match (optional_text(args, "note"), optional_text(args, "text")) {
-                    (Some(note), _) => sessions.spawn(note, &schedule, &pool, count, rule)?,
-                    (None, Some(text)) => sessions.create(text, &schedule, &pool, count, rule)?,
-                    (None, None) => {
+                let scheduled = ["start", "times", "rule"]
+                    .iter()
+                    .any(|key| args.get(key).is_some());
+                let schedule = match scheduled {
+                    true => Some(schedule_arg(args)?),
+                    false => None,
+                };
+                let note = optional_text(args, "note");
+                let text = optional_text(args, "text");
+                let (note, routine) = match (note, text, &schedule) {
+                    (Some(note), _, Some(schedule)) => {
+                        let made = sessions.spawn(note, schedule, &pool, count, rule)?;
+                        (made.setup.note_id, Some(made.routine.id))
+                    }
+                    (Some(note), _, None) => {
+                        sessions.make(note, &pool, count, rule)?;
+                        (note.to_string(), None)
+                    }
+                    (None, Some(text), Some(schedule)) => {
+                        let made = sessions.create(text, schedule, &pool, count, rule)?;
+                        (made.setup.note_id, Some(made.routine.id))
+                    }
+                    (None, Some(text), None) => {
+                        let text = text.trim();
+                        if text.is_empty() {
+                            return Err(Error::Invalid("the text must not be empty".into()));
+                        }
+                        let note = Notes::new(self).capture(text, None, None)?.id;
+                        sessions.make(&note, &pool, count, rule)?;
+                        (note, None)
+                    }
+                    (None, None, _) => {
                         return Err(Error::Invalid("a note or a text is needed".into()));
                     }
                 };
-                done(session.id())
+                json!({"id": note, "pending": PENDING, "routine": routine})
             }
             "set_session" => {
-                let session = id()?;
+                let note = id()?;
                 let mut set = false;
                 if args.get("pool").is_some() {
-                    sessions.set_pool(session, &strings_arg(args, "pool")?)?;
+                    sessions.set_pool(note, &strings_arg(args, "pool")?)?;
                     set = true;
                 }
                 if let Some(count) = count_arg(args)? {
-                    sessions.set_count(session, count)?;
+                    sessions.set_count(note, count)?;
                     set = true;
                 }
                 if let Some(rule) = picking_arg(args)? {
-                    sessions.set_rule(session, rule)?;
+                    sessions.set_rule(note, rule)?;
                     set = true;
                 }
                 if let Some(days) = args.get("weekdayCounts") {
@@ -1661,7 +1709,7 @@ impl Store {
                                 Error::Invalid(format!("the count of {weekday} is no whole number"))
                             })?),
                         };
-                        sessions.set_count_on(session, weekday, count)?;
+                        sessions.set_count_on(note, weekday, count)?;
                         set = true;
                     }
                 }
@@ -1671,7 +1719,7 @@ impl Store {
                             .into(),
                     ));
                 }
-                done(session)
+                done(note)
             }
             "make_list" => {
                 let note = id()?;
@@ -2289,7 +2337,23 @@ mod tests {
             },
             |s, _| {
                 let all = Sessions::new(s).all()?;
-                Ok(all.len() == 1 && all[0].pool.len() == 2 && all[0].rule == SessionRule::Random)
+                Ok(all.len() == 1
+                    && all[0].setup.pool.len() == 2
+                    && all[0].setup.rule == SessionRule::Random)
+            },
+        )?;
+        // Without a schedule the Note alone is set up.
+        lands_as_pending(
+            "make_session",
+            |s| {
+                let note = Notes::new(s).capture("Sport", None, None)?.id;
+                Ok(json!({"note": note, "picking": "least", "pool": [tally(s, "Push-ups")?.0]}))
+            },
+            |s, a| {
+                let note = arg(a, "note")?;
+                let setup = Sessions::new(s).setup_of(&note)?;
+                Ok(setup.is_some_and(|s| s.rule == SessionRule::Least)
+                    && Routines::new(s).of_note(&note)?.is_empty())
             },
         )?;
         lands_as_pending(
@@ -2304,11 +2368,13 @@ mod tests {
                     SessionRule::Rolling,
                 )?;
                 Ok(
-                    json!({"count": 2, "id": session.id(), "picking": "least", "pool": [one, two], "weekdayCounts": {"6": 1}}),
+                    json!({"count": 2, "id": session.note_id(), "picking": "least", "pool": [one, two], "weekdayCounts": {"6": 1}}),
                 )
             },
             |s, a| {
-                let session = Sessions::new(s).by_id(&arg(a, "id")?)?.ok_or("a Session")?;
+                let session = Sessions::new(s)
+                    .setup_of(&arg(a, "id")?)?
+                    .ok_or("a Session")?;
                 Ok(session.pool.len() == 2
                     && session.count == 2
                     && session.rule == SessionRule::Least
@@ -2614,6 +2680,7 @@ mod tests {
         assert_eq!(kind_of(&run), Some(json!("tally")));
         assert_eq!(kind_of(&trip), Some(json!("checklist")));
         assert_eq!(kind_of(&shop), Some(json!("shoppingList")));
+        assert_eq!(kind_of(&bank), Some(json!("session")));
         let bank_listed = kind(&bank).ok_or("the bank's Note")?;
         assert_eq!(bank_listed.get("frog"), Some(&json!(frog.id)));
         assert_eq!(bank_listed.get("sessions"), Some(&json!([workout.id()])));
@@ -2655,6 +2722,13 @@ mod tests {
             banked.pointer("/routines/0/session/pool"),
             Some(&json!([run]))
         );
+        assert_eq!(banked.pointer("/session/pool"), Some(&json!([run])));
+        assert_eq!(banked.pointer("/session/picking"), Some(&json!("least")));
+        assert_eq!(
+            banked.pointer("/session/routines"),
+            Some(&json!([workout.id()]))
+        );
+        assert_eq!(read(&trip)?.pointer("/session"), Some(&Value::Null));
         assert_eq!(
             read(&plain)?.pointer("/boxes/0/state"),
             Some(&json!("open"))

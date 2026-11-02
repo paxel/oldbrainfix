@@ -307,7 +307,13 @@ fn the_kind_badge_changes_the_kind_the_lines_carried_over() -> TestResult {
     let mut harness = dialog(&store, &elsewhere, &id);
     // A plain Note's kinds as radio buttons, its own picked.
     click(&mut harness, "Kind: Plain Note")?;
-    for kind in ["Plain Note", "Checklist", "Shopping List", "Tally"] {
+    for kind in [
+        "Plain Note",
+        "Checklist",
+        "Shopping List",
+        "Tally",
+        "Session",
+    ] {
         assert!(
             harness
                 .query_all_by_role_and_label(Role::RadioButton, kind)
@@ -329,12 +335,15 @@ fn the_kind_badge_changes_the_kind_the_lines_carried_over() -> TestResult {
     harness.state_mut().select_note(&id);
     harness.run();
     click(&mut harness, "Kind: Checklist")?;
-    assert!(
-        harness
-            .query_all_by_role_and_label(Role::RadioButton, "Tally")
-            .next()
-            .is_none()
-    );
+    for kind in ["Tally", "Session"] {
+        assert!(
+            harness
+                .query_all_by_role_and_label(Role::RadioButton, kind)
+                .next()
+                .is_none(),
+            "{kind}"
+        );
+    }
     pick(&mut harness, "Shopping List");
     assert!(Checklists::new(&store).by_note(&id)?.is_none());
     let list = ShoppingLists::new(&store)

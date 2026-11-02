@@ -9,6 +9,8 @@ import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/session_editor.dart';
+import 'package:oldbrainfix/src/session_form_screen.dart';
+import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -287,51 +289,77 @@ void main() {
       final occurrence = made.routine.schedule.on(Day(2026, 10, 24)).single;
       expect(sessions.on(made.id, occurrence).picks, hasLength(1));
     });
+  });
 
-    testWidgets('plus stops at 99, for every day and a weekday; a weekday\'s '
-        'switch turned off takes its own count away', (tester) async {
-      final made = session([tally('Push-ups')], count: 99);
-      sessions.setCountOn(made.id, DateTime.sunday, 3);
+  group('the Session Note\'s page', () {
+    testWidgets('the kind badge makes a plain Note a Session through its '
+        'setup page, which asks for a Tally, and makes it plain again', (
+      tester,
+    ) async {
+      final pushUps = tally('Push-ups');
+      final id = notes.capture('Sport\nMorning set').id;
       await start(tester);
-      await tap(tester, find.text('Sport').first);
-      expect(enabled(tester, step('session-count', plus: true)), isFalse);
-      expect(enabled(tester, step('session-count')), isTrue);
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      expect(key('kind-session'), findsOneWidget);
+      await tap(tester, key('kind-session'));
+      expect(find.byType(SessionFormScreen), findsOneWidget);
+      expect(key('session-form-name'), findsNothing);
+      expect(key('session-form-schedule'), findsNothing);
+      await tap(tester, key('session-form-save'));
+      expect(key('session-pool-error'), findsOneWidget);
+      expect(sessions.isSessionNote(id), isFalse);
+      await tap(tester, key('session-pool-$pushUps'));
+      await tap(tester, key('session-form-save'));
 
-      await tap(tester, find.text('Count per weekday'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(NoteKinds(store).of(id), NoteKind.session);
+      expect(sessions.setupOf(id)?.pool, [pushUps]);
+      expect(sessions.ofNote(id), isEmpty, reason: 'no Routine yet');
+      // Its page: the name, the pool and the count, then its badges.
+      expect(key('note-name'), findsOneWidget);
+      expect(key('session-pool'), findsOneWidget);
       expect(
-        find.descendant(of: key('session-count-7'), matching: find.text('3')),
+        find.descendant(of: key('badge-kind'), matching: find.text('Session')),
         findsOneWidget,
       );
-      await tap(tester, key('session-own-1'));
+      expect(key('badge-session-rule'), findsOneWidget);
+      expect(key('badge-session-weekdays'), findsOneWidget);
+      // The last Tally of the pool stays ticked.
       expect(
-        find.descendant(of: key('session-count-1'), matching: find.text('99')),
-        findsOneWidget,
+        tester.widget<CheckboxListTile>(key('session-pool-$pushUps')).onChanged,
+        isNull,
       );
-      expect(enabled(tester, step('session-count-1', plus: true)), isFalse);
-      await tap(tester, key('session-own-7'));
-      expect(key('session-count-7'), findsNothing);
-      await tap(tester, find.text('Save'));
 
-      final saved = sessions.byId(made.id);
-      expect(saved?.count, 99);
-      expect(saved?.counts, {DateTime.monday: 99});
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-plain'));
+      expect(NoteKinds(store).of(id), NoteKind.plain);
+      expect(key('session-pool'), findsNothing);
+      expect(key('badge-session-rule'), findsNothing);
+      expect(notes.byId(id)?.text, 'Sport\nMorning set');
     });
 
-    testWidgets('a Session opens in its editor; the pool is ordered by its '
-        'handles for Rolling and saves what changed', (tester) async {
+    testWidgets('the pool is ticked and ordered by its handles for Rolling, '
+        'and the count changes with − / +, each written at once', (
+      tester,
+    ) async {
       final pushUps = tally('Push-ups');
       final wallSit = tally('Wall sit', unit: 'min', target: 60);
       final bridge = tally('Half bridge', target: 15);
+      final squats = tally('Squats');
       final made = session([pushUps, wallSit, bridge]);
       await start(tester);
-      await tap(tester, find.text('Sport').first);
-      expect(find.text('Session'), findsOneWidget);
+      await edit(tester, made.noteId);
       for (final id in [pushUps, wallSit, bridge]) {
         expect(
           tester.widget<CheckboxListTile>(key('session-pool-$id')).value,
           isTrue,
         );
       }
+      expect(
+        tester.widget<CheckboxListTile>(key('session-pool-$squats')).value,
+        isFalse,
+      );
 
       final handle = key('session-move-$pushUps');
       await tester.ensureVisible(handle);
@@ -344,29 +372,120 @@ void main() {
       }
       await drag.up();
       await tester.pumpAndSettle();
+      final dragged = sessions.setupOf(made.noteId)!.pool;
+      expect(dragged.first, wallSit);
+      expect(dragged, unorderedEquals([pushUps, wallSit, bridge]));
       await tap(tester, key('session-pool-$bridge'));
-      await tap(tester, find.text('Save'));
+      await tap(tester, key('session-pool-$squats'));
+      expect(sessions.setupOf(made.noteId)?.pool, [
+        for (final id in dragged)
+          if (id != bridge) id,
+        squats,
+      ]);
 
-      final saved = sessions.byId(made.id);
-      expect(saved?.pool, [wallSit, pushUps]);
-      expect(saved?.counts, isEmpty);
+      await tap(tester, step('session-count', plus: true));
+      expect(sessions.setupOf(made.noteId)?.count, 3);
+      await tap(tester, step('session-count'));
+      await tap(tester, step('session-count'));
+      expect(sessions.setupOf(made.noteId)?.count, 1);
+      expect(enabled(tester, step('session-count')), isFalse);
+      // Written on the Note, none on the Routine.
       expect(
-        store
-            .history(made.id)
-            .where((e) => e.field.startsWith('${SessionKeys.count}:')),
+        store.history(made.id).where((e) => e.field.startsWith('session:')),
         isEmpty,
-        reason: 'no weekday count written that was not typed',
       );
     });
 
-    testWidgets('only Rolling has an order to drag', (tester) async {
+    testWidgets('the rule and the weekdays\' counts are badges whose small '
+        'editors write at once; only Rolling has an order to drag', (
+      tester,
+    ) async {
       final pushUps = tally('Push-ups');
-      session([pushUps, tally('Squats')]);
+      final made = session([pushUps, tally('Squats')], count: 99);
+      sessions.setCountOn(made.noteId, DateTime.sunday, 3);
       await start(tester);
-      await tap(tester, find.text('Sport').first);
+      await edit(tester, made.noteId);
       expect(key('session-move-$pushUps'), findsOneWidget);
-      await tap(tester, find.text('Least selected'));
+      await reveal(tester, key('badge-session-weekdays'));
+      expect(
+        find.descendant(
+          of: key('badge-session-weekdays'),
+          matching: find.text('1 weekday with its own count'),
+        ),
+        findsOneWidget,
+      );
+
+      await tap(tester, key('badge-session-weekdays'));
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(
+        find.descendant(of: key('session-count-7'), matching: find.text('3')),
+        findsOneWidget,
+      );
+      await tap(tester, key('session-own-1'));
+      expect(
+        find.descendant(of: key('session-count-1'), matching: find.text('99')),
+        findsOneWidget,
+      );
+      expect(enabled(tester, step('session-count-1', plus: true)), isFalse);
+      await tap(tester, key('session-own-7'));
+      expect(key('session-count-7'), findsNothing);
+      expect(sessions.setupOf(made.noteId)?.counts, {DateTime.monday: 99});
+      await tap(tester, key('badge-close'));
+
+      await tap(tester, key('badge-session-rule'));
+      await tap(tester, key('session-rule-least'));
+      expect(sessions.setupOf(made.noteId)?.rule, SessionRule.least);
+      expect(
+        find.descendant(
+          of: key('badge-session-rule'),
+          matching: find.text('Least selected'),
+        ),
+        findsOneWidget,
+      );
       expect(key('session-move-$pushUps'), findsNothing);
+    });
+
+    testWidgets('"New Tally" in the pool comes back with that Tally ticked '
+        'first', (tester) async {
+      final made = session([tally('Push-ups')], count: 1);
+      await start(tester);
+      await edit(tester, made.noteId);
+      await tap(tester, key('session-new-tally'));
+      expect(find.byType(TallyFormScreen), findsOneWidget);
+      await tester.enterText(key('tally-form-name'), 'Plank');
+      await tester.enterText(key('tally-form-field-name-0'), 'Time');
+      await tap(tester, key('tally-form-save'));
+
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      final plank = notes.all().firstWhere((n) => n.text == 'Plank').id;
+      expect(sessions.setupOf(made.noteId)?.pool.first, plank);
+      expect(
+        tester.widget<CheckboxListTile>(key('session-pool-$plank')).value,
+        isTrue,
+      );
+    });
+
+    testWidgets('"+" on a Session Note offers no Session; a Routine added '
+        'there runs it, and a Routine\'s editor only schedules', (
+      tester,
+    ) async {
+      final made = session([tally('Push-ups')], count: 1);
+      await start(tester);
+      await edit(tester, made.noteId);
+      await tap(tester, key('badge-add'));
+      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-session'), findsNothing);
+      await tap(tester, key('spawn-routine'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(key('session-pool'), findsNothing);
+      await tap(tester, find.text('Save'));
+
+      expect(sessions.ofNote(made.noteId), hasLength(2));
+      await tap(tester, key('badge-routine-${made.id}'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(key('session-pool'), findsNothing);
+      expect(key('session-rule'), findsNothing);
+      expect(find.text('Routine'), findsWidgets);
     });
   });
 
@@ -450,7 +569,7 @@ void main() {
         'picks, with no picks yet', (tester) async {
       final pushUps = tally('Push-ups');
       final made = session([pushUps, tally('Squats'), tally('Plank')]);
-      sessions.setCountOn(made.id, DateTime.sunday, 1);
+      sessions.setCountOn(made.noteId, DateTime.sunday, 1);
       await start(tester);
 
       // Tomorrow is a Sunday.
@@ -462,6 +581,30 @@ void main() {
           .keys
           .where((field) => field.startsWith(SessionKeys.pickPrefix));
       expect(occurrences, [SessionKeys.pick(today)]);
+    });
+
+    testWidgets('two Routines of one Session Note each show their '
+        'Occurrence with its own picks, Rolling going on from the earlier', (
+      tester,
+    ) async {
+      final pushUps = tally('Push-ups');
+      final wallSit = tally('Wall sit', unit: 'min', target: 60);
+      final made = session([pushUps, wallSit, tally('Half bridge')], count: 1);
+      final evening = Routines(store).spawn(
+        made.noteId,
+        Schedule(
+          start: Day(2026, 10, 24),
+          times: [ClockTime(18, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      await start(tester);
+
+      expect(find.text('Push-ups 20 times'), findsOneWidget);
+      expect(find.text('Wall sit 1:00 min'), findsOneWidget);
+      final later = Occurrence(Day(2026, 10, 24), ClockTime(18, 0));
+      expect(store.currentFields(evening.id)[SessionKeys.pick(later)], wallSit);
+      expect(picked(made), [pushUps]);
     });
   });
 }

@@ -299,7 +299,13 @@ void main() {
       await tap(tester, key('badge-kind'));
       expect(dialogTitle('Kind'), findsOneWidget);
       expect(inDialog(find.byIcon(Icons.notes)), findsOneWidget);
-      expect(offered(tester), ['plain', 'checklist', 'shoppingList', 'tally']);
+      expect(offered(tester), [
+        'plain',
+        'checklist',
+        'shoppingList',
+        'tally',
+        'session',
+      ]);
       expect(
         tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
         NoteKind.plain,

@@ -1145,7 +1145,8 @@ final _scenarios = <Scenario>[
     about:
         'Sessions spawned with their Notes behind the scenes, picking from '
         'Tallies by each rule: Rolling at 07:00 with a Saturday of its own '
-        'count, Least selected all day after an entry made on the Tally '
+        'count and a second Routine at 19:00 that goes on from its picks, '
+        'one of them recorded, Least selected all day after an entry made on the Tally '
         'itself, Random at 18:00 by its hash; today\'s picks asked for '
         'again, "Another one", picks recorded until one Occurrence is Done '
         'from its entries, another checked off; the next days\' picks, an '
@@ -1182,7 +1183,9 @@ final _scenarios = <Scenario>[
         count: 3,
         rule: SessionRule.rolling,
       );
-      sessions.setCountOn(sport.id, DateTime.saturday, 1);
+      sessions.setCountOn(sport.noteId, DateTime.saturday, 1);
+      // A second Routine of the Note runs the same Session (#191).
+      final evening = Routines(store).spawn(sport.noteId, daily([_at(19)])).id;
       final learn = sessions.create(
         'Learn',
         daily(),
@@ -1205,6 +1208,9 @@ final _scenarios = <Scenario>[
       sessions.record(sport.id, morning, pushUps, values: targets(pushUps));
       sessions.record(sport.id, morning, wallSit, values: targets(wallSit));
       sessions.record(sport.id, morning, bridge, line: 'Shaky');
+      final dusk = Occurrence(Day(2026, 1, 1), _at(19));
+      final late = sessions.on(evening, dusk).picks.first.noteId;
+      sessions.record(evening, dusk, late, line: 'Late');
       final allDay = Occurrence(Day(2026, 1, 1));
       final first = sessions.on(learn.id, allDay).picks.first.noteId;
       sessions.record(learn.id, allDay, first, values: targets(first));
@@ -1259,7 +1265,7 @@ final _scenarios = <Scenario>[
       final morning = Occurrence(Day(2026, 1, 1), _at(7));
       sessions.record(sport.id, morning, bridge, line: 'Shaky');
       final march = tally('Long march');
-      sessions.setPool(sport.id, [pushUps, bridge, march]);
+      sessions.setPool(sport.noteId, [pushUps, bridge, march]);
       sessions.another(sport.id, morning, pushUps);
       sessions.record(sport.id, morning, march, line: 'Slow');
       // As another Device of the user's writes its first pick, having
@@ -1271,6 +1277,85 @@ final _scenarios = <Scenario>[
       sessions.record(sport.id, next, bridge, line: 'Better');
       store.append(sport.id, SessionKeys.pick(next), '$pushUps,$march');
       sessions.pickToday(_frogDay(1));
+      sessions.pickToday(_frogDay(1));
+    },
+  ),
+  (
+    name: 'session-legacy',
+    about:
+        'Sessions as an older version wrote them, the setup on the Routine '
+        '(ADR 0029), read as a kind of Note (ADR 0039): Sport with one such '
+        'Routine, Rolling three a day and one on Saturdays; Stretch with '
+        'two, a Random one and a Least selected one written later, which '
+        'counts for both, and a third written last but in the trash; Learn '
+        'changed after today\'s picks, its whole setup written onto its '
+        'Note, its Routine left as it was, and given a second Routine; Yoga '
+        'made a plain Note again, its Routine a plain one; the next day\'s '
+        'picks.',
+    build: (store) {
+      final notes = Notes(store);
+      final tallies = Tallies(store);
+      final sessions = Sessions(store);
+      final routines = Routines(store);
+      String tally(String name) {
+        final id = notes.capture(name).id;
+        tallies.addField(id, name: name, unit: 'times', target: 10);
+        return id;
+      }
+
+      Schedule daily([List<ClockTime> times = const []]) => Schedule(
+        start: Day(2026, 1, 1),
+        times: times,
+        rule: Recurrence(frequency: Frequency.daily),
+      );
+      // A Session as an older version spawned it, its setup on the Routine.
+      String old(
+        String note,
+        Schedule schedule,
+        String pool,
+        String count,
+        String rule, {
+        Map<int, String> counts = const {},
+      }) => routines
+          .spawn(
+            note,
+            schedule,
+            within: (id) {
+              store.append(id, SessionKeys.pool, pool);
+              store.append(id, SessionKeys.count, count);
+              for (final MapEntry(:key, :value) in counts.entries) {
+                store.append(id, SessionKeys.countOn(key), value);
+              }
+              store.append(id, SessionKeys.rule, rule);
+            },
+          )
+          .id;
+      final pushUps = tally('Push-ups');
+      final sitUps = tally('Sit-ups');
+      final bridge = tally('Half bridge');
+      final pages = tally('Reading');
+      final sport = notes.capture('Sport').id;
+      old(
+        sport,
+        daily([_at(7)]),
+        '$pushUps,$sitUps,$bridge',
+        '3',
+        'rolling',
+        counts: {DateTime.saturday: '1'},
+      );
+      final stretch = notes.capture('Stretch').id;
+      old(stretch, daily([_at(18)]), '$bridge,$sitUps', '2', 'random');
+      old(stretch, daily([_at(20)]), '$sitUps,$bridge,$pushUps', '1', 'least');
+      routines.trash(old(stretch, daily([_at(21)]), pushUps, '1', 'rolling'));
+      final learn = notes.capture('Learn').id;
+      old(learn, daily(), pages, '1', 'rolling');
+      sessions.pickToday(_frogDay(0));
+      sessions.setCount(learn, 2);
+      sessions.setPool(learn, [pages, pushUps]);
+      routines.spawn(learn, daily([_at(12)]));
+      final yoga = notes.capture('Yoga').id;
+      old(yoga, daily([_at(6)]), bridge, '1', 'rolling');
+      sessions.unmake(yoga);
       sessions.pickToday(_frogDay(1));
     },
   ),
@@ -1839,7 +1924,9 @@ Map<String, Object?> _history(Store store) {
   }
 }
 
-/// What the Sessions of [store] come to: each Session with its pool,
+/// What the Sessions of [store] come to: the kind of each Note, each
+/// Note that is a Session with its setup and the Routines that run it;
+/// each Routine running a Session with its pool,
 /// counts and rule, what it picks from and may pick, its Routine with
 /// what is Done, and today's Occurrences with their picks the day
 /// before the clock held and the days after, written nowhere.
@@ -1865,7 +1952,26 @@ Map<String, Object?> _sessions(Store store) {
     'canSwap': o.canSwap,
     'complete': o.complete,
   };
+  final noteIds = store.entitiesOfType(NoteKeys.typeNote)..sort();
   return {
+    'kinds': {for (final id in noteIds) id: NoteKinds(store).of(id).name},
+    'setups': [
+      for (final id in noteIds)
+        if (sessions.setupOf(id) case final setup?)
+          {
+            'noteId': id,
+            'pool': setup.pool,
+            'count': setup.count,
+            'counts': {
+              for (final weekday in setup.counts.keys.toList()..sort())
+                '$weekday': setup.counts[weekday],
+            },
+            'rule': setup.rule.name,
+            'heldBy': setup.heldBy,
+            'runs': [for (final s in sessions.ofNote(id)) s.id],
+            'picksFrom': sessions.pool(setup),
+          },
+    ],
     'sessions': [
       for (final s in sessions.all())
         {
@@ -1878,7 +1984,7 @@ Map<String, Object?> _sessions(Store store) {
               '$weekday': s.counts[weekday],
           },
           'rule': s.rule.name,
-          'picksFrom': sessions.pool(s),
+          'picksFrom': sessions.pool(s.setup),
           'choices': sessions.choices(s.id),
         },
     ],
@@ -7885,8 +7991,11 @@ Future<void> main(List<String> args) async {
     'adds one; Ada renames, deletes and adds Lines and sends the update; '
     'she turns it back into a plain Note and sends that. Read on a UTC '
     'wall clock.\n'
-    '- `sessions/sessions.json`, `session-swap/sessions.json`: each '
-    'Session of the log with '
+    '- `sessions/sessions.json`, `session-swap/sessions.json`, '
+    '`session-legacy/sessions.json`: the kind of each Note, each Note '
+    'that is a Session with its setup, the Routine an older version left '
+    'it on, the Routines that run it and the Tallies it picks from; each '
+    'Routine that runs a Session with '
     'its pool, counts and rule, the Tallies it picks from and may pick, '
     'its Routine with what is Done, from entries too, and today\'s '
     'Occurrences with their picks, their targets and the entries recorded '

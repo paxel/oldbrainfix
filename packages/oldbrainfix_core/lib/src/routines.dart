@@ -402,9 +402,11 @@ class Routines {
       trashed: trashed == null ? null : DateTime.parse(trashed),
       trashedWith: trashed == null ? null : fields[RoutineKeys.trashedWith],
       done: {
-        // A Session's Occurrence is Done too once every pick has an
-        // entry (ADR 0029); a check-off, written below, keeps its moment.
-        if (fields[SessionKeys.pool] != null)
+        // An Occurrence of a Routine that ran a Session is Done too once
+        // every pick has an entry (ADR 0029), whether the Note is still a
+        // Session or not (ADR 0039); a check-off, written below, keeps
+        // its moment.
+        if (fields.keys.any((k) => k.startsWith(SessionKeys.pickPrefix)))
           ...SessionMarks.read(store, id, history).doneFromEntries(store),
         // Spawned from a Checklist, once every Line is checked for it
         // (ADR 0030).

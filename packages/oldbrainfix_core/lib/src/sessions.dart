@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import 'entry.dart';
+import 'note_kinds.dart';
 import 'notes.dart';
 import 'profiles.dart';
 import 'routines.dart';
@@ -11,10 +12,13 @@ import 'shared_areas.dart';
 import 'store.dart';
 import 'tallies.dart';
 
-/// Field keys of a Session (ADR 0029), on the entity of its Routine.
+/// Field keys of a Session (ADR 0029, 0039): its setup on the entity of
+/// its Note, written there since #191 and read from the Routine as an
+/// older version wrote it; its picks on the entity of each Routine that
+/// runs it.
 abstract final class SessionKeys {
   /// The pool: the Notes of its Tallies, in the order Rolling goes
-  /// through them, joined by commas. A Routine with a pool is a Session.
+  /// through them, joined by commas. A Note with a pool is a Session.
   static const pool = 'session:pool';
 
   /// How many Tallies an Occurrence picks.
@@ -26,6 +30,14 @@ abstract final class SessionKeys {
 
   /// The picking rule, a [SessionRule]'s name.
   static const rule = 'session:rule';
+
+  /// Every field of the setup.
+  static final setup = [
+    pool,
+    count,
+    for (var weekday = 1; weekday <= 7; weekday++) countOn(weekday),
+    rule,
+  ];
 
   /// The pick of an Occurrence: the Notes of its Tallies joined by
   /// commas. Keyed by the wall-clock Occurrence, as `done@` is.
@@ -56,10 +68,11 @@ enum SessionRule {
   least,
 }
 
-/// A Routine that picks Tallies from a pool for each Occurrence
-/// (CONTEXT.md).
-class Session {
-  final Routine routine;
+/// A Session as its Note holds it (#191): the pool, the counts and the
+/// rule each Routine of the Note runs.
+class SessionSetup {
+  /// The Note that is the Session.
+  final String noteId;
 
   /// The Notes of its Tallies as stored, in the order Rolling goes
   /// through them; see [Sessions.pool] for those it picks from.
@@ -73,18 +86,44 @@ class Session {
   final Map<int, int> counts;
   final SessionRule rule;
 
-  const Session({
-    required this.routine,
+  /// The Routine an older version wrote the setup on, while the Note
+  /// holds none of its own (ADR 0039); null once it does.
+  final String? heldBy;
+
+  const SessionSetup({
+    required this.noteId,
     required this.pool,
     required this.count,
     required this.counts,
     required this.rule,
+    this.heldBy,
   });
-
-  String get id => routine.id;
 
   /// How many Tallies an Occurrence on [day] picks.
   int countOn(Day day) => counts[day.weekday] ?? count;
+}
+
+/// A Routine that runs the Session of its Note: it picks Tallies from
+/// the Note's pool for each Occurrence (CONTEXT.md).
+class Session {
+  final Routine routine;
+  final SessionSetup setup;
+
+  const Session({required this.routine, required this.setup});
+
+  /// The Routine's id: its picks lie on it.
+  String get id => routine.id;
+
+  /// The Note whose Session it runs.
+  String get noteId => setup.noteId;
+
+  List<String> get pool => setup.pool;
+  int get count => setup.count;
+  Map<int, int> get counts => setup.counts;
+  SessionRule get rule => setup.rule;
+
+  /// How many Tallies an Occurrence on [day] picks.
+  int countOn(Day day) => setup.countOn(day);
 }
 
 /// One Tally a Session's Occurrence picked.
@@ -306,16 +345,55 @@ class SessionMarks {
   static const _notePrefix = 'note:';
 }
 
-/// Spawning and changing Sessions, and picking their Tallies.
+/// Setting up Sessions on their Notes, and picking their Tallies for
+/// the Routines that run them.
 class Sessions {
   final Store store;
 
   Sessions(this.store);
 
-  /// Spawns a Session from the Note [noteId], a Routine on [schedule]
-  /// that picks [count] Tallies of [pool] (their Notes, in the order
-  /// Rolling goes through them) by [rule] for each Occurrence. The pool
-  /// takes [choices] only.
+  /// Makes the Note [noteId] a Session (#191): it picks [count] Tallies
+  /// of [pool] (their Notes, in the order Rolling goes through them) by
+  /// [rule] for each Occurrence of every Routine of the Note. Only a
+  /// plain Note in the lists becomes one; the pool takes [choices] only.
+  /// It leaves Unsorted, as a Tally does.
+  void make(
+    String noteId, {
+    required List<String> pool,
+    required int count,
+    required SessionRule rule,
+  }) {
+    _requireChangeable(noteId);
+    if (NoteKinds(store).of(noteId) != NoteKind.plain) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a plain Note');
+    }
+    final chosen = _chosen(store.areaOf(noteId), pool);
+    _checkCount(count);
+    store.batch(() {
+      _writeSetup(noteId, chosen, count, rule);
+      if (!Notes(store).byId(noteId)!.spawned) {
+        store.append(
+          noteId,
+          NoteKeys.spawned,
+          store.clock().toUtc().toIso8601String(),
+        );
+      }
+    });
+  }
+
+  /// Makes the Session [noteId] a plain Note again: its pool is taken
+  /// away, so its Routines run as plain ones; their picks and entries
+  /// stay in the log.
+  void unmake(String noteId) {
+    _requireSetup(noteId);
+    _requireChangeable(noteId);
+    store.append(noteId, SessionKeys.pool, null);
+  }
+
+  /// Spawns a Routine on [schedule] from the Note [noteId] and sets the
+  /// Note up as a Session of [pool], [count] and [rule], as [make] does,
+  /// in one batch; a Session already gets that setup. The Session the
+  /// new Routine runs.
   Session spawn(
     String noteId,
     Schedule schedule, {
@@ -323,22 +401,37 @@ class Sessions {
     required int count,
     required SessionRule rule,
   }) {
-    final chosen = _chosen(store.areaOf(noteId), pool);
+    final held = setupOf(noteId);
+    if (held == null && NoteKinds(store).of(noteId) != NoteKind.plain) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a plain Note');
+    }
+    final chosen = _chosen(
+      store.areaOf(noteId),
+      pool,
+      held: held?.pool ?? const [],
+    );
     _checkCount(count);
+    if (held != null) _requireChangeable(noteId);
     final routine = Routines(store).spawn(
       noteId,
       schedule,
-      within: (id) {
-        store.append(id, SessionKeys.pool, chosen.join(','));
-        store.append(id, SessionKeys.count, '$count');
-        store.append(id, SessionKeys.rule, rule.name);
+      within: (_) {
+        if (held == null) {
+          _writeSetup(noteId, chosen, count, rule);
+        } else {
+          _adopt(held);
+          _write(noteId, SessionKeys.pool, chosen.join(','));
+          _write(noteId, SessionKeys.count, '$count');
+          _write(noteId, SessionKeys.rule, rule.name);
+        }
       },
     );
     return byId(routine.id)!;
   }
 
   /// Creates a Session without a Note at hand: its Note, holding [text],
-  /// is captured behind the scenes (ADR 0005).
+  /// is captured behind the scenes (ADR 0005) and set up with a Routine
+  /// on [schedule], as [spawn] does.
   Session create(
     String text,
     Schedule schedule, {
@@ -361,74 +454,116 @@ class Sessions {
     );
   }
 
-  /// Gives the Session [id] the pool [pool]: [choices], and those it
+  /// Gives the Session [noteId] the pool [pool]: [choices], and those it
   /// holds already.
-  void setPool(String id, List<String> pool) {
-    final session = _requireManaged(id);
-    final chosen = _chosen(store.areaOf(id), pool, held: session.pool);
-    _write(id, SessionKeys.pool, chosen.join(','));
+  void setPool(String noteId, List<String> pool) {
+    final setup = _requireManaged(noteId);
+    final chosen = _chosen(store.areaOf(noteId), pool, held: setup.pool);
+    _change(setup, SessionKeys.pool, chosen.join(','));
   }
 
-  /// Sets how many Tallies an Occurrence of the Session [id] picks.
-  void setCount(String id, int count) {
-    _requireManaged(id);
+  /// Sets how many Tallies an Occurrence of the Session [noteId] picks.
+  void setCount(String noteId, int count) {
+    final setup = _requireManaged(noteId);
     _checkCount(count);
-    _write(id, SessionKeys.count, '$count');
+    _change(setup, SessionKeys.count, '$count');
   }
 
   /// Sets how many an Occurrence on [weekday] (1 for Monday to 7 for
   /// Sunday) picks; null takes the weekday's own count away.
-  void setCountOn(String id, int weekday, int? count) {
-    _requireManaged(id);
+  void setCountOn(String noteId, int weekday, int? count) {
+    final setup = _requireManaged(noteId);
     if (weekday < 1 || weekday > 7) {
       throw ArgumentError.value(weekday, 'weekday', '1 to 7');
     }
     if (count != null) _checkCount(count);
-    _write(id, SessionKeys.countOn(weekday), count?.toString());
+    _change(setup, SessionKeys.countOn(weekday), count?.toString());
   }
 
-  /// Sets how the Session [id] picks.
-  void setRule(String id, SessionRule rule) {
-    _requireManaged(id);
-    _write(id, SessionKeys.rule, rule.name);
+  /// Sets how the Session [noteId] picks.
+  void setRule(String noteId, SessionRule rule) {
+    final setup = _requireManaged(noteId);
+    _change(setup, SessionKeys.rule, rule.name);
   }
 
-  /// The Session [id], trashed or not, or null when it is none.
+  /// The Session the Note [noteId] is, or null when it is none: the setup
+  /// on the Note, or, while the Note holds none, on the Routine of it an
+  /// older version wrote it on (ADR 0039), of several the one whose
+  /// setup was written last. A Note made plain again holds a pool of
+  /// null and is none.
+  SessionSetup? setupOf(String noteId) {
+    final fields = store.currentFields(noteId);
+    if (fields.containsKey(SessionKeys.pool)) {
+      return _setupFrom(noteId, fields, null);
+    }
+    Entry? newest;
+    String? heldBy;
+    Map<String, String?>? held;
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
+      final own = store.currentFields(id);
+      if (own[RoutineKeys.note] != noteId ||
+          own[RoutineKeys.trashed] != null ||
+          own[SessionKeys.pool] == null) {
+        continue;
+      }
+      for (final e in store.history(id)) {
+        if (!SessionKeys.setup.contains(e.field)) continue;
+        if (newest == null || Store.latestWins(e, newest) > 0) {
+          newest = e;
+          heldBy = id;
+          held = own;
+        }
+      }
+    }
+    if (held == null) return null;
+    return _setupFrom(noteId, held, heldBy);
+  }
+
+  /// Whether the Note [noteId] is a Session.
+  bool isSessionNote(String noteId) => setupOf(noteId) != null;
+
+  /// The Routine [id] running the Session of its Note, trashed or not, or
+  /// null when it is no Routine or its Note is no Session.
   Session? byId(String id) {
     final routine = Routines(store).byId(id);
     if (routine == null) return null;
-    final fields = store.currentFields(id);
-    final pool = fields[SessionKeys.pool];
-    if (pool == null) return null;
-    return Session(
-      routine: routine,
-      pool: SessionMarks._noteIds(pool),
-      count: _countOf(fields[SessionKeys.count]) ?? 1,
-      counts: {
-        for (var weekday = 1; weekday <= 7; weekday++)
-          weekday: ?_countOf(fields[SessionKeys.countOn(weekday)]),
-      },
-      rule:
-          SessionRule.values.asNameMap()[fields[SessionKeys.rule]] ??
-          SessionRule.rolling,
-    );
+    final setup = setupOf(routine.noteId);
+    if (setup == null) return null;
+    return Session(routine: routine, setup: setup);
   }
 
-  /// Whether the Routine [id] is a Session.
+  /// Whether the Routine [id] runs a Session.
   bool isSession(String id) => byId(id) != null;
 
-  /// Every Session not in the trash, by id.
+  /// Every Routine not in the trash that runs a Session, by id.
   List<Session> all() {
+    final setups = <String, SessionSetup?>{};
     final sessions = [
-      for (final routine in Routines(store).all()) ?byId(routine.id),
+      for (final routine in Routines(store).all())
+        if (setups.putIfAbsent(routine.noteId, () => setupOf(routine.noteId))
+            case final setup?)
+          Session(routine: routine, setup: setup),
+    ];
+    sessions.sort((a, b) => a.id.compareTo(b.id));
+    return sessions;
+  }
+
+  /// The Routines not in the trash spawned from the Session [noteId],
+  /// each running it, by id; none while the Note is no Session.
+  List<Session> ofNote(String noteId) {
+    final setup = setupOf(noteId);
+    if (setup == null) return const [];
+    final sessions = [
+      for (final routine in Routines(store).all())
+        if (routine.noteId == noteId) Session(routine: routine, setup: setup),
     ];
     sessions.sort((a, b) => a.id.compareTo(b.id));
     return sessions;
   }
 
   /// The Tallies a Session of [entity] may pick, as their Notes, newest
-  /// capture first: [entity] is the Note to spawn it from, or the
-  /// Session. Every Tally in the lists, but those outside its Area while
+  /// capture first: [entity] is the Note of the Session, or one of its
+  /// Routines. Every Tally in the lists, but those outside its Area while
   /// that is a Shared Area, which not everyone in it holds.
   List<String> choices(String entity) {
     final area = store.areaOf(entity);
@@ -438,16 +573,16 @@ class Sessions {
     ];
   }
 
-  /// The Tallies [session] picks from, as their Notes, in its order:
-  /// those of its pool that are Tallies in the lists, a merged one as
-  /// the Note it went into, each once, and in a Shared Area only those
-  /// of that Area.
-  List<String> pool(Session session) {
-    final area = store.areaOf(session.id);
+  /// The Tallies [setup] picks from, as their Notes, in its order: those
+  /// of its pool that are Tallies in the lists, a merged one as the Note
+  /// it went into, each once, and in a Shared Area only those of that
+  /// Area.
+  List<String> pool(SessionSetup setup) {
+    final area = store.areaOf(setup.noteId);
     final notes = Notes(store);
     final tallies = Tallies(store);
     final out = <String>[];
-    for (final id in session.pool) {
+    for (final id in setup.pool) {
       final shown = notes.byId(id)?.mergedInto ?? id;
       final note = notes.byId(shown);
       if (note == null || note.isTrashed || note.isMerged) continue;
@@ -463,7 +598,7 @@ class Sessions {
   SessionOccurrence on(String id, Occurrence occurrence) {
     final session = _requireDue(id, occurrence);
     final marks = SessionMarks.read(store, id);
-    final pool = this.pool(session);
+    final pool = this.pool(session.setup);
     final picks = _wanted(session, occurrence, pool, marks);
     return _shown(session, occurrence, picks, pool, marks);
   }
@@ -489,7 +624,7 @@ class Sessions {
     final session = _requireDue(id, occurrence);
     _requireCheckOff(id);
     final marks = SessionMarks.read(store, id);
-    final pool = this.pool(session);
+    final pool = this.pool(session.setup);
     final wanted = _wanted(session, occurrence, pool, marks);
     if (!wanted.contains(noteId)) {
       throw ArgumentError.value(noteId, 'noteId', 'not picked then');
@@ -528,7 +663,7 @@ class Sessions {
     final session = _requireDue(id, occurrence);
     _requireCheckOff(id);
     final marks = SessionMarks.read(store, id);
-    final pool = this.pool(session);
+    final pool = this.pool(session.setup);
     final wanted = _wanted(session, occurrence, pool, marks);
     if (!wanted.contains(noteId)) {
       throw ArgumentError.value(noteId, 'noteId', 'not picked then');
@@ -546,23 +681,29 @@ class Sessions {
 
   List<SessionOccurrence> _today(WallClock wallClock, {required bool write}) {
     final day = Day.today(store.clock(), wallClock);
-    final shown = <SessionOccurrence>[];
-    for (final session in all()) {
-      final pool = this.pool(session);
-      final may = write && store.mayCheckOff(session.id);
-      for (final occurrence in session.routine.schedule.on(day)) {
-        var marks = SessionMarks.read(store, session.id);
-        final picks = _wanted(session, occurrence, pool, marks);
-        if (may && _writePick(session.id, occurrence, picks, marks)) {
-          marks = SessionMarks.read(store, session.id);
-        }
-        shown.add(_shown(session, occurrence, picks, pool, marks));
-      }
-    }
-    shown.sort((a, b) {
-      final byTime = a.occurrence.compareTo(b.occurrence);
-      return byTime != 0 ? byTime : a.session.id.compareTo(b.session.id);
+    // By time, then by Routine, so that Rolling over several Routines of
+    // a Note goes on from the pick written before (ADR 0039).
+    final due = [
+      for (final session in all())
+        for (final occurrence in session.routine.schedule.on(day))
+          (session, occurrence),
+    ];
+    due.sort((a, b) {
+      final byTime = a.$2.compareTo(b.$2);
+      return byTime != 0 ? byTime : a.$1.id.compareTo(b.$1.id);
     });
+    final shown = <SessionOccurrence>[];
+    for (final (session, occurrence) in due) {
+      final pool = this.pool(session.setup);
+      var marks = SessionMarks.read(store, session.id);
+      final picks = _wanted(session, occurrence, pool, marks);
+      if (write &&
+          store.mayCheckOff(session.id) &&
+          _writePick(session.id, occurrence, picks, marks)) {
+        marks = SessionMarks.read(store, session.id);
+      }
+      shown.add(_shown(session, occurrence, picks, pool, marks));
+    }
     return shown;
   }
 
@@ -655,18 +796,33 @@ class Sessions {
         return byDraw != 0 ? byDraw : a.compareTo(b);
       });
     }
-    final before = [
-      for (final key in marks.picks.keys)
-        if (Occurrence.tryParse(key) case final o?
-            when o.compareTo(occurrence) < 0)
-          o,
-    ]..sort();
+    // The picks of the Occurrences before this one of every Routine that
+    // runs the Session, in schedule order, those at the same moment by
+    // their Routine (ADR 0039).
+    final before = <(Occurrence, String, List<String>)>[];
+    for (final runner in _runners(session)) {
+      final held = runner == session.id
+          ? marks
+          : SessionMarks.read(store, runner);
+      for (final MapEntry(:key, value: ids) in held.picks.entries) {
+        final o = Occurrence.tryParse(key);
+        if (o == null) continue;
+        final byTime = o.compareTo(occurrence);
+        if (byTime < 0 || byTime == 0 && runner.compareTo(session.id) < 0) {
+          before.add((o, runner, ids));
+        }
+      }
+    }
+    before.sort((a, b) {
+      final byTime = a.$1.compareTo(b.$1);
+      return byTime != 0 ? byTime : a.$2.compareTo(b.$2);
+    });
     // When each was picked last: later Occurrences count higher, and
     // within one, those further on in its pick.
     final last = <String, int>{};
     var picked = 0;
-    for (final o in before) {
-      for (final id in marks.picks[o.key] ?? const <String>[]) {
+    for (final (_, _, ids) in before) {
+      for (final id in ids) {
         last[id] = picked++;
       }
     }
@@ -753,7 +909,7 @@ class Sessions {
     return int.parse(value);
   }
 
-  /// The Session [id], not in the trash.
+  /// The Routine [id] running a Session, not in the trash.
   Session _require(String id) {
     final session = byId(id);
     if (session == null || session.routine.isTrashed) {
@@ -762,13 +918,108 @@ class Sessions {
     return session;
   }
 
-  /// The Session [id], which this Device may change.
-  Session _requireManaged(String id) {
-    final session = _require(id);
-    if (!store.mayChangeRoutine(id)) {
-      throw StateError('not a Manager of the Area of $id');
+  /// The Routines that run [session]: those not in the trash spawned
+  /// from its Note, and its own, by id.
+  List<String> _runners(Session session) => {
+    session.id,
+    for (final routine in Routines(store).all())
+      if (routine.noteId == session.noteId) routine.id,
+  }.toList()..sort();
+
+  /// The setup of the Session [noteId].
+  SessionSetup _requireSetup(String noteId) {
+    final setup = setupOf(noteId);
+    if (setup == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Session');
     }
-    return session;
+    return setup;
+  }
+
+  /// The setup of the Session [noteId], in the lists, which this Device
+  /// may change as it may change the Note (ADR 0013).
+  SessionSetup _requireManaged(String noteId) {
+    final setup = _requireSetup(noteId);
+    _requireChangeable(noteId);
+    return setup;
+  }
+
+  /// Requires the Note [noteId] in the lists, which this Device may
+  /// change.
+  void _requireChangeable(String noteId) {
+    final note = Notes(store).byId(noteId);
+    if (note == null || note.isTrashed || note.isMerged) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
+    }
+    if (!store.mayChange(noteId)) {
+      throw StateError('may not change $noteId');
+    }
+  }
+
+  /// Writes a new setup on the Note [noteId], taking away the weekdays'
+  /// counts an earlier one left.
+  void _writeSetup(
+    String noteId,
+    List<String> pool,
+    int count,
+    SessionRule rule,
+  ) {
+    store.append(noteId, SessionKeys.pool, pool.join(','));
+    store.append(noteId, SessionKeys.count, '$count');
+    store.append(noteId, SessionKeys.rule, rule.name);
+    final fields = store.currentFields(noteId);
+    for (var weekday = 1; weekday <= 7; weekday++) {
+      if (fields[SessionKeys.countOn(weekday)] != null) {
+        store.append(noteId, SessionKeys.countOn(weekday), null);
+      }
+    }
+  }
+
+  /// Writes [field] of the Session [setup] as [value] on its Note, with
+  /// the rest of a setup an older version left on a Routine in the same
+  /// batch.
+  void _change(SessionSetup setup, String field, String? value) {
+    store.batch(() {
+      _adopt(setup);
+      _write(setup.noteId, field, value);
+    });
+  }
+
+  /// Writes the setup an older version left on a Routine onto its Note,
+  /// as it reads, so the Note holds it from now on (ADR 0039); nothing
+  /// when the Note holds its own.
+  void _adopt(SessionSetup setup) {
+    if (setup.heldBy == null) return;
+    final id = setup.noteId;
+    store.append(id, SessionKeys.pool, setup.pool.join(','));
+    store.append(id, SessionKeys.count, '${setup.count}');
+    for (final MapEntry(key: weekday, value: count) in setup.counts.entries) {
+      store.append(id, SessionKeys.countOn(weekday), '$count');
+    }
+    store.append(id, SessionKeys.rule, setup.rule.name);
+  }
+
+  /// The setup [fields] of the Note [noteId] hold, or null without a
+  /// pool; [heldBy] is the Routine they lie on, if not on the Note.
+  static SessionSetup? _setupFrom(
+    String noteId,
+    Map<String, String?> fields,
+    String? heldBy,
+  ) {
+    final pool = fields[SessionKeys.pool];
+    if (pool == null) return null;
+    return SessionSetup(
+      noteId: noteId,
+      pool: SessionMarks._noteIds(pool),
+      count: _countOf(fields[SessionKeys.count]) ?? 1,
+      counts: {
+        for (var weekday = 1; weekday <= 7; weekday++)
+          weekday: ?_countOf(fields[SessionKeys.countOn(weekday)]),
+      },
+      rule:
+          SessionRule.values.asNameMap()[fields[SessionKeys.rule]] ??
+          SessionRule.rolling,
+      heldBy: heldBy,
+    );
   }
 
   /// The Session [id], due at [occurrence].

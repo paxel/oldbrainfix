@@ -687,6 +687,7 @@ impl<'a> ShoppingLists<'a> {
             )
             .is_none()
             && !Tallies::new(self.store).is_tally(note_id)?
+            && !crate::sessions::Sessions::new(self.store).is_session_note(note_id)?
             && self.store.may_change(note_id)?)
     }
 

@@ -3324,6 +3324,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sessionHistory => 'Last 4 weeks';
+
+  @override
+  String sessionHistoryWeek(String day, int done, int skipped) {
+    return 'Week of $day: done $done / skipped $skipped';
+  }
+
+  @override
   String get checklistRenameTitle => 'Rename Line';
 
   @override

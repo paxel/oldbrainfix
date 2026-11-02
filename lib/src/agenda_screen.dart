@@ -1061,6 +1061,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     lists: ShoppingLists(widget.notes.store),
                   ),
                   tally: widget.notes,
+                  session: widget.notes,
                   kind: () =>
                       NoteKinds(widget.notes.store).of(captured.note.id),
                   glance: () => glances.of(captured.note.id),

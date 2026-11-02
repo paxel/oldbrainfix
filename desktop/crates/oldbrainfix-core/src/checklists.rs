@@ -835,6 +835,7 @@ impl<'a> Checklists<'a> {
             && note.text_editable
             && parse_list_kind(self.store.current(note_id, keys::KIND)?.as_deref()).is_none()
             && !Tallies::new(self.store).is_tally(note_id)?
+            && !crate::sessions::Sessions::new(self.store).is_session_note(note_id)?
             && self.store.may_change(note_id)?)
     }
 

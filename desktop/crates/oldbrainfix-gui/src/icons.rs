@@ -128,6 +128,8 @@ pub const TALLY_HIDDEN: char = '\u{f4a0}';
 pub const SESSION_COUNT: char = '\u{e640}';
 pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';
+/// A Session's weekdays' own counts (#191), `calendar_view_week`.
+pub const SESSION_WEEKDAYS: char = '\u{e125}';
 pub const TALLY: char = '\u{e0cc}';
 pub const NEW_NOTE: char = '\u{f04f6}';
 /// A folded description of a Note of a kind (#188), `expand_more`, and

@@ -90,7 +90,7 @@ void main() {
       expect(Routines(ann).byId(s.id)?.noteId, s.routine.noteId);
       expect(notes.unsorted().map((n) => n.id), [milk]);
       expect(sessions.choices(s.routine.noteId), [c, b, a]);
-      expect(sessions.pool(s), [a, b, c]);
+      expect(sessions.pool(s.setup), [a, b, c]);
       // A pool of Tallies, at least one; a count of 1 to 99.
       final note = notes.capture('Learn').id;
       Session spawn(List<String> pool, int count) => sessions.spawn(
@@ -105,20 +105,20 @@ void main() {
       expect(() => spawn([a], 0), throwsArgumentError);
       expect(() => spawn([a], 100), throwsArgumentError);
       // Changed: what is the same writes nothing.
-      sessions.setCount(s.id, 3);
-      sessions.setCountOn(s.id, DateTime.saturday, 1);
-      sessions.setRule(s.id, SessionRule.random);
-      sessions.setPool(s.id, [c, a]);
+      sessions.setCount(s.noteId, 3);
+      sessions.setCountOn(s.noteId, DateTime.saturday, 1);
+      sessions.setRule(s.noteId, SessionRule.random);
+      sessions.setPool(s.noteId, [c, a]);
       final changed = sessions.byId(s.id)!;
       expect(changed.count, 3);
       expect(changed.counts, {DateTime.saturday: 1});
       expect(changed.rule, SessionRule.random);
       expect(changed.pool, [c, a]);
       final before = ann.allEntries().length;
-      sessions.setCount(s.id, 3);
-      sessions.setPool(s.id, [c, a]);
+      sessions.setCount(s.noteId, 3);
+      sessions.setPool(s.noteId, [c, a]);
       expect(ann.allEntries().length, before);
-      sessions.setCountOn(s.id, DateTime.saturday, null);
+      sessions.setCountOn(s.noteId, DateTime.saturday, null);
       expect(sessions.byId(s.id)?.counts, isEmpty);
       // A plain Routine is none.
       final walk = Routines(ann).create('Walk', _daily);
@@ -131,11 +131,11 @@ void main() {
       final s = session(ann, [a, b, c]);
       final today = day(ann, 0);
       // As a modified app would.
-      ann.append(s.id, SessionKeys.count, '+3');
-      ann.append(s.id, SessionKeys.countOn(8), '5');
-      ann.append(s.id, '${SessionKeys.count}:0', '5');
-      ann.append(s.id, SessionKeys.countOn(DateTime.sunday), '07');
-      ann.append(s.id, SessionKeys.rule, 'sometimes');
+      ann.append(s.noteId, SessionKeys.count, '+3');
+      ann.append(s.noteId, SessionKeys.countOn(8), '5');
+      ann.append(s.noteId, '${SessionKeys.count}:0', '5');
+      ann.append(s.noteId, SessionKeys.countOn(DateTime.sunday), '07');
+      ann.append(s.noteId, SessionKeys.rule, 'sometimes');
       ann.append(s.id, SessionKeys.pickPrefix, a);
       ann.append(s.id, '${SessionKeys.pickPrefix}2026-3-1', a);
       ann.append(s.id, SessionKeys.pick(today), 'x,$c,$c,note:,note:a@b,');
@@ -209,12 +209,12 @@ void main() {
     test('a weekday has a count of its own', () {
       final pool = tallies(ann, ['A', 'B', 'C', 'D']);
       final s = session(ann, pool, count: 1);
-      Sessions(ann).setCountOn(s.id, DateTime.saturday, 3);
+      Sessions(ann).setCountOn(s.noteId, DateTime.saturday, 3);
       expect(day(ann, 6).day.weekday, DateTime.saturday);
       expect(shown(ann, s, 5), hasLength(1));
       expect(shown(ann, s, 6), hasLength(3));
       // More than the pool holds picks the pool.
-      Sessions(ann).setCountOn(s.id, DateTime.saturday, 9);
+      Sessions(ann).setCountOn(s.noteId, DateTime.saturday, 9);
       expect(shown(ann, s, 6), hasLength(4));
     });
 
@@ -252,7 +252,7 @@ void main() {
       Notes(ann).trash(b);
       Notes(ann).trash(a);
       expect(picked(ann, s, 0), [c, b]);
-      expect(Sessions(ann).pool(Sessions(ann).byId(s.id)!), [c]);
+      expect(Sessions(ann).pool(Sessions(ann).byId(s.id)!.setup), [c]);
     });
 
     test('a Tally with an entry for it stays in its pick, in its place', () {
@@ -372,7 +372,7 @@ void main() {
       expect(picked(ann, s, 0), [pushUps, bridge]);
       record(ann, s, 0, bridge);
       final march = tally(ann, 'Long march');
-      Sessions(ann).setPool(s.id, [pushUps, bridge, march]);
+      Sessions(ann).setPool(s.noteId, [pushUps, bridge, march]);
       Sessions(ann).another(s.id, today, pushUps);
       expect(shown(ann, s, 0), [march, bridge]);
       record(ann, s, 0, march);
@@ -416,6 +416,254 @@ void main() {
     });
   });
 
+  group('on its Note (#191)', () {
+    final at18 = Schedule(
+      start: Day(2026, 1, 1),
+      rule: Recurrence(frequency: Frequency.daily),
+      times: [ClockTime(18, 0)],
+    );
+    final at7 = Schedule(
+      start: Day(2026, 1, 1),
+      rule: Recurrence(frequency: Frequency.daily),
+      times: [ClockTime(7, 0)],
+    );
+
+    /// The picks of [routine] on [days] days on, by Occurrence key.
+    Map<String, List<String>> picksOf(Store store, String routine, int days) {
+      Sessions(store).pickToday(onDay(days));
+      return SessionMarks.read(store, routine).picks;
+    }
+
+    test('a plain Note becomes one, and plain again', () {
+      final kinds = NoteKinds(ann);
+      final sessions = Sessions(ann);
+      final [a, b] = tallies(ann, ['A', 'B']);
+      final note = Notes(ann).capture('Sport').id;
+      sessions.make(note, pool: [a, b], count: 1, rule: SessionRule.least);
+      expect(kinds.of(note), NoteKind.session);
+      expect(Notes(ann).unsorted().map((n) => n.id), isNot(contains(note)));
+      final setup = sessions.setupOf(note)!;
+      expect(setup.pool, [a, b]);
+      expect(setup.count, 1);
+      expect(setup.rule, SessionRule.least);
+      expect(setup.heldBy, isNull);
+      expect(sessions.ofNote(note), isEmpty);
+      // A Session becomes no list.
+      expect(Checklists(ann).mayMake(note), isFalse);
+      expect(ShoppingLists(ann).mayMake(note), isFalse);
+      // Only a plain Note becomes one.
+      expect(
+        () => sessions.make(note, pool: [a], count: 1, rule: SessionRule.least),
+        throwsArgumentError,
+      );
+      expect(
+        () => sessions.make(a, pool: [b], count: 1, rule: SessionRule.least),
+        throwsArgumentError,
+      );
+      final list = Notes(ann).capture('Milk').id;
+      Checklists(ann).make(list);
+      expect(
+        () => sessions.make(list, pool: [a], count: 1, rule: SessionRule.least),
+        throwsArgumentError,
+      );
+      // Any Routine of it runs it.
+      final routine = Routines(ann).spawn(note, _daily);
+      expect(sessions.isSession(routine.id), isTrue);
+      expect(picked(ann, sessions.byId(routine.id)!, 0), [a]);
+      record(ann, sessions.byId(routine.id)!, 0, a);
+      final today = day(ann, 0);
+      final done = Routines(ann).byId(routine.id)!.doneAt(today);
+      expect(done, isNotNull);
+      sessions.setCountOn(note, DateTime.monday, 2);
+      // Plain again: its Routine runs as a plain one; what was Done stays.
+      sessions.unmake(note);
+      expect(kinds.of(note), NoteKind.plain);
+      expect(sessions.isSession(routine.id), isFalse);
+      expect(sessions.all(), isEmpty);
+      expect(Routines(ann).byId(routine.id)!.doneAt(today), done);
+      // Made again, it starts from the setup given.
+      sessions.setupOf(note);
+      sessions.make(note, pool: [b], count: 1, rule: SessionRule.random);
+      expect(sessions.setupOf(note)?.pool, [b]);
+      expect(sessions.setupOf(note)?.counts, isEmpty);
+    });
+
+    test('several Routines run it, each picking for its Occurrences', () {
+      final sessions = Sessions(ann);
+      final [a, b, c] = tallies(ann, ['A', 'B', 'C']);
+      final note = Notes(ann).capture('Sport').id;
+      final first = sessions
+          .spawn(
+            note,
+            at7,
+            pool: [a, b, c],
+            count: 1,
+            rule: SessionRule.rolling,
+          )
+          .id;
+      final second = Routines(ann).spawn(note, at18).id;
+      expect([
+        for (final s in sessions.ofNote(note)) s.id,
+      ], [first, second]..sort());
+      expect(sessions.byId(second)?.pool, [a, b, c]);
+      final morning = Occurrence(
+        Day.today(ann.clock(), onDay(0)),
+        ClockTime(7, 0),
+      );
+      final evening = Occurrence(
+        Day.today(ann.clock(), onDay(0)),
+        ClockTime(18, 0),
+      );
+      // Rolling goes on from one Routine's Occurrence to the next.
+      expect(picksOf(ann, first, 0), {
+        morning.key: [a],
+      });
+      expect(SessionMarks.read(ann, second).picks, {
+        evening.key: [b],
+      });
+      final next = Day.today(ann.clock(), onDay(1));
+      expect(picksOf(ann, first, 1)[Occurrence(next, ClockTime(7, 0)).key], [
+        c,
+      ]);
+      expect(
+        SessionMarks.read(ann, second).picks[Occurrence(
+          next,
+          ClockTime(18, 0),
+        ).key],
+        [a],
+      );
+      // Done per Occurrence, each on its Routine.
+      sessions.record(first, morning, a, line: 'Done');
+      expect(Routines(ann).byId(first)?.doneAt(morning), isNotNull);
+      expect(Routines(ann).byId(second)?.doneAt(evening), isNull);
+      // One change of the Note's setup for both.
+      sessions.setCount(note, 2);
+      expect(sessions.byId(first)?.count, 2);
+      expect(sessions.byId(second)?.count, 2);
+    });
+
+    test('a Session an older version left on its Routine reads as one', () {
+      final sessions = Sessions(ann);
+      final [a, b, c] = tallies(ann, ['A', 'B', 'C']);
+      final note = Notes(ann).capture('Sport').id;
+      // As an older version spawned it: the setup on the Routine.
+      final old = Routines(ann)
+          .spawn(
+            note,
+            _daily,
+            within: (id) {
+              ann.append(id, SessionKeys.pool, '$a,$b,$c');
+              ann.append(id, SessionKeys.count, '2');
+              ann.append(id, SessionKeys.countOn(DateTime.saturday), '1');
+              ann.append(id, SessionKeys.rule, 'least');
+            },
+          )
+          .id;
+      expect(NoteKinds(ann).of(note), NoteKind.session);
+      final setup = sessions.setupOf(note)!;
+      expect(setup.heldBy, old);
+      expect(setup.pool, [a, b, c]);
+      expect(setup.counts, {DateTime.saturday: 1});
+      expect(setup.rule, SessionRule.least);
+      expect(picked(ann, sessions.byId(old)!, 0), [a, b]);
+      // A later write goes to the Note, with the rest of the setup; the
+      // Routine is not rewritten.
+      final routineBefore = ann.history(old).length;
+      sessions.setCount(note, 3);
+      expect(ann.history(old).length, routineBefore);
+      final fields = ann.currentFields(note);
+      expect(fields[SessionKeys.pool], '$a,$b,$c');
+      expect(fields[SessionKeys.count], '3');
+      expect(fields[SessionKeys.countOn(DateTime.saturday)], '1');
+      expect(fields[SessionKeys.rule], 'least');
+      final now = sessions.setupOf(note)!;
+      expect(now.heldBy, isNull);
+      expect(now.count, 3);
+      expect(now.counts, {DateTime.saturday: 1});
+    });
+
+    test('spawned again from an older one, the Note takes its setup', () {
+      final sessions = Sessions(ann);
+      final [a, b] = tallies(ann, ['A', 'B']);
+      final note = Notes(ann).capture('Sport').id;
+      final old = Routines(ann)
+          .spawn(
+            note,
+            _daily,
+            within: (id) {
+              ann.append(id, SessionKeys.pool, a);
+              ann.append(id, SessionKeys.count, '1');
+              ann.append(id, SessionKeys.countOn(DateTime.sunday), '2');
+              ann.append(id, SessionKeys.rule, 'least');
+            },
+          )
+          .id;
+      final routineBefore = ann.history(old).length;
+      final added = sessions.spawn(
+        note,
+        at7,
+        pool: [a, b],
+        count: 2,
+        rule: SessionRule.random,
+      );
+      expect(ann.history(old).length, routineBefore);
+      final setup = sessions.setupOf(note)!;
+      expect(setup.heldBy, isNull);
+      expect(setup.pool, [a, b]);
+      expect(setup.count, 2);
+      expect(setup.counts, {DateTime.sunday: 2});
+      expect(setup.rule, SessionRule.random);
+      expect([
+        for (final s in sessions.ofNote(note)) s.id,
+      ], [old, added.id]..sort());
+    });
+
+    test('of several older ones on a Note, the one written last counts', () {
+      final sessions = Sessions(ann);
+      final [a, b] = tallies(ann, ['A', 'B']);
+      final note = Notes(ann).capture('Sport').id;
+      String old(String pool, String rule) => Routines(ann)
+          .spawn(
+            note,
+            _daily,
+            within: (id) {
+              ann.append(id, SessionKeys.pool, pool);
+              ann.append(id, SessionKeys.count, '1');
+              ann.append(id, SessionKeys.rule, rule);
+            },
+          )
+          .id;
+      final first = old(a, 'rolling');
+      final second = old(b, 'random');
+      expect(sessions.setupOf(note)?.heldBy, second);
+      expect(sessions.byId(first)?.pool, [b]);
+      // A change to the first, as the older version wrote it, wins then.
+      ann.append(first, SessionKeys.count, '1');
+      expect(sessions.setupOf(note)?.heldBy, first);
+      expect(sessions.byId(second)?.pool, [a]);
+      // One in the trash counts for nothing.
+      Routines(ann).trash(first);
+      expect(sessions.setupOf(note)?.heldBy, second);
+      // Plain again, no older one counts either.
+      sessions.unmake(note);
+      expect(sessions.setupOf(note), isNull);
+      expect(NoteKinds(ann).of(note), NoteKind.plain);
+    });
+
+    test('travels between own Devices as part of its Note', () {
+      final desk = device(clock, 'Ann at the desk');
+      exchange(desk, ann);
+      final [a] = tallies(ann, ['A']);
+      final note = Notes(ann).capture('Sport').id;
+      Sessions(ann).make(note, pool: [a], count: 1, rule: SessionRule.rolling);
+      Routines(ann).spawn(note, _daily);
+      Routines(ann).spawn(note, at18);
+      exchange(desk, ann);
+      expect(NoteKinds(desk).of(note), NoteKind.session);
+      expect(Sessions(desk).ofNote(note).length, 2);
+    });
+  });
+
   group('in a Shared Area', () {
     late Store ben;
     late String area;
@@ -446,7 +694,10 @@ void main() {
       expect(done, isNotNull);
       expect(Routines(ben).byId(s.id)?.doneAt(today), done);
       // A Member records and swaps, but changes no Session.
-      expect(() => Sessions(ben).setCount(s.id, 1), throwsA(isA<StateError>()));
+      expect(
+        () => Sessions(ben).setCount(s.noteId, 1),
+        throwsA(isA<StateError>()),
+      );
       final own = Notes(ben).capture('Gym', place: area).id;
       expect(
         () => Sessions(ben)
@@ -464,6 +715,8 @@ void main() {
       Sessions(ben).another(s.id, today, a);
       // As a modified app would.
       final forged = [
+        ben.append(s.noteId, SessionKeys.count, '3'),
+        ben.append(s.noteId, SessionKeys.pool, a),
         ben.append(s.id, SessionKeys.count, '3'),
         ben.append(s.id, SessionKeys.pool, a),
       ];
@@ -474,6 +727,28 @@ void main() {
       final read = Sessions(ann).byId(s.id)!;
       expect(read.count, 2);
       expect(read.pool, [a, b, c]);
+    });
+
+    test('a Member sets up their own Note, but spawns no Routine', () {
+      final [a] = tallies(ann, ['A'], place: area);
+      exchange(ben, ann);
+      final own = Notes(ben).capture('Gym', place: area).id;
+      Sessions(ben).make(own, pool: [a], count: 1, rule: SessionRule.rolling);
+      expect(
+        () => Routines(ben).spawn(own, _daily),
+        throwsA(isA<StateError>()),
+      );
+      exchange(ben, ann);
+      expect(NoteKinds(ann).of(own), NoteKind.session);
+      // Another's Note stays theirs.
+      final hers = Notes(ann).capture('Run', place: area).id;
+      exchange(ben, ann);
+      expect(
+        () =>
+            Sessions(ben)
+                .make(hers, pool: [a], count: 1, rule: SessionRule.rolling),
+        throwsA(isA<StateError>()),
+      );
     });
 
     test('only Tallies of its Area count while it is shared', () {
@@ -493,10 +768,10 @@ void main() {
       );
       // A Session of one's own picks from every Area.
       final private = session(ann, [mine, a]);
-      expect(Sessions(ann).pool(private), [mine, a]);
+      expect(Sessions(ann).pool(private.setup), [mine, a]);
       // Filed into the Area, it leaves the others out.
       Notes(ann).file(private.routine.noteId, area);
-      expect(Sessions(ann).pool(private), [a]);
+      expect(Sessions(ann).pool(private.setup), [a]);
       expect(picked(ann, private, 0), [a]);
     });
   });
