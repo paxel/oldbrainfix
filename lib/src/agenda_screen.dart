@@ -140,6 +140,11 @@ class AgendaScreen extends StatefulWidget {
     this.onThemeChanged,
   });
 
+  /// How many times an Agenda read its rows, for the tests that count
+  /// them: once per change (#205).
+  @visibleForTesting
+  static var loads = 0;
+
   @override
   State<AgendaScreen> createState() => _AgendaScreenState();
 }
@@ -156,6 +161,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
+
+  /// The days as read last, for a calendar read to go into (#205).
+  AgendaDays? _days;
   List<DayEntry> _today = const [];
   List<DayEntry> _tomorrow = const [];
 
@@ -223,7 +231,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         unawaited(_openWaiting());
       },
     );
-    widget.alarms.addListener(_reload);
+    widget.alarms.addListener(_alarmsChanged);
     // Notes sorted on a page opened from elsewhere, like the Nudge
     // screen, change the Unsorted count.
     widget.notes.store.addListener(_logChanged);
@@ -246,7 +254,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     unawaited(_shares?.cancel());
     unawaited(_requests.cancel());
     _timer?.cancel();
-    widget.alarms.removeListener(_reload);
+    widget.alarms.removeListener(_alarmsChanged);
     widget.notes.store.removeListener(_logChanged);
     _lifecycle.dispose();
     super.dispose();
@@ -296,33 +304,57 @@ class _AgendaScreenState extends State<AgendaScreen> {
           const [];
     }
     if (!mounted || read != _calendarReads) return;
-    _appointments = [
+    final shown = [
       for (final appointment in appointments)
         if (picked.contains(appointment.calendarId)) appointment,
     ];
-    _readCalendars = {for (final calendar in calendars) calendar.id: calendar};
-    _reload();
+    // Nothing shown before nor now, as while the calendar is off.
+    if (shown.isEmpty &&
+        _appointments.isEmpty &&
+        calendars.isEmpty &&
+        _readCalendars.isEmpty) {
+      return;
+    }
+    // Into the days as read, without reading the log again (#205).
+    setState(() {
+      _appointments = shown;
+      _readCalendars = {
+        for (final calendar in calendars) calendar.id: calendar,
+      };
+      if (_days case final days?) _show(days.withAppointments(shown));
+    });
   }
 
+  /// Set while [_load] runs, so the log's change by its own picks reads
+  /// nothing again (#205).
+  var _loading = false;
+
   void _load() {
+    AgendaScreen.loads++;
+    _loading = true;
+    try {
+      _read();
+    } finally {
+      _loading = false;
+    }
+  }
+
+  void _read() {
     // Writes today's picks when they are new, before the rows read their
-    // Done; the reload that follows writes nothing.
+    // Done; the log's change they make is no reason to read again.
     final sessions = _sessions.pickToday(deviceWallClock);
     final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
-    final days = AgendaDays.read(
-      store: widget.notes.store,
-      places: widget.places,
-      wallClock: deviceWallClock,
-      days: AgendaScreen.days,
-      sessions: sessions,
-      frogsToday: frogs,
-      appointments: _appointments,
+    _show(
+      AgendaDays.read(
+        store: widget.notes.store,
+        places: widget.places,
+        wallClock: deviceWallClock,
+        days: AgendaScreen.days,
+        sessions: sessions,
+        frogsToday: frogs,
+        appointments: _appointments,
+      ),
     );
-    _system = days.system;
-    _today = days.todayRows;
-    _tomorrow = days.tomorrowRows;
-    _later = days.later;
-    _frogRows = days.frogs;
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
     // Counted from the pending sets, without reading each held file.
@@ -343,6 +375,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
             (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
+  }
+
+  /// Shows the rows of [days].
+  void _show(AgendaDays days) {
+    _days = days;
+    _system = days.system;
+    _today = days.todayRows;
+    _tomorrow = days.tomorrowRows;
+    _later = days.later;
+    _frogRows = days.frogs;
   }
 
   /// Back on the Agenda: the Areas opened meanwhile close again.
@@ -366,23 +408,36 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  void _reload() => setState(_load);
+  var _reloadQueued = false;
+
+  /// Reads the rows again once, however many changes asked for it
+  /// meanwhile, and never in the middle of whatever changed (#205): a
+  /// check-off and the log's change it makes, a sync's writes, a resume
+  /// and its calendar read.
+  void _reload() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    scheduleMicrotask(() {
+      _reloadQueued = false;
+      if (mounted) setState(_load);
+    });
+  }
 
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
 
-  var _reloadQueued = false;
-
-  /// Reloads once after the log changed, never in the middle of whatever
-  /// changed it.
+  /// The log changed: read again, unless the change is the Agenda's own
+  /// picks written as it read.
   void _logChanged() {
-    if (_reloadQueued) return;
-    _reloadQueued = true;
-    scheduleMicrotask(() {
-      _reloadQueued = false;
-      _reloadIfMounted();
-    });
+    if (_loading) return;
+    _reload();
+  }
+
+  /// The alarms' permissions or ringing changed, which only the banner
+  /// shows; what a tap applied changed the log, which reads again.
+  void _alarmsChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Fans out the ways to capture from "+", the ones this Device has,

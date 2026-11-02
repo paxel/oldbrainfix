@@ -691,4 +691,72 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('the Agenda loads once per change (#205)', () {
+    setUp(() {
+      // A Frog makes the first load on a day write its pick, a change of
+      // the log the Agenda listens to.
+      Frogs(store).spawn(notes.capture('eat the frog').id);
+      routines.create('pills', daily([at(10)]));
+    });
+
+    testWidgets('on starting', (tester) async {
+      AgendaScreen.loads = 0;
+      await start(tester);
+      expect(find.text('eat the frog'), findsOneWidget);
+      expect(AgendaScreen.loads, 1);
+    });
+
+    testWidgets('on a check-off', (tester) async {
+      await start(tester);
+      AgendaScreen.loads = 0;
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).first, startsWith('[x] '));
+      expect(AgendaScreen.loads, 1);
+    });
+
+    testWidgets('on a sync arrival, however many entries it brings', (
+      tester,
+    ) async {
+      await start(tester);
+      AgendaScreen.loads = 0;
+      // As a sync applies what came: one batch, and one more write
+      // straight after it.
+      store.batch(() {
+        notes.capture('from the laptop');
+        routines.create('stretch', daily([at(11)]));
+      });
+      routines.create('walk', daily([at(12)]));
+      await tester.pumpAndSettle();
+      expect(find.text('stretch'), findsWidgets);
+      expect(find.text('walk'), findsWidgets);
+      expect(AgendaScreen.loads, 1);
+    });
+
+    for (final newDay in [false, true]) {
+      testWidgets(
+        'on a resume${newDay ? ' on a new day, which picks anew' : ''}',
+        (tester) async {
+          await start(tester);
+          AgendaScreen.loads = 0;
+          if (newDay) now = now.add(const Duration(days: 1));
+          final before = store.currentSeq();
+          for (final state in [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused,
+            AppLifecycleState.hidden,
+            AppLifecycleState.inactive,
+            AppLifecycleState.resumed,
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+          await tester.pumpAndSettle();
+          // The new day's pick went into the log as the Agenda read it.
+          expect(store.currentSeq() > before, newDay);
+          expect(AgendaScreen.loads, 1);
+        },
+      );
+    }
+  });
 }

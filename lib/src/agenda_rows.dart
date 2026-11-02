@@ -81,15 +81,29 @@ class AgendaDays {
   /// The units a Session's targets show in.
   final UnitSystem system;
 
-  const AgendaDays._({
-    required this.today,
-    required this.tomorrow,
-    required this.todayRows,
-    required this.tomorrowRows,
-    required this.later,
+  /// What the days' rows are made of before the appointments go in, so
+  /// a new calendar read goes in without reading the log again (#205).
+  final _DayParts _parts;
+
+  AgendaDays._(
+    _DayParts parts,
+    List<Appointment> appointments, {
     required this.frogs,
     required this.system,
-  });
+  }) : _parts = parts,
+       today = parts.today.day,
+       tomorrow = parts.tomorrow.day,
+       todayRows = parts.today.entries(appointments, parts.wallClock),
+       tomorrowRows = parts.tomorrow.entries(appointments, parts.wallClock),
+       later = [
+         for (final day in parts.later)
+           (day: day.day, rows: day.entries(appointments, parts.wallClock)),
+       ];
+
+  /// These days with the calendar's [appointments] in place of those
+  /// they were read with; the log is not read again.
+  AgendaDays withAppointments(List<Appointment> appointments) =>
+      AgendaDays._(_parts, appointments, frogs: frogs, system: system);
 
   /// Reads the [days] of the Agenda from [store] on [wallClock], with
   /// today's Session Occurrences [sessions], today's "Eat a frog" section
@@ -105,7 +119,7 @@ class AgendaDays {
     required FrogsToday frogsToday,
     List<Appointment> appointments = const [],
   }) {
-    final reader = _Reader(store, places, wallClock, sessions, appointments);
+    final reader = _Reader(store, places, wallClock, sessions);
     final agenda = Routines(store).agenda(wallClock, days: days);
     reader.listNotes = reader.checklists
         .ofNotes({
@@ -121,26 +135,25 @@ class AgendaDays {
         .toSet();
     final frogs = Frogs(store);
     return AgendaDays._(
-      today: agenda.today,
-      tomorrow: agenda.tomorrow,
-      todayRows: reader.entries(
-        agenda.today,
-        [for (final row in agenda.todayRows) reader.place(row)],
-        shopping: reader.shoppingRows(),
-        checklists: reader.checklistRows(),
-      ),
-      tomorrowRows: reader.entries(agenda.tomorrow, [
-        for (final row in agenda.tomorrowRows) reader.place(row),
-      ]),
-      later: [
-        for (final (i, rows) in agenda.laterRows.indexed)
-          (
-            day: agenda.later(i),
-            rows: reader.entries(agenda.later(i), [
+      (
+        wallClock: wallClock,
+        today: _DayPart(
+          agenda.today,
+          [for (final row in agenda.todayRows) reader.place(row)],
+          shopping: reader.shoppingRows(),
+          checklists: reader.checklistRows(),
+        ),
+        tomorrow: _DayPart(agenda.tomorrow, [
+          for (final row in agenda.tomorrowRows) reader.place(row),
+        ]),
+        later: [
+          for (final (i, rows) in agenda.laterRows.indexed)
+            _DayPart(agenda.later(i), [
               for (final row in rows) reader.place(row),
             ]),
-          ),
-      ],
+        ],
+      ),
+      appointments,
       frogs: [
         for (final frog in frogsToday.shown)
           if (placeFrog(frogs, places, frog) case final placed?)
@@ -151,55 +164,35 @@ class AgendaDays {
   }
 }
 
-/// What [AgendaDays.read] reads its rows with.
-class _Reader {
-  final Store store;
-  final Places places;
-  final WallClock wallClock;
-  final List<Appointment> appointments;
-  final Notes notes;
-  final AreaLocks locks;
-  final Sessions sessions;
-  final Checklists checklists;
-  final ShoppingLists shopping;
+/// The days' parts of an [AgendaDays], and the wall clock that places
+/// the appointments on them.
+typedef _DayParts = ({
+  WallClock wallClock,
+  _DayPart today,
+  _DayPart tomorrow,
+  List<_DayPart> later,
+});
 
-  /// Today's Occurrences of Sessions with their picks, by Session id and
-  /// Occurrence key.
-  final Map<String, SessionOccurrence> sessionsToday;
+/// One day's rows as read from the log: its Occurrences [rows], and
+/// today's Shopping Lists [shopping] and Checklists [checklists].
+class _DayPart {
+  final Day day;
+  final List<PlacedRow> rows;
+  final List<ShoppingRow> shopping;
+  final List<ChecklistRow> checklists;
 
-  /// The Notes of the rows that are Checklists, read in one pass so only
-  /// their rows read their Lines for the Occurrence.
-  Set<String> listNotes = const {};
+  const _DayPart(
+    this.day,
+    this.rows, {
+    this.shopping = const [],
+    this.checklists = const [],
+  });
 
-  _Reader(
-    this.store,
-    this.places,
-    this.wallClock,
-    List<SessionOccurrence> today,
-    this.appointments,
-  ) : notes = Notes(store),
-      locks = AreaLocks(store),
-      sessions = Sessions(store),
-      checklists = Checklists(store),
-      shopping = ShoppingLists(store),
-      sessionsToday = {
-        for (final occurrence in today)
-          _sessionKey(occurrence.session.id, occurrence.occurrence): occurrence,
-      };
-
-  static String _sessionKey(String id, Occurrence occurrence) =>
-      '$id@${occurrence.key}';
-
-  /// The rows of [day]: its all-day Occurrences [rows] and all-day
-  /// appointments, then the rows of the Shopping Lists [shopping] and of
-  /// the Checklists [checklists], then the timed ones of both by time, an
+  /// The rows of [day] with the [appointments] on it: its all-day
+  /// Occurrences and all-day appointments, then the rows of the Shopping
+  /// Lists and of the Checklists, then the timed ones of both by time, an
   /// Occurrence before an appointment at the same time.
-  List<DayEntry> entries(
-    Day day,
-    List<PlacedRow> rows, {
-    List<ShoppingRow> shopping = const [],
-    List<ChecklistRow> checklists = const [],
-  }) {
+  List<DayEntry> entries(List<Appointment> appointments, WallClock wallClock) {
     final pieces = appointmentsOn(day, appointments, wallClock);
     final timedRows = [
       for (final placed in rows)
@@ -247,6 +240,44 @@ class _Reader {
       ...timed,
     ];
   }
+}
+
+/// What [AgendaDays.read] reads its rows with.
+class _Reader {
+  final Store store;
+  final Places places;
+  final WallClock wallClock;
+  final Notes notes;
+  final AreaLocks locks;
+  final Sessions sessions;
+  final Checklists checklists;
+  final ShoppingLists shopping;
+
+  /// Today's Occurrences of Sessions with their picks, by Session id and
+  /// Occurrence key.
+  final Map<String, SessionOccurrence> sessionsToday;
+
+  /// The Notes of the rows that are Checklists, read in one pass so only
+  /// their rows read their Lines for the Occurrence.
+  Set<String> listNotes = const {};
+
+  _Reader(
+    this.store,
+    this.places,
+    this.wallClock,
+    List<SessionOccurrence> today,
+  ) : notes = Notes(store),
+      locks = AreaLocks(store),
+      sessions = Sessions(store),
+      checklists = Checklists(store),
+      shopping = ShoppingLists(store),
+      sessionsToday = {
+        for (final occurrence in today)
+          _sessionKey(occurrence.session.id, occurrence.occurrence): occurrence,
+      };
+
+  static String _sessionKey(String id, Occurrence occurrence) =>
+      '$id@${occurrence.key}';
 
   /// Today's rows of the Shopping Lists, as this person chose for each
   /// list (#186): one per open Line, or one per list with their number.

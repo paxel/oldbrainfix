@@ -25,6 +25,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Behoben
 
 - Auf dem Telefon und dem Desktop zeigt eine Zeile, die gerade in eine Checkliste oder eine Einkaufsliste im Notiz-Editor getippt wurde, ihr ⋮, sobald sie Text hat, wo es erst nach Eingabetaste und Rücktaste erschien. Ein Eintrag ihres ⋮ speichert die Zeile zuerst und handelt dann; eine leere neue Zeile hat kein ⋮.
+- Auf dem Telefon liest die Agenda ihre Zeilen einmal pro Änderung und öffnet und aktualisiert sich dadurch schneller: Ein Abhaken, ein Abgleich, ein Lesen des Kalenders oder die Rückkehr in die App lesen sie einmal, wo jedes sie zwei- oder dreimal las.
 
 ## [0.3.1] - 2026-11-01
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_rows.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/calendar_screen.dart';
@@ -376,6 +378,90 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.text('Lunch with Ann'), findsOneWidget);
+    });
+  });
+
+  group('a calendar read (#205)', () {
+    setUp(() {
+      showPersonal();
+      routines
+        ..create(
+          'pills',
+          Schedule(start: Day(2026, 10, 24), times: [ClockTime(8, 0)]),
+        )
+        ..create(
+          'walk',
+          Schedule(
+            start: Day(2026, 10, 1),
+            times: [ClockTime(18, 0)],
+            rule: Recurrence.parse('FREQ=DAILY'),
+          ),
+        );
+      source
+        ..add(allDay('h', 'Holiday', 25))
+        ..add(timed('l', 'Lunch with Ann', local(24, 12), local(24, 13, 30)));
+    });
+
+    testWidgets('goes into the Agenda without reading the log again', (
+      tester,
+    ) async {
+      AgendaScreen.loads = 0;
+      await start(tester);
+      expect(row('l@2026-10-24'), findsOneWidget);
+      expect(AgendaScreen.loads, 1);
+
+      // Back from the background with a new appointment meanwhile.
+      source.add(timed('d', 'Dentist', local(24, 15), local(24, 16)));
+      AgendaScreen.loads = 0;
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('Dentist'), findsOneWidget);
+      expect(AgendaScreen.loads, 1);
+    });
+
+    test('puts the appointments where a read with them puts them', () {
+      DateTime wall(DateTime utc) => utc.toLocal();
+      AgendaDays read(List<Appointment> appointments) => AgendaDays.read(
+        store: store,
+        places: Places(store),
+        wallClock: wall,
+        days: 3,
+        sessions: const [],
+        frogsToday: Frogs(store).today(wall),
+        appointments: appointments,
+      );
+      List<List<String>> shown(AgendaDays days) => [
+        for (final rows in [
+          days.todayRows,
+          days.tomorrowRows,
+          for (final later in days.later) later.rows,
+        ])
+          [
+            for (final entry in rows)
+              entry.piece?.key ??
+                  '${entry.row?.row.routine.id}@${entry.row?.row.occurrence.key}',
+          ],
+      ];
+      final appointments = [
+        allDay('h', 'Holiday', 25),
+        timed('l', 'Lunch with Ann', local(24, 12), local(24, 13, 30)),
+        timed('e', 'Early', local(26, 7), local(26, 8)),
+      ];
+      final withThem = read(appointments);
+      final merged = read(const []).withAppointments(appointments);
+      expect(shown(merged), shown(withThem));
+      expect(shown(merged).expand((day) => day), contains('h@2026-10-25'));
+      // And out again.
+      expect(shown(withThem.withAppointments(const [])), shown(read(const [])));
     });
   });
 

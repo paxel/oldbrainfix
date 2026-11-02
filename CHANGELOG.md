@@ -26,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Fixed
 
 - On the phone and the desktop, a Line just typed into a Checklist or a Shopping List in the Note editor shows its ⋮ as soon as it holds text, where it showed only after Return and Backspace. An entry of its ⋮ stores the Line first, then acts; an empty new Line has no ⋮.
+- On the phone the Agenda reads its rows once per change, so it opens and updates faster: a check-off, a sync, a calendar read or coming back to the app read them once, where each read them two or three times.
 
 ---
 
