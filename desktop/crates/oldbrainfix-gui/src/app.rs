@@ -91,12 +91,13 @@ use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
-    CaptureContext, CapturedDetail, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day,
-    DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes,
-    NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
-    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
-    ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
+    ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
+    ListOnAgenda, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
+    PersonFilter, Places, Profile, QuickNoteControl, QuietHours, Routine, RoutineOccurrence,
+    Routines, Search, Section, SessionSetup, Sessions, ShoppingLine, ShoppingList, ShoppingLists,
+    ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic, UnitSystem, bundle, markdown,
+    text_format,
 };
 
 use crate::about_view;
@@ -4469,18 +4470,21 @@ impl App {
                     });
                 }
                 let mut checklist_rows = Vec::new();
-                for list in lists.agenda()? {
-                    let Some(note) = notes.by_id(&list.note_id)? else {
+                for row in lists.agenda_rows()? {
+                    let Some(note) = notes.by_id(&row.list.note_id)? else {
                         continue;
                     };
                     let title = match row_title(&self.t, Some(&note)).lines().next() {
                         Some(first) if !first.trim().is_empty() => first.trim().to_string(),
                         _ => self.t.checklist_heading().to_string(),
                     };
-                    // Every open Line; a later choice of how a Checklist
-                    // shows on the Agenda goes in here, as a Shopping
-                    // List's does, empty Lines leaving the count.
-                    let lines = agenda_lines(&list);
+                    // As this person chose for the list (#219): every
+                    // open Line, or none, which leaves the count.
+                    let ChecklistAgendaRow { list, shows } = row;
+                    let lines = match shows {
+                        ListOnAgenda::Count => Vec::new(),
+                        _ => agenda_lines(&list),
+                    };
                     let text = if lines.is_empty() {
                         let (open, count) = (list.open_count() as i64, list.count() as i64);
                         self.t.checklist_row_open(&title, open, count)
@@ -5997,11 +6001,11 @@ impl App {
                     }
                 }
             }
-            ChecklistAction::ShowOnAgenda(note, on) => {
+            ChecklistAction::OnAgenda(note, shows) => {
                 let lists = Checklists::new(&self.store);
                 // A Routine may have come meanwhile.
                 if lists.may_show_on_agenda(&note)? {
-                    lists.set_show_on_agenda(&note, on)?;
+                    lists.set_on_agenda(&note, shows)?;
                 }
             }
             ChecklistAction::Check(line, checked, on) => {
@@ -8504,23 +8508,13 @@ impl App {
                     }
                 })
             }
-            NoteBadge::OnAgenda => {
-                let mut on = self
-                    .view
-                    .checklist
-                    .as_ref()
-                    .and_then(|c| c.on_agenda)
-                    .unwrap_or(false);
-                let setting = t.checklist_show_on_agenda();
-                badge_dialog(ctx, shown, (icons::ON_AGENDA, None), setting, |ui| {
-                    if badge_switch(ui, &t, setting, &mut on) {
-                        let asked = ChecklistAction::ShowOnAgenda(note.id.clone(), on);
-                        actions.push(Action::Checklist(asked));
-                    }
-                })
-            }
-            NoteBadge::ShoppingOnAgenda => {
-                let shows = self.view.shopping.as_ref().and_then(|s| s.on_agenda);
+            // A Checklist's (#219) or a Shopping List's (#186) three ways.
+            NoteBadge::OnAgenda | NoteBadge::ShoppingOnAgenda => {
+                let checklist = open == NoteBadge::OnAgenda;
+                let shows = match checklist {
+                    true => self.view.checklist.as_ref().and_then(|c| c.on_agenda),
+                    false => self.view.shopping.as_ref().and_then(|s| s.on_agenda),
+                };
                 let setting = t.checklist_show_on_agenda();
                 badge_dialog(ctx, shown, (icons::ON_AGENDA, None), setting, |ui| {
                     let Some(shows) = shows else {
@@ -8532,8 +8526,11 @@ impl App {
                     // A pick writes it and closes, as on the phone.
                     if radio_column(ui, &mut picked, options) {
                         if picked != shows {
-                            let asked = ShoppingAction::OnAgenda(note.id.clone(), picked);
-                            actions.push(Action::Shopping(asked));
+                            let note = note.id.clone();
+                            actions.push(match checklist {
+                                true => Action::Checklist(ChecklistAction::OnAgenda(note, picked)),
+                                false => Action::Shopping(ShoppingAction::OnAgenda(note, picked)),
+                            });
                         }
                         actions.push(Action::Badge(None));
                     }
@@ -13878,7 +13875,7 @@ struct BadgesShown<'a> {
     routines: &'a [Routine],
     newer: usize,
     kind: &'a KindShown,
-    on_agenda: Option<bool>,
+    on_agenda: Option<ListOnAgenda>,
     shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
     /// A Session Note's setup, for its rule and weekdays' badges, and
@@ -14070,8 +14067,15 @@ fn note_badges(
                 actions.push(Action::Badge(Some(NoteBadge::SessionWeekdays)));
             }
         }
-        // A Shopping List's three ways, where a Checklist's switch sits.
-        if let Some(shows) = shown.shopping_on_agenda {
+        // A Shopping List's (#186) or a Checklist's (#219) three ways.
+        let ways = [
+            (shown.on_agenda, NoteBadge::OnAgenda),
+            (shown.shopping_on_agenda, NoteBadge::ShoppingOnAgenda),
+        ];
+        for (shows, open) in ways {
+            let Some(shows) = shows else {
+                continue;
+            };
             let value = shopping_view::on_agenda_label(t, shows);
             let value = Some(BadgeValue::Icon(
                 shopping_view::on_agenda_icon(shows),
@@ -14080,23 +14084,15 @@ fn note_badges(
             let icon = (icons::ON_AGENDA, None);
             let setting = t.checklist_show_on_agenda();
             if badge(ui, look, icon, setting, value, true).clicked() {
-                actions.push(Action::Badge(Some(NoteBadge::ShoppingOnAgenda)));
+                actions.push(Action::Badge(Some(open)));
             }
         }
-        let switches = [
-            (
-                shown.on_agenda,
-                icons::ON_AGENDA,
-                t.checklist_show_on_agenda(),
-                NoteBadge::OnAgenda,
-            ),
-            (
-                shown.ticks,
-                icons::SHOW_TICKS,
-                t.box_show_ticks(),
-                NoteBadge::Ticks,
-            ),
-        ];
+        let switches = [(
+            shown.ticks,
+            icons::SHOW_TICKS,
+            t.box_show_ticks(),
+            NoteBadge::Ticks,
+        )];
         for (on, icon, setting, open) in switches {
             let Some(on) = on else {
                 continue;

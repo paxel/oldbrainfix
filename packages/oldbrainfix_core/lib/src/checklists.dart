@@ -6,6 +6,7 @@ import 'routines.dart';
 import 'schedule.dart';
 import 'sent_items.dart';
 import 'shared_areas.dart';
+import 'shopping_lists.dart';
 import 'sessions.dart';
 import 'store.dart';
 import 'tallies.dart';
@@ -75,8 +76,10 @@ abstract final class ChecklistKeys {
   /// personal key and goes only to the user's own Devices.
   static const agendaPrefix = 'agenda:';
 
-  /// On that entity: [agendaOff] while the Checklist stays off the
-  /// Agenda; absent, null or any other value while it shows.
+  /// On that entity: how the Checklist shows on the Agenda (#219), a
+  /// [ListOnAgenda]'s code: [agendaOff] while it stays off, `count` for
+  /// one row with the number of its open Lines; absent, null, `lines` or
+  /// any other value for every open Line under its name.
   static const agenda = 'agenda';
 
   static const agendaOff = 'off';
@@ -182,6 +185,11 @@ class Line {
 /// An Occurrence of the Routine [routineId]: one a Checklist is checked
 /// for.
 typedef RoutineOccurrence = ({String routineId, Occurrence occurrence});
+
+/// A Checklist on today's Agenda (#219) and how it shows there: every
+/// open Line under its name for [ListOnAgenda.lines], its name with the
+/// count for [ListOnAgenda.count].
+typedef ChecklistAgendaRow = ({Checklist list, ListOnAgenda shows});
 
 /// A Note whose Lines are checked off (CONTEXT.md).
 class Checklist {
@@ -393,51 +401,60 @@ class Checklists {
     return schedule.between(start, today).lastOrNull?.day;
   }
 
-  /// The Checklists on today's Agenda (#143): each not in the trash nor
-  /// merged, with no Routine or Reminder out of the trash, that
-  /// [showsOnAgenda] and has a Line open; oldest capture first. One with
-  /// a Routine shows as its Occurrence instead. Each row says how many
+  /// The Checklists on today's Agenda (#143, #219): each not in the
+  /// trash nor merged, with no Routine or Reminder out of the trash, that
+  /// this person does not keep [ListOnAgenda.off] and that has a Line
+  /// open, with how it shows ([onAgenda]); oldest capture first. One with
+  /// a Routine shows as its Occurrence instead. Each list says how many
   /// Lines are open of how many ([Checklist.openCount],
   /// [Checklist.count]); the apps show one of a locked Area set to
   /// Masked as a row that tells nothing of it, as a Shopping List's.
-  List<Checklist> agenda() {
+  /// Reading writes nothing.
+  List<ChecklistAgendaRow> agendaRows() {
     final notes = Notes(store);
     final routines = Routines(store);
     final spawned = {for (final r in routines.all()) ?routines.note(r)?.id};
     final own = <String, bool>{};
-    final shown = <Note>[];
+    final shown = <(Note, ListOnAgenda)>[];
     for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
       if (_making(id) == null || spawned.contains(id)) continue;
+      final shows = _onAgenda(id, own);
+      if (shows == ListOnAgenda.off) continue;
       if (notes.byId(id) case final note?
-          when !note.isTrashed && !note.isMerged && _shows(id, own)) {
-        shown.add(note);
+          when !note.isTrashed && !note.isMerged) {
+        shown.add((note, shows));
       }
     }
     shown.sort((a, b) {
-      final byCapture = a.captured.compareTo(b.captured);
-      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+      final byCapture = a.$1.captured.compareTo(b.$1.captured);
+      return byCapture != 0 ? byCapture : a.$1.id.compareTo(b.$1.id);
     });
-    final lists = ofNotes([for (final n in shown) n.id]);
+    final lists = ofNotes([for (final (n, _) in shown) n.id]);
     return [
-      for (final note in shown)
-        if (lists[note.id] case final list? when list.openCount > 0) list,
+      for (final (note, shows) in shown)
+        if (lists[note.id] case final list? when list.openCount > 0)
+          (list: list, shows: shows),
     ];
   }
 
-  /// Whether the Checklist of [noteId] shows on today's Agenda for this
-  /// person, as far as it is theirs to say: unless one of the user's own
-  /// Devices switched it off last. What another person's Device wrote
-  /// counts for nothing, so in a Shared Area each person decides for
-  /// their own Agenda.
-  bool showsOnAgenda(String noteId) => _shows(noteId, {});
+  /// How the Checklist of [noteId] shows on today's Agenda for this
+  /// person (#219), as one of the user's own Devices chose last: off,
+  /// one row with its count, or, for a list nobody chose for or a value
+  /// no app writes, every open Line, as #143's "on" showed it. What
+  /// another person's Device wrote counts for nothing, so in a Shared
+  /// Area each person decides for their own Agenda.
+  ListOnAgenda onAgenda(String noteId) => _onAgenda(noteId, {});
 
-  bool _shows(String noteId, Map<String, bool> own) =>
-      store.currentByOwn(
+  ListOnAgenda _onAgenda(String noteId, Map<String, bool> own) =>
+      switch (store.currentByOwn(
         '${ChecklistKeys.agendaPrefix}$noteId',
         ChecklistKeys.agenda,
         own,
-      ) !=
-      ChecklistKeys.agendaOff;
+      )) {
+        ChecklistKeys.agendaOff => ListOnAgenda.off,
+        final code when code == ListOnAgenda.count.code => ListOnAgenda.count,
+        _ => ListOnAgenda.lines,
+      };
 
   /// Whether "Show on the Agenda" applies to the Note [noteId]: a
   /// Checklist not in the trash nor merged, with no Routine or Reminder
@@ -451,19 +468,20 @@ class Checklists {
         Routines(store).ofNote(noteId).isEmpty;
   }
 
-  /// Switches "Show on the Agenda" of the Checklist of [noteId] on or
-  /// off for this person alone, kept like an Override: on the user's own
-  /// Devices only, whatever their role in its Area. The same again
-  /// writes nothing.
-  void setShowOnAgenda(String noteId, bool shown) {
+  /// Sets how the Checklist of [noteId] shows on the Agenda for this
+  /// person alone (#219), kept like an Override: on the user's own
+  /// Devices only, whatever their role in its Area. A choice it already
+  /// shows by writes nothing, as every Device reads no choice as every
+  /// open Line.
+  void setOnAgenda(String noteId, ListOnAgenda shows) {
     if (_making(noteId) == null) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Checklist');
     }
-    if (showsOnAgenda(noteId) == shown) return;
+    if (onAgenda(noteId) == shows) return;
     store.append(
       '${ChecklistKeys.agendaPrefix}$noteId',
       ChecklistKeys.agenda,
-      shown ? null : ChecklistKeys.agendaOff,
+      shows.code,
     );
   }
 

@@ -233,7 +233,7 @@ void main() {
       ]);
       expect(drawn(tester, 'badge-agenda'), [
         Icons.today_outlined,
-        Icons.toggle_on,
+        Icons.format_list_bulleted,
       ]);
       // The same folder for every Area, its name as text.
       expect(drawn(tester, 'badge-place'), [
@@ -286,7 +286,7 @@ void main() {
       Checklists(store).make(id);
       await edit(tester, id);
       expect(value(tester, 'badge-kind'), 'Checklist');
-      expect(value(tester, 'badge-agenda'), 'On');
+      expect(value(tester, 'badge-agenda'), 'Each open Line on its own row');
       expect(key('checklist-to-plain'), findsNothing, reason: 'in the badge');
 
       await tap(tester, key('badge-kind'));
@@ -307,24 +307,36 @@ void main() {
       );
     });
 
-    testWidgets('Show on the Agenda is a switch that writes at once', (
-      tester,
-    ) async {
+    testWidgets('Show on the Agenda offers the three ways as radio '
+        'buttons and writes at once', (tester) async {
       final id = notes.capture('Trip\nPassport').id;
       final lists = Checklists(store)..make(id);
       await edit(tester, id);
+      expect(value(tester, 'badge-agenda'), 'Each open Line on its own row');
       await tap(tester, key('badge-agenda'));
       expect(dialogTitle('Show on the Agenda'), findsOneWidget);
-      expect(tester.widget<Switch>(key('badge-switch')).value, isTrue);
-      await tap(tester, key('badge-switch'));
-      expect(lists.showsOnAgenda(id), isFalse);
-      expect(tester.widget<Switch>(key('badge-switch')).value, isFalse);
-      expect(inDialog(find.text('Off')), findsOneWidget);
-      await tap(tester, key('badge-switch'));
-      expect(lists.showsOnAgenda(id), isTrue, reason: 'back on');
-      await tap(tester, key('badge-switch'));
-      await tap(tester, key('badge-close'));
+      expect(key('badge-switch'), findsNothing, reason: 'no switch');
+      expect(
+        tester
+            .widget<RadioGroup<ListOnAgenda>>(
+              inDialog(
+                find.byWidgetPredicate((w) => w is RadioGroup<ListOnAgenda>),
+              ),
+            )
+            .groupValue,
+        ListOnAgenda.lines,
+      );
+      await tap(tester, key('shopping-agenda-off'));
+      expect(lists.onAgenda(id), ListOnAgenda.off);
+      expect(find.byType(AlertDialog), findsNothing, reason: 'it closes');
       expect(value(tester, 'badge-agenda'), 'Off');
+      await tap(tester, key('badge-agenda'));
+      await tap(tester, key('shopping-agenda-count'));
+      expect(lists.onAgenda(id), ListOnAgenda.count);
+      expect(
+        value(tester, 'badge-agenda'),
+        'One row with the number of open Lines',
+      );
     });
 
     testWidgets('with a Routine it has no Show on the Agenda', (tester) async {
@@ -541,7 +553,10 @@ void main() {
     await edit(tester, id);
     // A Checklist leaves Unsorted.
     expect(value(tester, 'badge-place'), 'Nicht abgelegt');
-    expect(value(tester, 'badge-agenda'), 'Ein');
+    expect(
+      value(tester, 'badge-agenda'),
+      'Jede offene Zeile in einer eigenen Reihe',
+    );
     final semantics = tester.ensureSemantics();
     expect(find.bySemanticsLabel('Wichtigkeit: Normal'), findsOneWidget);
     expect(find.bySemanticsLabel('Art: Checkliste'), findsOneWidget);

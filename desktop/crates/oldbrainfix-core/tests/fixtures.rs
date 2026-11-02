@@ -30,8 +30,8 @@ use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, CapturedDetail, Checklist, Checklists, ClockTime,
-    Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, Note, Notes,
-    NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
+    Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, ListOnAgenda, Note,
+    Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
     RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
     ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, SimpleRepeat,
     Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso,
@@ -3026,10 +3026,10 @@ fn write_checklist_agenda(store: &Store) -> Built {
     lists.check(&line(&trip, "Batteries")?)?;
     lists.check(&line(&trip, "Map")?)?;
     let someday = make("Someday\nPaint the shed")?;
-    lists.set_show_on_agenda(&someday, false)?;
+    lists.set_on_agenda(&someday, ListOnAgenda::Off)?;
     let garden = make("Garden\nRake\nSeeds")?;
-    lists.set_show_on_agenda(&garden, false)?;
-    lists.set_show_on_agenda(&garden, true)?;
+    lists.set_on_agenda(&garden, ListOnAgenda::Off)?;
+    lists.set_on_agenda(&garden, ListOnAgenda::Lines)?;
     make("Done\n✓ All of it")?;
     make("Title only")?;
     let gym = make("Gym bag\nTowel")?;
@@ -3044,8 +3044,16 @@ fn write_checklist_agenda(store: &Store) -> Built {
     let merged = make("Merged\nCord")?;
     let kept = notes.capture("Kept", None, None)?.id;
     notes.merge(&merged, &kept)?;
-    // As a modified app or a later version would write them.
-    for (note, value) in [(&garden, "OFF"), (&trip, "later")] {
+    let packing = make("Packing\nSocks\nShirts")?;
+    lists.set_on_agenda(&packing, ListOnAgenda::Count)?;
+    let spare = make("Spare\n✓ Cord")?;
+    lists.set_on_agenda(&spare, ListOnAgenda::Count)?;
+    let books = make("Books\nNovel")?;
+    lists.set_on_agenda(&books, ListOnAgenda::Count)?;
+    lists.set_on_agenda(&books, ListOnAgenda::Lines)?;
+    // As a modified app or a later version would write them: none is
+    // "off" or "count", so each shows every open Line.
+    for (note, value) in [(&garden, "OFF"), (&trip, "later"), (&books, "Count")] {
         let entity = format!("{}{note}", keys::AGENDA_PREFIX);
         store.append(&entity, keys::AGENDA, Some(value), None)?;
     }
@@ -3166,22 +3174,21 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
     assert_eq!(Value::Object(plain), expected["plain"]);
     // Today's Agenda, and each Note's "Show on the Agenda" choice.
     let agenda: Vec<Value> = lists
-        .agenda()?
+        .agenda_rows()?
         .iter()
-        .map(|l| json!({"note": l.note_id, "open": l.open_count(), "count": l.count()}))
+        .map(|r| {
+            let l = &r.list;
+            json!({"note": l.note_id, "open": l.open_count(), "count": l.count(), "shows": r.shows.code()})
+        })
         .collect();
     assert_eq!(json!(agenda), expected["agenda"], "{scenario}");
     let mut shows = serde_json::Map::new();
     let mut applies = serde_json::Map::new();
     for id in &ids {
-        shows.insert(id.clone(), json!(lists.shows_on_agenda(id)?));
+        shows.insert(id.clone(), json!(lists.on_agenda(id)?.code()));
         applies.insert(id.clone(), json!(lists.may_show_on_agenda(id)?));
     }
-    assert_eq!(
-        Value::Object(shows),
-        expected["showsOnAgenda"],
-        "{scenario}"
-    );
+    assert_eq!(Value::Object(shows), expected["onAgenda"], "{scenario}");
     assert_eq!(
         Value::Object(applies),
         expected["mayShowOnAgenda"],
@@ -4994,7 +5001,7 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
         .id;
     assert_eq!(trip, expected["agendaNote"].as_str().ok_or("agendaNote")?);
     Checklists::new(&ann).make(&trip)?;
-    Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+    Checklists::new(&ann).set_on_agenda(&trip, ListOnAgenda::Off)?;
     let groceries = Notes::new(&ann)
         .capture("Groceries\nMilk\nEggs", Some(&area), None)?
         .id;
@@ -5112,9 +5119,9 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(roles_json(&ben, &area, &ids)?, after["joinerRoles"]);
     for (store, key) in [(&ann, "hostAgenda"), (&ben, "joinerAgenda")] {
         let shown: Vec<String> = Checklists::new(store)
-            .agenda()?
+            .agenda_rows()?
             .into_iter()
-            .map(|l| l.note_id)
+            .map(|r| r.list.note_id)
             .collect();
         assert_eq!(json!(shown), after[key], "{key}");
     }

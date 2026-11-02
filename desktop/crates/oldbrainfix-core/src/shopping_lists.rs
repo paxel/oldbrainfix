@@ -151,49 +151,51 @@ impl ShoppingAgenda {
     }
 }
 
-/// How a Shopping List shows on today's Agenda (#186), each person's own
-/// choice for each list, kept as an Override is (ADR 0030).
+/// How a Shopping List shows on today's Agenda (#186), the name its code
+/// knows the shared [`ListOnAgenda`] by.
+pub type ShoppingOnAgenda = ListOnAgenda;
+
+/// How a Shopping List (#186) or a Checklist (#219) shows on today's
+/// Agenda, each person's own choice for each list, kept as an Override is
+/// (ADR 0030).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ShoppingOnAgenda {
+pub enum ListOnAgenda {
     /// Never.
     Off,
     /// One row with the number of its open Lines, such as "Groceries: 4
-    /// open".
+    /// open" or "Before the trip: 3 of 7 open".
     Count,
     /// Each open Line on a row of its own, checkable there.
     Lines,
 }
 
-impl ShoppingOnAgenda {
-    pub const ALL: [ShoppingOnAgenda; 3] = [
-        ShoppingOnAgenda::Off,
-        ShoppingOnAgenda::Count,
-        ShoppingOnAgenda::Lines,
-    ];
+impl ListOnAgenda {
+    pub const ALL: [ListOnAgenda; 3] =
+        [ListOnAgenda::Off, ListOnAgenda::Count, ListOnAgenda::Lines];
 
     /// How it is stored, as the Dart core's enum names it.
     pub fn code(self) -> &'static str {
         match self {
-            ShoppingOnAgenda::Off => "off",
-            ShoppingOnAgenda::Count => "count",
-            ShoppingOnAgenda::Lines => "lines",
+            ListOnAgenda::Off => "off",
+            ListOnAgenda::Count => "count",
+            ListOnAgenda::Lines => "lines",
         }
     }
 
     /// The choice `code` names; `None` for none known here.
-    pub fn parse(code: &str) -> Option<ShoppingOnAgenda> {
-        ShoppingOnAgenda::ALL.into_iter().find(|s| s.code() == code)
+    pub fn parse(code: &str) -> Option<ListOnAgenda> {
+        ListOnAgenda::ALL.into_iter().find(|s| s.code() == code)
     }
 
     /// What a list nobody chose for shows as on a Device whose Agenda
     /// showed Shopping Lists the way `old` before: off for "Not at all",
     /// each open Line for "Each Line that came back today", else one row
     /// with the count.
-    pub fn from_device(old: ShoppingAgenda) -> ShoppingOnAgenda {
+    pub fn from_device(old: ShoppingAgenda) -> ListOnAgenda {
         match old {
-            ShoppingAgenda::Off => ShoppingOnAgenda::Off,
-            ShoppingAgenda::Lines => ShoppingOnAgenda::Lines,
-            ShoppingAgenda::Back | ShoppingAgenda::Open => ShoppingOnAgenda::Count,
+            ShoppingAgenda::Off => ListOnAgenda::Off,
+            ShoppingAgenda::Lines => ListOnAgenda::Lines,
+            ShoppingAgenda::Back | ShoppingAgenda::Open => ListOnAgenda::Count,
         }
     }
 }
@@ -2246,7 +2248,7 @@ mod tests {
         let note = Notes::new(&ann).capture("Groceries\nMilk", None, None)?.id;
         let checklists = Checklists::new(&ann);
         checklists.make(&note)?;
-        checklists.set_show_on_agenda(&note, false)?;
+        checklists.set_on_agenda(&note, ListOnAgenda::Off)?;
         checklists.to_plain(&note)?;
         let lists = ShoppingLists::new(&ann);
         lists.make(&note)?;
@@ -2255,8 +2257,8 @@ mod tests {
         lists.set_on_agenda(&note, ShoppingOnAgenda::Off)?;
         lists.to_plain(&note, &wall)?;
         checklists.make(&note)?;
-        checklists.set_show_on_agenda(&note, true)?;
-        assert_eq!(checklists.agenda()?.len(), 1);
+        checklists.set_on_agenda(&note, ListOnAgenda::Lines)?;
+        assert_eq!(checklists.agenda_rows()?.len(), 1);
         Ok(())
     }
 

@@ -78,6 +78,8 @@ Amended by #168: the tools read and set up every kind that came after the port, 
 
 Amended by #186: `read_note` names how a Shopping List shows on the user's own Agenda (`agenda`: `off`, `count` or `lines`; null for any other Note), and `set_shopping_agenda` sets it as a Pending Change through the screens' own call (ADR 0030). An AI Task may thus write on the user's own `agenda:<note id>` the field `shopping`, for a Note that is a Shopping List, whatever the role in its Area, as the user may; a Checklist's switch (`agenda`) stays out of its reach. The choice is read from the log alone, so it shows on the Agenda only once accepted. The review shows it among the Checklists and Shopping Lists changed, under the list's Note.
 
+Amended by #219: a Checklist without a Routine or Reminder has the same three choices, so `read_note` names its choice too (`agenda`: `off`, `count` or `lines`; null for a Checklist with a Routine, whose choice does not apply), and `set_checklist_agenda` sets it as a Pending Change, beside `set_shopping_agenda`. An AI Task may thus write on the user's own `agenda:<note id>` the field `agenda` as well, for a Checklist without a Routine, whatever the role in its Area; the review shows it the same way.
+
 ## A Note is its kind (#188)
 
 Amended by ADR 0038: `read_note` reports a Note's name and description beside its kind, null for a Plain Note, and `switch_list` switches a Checklist and a Shopping List into each other as a Pending Change, refusing a list with a checked or struck Line.

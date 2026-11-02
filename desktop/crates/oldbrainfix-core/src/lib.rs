@@ -72,7 +72,9 @@ pub mod transcript_prompts;
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};
-pub use checklists::{Checklist, Checklists, Line, LineChecks, RoutineOccurrence};
+pub use checklists::{
+    Checklist, ChecklistAgendaRow, Checklists, Line, LineChecks, RoutineOccurrence,
+};
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
@@ -106,8 +108,8 @@ pub use sessions::{
 pub use settings::{DeviceSettings, QuickNoteControl, ThemeChoice};
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use shopping_lists::{
-    Reappear, ShoppingAgenda, ShoppingAgendaRow, ShoppingLine, ShoppingList, ShoppingLists,
-    ShoppingOnAgenda,
+    ListOnAgenda, Reappear, ShoppingAgenda, ShoppingAgendaRow, ShoppingLine, ShoppingList,
+    ShoppingLists, ShoppingOnAgenda,
 };
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, STORE_VERSION, Store};

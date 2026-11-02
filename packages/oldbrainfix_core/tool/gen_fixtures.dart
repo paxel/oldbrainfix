@@ -960,11 +960,13 @@ final _scenarios = <Scenario>[
   (
     name: 'checklist-agenda',
     about:
-        'Checklists on the Agenda (#143): one with open Lines and a group, '
-        'one switched off, one switched off and on again, one with every '
-        'Line checked, one without Lines, one with a Routine and one whose '
-        'Reminder went to the trash, one in the trash and one merged into '
-        'a Note; choices no app writes; a plain Note beside them.',
+        'Checklists on the Agenda (#143, #219): one with open Lines and a '
+        'group, one switched off, one switched off and on again, one with '
+        'every Line checked, one without Lines, one with a Routine and one '
+        'whose Reminder went to the trash, one in the trash and one merged '
+        'into a Note; one shown as its count, one shown as its count with '
+        'every Line checked, one shown as its count and then each Line '
+        'again; choices no app writes; a plain Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final lists = Checklists(store);
@@ -981,10 +983,10 @@ final _scenarios = <Scenario>[
       lists.check(line(trip, 'Batteries'));
       lists.check(line(trip, 'Map'));
       final someday = make('Someday\nPaint the shed');
-      lists.setShowOnAgenda(someday, false);
+      lists.setOnAgenda(someday, ListOnAgenda.off);
       final garden = make('Garden\nRake\nSeeds');
-      lists.setShowOnAgenda(garden, false);
-      lists.setShowOnAgenda(garden, true);
+      lists.setOnAgenda(garden, ListOnAgenda.off);
+      lists.setOnAgenda(garden, ListOnAgenda.lines);
       make('Done\n✓ All of it');
       make('Title only');
       final gym = make('Gym bag\nTowel');
@@ -1002,9 +1004,20 @@ final _scenarios = <Scenario>[
       notes.trash(old);
       final merged = make('Merged\nCord');
       notes.merge(merged, notes.capture('Kept').id);
-      // As a modified app or a later version would write them: neither
-      // is "off", so both show.
-      for (final (note, value) in [(garden, 'OFF'), (trip, 'later')]) {
+      final packing = make('Packing\nSocks\nShirts');
+      lists.setOnAgenda(packing, ListOnAgenda.count);
+      final spare = make('Spare\n✓ Cord');
+      lists.setOnAgenda(spare, ListOnAgenda.count);
+      final books = make('Books\nNovel');
+      lists.setOnAgenda(books, ListOnAgenda.count);
+      lists.setOnAgenda(books, ListOnAgenda.lines);
+      // As a modified app or a later version would write them: none is
+      // "off" or "count", so each shows every open Line.
+      for (final (note, value) in [
+        (garden, 'OFF'),
+        (trip, 'later'),
+        (books, 'Count'),
+      ]) {
         store.append(
           '${ChecklistKeys.agendaPrefix}$note',
           ChecklistKeys.agenda,
@@ -2136,10 +2149,15 @@ Map<String, Object?> _checklists(Store store) {
     'ofNotes': [...lists.ofNotes(ids).keys],
     'mayMake': {for (final id in ids) id: lists.mayMake(id)},
     'agenda': [
-      for (final list in lists.agenda())
-        {'note': list.noteId, 'open': list.openCount, 'count': list.count},
+      for (final (:list, :shows) in lists.agendaRows())
+        {
+          'note': list.noteId,
+          'open': list.openCount,
+          'count': list.count,
+          'shows': shows.code,
+        },
     ],
-    'showsOnAgenda': {for (final id in ids) id: lists.showsOnAgenda(id)},
+    'onAgenda': {for (final id in ids) id: lists.onAgenda(id).code},
     'mayShowOnAgenda': {for (final id in ids) id: lists.mayShowOnAgenda(id)},
     'plain': {
       for (final id in ids)
@@ -5172,7 +5190,7 @@ Future<void> _sharedFixture(Directory root) async {
     final trip = Notes(ann).capture('Trip\nTent\nTorch', place: area).id;
     Checklists(ann)
       ..make(trip)
-      ..setShowOnAgenda(trip, false);
+      ..setOnAgenda(trip, ListOnAgenda.off);
     final groceries = Notes(ann)
         .capture('Groceries\nMilk\nEggs', place: area)
         .id;
@@ -5309,8 +5327,12 @@ Future<void> _sharedFixture(Directory root) async {
       'joiner': _expected(ben)..remove('device'),
       'hostRoles': _roles(ann, area, checked),
       'joinerRoles': _roles(ben, area, checked),
-      'hostAgenda': [for (final l in Checklists(ann).agenda()) l.noteId],
-      'joinerAgenda': [for (final l in Checklists(ben).agenda()) l.noteId],
+      'hostAgenda': [
+        for (final r in Checklists(ann).agendaRows()) r.list.noteId,
+      ],
+      'joinerAgenda': [
+        for (final r in Checklists(ben).agendaRows()) r.list.noteId,
+      ],
       'hostShopping': _shoppingRows(ann),
       'joinerShopping': _shoppingRows(ben),
     };
@@ -5324,8 +5346,8 @@ Future<void> _sharedFixture(Directory root) async {
               e.entity.startsWith(ChecklistKeys.agendaPrefix) &&
               e.device != ben.deviceId,
         ) ||
-        Checklists(ann).showsOnAgenda(trip) ||
-        !Checklists(ben).showsOnAgenda(trip) ||
+        Checklists(ann).onAgenda(trip) != ListOnAgenda.off ||
+        Checklists(ben).onAgenda(trip) != ListOnAgenda.lines ||
         Notes(ben).byId(trip) == null) {
       throw StateError('Ann\'s Agenda choice reached Ben');
     }
@@ -7987,9 +8009,9 @@ Future<void> main(List<String> args) async {
     'after, on the same clock.\n'
     '- `checklist-agenda/checklists.json`: the same of the '
     '`checklist-agenda` log; every `checklists.json` also holds the '
-    'Checklists on today\'s Agenda with their open and total Lines, '
-    'whether each Note shows there by the user\'s own choice and whether '
-    'the choice applies to it.\n'
+    'Checklists on today\'s Agenda with their open and total Lines and '
+    'how each shows there, how each Note shows there by the user\'s own '
+    'choice (#219) and whether the choice applies to it.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
     '`list-switch` log, with the name and description its text shows as; '
     'its `checklists.json` and `shopping.json` as for the logs above.\n'

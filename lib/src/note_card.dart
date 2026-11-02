@@ -184,35 +184,32 @@ class NoteActions {
 }
 
 /// The Checklist and Shopping List entries of a card's ⋮ as the menu
-/// opens (#120, #122): [isList] while the Note is either; [showOnAgenda]
-/// whether a Checklist without a Routine shows on this person's Agenda,
-/// and switching that (#143); [shoppingOnAgenda] how a Shopping List
-/// shows there for this person, and choosing that (#186).
+/// opens (#120, #122): [isList] while the Note is either; [onAgenda] how
+/// a Shopping List (#186) or a Checklist without a Routine (#219) shows
+/// on this person's Agenda, and choosing that.
 typedef ChecklistMenu = ({
   bool isList,
   VoidCallback? make,
   VoidCallback? makeShopping,
   VoidCallback? toPlain,
   VoidCallback? uncheckAll,
-  ({bool on, VoidCallback toggle})? showOnAgenda,
-  ShoppingOnAgendaChoice? shoppingOnAgenda,
+  ListOnAgendaChoice? onAgenda,
 });
 
-/// How a Shopping List shows on this person's Agenda (#186), and
-/// choosing another way.
-typedef ShoppingOnAgendaChoice = ({
-  ShoppingOnAgenda shows,
-  ValueChanged<ShoppingOnAgenda> choose,
+/// How a Shopping List or a Checklist shows on this person's Agenda
+/// (#186, #219), and choosing another way.
+typedef ListOnAgendaChoice = ({
+  ListOnAgenda shows,
+  ValueChanged<ListOnAgenda> choose,
 });
 
-/// The three ways a Shopping List shows on the Agenda with their words,
-/// in the order they are offered.
-List<(ShoppingOnAgenda, String)> shoppingOnAgendaOptions(AppLocalizations t) =>
-    [
-      (ShoppingOnAgenda.off, t.settingOff),
-      (ShoppingOnAgenda.count, t.shoppingOnAgendaCount),
-      (ShoppingOnAgenda.lines, t.shoppingOnAgendaLines),
-    ];
+/// The three ways a Shopping List or a Checklist shows on the Agenda with
+/// their words, in the order they are offered.
+List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
+  (ListOnAgenda.off, t.settingOff),
+  (ListOnAgenda.count, t.shoppingOnAgendaCount),
+  (ListOnAgenda.lines, t.shoppingOnAgendaLines),
+];
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
@@ -829,13 +826,11 @@ class _MoreButton extends StatelessWidget {
               t.makeShoppingList,
               make,
             ),
-          if (list?.showOnAgenda case final agenda?)
-            showOnAgendaItem(button, agenda),
-          if (list?.shoppingOnAgenda case final agenda?) ...[
+          if (list?.onAgenda case final agenda?) ...[
             const PopupMenuDivider(),
             // The heading the choices continue, as Importance's.
             PopupMenuItem(enabled: false, child: Text(t.checklistShowOnAgenda)),
-            for (final (value, label) in shoppingOnAgendaOptions(t))
+            for (final (value, label) in listOnAgendaOptions(t))
               PopupMenuItem(
                 key: ValueKey('note-show-on-agenda-${value.name}'),
                 // A tap on the one it has changes nothing.
@@ -926,18 +921,6 @@ PopupMenuItem<VoidCallback> showTicksItem(
   Icons.history_toggle_off,
   context.t.boxShowTicks,
   ticks,
-);
-
-/// The menu entry that switches "Show on the Agenda" of a Checklist on
-/// and off for this person (#143), [agenda] telling whether it is on.
-PopupMenuItem<VoidCallback> showOnAgendaItem(
-  BuildContext context,
-  ({bool on, VoidCallback toggle}) agenda,
-) => _switchItem(
-  const ValueKey('note-show-on-agenda'),
-  Icons.today_outlined,
-  context.t.checklistShowOnAgenda,
-  agenda,
 );
 
 /// A menu entry with its icon and words, and the switch below them.

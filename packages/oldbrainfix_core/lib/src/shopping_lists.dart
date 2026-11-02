@@ -87,14 +87,19 @@ enum ShoppingAgenda {
       values.asNameMap()[code] ?? standard;
 }
 
-/// How a Shopping List shows on today's Agenda (#186), each person's own
-/// choice for each list, kept as an Override is (ADR 0030).
-enum ShoppingOnAgenda {
+/// How a Shopping List shows on today's Agenda (#186), the name its code
+/// knows the shared [ListOnAgenda] by.
+typedef ShoppingOnAgenda = ListOnAgenda;
+
+/// How a Shopping List (#186) or a Checklist (#219) shows on today's
+/// Agenda, each person's own choice for each list, kept as an Override is
+/// (ADR 0030).
+enum ListOnAgenda {
   /// Never.
   off,
 
   /// One row with the number of its open Lines, such as "Groceries: 4
-  /// open".
+  /// open" or "Before the trip: 3 of 7 open".
   count,
 
   /// Each open Line on a row of its own, checkable there.
@@ -104,13 +109,13 @@ enum ShoppingOnAgenda {
   String get code => name;
 
   /// The choice [code] names; null for none known here.
-  static ShoppingOnAgenda? parse(String? code) => values.asNameMap()[code];
+  static ListOnAgenda? parse(String? code) => values.asNameMap()[code];
 
   /// What a list nobody chose for shows as on a Device whose Agenda
   /// showed Shopping Lists the way [old] before: off for "Not at all",
   /// each open Line for "Each Line that came back today", else one row
   /// with the count.
-  static ShoppingOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
+  static ListOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
     ShoppingAgenda.off => off,
     ShoppingAgenda.lines => lines,
     ShoppingAgenda.back || ShoppingAgenda.open => count,

@@ -17,6 +17,7 @@ use crate::error::{Error, Result};
 use crate::notes::keys;
 use crate::places::Places;
 use crate::search::lower_case;
+use crate::shopping_lists::ListOnAgenda;
 use crate::store::Store;
 use crate::text_boxes;
 use crate::text_format::{self, KNOWN, MARKDOWN, PLAIN, StoredText, VERSION};
@@ -304,7 +305,7 @@ impl<'a> Imports<'a> {
                 s.append(&id, checklist_keys::CHECKED, Some(&dart_iso(on)), Some(on))?;
             }
         }
-        Checklists::new(s).set_show_on_agenda(note_id, false)
+        Checklists::new(s).set_on_agenda(note_id, ListOnAgenda::Off)
     }
 
     /// Makes one Note of each note of a Google Keep export in a new Area
@@ -1143,10 +1144,14 @@ mod tests {
             )?;
             let lists = Checklists::new(&store);
             let id = only(&store, &summary)?.id;
-            assert!(!lists.shows_on_agenda(&id)?);
-            assert!(lists.agenda()?.is_empty());
-            lists.set_show_on_agenda(&id, true)?;
-            let shown: Vec<_> = lists.agenda()?.into_iter().map(|l| l.note_id).collect();
+            assert_eq!(lists.on_agenda(&id)?, ListOnAgenda::Off);
+            assert!(lists.agenda_rows()?.is_empty());
+            lists.set_on_agenda(&id, ListOnAgenda::Lines)?;
+            let shown: Vec<_> = lists
+                .agenda_rows()?
+                .into_iter()
+                .map(|r| r.list.note_id)
+                .collect();
             assert_eq!(shown, [id]);
             Ok(())
         }

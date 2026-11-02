@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, Note, RoutineOccurrence, Sessions, ShoppingLists,
+    Checklist, Checklists, Line, ListOnAgenda, Note, RoutineOccurrence, Sessions, ShoppingLists,
     ShoppingOnAgenda, Store, WallClock,
 };
 
@@ -38,7 +38,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::shopping_view;
-use crate::theme::{self, Tones};
+use crate::theme::Tones;
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
 /// of the Line above it, whether it shows checked and what shows dimmed
@@ -110,9 +110,9 @@ pub enum ChecklistAction {
     ToPlain(String),
     /// Unchecks every Line of the Note's Checklist as it shows now.
     UncheckAll(String),
-    /// Switches "Show on the Agenda" of the Note's Checklist on or off
-    /// for this person (#143).
-    ShowOnAgenda(String, bool),
+    /// Sets how the Note's Checklist shows on this person's Agenda (#143,
+    /// #219).
+    OnAgenda(String, ListOnAgenda),
     /// Checks the Line with this id, or unchecks it: for the Occurrence
     /// given, or by its own checks without one.
     Check(String, bool, Option<RoutineOccurrence>),
@@ -137,9 +137,9 @@ pub struct ChecklistShown {
     pub editable: HashSet<String>,
     /// Whether it may turn it back into a plain Note.
     pub plain: bool,
-    /// Whether it shows on this person's Agenda, while "Show on the
-    /// Agenda" applies to it: a Checklist without a Routine (#143).
-    pub on_agenda: Option<bool>,
+    /// How it shows on this person's Agenda, while "Show on the Agenda"
+    /// applies to it: a Checklist without a Routine (#143, #219).
+    pub on_agenda: Option<ListOnAgenda>,
 }
 
 /// Whether this Device may check the Lines of `list` as it shows: for
@@ -181,13 +181,14 @@ pub fn read(
     }))
 }
 
-/// Whether the Checklist of `note` shows on this person's Agenda, or
-/// `None` while "Show on the Agenda" does not apply to it (#143).
-fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<bool>> {
+/// How the Checklist of `note` shows on this person's Agenda, or `None`
+/// while "Show on the Agenda" does not apply to it (#143, #219): offered
+/// while no Line is open too, for when Lines open again.
+fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<ListOnAgenda>> {
     if !lists.may_show_on_agenda(note)? {
         return Ok(None);
     }
-    Ok(Some(lists.shows_on_agenda(note)?))
+    Ok(Some(lists.on_agenda(note)?))
 }
 
 /// What the menu of a Note's card offers of a Checklist (#120) and a
@@ -199,9 +200,9 @@ pub struct CardMenu {
     pub note: String,
     pub make: bool,
     pub make_shopping: bool,
-    /// Whether the Checklist shows on this person's Agenda, while the
-    /// switch applies to it.
-    pub on_agenda: Option<bool>,
+    /// How the Checklist shows on this person's Agenda, while the choice
+    /// applies to it (#219).
+    pub on_agenda: Option<ListOnAgenda>,
     /// How the Shopping List shows on this person's Agenda, while the
     /// choice applies to it (#186).
     pub shopping_on_agenda: Option<ShoppingOnAgenda>,
@@ -812,17 +813,13 @@ pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Check
     ];
     let mut picked = None;
     for (i, (shown, label, action)) in entries.into_iter().enumerate() {
-        // "Show on the Agenda" before "Uncheck all", as on the phone.
+        // "Show on the Agenda" before "Uncheck all", as on the phone: its
+        // three ways as a Shopping List's (#219).
         if i == 1
-            && let Some(mut on) = menu.on_agenda
-            && theme::checkbox(
-                ui,
-                &mut on,
-                RichText::new(t.checklist_show_on_agenda()).color(text),
-            )
-            .clicked()
+            && let Some(current) = menu.on_agenda
+            && let Some(shows) = shopping_view::agenda_radios(ui, t, current)
         {
-            picked = Some(ChecklistAction::ShowOnAgenda(note.clone(), on));
+            picked = Some(ChecklistAction::OnAgenda(note.clone(), shows));
         }
         if shown && ui.button(RichText::new(label).color(text)).clicked() {
             picked = Some(action);

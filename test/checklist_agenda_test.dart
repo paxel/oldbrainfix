@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'reveal.dart';
 
-/// Checklists on the Agenda (#143, #208): each without a Routine shows
-/// today as a heading with its name and its open Lines indented under it,
-/// each with its box, after the Shopping Lists' rows, until every Line is
-/// checked or the user switches "Show on the Agenda" off in the ⋮ of its
-/// card or editor.
+/// Checklists on the Agenda (#143, #208, #219): each without a Routine
+/// shows today as a heading with its name and its open Lines indented
+/// under it, each with its box, after the Shopping Lists' rows, until
+/// every Line is checked; or as its heading alone with the count, or not
+/// at all, as the user chooses under "Show on the Agenda" in the ⋮ of its
+/// card or its editor's badge.
 void main() {
   late Store store;
   late Notes notes;
@@ -83,15 +85,17 @@ void main() {
       (element.widget.key! as ValueKey<String>).value,
   ];
 
-  /// Whether the "Show on the Agenda" entry of the menu open shows on.
-  bool switchOn(WidgetTester tester) => tester
-      .widget<Switch>(
-        find.descendant(
-          of: key('note-show-on-agenda'),
-          matching: find.byType(Switch),
-        ),
-      )
-      .value;
+  /// Which of the three choices of the ⋮ open shows chosen.
+  List<bool> menuChosen() => [
+    for (final way in ListOnAgenda.values)
+      find
+          .descendant(
+            of: key('note-show-on-agenda-${way.name}'),
+            matching: find.byIcon(Icons.radio_button_checked),
+          )
+          .evaluate()
+          .isNotEmpty,
+  ];
 
   testWidgets('a new Checklist shows today as a heading with its open Lines '
       'indented, each with its box; a tap opens the list', (tester) async {
@@ -184,46 +188,84 @@ void main() {
 
   testWidgets('switched off, it stays off the Agenda', (tester) async {
     final id = trip();
-    lists.setShowOnAgenda(id, false);
+    lists.setOnAgenda(id, ListOnAgenda.off);
     await start(tester);
     expect(checklistRows(), isEmpty);
   });
 
-  testWidgets('the card\'s ⋮ switches "Show on the Agenda" off and on', (
+  testWidgets('shown as its count, it is its heading with how many are '
+      'open, without Lines; a tap opens the list', (tester) async {
+    final id = trip();
+    lists.setOnAgenda(id, ListOnAgenda.count);
+    await start(tester);
+    expect(checklistRows(), ['checklist-row-$id']);
+    expect(find.text('Before the trip: 2 of 3 open'), findsOneWidget);
+    expect(find.text('Tickets'), findsNothing);
+    expect(
+      find.descendant(
+        of: key('checklist-row-$id'),
+        matching: find.byType(Checkbox),
+      ),
+      findsNothing,
+    );
+    await tap(tester, find.text('Before the trip: 2 of 3 open'));
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
+  });
+
+  testWidgets('shown as its count, every Line checked, it is gone', (
     tester,
   ) async {
+    final id = trip();
+    lists.setOnAgenda(id, ListOnAgenda.count);
+    lists.check(lineId(id, 'Tickets'));
+    lists.check(lineId(id, 'Charger'));
+    await start(tester);
+    expect(checklistRows(), isEmpty);
+  });
+
+  testWidgets('the card\'s ⋮ offers the three ways as radio buttons, the '
+      'one it has marked', (tester) async {
     final id = trip();
     await startAtNotes(tester);
     await tap(tester, key('note-menu'));
     expect(find.text('Show on the Agenda'), findsOneWidget);
-    expect(switchOn(tester), isTrue);
-    await tap(tester, key('note-show-on-agenda'));
-    expect(lists.showsOnAgenda(id), isFalse);
+    expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
+    expect(menuChosen(), [false, false, true]);
+    await tap(tester, key('note-show-on-agenda-count'));
+    expect(lists.onAgenda(id), ListOnAgenda.count);
     await tap(tester, key('note-menu'));
-    expect(switchOn(tester), isFalse);
-    await tap(tester, key('note-show-on-agenda'));
-    expect(lists.showsOnAgenda(id), isTrue);
+    expect(menuChosen(), [false, true, false]);
+    await tap(tester, key('note-show-on-agenda-off'));
+    expect(lists.onAgenda(id), ListOnAgenda.off);
+    await tap(tester, key('note-menu'));
+    await tap(tester, key('note-show-on-agenda-lines'));
+    expect(lists.onAgenda(id), ListOnAgenda.lines);
   });
 
-  testWidgets('the editor\'s badge has the switch, also without boxes', (
-    tester,
-  ) async {
+  testWidgets('the editor\'s badge names it and chooses it, also without '
+      'boxes', (tester) async {
     final id = trip();
     await start(tester);
     await tap(tester, key('checklist-row-$id'));
     expect(key('badge-ticks'), findsNothing);
+    expect(
+      tester.widget<SettingBadge>(key('badge-agenda')).value,
+      'Each open Line on its own row',
+    );
     await tap(tester, key('badge-agenda'));
-    expect(tester.widget<Switch>(key('badge-switch')).value, isTrue);
-    await tap(tester, key('badge-switch'));
-    expect(lists.showsOnAgenda(id), isFalse);
-    await tap(tester, key('badge-close'));
+    await tap(tester, key('shopping-agenda-count'));
+    expect(lists.onAgenda(id), ListOnAgenda.count);
+    expect(
+      tester.widget<SettingBadge>(key('badge-agenda')).value,
+      'One row with the number of open Lines',
+    );
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(checklistRows(), isEmpty);
+    expect(find.text('Before the trip: 2 of 3 open'), findsOneWidget);
   });
 
   testWidgets('a Checklist with a Routine shows as its Occurrence only, '
-      'without the switch', (tester) async {
+      'without the choice', (tester) async {
     final id = trip();
     Routines(store).spawn(
       id,
@@ -231,7 +273,7 @@ void main() {
     );
     await startAtNotes(tester);
     await tap(tester, key('note-menu'));
-    expect(key('note-show-on-agenda'), findsNothing);
+    expect(key('note-show-on-agenda-lines'), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
     await tester.longPress(find.text('Before the trip').first);

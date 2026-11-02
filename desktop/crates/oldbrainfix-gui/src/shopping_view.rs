@@ -113,7 +113,7 @@ pub fn on_agenda(
     Ok(Some(lists.on_agenda(note)?))
 }
 
-/// The words of a way a Shopping List shows on the Agenda.
+/// The words of a way a Shopping List or a Checklist shows on the Agenda.
 pub fn on_agenda_label(t: &L10n, shows: ShoppingOnAgenda) -> &'static str {
     match shows {
         ShoppingOnAgenda::Off => t.setting_off(),
@@ -286,6 +286,13 @@ pub fn section(
 /// click on the way it has already changes nothing.
 pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ShoppingAction> {
     let current = menu.shopping_on_agenda?;
+    agenda_radios(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
+}
+
+/// "Show on the Agenda" of a Shopping List or a Checklist (#219) in a
+/// card's menu: its three ways as radio buttons under their heading,
+/// `current` marked; the other way clicked.
+pub fn agenda_radios(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut picked = None;
@@ -299,7 +306,7 @@ pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Shopping
         let on = shows == current;
         let label = RichText::new(on_agenda_label(t, shows)).color(text);
         if ui.radio(on, label).clicked() && !on {
-            picked = Some(ShoppingAction::OnAgenda(menu.note.clone(), shows));
+            picked = Some(shows);
         }
     }
     ui.separator();

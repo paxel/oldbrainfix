@@ -313,7 +313,7 @@ class _Reader {
         note: note,
         area: area,
         masked: masked,
-        lines: shows == ShoppingOnAgenda.lines && !masked
+        lines: shows == ListOnAgenda.lines && !masked
             ? lines
             : const <ShoppingLine>[],
         count: lines.length,
@@ -324,28 +324,34 @@ class _Reader {
   }
 
   /// Today's rows of the Checklists without a Routine that show on this
-  /// person's Agenda, oldest capture first; one of a Masked Area tells
-  /// nothing of it.
+  /// person's Agenda, as this person chose for each list (#219): its open
+  /// Lines under it, or only their count; oldest capture first. One of a
+  /// Masked Area tells nothing of it.
   List<ChecklistRow> checklistRows() => [
-    for (final list in checklists.agenda())
+    for (final (:list, :shows) in checklists.agendaRows())
       if (notes.byId(list.noteId) case final note?)
-        checklistRow(note, list, masked: masksNote(note)),
+        checklistRow(
+          note,
+          list,
+          masked: masksNote(note),
+          count: shows == ListOnAgenda.count,
+        ),
   ];
 
-  /// The group of the Checklist [list] of [note]: every open Line under
-  /// its name, or, [masked], its heading alone with the count. A later
-  /// choice of how a Checklist shows on the Agenda goes in here, as a
-  /// Shopping List's does.
+  /// The group of the Checklist [list] of [note]: every Line it shows
+  /// under its name, or, [masked] or shown as its [count], its heading
+  /// alone with the count.
   ChecklistRow checklistRow(
     Note note,
     Checklist list, {
     required bool masked,
+    bool count = false,
   }) => (
     note: note,
     area: placeNote(places, note).area,
     masked: masked,
     list: list,
-    lines: masked ? const <Line>[] : agendaLines(list),
+    lines: masked || count ? const <Line>[] : agendaLines(list),
     checks: checklists.mayCheck(note.id),
   );
 

@@ -250,10 +250,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines (#143, #208): its name as the heading, without a
   box, and its open Lines under it, each with its box, which checks it;
-  unless the user switched **Show on the Agenda** off in the ⋮ of its
-  card or in its badge in the editor; the switch is there only for such
-  a Checklist. A tap on the heading or a Line's words opens the list. A
-  Masked one is the heading alone, "Private Checklist: 3 of 7 open".
+  or, as the user chose under **Show on the Agenda** in the ⋮ of its
+  card or in its badge in the editor (#219), the heading alone with the
+  count, "Before the trip: 3 of 7 open", or not at all: the three radio
+  choices of a Shopping List, there only for such a Checklist. A tap on
+  the heading or a Line's words opens the list. A Masked one is the
+  heading alone, "Private Checklist: 3 of 7 open".
 - **A Shopping List's group today** (#186, #208): its name as the
   heading, without a box, and its open Lines under it, each with its
   box, which strikes it and takes it off the Agenda; chosen to show "one

@@ -1014,7 +1014,7 @@ void main() {
         ('Passport', true),
         ('Charger', false),
       ]);
-      expect(Checklists(store).showsOnAgenda(packing.id), isFalse);
+      expect(Checklists(store).onAgenda(packing.id), ListOnAgenda.off);
       expect(notes.unsorted(), isEmpty);
       expect(find.text('Import from Google Keep'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);

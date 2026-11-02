@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:02:58.000Z",
+  "now": "2026-01-02T10:03:52.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -305,11 +305,101 @@
     },
     {
       "id": "note:00000000000000000000000000000022",
+      "text": "Packing",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:53.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000026",
+      "text": "Spare",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:03:14.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000029",
+      "text": "Books",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:03:30.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002c",
       "text": "Unsorted thought",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:02:55.000Z",
+      "captured": "2026-01-01T10:03:49.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -335,6 +425,9 @@
     }
   ],
   "all": [
+    "note:0000000000000000000000000000002c",
+    "note:00000000000000000000000000000029",
+    "note:00000000000000000000000000000026",
     "note:00000000000000000000000000000022",
     "note:00000000000000000000000000000021",
     "note:00000000000000000000000000000017",
@@ -347,13 +440,16 @@
   ],
   "unsorted": [
     "note:00000000000000000000000000000021",
-    "note:00000000000000000000000000000022"
+    "note:0000000000000000000000000000002c"
   ],
   "trashed": [
     "note:0000000000000000000000000000001b"
   ],
   "inside": {},
   "sections": {
+    "note:0000000000000000000000000000002c": [],
+    "note:00000000000000000000000000000029": [],
+    "note:00000000000000000000000000000026": [],
     "note:00000000000000000000000000000022": [],
     "note:00000000000000000000000000000021": [
       {
@@ -397,11 +493,29 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
-    "note:00000000000000000000000000000022": {
+    "note:0000000000000000000000000000002c": {
       "html": null,
       "photos": [],
       "recordings": [],
       "text": "Unsorted thought"
+    },
+    "note:00000000000000000000000000000029": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Books"
+    },
+    "note:00000000000000000000000000000026": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Spare"
+    },
+    "note:00000000000000000000000000000022": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Packing"
     },
     "note:00000000000000000000000000000021": {
       "html": null,
@@ -460,6 +574,9 @@
   },
   "search": {
     "": [
+      "note:0000000000000000000000000000002c",
+      "note:00000000000000000000000000000029",
+      "note:00000000000000000000000000000026",
       "note:00000000000000000000000000000022",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000017",
@@ -479,7 +596,9 @@
     "called": [],
     "loop": [],
     " e ": [
-      "note:00000000000000000000000000000022",
+      "note:0000000000000000000000000000002c",
+      "note:00000000000000000000000000000029",
+      "note:00000000000000000000000000000026",
       "note:00000000000000000000000000000021",
       "note:00000000000000000000000000000017",
       "note:00000000000000000000000000000013",

@@ -111,8 +111,9 @@ const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys:
 /// ([`crate::checklists::keys::AGENDA_PREFIX`]).
 const AGENDA_TYPE: &str = "agenda";
 /// The user's own choices for the Agenda, `agenda:<note id>`: how a
-/// Shopping List shows there (#186), never a Checklist's switch.
-const AGENDA_FIELDS: [&str; 1] = [shopping_keys::AGENDA];
+/// Shopping List (#186) or a Checklist without a Routine (#219) shows
+/// there.
+const AGENDA_FIELDS: [&str; 2] = [shopping_keys::AGENDA, line_keys::AGENDA];
 
 /// The fields of a Note's or Section's Capture Context, which an AI Task
 /// only ever removes (ADR 0037): it never says where or when something
@@ -462,7 +463,10 @@ impl Store {
             // The user's own, whatever their role in the list's Area.
             AGENDA_TYPE => {
                 let note = entity.split_once(':').map_or("", |(_, note)| note);
-                ShoppingLists::new(self).making(note)?.is_some()
+                match field {
+                    line_keys::AGENDA => Checklists::new(self).may_show_on_agenda(note)?,
+                    _ => ShoppingLists::new(self).making(note)?.is_some(),
+                }
             }
             "area" => made || self.may_manage(Some(entity))?,
             "topic" => {

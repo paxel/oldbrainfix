@@ -298,16 +298,18 @@ void main() {
       ]);
     });
 
-    testWidgets('a Checklist keeps its switch, without the three ways', (
-      tester,
-    ) async {
+    testWidgets('a Checklist offers the same three ways, kept as its own '
+        'choice (#219)', (tester) async {
       notes.trash(hardware);
       final trip = notes.capture('Before the trip\nPassport').id;
-      Checklists(store).make(trip);
+      final checklists = Checklists(store)..make(trip);
       await startAtNotes(tester);
       await tap(tester, key('note-menu'));
-      expect(key('note-show-on-agenda'), findsOneWidget);
-      expect(key('note-show-on-agenda-count'), findsNothing);
+      expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
+      expect(menuChosen(tester), [false, false, true]);
+      await tap(tester, key('note-show-on-agenda-count'));
+      expect(checklists.onAgenda(trip), ListOnAgenda.count);
+      expect(lists.mayShowOnAgenda(trip), isFalse, reason: 'no Shopping List');
     });
   });
 

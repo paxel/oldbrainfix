@@ -26,8 +26,9 @@ use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync
 use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{
-    AreaRole, Checklists, Day, Frogs, Importance, Invite, Notes, OwnProfile, PairedDevice, Places,
-    Recurrence, Routines, Schedule, Sessions, ShoppingLists, SigningKey, Store, Tallies, TallyRule,
+    AreaRole, Checklists, Day, Frogs, Importance, Invite, ListOnAgenda, Notes, OwnProfile,
+    PairedDevice, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists, SigningKey,
+    Store, Tallies, TallyRule,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -386,13 +387,13 @@ fn a_lists_kind_badge_goes_back_to_a_plain_note_and_its_agenda_badge_switches() 
             .count(),
         0
     );
-    click(&mut harness, "Show on the Agenda: On");
-    harness
-        .get_by_role_and_label(Role::CheckBox, "Show on the Agenda")
-        .click_accesskit();
-    harness.run();
-    assert!(!Checklists::new(&store).shows_on_agenda(&list)?);
-    click(&mut harness, "Close");
+    // Its three ways, as a Shopping List's (#219); a pick closes it.
+    click(
+        &mut harness,
+        "Show on the Agenda: Each open Line on its own row",
+    );
+    pick(&mut harness, "Off");
+    assert_eq!(Checklists::new(&store).on_agenda(&list)?, ListOnAgenda::Off);
     assert!(shows(&harness, "Show on the Agenda: Off"));
     click(&mut harness, "Kind: Checklist");
     pick(&mut harness, "Plain Note");

@@ -441,6 +441,38 @@ void main() {
       expect(eaten[1].done, isTrue);
     });
 
+    test('Checklists as the user chose for each (#219)', () {
+      final id = trip();
+      final lists = Checklists(store);
+
+      lists.setOnAgenda(id, ListOnAgenda.count);
+      final today = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+      expect(titles(today), ['Before the trip: 2 of 2 open']);
+      expect(today.single.toMap(), {
+        'kind': 'checklist',
+        'title': 'Before the trip: 2 of 2 open',
+        'done': false,
+        'block': 'lists',
+      });
+
+      lists.setOnAgenda(id, ListOnAgenda.off);
+      expect(snapshot().days['2026-10-24'], isEmpty);
+
+      lists.setOnAgenda(id, ListOnAgenda.lines);
+      expect(titles(snapshot().days['2026-10-24']), [
+        'Before the trip',
+        'Passport',
+        'Tickets',
+      ]);
+
+      // Without an open Line it never shows.
+      lists.setOnAgenda(id, ListOnAgenda.count);
+      for (final line in lists.byNote(id)!.lines) {
+        lists.check(line.id);
+      }
+      expect(snapshot().days['2026-10-24'], isEmpty);
+    });
+
     test('Shopping Lists as the user chose for each (#186)', () {
       final id = groceries();
       final lists = ShoppingLists(store);

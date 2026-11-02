@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::imports::MAX_FILE_BYTES;
-use oldbrainfix_core::{Checklists, Notes, Places, SigningKey, Store};
+use oldbrainfix_core::{Checklists, ListOnAgenda, Notes, Places, SigningKey, Store};
 use oldbrainfix_gui::{App, Selection};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
@@ -250,7 +250,7 @@ fn made_as_keep_says(harness: &Harness<'_, App>) -> Result<String, Box<dyn std::
         .map(|l| (l.text.as_str(), l.checked))
         .collect();
     assert_eq!(lines, [("Milk", true), ("Eggs", false)]);
-    assert!(!checklists.shows_on_agenda(&groceries.id)?);
+    assert_eq!(checklists.on_agenda(&groceries.id)?, ListOnAgenda::Off);
     Ok(area.id.clone())
 }
 
@@ -344,7 +344,7 @@ fn an_imported_checklist_stays_off_the_agenda_until_switched_on() -> TestResult 
         .into_iter()
         .find(|n| n.text.starts_with("Groceries"))
         .ok_or("the list")?;
-    Checklists::new(desk).set_show_on_agenda(&groceries.id, true)?;
+    Checklists::new(desk).set_on_agenda(&groceries.id, ListOnAgenda::Lines)?;
     harness.state_mut().select(Selection::All);
     harness.step();
     harness.state_mut().select(Selection::Agenda);

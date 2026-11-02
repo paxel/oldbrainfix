@@ -340,8 +340,9 @@ NoteActions noteActions(
                 changed();
               }
             : null,
-        showOnAgenda: showOnAgendaEntry(lists, id, changed),
-        shoppingOnAgenda: shoppingOnAgendaEntry(shopping, id, changed),
+        onAgenda:
+            checklistOnAgendaEntry(lists, id, changed) ??
+            shoppingOnAgendaEntry(shopping, id, changed),
       );
     },
     showTicks: () => showTicksEntry(notes, id, changed),
@@ -375,20 +376,21 @@ BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
   );
 }
 
-/// The "Show on the Agenda" entry of the menu of the Note [noteId]
-/// (#143): on or off for this person, and switching it; null unless it
-/// is a Checklist without a Routine. [changed] runs after a switch.
-({bool on, VoidCallback toggle})? showOnAgendaEntry(
+/// The "Show on the Agenda" choice of the Checklist [noteId] (#143,
+/// #219): how it shows on this person's Agenda, and choosing another way;
+/// null unless it is a Checklist without a Routine. It is offered while
+/// no Line is open too, for when Lines open again. [changed] runs after
+/// a choice.
+ListOnAgendaChoice? checklistOnAgendaEntry(
   Checklists lists,
   String noteId,
   VoidCallback changed,
 ) {
   if (!lists.mayShowOnAgenda(noteId)) return null;
-  final on = lists.showsOnAgenda(noteId);
   return (
-    on: on,
-    toggle: () {
-      lists.setShowOnAgenda(noteId, !on);
+    shows: lists.onAgenda(noteId),
+    choose: (shows) {
+      lists.setOnAgenda(noteId, shows);
       changed();
     },
   );
@@ -399,7 +401,7 @@ BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
 /// unless it is a Shopping List not in the trash nor merged. It is
 /// offered while no Line is open too, for when Lines come back.
 /// [changed] runs after a choice.
-ShoppingOnAgendaChoice? shoppingOnAgendaEntry(
+ListOnAgendaChoice? shoppingOnAgendaEntry(
   ShoppingLists lists,
   String noteId,
   VoidCallback changed,
@@ -619,13 +621,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the Note, in the lists (ADR 0039).
   bool _setsUp = false;
 
-  /// The "Show on the Agenda" switch of a Checklist without a Routine
-  /// (#143); null for any other Note.
-  ({bool on, VoidCallback toggle})? _onAgenda;
-
-  /// How a Shopping List shows on this person's Agenda (#186); null for
-  /// any other Note.
-  ShoppingOnAgendaChoice? _shoppingOnAgenda;
+  /// How a Shopping List (#186) or a Checklist without a Routine (#219)
+  /// shows on this person's Agenda; null for any other Note.
+  ListOnAgendaChoice? _onAgenda;
 
   @override
   void initState() {
@@ -780,9 +778,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _placed = note == null ? null : placeNote(widget.places, note);
     _amends = widget.notes.store.mayWriteIn(widget.noteId);
     final lists = Checklists(widget.notes.store);
-    _onAgenda = showOnAgendaEntry(lists, widget.noteId, _reload);
     final shopping = ShoppingLists(widget.notes.store);
-    _shoppingOnAgenda = shoppingOnAgendaEntry(shopping, widget.noteId, _reload);
+    _onAgenda =
+        checklistOnAgendaEntry(lists, widget.noteId, _reload) ??
+        shoppingOnAgendaEntry(shopping, widget.noteId, _reload);
     _kind = NoteKinds(widget.notes.store).of(widget.noteId);
     final changes = _placed?.changes ?? false;
     // Back to a plain Note where its text may change, as the card's ⋮.
@@ -1093,28 +1092,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
-  /// Takes the Checklist off the Agenda for this person, or puts it back
-  /// (#143).
-  void _toggleOnAgenda() {
-    final lists = Checklists(widget.notes.store);
-    lists.setShowOnAgenda(widget.noteId, !lists.showsOnAgenda(widget.noteId));
-    _reload();
-  }
-
-  /// The Shopping List's "Show on the Agenda" badge's editor (#186): the
-  /// three ways as radio buttons, the one it has marked; a tap on another
-  /// writes it and closes.
-  Future<void> _editShoppingOnAgenda(ShoppingOnAgendaChoice agenda) async {
+  /// The "Show on the Agenda" badge's editor of a Shopping List (#186)
+  /// or a Checklist (#219): the three ways as radio buttons, the one it
+  /// has marked; a tap on another writes it and closes.
+  Future<void> _editOnAgenda(ListOnAgendaChoice agenda) async {
     final t = context.t;
-    final picked = await showDialog<ShoppingOnAgenda>(
+    final picked = await showDialog<ListOnAgenda>(
       context: context,
       builder: (context) => BadgeDialog(
         setting: t.checklistShowOnAgenda,
         icon: Icons.today_outlined,
-        content: RadioColumn<ShoppingOnAgenda>(
+        content: RadioColumn<ListOnAgenda>(
           value: agenda.shows,
           options: [
-            for (final (value, label) in shoppingOnAgendaOptions(t))
+            for (final (value, label) in listOnAgendaOptions(t))
               RadioOption(
                 key: ValueKey('shopping-agenda-${value.name}'),
                 value: value,
@@ -1517,27 +1508,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             key: const ValueKey('badge-agenda'),
             setting: t.checklistShowOnAgenda,
             icon: Icons.today_outlined,
-            value: agenda.on ? t.settingOn : t.settingOff,
-            valueIcon: switchIcon(agenda.on),
-            onTap: (_) => _editSwitch(
-              t.checklistShowOnAgenda,
-              Icons.today_outlined,
-              agenda.on,
-              _toggleOnAgenda,
-            ),
-          ),
-        if (_shoppingOnAgenda case final agenda?)
-          SettingBadge(
-            key: const ValueKey('badge-agenda'),
-            setting: t.checklistShowOnAgenda,
-            icon: Icons.today_outlined,
             value: switch (agenda.shows) {
-              ShoppingOnAgenda.off => t.settingOff,
-              ShoppingOnAgenda.count => t.shoppingOnAgendaCount,
-              ShoppingOnAgenda.lines => t.shoppingOnAgendaLines,
+              ListOnAgenda.off => t.settingOff,
+              ListOnAgenda.count => t.shoppingOnAgendaCount,
+              ListOnAgenda.lines => t.shoppingOnAgendaLines,
             },
-            valueIcon: shoppingOnAgendaIcon(agenda.shows),
-            onTap: (_) => _editShoppingOnAgenda(agenda),
+            valueIcon: listOnAgendaIcon(agenda.shows),
+            onTap: (_) => _editOnAgenda(agenda),
           ),
         if (_hasBoxes)
           SettingBadge(
@@ -2308,12 +2285,12 @@ IconData importanceIcon(Importance importance) => switch (importance) {
   Importance.unimportant => Icons.low_priority,
 };
 
-/// The value icon of a Shopping List's Show on the Agenda [shows] in its
-/// badge (#192).
-IconData shoppingOnAgendaIcon(ShoppingOnAgenda shows) => switch (shows) {
-  ShoppingOnAgenda.off => switchIcon(false),
-  ShoppingOnAgenda.count => Icons.numbers,
-  ShoppingOnAgenda.lines => Icons.format_list_bulleted,
+/// The value icon of a Shopping List's or a Checklist's Show on the
+/// Agenda [shows] in its badge (#192, #219).
+IconData listOnAgendaIcon(ListOnAgenda shows) => switch (shows) {
+  ListOnAgenda.off => switchIcon(false),
+  ListOnAgenda.count => Icons.numbers,
+  ListOnAgenda.lines => Icons.format_list_bulleted,
 };
 
 /// The icon of the kind [kind] (#188), the value of its badge.

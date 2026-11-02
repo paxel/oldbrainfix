@@ -37,7 +37,9 @@ use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallCloc
 use crate::search::Search;
 use crate::sessions::{SessionMarks, SessionRule, SessionSetup, Sessions};
 use crate::settings::{DeviceSettings, QuickNoteControl};
-use crate::shopping_lists::{Reappear, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys};
+use crate::shopping_lists::{
+    ListOnAgenda, Reappear, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys,
+};
 use crate::store::Store;
 use crate::tallies::{Tallies, Tally};
 use crate::tally_units::{self, TallyRule, UnitSystem};
@@ -166,7 +168,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
+            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -567,6 +569,13 @@ fn set_up_tools() -> Vec<Value> {
         tool(
             "set_shopping_agenda",
             "Sets how a Shopping List shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (each open Line on a row of its own). A list with no open Line never shows.",
+            false,
+            json!({"agenda": {"enum": ["off", "count", "lines"], "type": "string"}, "id": id("Note")}),
+            &["id", "agenda"],
+        ),
+        tool(
+            "set_checklist_agenda",
+            "Sets how a Checklist without a Routine shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (its name with each open Line under it, the default). A list with no open Line never shows; a Checklist with a Routine shows as its Occurrence instead.",
             false,
             json!({"agenda": {"enum": ["off", "count", "lines"], "type": "string"}, "id": id("Note")}),
             &["id", "agenda"],
@@ -1127,9 +1136,13 @@ impl Store {
                 };
                 let lines = self.lines_value(id, wall)?;
                 let shopping = ShoppingLists::new(self);
-                let agenda = match shopping.is_shopping_list(id)? {
-                    true => Some(shopping.on_agenda(id)?.code()),
-                    false => None,
+                let checklists = Checklists::new(self);
+                let agenda = if shopping.is_shopping_list(id)? {
+                    Some(shopping.on_agenda(id)?.code())
+                } else if checklists.may_show_on_agenda(id)? {
+                    Some(checklists.on_agenda(id)?.code())
+                } else {
+                    None
                 };
                 let kind = self.kind_of(&self.kinds()?, &note)?;
                 // The text of a Note of a kind is its name and its
@@ -1908,6 +1921,19 @@ impl Store {
                 shopping.set_on_agenda(note, shows)?;
                 done(note)
             }
+            "set_checklist_agenda" => {
+                let note = id()?;
+                let code = text_arg(args, "agenda")?;
+                let shows = ListOnAgenda::parse(code)
+                    .ok_or_else(|| Error::Invalid(format!("no way to show {code}")))?;
+                if !checklists.may_show_on_agenda(note)? {
+                    return Err(Error::Invalid(format!(
+                        "not a Checklist without a Routine: {note}"
+                    )));
+                }
+                checklists.set_on_agenda(note, shows)?;
+                done(note)
+            }
             "make_frog" => {
                 let note = id()?;
                 let frog = frogs.spawn(note)?;
@@ -2563,7 +2589,54 @@ mod tests {
                 let entity = format!("{}{}", checklist_keys::AGENDA_PREFIX, arg(a, "id")?);
                 Ok(s.current(&entity, shopping_keys::AGENDA)?.as_deref() == Some("lines"))
             },
+        )?;
+        lands_as_pending(
+            "set_checklist_agenda",
+            |s| Ok(json!({"agenda": "count", "id": checklist(s, "Trip\nSocks")?})),
+            |s, a| {
+                let entity = format!("{}{}", checklist_keys::AGENDA_PREFIX, arg(a, "id")?);
+                Ok(s.current(&entity, checklist_keys::AGENDA)?.as_deref() == Some("count"))
+            },
         )
+    }
+
+    #[test]
+    fn a_checklists_agenda_choice_is_set_once_accepted() -> TestResult {
+        let store = store();
+        let trip = checklist(&store, "Trip\nSocks")?;
+        let shop = shopping_list(&store, "Shop\nMilk")?;
+        let gym = checklist(&store, "Gym\nTowel")?;
+        Routines::new(&store).spawn(
+            &gym,
+            &Schedule::new(Day::new(2026, 3, 1), &[], None).ok_or("a schedule")?,
+        )?;
+        let task = store.open_ai_task()?;
+        let set = |id: &str, agenda: &str| {
+            call(
+                &store,
+                &task,
+                "set_checklist_agenda",
+                &json!({"agenda": agenda, "id": id}),
+            )
+        };
+        assert!(set(&shop, "off")?.is_error, "a Shopping List");
+        assert!(set(&gym, "off")?.is_error, "a Checklist with a Routine");
+        assert!(set(&trip, "sideways")?.is_error, "no such way");
+        assert!(!set(&trip, "count")?.is_error);
+        let review = store.ai_review(&task)?;
+        let items: Vec<&crate::ai_task::AiReviewItem> =
+            review.groups.iter().flat_map(|(_, i)| i).collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, crate::ai_task::AiChangeKind::List);
+        assert_eq!(items[0].note.as_deref(), Some(trip.as_str()));
+        let lists = Checklists::new(&store);
+        assert_eq!(lists.on_agenda(&trip)?, ListOnAgenda::Lines);
+        store.accept_pending(&task)?;
+        assert_eq!(lists.on_agenda(&trip)?, ListOnAgenda::Count);
+        let rows = lists.agenda_rows()?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].shows, ListOnAgenda::Count);
+        Ok(())
     }
 
     #[test]
@@ -2664,6 +2737,7 @@ mod tests {
             "set_reappear",
             "remove_line",
             "set_shopping_agenda",
+            "set_checklist_agenda",
             "make_frog",
             "frog_to_plain",
         ];
@@ -2788,7 +2862,8 @@ mod tests {
             gymmed.pointer("/description"),
             Some(&json!("Mondays and Thursdays"))
         );
-        assert_eq!(read(&trip)?.pointer("/agenda"), Some(&Value::Null));
+        assert_eq!(read(&trip)?.pointer("/agenda"), Some(&json!("lines")));
+        assert_eq!(read(&plain)?.pointer("/agenda"), Some(&Value::Null));
         let banked = read(&bank)?;
         assert_eq!(banked.pointer("/frogs/0/id"), Some(&json!(frog.id)));
         assert_eq!(

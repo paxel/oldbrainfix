@@ -21,8 +21,8 @@ use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
 use oldbrainfix_core::tally_units::{self, UnitSystem};
 use oldbrainfix_core::{
-    Checklists, DeviceSettings, Importance, Notes, Places, Routines, SessionRule, ShoppingOnAgenda,
-    Store, StoredText, parse_time,
+    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, Places, Routines, SessionRule,
+    ShoppingOnAgenda, Store, StoredText, parse_time,
 };
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
@@ -309,6 +309,21 @@ fn change_line(
                 let shows = match v {
                     Some(code) => ShoppingOnAgenda::parse(code).unwrap_or(ShoppingOnAgenda::Count),
                     None => standard,
+                };
+                on_agenda_label(t, shows).to_string()
+            }));
+        }
+        // How a Checklist shows on the user's own Agenda (#219), on the
+        // same entity: none chosen or a value no app writes is every open
+        // Line.
+        (agenda, line_keys::AGENDA)
+            if line_keys::AGENDA_PREFIX.strip_suffix(':') == Some(agenda) =>
+        {
+            return Ok(words(t.checklist_show_on_agenda().to_string(), &|v| {
+                let shows = match v {
+                    Some(line_keys::AGENDA_OFF) => ListOnAgenda::Off,
+                    Some(code) if code == ListOnAgenda::Count.code() => ListOnAgenda::Count,
+                    _ => ListOnAgenda::Lines,
                 };
                 on_agenda_label(t, shows).to_string()
             }));

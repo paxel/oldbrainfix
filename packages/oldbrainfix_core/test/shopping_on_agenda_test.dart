@@ -178,7 +178,7 @@ void main() {
       final checklists = Checklists(ann);
       checklists
         ..make(note)
-        ..setShowOnAgenda(note, false)
+        ..setOnAgenda(note, ListOnAgenda.off)
         ..toPlain(note);
       final lists = ShoppingLists(ann)..make(note);
       expect(lists.onAgenda(note), ShoppingOnAgenda.count);
@@ -188,8 +188,8 @@ void main() {
         ..toPlain(note, _wall);
       checklists
         ..make(note)
-        ..setShowOnAgenda(note, true);
-      expect(checklists.agenda(), hasLength(1));
+        ..setOnAgenda(note, ListOnAgenda.lines);
+      expect(checklists.agendaRows(), hasLength(1));
     });
 
     test('only Shopping Lists not in the trash nor merged take a choice; '
