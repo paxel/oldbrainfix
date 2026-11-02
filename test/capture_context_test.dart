@@ -73,10 +73,10 @@ void main() {
 
       expect(find.text('nees mor sauce'), findsOneWidget);
       expect(notes.all().single.context.location, isNull);
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · Home'), findsNothing);
 
       await arrive(tester, home);
-      expect(find.text('Home'), findsOneWidget);
+      expect(find.textContaining(' · Home'), findsOneWidget);
       expect(notes.all().single.context.location, home);
       expect(location.asked, 0);
     });
@@ -89,8 +89,8 @@ void main() {
       await start(tester);
       await capture(tester, 'nees mor sauce');
       await arrive(tester, faraway);
-      expect(find.text('48.1472, 11.5761'), findsOneWidget);
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · 48.1472, 11.5761'), findsOneWidget);
+      expect(find.textContaining(' · Home'), findsNothing);
     });
 
     testWidgets('with no position the Note stays, without a place', (
@@ -139,9 +139,13 @@ void main() {
         findsOneWidget,
         reason: 'the list does not wait for the position',
       );
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · Home'), findsNothing);
       await arrive(tester, home);
-      expect(find.text('Home'), findsOneWidget, reason: 'that Note too');
+      expect(
+        find.textContaining(' · Home'),
+        findsOneWidget,
+        reason: 'that Note too',
+      );
 
       location.fix = Completer()..complete(home);
       await capture(tester, 'second');
