@@ -106,6 +106,14 @@ const SCHEMA: &str = "
         ON entries (entity, field);
     ";
 
+/// What [`Store::worked_out`] keeps, by key, and the log's high-water
+/// mark it was worked out at.
+#[derive(Default)]
+struct WorkedOut {
+    seq: i64,
+    held: HashMap<&'static str, Arc<dyn std::any::Any + Send + Sync>>,
+}
+
 /// The current fields of one entity, in the order they were first
 /// written, as the Dart core's `currentFields` map keeps them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -250,6 +258,12 @@ pub struct Store {
     /// Counts the changes, so a judgement worked out while another
     /// thread wrote is not kept.
     generation: std::sync::atomic::AtomicU64,
+    /// What [`Store::worked_out`] keeps until the next change, by key.
+    worked_out: Mutex<WorkedOut>,
+    /// How often [`Store::history`] was read: what a test counts reads
+    /// by.
+    #[cfg(test)]
+    pub(crate) history_reads: std::sync::atomic::AtomicUsize,
     /// Other people's Profiles as read from the local settings, until
     /// one is kept ([`crate::people`]).
     pub(crate) people: Mutex<Option<Arc<crate::people::PeopleIndex>>>,
@@ -326,6 +340,9 @@ impl Store {
             audio,
             judged: Mutex::new(None),
             generation: std::sync::atomic::AtomicU64::new(0),
+            worked_out: Mutex::new(WorkedOut::default()),
+            #[cfg(test)]
+            history_reads: std::sync::atomic::AtomicUsize::new(0),
             people: Mutex::new(None),
             own_keys: Mutex::new(None),
             pending_files,
@@ -384,6 +401,50 @@ impl Store {
         let mut pending = self.pending.lock();
         pending.overlay = None;
         pending.judged = None;
+        self.worked_out.lock().held.clear();
+    }
+
+    /// What `build` works out from the reads, kept under `key` until what
+    /// they show changes, as the Dart core's `workedOut`: the log, or the
+    /// shown pending sets. An entry another store open on the same file
+    /// wrote counts too, by the log's high-water mark. Inside
+    /// [`Store::log_only`], which shows the log alone, it is worked out
+    /// anew and not kept.
+    pub(crate) fn worked_out<T: Send + Sync + 'static>(
+        &self,
+        key: &'static str,
+        build: impl FnOnce() -> Result<T>,
+    ) -> Result<Arc<T>> {
+        let log_only = self.reads_log_only();
+        // Read before the lock is taken: a write takes the connection
+        // first, then this lock.
+        let seq = self.current_seq()?;
+        if !log_only {
+            let mut worked = self.worked_out.lock();
+            if worked.seq != seq {
+                worked.seq = seq;
+                worked.held.clear();
+            }
+            if let Some(held) = worked.held.get(key).cloned()
+                && let Ok(held) = held.downcast::<T>()
+            {
+                return Ok(held);
+            }
+        }
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        let value = Arc::new(build()?);
+        if !log_only {
+            let after = self.current_seq()?;
+            let mut worked = self.worked_out.lock();
+            // Kept only when nothing changed while it was worked out.
+            if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation
+                && after == seq
+                && worked.seq == seq
+            {
+                worked.held.insert(key, value.clone());
+            }
+        }
+        Ok(value)
     }
 
     /// What the roles of the Shared Areas allow (ADR 0013), worked out
@@ -1171,6 +1232,9 @@ impl Store {
     /// the shown pending sets: what no role in a Shared Area allows is
     /// left out, judged with those sets too.
     pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let shown = self.shown()?;
         if shown.is_empty() {
             return self.logged_history(entity);

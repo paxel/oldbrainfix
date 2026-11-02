@@ -492,31 +492,14 @@ class Sessions {
   /// setup was written last. A Note made plain again holds a pool of
   /// null and is none.
   SessionSetup? setupOf(String noteId) {
-    final fields = store.currentFields(noteId);
-    if (fields.containsKey(SessionKeys.pool)) {
+    final setups = store.workedOut(_Setups, () => _Setups.read(store));
+    if (setups.own[noteId] case final fields?) {
       return _setupFrom(noteId, fields, null);
     }
-    Entry? newest;
-    String? heldBy;
-    Map<String, String?>? held;
-    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
-      final own = store.currentFields(id);
-      if (own[RoutineKeys.note] != noteId ||
-          own[RoutineKeys.trashed] != null ||
-          own[SessionKeys.pool] == null) {
-        continue;
-      }
-      for (final e in store.history(id)) {
-        if (!SessionKeys.setup.contains(e.field)) continue;
-        if (newest == null || Store.latestWins(e, newest) > 0) {
-          newest = e;
-          heldBy = id;
-          held = own;
-        }
-      }
+    if (setups.left[noteId] case (final heldBy, final fields)) {
+      return _setupFrom(noteId, fields, heldBy);
     }
-    if (held == null) return null;
-    return _setupFrom(noteId, held, heldBy);
+    return null;
   }
 
   /// Whether the Note [noteId] is a Session.
@@ -599,7 +582,7 @@ class Sessions {
     final session = _requireDue(id, occurrence);
     final marks = SessionMarks.read(store, id);
     final pool = this.pool(session.setup);
-    final picks = _wanted(session, occurrence, pool, marks);
+    final picks = _wanted(session, occurrence, pool, marks, _runners(session));
     return _shown(session, occurrence, picks, pool, marks);
   }
 
@@ -625,14 +608,15 @@ class Sessions {
     _requireCheckOff(id);
     final marks = SessionMarks.read(store, id);
     final pool = this.pool(session.setup);
-    final wanted = _wanted(session, occurrence, pool, marks);
+    final runners = _runners(session);
+    final wanted = _wanted(session, occurrence, pool, marks, runners);
     if (!wanted.contains(noteId)) {
       throw ArgumentError.value(noteId, 'noteId', 'not picked then');
     }
     // A pick with an entry stays in the pick.
     if (marks.entriesFor(store, occurrence.key, noteId).isNotEmpty) return;
     final offered = {...?marks.offered[occurrence.key], ...wanted};
-    final order = _order(session, occurrence, pool, marks);
+    final order = _order(session, occurrence, pool, marks, runners);
     final next =
         order.where((t) => !offered.contains(t)).firstOrNull ??
         order.where((t) => !wanted.contains(t)).firstOrNull;
@@ -664,7 +648,7 @@ class Sessions {
     _requireCheckOff(id);
     final marks = SessionMarks.read(store, id);
     final pool = this.pool(session.setup);
-    final wanted = _wanted(session, occurrence, pool, marks);
+    final wanted = _wanted(session, occurrence, pool, marks, _runners(session));
     if (!wanted.contains(noteId)) {
       throw ArgumentError.value(noteId, 'noteId', 'not picked then');
     }
@@ -683,8 +667,10 @@ class Sessions {
     final day = Day.today(store.clock(), wallClock);
     // By time, then by Routine, so that Rolling over several Routines of
     // a Note goes on from the pick written before (ADR 0039).
+    final sessions = all();
+    final routines = [for (final session in sessions) session.routine];
     final due = [
-      for (final session in all())
+      for (final session in sessions)
         for (final occurrence in session.routine.schedule.on(day))
           (session, occurrence),
     ];
@@ -696,7 +682,8 @@ class Sessions {
     for (final (session, occurrence) in due) {
       final pool = this.pool(session.setup);
       var marks = SessionMarks.read(store, session.id);
-      final picks = _wanted(session, occurrence, pool, marks);
+      final runners = _runners(session, routines);
+      final picks = _wanted(session, occurrence, pool, marks, runners);
       if (write &&
           store.mayCheckOff(session.id) &&
           _writePick(session.id, occurrence, picks, marks)) {
@@ -740,9 +727,10 @@ class Sessions {
     Occurrence occurrence,
     List<String> pool,
     SessionMarks marks,
+    List<String> runners,
   ) {
     final count = session.countOn(occurrence.day);
-    final order = _order(session, occurrence, pool, marks);
+    final order = _order(session, occurrence, pool, marks, runners);
     final held = marks.picks[occurrence.key];
     if (held == null) return order.take(count).toList();
     final offered = marks.offered[occurrence.key] ?? const <String>{};
@@ -771,7 +759,8 @@ class Sessions {
     return wanted;
   }
 
-  /// [pool] in the order [session]'s rule picks for [occurrence].
+  /// [pool] in the order [session]'s rule picks for [occurrence], with
+  /// [runners] the Routines that run it ([_runners]).
   /// Rolling: those picked longest ago first, by the Occurrences before
   /// this one and their place in its pick, those never picked before
   /// them in pool order. Least selected: those with the fewest entries
@@ -782,6 +771,7 @@ class Sessions {
     Occurrence occurrence,
     List<String> pool,
     SessionMarks marks,
+    List<String> runners,
   ) {
     final index = {for (var i = 0; i < pool.length; i++) pool[i]: i};
     if (session.rule == SessionRule.random) {
@@ -800,7 +790,7 @@ class Sessions {
     // runs the Session, in schedule order, those at the same moment by
     // their Routine (ADR 0039).
     final before = <(Occurrence, String, List<String>)>[];
-    for (final runner in _runners(session)) {
+    for (final runner in runners) {
       final held = runner == session.id
           ? marks
           : SessionMarks.read(store, runner);
@@ -919,10 +909,11 @@ class Sessions {
   }
 
   /// The Routines that run [session]: those not in the trash spawned
-  /// from its Note, and its own, by id.
-  List<String> _runners(Session session) => {
+  /// from its Note, and its own, by id. [routines] are those not in the
+  /// trash, read once for many; null reads them.
+  List<String> _runners(Session session, [List<Routine>? routines]) => {
     session.id,
-    for (final routine in Routines(store).all())
+    for (final routine in routines ?? Routines(store).all())
       if (routine.noteId == session.noteId) routine.id,
   }.toList()..sort();
 
@@ -1035,5 +1026,53 @@ class Sessions {
     if (!store.mayCheckOff(id)) {
       throw StateError('no role in the Shared Area of $id');
     }
+  }
+}
+
+/// Where the setups of the Sessions lie (ADR 0039), worked out in one
+/// pass over what wrote a pool and kept until the log changes: a Note
+/// is read once for many, and the Routines that never held a setup not
+/// at all.
+class _Setups {
+  /// The fields of every entity that holds a pool of its own, of null
+  /// too, by entity.
+  final Map<String, Map<String, String?>> own;
+
+  /// The setup an older version left on a Routine not in the trash, by
+  /// its Note: the Routine and its fields; of several the one whose
+  /// setup was written last.
+  final Map<String, (String, Map<String, String?>)> left;
+
+  _Setups(this.own, this.left);
+
+  static _Setups read(Store store) {
+    final own = <String, Map<String, String?>>{};
+    final left = <String, (String, Map<String, String?>)>{};
+    final newest = <String, Entry>{};
+    final ids = {
+      for (final (id, field) in store.fieldsWithPrefix(SessionKeys.pool))
+        if (field == SessionKeys.pool) id,
+    };
+    for (final id in ids) {
+      final fields = store.currentFields(id);
+      if (!fields.containsKey(SessionKeys.pool)) continue;
+      own[id] = fields;
+      final noteId = fields[RoutineKeys.note];
+      if (fields[RoutineKeys.type] != RoutineKeys.typeRoutine ||
+          noteId == null ||
+          fields[RoutineKeys.trashed] != null ||
+          fields[SessionKeys.pool] == null) {
+        continue;
+      }
+      for (final e in store.history(id)) {
+        if (!SessionKeys.setup.contains(e.field)) continue;
+        final held = newest[noteId];
+        if (held == null || Store.latestWins(e, held) > 0) {
+          newest[noteId] = e;
+          left[noteId] = (id, fields);
+        }
+      }
+    }
+    return _Setups(own, left);
   }
 }

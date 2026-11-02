@@ -426,6 +426,61 @@ fn check_count(count: i64) -> Result<()> {
     Ok(())
 }
 
+/// Where the setups of the Sessions lie (ADR 0039), worked out in one
+/// pass over what wrote a pool and kept until the log changes, as the
+/// Dart core's `_Setups`: a Note is read once for many, and the Routines
+/// that never held a setup not at all.
+struct Setups {
+    /// The fields of every entity that holds a pool of its own, of
+    /// `None` too, by entity.
+    own: HashMap<String, Fields>,
+    /// The setup an older version left on a Routine not in the trash, by
+    /// its Note: the Routine and its fields; of several the one whose
+    /// setup was written last.
+    left: HashMap<String, (String, Fields)>,
+}
+
+impl Setups {
+    fn read(store: &Store) -> Result<Setups> {
+        let mut own = HashMap::new();
+        let mut left: HashMap<String, (String, Fields)> = HashMap::new();
+        let mut newest: HashMap<String, Entry> = HashMap::new();
+        let mut ids: Vec<String> = Vec::new();
+        for (id, field) in store.fields_with_prefix(keys::POOL)? {
+            if field == keys::POOL && !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        for id in ids {
+            let fields = store.current_fields(&id)?;
+            if !fields.iter().any(|(field, _)| field == keys::POOL) {
+                continue;
+            }
+            let note_id = fields.get(routine_keys::NOTE).map(str::to_string);
+            let held = fields.get(routine_keys::TYPE) == Some(routine_keys::TYPE_ROUTINE)
+                && fields.get(routine_keys::TRASHED).is_none()
+                && fields.get(keys::POOL).is_some();
+            own.insert(id.clone(), fields.clone());
+            let Some(note_id) = note_id.filter(|_| held) else {
+                continue;
+            };
+            for e in store.history(&id)? {
+                if !keys::is_setup(&e.field) {
+                    continue;
+                }
+                if newest
+                    .get(&note_id)
+                    .is_none_or(|n| Store::latest_wins(&e, n) == Ordering::Greater)
+                {
+                    newest.insert(note_id.clone(), e);
+                    left.insert(note_id.clone(), (id.clone(), fields.clone()));
+                }
+            }
+        }
+        Ok(Setups { own, left })
+    }
+}
+
 /// The setup `fields` of the Note `note_id` hold, or `None` without a
 /// pool; `held_by` is the Routine they lie on, if not on the Note.
 fn setup_from(note_id: &str, fields: &Fields, held_by: Option<String>) -> Option<SessionSetup> {
@@ -600,38 +655,16 @@ impl<'a> Sessions<'a> {
     /// whose setup was written last. A Note made plain again holds a pool
     /// of null and is none.
     pub fn setup_of(&self, note_id: &str) -> Result<Option<SessionSetup>> {
-        let fields = self.store.current_fields(note_id)?;
-        if fields.iter().any(|(field, _)| field == keys::POOL) {
-            return Ok(setup_from(note_id, &fields, None));
+        let setups = self
+            .store
+            .worked_out("sessions:setups", || Setups::read(self.store))?;
+        if let Some(fields) = setups.own.get(note_id) {
+            return Ok(setup_from(note_id, fields, None));
         }
-        let mut newest: Option<Entry> = None;
-        let mut held: Option<(String, Fields)> = None;
-        for id in self.store.entities_of_type(routine_keys::TYPE_ROUTINE)? {
-            let own = self.store.current_fields(&id)?;
-            if own.get(routine_keys::NOTE) != Some(note_id)
-                || own.get(routine_keys::TRASHED).is_some()
-                || own.get(keys::POOL).is_none()
-            {
-                continue;
-            }
-            let mut newer = false;
-            for e in self.store.history(&id)? {
-                if !keys::is_setup(&e.field) {
-                    continue;
-                }
-                if newest
-                    .as_ref()
-                    .is_none_or(|n| Store::latest_wins(&e, n) == Ordering::Greater)
-                {
-                    newest = Some(e);
-                    newer = true;
-                }
-            }
-            if newer {
-                held = Some((id, own));
-            }
-        }
-        Ok(held.and_then(|(id, fields)| setup_from(note_id, &fields, Some(id))))
+        Ok(setups
+            .left
+            .get(note_id)
+            .and_then(|(id, fields)| setup_from(note_id, fields, Some(id.clone()))))
     }
 
     /// Whether the Note `note_id` is a Session.
@@ -748,7 +781,8 @@ impl<'a> Sessions<'a> {
         let session = self.require_due(id, occurrence)?;
         let marks = SessionMarks::of(self.store, id)?;
         let pool = self.pool(&session.setup)?;
-        let picks = self.wanted(&session, occurrence, &pool, &marks)?;
+        let runners = self.runners(&session, None)?;
+        let picks = self.wanted(&session, occurrence, &pool, &marks, &runners)?;
         self.shown(session, *occurrence, picks, &pool, &marks)
     }
 
@@ -777,7 +811,8 @@ impl<'a> Sessions<'a> {
         self.require_check_off(id)?;
         let marks = SessionMarks::of(self.store, id)?;
         let pool = self.pool(&session.setup)?;
-        let wanted = self.wanted(&session, occurrence, &pool, &marks)?;
+        let runners = self.runners(&session, None)?;
+        let wanted = self.wanted(&session, occurrence, &pool, &marks, &runners)?;
         if !wanted.iter().any(|w| w == note_id) {
             return Err(Error::Invalid(format!("not picked then: {note_id}")));
         }
@@ -794,7 +829,7 @@ impl<'a> Sessions<'a> {
             .cloned()
             .unwrap_or_default();
         offered.extend(wanted.iter().cloned());
-        let order = self.order(&session, occurrence, &pool, &marks)?;
+        let order = self.order(&session, occurrence, &pool, &marks, &runners)?;
         let next = order
             .iter()
             .find(|t| !offered.contains(*t))
@@ -837,7 +872,8 @@ impl<'a> Sessions<'a> {
         self.require_check_off(id)?;
         let marks = SessionMarks::of(self.store, id)?;
         let pool = self.pool(&session.setup)?;
-        let wanted = self.wanted(&session, occurrence, &pool, &marks)?;
+        let runners = self.runners(&session, None)?;
+        let wanted = self.wanted(&session, occurrence, &pool, &marks, &runners)?;
         if !wanted.iter().any(|w| w == note_id) {
             return Err(Error::Invalid(format!("not picked then: {note_id}")));
         }
@@ -853,8 +889,10 @@ impl<'a> Sessions<'a> {
         let day = Day::today(self.store.now(), wall);
         // By time, then by Routine, so that Rolling over several Routines
         // of a Note goes on from the pick written before (ADR 0039).
+        let sessions = self.all()?;
+        let routines: Vec<Routine> = sessions.iter().map(|s| s.routine.clone()).collect();
         let mut due: Vec<(Session, Occurrence)> = Vec::new();
-        for session in self.all()? {
+        for session in sessions {
             for occurrence in session.routine.schedule.on(day) {
                 due.push((session.clone(), occurrence));
             }
@@ -864,7 +902,8 @@ impl<'a> Sessions<'a> {
         for (session, occurrence) in due {
             let pool = self.pool(&session.setup)?;
             let mut marks = SessionMarks::of(self.store, session.id())?;
-            let picks = self.wanted(&session, &occurrence, &pool, &marks)?;
+            let runners = self.runners(&session, Some(&routines))?;
+            let picks = self.wanted(&session, &occurrence, &pool, &marks, &runners)?;
             if write
                 && self.store.may_check_off(session.id())?
                 && self.write_pick(session.id(), &occurrence, &picks, &marks)?
@@ -914,9 +953,10 @@ impl<'a> Sessions<'a> {
         occurrence: &Occurrence,
         pool: &[String],
         marks: &SessionMarks,
+        runners: &[String],
     ) -> Result<Vec<String>> {
         let count = usize::try_from(session.count_on(occurrence.day)).unwrap_or(0);
-        let order = self.order(session, occurrence, pool, marks)?;
+        let order = self.order(session, occurrence, pool, marks, runners)?;
         let key = occurrence.key();
         let Some(held) = marks.picks.get(&key) else {
             return Ok(order.into_iter().take(count).collect());
@@ -973,6 +1013,7 @@ impl<'a> Sessions<'a> {
         occurrence: &Occurrence,
         pool: &[String],
         marks: &SessionMarks,
+        runners: &[String],
     ) -> Result<Vec<String>> {
         let mut out = pool.to_vec();
         if session.setup.rule == SessionRule::Random {
@@ -993,10 +1034,10 @@ impl<'a> Sessions<'a> {
         // that runs the Session, in schedule order, those at the same
         // moment by their Routine (ADR 0039).
         let mut held: Vec<(String, SessionMarks)> = Vec::new();
-        for runner in self.runners(session)? {
+        for runner in runners {
             if runner != session.id() {
-                let marks = SessionMarks::of(self.store, &runner)?;
-                held.push((runner, marks));
+                let marks = SessionMarks::of(self.store, runner)?;
+                held.push((runner.clone(), marks));
             }
         }
         let mut before: Vec<(Occurrence, &str, &[String])> = Vec::new();
@@ -1123,12 +1164,21 @@ impl<'a> Sessions<'a> {
     }
 
     /// The Routines that run `session`: those not in the trash spawned
-    /// from its Note, and its own, by id.
-    fn runners(&self, session: &Session) -> Result<Vec<String>> {
+    /// from its Note, and its own, by id. `routines` are those not in the
+    /// trash, read once for many; `None` reads them.
+    fn runners(&self, session: &Session, routines: Option<&[Routine]>) -> Result<Vec<String>> {
+        let read;
+        let routines = match routines {
+            Some(routines) => routines,
+            None => {
+                read = Routines::new(self.store).all()?;
+                &read
+            }
+        };
         let mut out = vec![session.id().to_string()];
-        for routine in Routines::new(self.store).all()? {
+        for routine in routines {
             if routine.note_id == session.note_id() && !out.contains(&routine.id) {
-                out.push(routine.id);
+                out.push(routine.id.clone());
             }
         }
         out.sort_by(|a, b| utf16_cmp(a, b));
@@ -2087,6 +2137,64 @@ mod tests {
         sessions.unmake(&note)?;
         assert_eq!(sessions.setup_of(&note)?, None);
         assert_eq!(NoteKind::of(&ann, &note)?, NoteKind::Plain);
+        Ok(())
+    }
+
+    #[test]
+    fn it_finds_the_setups_without_reading_every_routine() -> TestResult {
+        use std::sync::atomic::Ordering::SeqCst;
+        let ann = device(1, "Ann")?;
+        let sessions = Sessions::new(&ann);
+        let t = tallies(&ann, &["A"], None)?;
+        let note = Notes::new(&ann).capture("Sport", None, None)?.id;
+        let older = old(&ann, &note, &[(keys::POOL.to_string(), &t[0])])?;
+        let mut plain = Vec::new();
+        for i in 0..10 {
+            let id = Notes::new(&ann)
+                .capture(&format!("Plain {i}"), None, None)?
+                .id;
+            Routines::new(&ann).spawn(&id, &daily()?)?;
+            plain.push(id);
+        }
+        // Worked out once: the Routine that holds a setup is read, its
+        // fields and its history, and none of the plain ones.
+        let before = ann.history_reads.load(SeqCst);
+        assert_eq!(sessions.setup_of(&plain[0])?, None);
+        assert_eq!(ann.history_reads.load(SeqCst) - before, 2);
+        // Then kept until the log changes: no read at all.
+        let kept = ann.history_reads.load(SeqCst);
+        for id in &plain {
+            assert_eq!(sessions.setup_of(id)?, None);
+        }
+        assert_eq!(
+            sessions.setup_of(&note)?.and_then(|s| s.held_by),
+            Some(older)
+        );
+        assert_eq!(ann.history_reads.load(SeqCst), kept);
+        sessions.unmake(&note)?;
+        assert_eq!(sessions.setup_of(&note)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn it_sees_what_another_store_on_the_same_file_wrote() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("oldbrainfix.db");
+        let app = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        OwnProfile::new(&app).apply_defaults("Ann", None)?;
+        // As the phone's background sync does: a second store, open on
+        // the same file at the same time.
+        let background = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let t = tallies(&app, &["A"], None)?;
+        let note = Notes::new(&app).capture("Sport", None, None)?.id;
+        assert_eq!(NoteKind::of(&app, &note)?, NoteKind::Plain);
+        Sessions::new(&background).make(&note, &t, 1, SessionRule::Rolling)?;
+        // No write here since: the store still sees it.
+        assert_eq!(NoteKind::of(&app, &note)?, NoteKind::Session);
+        assert_eq!(
+            Sessions::new(&app).setup_of(&note)?.ok_or("a setup")?.pool,
+            t
+        );
         Ok(())
     }
 

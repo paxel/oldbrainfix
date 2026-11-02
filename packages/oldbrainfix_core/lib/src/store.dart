@@ -90,6 +90,7 @@ class Store {
     _judged = null;
     _overlay = null;
     _shownJudged = null;
+    _forgetWorkedOut();
     if (_inBatch) return;
     for (final listener in List.of(_listeners)) {
       listener();
@@ -572,6 +573,7 @@ class Store {
     } catch (_) {
       _db.execute('ROLLBACK');
       _judged = null;
+      _forgetWorkedOut();
       rethrow;
     } finally {
       _inBatch = false;
@@ -698,6 +700,7 @@ class Store {
     }
     _overlay = null;
     _shownJudged = null;
+    _forgetWorkedOut();
   }
 
   /// The pending sets, the oldest first.
@@ -926,10 +929,15 @@ class Store {
     return [...logged, ...pending]..sort(_compareBytes);
   }
 
+  /// How often [history] was read: what a test counts reads by.
+  @visibleForTesting
+  var historyReads = 0;
+
   /// Every entry of [entity] that counts, in log order, then those of
   /// the shown pending sets: what no role in a Shared Area allows is left
   /// out, judged with those sets too.
   List<Entry> history(String entity) {
+    historyReads++;
     final shown = _shown;
     if (shown.isEmpty) return loggedHistory(entity);
     final all = [
@@ -984,6 +992,37 @@ class Store {
   }
 
   JudgedLog? _judged;
+
+  final _workedOut = <Object, Object?>{};
+  var _generation = 0;
+  var _workedSeq = -1;
+
+  /// What [build] works out from the reads, kept under [key] until what
+  /// they show changes: the log, or the shown pending sets. An entry
+  /// another store open on the same file wrote, such as the phone's
+  /// background sync, counts too, by the log's high-water mark. What it
+  /// returns is shared by every caller, so nobody changes it.
+  @internal
+  T workedOut<T>(Object key, T Function() build) {
+    final seq = currentSeq();
+    if (seq != _workedSeq) {
+      _forgetWorkedOut();
+      _workedSeq = seq;
+    }
+    if (_workedOut.containsKey(key)) return _workedOut[key] as T;
+    final generation = _generation;
+    final value = build();
+    // Kept only when nothing changed while it was worked out.
+    if (generation == _generation && seq == currentSeq()) {
+      _workedOut[key] = value;
+    }
+    return value;
+  }
+
+  void _forgetWorkedOut() {
+    _generation++;
+    _workedOut.clear();
+  }
 
   /// What the roles of the Shared Areas allow (ADR 0013), worked out
   /// from the whole log after every change; nothing to work out while no

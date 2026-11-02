@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -648,6 +649,63 @@ void main() {
       sessions.unmake(note);
       expect(sessions.setupOf(note), isNull);
       expect(NoteKinds(ann).of(note), NoteKind.plain);
+    });
+
+    test('finds the setups without reading every Routine (#203)', () {
+      final sessions = Sessions(ann);
+      final [a] = tallies(ann, ['A']);
+      final note = Notes(ann).capture('Sport').id;
+      final old = Routines(ann)
+          .spawn(
+            note,
+            _daily,
+            within: (id) => ann.append(id, SessionKeys.pool, a),
+          )
+          .id;
+      final plain = [
+        for (var i = 0; i < 10; i++) Notes(ann).capture('Plain $i').id,
+      ];
+      for (final id in plain) {
+        Routines(ann).spawn(id, _daily);
+      }
+      // Worked out once: the Routine that holds a setup is read, its
+      // fields and its history, and none of the plain ones.
+      final before = ann.historyReads;
+      expect(sessions.setupOf(plain.first), isNull);
+      expect(ann.historyReads - before, 2);
+      // Then kept until the log changes: no read at all.
+      final kept = ann.historyReads;
+      for (final id in plain) {
+        expect(sessions.setupOf(id), isNull);
+      }
+      expect(sessions.setupOf(note)?.heldBy, old);
+      expect(ann.historyReads, kept);
+      sessions.unmake(note);
+      expect(sessions.setupOf(note), isNull);
+    });
+
+    test('sees what another store on the same file wrote (#203)', () {
+      final dir = Directory.systemTemp.createTempSync('sessions');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      Store open() =>
+          Store.open('${dir.path}/log.db', clock: clock)
+            ..setLocalSetting('author', 'Ann');
+      final app = open();
+      // As the phone's background sync does: a second store, open on the
+      // same file at the same time.
+      final background = open();
+      addTearDown(() {
+        app.close();
+        background.close();
+      });
+      final [a] = tallies(app, ['A']);
+      final note = Notes(app).capture('Sport').id;
+      expect(NoteKinds(app).of(note), NoteKind.plain);
+      Sessions(background)
+          .make(note, pool: [a], count: 1, rule: SessionRule.rolling);
+      // No write here since: the store still sees it.
+      expect(NoteKinds(app).of(note), NoteKind.session);
+      expect(Sessions(app).setupOf(note)?.pool, [a]);
     });
 
     test('travels between own Devices as part of its Note', () {
