@@ -27,6 +27,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon und dem Desktop zeigt eine Zeile, die gerade in eine Checkliste oder eine Einkaufsliste im Notiz-Editor getippt wurde, ihr ⋮, sobald sie Text hat, wo es erst nach Eingabetaste und Rücktaste erschien. Ein Eintrag ihres ⋮ speichert die Zeile zuerst und handelt dann; eine leere neue Zeile hat kein ⋮.
 - Auf dem Telefon liest die Agenda ihre Zeilen einmal pro Änderung und öffnet und aktualisiert sich dadurch schneller: Ein Abhaken, ein Abgleich, ein Lesen des Kalenders oder die Rückkehr in die App lesen sie einmal, wo jedes sie zwei- oder dreimal las.
 - Auf dem Telefon und dem Desktop werden die Auswahl und die Einträge einer Einheit einmal pro Änderung gelesen, und die Agenda lädt dadurch schneller: Sie wurden für jeden bisherigen Lauf erneut gelesen, mehrmals pro Laden. Auf dem Telefon übernimmt das Agenda-Widget des Startbildschirms die Zeilen der Agenda, statt sie ein zweites Mal zu lesen. Ob eine Notiz eine Strichliste ist und welcher Art jede Notiz ist, wird gelesen, ohne alle Einträge der Strichlisten durchzugehen.
+- Auf dem Telefon öffnet die Meldung nach einem unerwarteten Beenden einen Dialog, der sagt, was passiert ist, mit „Schließen“ und „Melden“, wo ihr Tippen sofort die Mail öffnete. Geschlossen kommt sie erst beim nächsten unerwarteten Beenden wieder. Ein Hängen, während die App im Hintergrund war, das die Energieverwaltung des Telefons beendet, zählt nicht mehr als unerwartetes Beenden.
 
 ## [0.3.1] - 2026-11-01
 

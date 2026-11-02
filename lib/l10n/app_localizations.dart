@@ -4442,11 +4442,35 @@ abstract class AppLocalizations {
   /// **'Send report to the developer'**
   String get crashSendReport;
 
-  /// Announcement at the next start after the app died; tapping it opens a mail with the report.
+  /// Announcement at the next start after the app died; tapping it opens the dialog of what happened, with Close and Report.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.'**
+  /// **'Old Brain Fix stopped unexpectedly last time. Tap for details.'**
   String get crashLastRunBody;
+
+  /// Title of the dialog the announcement after an unexpected stop opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix stopped unexpectedly'**
+  String get crashLastRunTitle;
+
+  /// Cause in the dialog after an unexpected stop, when a crash log or the system's exit record says what happened.
+  ///
+  /// In en, this message translates to:
+  /// **'The last run ended with an error or was ended by the system; the text below says how.'**
+  String get crashLastRunErrorCause;
+
+  /// Cause in the dialog after an unexpected stop, when nothing recorded why the app ended.
+  ///
+  /// In en, this message translates to:
+  /// **'The last run was ended while on screen without leaving an error behind, most likely because the phone ran short of memory.'**
+  String get crashLastRunKilledCause;
+
+  /// Fix sentence in the dialog after an unexpected stop, after the cause.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved Notes are safe. “Report” sends this text to the developer by mail; “Close” sends nothing.'**
+  String get crashLastRunFix;
 
   /// No description provided for @sendToPerson.
   ///

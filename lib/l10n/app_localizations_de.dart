@@ -2769,7 +2769,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get crashLastRunBody =>
-      'Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken.';
+      'Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe für Details.';
+
+  @override
+  String get crashLastRunTitle => 'Old Brain Fix wurde unerwartet beendet';
+
+  @override
+  String get crashLastRunErrorCause =>
+      'Der letzte Lauf endete mit einem Fehler oder wurde vom System beendet; der Text unten sagt, wie.';
+
+  @override
+  String get crashLastRunKilledCause =>
+      'Der letzte Lauf wurde auf dem Bildschirm beendet, ohne einen Fehler zu hinterlassen, wahrscheinlich weil dem Telefon der Speicher knapp wurde.';
+
+  @override
+  String get crashLastRunFix =>
+      'Deine gespeicherten Notizen sind sicher. „Melden“ schickt diesen Text per Mail an den Entwickler; „Schließen“ schickt nichts.';
 
   @override
   String get sendToPerson => 'An eine Person senden';

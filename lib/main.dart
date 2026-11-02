@@ -41,6 +41,9 @@ Store? _store;
 /// What the app has to say; one for the whole run, across Restarts.
 final _announcements = Announcements();
 
+/// The app's root navigator, where the report of a run that died opens.
+final _navigator = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -65,11 +68,14 @@ Future<void> main() async {
         PlatformDispatcher.instance.locales,
         AppLocalizations.supportedLocales,
       );
-      offerCrashReport(_announcements, lookupAppLocalizations(locale));
+      offerCrashReport(
+        _announcements,
+        lookupAppLocalizations(locale),
+        navigator: _navigator,
+      );
     }
     markRunning();
-    // Out of sight is a clean end; back on screen, running again.
-    AppLifecycleListener(onHide: markCleanExit, onShow: markRunning);
+    watchRunning();
     await _openAndRun(dir);
   }, reportCrash);
 }
@@ -91,6 +97,7 @@ Future<void> _openAndRun(Directory dir) async {
     OldBrainFixApp(
       store: store,
       announcements: _announcements,
+      navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),

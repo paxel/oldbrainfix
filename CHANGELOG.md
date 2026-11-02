@@ -28,6 +28,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a Line just typed into a Checklist or a Shopping List in the Note editor shows its ⋮ as soon as it holds text, where it showed only after Return and Backspace. An entry of its ⋮ stores the Line first, then acts; an empty new Line has no ⋮.
 - On the phone the Agenda reads its rows once per change, so it opens and updates faster: a check-off, a sync, a calendar read or coming back to the app read them once, where each read them two or three times.
 - On the phone and the desktop, a Session's picks and entries are read once per change, so the Agenda loads faster: they were read again for every run so far, several times per load. On the phone the home-screen Agenda widget takes the Agenda's rows instead of reading them a second time. Whether a Note is a Tally, and which kind each Note is, are read without going through every Tally entry.
+- On the phone the announcement after an unexpected stop opens a dialog that says what happened, with Close and Report, where its tap opened the mail at once. Closed, it does not come back before the next unexpected stop. A freeze while the app was in the background, which the phone's energy management ends, no longer counts as an unexpected stop.
 
 ---
 

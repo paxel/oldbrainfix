@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
 
@@ -20,11 +21,12 @@ import 'look.dart';
 /// happened, with a Restart button and a prefilled mail to the
 /// developer. A real out-of-memory kill cannot be caught by anything in
 /// the process. On Android 11 and newer the system remembers why the
-/// process died and is asked at the next start: a crash, a native crash,
-/// an ANR or a memory kill while on screen get the offer of a report, a
-/// battery saver's or the user's kill gets none. Older systems fall back
-/// to the running marker: set at startup, cleared when the app goes out
-/// of sight, dirty at the next start means a kill. A crash in the
+/// process died and is asked at the next start: a crash or a native
+/// crash, and a freeze (ANR) or a memory kill while on screen get the
+/// offer of a report; the same in the background, a battery saver's or
+/// the user's kill get none (#206). Older systems fall back to the
+/// running marker: set at startup, cleared when the app goes out of
+/// sight, dirty at the next start means a kill ([watchRunning]). A crash in the
 /// Kotlin code writes the same files (android/…/CrashLog.kt).
 const crashMail = 'taum@tuta.io';
 
@@ -112,13 +114,14 @@ Future<bool> previousRunDied() async {
   return true;
 }
 
-/// Whether an exit the system reports deserves a report: a crash, a
-/// native crash, an ANR, or a memory kill while the app was on screen.
-/// A memory kill in the background is Android's housekeeping.
+/// Whether an exit the system reports deserves a report: a crash or a
+/// native crash always, a freeze (ANR) or a memory kill only while the
+/// app was on screen. In the background both are the system's energy
+/// management and housekeeping ending an app out of sight (#206).
 bool exitDeservesReport(String reason, {required bool foreground}) =>
     switch (reason) {
-      'crash' || 'native' || 'anr' => true,
-      'low_memory' => foreground,
+      'crash' || 'native' => true,
+      'anr' || 'low_memory' => foreground,
       _ => false,
     };
 
@@ -168,6 +171,14 @@ void markCleanExit() {
     if (marker != null && marker.existsSync()) marker.deleteSync();
   } catch (_) {}
 }
+
+/// Keeps the running marker in step with the screen: out of sight is a
+/// clean end, back on screen is running again. Hidden comes with
+/// Android's onStop, before the system may end the process, so a kill
+/// in the background finds the marker clean; a death on screen finds it
+/// dirty. Dispose it to stop watching.
+AppLifecycleListener watchRunning() =>
+    AppLifecycleListener(onHide: markCleanExit, onShow: markRunning);
 
 Future<String?> _versionFromPackage() async {
   try {
@@ -252,23 +263,44 @@ Future<void> mailCrashReport(
 }
 
 /// Offers the report of the run that died at the top of the screen (UI
-/// laws, "Announcements"): tapping it opens the mail, which the user
-/// still sends or discards. The report is taken now and the file
-/// cleared, so the same crash is offered once.
+/// laws, "Announcements"): tapping it opens what happened in the
+/// [navigator]'s dialog, with Close and Report; Report opens the mail,
+/// which the user still sends or discards. The report is taken now and
+/// the file cleared, so the same stop is offered once: closed, it does
+/// not come back before the next unexpected stop.
 void offerCrashReport(
   Announcements announcements,
   AppLocalizations t, {
+  required GlobalKey<NavigatorState> navigator,
   Future<void> Function(String body) mail = mailCrashReport,
 }) {
+  final logged = lastCrashText();
   final body =
-      lastCrashText() ??
+      logged ??
       '${crashReportHeader()}\n\n'
           'Old Brain Fix was killed without a crash log '
           '(most likely out of memory).';
   clearLastCrash();
   announcements.announce(
     t.crashLastRunBody,
-    onTap: () => unawaited(mail(body)),
+    onTap: () {
+      // Taken at the tap: at the offer the app is not running yet.
+      final context = navigator.currentContext;
+      if (context == null) return;
+      unawaited(
+        showFailure(
+          context,
+          title: t.crashLastRunTitle,
+          cause: logged == null
+              ? t.crashLastRunKilledCause
+              : t.crashLastRunErrorCause,
+          fix: t.crashLastRunFix,
+          details: body,
+          // The report carries its own header and stays a crash report.
+          report: mail,
+        ),
+      );
+    },
   );
 }
 

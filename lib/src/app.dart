@@ -60,6 +60,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// What the app has to say; the app keeps its own when none is given.
   final Announcements? announcements;
 
+  /// The root navigator, for what is announced before the app runs,
+  /// such as the report of a run that died.
+  final GlobalKey<NavigatorState>? navigatorKey;
+
   /// Where the Note editor keeps unsaved text; in memory when none is
   /// given.
   final Drafts? drafts;
@@ -148,6 +152,7 @@ class OldBrainFixApp extends StatefulWidget {
     super.key,
     required this.store,
     this.announcements,
+    this.navigatorKey,
     this.drafts,
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
@@ -278,6 +283,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: widget.navigatorKey,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

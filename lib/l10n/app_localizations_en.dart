@@ -2742,7 +2742,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crashLastRunBody =>
-      'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.';
+      'Old Brain Fix stopped unexpectedly last time. Tap for details.';
+
+  @override
+  String get crashLastRunTitle => 'Old Brain Fix stopped unexpectedly';
+
+  @override
+  String get crashLastRunErrorCause =>
+      'The last run ended with an error or was ended by the system; the text below says how.';
+
+  @override
+  String get crashLastRunKilledCause =>
+      'The last run was ended while on screen without leaving an error behind, most likely because the phone ran short of memory.';
+
+  @override
+  String get crashLastRunFix =>
+      'Your saved Notes are safe. “Report” sends this text to the developer by mail; “Close” sends nothing.';
 
   @override
   String get sendToPerson => 'Send to a person';

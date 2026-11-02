@@ -1542,10 +1542,18 @@
   "@crashSendReport": {
     "description": "Crash screen button: opens a mail to the developer with the error report."
   },
-  "crashLastRunBody": "Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.",
+  "crashLastRunBody": "Old Brain Fix stopped unexpectedly last time. Tap for details.",
   "@crashLastRunBody": {
-    "description": "Announcement at the next start after the app died; tapping it opens a mail with the report."
+    "description": "Announcement at the next start after the app died; tapping it opens the dialog of what happened, with Close and Report."
   },
+  "crashLastRunTitle": "Old Brain Fix stopped unexpectedly",
+  "@crashLastRunTitle": {"description": "Title of the dialog the announcement after an unexpected stop opens."},
+  "crashLastRunErrorCause": "The last run ended with an error or was ended by the system; the text below says how.",
+  "@crashLastRunErrorCause": {"description": "Cause in the dialog after an unexpected stop, when a crash log or the system's exit record says what happened."},
+  "crashLastRunKilledCause": "The last run was ended while on screen without leaving an error behind, most likely because the phone ran short of memory.",
+  "@crashLastRunKilledCause": {"description": "Cause in the dialog after an unexpected stop, when nothing recorded why the app ended."},
+  "crashLastRunFix": "Your saved Notes are safe. “Report” sends this text to the developer by mail; “Close” sends nothing.",
+  "@crashLastRunFix": {"description": "Fix sentence in the dialog after an unexpected stop, after the cause."},
   "sendToPerson": "Send to a person",
   "addToCalendar": "Add to calendar",
   "deleteNoteQuestion": "Delete this Note?",
