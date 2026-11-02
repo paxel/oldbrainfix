@@ -190,9 +190,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
   all-day appointments of the calendars picked, then the Shopping Lists'
-  rows as the user chose for each list (today only, oldest capture
+  groups as the user chose for each list (today only, oldest capture
   first, none for a list without open Lines), then the
-  Checklists' rows (today only, oldest capture first), then today's timed
+  Checklists' groups (today only, oldest capture first), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
   while today's pick holds a Frog (never above what is due). Every later
@@ -214,6 +214,28 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   whose calendars are picked on a page of checkboxes, none at first) and
   "Write to your calendar" (the calendar mirror); Settings has a row
   leading to the same page. Nothing on the Agenda selects rows to share.
+- **Every group on the Agenda is a heading with its entries under it**
+  (#208): a Shopping List, a Checklist, a Checklist Routine's Occurrence
+  and a Session's Occurrence alike. The heading leads with its box, or
+  with its kind's icon where it has none, then its time and words, its
+  Area's colour and icon and, on an Occurrence, ⋮; the entries are
+  indented so their boxes stand where the heading's words begin, a Line
+  under another Line one step further, and every entry looks alike: its
+  box and its words. A tap on a heading opens its list or Routine, a
+  tap on an entry's words what its heading opens (a pick its entry
+  form), a box checks its entry. One card holds a group. Which Lines a
+  Checklist's group shows is decided in one place (`agendaLines`, on the
+  desktop `agenda_lines`).
+- **The Agenda's rows are tight, their targets are not** (#208): on the
+  phone every box and ⋮ is 40 by 40 dp, a heading at least 40 high with
+  2 above and below it in its card, an entry 40 high, 6 between two
+  cards, entries indented 48; an Occurrence's card is 48 high and the
+  next starts 54 below it, where 0.3.1 had 56 and 68. On the desktop a
+  row's card has 6 above and below its content, 6 between cards and 2
+  between a heading's time and words, so the next row starts 52 below,
+  where 0.3.1 had 84; the box stays 28. The "Eat a frog" rows and the
+  appointments' rows are as tight. Not as tight as the widget, whose
+  rows lie 4 apart.
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
   press: History for a Routine, and Share, which hands the Routine as
   its whole series with its end, or the Reminder, to another app as a
@@ -225,26 +247,35 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note of its title, time, place and description and shows its card on
   top. The calendar mirror's own entries never show as appointments.
   Nothing of an appointment is kept or synced.
-- **A Checklist without a Routine or Reminder is one row today** while
-  it has open Lines, "Before the trip: 3 of 7 open", unless the user
-  switched **Show on the Agenda** off in the ⋮ of its card or in its
-  badge in the editor; the switch is there only for such a Checklist. The row has no box; a tap
-  opens the list. A Masked one says "Private Checklist" and its counts.
+- **A Checklist without a Routine or Reminder is a group today** while
+  it has open Lines (#143, #208): its name as the heading, without a
+  box, and its open Lines under it, each with its box, which checks it;
+  unless the user switched **Show on the Agenda** off in the ⋮ of its
+  card or in its badge in the editor; the switch is there only for such
+  a Checklist. A tap on the heading or a Line's words opens the list. A
+  Masked one is the heading alone, "Private Checklist: 3 of 7 open".
+- **A Shopping List's group today** (#186, #208): its name as the
+  heading, without a box, and its open Lines under it, each with its
+  box, which strikes it and takes it off the Agenda; chosen to show "one
+  row with the number of open Lines", or Masked, it is the heading
+  alone, "Weekly: 4 open". A tap on the heading or a Line's words opens
+  the list.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
   through; the box unchecks it. Checking off opens nothing.
-- **A Session's row today lists its picks under its title**, in the
-  order picked, each Tally's name with its targets ("Push-ups 20 times,
-  Wall sit 1:00"), struck through once it has an entry. Tapping a pick
-  opens its entry form, prefilled with the targets; saving records it
-  for this Occurrence. Each pick without an entry offers "Another one"
-  while the pool holds a Tally not picked. The row's own box checks the
-  Occurrence off as any Routine's; once every pick has an entry it is
-  Done and stays checked, and removing an entry undoes that. Tomorrow
-  and later days show only the title and how many it picks: the picks
-  are made on the day.
+- **A Session's group today lists its picks under its title** (#208),
+  in the order picked, each an entry with its box, checked and struck
+  through once it has an entry, each Tally's name with its targets
+  ("Push-ups 20 times"). The pick's box and words open its entry form,
+  prefilled with the targets; saving records it for this Occurrence.
+  Each pick without an entry offers "Another one" under it while the
+  pool holds a Tally not picked. **The heading's box only shows Done**:
+  it checks itself once every pick has an entry, removing an entry
+  unchecks it, and a tap on it does nothing, on every day. Tomorrow and
+  later days show only the title and how many it picks: the picks are
+  made on the day.
 - **The home-screen Agenda widget shows exactly what the Agenda shows
   for today** (#153), in the Agenda's order: the Missed Summary with its
   Missed Occurrences, the "x Unsorted" row, which opens the Unsorted

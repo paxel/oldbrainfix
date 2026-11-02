@@ -318,7 +318,7 @@ class _Words {
       if (entry.row case final placed?)
         ..._occurrence(day, placed)
       else if (entry.shopping case final shopping?)
-        _shopping(shopping)
+        ..._shopping(shopping)
       else if (entry.checklist case final checklist?)
         _checklist(checklist),
   ];
@@ -392,24 +392,36 @@ class _Words {
     final title => title,
   };
 
-  WidgetRow _shopping(ShoppingRow shopping) {
-    final (:note, :masked, :line, :count, :checks, area: _) = shopping;
+  /// A Shopping List's rows: each open Line on its own, the list's name
+  /// after its text, or the list with how many are open.
+  List<WidgetRow> _shopping(ShoppingRow shopping) {
+    final (:note, :masked, :lines, :count, :checks, area: _) = shopping;
     final title = _listTitle(note, t.shoppingHeading);
     final shown = masked ? t.maskedShoppingList : title;
-    return WidgetRow(
-      kind: WidgetRow.shopping,
-      title: switch (line) {
-        final line? => '${line.text} · $title',
-        null => t.shoppingRowOpen(shown, count),
-      },
-      checks: line != null && checks,
-      lineId: line?.id,
-      block: WidgetRow.lists,
-    );
+    if (lines.isEmpty) {
+      return [
+        WidgetRow(
+          kind: WidgetRow.shopping,
+          title: t.shoppingRowOpen(shown, count),
+          checks: false,
+          block: WidgetRow.lists,
+        ),
+      ];
+    }
+    return [
+      for (final line in lines)
+        WidgetRow(
+          kind: WidgetRow.shopping,
+          title: '${line.text} · $title',
+          checks: checks,
+          lineId: line.id,
+          block: WidgetRow.lists,
+        ),
+    ];
   }
 
   WidgetRow _checklist(ChecklistRow row) {
-    final (:note, :masked, :list, area: _) = row;
+    final (:note, :masked, :list, area: _, lines: _, checks: _) = row;
     final title = masked
         ? t.maskedChecklist
         : _listTitle(note, t.checklistHeading);

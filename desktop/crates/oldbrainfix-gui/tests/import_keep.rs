@@ -335,7 +335,8 @@ fn an_imported_checklist_stays_off_the_agenda_until_switched_on() -> TestResult 
     harness.state_mut().select(Selection::Agenda);
     harness.step();
     harness.step();
-    assert!(!shows(&harness, "Groceries: 1 of 2 open"));
+    // The list's group, its name as the heading (#208).
+    assert!(!shows(&harness, "Groceries"));
 
     let desk = harness.state().store();
     let groceries = Notes::new(desk)
@@ -349,7 +350,7 @@ fn an_imported_checklist_stays_off_the_agenda_until_switched_on() -> TestResult 
     harness.state_mut().select(Selection::Agenda);
     harness.step();
     harness.step();
-    assert!(shows(&harness, "Groceries: 1 of 2 open"));
+    assert!(shows(&harness, "Groceries"));
     Ok(())
 }
 

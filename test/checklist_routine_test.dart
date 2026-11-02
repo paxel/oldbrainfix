@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_group.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -90,9 +91,13 @@ void main() {
     String text,
   ) => tester.widget<Checkbox>(lineBox(routine, occurrence, text)).value;
 
-  /// The row's own box, which checks the Occurrence off.
+  /// The row's own box, which checks the Occurrence off: its heading's,
+  /// above its Lines in its group (#208).
   Finder rowBox(String routine, Occurrence occurrence) => find.descendant(
-    of: find.ancestor(of: row(routine, occurrence), matching: find.byType(Row)),
+    of: find.ancestor(
+      of: row(routine, occurrence),
+      matching: find.byType(AgendaGroup),
+    ),
     matching: find.byWidgetPredicate(
       (w) => w is Checkbox && w.semanticLabel == 'Done',
     ),

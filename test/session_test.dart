@@ -565,7 +565,42 @@ void main() {
       expect(tallies.entryById(entry.id)?.isTrashed, isTrue);
       final box = tester.widget<Checkbox>(find.byType(Checkbox).first);
       expect(box.value, isFalse);
-      expect(box.onChanged, isNotNull);
+      expect(box.onChanged, isNull, reason: 'it only shows Done (#208)');
+    });
+
+    testWidgets('the heading\'s box only shows Done and a tap on it does '
+        'nothing; each pick has a box of its own that opens its entry form '
+        '(#208)', (tester) async {
+      final pushUps = tally('Push-ups');
+      final made = session([pushUps, tally('Squats')]);
+      await start(tester);
+
+      final heading = find.byType(Checkbox).first;
+      expect(tester.widget<Checkbox>(heading).onChanged, isNull);
+      await tap(tester, heading);
+      expect(find.byType(RoutineEditorScreen), findsNothing);
+      expect(
+        Routines(store).agenda(deviceWallClock).todayRows.single.done,
+        isNull,
+      );
+
+      final pick = key('session-check-$pushUps');
+      expect(
+        find.descendant(of: key('session-pick-$pushUps'), matching: pick),
+        findsOneWidget,
+      );
+      expect(tester.widget<Checkbox>(pick).value, isFalse);
+      expect(tester.getSize(pick).height, greaterThanOrEqualTo(40));
+      // Indented under the heading's words.
+      expect(
+        tester.getTopLeft(pick).dx,
+        greaterThanOrEqualTo(tester.getTopLeft(find.text('Sport').first).dx),
+      );
+      await tap(tester, pick);
+      expect(find.byType(TallyEntryScreen), findsOneWidget);
+      await tap(tester, key('tally-entry-save'));
+      expect(sessions.on(made.id, today).picks.first.done, isTrue);
+      expect(tester.widget<Checkbox>(pick).value, isTrue);
     });
 
     testWidgets('tomorrow and later days show the title and how many it '

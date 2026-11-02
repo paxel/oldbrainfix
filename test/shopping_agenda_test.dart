@@ -136,26 +136,34 @@ void main() {
     expect(key('shopping'), findsOneWidget);
   });
 
-  testWidgets('each open Line on its own row, checked off there', (
-    tester,
-  ) async {
+  testWidgets('each open Line indented under the list\'s name, each with '
+      'its box, checked off there (#208)', (tester) async {
     lists.setOnAgenda(groceries, ShoppingOnAgenda.lines);
     final milk = lineId(groceries, 'Milk');
     final eggs = lineId(groceries, 'Eggs');
     final rice = lineId(groceries, 'Rice');
     await start(tester);
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       'shopping-line-$milk',
       'shopping-line-$eggs',
       'shopping-line-$rice',
       'shopping-row-$hardware',
     ]);
+    Finder inList(Finder finder) =>
+        find.descendant(of: key('shopping-row-$groceries'), matching: finder);
+    // The heading is the list's name alone, without a box.
+    expect(inList(find.text('Groceries')), findsOneWidget);
+    expect(inList(find.byType(Checkbox)), findsNWidgets(3));
+    expect(inList(key('shopping-line-$milk')), findsOneWidget);
     expect(
-      find.descendant(
-        of: key('shopping-line-$milk'),
-        matching: find.text('Groceries'),
-      ),
-      findsOneWidget,
+      tester.getTopLeft(key('shopping-check-$milk')).dx,
+      greaterThanOrEqualTo(tester.getTopLeft(find.text('Groceries')).dx),
+      reason: 'indented under the heading',
+    );
+    expect(
+      tester.getTopLeft(key('shopping-check-$milk')).dy,
+      greaterThan(tester.getTopLeft(find.text('Groceries')).dy),
     );
     await tap(tester, key('shopping-check-$milk'));
     expect(
@@ -163,6 +171,7 @@ void main() {
       isTrue,
     );
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       'shopping-line-$eggs',
       'shopping-line-$rice',
       'shopping-row-$hardware',
@@ -204,6 +213,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await start(tester);
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       for (final line in ['Milk', 'Eggs', 'Rice'])
         'shopping-line-${lineId(groceries, line)}',
       'shopping-row-$hardware',
@@ -283,6 +293,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(shoppingRows(tester), [
+        'shopping-row-$hardware',
         'shopping-line-${lineId(hardware, 'Nails')}',
       ]);
     });

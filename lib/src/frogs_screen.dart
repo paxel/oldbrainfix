@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'agenda_group.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
 import 'browser.dart';
@@ -143,7 +144,10 @@ class FrogRow extends StatelessWidget {
     final subtitle = this.subtitle;
     final onAnother = this.onAnother;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: AgendaSizes.gap,
+      ),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -162,12 +166,19 @@ class FrogRow extends StatelessWidget {
                             left: BorderSide(color: colour, width: 6),
                           ),
                         ),
-                  padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(
+                    4,
+                    AgendaSizes.inside,
+                    16,
+                    AgendaSizes.inside,
+                  ),
                   child: Row(
                     children: [
                       Checkbox(
                         value: done,
                         semanticLabel: t.markDone,
+                        // 40 by 40, as on the Agenda's rows (#208).
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         onChanged: switch (onToggle) {
                           null => null,
                           final onToggle => (_) => onToggle(),

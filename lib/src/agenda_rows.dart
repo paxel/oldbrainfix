@@ -32,22 +32,42 @@ typedef ShownPicks = ({
   bool swaps,
 });
 
-/// A Shopping List's row on today's Agenda (#123, #186): one open Line
-/// when [line] is set, else the list with [count] open Lines; with where its Note is filed, whether it shows Masked and
-/// whether this Device may check its Lines.
+/// A Shopping List's group on today's Agenda (#123, #186, #208): its
+/// open [lines] under its name, or none when it shows as one row with its
+/// [count] of open Lines, as chosen for it or as a Masked one does; with
+/// where its Note is filed, whether it shows Masked and whether this
+/// Device may check its Lines.
 typedef ShoppingRow = ({
   Note note,
   Area? area,
   bool masked,
-  ShoppingLine? line,
+  List<ShoppingLine> lines,
   int count,
   bool checks,
 });
 
-/// A Checklist's row on today's Agenda (#143): the list with how many of
-/// its Lines are open, with where its Note is filed and whether it shows
-/// Masked.
-typedef ChecklistRow = ({Note note, Area? area, bool masked, Checklist list});
+/// A Checklist's group on today's Agenda (#143, #208), shaped as a
+/// Shopping List's: the [lines] under its name, or none when it shows as
+/// its heading alone with how many of the [list]'s Lines are open, as a
+/// Masked one does; with where its Note is filed, whether it shows Masked
+/// and whether this Device may check its Lines.
+typedef ChecklistRow = ({
+  Note note,
+  Area? area,
+  bool masked,
+  Checklist list,
+  List<Line> lines,
+  bool checks,
+});
+
+/// The Lines a Checklist shows under its heading on the Agenda (#208): a
+/// Checklist Routine's Occurrence every Line, checked ones struck
+/// through; a Checklist without a Routine its open ones. The one place
+/// that decides it, for the Agenda and its widget alike.
+List<Line> agendaLines(Checklist list) => [
+  for (final line in list.lines)
+    if (list.on != null || !line.checked) line,
+];
 
 /// One row of a day on the Agenda: an Occurrence, a part of a calendar
 /// appointment, a Shopping List's or a Checklist's.
@@ -279,9 +299,9 @@ class _Reader {
   static String _sessionKey(String id, Occurrence occurrence) =>
       '$id@${occurrence.key}';
 
-  /// Today's rows of the Shopping Lists, as this person chose for each
-  /// list (#186): one per open Line, or one per list with their number.
-  /// A list of a Masked Area is one row that tells nothing of its Lines.
+  /// Today's groups of the Shopping Lists, as this person chose for each
+  /// list (#186): its open Lines under it, or only their number. A list
+  /// of a Masked Area tells nothing of its Lines.
   List<ShoppingRow> shoppingRows() {
     final rows = <ShoppingRow>[];
     for (final (:list, :shows, :lines) in shopping.agendaRows(wallClock)) {
@@ -289,28 +309,16 @@ class _Reader {
       if (note == null) continue;
       final masked = masksNote(note);
       final area = placeNote(places, note).area;
-      final checks = shopping.mayCheck(note.id);
-      if (shows == ShoppingOnAgenda.lines && !masked) {
-        for (final line in lines) {
-          rows.add((
-            note: note,
-            area: area,
-            masked: false,
-            line: line,
-            count: 1,
-            checks: checks,
-          ));
-        }
-      } else {
-        rows.add((
-          note: note,
-          area: area,
-          masked: masked,
-          line: null,
-          count: lines.length,
-          checks: checks,
-        ));
-      }
+      rows.add((
+        note: note,
+        area: area,
+        masked: masked,
+        lines: shows == ShoppingOnAgenda.lines && !masked
+            ? lines
+            : const <ShoppingLine>[],
+        count: lines.length,
+        checks: shopping.mayCheck(note.id),
+      ));
     }
     return rows;
   }
@@ -321,13 +329,25 @@ class _Reader {
   List<ChecklistRow> checklistRows() => [
     for (final list in checklists.agenda())
       if (notes.byId(list.noteId) case final note?)
-        (
-          note: note,
-          area: placeNote(places, note).area,
-          masked: masksNote(note),
-          list: list,
-        ),
+        checklistRow(note, list, masked: masksNote(note)),
   ];
+
+  /// The group of the Checklist [list] of [note]: every open Line under
+  /// its name, or, [masked], its heading alone with the count. A later
+  /// choice of how a Checklist shows on the Agenda goes in here, as a
+  /// Shopping List's does.
+  ChecklistRow checklistRow(
+    Note note,
+    Checklist list, {
+    required bool masked,
+  }) => (
+    note: note,
+    area: placeNote(places, note).area,
+    masked: masked,
+    list: list,
+    lines: masked ? const <Line>[] : agendaLines(list),
+    checks: checklists.mayCheck(note.id),
+  );
 
   PlacedRow place(AgendaRow row) {
     final id = row.routine.id;

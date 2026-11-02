@@ -267,6 +267,42 @@ fn once_every_pick_has_an_entry_the_box_stays_checked() -> TestResult {
 }
 
 #[test]
+fn the_headings_box_only_shows_done_and_each_pick_has_a_box_that_opens_it() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    let mut harness = window(&device.store, None);
+    let t = L10n::new("en");
+    // Not clickable, even before its picks have entries (#208).
+    let heading = harness
+        .query_all_by_role_and_label(Role::CheckBox, "Done: All day Sport")
+        .next()
+        .ok_or("today's box")?;
+    assert!(heading.accesskit_node().is_disabled());
+    let heading_box = heading.rect();
+    heading.click_accesskit();
+    harness.run();
+    let today = Sessions::new(&device.store).on(&id, &occurrence())?;
+    assert!(!today.complete());
+    assert!(harness.state().routine_editor().is_none());
+    // Each pick an entry with its box, indented under the heading.
+    let pick = harness
+        .query_all_by_role_and_label(Role::CheckBox, "Push-ups 20 times")
+        .next()
+        .ok_or("the pick's box")?;
+    assert_ne!(pick.accesskit_node().toggled(), Some(Toggled::True));
+    assert!(pick.rect().left() > heading_box.left());
+    assert!(pick.rect().top() > heading_box.top());
+    pick.click_accesskit();
+    harness.run();
+    assert!(shows(&harness, t.tally_new_entry()));
+    click_button(&mut harness, t.save());
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(checked(&harness, Role::CheckBox, "Push-ups 20 times"));
+    Ok(())
+}
+
+#[test]
 fn a_pick_with_an_entry_opens_that_entry() -> TestResult {
     let device = device()?;
     let id = spawn(&device)?;

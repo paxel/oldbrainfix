@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -232,6 +233,28 @@ void main() {
       final dentist = tester.getTopLeft(find.text('dentist')).dy;
       expect(dentist, greaterThan(tester.getTopLeft(find.text(week[5])).dy));
       expect(dentist, lessThan(tester.getTopLeft(find.text(week[6])).dy));
+    });
+
+    testWidgets('rows are tighter than in 0.3.1, their boxes and ⋮ still '
+        '40 dp (#208)', (tester) async {
+      routines.create('pills', daily([at(8)]));
+      routines.create('call Mum', daily([at(12)]));
+      await start(tester);
+      Finder card(String text) => find
+          .ancestor(of: find.text(text), matching: find.byType(Embossed))
+          .first;
+      // 0.3.1: 56 high, 68 from one row's top to the next's.
+      expect(tester.getSize(card('pills')).height, lessThanOrEqualTo(48));
+      expect(
+        tester.getTopLeft(card('call Mum')).dy -
+            tester.getTopLeft(card('pills')).dy,
+        lessThanOrEqualTo(54),
+      );
+      final box = tester.getSize(find.byType(Checkbox).first);
+      expect(box.width, greaterThanOrEqualTo(40));
+      expect(box.height, greaterThanOrEqualTo(40));
+      final menu = tester.getSize(find.byTooltip('More').first);
+      expect(menu.height, greaterThanOrEqualTo(40));
     });
 
     testWidgets('a day after tomorrow is checked off today', (tester) async {

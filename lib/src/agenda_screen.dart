@@ -6,16 +6,15 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'agenda_group.dart';
 import 'agenda_rows.dart';
 import 'agenda_widget.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
-import 'area_look.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
-import 'checklist_view.dart';
 import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
 import 'calendar_screen.dart';
@@ -83,11 +82,13 @@ enum _RowChoice { history, share }
 /// heading opens the Frog view; it shows while a Frog is open or one was
 /// eaten today. A Frog of a Masked Area shows masked, as an Occurrence.
 ///
-/// A Session's row today lists its picks (ADR 0029), written for
-/// everyone the Session reaches as it loads: each opens its entry form
-/// and has "Another one" until it has an entry. Once each has one, the
-/// box stays checked. On later days the row says how many it picks. A
-/// Masked row lists none, and a pick from a Masked Area shows masked.
+/// A Session's group today lists its picks under its title (ADR 0029,
+/// #208), written for everyone the Session reaches as it loads: each an
+/// entry with its box, which with its words opens its entry form, and
+/// "Another one" until it has an entry. The title's box only shows Done:
+/// once each pick has an entry it checks itself, and a tap on it does
+/// nothing. On later days the row says how many it picks. A Masked row
+/// lists none, and a pick from a Masked Area shows masked.
 ///
 /// Where switched on, every day also shows the appointments of the
 /// calendars picked on the Calendar page (#116), read as the Agenda
@@ -97,14 +98,16 @@ enum _RowChoice { history, share }
 /// and "Copy into a Note" makes a Note of one.
 ///
 /// Today also shows the Shopping Lists with open Lines, after the
-/// all-day rows, each as the user chose for it (#186): each open Line
-/// with its box, or one row with how many are open, or none. A tap opens
-/// the list; a Masked one is one row that names no Line.
+/// all-day rows, each as the user chose for it (#186, #208): its name as
+/// a heading with each open Line under it with its box, or the heading
+/// alone with how many are open, or none. A tap opens the list; a Masked
+/// one is the heading alone and names no Line.
 ///
 /// After them today shows each Checklist without a Routine or Reminder
 /// that has open Lines and that the user did not switch off for their
-/// own Agenda (#143), as one row with how many of its Lines are open; a
-/// tap opens it, and a Masked one names nothing of it.
+/// own Agenda (#143, #208): its name as a heading with its open Lines
+/// under it, each with its box; a tap opens it, and a Masked one is the
+/// heading alone with its counts, naming nothing of it.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -629,6 +632,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  /// Checks the Line [lineId] of a Checklist without a Routine from its
+  /// group today: it leaves the Agenda, and the list with its last.
+  void _checkListLine(String lineId) {
+    _checklists.check(lineId);
+    _reload();
+  }
+
   /// Checks the Line [lineId] of a Shopping List from its row today: it
   /// is struck through and leaves the Agenda until it comes back.
   void _checkShopping(String lineId) {
@@ -748,116 +758,214 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  _OccurrenceRow _occurrenceRow(
-    AppLocalizations t,
-    String locale,
-    PlacedRow placed,
-  ) {
-    final (:row, :area, :masked, :picks, :lines, session: _) = placed;
+  /// An Occurrence's group (#208): its box, time and title as the
+  /// heading, and under it a Session's picks or a Checklist Routine's
+  /// Lines, each with its box.
+  Widget _occurrenceRow(AppLocalizations t, String locale, PlacedRow placed) {
+    final (:row, :area, :masked, :picks, :lines, :session) = placed;
+    final note = row.note;
     // Done from the entries of every pick, or from every Line checked,
     // stays checked.
     final complete =
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
-    return _OccurrenceRow(
-      row: row,
+    final done = row.done != null || complete;
+    // A Session's box only shows Done: its picks make it (#208).
+    final checks = !complete && session == null;
+    return AgendaGroup(
+      key: ValueKey('row-${row.routine.id}@${row.occurrence.key}'),
       // A Masked row tells nothing of its Area either.
       area: masked ? null : area,
-      masked: masked
-          ? maskedText(t, locale, row.routine, row.occurrence)
-          : null,
+      lead: AgendaBox(
+        value: done,
+        label: t.markDone,
+        onChanged: checks ? (_) => _toggle(row) : null,
+      ),
       time: occurrenceTime(t, locale, row.occurrence),
-      below: _sessionPart(t, placed) ?? _checklistPart(placed),
-      onToggle: complete ? null : () => _toggle(row),
+      title: masked
+          ? maskedText(t, locale, row.routine, row.occurrence)
+          : note == null
+          ? t.noteGone
+          : noteText(t, note),
+      struck: row.done != null,
+      under: _sessionUnder(t, placed),
+      marks: [
+        if (row.routine.isReminder)
+          Icon(
+            Icons.notifications_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            semanticLabel: t.reminder,
+          ),
+      ],
       onTap: () => _openRow(row),
       onMenu: _rowMenu(row),
+      menuKey: ValueKey('row-menu-${row.routine.id}'),
+      entries: [..._sessionPicks(t, placed), ..._routineLines(placed)],
     );
   }
 
-  /// What shows under a Session's title: today its picks, on later days
-  /// how many it picks; nothing on a Masked row.
-  Widget? _sessionPart(AppLocalizations t, PlacedRow placed) {
+  /// What shows under a Session's title: on later days how many it
+  /// picks, today that there is nothing left to pick; nothing on a Masked
+  /// row.
+  Widget? _sessionUnder(AppLocalizations t, PlacedRow placed) {
     final (:row, :masked, :session, :picks, area: _, lines: _) = placed;
     if (masked || session == null) return null;
     if (picks == null) {
       return Text(t.sessionPicks(session.countOn(row.occurrence.day)));
     }
+    if (picks.today.picks.isEmpty) {
+      return Text(
+        t.sessionNothingToPick,
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+    return null;
+  }
+
+  /// Today's picks of a Session under its title, each with its box, which
+  /// shows whether it has an entry; the box and the words open its entry
+  /// form, and "Another one" goes under each without an entry while it
+  /// swaps; nothing on a Masked row.
+  List<Widget> _sessionPicks(AppLocalizations t, PlacedRow placed) {
+    final (:masked, :picks, row: _, session: _, area: _, lines: _) = placed;
+    if (masked || picks == null) return const [];
     final (:today, masked: hidden, :opens, :swaps) = picks;
     final decimal = decimalSign(context);
-    return SessionPicks(
-      today: today,
-      texts: [
-        for (final (i, pick) in today.picks.indexed)
-          hidden[i] ? t.maskedTally : pickText(t, pick, _system, decimal),
+    return [
+      for (final (i, pick) in today.picks.indexed) ...[
+        AgendaEntry(
+          key: ValueKey('session-pick-${pick.noteId}'),
+          boxKey: ValueKey('session-check-${pick.noteId}'),
+          text: hidden[i] ? t.maskedTally : pickText(t, pick, _system, decimal),
+          checked: pick.done,
+          onBox: opens[i] ? () => _openPick(today, pick) : null,
+          onTap: opens[i] ? () => _openPick(today, pick) : null,
+        ),
+        // The control goes below its text.
+        if (swaps && !pick.done)
+          Padding(
+            padding: const EdgeInsets.only(left: AgendaSizes.indent),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('session-another-${pick.noteId}'),
+                onPressed: () => _anotherPick(today, pick),
+                icon: const Icon(Icons.swap_horiz),
+                label: Text(t.sessionAnother),
+              ),
+            ),
+          ),
       ],
-      onOpen: (i) => opens[i] ? () => _openPick(today, today.picks[i]) : null,
-      onAnother: (i) =>
-          swaps ? () => _anotherPick(today, today.picks[i]) : null,
-    );
+    ];
   }
 
-  /// What shows under the title of a Routine spawned from a Checklist:
-  /// its Lines as checked for this Occurrence, checkable where this
-  /// Device may check it off, on every day shown; nothing on a Masked
-  /// row.
-  Widget? _checklistPart(PlacedRow placed) {
+  /// The Lines of a Routine spawned from a Checklist under its title, as
+  /// checked for this Occurrence, checkable where this Device may check
+  /// it off, on every day shown; a tap on one's words opens the Routine
+  /// as the heading does. Nothing on a Masked row.
+  List<Widget> _routineLines(PlacedRow placed) {
     final (:row, :masked, :lines, area: _, session: _, picks: _) = placed;
-    if (masked || lines == null) return null;
+    if (masked || lines == null) return const [];
     final (:list, :checks) = lines;
-    return KeyedSubtree(
-      key: ValueKey('row-checklist-${row.routine.id}@${row.occurrence.key}'),
-      child: ChecklistLines(
-        lines: shownLines(list),
-        onCheck: checks ? (id, checked) => _checkLine(row, id, checked) : null,
+    return [
+      KeyedSubtree(
+        key: ValueKey('row-checklist-${row.routine.id}@${row.occurrence.key}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final line in agendaLines(list))
+              _lineEntry(
+                line,
+                onBox: checks
+                    ? () => _checkLine(row, line.id, !line.checked)
+                    : null,
+                onTap: () => _openRow(row),
+              ),
+          ],
+        ),
       ),
-    );
+    ];
   }
 
-  /// A Shopping List's row today: an open Line, with its box and the
-  /// list's title under it, or the list with how many Lines are open. A
-  /// tap opens the list.
+  /// A Checklist's Line as an entry, a Line under another one step
+  /// further in.
+  Widget _lineEntry(
+    Line line, {
+    required VoidCallback? onBox,
+    required VoidCallback onTap,
+  }) => AgendaEntry(
+    boxKey: ValueKey('checklist-check-${line.id}'),
+    textKey: ValueKey('checklist-line-${line.id}'),
+    text: line.text,
+    checked: line.checked,
+    depth: line.inGroup ? 1 : 0,
+    onBox: onBox,
+    onTap: onTap,
+  );
+
+  /// The title of the list [note]: its first line, else [fallback].
+  String _listTitle(AppLocalizations t, Note note, String fallback) =>
+      switch (noteText(t, note).trim().split('\n').first.trim()) {
+        '' => fallback,
+        final title => title,
+      };
+
+  /// A Shopping List's group today (#208): its name as the heading, with
+  /// no box, and its open Lines under it, each with its box, which checks
+  /// it and takes it off; or, as chosen for it or Masked, the heading
+  /// alone with how many are open. A tap opens the list.
   Widget _shoppingRow(AppLocalizations t, ShoppingRow shopping) {
-    final (:note, :area, :masked, :line, :count, :checks) = shopping;
-    final title = switch (noteText(t, note).trim().split('\n').first.trim()) {
-      '' => t.shoppingHeading,
-      final title => title,
-    };
-    final shown = masked ? t.maskedShoppingList : title;
-    return _ShoppingListRow(
-      icon: Icons.shopping_cart_outlined,
-      key: ValueKey(
-        line == null ? 'shopping-row-${note.id}' : 'shopping-line-${line.id}',
-      ),
+    final (:note, :area, :masked, :lines, :count, :checks) = shopping;
+    final title = _listTitle(t, note, t.shoppingHeading);
+    return AgendaGroup(
+      key: ValueKey('shopping-row-${note.id}'),
       area: masked ? null : area,
-      text: switch (line) {
-        final line? => line.text,
-        null => t.shoppingRowOpen(shown, count),
-      },
-      list: line == null ? null : title,
-      checkKey: line == null ? null : ValueKey('shopping-check-${line.id}'),
-      onCheck: line != null && checks ? () => _checkShopping(line.id) : null,
+      lead: AgendaGroup.icon(context, Icons.shopping_cart_outlined),
+      title: lines.isNotEmpty
+          ? title
+          : t.shoppingRowOpen(masked ? t.maskedShoppingList : title, count),
       onTap: () => _openList(note),
+      entries: [
+        for (final line in lines)
+          AgendaEntry(
+            key: ValueKey('shopping-line-${line.id}'),
+            boxKey: ValueKey('shopping-check-${line.id}'),
+            text: line.text,
+            checked: false,
+            onBox: checks ? () => _checkShopping(line.id) : null,
+            onTap: () => _openList(note),
+          ),
+      ],
     );
   }
 
-  /// A Checklist's row today: its title with how many of its Lines are
-  /// open, "Before the trip: 3 of 7 open". A tap opens the list.
+  /// A Checklist's group today (#208), as a Shopping List's: its name as
+  /// the heading, with no box, and its open Lines under it, each with its
+  /// box; without Lines, as a Masked one, the heading alone with the count,
+  /// "Private Checklist: 3 of 7 open". A tap opens the list.
   Widget _checklistRow(AppLocalizations t, ChecklistRow row) {
-    final (:note, :area, :masked, :list) = row;
-    final title = masked
-        ? t.maskedChecklist
-        : switch (noteText(t, note).trim().split('\n').first.trim()) {
-            '' => t.checklistHeading,
-            final title => title,
-          };
-    return _ShoppingListRow(
+    final (:note, :area, :masked, :list, :lines, :checks) = row;
+    final title = _listTitle(t, note, t.checklistHeading);
+    return AgendaGroup(
       key: ValueKey('checklist-row-${note.id}'),
-      icon: Icons.checklist,
       area: masked ? null : area,
-      text: t.checklistRowOpen(title, list.openCount, list.count),
-      list: null,
-      checkKey: null,
-      onCheck: null,
+      lead: AgendaGroup.icon(context, Icons.checklist),
+      title: lines.isNotEmpty
+          ? title
+          : t.checklistRowOpen(
+              masked ? t.maskedChecklist : title,
+              list.openCount,
+              list.count,
+            ),
       onTap: () => _openList(note),
+      entries: [
+        for (final line in lines)
+          _lineEntry(
+            line,
+            onBox: checks ? () => _checkListLine(line.id) : null,
+            onTap: () => _openList(note),
+          ),
+      ],
     );
   }
 
@@ -1380,268 +1488,6 @@ class _NothingPlanned extends StatelessWidget {
   );
 }
 
-/// One Occurrence as an embossed row: the box to check it off, its time,
-/// its Note's text, its Area's colour and icon, and ⋮. Tapping the row
-/// opens its Routine; a long press opens [onMenu] where the finger is,
-/// and ⋮ opens it at the button, when there is one.
-class _OccurrenceRow extends StatelessWidget {
-  final AgendaRow row;
-  final Area? area;
-
-  /// The masked text shown instead of the Note's; null when it shows in
-  /// full.
-  final String? masked;
-  final String time;
-
-  /// What shows under the title, such as a Session's picks.
-  final Widget? below;
-
-  /// Checks it off or unchecks it; the box is disabled when null.
-  final VoidCallback? onToggle;
-  final VoidCallback onTap;
-  final void Function(Offset at)? onMenu;
-
-  const _OccurrenceRow({
-    required this.row,
-    required this.area,
-    this.masked,
-    required this.time,
-    this.below,
-    required this.onToggle,
-    required this.onTap,
-    this.onMenu,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final colour = areaColour(area?.colour);
-    final done = row.done != null;
-    final note = row.note;
-    final title = masked ?? (note == null ? t.noteGone : noteText(t, note));
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The row's ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: GestureDetector(
-              onLongPressStart: switch (onMenu) {
-                null => null,
-                final onMenu => (details) => onMenu(details.globalPosition),
-              },
-              child: InkWell(
-                onTap: onTap,
-                child: Container(
-                  decoration: colour == null
-                      ? null
-                      : BoxDecoration(
-                          border: Border(
-                            left: BorderSide(color: colour, width: 6),
-                          ),
-                        ),
-                  padding: EdgeInsets.fromLTRB(
-                    4,
-                    4,
-                    onMenu == null ? 16 : 4,
-                    4,
-                  ),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: done,
-                        semanticLabel: t.markDone,
-                        onChanged: switch (onToggle) {
-                          null => null,
-                          final onToggle => (_) => onToggle(),
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(time, style: text.labelLarge),
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: text.bodyLarge?.copyWith(
-                                decoration: done
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                            ),
-                            ?below,
-                          ],
-                        ),
-                      ),
-                      if (row.routine.isReminder)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Icon(
-                            Icons.notifications_outlined,
-                            size: 18,
-                            color: scheme.onSurfaceVariant,
-                            semanticLabel: t.reminder,
-                          ),
-                        ),
-                      if (areaIconData(area?.icon) case final icon?)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Icon(icon, size: 20, color: colour),
-                        ),
-                      if (onMenu case final onMenu?)
-                        // The same menu as the long press, at the button.
-                        Builder(
-                          builder: (button) => IconButton(
-                            key: ValueKey('row-menu-${row.routine.id}'),
-                            tooltip: t.more,
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () {
-                              final box =
-                                  button.findRenderObject() as RenderBox?;
-                              if (box == null) return;
-                              onMenu(
-                                box.localToGlobal(
-                                  box.size.bottomLeft(Offset.zero),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A Shopping List's or Checklist's row today as an embossed row, its
-/// Area's colour and icon on it: a Line that came back today with its box
-/// and the list's title under it, or the list with its [icon]. Tapping it
-/// opens the list.
-class _ShoppingListRow extends StatelessWidget {
-  /// What leads a row of the list, which has no box.
-  final IconData icon;
-  final Area? area;
-  final String text;
-
-  /// The list's title under a Line's text; null on a row of the list.
-  final String? list;
-
-  /// The box's key on a Line's row; null on a row of the list, which has
-  /// no box.
-  final Key? checkKey;
-
-  /// Checks the Line; the box is disabled when null.
-  final VoidCallback? onCheck;
-  final VoidCallback onTap;
-
-  const _ShoppingListRow({
-    super.key,
-    required this.icon,
-    required this.area,
-    required this.text,
-    required this.list,
-    required this.checkKey,
-    required this.onCheck,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final styles = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final colour = areaColour(area?.colour);
-    final list = this.list;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The row's ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
-              child: Container(
-                decoration: colour == null
-                    ? null
-                    : BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: colour, width: 6),
-                        ),
-                      ),
-                padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
-                child: Row(
-                  children: [
-                    if (checkKey case final checkKey?)
-                      Checkbox(
-                        key: checkKey,
-                        value: false,
-                        semanticLabel: text,
-                        onChanged: switch (onCheck) {
-                          null => null,
-                          final onCheck => (_) => onCheck(),
-                        },
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(icon, color: scheme.onSurfaceVariant),
-                      ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              text,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: styles.bodyLarge,
-                            ),
-                            if (list != null)
-                              Text(
-                                list,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: styles.labelMedium?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (areaIconData(area?.icon) case final icon?)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(icon, size: 20, color: colour),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// A calendar appointment's part on one day as an embossed row, read
 /// only: its calendar's colour down the side and its icon, its time, its
 /// title, its calendar's name, and ⋮; no box, as nothing here checks it
@@ -1682,7 +1528,10 @@ class _AppointmentRow extends StatelessWidget {
     final description = appointment.description.trim();
     final dim = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: AgendaSizes.gap,
+      ),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -1697,7 +1546,7 @@ class _AppointmentRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(left: BorderSide(color: colour, width: 6)),
                   ),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                  padding: const EdgeInsets.fromLTRB(12, 2, 0, 2),
                   child: Row(
                     children: [
                       Icon(
@@ -1710,7 +1559,7 @@ class _AppointmentRow extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1741,6 +1590,10 @@ class _AppointmentRow extends StatelessWidget {
                         builder: (button) => IconButton(
                           key: ValueKey('appointment-menu-${piece.key}'),
                           tooltip: t.more,
+                          // 40 by 40, as the boxes (#208).
+                          style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           icon: const Icon(Icons.more_vert),
                           onPressed: () {
                             final box = button.findRenderObject() as RenderBox?;

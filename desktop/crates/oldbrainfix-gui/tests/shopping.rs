@@ -100,6 +100,16 @@ fn shows_part(harness: &Harness<'_, App>, part: &str) -> bool {
     harness.query_all_by_label_contains(part).next().is_some()
 }
 
+/// Whether the Agenda shows the list "Weekly", as its heading alone or
+/// with its Lines under it (#208).
+fn shows_weekly(harness: &Harness<'_, App>) -> bool {
+    shows_part(harness, "Weekly:")
+        || harness
+            .query_all_by_role_and_label(Role::Button, "Weekly")
+            .next()
+            .is_some()
+}
+
 /// Clicks the last widget labelled `label`: a menu's or a dialog's, over
 /// the window.
 fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
@@ -921,23 +931,37 @@ fn by_default_the_agenda_has_one_row_with_the_open_lines_of_the_list() -> TestRe
 #[test]
 fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    // The list's name as the heading, its open Lines under it (#208).
+    let heading = harness.get_by_role_and_label(Role::Button, "Weekly").rect();
     for line in ["Milk", "Bread", "Apples"] {
-        assert!(shows(&harness, &format!("Weekly: {line}")), "{line}");
+        let words = harness.get_by_role_and_label(Role::Button, line).rect();
+        let tick = boxes(&harness, line).pop().ok_or(line)?.rect();
+        assert!(words.top() > heading.top(), "{line} under the heading");
+        assert!(tick.left() >= heading.left() - 0.5, "{line} indented");
     }
     assert!(!shows_part(&harness, "open"));
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
-    assert!(!shows(&harness, "Weekly: Bread"));
-    assert!(shows(&harness, "Weekly: Milk"));
+    assert!(boxes(&harness, "Bread").is_empty());
+    assert!(!boxes(&harness, "Milk").is_empty());
     Ok(())
 }
 
 #[test]
 fn a_line_row_opens_its_note() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    harness.get_by_role_and_label(Role::Button, "Milk").click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_heading_of_a_list_with_its_lines_opens_its_note() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
     harness
-        .get_by_role_and_label(Role::Button, "Weekly: Milk")
+        .get_by_role_and_label(Role::Button, "Weekly")
         .click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
@@ -947,7 +971,7 @@ fn a_line_row_opens_its_note() -> TestResult {
 #[test]
 fn the_off_choice_shows_no_shopping_list() -> TestResult {
     let (harness, _) = agenda(Some(ShoppingOnAgenda::Off))?;
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(shows(&harness, NOTHING_TODAY));
     Ok(())
@@ -966,7 +990,7 @@ fn a_list_without_open_lines_never_shows() -> TestResult {
             }
             Ok(())
         })?;
-        assert!(!shows_part(&harness, "Weekly:"), "{shows_as:?}");
+        assert!(!shows_weekly(&harness), "{shows_as:?}");
         assert!(shows(&harness, NOTHING_TODAY), "{shows_as:?}");
     }
     Ok(())
@@ -982,9 +1006,10 @@ fn a_list_nobody_chose_for_shows_as_this_device_showed_shopping_lists() -> TestR
         }
     };
     let (harness, _) = agenda_with(old("off"))?;
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     let (harness, _) = agenda_with(old("lines"))?;
-    assert!(shows(&harness, "Weekly: Bread"));
+    assert!(shows(&harness, "Weekly"));
+    assert!(!boxes(&harness, "Bread").is_empty());
     let (harness, _) = agenda_with(old("back"))?;
     assert!(shows(&harness, "Weekly: 3 open"));
     Ok(())
@@ -1075,7 +1100,7 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     assert_eq!(radio(&harness, LINES), None, "the menu closed");
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(shows(&harness, "Weekly: Milk"));
+    assert!(!boxes(&harness, "Milk").is_empty());
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Weekly")?;
@@ -1084,7 +1109,7 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Off);
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     Ok(())
 }
 

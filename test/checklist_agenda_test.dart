@@ -6,10 +6,11 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'reveal.dart';
 
-/// Checklists on the Agenda (#143): each without a Routine shows today as
-/// one row with how many of its Lines are open, after the Shopping Lists'
-/// rows, until every Line is checked or the user switches "Show on the
-/// Agenda" off in the ⋮ of its card or editor.
+/// Checklists on the Agenda (#143, #208): each without a Routine shows
+/// today as a heading with its name and its open Lines indented under it,
+/// each with its box, after the Shopping Lists' rows, until every Line is
+/// checked or the user switches "Show on the Agenda" off in the ⋮ of its
+/// card or editor.
 void main() {
   late Store store;
   late Notes notes;
@@ -92,16 +93,45 @@ void main() {
       )
       .value;
 
-  testWidgets('a new Checklist shows today with its open Lines; '
-      'a tap opens the list', (tester) async {
+  testWidgets('a new Checklist shows today as a heading with its open Lines '
+      'indented, each with its box; a tap opens the list', (tester) async {
     final id = trip();
     await start(tester);
     expect(checklistRows(), ['checklist-row-$id']);
-    expect(find.text('Before the trip: 2 of 3 open'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNothing, reason: 'no box on the row');
-    await tap(tester, key('checklist-row-$id'));
+    Finder inRow(Finder finder) =>
+        find.descendant(of: key('checklist-row-$id'), matching: finder);
+    expect(inRow(find.text('Before the trip')), findsOneWidget);
+    expect(find.textContaining('of 3 open'), findsNothing);
+    expect(inRow(find.text('Passport')), findsNothing, reason: 'open only');
+    final tickets = lineId(id, 'Tickets');
+    final charger = lineId(id, 'Charger');
+    expect(inRow(find.byType(Checkbox)), findsNWidgets(2));
+    // Indented: each Line's box starts where the heading's words do.
+    expect(
+      tester.getTopLeft(key('checklist-check-$tickets')).dx,
+      greaterThanOrEqualTo(tester.getTopLeft(find.text('Before the trip')).dx),
+    );
+    expect(
+      tester.getSize(key('checklist-check-$tickets')).height,
+      greaterThanOrEqualTo(40),
+    );
+    await tap(tester, key('checklist-check-$tickets'));
+    expect(
+      lists.byNote(id)!.lines.firstWhere((l) => l.id == tickets).checked,
+      isTrue,
+    );
+    expect(key('checklist-check-$tickets'), findsNothing);
+    expect(key('checklist-check-$charger'), findsOneWidget);
+    await tap(tester, key('checklist-line-$charger'));
     expect(find.byType(NoteEditorScreen), findsOneWidget);
     expect(key('checklist'), findsOneWidget);
+  });
+
+  testWidgets('a tap on the heading opens the list', (tester) async {
+    trip();
+    await start(tester);
+    await tap(tester, find.text('Before the trip'));
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
   });
 
   testWidgets('oldest capture first, after the all-day Occurrences and the '
@@ -137,7 +167,7 @@ void main() {
       top(find.text('Evening pills')),
     ];
     expect(order, [...order]..sort());
-    expect(find.text('Garage: 1 of 1 open'), findsOneWidget);
+    expect(find.text('Garage'), findsOneWidget);
   });
 
   testWidgets('every Line checked, it is gone', (tester) async {
@@ -234,5 +264,7 @@ void main() {
     expect(checklistRows(), ['checklist-row-$id']);
     expect(find.text('Private Checklist: 2 of 3 open'), findsOneWidget);
     expect(find.textContaining('Before the trip'), findsNothing);
+    expect(find.text('Tickets'), findsNothing);
+    expect(find.byType(Checkbox), findsNothing);
   });
 }

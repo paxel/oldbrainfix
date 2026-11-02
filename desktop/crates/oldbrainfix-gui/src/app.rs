@@ -112,7 +112,7 @@ use crate::capture_choices::{
 };
 use crate::card_glance;
 use crate::card_selection::CardSelection;
-use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
+use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
 use crate::enrich::Enricher;
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
@@ -279,30 +279,43 @@ struct Row {
     lines: Option<(Checklist, bool)>,
 }
 
-/// A Shopping List's row on today's Agenda (#123): one Line that came
-/// back today when `line` is set, else the list with what its row says,
-/// "Groceries: 3 back"; with the Area its Note is filed in and whether
+/// A Shopping List's group on today's Agenda (#123, #186, #208): its
+/// heading, the list's title, and its open `lines` under it; or, as
+/// chosen for it, the heading alone saying how many are open,
+/// "Groceries: 3 open". With the Area its Note is filed in and whether
 /// this Device may check its Lines.
 #[derive(Debug, Clone)]
 struct ShoppingRow {
     note_id: String,
     area: Option<Area>,
-    /// The list's title: the first line of its Note's text, else
-    /// "Shopping List".
-    title: String,
-    line: Option<ShoppingLine>,
-    /// What the row of the list says; the Line's text on a Line's row.
+    /// What the heading says.
     text: String,
+    lines: Vec<ShoppingLine>,
     checks: bool,
 }
 
-/// A Checklist's row on today's Agenda (#143): its Note, Area and what
-/// it says, "Before the trip: 3 of 7 open".
+/// A Checklist's group on today's Agenda (#143, #208), shaped as a
+/// Shopping List's: its Note, Area, what its heading says and its open
+/// Lines under it; with no Lines the heading says how many are open,
+/// "Packing: 3 of 7 open". With whether this Device may check them.
 #[derive(Debug, Clone)]
 struct ChecklistRow {
     note_id: String,
     area: Option<Area>,
     text: String,
+    lines: Vec<ShownLine>,
+    checks: bool,
+}
+
+/// The Lines a Checklist shows under its heading on the Agenda (#208): a
+/// Checklist Routine's Occurrence every Line, checked ones struck
+/// through; a Checklist without a Routine its open ones. The one place
+/// that decides it.
+fn agenda_lines(list: &Checklist) -> Vec<ShownLine> {
+    checklist_view::shown_lines(list)
+        .into_iter()
+        .filter(|line| list.on.is_some() || !line.checked)
+        .collect()
 }
 
 /// What the Agenda shows.
@@ -4437,31 +4450,23 @@ impl App {
                         Some(first) if !first.trim().is_empty() => first.trim().to_string(),
                         _ => self.t.shopping_heading().to_string(),
                     };
-                    let checks = shopping.may_check(&note.id)?;
-                    let area = place(note.clone())?.area;
-                    let row = |line: Option<ShoppingLine>, text: String| ShoppingRow {
-                        note_id: note.id.clone(),
-                        area: area.clone(),
-                        title: title.clone(),
-                        line,
-                        text,
-                        checks,
-                    };
                     // As this person chose for the list (#186); one kept
                     // off is not among them.
                     let count = shown.lines.len() as i64;
-                    match shown.shows {
-                        ShoppingOnAgenda::Lines => {
-                            for line in shown.lines {
-                                let text = line.text.clone();
-                                shopping_rows.push(row(Some(line), text));
-                            }
-                        }
+                    let (lines, text) = match shown.shows {
+                        ShoppingOnAgenda::Lines => (shown.lines, title),
                         ShoppingOnAgenda::Count => {
-                            shopping_rows.push(row(None, self.t.shopping_row_open(&title, count)));
+                            (Vec::new(), self.t.shopping_row_open(&title, count))
                         }
-                        ShoppingOnAgenda::Off => {}
-                    }
+                        ShoppingOnAgenda::Off => continue,
+                    };
+                    shopping_rows.push(ShoppingRow {
+                        area: place(note.clone())?.area,
+                        checks: shopping.may_check(&note.id)?,
+                        note_id: note.id,
+                        text,
+                        lines,
+                    });
                 }
                 let mut checklist_rows = Vec::new();
                 for list in lists.agenda()? {
@@ -4472,10 +4477,21 @@ impl App {
                         Some(first) if !first.trim().is_empty() => first.trim().to_string(),
                         _ => self.t.checklist_heading().to_string(),
                     };
-                    let (open, count) = (list.open_count() as i64, list.count() as i64);
+                    // Every open Line; a later choice of how a Checklist
+                    // shows on the Agenda goes in here, as a Shopping
+                    // List's does, empty Lines leaving the count.
+                    let lines = agenda_lines(&list);
+                    let text = if lines.is_empty() {
+                        let (open, count) = (list.open_count() as i64, list.count() as i64);
+                        self.t.checklist_row_open(&title, open, count)
+                    } else {
+                        title
+                    };
                     checklist_rows.push(ChecklistRow {
                         area: place(note.clone())?.area,
-                        text: self.t.checklist_row_open(&title, open, count),
+                        text,
+                        lines,
+                        checks: lists.may_check(&note.id)?,
                         note_id: note.id,
                     });
                 }
@@ -10379,7 +10395,8 @@ impl App {
             return;
         };
         let output = list_scroll(ui, "agenda", |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
+            // Tighter than 0.3.1's 12 (#208).
+            ui.spacing_mut().item_spacing.y = 6.0;
             ui.add_space(4.0);
             if !agenda.missed.is_empty() {
                 missed_card(ui, &t, tones, &agenda.missed, actions);
@@ -13066,14 +13083,104 @@ pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     }
 }
 
-/// One Occurrence on the Agenda as an embossed row: the box to check it
-/// off, its time, its Note's text, its Area's colour and icon, and its
-/// ⋮. A click on the text opens its Routine; a right-click on it opens
-/// the menu of ⋮. A Session's row lists its picks under it today, and
-/// how many it picks on later days; once every pick has an entry, its
-/// box stays checked. A Routine spawned from a Checklist lists its Lines
-/// under it, checked for this Occurrence; once every Line is checked, its
-/// box stays checked too (#121).
+/// How far an entry under an Agenda group's heading is indented, beside
+/// the item spacing: its box stands where the heading's words begin, as
+/// far in as a box and the room after it (#208).
+const ENTRY_INDENT: f32 = 28.0 + 4.0;
+
+/// How much further a Line under another Line is indented.
+const ENTRY_STEP: f32 = 20.0;
+
+/// The room above and below an Agenda row's content in its card, tighter
+/// than a card's elsewhere (#208).
+const AGENDA_INSIDE: i8 = 6;
+
+/// The box of an Agenda heading that only shows Done, a Session's
+/// (#208): drawn as [`check`] in its usual colours, but nothing clicks
+/// it.
+fn shown_check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, false, done, label));
+    let (icon, colour) = if done {
+        (icons::CHECKED, tones.accent)
+    } else {
+        (icons::UNCHECKED, ui.visuals().text_color())
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    resp
+}
+
+/// The icon that leads an Agenda heading without a box, in a box's room.
+fn heading_icon(ui: &mut Ui, icon: char) {
+    let weak = ui.visuals().weak_text_color();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+    icons::paint(ui.painter(), rect.shrink(4.0), icon, weak);
+}
+
+/// What was clicked on an entry of an Agenda group.
+#[derive(Debug, Clone, Copy, Default)]
+struct EntryClicks {
+    boxed: bool,
+    words: bool,
+}
+
+/// One entry under an Agenda group's heading (#208): a Line, a Shopping
+/// List's Line or a Session's pick, all alike: its box, `checked`, and its
+/// words, struck through and dimmed when `struck`, indented under the
+/// heading, `depth` steps further for a Line under another. The box
+/// clicks while `boxes`, the words while `opens`, as a button named by
+/// them; `id` keeps their click apart from every other's.
+fn agenda_entry(
+    ui: &mut Ui,
+    tones: Tones,
+    (id, words, depth): (Id, &str, usize),
+    (checked, struck): (bool, bool),
+    (boxes, opens): (bool, bool),
+) -> EntryClicks {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal(|ui| {
+        let spacing = ui.spacing().item_spacing.x;
+        ui.add_space(ENTRY_INDENT + spacing + depth as f32 * ENTRY_STEP);
+        let boxed = ui
+            .add_enabled_ui(boxes, |ui| check(ui, tones, checked, words))
+            .inner
+            .clicked();
+        ui.add_space(4.0);
+        let mut shown = RichText::new(words).size(15.0).color(text);
+        if struck {
+            shown = shown.strikethrough().color(weak);
+        }
+        let label = ui.add(egui::Label::new(shown).truncate());
+        let sense = if opens {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let mut open = ui.interact(label.rect, id, sense);
+        open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, opens, words));
+        if opens {
+            open = open.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+        EntryClicks {
+            boxed,
+            words: open.clicked(),
+        }
+    })
+    .inner
+}
+
+/// One Occurrence on the Agenda as a group (#208): the heading an
+/// embossed card's top, with the box to check it off, its time, its
+/// Note's text, its Area's colour and icon, and its ⋮; a click on the
+/// text opens its Routine, a right-click on it the menu of ⋮. Under it a
+/// Session's picks today, each with its box showing whether it has an
+/// entry, its box and words opening its entry form, and "Another one"
+/// under each without one; how many it picks on later days. A Session's
+/// own box only shows Done: once every pick has an entry it checks
+/// itself, and nothing else checks it. A Routine spawned from a
+/// Checklist lists its Lines under it, checked for this Occurrence; once
+/// every Line is checked, its box stays checked too (#121).
 fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -13086,7 +13193,7 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
         .and_then(|a| area_colour(a.colour.as_deref()));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
-    embossed(ui, tones, false, colour, |ui| {
+    agenda_card(ui, tones, colour, |ui| {
         // Done from the entries of every pick, or from every Line
         // checked, stays checked.
         let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
@@ -13096,22 +13203,37 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 .is_some_and(|(list, _)| list.all_checked());
         ui.horizontal(|ui| {
             let label = format!("{}: {time} {title}", t.mark_done());
-            let toggled = ui
-                .add_enabled_ui(!complete, |ui| check(ui, tones, done, &label))
-                .inner;
-            if toggled.clicked() {
-                actions.push(Action::Toggle(routine.id.clone(), occurrence));
+            if row.session.is_some() {
+                // Its picks make it Done (#208).
+                shown_check(ui, tones, done || complete, &label);
+            } else {
+                let toggled = ui
+                    .add_enabled_ui(!complete, |ui| check(ui, tones, done, &label))
+                    .inner;
+                if toggled.clicked() {
+                    actions.push(Action::Toggle(routine.id.clone(), occurrence));
+                }
             }
             ui.add_space(4.0);
             let width = (ui.available_width() - 84.0).max(40.0);
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
+                ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
                 let mut line = RichText::new(&title).size(15.0).color(text);
                 if done {
                     line = line.strikethrough();
                 }
                 ui.add(egui::Label::new(line).truncate());
+                match &row.session {
+                    Some(SessionPart::Later(count)) => {
+                        ui.label(RichText::new(t.session_picks(*count)).color(text));
+                    }
+                    Some(SessionPart::Today(shown)) if shown.today.picks.is_empty() => {
+                        ui.label(RichText::new(t.session_nothing_to_pick()).color(text));
+                    }
+                    _ => {}
+                }
             });
             let open = body
                 .response
@@ -13150,146 +13272,190 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 None => {}
             }
         });
-        // The picks go under the title, outside its click.
-        if let Some(part) = &row.session {
-            let mut asked = Vec::new();
-            ui.indent(("session part", &routine.id, occurrence.key()), |ui| {
-                session_view::part(ui, t, part, &mut asked);
-            });
-            actions.extend(asked.into_iter().map(Action::Session));
+        // The entries go under the heading, outside its click.
+        if let Some(SessionPart::Today(shown)) = &row.session {
+            session_picks(ui, t, tones, shown, actions);
         } else if let Some((list, checks)) = &row.lines {
             // The Lines go there too, checked for this Occurrence.
-            let mut asked = Vec::new();
-            ui.indent(("row lines", &routine.id, occurrence.key()), |ui| {
-                checklist_view::lines(
+            for line in agenda_lines(list) {
+                let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
+                let shown = (id, line.text.as_str(), usize::from(line.in_group));
+                let clicks = agenda_entry(
                     ui,
-                    (t, tones),
-                    &checklist_view::shown_lines(list),
-                    (*checks, list.on.as_ref()),
-                    (None, None),
-                    &mut asked,
+                    tones,
+                    shown,
+                    (line.checked, line.checked),
+                    (*checks, true),
                 );
-            });
-            actions.extend(asked.into_iter().map(Action::Checklist));
+                if clicks.boxed {
+                    actions.push(Action::Checklist(ChecklistAction::Check(
+                        line.id.clone(),
+                        !line.checked,
+                        list.on.clone(),
+                    )));
+                }
+                if clicks.words {
+                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                }
+            }
         }
     });
 }
 
-/// A Shopping List's row today as an embossed row with its Area's colour
-/// and icon (#123): a Line that came back today with its box and the
-/// list's title under it, checking it strikes it and it leaves the
-/// Agenda; or the list with the cart and how many came back or are open.
-/// A click on its text opens the Note.
-fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
+/// Today's picks of a Session under its heading (#208), in the order
+/// picked, each an entry with its box, checked once it has an entry and
+/// struck through; its box and its words open its entry form where this
+/// Device may; "Another one" goes under each without an entry while they
+/// swap (the control goes below its text).
+fn session_picks(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    shown: &PicksShown,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let today = &shown.today;
+    let session = today.session.id();
+    let occurrence = today.occurrence;
+    for (i, pick) in today.picks.iter().enumerate() {
+        let words = shown.texts.get(i).map(String::as_str).unwrap_or_default();
+        let opens = shown.opens.get(i).copied().unwrap_or(false);
+        let id = Id::new(("session pick", session, occurrence.key(), &pick.note_id));
+        let clicks = agenda_entry(
+            ui,
+            tones,
+            (id, words, 0),
+            (pick.done(), pick.done()),
+            (opens, opens),
+        );
+        if clicks.boxed || clicks.words {
+            actions.push(Action::Session(SessionAction::Open {
+                session: session.to_string(),
+                occurrence,
+                note_id: pick.note_id.clone(),
+                entry: pick.entries.last().map(|e| e.id.clone()),
+            }));
+        }
+        if shown.swaps && !pick.done() {
+            let another = ui.horizontal(|ui| {
+                ui.add_space(ENTRY_INDENT + ui.spacing().item_spacing.x);
+                icons::show(ui, icons::SWAP, 18.0, text);
+                ui.button(RichText::new(t.session_another()).color(text))
+            });
+            if another.inner.clicked() {
+                actions.push(Action::Session(SessionAction::Another {
+                    session: session.to_string(),
+                    occurrence,
+                    note_id: pick.note_id.clone(),
+                }));
+            }
+        }
+    }
+}
+
+/// The heading of a Shopping List's or Checklist's group: its kind's
+/// icon where a box would be, its `words`, a click on which opens the
+/// Note `note_id`, and its Area's icon.
+fn list_heading(
+    ui: &mut Ui,
+    (icon, area, colour): (char, Option<&Area>, Option<Color32>),
+    (note_id, words, salt): (&str, &str, &str),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let colour = row
-        .area
-        .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
-    embossed(ui, tones, false, colour, |ui| {
-        ui.horizontal(|ui| {
-            match &row.line {
-                Some(line) => {
-                    let ticked = ui
-                        .add_enabled_ui(row.checks, |ui| check(ui, tones, false, &line.text))
-                        .inner;
-                    if ticked.clicked() {
-                        actions.push(Action::Shopping(ShoppingAction::Check(
-                            line.id.clone(),
-                            true,
-                        )));
-                    }
-                }
-                None => {
-                    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-                    icons::paint(ui.painter(), rect.shrink(4.0), icons::SHOPPING_CART, weak);
-                }
+    ui.horizontal(|ui| {
+        heading_icon(ui, icon);
+        ui.add_space(4.0);
+        let width = (ui.available_width() - 32.0).max(40.0);
+        let body = ui.vertical(|ui| {
+            ui.set_max_width(width);
+            ui.add(egui::Label::new(RichText::new(words).size(15.0).color(text)).truncate());
+        });
+        let open = ui
+            .interact(body.response.rect, Id::new((salt, note_id)), Sense::click())
+            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
+        if open.clicked() {
+            actions.push(Action::SelectNote(note_id.to_string()));
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(icon) = area.and_then(|a| icons::area_icon(a.icon.as_deref())) {
+                icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
             }
-            ui.add_space(4.0);
-            let width = (ui.available_width() - 32.0).max(40.0);
-            let body = ui.vertical(|ui| {
-                ui.set_max_width(width);
-                ui.add(
-                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
-                );
-                if row.line.is_some() {
-                    ui.add(
-                        egui::Label::new(RichText::new(&row.title).small().color(weak)).truncate(),
-                    );
-                }
-            });
-            let salt = match &row.line {
-                Some(line) => ("shopping line", line.id.as_str()),
-                None => ("shopping row", row.note_id.as_str()),
-            };
-            let open = ui
-                .interact(body.response.rect, Id::new(salt), Sense::click())
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            let label = match &row.line {
-                Some(line) => format!("{}: {}", row.title, line.text),
-                None => row.text.clone(),
-            };
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
-            if open.clicked() {
-                actions.push(Action::SelectNote(row.note_id.clone()));
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(icon) = row
-                    .area
-                    .as_ref()
-                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
-                {
-                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
-                }
-            });
         });
     });
 }
 
-/// A Checklist's row today as an embossed row with its Area's colour and
-/// icon (#143): the list with how many of its Lines are open, "Before the
-/// trip: 3 of 7 open". A click on its text opens the Note.
-fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
+/// A Shopping List's group today (#123, #208): its title as the heading,
+/// with the cart and no box, and the Lines that came back today under it,
+/// each with its box, which strikes it and takes it off the Agenda; or,
+/// as chosen for it, the heading alone with how many are open. A click
+/// on a heading's or Line's words opens the Note.
+fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
     let colour = row
         .area
         .as_ref()
         .and_then(|a| area_colour(a.colour.as_deref()));
-    embossed(ui, tones, false, colour, |ui| {
-        ui.horizontal(|ui| {
-            let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-            icons::paint(ui.painter(), rect.shrink(4.0), icons::CHECKLIST, weak);
-            ui.add_space(4.0);
-            let width = (ui.available_width() - 32.0).max(40.0);
-            let body = ui.vertical(|ui| {
-                ui.set_max_width(width);
-                ui.add(
-                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
-                );
-            });
-            let open = ui
-                .interact(
-                    body.response.rect,
-                    Id::new(("checklist row", row.note_id.as_str())),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &row.text));
-            if open.clicked() {
+    agenda_card(ui, tones, colour, |ui| {
+        let icon = (icons::SHOPPING_CART, row.area.as_ref(), colour);
+        list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
+        for line in &row.lines {
+            let id = Id::new(("shopping line", line.id.as_str()));
+            let clicks = agenda_entry(
+                ui,
+                tones,
+                (id, &line.text, 0),
+                (false, false),
+                (row.checks, true),
+            );
+            if clicks.boxed {
+                let check = ShoppingAction::Check(line.id.clone(), true);
+                actions.push(Action::Shopping(check));
+            }
+            if clicks.words {
                 actions.push(Action::SelectNote(row.note_id.clone()));
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(icon) = row
-                    .area
-                    .as_ref()
-                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
-                {
-                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
-                }
-            });
-        });
+        }
+    });
+}
+
+/// A Checklist's group today (#143, #208): its title as the heading,
+/// with the list's icon and no box, and its open Lines under it, each
+/// with its box, which checks it. A click on a heading's or Line's words
+/// opens the Note.
+fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
+    let colour = row
+        .area
+        .as_ref()
+        .and_then(|a| area_colour(a.colour.as_deref()));
+    agenda_card(ui, tones, colour, |ui| {
+        let icon = (icons::CHECKLIST, row.area.as_ref(), colour);
+        list_heading(
+            ui,
+            icon,
+            (&row.note_id, &row.text, "checklist row"),
+            actions,
+        );
+        for line in &row.lines {
+            let id = Id::new(("checklist line", line.id.as_str()));
+            let shown = (id, line.text.as_str(), usize::from(line.in_group));
+            let clicks = agenda_entry(
+                ui,
+                tones,
+                shown,
+                (line.checked, line.checked),
+                (row.checks, true),
+            );
+            if clicks.boxed {
+                let check = ChecklistAction::Check(line.id.clone(), !line.checked, None);
+                actions.push(Action::Checklist(check));
+            }
+            if clicks.words {
+                actions.push(Action::SelectNote(row.note_id.clone()));
+            }
+        }
     });
 }
 
@@ -13685,14 +13851,35 @@ pub(crate) fn embossed(
     band: Option<Color32>,
     content: impl FnOnce(&mut Ui),
 ) -> egui::Response {
+    embossed_inside(ui, (tones, strong), (band, 14), content)
+}
+
+/// An Agenda row's card (#208): as [`embossed`], plain, with less room
+/// above and below its content.
+pub(crate) fn agenda_card(
+    ui: &mut Ui,
+    tones: Tones,
+    band: Option<Color32>,
+    content: impl FnOnce(&mut Ui),
+) -> egui::Response {
+    embossed_inside(ui, (tones, false), (band, AGENDA_INSIDE), content)
+}
+
+/// An embossed card with `inside` room above and below its content.
+fn embossed_inside(
+    ui: &mut Ui,
+    (tones, strong): (Tones, bool),
+    (band, inside): (Option<Color32>, i8),
+    content: impl FnOnce(&mut Ui),
+) -> egui::Response {
     let under = ui.painter().add(egui::Shape::Noop);
     let left = if band.is_some() { 22 } else { 16 };
     let inner = Frame::NONE
         .inner_margin(Margin {
             left,
             right: 16,
-            top: 14,
-            bottom: 14,
+            top: inside,
+            bottom: inside,
         })
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());

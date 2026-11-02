@@ -8,7 +8,7 @@
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Area, Day, Frog, Note};
 
-use crate::app::{area_colour, check, embossed, list_scroll, row_title};
+use crate::app::{agenda_card, area_colour, check, list_scroll, row_title};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::day_text;
@@ -95,7 +95,7 @@ pub fn frog_row(
         .as_ref()
         .and_then(|a| area_colour(a.colour.as_deref()));
     let title = row_title(t, Some(&shown.note));
-    embossed(ui, tones, false, colour, |ui| {
+    agenda_card(ui, tones, colour, |ui| {
         ui.horizontal(|ui| {
             let label = format!("{}: {title}", t.mark_done());
             let toggled = ui

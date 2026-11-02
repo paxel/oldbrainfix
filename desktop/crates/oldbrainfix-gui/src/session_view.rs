@@ -1,9 +1,7 @@
-//! A Session's part of its Agenda row (#104, ADR 0029), as the phone's
-//! `session_view.dart` draws it: today its picks under the title, in the
-//! order picked, each a line with its targets, struck through once it
-//! has an entry, a click opening its entry form, and under each without
-//! an entry "Another one"; on later days how many it picks. A Session
-//! Note's detailed card (#191, ADR 0039) shows the same picks for today
+//! A Session's part of its Agenda row (#104, ADR 0029): what it shows,
+//! today its picks with their targets, drawn under the row's heading as
+//! entries with boxes (#208), on later days how many it picks. A Session
+//! Note's detailed card (#191, ADR 0039) shows the picks for today
 //! under each of its Routines' times, after its pool, and how often it was
 //! Done and skipped in each of the last four weeks.
 
@@ -271,17 +269,6 @@ pub fn opens_pick(
     match pick.entries.last() {
         Some(entry) => store.may_change(&entry.id),
         None => Ok(store.may_check_off(session)? && store.may_write_in(&pick.note_id)?),
-    }
-}
-
-/// Draws `part` under a Session's title.
-pub fn part(ui: &mut Ui, t: &L10n, part: &SessionPart, actions: &mut Vec<SessionAction>) {
-    let text = ui.visuals().text_color();
-    match part {
-        SessionPart::Later(count) => {
-            ui.label(RichText::new(t.session_picks(*count)).color(text));
-        }
-        SessionPart::Today(shown) => picks(ui, t, shown, actions),
     }
 }
 

@@ -153,6 +153,29 @@ fn dentist_store(now: &str) -> Result<Store, Box<dyn std::error::Error>> {
     Ok(store)
 }
 
+/// 0.3.1's rows from one box's top to the next's (#208).
+const PITCH_0_3_1: f32 = 84.0;
+
+#[test]
+fn the_rows_are_tighter_than_in_0_3_1() -> TestResult {
+    let now = parse_time("2026-11-02T07:00:00.000Z")?;
+    let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([9; 32])))?;
+    let routines = Routines::new(&store);
+    for (text, hour) in [("Alpha", 9), ("Beta", 10)] {
+        let at = ClockTime::new(hour, 0).into_iter().collect::<Vec<_>>();
+        let once = Schedule::new(Day::new(2026, 11, 2), &at, None).ok_or("a schedule")?;
+        routines.create(text, &once)?;
+    }
+    let harness = window(store, "en");
+    let first = harness.get_by_label("Done: 09:00 Alpha").rect();
+    let second = harness.get_by_label("Done: 10:00 Beta").rect();
+    let pitch = second.top() - first.top();
+    assert!(pitch < PITCH_0_3_1 * 0.75, "{pitch}");
+    // The box keeps its size.
+    assert!(first.height() >= 28.0, "{}", first.height());
+    Ok(())
+}
+
 #[test]
 fn the_agenda_shows_the_week_each_later_day_under_its_weekday_and_date() -> TestResult {
     // Wednesday noon in Europe; the week crosses the month end.
