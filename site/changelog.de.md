@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.4.0]
 
+### Geändert
+
+- Auf dem Telefon und dem Desktop zeigt ein Ort, der innerhalb eines benannten Orts erfasst wurde, nur noch dessen Namen, etwa „Zuhause“, auf den Karten, in der Plakette „Erfasst“ und ihrem Dialog und über jedem Abschnitt, wo er auch die Koordinaten zeigte; ein Ort ohne benannten Ort zeigt weiter seine Koordinaten.
+
 ## [0.3.1] - 2026-11-01
 
 ### Geändert

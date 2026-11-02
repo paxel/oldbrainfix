@@ -320,9 +320,11 @@ fn noted(store: &Store) -> Result<String, Box<dyn std::error::Error>> {
     Ok(note.id)
 }
 
-/// The Note's Capture Context and the Amend's, each line as it shows.
+/// The Note's Capture Context and the Amend's, each line as it shows:
+/// the Note's place by its Named Place alone (#169), the Amend's, in
+/// none, by its coordinates.
 const NOTE_CONTEXT: [&str; 4] = [
-    "Home (52.5200, 13.4050)",
+    "Home",
     "Shared from WhatsApp",
     "During: Team call",
     "Connected: Car kit, Headphones",
@@ -339,6 +341,13 @@ fn a_full_card_shows_the_capture_context_of_the_note_and_above_each_section() ->
         let shown = harness.get_by_label(line).rect();
         assert!(dentist.contains_rect(shown), "{line}");
     }
+    // The Named Place hides its coordinates.
+    assert!(
+        harness
+            .query_all_by_label_contains("52.5200")
+            .next()
+            .is_none()
+    );
     // The Note's in its header, above its text; the Amend's above it.
     // The card is labelled with the text too.
     let text = harness.get_by_role_and_label(Role::Label, TEXT).rect();
@@ -364,26 +373,33 @@ fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let mut harness = window(store, Selection::All);
     // Compact: where, by its Named Place; the rest in the editor.
-    assert!(shows(&harness, "Home"));
-    for line in NOTE_CONTEXT.iter().chain(&AMEND_CONTEXT) {
+    assert!(shows(&harness, NOTE_CONTEXT[0]));
+    for line in NOTE_CONTEXT[1..].iter().chain(&AMEND_CONTEXT) {
         assert!(!shows(&harness, line), "{line}");
     }
     edit(&harness, TEXT).click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(id.as_str()));
     // The Section's under it in the Note dialog; the Note's own behind
-    // its Captured badge (#160), each on a line of its own.
+    // its Captured badge (#160), each on a line of its own, the place
+    // besides the compact card's.
     for line in AMEND_CONTEXT {
         assert!(shows(&harness, line), "{line} in the editor");
     }
+    let before: Vec<usize> = NOTE_CONTEXT
+        .iter()
+        .map(|line| harness.query_all_by_label(line).count())
+        .collect();
+    assert_eq!(before, [1, 0, 0, 0]);
     let captured = harness
         .query_all_by_label_contains("Captured: ")
         .next()
         .ok_or("the Captured badge")?;
     captured.click();
     harness.run();
-    for line in NOTE_CONTEXT {
-        assert_eq!(harness.query_all_by_label(line).count(), 1, "{line}");
+    for (line, before) in NOTE_CONTEXT.iter().zip(before) {
+        let count = harness.query_all_by_label(line).count();
+        assert_eq!(count, before + 1, "{line}");
     }
     Ok(())
 }

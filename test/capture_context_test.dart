@@ -175,8 +175,8 @@ void main() {
   });
 
   group('editor', () {
-    testWidgets('shows the Named Place with its coordinates, and an Amend '
-        'gets its own place', (tester) async {
+    testWidgets('shows only the Named Place, and an Amend elsewhere gets '
+        'its own coordinates', (tester) async {
       named.add('Home', home, radius: 100);
       final note = notes.capture('nees mor sauce');
       notes.locate(note.id, home);
@@ -187,7 +187,8 @@ void main() {
       await tester.pumpAndSettle();
       // In the Captured badge's editor.
       await tap(tester, find.byKey(const ValueKey('badge-captured')));
-      expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.textContaining('48.1372'), findsNothing);
       await tap(tester, find.byKey(const ValueKey('badge-close')));
 
       await reveal(tester, find.text('Add to Note'));

@@ -12906,22 +12906,16 @@ fn where_captured(context: &CaptureContext) -> Option<String> {
 }
 
 /// What a Capture Context says beyond the time, line by line with each
-/// line's icon, as the phone's `CaptureContextLines`: where, with its
-/// Named Place, the app it was shared in from, the calendar events
-/// running and the Bluetooth devices connected; each with the detail
-/// it shows.
+/// line's icon, as the phone's `CaptureContextLines`: where, by its
+/// Named Place, else its coordinates, the app it was shared in from,
+/// the calendar events running and the Bluetooth devices connected;
+/// each with the detail it shows.
 fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String, CapturedDetail)> {
     let mut lines = Vec::new();
-    if let Some(at) = context.location {
-        let at = coordinates_text(at);
-        lines.push((
-            icons::CONTEXT_WHERE,
-            match &context.named_place {
-                Some(place) => format!("{} ({at})", place.name),
-                None => at,
-            },
-            CapturedDetail::Place,
-        ));
+    if context.location.is_some()
+        && let Some(place) = where_captured(context)
+    {
+        lines.push((icons::CONTEXT_WHERE, place, CapturedDetail::Place));
     }
     if let Some(app) = &context.source_app {
         let line = t.context_source_app(app.name());

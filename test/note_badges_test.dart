@@ -470,6 +470,16 @@ void main() {
         }
       });
 
+      testWidgets("a Member sees another person's place by its coordinates, "
+          'their Named Place staying theirs', (tester) async {
+        NamedPlaces(store).add('Home', Coordinates(52.52, 13.405), radius: 100);
+        expect(Notes(store).byId(anns)!.context.namedPlace?.name, 'Home');
+        await edit(tester, anns, on: ben);
+        await tap(tester, key('badge-captured'));
+        expect(inDialog(find.text('52.5200, 13.4050')), findsOneWidget);
+        expect(find.textContaining('Home'), findsNothing);
+      });
+
       testWidgets('a Member removes a detail of their own Note', (
         tester,
       ) async {

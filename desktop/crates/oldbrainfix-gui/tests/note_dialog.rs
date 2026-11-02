@@ -789,7 +789,7 @@ fn each_captured_detail_but_the_time_goes_from_the_captured_badge() -> TestResul
     harness.run();
     let time = open_captured(&mut harness)?;
     let steps = [
-        ("place", "Home (52.5200, 13.4050)"),
+        ("place", "Home"),
         ("calendar events", "During: Team call"),
         ("Bluetooth devices", "Connected: Car kit, Headphones"),
         ("app", "Shared from WhatsApp"),

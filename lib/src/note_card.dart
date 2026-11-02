@@ -77,8 +77,8 @@ String coordinatesText(Coordinates location) =>
     '${location.latitude.toStringAsFixed(4)}, '
     '${location.longitude.toStringAsFixed(4)}';
 
-/// Where [capture] happened as shown on a card: its Named Place, else its
-/// coordinates; null while unknown.
+/// Where [capture] happened as shown on a card and in its Capture Context:
+/// its Named Place, else its coordinates; null while unknown.
 String? whereCaptured(CaptureContext capture) =>
     capture.namedPlace?.name ??
     switch (capture.location) {
@@ -1033,10 +1033,10 @@ class _AuthorLineState extends State<_AuthorLine> {
 }
 
 /// The Capture Context of a Note or Section, one line per thing known:
-/// the time; where it was, the Named Place with its coordinates or the
-/// coordinates alone; the app it was shared in from; the calendar events
-/// running; the Bluetooth devices connected. Each detail in [removable]
-/// ends in a Remove that calls [onRemove] (ADR 0037); the time has none.
+/// the time; where it was, its Named Place, else its coordinates; the
+/// app it was shared in from; the calendar events running; the
+/// Bluetooth devices connected. Each detail in [removable] ends in a
+/// Remove that calls [onRemove] (ADR 0037); the time has none.
 ///
 /// A Section whose text was [edited] says under its time, small and
 /// grey, when that was and, when known, who did it ([editedBy], #183).
@@ -1079,18 +1079,10 @@ class CaptureContextLines extends StatelessWidget {
     final t = context.t;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final text = Theme.of(context).textTheme;
-    final location = capture.location;
-    final named = capture.namedPlace;
     final lines = <(IconData, String, CapturedDetail?)>[
       (Icons.schedule, when.format(capture.captured.toLocal()), null),
-      if (location != null)
-        (
-          Icons.place_outlined,
-          named == null
-              ? coordinatesText(location)
-              : '${named.name} (${coordinatesText(location)})',
-          CapturedDetail.place,
-        ),
+      if (capture.location != null)
+        (Icons.place_outlined, whereCaptured(capture)!, CapturedDetail.place),
       if (capture.sourceApp case final app?)
         (Icons.apps, t.contextSourceApp(app.name), CapturedDetail.app),
       if (capture.calendarEvents.isNotEmpty)
