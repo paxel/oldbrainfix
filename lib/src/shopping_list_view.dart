@@ -48,10 +48,14 @@ mixin _ReadsAtDayStart<T extends StatefulWidget> on State<T> {
   }
 }
 
-/// A Shopping List on a Note's card (#122): every Line with its checkbox
-/// on a [full] card, open ones first and struck ones at the end with the
-/// day they come back, checkable where this Device may; else how many
-/// are open. Nothing for a Note that is none. It reads the list whenever
+/// The setting of this Device that keeps the struck Lines of the Shopping
+/// List [noteId] unfolded on its card (#189); nothing kept means folded.
+String struckShownSetting(String noteId) => 'shoppingStruckShown:$noteId';
+
+/// A Shopping List on a Note's card (#122): on a [full] card the open
+/// Lines with their checkboxes, then the struck ones folded under how many
+/// they are, a tap showing them with the day they come back (#189),
+/// checkable where this Device may; else how many are open. Nothing for a Note that is none. It reads the list whenever
 /// the card is built anew, after a check and when a new day begins.
 class CardShoppingList extends StatefulWidget {
   final String noteId;
@@ -74,12 +78,28 @@ class _CardShoppingListState extends State<CardShoppingList>
   ShoppingList? _list;
   var _checks = false;
 
+  /// Whether the struck Lines show, unfolded by a tap (#189), kept per
+  /// Note in a setting of this Device; folded by default.
+  var _struckShown = false;
+
+  String get _struckSetting => struckShownSetting(widget.noteId);
+
+  void _toggleStruck() {
+    final store = widget.shopping.lists.store;
+    setState(() => _struckShown = !_struckShown);
+    _struckShown
+        ? store.setLocalSetting(_struckSetting, 'true')
+        : store.removeLocalSetting(_struckSetting);
+  }
+
   @override
   Store get dayStore => widget.shopping.lists.store;
 
   @override
   void initState() {
     super.initState();
+    _struckShown =
+        widget.shopping.lists.store.localSetting(_struckSetting) == 'true';
     _show(widget.shopping.read());
   }
 
@@ -125,12 +145,61 @@ class _CardShoppingListState extends State<CardShoppingList>
         ),
       );
     }
+    final lines = _shown(context, list);
+    final struck = [
+      for (final line in lines)
+        if (line.checked) line,
+    ];
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: ChecklistLines(
+      child: Column(
         key: const ValueKey('shopping-card'),
-        lines: _shown(context, list),
-        onCheck: _checks ? _check : null,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChecklistLines(
+            lines: [
+              for (final line in lines)
+                if (!line.checked) line,
+            ],
+            onCheck: _checks ? _check : null,
+          ),
+          // The struck ones folded under the open ones (#189).
+          if (struck.isNotEmpty) ...[
+            Semantics(
+              button: true,
+              expanded: _struckShown,
+              child: InkWell(
+                key: const ValueKey('shopping-struck'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: _toggleStruck,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _struckShown ? Icons.expand_less : Icons.expand_more,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        context.t.shoppingStruckCount(struck.length),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_struckShown)
+              ChecklistLines(
+                key: const ValueKey('shopping-card-struck'),
+                lines: struck,
+                onCheck: _checks ? _check : null,
+              ),
+          ],
+        ],
       ),
     );
   }

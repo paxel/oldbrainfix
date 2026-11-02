@@ -121,7 +121,7 @@ void main() {
         'card', (tester) async {
       notes.capture('Seeds for the #Balkon\nand the pots');
       await startAtNotes(tester);
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(key('note-first-line'), findsOneWidget);
       expect(colourOf(tester, key('tag-14')), accent(tester));
 

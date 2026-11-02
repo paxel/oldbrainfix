@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_glance.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
@@ -47,9 +48,10 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   }
 }
 
-/// A Note list's full/compact switch (#114): full unless switched to
-/// compact, remembered per list in a setting of this Device, and the
-/// Notes a tap unfolded while compact, for as long as the page shows.
+/// A Note list's switch between the compact and the detailed view (#114,
+/// #189): detailed unless switched to compact, remembered per list in a
+/// setting of this Device, and the Notes a tap switched to the other view,
+/// remembered in another setting of this Device until the switch changes.
 mixin FoldsNoteCards<T extends StatefulWidget> on State<T> {
   /// The log whose Device settings keep the choice.
   Store get log;
@@ -57,13 +59,16 @@ mixin FoldsNoteCards<T extends StatefulWidget> on State<T> {
   /// Which list this is, e.g. `area:<id>`; each keeps its own choice.
   String get cardsKey;
 
-  /// Whether the cards show compact, by their first line.
+  /// Whether the cards start in the compact view.
   bool compact = false;
 
-  /// The Notes shown in full while [compact].
-  Set<String> unfolded = const {};
+  /// The Notes a tap switched to the view the list does not start in.
+  Set<String> switched = const {};
 
   String get _setting => 'compactNotes:$cardsKey';
+
+  /// The Notes in [switched], joined by commas.
+  String get _switchedSetting => 'switchedNotes:$cardsKey';
 
   @override
   void initState() {
@@ -71,28 +76,43 @@ mixin FoldsNoteCards<T extends StatefulWidget> on State<T> {
     readCompact();
   }
 
-  /// Reads the choice again, as another page showing the same list may
-  /// have changed it.
-  void readCompact() => compact = log.localSetting(_setting) == 'true';
+  /// Reads the choice and the Notes switched again, as another page
+  /// showing the same list may have changed them.
+  void readCompact() {
+    compact = log.localSetting(_setting) == 'true';
+    final kept = log.localSetting(_switchedSetting) ?? '';
+    switched = {
+      for (final id in kept.split(','))
+        if (id.isNotEmpty) id,
+    };
+  }
 
-  /// Switches the list to compact or full and remembers it; what was
-  /// unfolded folds again.
+  /// Switches the list to compact or detailed and remembers it; every card
+  /// shows that view again.
   void setCompact(bool on) {
     setState(() {
       compact = on;
-      unfolded = const {};
+      switched = const {};
     });
-    // Nothing kept means full, the default.
+    // Nothing kept means detailed, the default.
     on
         ? log.setLocalSetting(_setting, 'true')
         : log.removeLocalSetting(_setting);
+    log.removeLocalSetting(_switchedSetting);
   }
 
-  /// Shows [note] in full, in place.
-  void unfold(Note note) => setState(() => unfolded = {...unfolded, note.id});
+  /// Switches [note]'s card to its other view, in place, and remembers it.
+  void switchView(Note note) {
+    final next = {...switched};
+    if (!next.remove(note.id)) next.add(note.id);
+    setState(() => switched = next);
+    next.isEmpty
+        ? log.removeLocalSetting(_switchedSetting)
+        : log.setLocalSetting(_switchedSetting, next.join(','));
+  }
 }
 
-/// The bar button of a Note list's full/compact switch: it says what
+/// The bar button of a Note list's compact/detailed switch: it says what
 /// tapping it does and shows as selected while the list is compact.
 class CompactNotesButton extends StatelessWidget {
   final bool compact;
@@ -580,9 +600,9 @@ class BrowserSearchField extends StatelessWidget {
 /// Notes as a diary of cards, each with "file into…", "merge into…",
 /// with [onSchedule] Routine, Reminder, Frog or Session, and ⋮ for the
 /// rest the Note editor offers, as far as this Device may. Each shows in
-/// full unless [compact]; a tap on a compact one runs [onUnfold], and
-/// the Notes in [unfolded] show in full. A long press or Edit in ⋮ opens
-/// the editor (#114).
+/// its detailed view unless [compact], those in [switched] in the other
+/// view; a tap on a card runs [onSwitch] (#189). A long press or Edit in
+/// ⋮ opens the editor (#114).
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
 /// [showPlace] says which cards name where they are filed: those the
 /// screen does not name already.
@@ -597,8 +617,8 @@ List<Widget> diaryCards(
   required bool Function(PlacedNote placed) showPlace,
   void Function(Note note, Spawn spawn)? onSchedule,
   bool compact = false,
-  Set<String> unfolded = const {},
-  void Function(Note note)? onUnfold,
+  Set<String> switched = const {},
+  void Function(Note note)? onSwitch,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
@@ -623,6 +643,9 @@ List<Widget> diaryCards(
   ShoppingList? shoppingOf(Note note) => (shopped ??= shopping.ofNotes([
     for (final placed in shown) placed.note.id,
   ], deviceWallClock))[note.id];
+  // What their compact cards say of a Tally or a Session (#189), read
+  // when the first compact card asks.
+  final glances = CardGlances.inContext(context, notes.store);
   return [
     for (final placed in shown)
       if (placed case (
@@ -654,17 +677,15 @@ List<Widget> diaryCards(
             onChanged,
             onEdit: () => onOpen(note),
           ),
-          full: !compact || unfolded.contains(note.id),
+          full: compact == switched.contains(note.id),
           sections: () => sectionsOf(note),
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
           kind: () => NoteKinds(notes.store).of(note.id),
+          glance: () => glances.of(note.id),
           boxes: boxTicks(notes, placed, onChanged),
           onTable: tableEdit(notes, placed, onChanged),
-          // A full Note has nothing to unfold (#114).
-          onTap: !compact || unfolded.contains(note.id) || onUnfold == null
-              ? null
-              : () => onUnfold(note),
+          onTap: onSwitch == null ? null : () => onSwitch(note),
           onEdit: () => onOpen(note),
         ),
   ];

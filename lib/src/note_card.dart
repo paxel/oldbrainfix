@@ -214,24 +214,21 @@ List<(ShoppingOnAgenda, String)> shoppingOnAgendaOptions(AppLocalizations t) =>
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
-/// own, ADR 0017); its capture time with the Named Place or coordinates
-/// it was captured at and an icon when there is more Capture Context;
-/// with [showPlace] where it is filed; a separator; its first line,
-/// thumbnails of its first [shownPhotos] photos, a play button per voice
-/// recording with the start of its Transcript under it, and the start of
-/// each Transcript and Photo Text whose recording or photo was removed; a
-/// separator; and
-/// its action row, icons only: file it, spawn a Routine, Reminder, Frog or
-/// Session from it, merge it, and ⋮ for the rest with words. Its Area's colour runs
-/// down the left edge and its icon leads the place line. An important
-/// Note gets an accent marker and a stronger emboss, an unimportant one
-/// is dimmed (UI laws, "Cards").
+/// own, ADR 0017); with [showPlace] where it is filed; a separator under
+/// them; then the Note in its compact or its detailed view ([full], #189).
+/// Its Area's colour runs down the left edge and its icon leads the place
+/// line. An important Note gets an accent marker and a stronger emboss, an
+/// unimportant one is dimmed (UI laws, "Cards").
 ///
-/// [full] shows the whole Note instead (#114): its Capture Context line
-/// by line, its text, every photo at full width with its Photo Text under
-/// it and every recording with its Transcript, both labelled and dimmed,
-/// and then each of its [sections], oldest first, the same way under its
-/// own Capture Context.
+/// The compact view is a glance by the Note's kind ([_CompactNote]), with
+/// ⋮ top right and no buttons at the bottom and no Capture Context. The
+/// detailed view shows the whole Note (#114): its text, every photo at
+/// full width with its Photo Text under it and every recording with its
+/// Transcript, both labelled and dimmed, its Capture Context as one line
+/// under its text (#170), then each of its [sections], oldest first, the
+/// same way; and under a separator its action row, icons only: file it,
+/// spawn a Routine, Reminder, Frog or Session from it, merge it, and ⋮ for
+/// the rest with words.
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -264,15 +261,15 @@ class NoteCard extends StatelessWidget {
   /// The ⋮ menu's actions; no ⋮ when null.
   final NoteActions? actions;
 
-  /// Whether the card shows the whole Note with its Sections, rather
-  /// than its first line.
+  /// Whether the card shows its detailed view, the whole Note with its
+  /// Sections, rather than its compact view (#189).
   final bool full;
 
   /// Reads the Note's Sections, oldest first, for [full]; once per Note
   /// read, never while building.
   final List<Section> Function()? sections;
 
-  /// What a tap on the card does: unfold a compact Note in a list, pick
+  /// What a tap on the card does: switch its view in a list (#189), pick
   /// it in "merge into…"; nothing when null.
   final VoidCallback? onTap;
 
@@ -283,17 +280,23 @@ class NoteCard extends StatelessWidget {
   final Widget? footer;
 
   /// The Note's Checklist, if it is one: its Lines on a [full] card, how
-  /// many are checked on a compact one (#120); nothing when null.
+  /// many are open on a compact one (#120, #189); nothing when null.
   final NoteChecklist? checklist;
 
-  /// The Note's Shopping List, if it is one: its Lines on a [full] card,
-  /// how many are open on a compact one (#122); nothing when null.
+  /// The Note's Shopping List, if it is one: its open Lines on a [full]
+  /// card, the struck ones folded under them, how many are open on a
+  /// compact one (#122, #189); nothing when null.
   final NoteShoppingList? shopping;
 
-  /// Reads the Note's kind (#188) for a [full] card, never while
-  /// building: a Note of a kind shows its name as the title and its
-  /// description folded under it; a plain Note when null.
+  /// Reads the Note's kind (#188), never while building: a Note of a
+  /// kind shows its name as the title, on a [full] card its description
+  /// folded under it; a plain Note when null.
   final NoteKind Function()? kind;
+
+  /// Reads what the compact view says under the name of the Note's Tally
+  /// or of the Session it runs (#189), never while building; nothing when
+  /// null.
+  final List<String> Function()? glance;
 
   /// How the boxes of the Note's text, or of a Section's, given by its
   /// entity and its boxes, are ticked (ADR 0035): each ☐, ✅ or ❌ opens
@@ -311,7 +314,7 @@ class NoteCard extends StatelessWidget {
   /// How many photo thumbnails a card shows; the rest are counted.
   static const shownPhotos = 3;
 
-  /// How tall a photo on a full card may get, so one of extreme
+  /// How tall a photo in the detailed view may get, so one of extreme
   /// proportions cannot stretch the card.
   static const photoHeight = 480.0;
 
@@ -335,6 +338,7 @@ class NoteCard extends StatelessWidget {
     this.checklist,
     this.shopping,
     this.kind,
+    this.glance,
     this.boxes,
     this.onTable,
   });
@@ -346,6 +350,21 @@ class NoteCard extends StatelessWidget {
     var end = start;
     while (end < text.length && text[end] != '\n' && text[end] != '\r') {
       end++;
+    }
+    return (start, start + text.substring(start, end).trimRight().length);
+  }
+
+  /// Where the [count] lines after [from] in [text] start and end, from
+  /// the first with words, without the spaces around them, as a compact
+  /// card shows them under a plain Note's first line (#189); null when no
+  /// words follow.
+  static (int, int)? nextLines(String text, int from, [int count = 2]) {
+    final rest = text.substring(from);
+    final start = from + rest.length - rest.trimLeft().length;
+    if (start >= text.length) return null;
+    var end = start;
+    for (var lines = 0; end < text.length; end++) {
+      if (text[end] == '\n' && ++lines == count) break;
     }
     return (start, start + text.substring(start, end).trimRight().length);
   }
@@ -404,40 +423,6 @@ class NoteCard extends StatelessWidget {
           _AuthorLine(noteId: note.id, author: author),
           const SizedBox(height: 4),
         ],
-        // A full card shows it under the Note's text (#170).
-        if (!full)
-          Row(
-            children: [
-              Text(when.format(note.captured.toLocal()), style: text.bodySmall),
-              if (whereCaptured(note.context) case final where?) ...[
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.place_outlined,
-                  size: 14,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 2),
-                Flexible(
-                  child: Text(
-                    where,
-                    style: text.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              // The editor shows the rest.
-              if (note.context.hasMore) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.more_horiz,
-                  size: 16,
-                  color: scheme.onSurfaceVariant,
-                  semanticLabel: t.moreCaptureContext,
-                ),
-              ],
-            ],
-          ),
         if (place != null) ...[
           const SizedBox(height: 4),
           Row(
@@ -452,9 +437,9 @@ class NoteCard extends StatelessWidget {
         ],
       ],
     );
-    // A full card shows its time and place under the text (#170): with
-    // no Profile or place over the text it has no header.
-    final headed = !full || author != null || place != null;
+    // Its time and place show under the text of the detailed view (#170):
+    // with no Profile or place over the text it has no header.
+    final headed = author != null || place != null;
     final marker = important
         ? Icon(
             Icons.label_important,
@@ -462,6 +447,80 @@ class NoteCard extends StatelessWidget {
             semanticLabel: t.importanceImportant,
           )
         : null;
+    // The compact view has no buttons at the bottom; its ⋮ sits top right
+    // (#189).
+    final menu = !full && actions != null
+        ? _MoreButton(
+            importance: note.importance,
+            actions: actions,
+            // What the action row offers, as the compact view has none.
+            onFile: onFile,
+            onMerge: onMerge,
+          )
+        : null;
+    final bottom = full && acts;
+    Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (headed) ...[
+          if (full)
+            // The Important marker beside it.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: header),
+                ?marker,
+              ],
+            )
+          else
+            header,
+          const Divider(height: 24),
+        ],
+        if (full)
+          // With nothing over its text it starts with it, the Important
+          // marker beside it.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _FullNote(
+                  note: note,
+                  when: when,
+                  sections: sections,
+                  list: lists(true),
+                  kind: kind,
+                  boxes: boxes,
+                  onTable: onTable,
+                ),
+              ),
+              if (!headed) ?marker,
+            ],
+          )
+        else
+          _CompactNote(
+            note: note,
+            list: lists(false),
+            kind: kind,
+            glance: glance,
+            ticking: boxes?.call(note.id, note.boxes),
+          ),
+      ],
+    );
+    if (!full && (menu != null || marker != null)) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              // In line with ⋮, which sits closer to the card's corner.
+              padding: EdgeInsets.only(top: menu == null ? 0 : 12),
+              child: content,
+            ),
+          ),
+          Column(children: [?menu, ?marker]),
+        ],
+      );
+    }
     final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Embossed(
@@ -482,120 +541,18 @@ class NoteCard extends StatelessWidget {
                           left: BorderSide(color: colour, width: 6),
                         ),
                       ),
-                padding: EdgeInsets.fromLTRB(16, 16, 16, acts ? 4 : 16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  menu == null ? 16 : 4,
+                  menu == null ? 16 : 4,
+                  bottom ? 4 : 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // A full card with nothing over its text starts with
-                    // it, the Important marker beside it.
-                    if (headed) ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: header),
-                          ?marker,
-                        ],
-                      ),
-                      const Divider(height: 24),
-                    ],
-                    if (full)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _FullNote(
-                              note: note,
-                              when: when,
-                              sections: sections,
-                              list: lists(true),
-                              kind: kind,
-                              boxes: boxes,
-                              onTable: onTable,
-                            ),
-                          ),
-                          if (!headed) ?marker,
-                        ],
-                      )
-                    else ...[
-                      // A photo Note may have no words.
-                      if (note.text.isNotEmpty)
-                        if (note.shownText case final shown)
-                          if (firstLine(shown) case (final start, final end))
-                            MarkedText(
-                              shown,
-                              key: const ValueKey('note-first-line'),
-                              format: note.textFormat,
-                              start: start,
-                              end: end,
-                              style: text.bodyLarge,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              boxes: note.boxes,
-                              source: note.text,
-                              ticking: boxes?.call(note.id, note.boxes),
-                            ),
-                      ?lists(false),
-                      if (note.photos.isNotEmpty) ...[
-                        if (note.text.isNotEmpty) const SizedBox(height: 8),
-                        // Not a sideways list: swipes on a card belong to
-                        // the browser.
-                        Row(
-                          children: [
-                            for (final hash in note.photos.take(
-                              shownPhotos,
-                            )) ...[
-                              NotePhoto(
-                                key: ValueKey(hash),
-                                hash: hash,
-                                size: 64,
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            if (note.photos.length > shownPhotos)
-                              Text(
-                                t.morePhotos(note.photos.length - shownPhotos),
-                                style: text.labelLarge,
-                              ),
-                          ],
-                        ),
-                      ],
-                      if (note.recordings.isNotEmpty) ...[
-                        if (note.text.isNotEmpty || note.photos.isNotEmpty)
-                          const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            for (final hash in note.recordings)
-                              RecordingButton(key: ValueKey(hash), hash: hash),
-                          ],
-                        ),
-                        for (final hash in note.recordings)
-                          TranscriptText(
-                            key: ValueKey('transcript:$hash'),
-                            noteId: note.id,
-                            hash: hash,
-                            transcript: note.transcripts[hash],
-                          ),
-                      ],
-                      // Removed, the file shows no more; its text stays.
-                      for (final hash in note.removedRecordings)
-                        TranscriptText(
-                          key: ValueKey('transcript:$hash'),
-                          noteId: note.id,
-                          hash: hash,
-                          transcript: note.transcripts[hash],
-                        ),
-                      for (final hash in note.removedPhotos)
-                        PhotoText(
-                          key: ValueKey('ocr:$hash'),
-                          noteId: note.id,
-                          hash: hash,
-                          photoText: note.photoTexts[hash],
-                          compact: true,
-                        ),
-                    ],
-                    if (acts || footer != null) const Divider(height: 24),
-                    if (acts)
+                    content,
+                    if (bottom || footer != null) const Divider(height: 24),
+                    if (bottom)
                       NoteActionRow(
                         importance: note.importance,
                         onFile: onFile,
@@ -688,8 +645,9 @@ class NoteActionRow extends StatelessWidget {
   }
 }
 
-/// The ⋮ of a card's action row: a menu at the button with words. It
-/// leads with Edit, then, for a Note being captured, its Importance as radio
+/// The ⋮ of a card's action row, or of a compact card's top right: a menu
+/// at the button with words. It leads with Edit, then on a compact card
+/// File into… and Merge into… (#189), then, for a Note being captured, its Importance as radio
 /// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
@@ -701,7 +659,17 @@ class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
 
-  const _MoreButton({required this.importance, required this.actions});
+  /// "File into…" and "Merge into…" after Edit, for a compact card, which
+  /// has no action row (#189); left out when null.
+  final VoidCallback? onFile;
+  final VoidCallback? onMerge;
+
+  const _MoreButton({
+    required this.importance,
+    required this.actions,
+    this.onFile,
+    this.onMerge,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -740,6 +708,11 @@ class _MoreButton extends StatelessWidget {
             item('note-edit', Icons.edit_outlined, t.edit, edit),
             const PopupMenuDivider(),
           ],
+          if (onFile case final file?)
+            item('note-file', Icons.drive_file_move_outline, t.fileInto, file),
+          if (onMerge case final merge?)
+            item('note-merge', Icons.call_merge, t.mergeInto, merge),
+          if (onFile != null || onMerge != null) const PopupMenuDivider(),
           if (actions.onImportance case final set?) ...[
             // The heading the choices continue: "Importance" "Important".
             PopupMenuItem(enabled: false, child: Text(t.importance)),
@@ -1252,7 +1225,197 @@ class CaptureLine extends StatelessWidget {
   }
 }
 
-/// The whole of a Note on a full card: its text, photos and recordings,
+/// The compact view of a Note's card (#189), by its kind: a Checklist or
+/// a Shopping List shows its name and how many of its Lines are open
+/// ([list]), a Tally its name and each field's total today against its
+/// target ([glance]); a plain Note its first line and the two lines after
+/// it, or, running a Session, its first line, the next run and this
+/// week's runs Done and Missed ([glance]); a Note without words its
+/// photos and recordings. The kind and the glance are read when the Note
+/// is, not while building.
+class _CompactNote extends StatefulWidget {
+  final Note note;
+  final Widget? list;
+  final NoteKind Function()? kind;
+  final List<String> Function()? glance;
+
+  /// How the boxes of the text are ticked; plain characters when null.
+  final BoxTicking? ticking;
+
+  const _CompactNote({
+    required this.note,
+    this.list,
+    this.kind,
+    this.glance,
+    this.ticking,
+  });
+
+  @override
+  State<_CompactNote> createState() => _CompactNoteState();
+}
+
+class _CompactNoteState extends State<_CompactNote> {
+  NoteKind _kind = NoteKind.plain;
+  List<String> _glance = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(_CompactNote old) {
+    super.didUpdateWidget(old);
+    // Its kind and its Tally's entries change without its text, so this
+    // reads every time the card is built anew.
+    _read();
+  }
+
+  void _read() {
+    _kind = widget.kind?.call() ?? NoteKind.plain;
+    _glance = widget.glance?.call() ?? const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final note = widget.note;
+    final shown = note.shownText;
+    Widget marked(
+      int start,
+      int end, {
+      Key? key,
+      TextStyle? style,
+      required int lines,
+    }) => MarkedText(
+      shown,
+      key: key,
+      format: note.textFormat,
+      start: start,
+      end: end,
+      style: style,
+      maxLines: lines,
+      overflow: TextOverflow.ellipsis,
+      boxes: note.boxes,
+      source: note.text,
+      ticking: widget.ticking,
+    );
+    final glance = [
+      for (final (i, line) in _glance.indexed)
+        Padding(
+          key: ValueKey('card-glance-$i'),
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(line, style: text.bodyMedium),
+        ),
+    ];
+    if (_kind != NoteKind.plain) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (NoteKinds.name(shown).length case final end when end > 0)
+            marked(
+              0,
+              end,
+              key: const ValueKey('card-name'),
+              style: text.titleMedium,
+              lines: 1,
+            ),
+          ?widget.list,
+          ...glance,
+        ],
+      );
+    }
+    final (start, end) = NoteCard.firstLine(shown);
+    final next = glance.isEmpty ? NoteCard.nextLines(shown, end) : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // A photo Note may have no words.
+        if (shown.trim().isNotEmpty)
+          marked(
+            start,
+            end,
+            key: const ValueKey('note-first-line'),
+            style: text.bodyLarge,
+            lines: 1,
+          ),
+        if (next case (final from, final to))
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: marked(
+              from,
+              to,
+              key: const ValueKey('note-next-lines'),
+              style: text.bodyMedium,
+              lines: 2,
+            ),
+          ),
+        ...glance,
+        // Without words it shows what it holds instead.
+        if (shown.trim().isEmpty) ...[
+          if (note.photos.isNotEmpty)
+            // Not a sideways list: swipes on a card belong to the browser.
+            Row(
+              children: [
+                for (final hash in note.photos.take(NoteCard.shownPhotos)) ...[
+                  NotePhoto(key: ValueKey(hash), hash: hash, size: 64),
+                  const SizedBox(width: 8),
+                ],
+                if (note.photos.length > NoteCard.shownPhotos)
+                  Text(
+                    t.morePhotos(note.photos.length - NoteCard.shownPhotos),
+                    style: text.labelLarge,
+                  ),
+              ],
+            ),
+          if (note.recordings.isNotEmpty) ...[
+            if (note.photos.isNotEmpty) const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final hash in note.recordings)
+                  RecordingButton(key: ValueKey(hash), hash: hash),
+              ],
+            ),
+            for (final hash in note.recordings)
+              TranscriptText(
+                key: ValueKey('transcript:$hash'),
+                noteId: note.id,
+                hash: hash,
+                transcript: note.transcripts[hash],
+              ),
+          ],
+          // Removed, the file shows no more; its text stays.
+          for (final hash in note.removedRecordings)
+            TranscriptText(
+              key: ValueKey('transcript:$hash'),
+              noteId: note.id,
+              hash: hash,
+              transcript: note.transcripts[hash],
+            ),
+          for (final hash in note.removedPhotos)
+            PhotoText(
+              key: ValueKey('ocr:$hash'),
+              noteId: note.id,
+              hash: hash,
+              photoText: note.photoTexts[hash],
+              compact: true,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The setting of this Device that keeps the description of the Note
+/// [noteId] unfolded on its card (#189); nothing kept means folded.
+String descriptionUnfoldedSetting(String noteId) =>
+    'descriptionUnfolded:$noteId';
+
+/// The whole of a Note in the detailed view: its text, photos and recordings,
 /// then each Section under a separator and its own Capture Context. The
 /// Sections are read when the Note is, not while building.
 class _FullNote extends StatefulWidget {
@@ -1443,6 +1606,7 @@ class _Whole extends StatelessWidget {
         ? null
         : named
         ? _NameAndDescription(
+            noteId: id,
             text: text,
             source: source,
             boxes: boxes,
@@ -1530,12 +1694,16 @@ class _Whole extends StatelessWidget {
   }
 }
 
-/// The text of a Note of a kind on its full card (#188): its name as the
+/// The text of a Note of a kind in its detailed view (#188): its name as the
 /// title, and its description under it, small and weak, folded to one
 /// line until a tap unfolds it; a tap on the description folds or unfolds
-/// it and nothing else, the card's own tap not included. [text] is the
-/// text as it shows, its [boxes] in it, as [MarkedText] takes it.
+/// it and nothing else, the card's own tap not included, and this Device
+/// keeps it per Note (#189). [text] is the text as it shows, its [boxes] in
+/// it, as [MarkedText] takes it.
 class _NameAndDescription extends StatefulWidget {
+  /// The Note whose fold this Device keeps.
+  final String noteId;
+
   final String text;
   final String source;
   final List<ShownBox> boxes;
@@ -1544,6 +1712,7 @@ class _NameAndDescription extends StatefulWidget {
   final TableEditing? onTable;
 
   const _NameAndDescription({
+    required this.noteId,
     required this.text,
     required this.source,
     required this.boxes,
@@ -1558,6 +1727,30 @@ class _NameAndDescription extends StatefulWidget {
 
 class _NameAndDescriptionState extends State<_NameAndDescription> {
   var _unfolded = false;
+
+  /// Where the fold is kept: per Note in a setting of this Device (#189);
+  /// it is only held while the card shows without one.
+  Store? _store;
+
+  String get _setting => descriptionUnfoldedSetting(widget.noteId);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final store = PersonScope.of(context)?.store;
+    if (store == _store) return;
+    _store = store;
+    _unfolded = store?.localSetting(_setting) == 'true';
+  }
+
+  void _toggle() {
+    setState(() => _unfolded = !_unfolded);
+    final store = _store;
+    if (store == null) return;
+    _unfolded
+        ? store.setLocalSetting(_setting, 'true')
+        : store.removeLocalSetting(_setting);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1602,7 +1795,7 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
             // Its own tap, so the card's does not run too.
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _unfolded = !_unfolded),
+              onTap: _toggle,
               child: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: part(

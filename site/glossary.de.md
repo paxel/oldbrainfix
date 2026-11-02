@@ -24,6 +24,14 @@ _Avoid_: Titel, Überschrift, Bezeichnung
 Der Rest des Textes einer Notiz jeder Art außer der einfachen Notiz, nach ihrem Namen: klein direkt unter dem Namen gezeigt, auf eine Zeile eingeklappt, bis ein Tippen sie aufklappt. Im Editor ist sie ein eigenes Feld; gespeichert sind Name und Beschreibung wieder ein Text.
 _Avoid_: Inhalt, Notizen, Details
 
+**Kompaktansicht** [Compact view]:
+Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel („Schritte 7000 / 10000 Schritte“), eine Notiz, die eine Einheit ausführt, ihre erste Zeile, den nächsten Lauf und die Läufe dieser Woche, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
+_Avoid_: eingeklappte Karte, Kurzansicht, Zusammenfassung
+
+**Detailansicht** [Detailed view]:
+Wie die Karte einer Notiz sie in einer Liste ganz zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihren ganzen Text, ihre Ergänzungen, Fotos und Aufnahmen, eine Checkliste alle Zeilen mit ihren Kästchen, abhakbar, in ihren Gruppen, eine Einkaufsliste ihre offenen Zeilen, abhakbar, die durchgestrichenen darunter eingeklappt; jeder Teil mit seinem Erfassungskontext als eine Zeile unter seinem Text, die Schaltflächen unten an der Karte. Die Voreinstellung jeder Liste.
+_Avoid_: volle Karte, aufgeklappte Ansicht, Langansicht
+
 **Erfassen** [Capture]:
 Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widget, eine Kachel, eine Verknüpfung (die auch die Tasten- oder Gesteneinstellungen des Handys oder eine Tastenbelegungs-App starten können; die App selbst liest keine Taste), das Tastenkürzel am Computer. Erfassen fragt nie nach Sortieren oder Entsperren.
 _Avoid_: Schnell hinzufügen, Aufnehmen

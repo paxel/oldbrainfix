@@ -17,8 +17,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_photos.dart';
 import 'open_capture.dart';
 
-/// The Note lists show every Note in full, with a full/compact switch
-/// per list; the editor opens by a long press or Edit in ⋮ (#114).
+/// The Note lists show every Note in its detailed view, with a switch to
+/// the compact view per list (#114, #189); the editor opens by a long
+/// press or Edit in ⋮.
 void main() {
   late Store store;
   late Notes notes;
@@ -217,15 +218,17 @@ void main() {
       expect(find.text('First amended'), findsOneWidget);
     });
 
-    testWidgets('a tap does nothing; a long press opens the editor', (
-      tester,
-    ) async {
+    testWidgets('a tap switches it to the compact view (#189); a long press '
+        'opens the editor', (tester) async {
       amendedNote();
       await start(tester);
       await openAllNotes(tester);
 
       await tap(tester, find.text('Amended later'));
       expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.text('Merged in'), findsNothing);
+      expect(find.byKey(const ValueKey('note-first-line')), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('note-first-line')));
       expect(find.text('Merged in'), findsOneWidget);
 
       await tester.longPress(find.text('Amended later'));
@@ -291,41 +294,45 @@ void main() {
     });
   });
 
-  testWidgets('the Agenda\'s just-captured card is compact and unfolds on '
-      'a tap', (tester) async {
+  testWidgets('the Agenda\'s just-captured card is detailed, its buttons '
+      'at hand; a tap switches it to compact and back (#189)', (tester) async {
     await start(tester);
     await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), 'milk\nand bread');
     await tap(tester, find.text('Save'));
 
     expect(find.text('Just captured'), findsOneWidget);
-    expect(find.byKey(const ValueKey('note-first-line')), findsOneWidget);
-    await tap(tester, find.byKey(const ValueKey('note-first-line')));
-    expect(find.byType(NoteEditorScreen), findsNothing);
     expect(find.text('milk\nand bread'), findsOneWidget);
-    expect(find.byKey(const ValueKey('note-first-line')), findsNothing);
+    expect(find.byKey(const ValueKey('note-actions')), findsOneWidget);
+    await tap(tester, find.text('milk\nand bread'));
+    expect(find.byType(NoteEditorScreen), findsNothing);
+    expect(find.byKey(const ValueKey('note-first-line')), findsOneWidget);
+    expect(find.byKey(const ValueKey('note-actions')), findsNothing);
+    await tap(tester, find.byKey(const ValueKey('note-first-line')));
+    expect(find.text('milk\nand bread'), findsOneWidget);
   });
 
-  group('the full/compact switch', () {
-    testWidgets('shows the first line only; a tap unfolds the Note in '
-        'place', (tester) async {
+  group('the list\'s switch', () {
+    testWidgets('shows the compact view of every card; a tap switches one '
+        'card in place', (tester) async {
       amendedNote();
       notes.capture('Another Note');
       await start(tester);
       await openAllNotes(tester);
 
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(find.text('Original first line'), findsOneWidget);
+      expect(find.text('Original second line'), findsOneWidget);
       expect(find.text('Merged in'), findsNothing);
       expect(find.text('Amended later'), findsNothing);
       expect(find.text('Transcript'), findsNothing);
-      expect(find.byTooltip('Show Notes in full'), findsOneWidget);
+      expect(find.byTooltip('Show detailed views'), findsOneWidget);
 
       await tap(tester, find.text('Original first line'));
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.text('Merged in'), findsOneWidget);
       expect(find.text('Amended later'), findsOneWidget);
-      // Only the Note tapped unfolds.
+      // Only the Note tapped switches.
       expect(find.byKey(const ValueKey('note-first-line')), findsOneWidget);
 
       await tester.longPress(find.text('Another Note'));
@@ -340,23 +347,23 @@ void main() {
       await start(tester);
       await openAllNotes(tester);
 
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(store.localSetting('compactNotes:allNotes'), 'true');
       expect(find.text('Fix the tap'), findsOneWidget);
 
-      // Another list keeps its own choice: full.
+      // Another list keeps its own choice: detailed.
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tap(tester, find.text('Household'));
       expect(find.text('Fix the tap\nwith the washer'), findsOneWidget);
-      expect(find.byTooltip('Show Notes compact'), findsOneWidget);
+      expect(find.byTooltip('Show compact views'), findsOneWidget);
 
-      // Back to All Notes, still compact; full again is not kept.
+      // Back to All Notes, still compact; detailed again is not kept.
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tap(tester, find.byTooltip('All Notes'));
       expect(find.text('Fix the tap'), findsOneWidget);
-      await tap(tester, find.byTooltip('Show Notes in full'));
+      await tap(tester, find.byTooltip('Show detailed views'));
       expect(find.text('Fix the tap\nwith the washer'), findsOneWidget);
       expect(store.localSetting('compactNotes:allNotes'), isNull);
     });
@@ -368,7 +375,7 @@ void main() {
       await start(tester);
 
       await tap(tester, find.text('1 Unsorted'));
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(store.localSetting('compactNotes:unsorted'), 'true');
       expect(find.text('Call the plumber'), findsOneWidget);
       await tester.pageBack();
@@ -378,7 +385,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'plumber');
       await tester.pumpAndSettle();
       expect(find.text('Call the plumber\ntomorrow'), findsOneWidget);
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(store.localSetting('compactNotes:search'), 'true');
     });
   });

@@ -54,6 +54,20 @@
   Name und Beschreibung zwei Felder; Speichern schreibt sie wieder als einen Text, und eine Notiz,
   die unverändert geöffnet und verlassen wird, wird nicht geschrieben.
 </p>
+<p>
+  In einer Liste zeigt jede Karte ihre Notiz in ihrer <strong>Kompaktansicht</strong> oder ihrer
+  <strong>Detailansicht</strong>. Die Detailansicht, die Voreinstellung, zeigt die Notiz ganz; die
+  Kompaktansicht zeigt einen Blick nach ihrer Art: eine einfache Notiz ihre erste Zeile und die zwei
+  Zeilen danach, eine Checkliste ihren Namen und „3 von 7 offen“, eine Einkaufsliste ihren Namen und
+  „4 offen“, eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel, etwa
+  „Seiten 30 / 50 Seiten“, und eine Notiz, die eine Einheit ausführt, ihre erste Zeile, ihren
+  nächsten Lauf und „diese Woche 4 erledigt / 1 ausgelassen“. Die Kompaktansicht hat keinen
+  Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und
+  bietet nach Bearbeiten <strong>Ablegen in …</strong> und <strong>Zusammenführen mit …</strong> an. Der
+  Knopf in der Leiste der Liste zeigt alle Karten kompakt oder ausführlich. Ein Tippen auf eine
+  Karte wechselt nur diese Karte; das Handy behält das für diese Liste, bis der Knopf in der Leiste
+  wieder benutzt wird. Langes Drücken öffnet weiter den Editor.
+</p>
 <ul>
   <li>Die Plakette „Art“ im Notiz-Editor zeigt die Art. Ein Tippen bietet die Arten an, die die Notiz werden kann: Eine einfache Notiz wird eine Checkliste, eine Einkaufsliste oder eine Strichliste; eine Checkliste wird eine Einkaufsliste oder eine einfache Notiz; eine Einkaufsliste wird eine Checkliste oder eine einfache Notiz. Eine Strichliste bleibt eine Strichliste.</li>
   <li>Eine Checkliste, die eine Einkaufsliste wird, behält ihre Zeilen in ihrer Reihenfolge, die abgehakten durchgestrichen, ohne Gruppen; eine Einkaufsliste, die eine Checkliste wird, behält die Zeilen, die sie zeigt, die durchgestrichenen abgehakt. Der Text bleibt, wie er ist. Die alten Zeilen bleiben im Protokoll und werden nicht mehr gezeigt.</li>
@@ -69,7 +83,7 @@
   nicht mehr unsortiert.
 </p>
 <ul>
-  <li>Auf einer vollen Karte hat jede Zeile ihr Kästchen; eine abgehakte Zeile wird an ihrem Platz durchgestrichen. Eine kompakte Karte zeigt „2 von 5 abgehakt“.</li>
+  <li>In der Detailansicht hat jede Zeile ihr Kästchen; eine abgehakte Zeile wird an ihrem Platz durchgestrichen. Die Kompaktansicht zeigt „3 von 5 offen“.</li>
   <li>Eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Sind alle Zeilen einer Gruppe abgehakt, ist auch die Zeile darüber abgehakt; wird diese abgehakt, ist ihre ganze Gruppe abgehakt; wird eine Zeile der Gruppe wieder freigegeben, ist es auch die Zeile darüber.</li>
   <li>Eine Gruppe steht in einem Rahmen mit der Zeile, unter der sie steht.</li>
   <li>Im Editor werden die Zeilen wie ein zusammenhängender Text bearbeitet, jede Zeile beginnt mit ihrem Kästchen; eine neue Liste beginnt mit einer leeren Zeile. Die Eingabetaste fügt unter der Zeile mit dem Cursor eine neue Zeile mit leerem Kästchen ein; mitten in einer Zeile nimmt die neue Zeile den Rest der Zeile mit. Die Rücktaste am Anfang einer Zeile hängt sie an die Zeile darüber an, die ihr Kästchen behält und abgehakt bleibt oder nicht; die Haken der angehängten Zeile bleiben im Protokoll. Eine leere Zeile verschwindet einfach. <strong>Unter die Zeile darüber</strong> und <strong>Zurück auf die oberste Ebene</strong> in der Leiste über der Tastatur, auf dem Desktop Tab und Umschalt+Tab, nehmen die Zeile mit dem Cursor in eine Gruppe auf und wieder heraus.</li>
@@ -126,7 +140,7 @@
   <li>Im Editor werden die Zeilen wie bei einer Checkliste bearbeitet: ein zusammenhängender Text, jede Zeile beginnt mit ihrem Kästchen, die Eingabetaste für eine neue Zeile, die Rücktaste am Anfang, um eine Zeile an die darüber anzuhängen. Die Zeilen bleiben in der Reihenfolge, in der sie getippt wurden, auch beim nächsten Mal. Solange der Editor offen ist, bleibt eine dort abgehakte Zeile an ihrer Stelle; beim nächsten Mal steht sie unter den offenen.</li>
   <li>Ein Name, den die Liste schon hat, fügt nichts hinzu, gleich in welcher Schreibung und mit Leerzeichen drumherum: Eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, und eine offene bleibt.</li>
   <li>Eine leer gelassene Zeile fällt beim Verlassen weg. ⋮ an einer Zeile bietet die Wiederkehr zur Wahl und <strong>Löschen</strong>.</li>
-  <li>Auf einer vollen Karte stehen die Zeilen mit ihren Kästchen, die offenen zuerst; eine kompakte Karte zeigt „3 offen“. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte, und <strong>Einfache Notiz</strong> hinter der Plakette „Einkaufsliste“ im Editor schreiben die Zeilen in den Text, die durchgestrichenen mit „✓ “ davor.</li>
+  <li>In der Detailansicht stehen die offenen Zeilen mit ihren Kästchen; die durchgestrichenen sind darunter als „2 durchgestrichen“ eingeklappt, was ein Tippen zeigt und wieder verbirgt; das Handy zeigt sie weiter, bis sie wieder eingeklappt werden. Die Kompaktansicht zeigt „3 offen“. <strong>Wieder eine einfache Notiz</strong>, im ⋮ der Karte, und <strong>Einfache Notiz</strong> hinter der Plakette „Einkaufsliste“ im Editor schreiben die Zeilen in den Text, die durchgestrichenen mit „✓ “ davor.</li>
 </ul>
 
 <figure class="frame phone">
@@ -267,6 +281,7 @@
 
 <h2>Auf dem Desktop</h2>
 <ul>
+  <li>Der Ansichtsknopf einer Karte, oben rechts neben ⋮ und dem Stift, wechselt diese Karte zwischen ihrer Kompakt- und ihrer Detailansicht, wie ein Tippen auf dem Handy; ein Klick auf die Karte wählt sie nur aus. <strong>Kompaktansichten</strong> und <strong>Detailansichten</strong> im Menü Ansicht tun, was der Knopf in der Leiste der Liste tut.</li>
   <li>Der Notiz-Dialog zeigt eine Notiz einer Art wie der Editor auf dem Handy: ihren Namen, ihre Beschreibung eingeklappt darunter, dann die Zeilen oder die Strichliste. Ihre Plakette „Art“ wechselt die Art wie auf dem Handy, und das Menü der Karte bietet die Listen ebenfalls. Die Plakette „+“ des Notiz-Dialogs enthält Routine, Erinnerung, Frosch und Einheit.</li>
   <li>Eine Checkliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. <strong>Auf der Agenda zeigen</strong> ist ein Kästchen im Menü der Karte, vor <strong>Alle Haken entfernen</strong>, und eine Plakette im Notiz-Dialog.</li>
   <li>Eine Einkaufsliste erscheint wie auf dem Handy in der Agenda von heute, und ein Klick auf ihre Reihe öffnet sie im Notiz-Dialog. Ihr <strong>Auf der Agenda zeigen</strong> bietet das Menü der Karte mit drei Optionsfeldern an, vor <strong>Wieder eine einfache Notiz</strong>, und der Notiz-Dialog als Plakette, deren Dialog dieselben drei anbietet; ein Klick auf eines schließt ihn.</li>

@@ -320,6 +320,9 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
     let bread = line_id(&store, &note, "Bread")?;
     lists.check(&bread, &utc)?;
     let mut harness = window(&store, None);
+    // Folded under the open Lines until a click shows it (#189).
+    assert!(boxes(&harness, "Bread").is_empty());
+    click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
     assert!(shows(&harness, "back Sat, Oct 31"));
     // Late on the day before: still struck.
@@ -641,8 +644,11 @@ fn full_cards_check_lines_and_compact_cards_count_the_open_ones() -> TestResult 
     let mut harness = window(&store, None);
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
-    assert!(checked(&harness, "Bread")?);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // Struck, it folds under the open Lines until a click shows it (#189).
+    assert!(boxes(&harness, "Bread").is_empty());
+    click(&mut harness, "1 struck through")?;
+    assert!(checked(&harness, "Bread")?);
     assert!(shows(&harness, "back Sat, Oct 31"));
     // The card's checkbox writes a check, never the Note's text.
     assert_eq!(

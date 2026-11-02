@@ -5294,11 +5294,41 @@ abstract class AppLocalizations {
   /// **'Checklist'**
   String get checklistHeading;
 
-  /// A compact card of a Checklist: how many of its Lines are checked.
+  /// The compact view of a Checklist's card (#189): how many of its Lines are open.
   ///
   /// In en, this message translates to:
-  /// **'{checked} of {count} checked'**
-  String checklistCount(int checked, int count);
+  /// **'{open} of {count} open'**
+  String checklistOpenCount(int open, int count);
+
+  /// The detailed view of a Shopping List's card (#189): the folded struck Lines, how many; a tap shows or hides them.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} struck through'**
+  String shoppingStruckCount(int count);
+
+  /// The compact view of a Tally's card (#189): a field's name, its total today as a number and its target with the unit, such as 'Steps 7000 / 10000 steps'.
+  ///
+  /// In en, this message translates to:
+  /// **'{field} {total} / {target}'**
+  String tallyCardTotal(String field, String total, String target);
+
+  /// The compact view of a Tally's card (#189): a field without a target, its name and its total today with the unit, such as 'Books 1 books'.
+  ///
+  /// In en, this message translates to:
+  /// **'{field} {total}'**
+  String tallyCardTotalOnly(String field, String total);
+
+  /// The compact view of the card of a Note that runs a Session (#189): its next run, a date and a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {when}'**
+  String sessionCardNext(String when);
+
+  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many Missed since the week began.
+  ///
+  /// In en, this message translates to:
+  /// **'done {done} / skipped {skipped} this week'**
+  String sessionCardWeek(int done, int skipped);
 
   /// No description provided for @checklistRenameTitle.
   ///
@@ -6122,16 +6152,16 @@ abstract class AppLocalizations {
   /// **'The Note being captured'**
   String get noteBeingCaptured;
 
-  /// Bar button of a Note list that shows each Note by its first line only.
+  /// Bar button of a Note list that shows every card in its compact view (#189).
   ///
   /// In en, this message translates to:
-  /// **'Show Notes compact'**
+  /// **'Show compact views'**
   String get showNotesCompact;
 
-  /// Bar button of a Note list that shows each Note whole, with its Sections.
+  /// Bar button of a Note list that shows every card in its detailed view (#189).
   ///
   /// In en, this message translates to:
-  /// **'Show Notes in full'**
+  /// **'Show detailed views'**
   String get showNotesFull;
 
   /// Small label above a Transcript on a Note card.

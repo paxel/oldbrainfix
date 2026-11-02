@@ -686,10 +686,10 @@ pub fn card_checks(
     clicked
 }
 
-/// How many Lines of `list` are checked, on a compact card.
+/// How many Lines of `list` are open, on a compact card (#189).
 pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
     let text = ui.visuals().text_color();
-    let said = t.checklist_count(list.checked_count() as i64, list.count() as i64);
+    let said = t.checklist_open_count(list.open_count() as i64, list.count() as i64);
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 

@@ -52,7 +52,7 @@ class _NudgeScreenState extends State<NudgeScreen>
   Future<void> _all() async {
     await openUnsorted(context, widget.notes, widget.places);
     if (!mounted) return;
-    // The list of all of them shares the full/compact switch.
+    // The list of all of them shares the compact/detailed switch.
     setState(readCompact);
     _reload();
   }
@@ -83,8 +83,8 @@ class _NudgeScreenState extends State<NudgeScreen>
               _unsorted.take(nudgeCards),
               _reload,
               compact: compact,
-              unfolded: unfolded,
-              onUnfold: unfold,
+              switched: switched,
+              onSwitch: switchView,
             ),
           if (more > 0)
             Padding(
@@ -195,8 +195,8 @@ class _UnsortedScreenState extends State<UnsortedScreen>
               _unsorted,
               _reload,
               compact: compact,
-              unfolded: unfolded,
-              onUnfold: unfold,
+              switched: switched,
+              onSwitch: switchView,
             ),
         ],
       ),
@@ -204,9 +204,9 @@ class _UnsortedScreenState extends State<UnsortedScreen>
   }
 }
 
-/// [unsorted] as cards, full unless [compact], that open their Note and
-/// offer to file, merge or schedule it; [changed] runs once the user is
-/// back from any of them.
+/// [unsorted] as cards, detailed unless [compact] (#189), that open their
+/// Note and offer to file, merge or schedule it; [changed] runs once the
+/// user is back from any of them.
 List<Widget> _sortingCards(
   BuildContext context,
   Notes notes,
@@ -214,8 +214,8 @@ List<Widget> _sortingCards(
   Iterable<Note> unsorted,
   VoidCallback changed, {
   required bool compact,
-  required Set<String> unfolded,
-  required void Function(Note note) onUnfold,
+  required Set<String> switched,
+  required void Function(Note note) onSwitch,
 }) {
   Future<void> then(Future<Object?> step) async {
     await step;
@@ -235,7 +235,7 @@ List<Widget> _sortingCards(
     onSchedule: (note, spawn) =>
         then(spawnFromNote(context, notes, places, note, spawn: spawn)),
     compact: compact,
-    unfolded: unfolded,
-    onUnfold: onUnfold,
+    switched: switched,
+    onSwitch: onSwitch,
   );
 }

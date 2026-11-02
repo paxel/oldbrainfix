@@ -26,6 +26,14 @@ _Avoid_: title, heading, label
 The rest of the text of a Note of any Kind but a Plain Note, after its Name: shown small right under the Name, folded to one line until a tap unfolds it. In the editor it is its own field; saved, Name and Description are one text again. German: Beschreibung.
 _Avoid_: body, notes, details
 
+**Compact view**:
+How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total today against its target ("Steps 7000 / 10000 steps"), a Note that runs a Session its first line, the next run and this week's runs done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
+_Avoid_: folded card, short view, summary
+
+**Detailed view**:
+How a Note's card shows it whole in a list, as its Kind defines it: a Plain Note its whole text, its Amends, photos and recordings, a Checklist all its Lines with their boxes, tickable, in their groups, a Shopping List its open Lines, tickable, the struck ones folded under them; each part with its Capture Context as one line under its text, the buttons at the bottom of the card. The default of every list. German: Detailansicht.
+_Avoid_: full card, expanded view, long view
+
 **Capture**:
 The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut (which the phone's own key or gesture settings or a button-mapper app can also start; the app reads no key itself), the desktop hotkey). Capturing never asks for sorting or unlocking.
 _Avoid_: quick add, record

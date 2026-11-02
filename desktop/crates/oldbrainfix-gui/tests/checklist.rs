@@ -643,7 +643,7 @@ fn full_cards_check_lines_in_place_and_compact_cards_count_them() -> TestResult 
     );
     let compact = L10n::new("en").show_notes_compact();
     click(&mut harness, compact)?;
-    assert!(shows(&harness, "1 of 3 checked"));
+    assert!(shows(&harness, "2 of 3 open"));
     assert!(boxes(&harness, "Ticket").is_empty());
     Ok(())
 }

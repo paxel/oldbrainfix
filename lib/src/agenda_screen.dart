@@ -18,6 +18,7 @@ import 'checklist_view.dart';
 import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
 import 'calendar_screen.dart';
+import 'card_glance.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
@@ -188,8 +189,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
   String? _capturedId;
   PlacedNote? _captured;
 
-  /// The captured Note when a tap unfolded its compact card (#114).
-  String? _unfoldedId;
+  /// The captured Note when a tap switched its card to the compact view;
+  /// it starts detailed, its buttons at hand for what was not done while
+  /// capturing (#189).
+  String? _compactId;
 
   /// Where shares come from; set with the first dependencies.
   PhotoPlatform? _photos;
@@ -856,7 +859,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       nudgeIn: Notes.defaultNudge,
     );
     _capturedId = note.id;
-    _unfoldedId = null;
+    _compactId = null;
     _reload();
   }
 
@@ -924,6 +927,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
+    // Read only when its compact view shows.
+    final glances = CardGlances.inContext(context, widget.notes.store);
     List<Widget> rows(List<DayEntry> entries) => [
       for (final entry in entries)
         if (entry.piece case final piece?)
@@ -1041,7 +1046,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     _reload,
                     onEdit: () => _open(captured.note),
                   ),
-                  full: _unfoldedId == captured.note.id,
+                  full: _compactId != captured.note.id,
                   sections: () => widget.notes.sections(captured.note.id),
                   checklist: (
                     read: () =>
@@ -1057,11 +1062,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   ),
                   kind: () =>
                       NoteKinds(widget.notes.store).of(captured.note.id),
+                  glance: () => glances.of(captured.note.id),
                   boxes: boxTicks(widget.notes, captured, _reload),
                   onTable: tableEdit(widget.notes, captured, _reload),
-                  onTap: _unfoldedId == captured.note.id
-                      ? null
-                      : () => setState(() => _unfoldedId = captured.note.id),
+                  onTap: () => setState(
+                    () => _compactId = _compactId == captured.note.id
+                        ? null
+                        : captured.note.id,
+                  ),
                   onEdit: () => _open(captured.note),
                 ),
               ],

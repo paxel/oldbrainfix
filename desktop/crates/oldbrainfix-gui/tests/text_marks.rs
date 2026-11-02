@@ -182,16 +182,19 @@ fn a_cards_box_offers_the_other_two_states_and_ticks_beside_the_text() -> TestRe
 }
 
 #[test]
-fn a_compact_card_offers_the_box_of_its_first_line() -> TestResult {
-    let (store, note) = with_note("\n☐ Call Ann\n✅ later")?;
+fn a_compact_card_offers_the_boxes_of_its_first_lines() -> TestResult {
+    let (store, note) = with_note("\n☐ Call Ann\n✅ later\nthen\n✅ never")?;
     let mut harness = window(&store, None);
     let compact = L10n::new("en").show_notes_compact();
     click(&mut harness, compact)?;
-    // Only the first line shows, and the box is its own.
-    assert_eq!(buttons(&harness, "Checked"), 0);
+    // The first line and the two after it show (#189), each box its own.
+    assert_eq!(buttons(&harness, "Checked"), 1);
     click_box(&mut harness, "Open")?;
     click(&mut harness, "✅ Check")?;
-    assert_eq!(shown(&store, &note)?, "\n✅ Call Ann\n✅ later");
+    assert_eq!(
+        shown(&store, &note)?,
+        "\n✅ Call Ann\n✅ later\nthen\n✅ never"
+    );
     Ok(())
 }
 

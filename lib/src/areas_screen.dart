@@ -401,8 +401,8 @@ class _AreasScreenState extends State<AreasScreen>
                           // Hits from every Area.
                           (_) => true,
                           compact: compact,
-                          unfolded: unfolded,
-                          onUnfold: unfold,
+                          switched: switched,
+                          onSwitch: switchView,
                         )
                       : _areaRows(t),
                 ),
@@ -677,8 +677,8 @@ class _AreaScreenState extends State<AreaScreen>
         showPlace: (_) => false,
         onSchedule: _schedule,
         compact: compact,
-        unfolded: unfolded,
-        onUnfold: unfold,
+        switched: switched,
+        onSwitch: switchView,
       ),
     ];
   }
@@ -754,8 +754,8 @@ class _AreaScreenState extends State<AreaScreen>
                         // A hit in one of the Topics names it.
                         (placed) => placed.note.place != widget.areaId,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       )
                     : _browsing(t, area),
               ),
@@ -974,8 +974,8 @@ class _TopicScreenState extends State<TopicScreen>
                         // Every hit is in the Topic of the title.
                         (_) => false,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       )
                     : _diary.isEmpty
                     ? [
@@ -996,8 +996,8 @@ class _TopicScreenState extends State<TopicScreen>
                         showPlace: (_) => false,
                         onSchedule: _schedule,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       ),
               ),
             ),
@@ -1052,8 +1052,8 @@ List<Widget> _hitCards(
   VoidCallback onChanged,
   bool Function(PlacedNote placed) showPlace, {
   required bool compact,
-  required Set<String> unfolded,
-  required void Function(Note note) onUnfold,
+  required Set<String> switched,
+  required void Function(Note note) onSwitch,
 }) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -1067,8 +1067,8 @@ List<Widget> _hitCards(
         showPlace: showPlace,
         onSchedule: onSchedule,
         compact: compact,
-        unfolded: unfolded,
-        onUnfold: onUnfold,
+        switched: switched,
+        onSwitch: onSwitch,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.

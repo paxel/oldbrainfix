@@ -232,19 +232,19 @@ void main() {
       expect(checkbox(tester, soap), isFalse);
     });
 
-    testWidgets('a compact card shows how many are checked; "Uncheck all" '
+    testWidgets('a compact card shows how many are open (#189); "Uncheck all" '
         'in the ⋮ unchecks them', (tester) async {
       final note = notes.capture('Shop\n✓ Milk\nEggs\n✓ Tea').id;
       lists.make(note);
       await startAtNotes(tester);
       await tap(tester, key('compactNotes'));
-      expect(find.text('2 of 3 checked'), findsOneWidget);
+      expect(find.text('1 of 3 open'), findsOneWidget);
       expect(find.byType(Checkbox), findsNothing);
 
       await cardMenu(tester);
       await tap(tester, key('note-uncheck-all'));
       expect(shown(note), ['Milk', 'Eggs', 'Tea']);
-      expect(find.text('0 of 3 checked'), findsOneWidget);
+      expect(find.text('3 of 3 open'), findsOneWidget);
       await cardMenu(tester);
       // Nothing left to uncheck.
       expect(key('note-uncheck-all'), findsNothing);

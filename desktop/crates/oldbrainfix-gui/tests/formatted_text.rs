@@ -168,12 +168,16 @@ fn a_formatted_note_reads_without_its_marks_on_its_card_and_in_the_editor() -> T
 }
 
 #[test]
-fn a_compact_card_shows_its_first_line_as_it_reads() -> TestResult {
-    let (store, _) = with_note("## **Big** plan\nsecond", MARKDOWN)?;
+fn a_compact_card_shows_its_first_lines_as_they_read() -> TestResult {
+    let (store, _) = with_note("## **Big** plan\n**second**\nthird\nfourth", MARKDOWN)?;
     let mut harness = window(&store, Selection::All, None);
     click(&mut harness, L10n::new("en").show_notes_compact())?;
     assert!(shows(&harness, "Big plan"));
-    assert!(!shows(&harness, "second"));
+    // The two lines after it, as they read (#189).
+    assert!(shows(&harness, "second"));
+    assert!(shows(&harness, "third"));
+    assert!(!shows(&harness, "**second**"));
+    assert!(!shows(&harness, "fourth"));
     Ok(())
 }
 

@@ -237,7 +237,7 @@ class _LineRow extends StatelessWidget {
 
 /// A Checklist on a Note's card (#120): every Line with its checkbox on a
 /// [full] card, checkable where this Device may, else how many of its
-/// Lines are checked. Nothing for a Note that is none. It reads the
+/// Lines are open (#189). Nothing for a Note that is none. It reads the
 /// Checklist whenever the card is built anew, and again after a check.
 class CardChecklist extends StatefulWidget {
   final String noteId;
@@ -296,7 +296,7 @@ class _CardChecklistState extends State<CardChecklist> {
       return Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          context.t.checklistCount(list.checkedCount, list.count),
+          context.t.checklistOpenCount(list.openCount, list.count),
           key: const ValueKey('checklist-count'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),

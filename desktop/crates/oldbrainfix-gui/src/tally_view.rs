@@ -251,7 +251,12 @@ pub fn shown_value(base: f64, unit: &str, system: UnitSystem, decimal: &str) -> 
 }
 
 /// `base` as typed into a field of `unit`: as shown, without the unit.
-fn typed_value(base: Option<f64>, unit: &str, system: UnitSystem, decimal: &str) -> String {
+pub(crate) fn typed_value(
+    base: Option<f64>,
+    unit: &str,
+    system: UnitSystem,
+    decimal: &str,
+) -> String {
     base.map(|b| tally_units::format_shown(b, unit, system, decimal))
         .unwrap_or_default()
 }

@@ -62,8 +62,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 ## Gestures
 
 - **Tap is the primary action.** On a list row it opens the thing; on a
-  checkbox it checks. A tap on a Note card unfolds it in place while it
-  is compact and does nothing while it is full; in "merge into…" it
+  checkbox it checks. **A tap on a Note card switches that card** between
+  its compact and its detailed view, in place (#189); in "merge into…" it
   picks the Note. A tap on a row or card never opens a menu.
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
@@ -179,7 +179,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   a closed locked Area without its Topics.
 - After saving, the new Note's card shows with the same options, for
   whatever was not done while capturing (merging into another Note
-  among them). Enriching is never required; a Note left without an
+  among them): in its detailed view, a tap switching it to compact. Enriching is never required; a Note left without an
   Area or Topic stays Unsorted.
 
 ## Agenda
@@ -262,14 +262,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - A Note is drawn as a card with a soft embossed look, visibly above the
   background.
-- **A Note is read on its card; the editor is the last step.** A full
-  card shows the whole Note: every Section oldest first, the original
+- **A Note is read on its card; the editor is the last step.** Every
+  kind has a **compact view** and a **detailed view** (#189). The
+  detailed view shows the whole Note: every Section oldest first, the original
   and then each Amend and Merge, each with its date and Capture
   Context, with all its photos, recordings, Transcripts and Photo Texts.
   A Transcript or Photo Text shows whole under its recording or photo,
   dimmed and labelled "Transcript" or "Photo Text", so it never reads as
   typed text.
-- A photo on a full card fills the card's width in its own proportions,
+- A photo in the detailed view fills the card's width in its own proportions,
   its height capped, and is decoded no larger than it shows, so an
   extreme picture (12 × 34,000 px) cannot break the card; a tap opens it
   full screen with zoom.
@@ -282,8 +283,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   and "Open in another program". Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
 - **A part's meta is one weak line under its text** (#170): under the
-  Note's text on its full card, and under each Section's on the full
-  card and in the Note editor, its time, place (the Named Place, else the coordinates),
+  Note's text in the detailed view, and under each Section's there and
+  in the Note editor, its time, place (the Named Place, else the coordinates),
   calendar events, Bluetooth devices and source app go on one line,
   joined by " · " ("12:40 · Home · Dentist"), wrapping only where it
   must, smaller than the text and in the weak text colour, so the text
@@ -292,9 +293,19 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   rule. A Section's "Edited … by …" is a second weak line under it. The
   Captured badge's dialog keeps each detail on a line of its own, with
   Remove; in the editor a Section's line opens the same dialog for it.
-- A compact card shows date, time and, when known, the Named Place or
-  location, plus a Capture Context icon when there is more to see, the
-  Note's first line, its media and the action row.
+- **The compact view is a glance, by the Note's kind** (#189): a Plain
+  Note its first line and the two lines after it, a Checklist its name
+  and how many Lines are open ("3 of 7 open"), a Shopping List its name
+  and how many are open ("4 open"), a Tally its name and each field's
+  total today against its target ("Steps 7000 / 10000 steps"), a Note
+  that runs a Session its first line, the next run and "done 4 /
+  skipped 1 this week"; a Note without words its photos and recordings.
+  It shows no Capture Context and **none of the buttons at the bottom of
+  the card** (File into, Routine, Merge); **its ⋮ sits top right** and
+  offers File into… and Merge into… after Edit, as far as the action row
+  would. In the detailed view a Shopping List shows its open Lines,
+  tickable, the struck ones folded under them ("2 struck through") until
+  a tap shows them, kept open per Note on this Device; a Tally's and a Session's detailed view grow with #190 and #191.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
 - **Copy text** in a card's ⋮ puts the text of the Note and of each
@@ -309,10 +320,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   grey, when it was last edited and by whom, once it was.
 - **A Note is its kind** (#188): a Plain Note, a Checklist, a Shopping
   List or a Tally. A Plain Note shows as its text. Every other kind's
-  page, in the Note editor and on the full card, starts with its
+  page, in the Note editor and in the detailed view, starts with its
   **name**, the text's first line, as a heading, its **description**,
   the rest of the text, small right under it and folded to one line
-  until a tap unfolds it, then **the kind's content** (the Lines, the
+  until a tap unfolds it (on a card kept open per Note on this Device,
+  #189), then **the kind's content** (the Lines, the
   Tally), then the badges, the photos and recordings, and the Amends
   below as the dated diary part. In the editor the name is a one-line
   field and the description its own field; nothing is rewritten for the
@@ -427,7 +439,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - **A tap on a box opens its menu at the finger**: Check, Fail and
   Open, the state it shows left out, and History once it has been
-  ticked. It works wherever the box is drawn: on a full or compact
+  ticked. It works wherever the box is drawn: in either view of a
   card, in a Section, in a table full screen and in the editor's field,
   also where the text is only read. A box being typed becomes one when
   the text is saved.
@@ -501,12 +513,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A part of a page that is rarely needed folds; the fold is remembered
   per Device in a setting of that Device, closed by default when there
   is already a choice.
-- **Every Note list has a full/compact switch** on its bar: each Area,
-  each Topic, Unsorted (with the Nudge screen), the search results and a
-  person's Notes. It is an on/off toggle of the view, not a choice of
-  value: one button that says what tapping it does. Full is the
+- **Every Note list has a compact/detailed switch** on its bar: each
+  Area, each Topic, Unsorted (with the Nudge screen), the search results
+  and a person's Notes. It is an on/off toggle of the view, not a choice
+  of value: one button that says what tapping it does. Detailed is the
   default; each list remembers its own choice in a setting of this
   Device. A search inside an Area or Topic follows that list's switch.
+  **A card a tap switched keeps its view** in another setting of this
+  Device, per list, until the list's switch changes again, which shows
+  every card in the view it sets (#189).
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
 
@@ -574,8 +589,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **The path beside the arrows leads up the levels**, such as "Areas ›
   Household › Repairs"; a click on a level shows it, "Areas" leading to
   All Notes.
-- In the Note lists a click selects the card and unfolds a compact
-  Note; Ctrl-click (Cmd on macOS) adds a card to the selection or takes
+- In the Note lists a click selects the card; **the view button beside
+  ⋮ and Edit at the card's top right switches the card** between its
+  compact and its detailed view, as a tap does on the phone (#189), and
+  the View menu's Compact views and Detailed views are the list's
+  switch. Ctrl-click (Cmd on macOS) adds a card to the selection or takes
   it away, Shift-click selects the run from the card clicked last in the
   list's order (#148). The selected cards carry a check mark and a
   thicker outline, and say so to a screen reader; Esc and showing

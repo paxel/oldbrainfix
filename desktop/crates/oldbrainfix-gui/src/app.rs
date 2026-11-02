@@ -110,6 +110,7 @@ use crate::backups;
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
+use crate::card_glance;
 use crate::card_selection::CardSelection;
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
@@ -436,9 +437,20 @@ struct View {
     /// How the boxes of the table shown full screen show, while it is
     /// one of a stored text.
     table_ticking: Option<table_view::Ticking>,
-    /// Whether the list shows its Notes compact, by their first line,
-    /// as this Device keeps it for that list (#114).
+    /// Whether the list shows its cards in the compact view, as this
+    /// Device keeps it for that list (#114, #189).
     compact: bool,
+    /// The Notes of the list whose card a click on its view button
+    /// switched to the other view, kept on this Device until the list's
+    /// switch changes (#189).
+    switched: HashSet<String>,
+    /// What the compact view says of each listed Tally and Note running a
+    /// Session, by its id (#189).
+    glances: HashMap<String, Vec<String>>,
+    /// The Notes whose card this Device keeps with its struck Lines, or
+    /// its description, unfolded (#189).
+    struck_shown: HashSet<String>,
+    descriptions_unfolded: HashSet<String>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
     /// Whether the Note being captured may spawn where it goes (#113).
@@ -930,10 +942,14 @@ enum Action {
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
-    /// Shows the compact card of this Note in full, in place (#114).
-    Unfold(String),
-    /// Switches the list shown to compact cards or full ones and keeps
-    /// the choice for that list on this Device (#114).
+    /// Switches the card of this Note to its other view, in place, and
+    /// keeps that on this Device until the list's switch changes (#189).
+    SwitchView(String),
+    /// Keeps a fold of a card open, by its setting, or forgets it (#189).
+    Fold(String, bool),
+    /// Switches every card of the list shown to the compact view or the
+    /// detailed one and keeps the choice for that list on this Device
+    /// (#114, #189).
     Compact(bool),
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
@@ -1296,10 +1312,6 @@ pub struct App {
     error: Option<String>,
     /// How far the Notes list is scrolled, for the parallax.
     scrolled: f32,
-    /// The Notes a click unfolded on the compact list shown, and which
-    /// list that is; they fold again once another list shows (#114).
-    unfolded: HashSet<String>,
-    unfolded_of: Option<String>,
     /// The photo shown full screen over the window, while one is (#114).
     viewer: Option<Viewer>,
     /// The table shown full screen over the window, while one is (#128).
@@ -1717,8 +1729,6 @@ impl App {
             view: View::default(),
             error: None,
             scrolled: 0.0,
-            unfolded: HashSet::new(),
-            unfolded_of: None,
             viewer: None,
             table: None,
             table_amends: false,
@@ -3791,12 +3801,6 @@ impl App {
         if let Ok(from) = DeviceSettings::new(&self.store).all_day_from() {
             self.all_day_text = from.to_string();
         }
-        // What a click unfolded stays while its list shows.
-        let cards = self.cards_key();
-        if cards != self.unfolded_of {
-            self.unfolded.clear();
-            self.unfolded_of = cards;
-        }
         let shown = self.view.detail.as_ref().map(|(p, _)| &p.note);
         let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
@@ -4081,12 +4085,30 @@ impl App {
         }
         let (box_looks, box_ticks, show_ticks) = self.box_looks(&texts)?;
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
-        let compact = match cards_key(&self.selection, &self.people, is_area) {
-            Some(key) => {
-                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true")
-            }
-            None => false,
+        let (compact, switched) = match cards_key(&self.selection, &self.people, is_area) {
+            Some(key) => (
+                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
+                self.store
+                    .local_setting(&switched_setting(&key))?
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_string)
+                    .collect(),
+            ),
+            None => (false, HashSet::new()),
         };
+        let glances = card_glance::read(store, &self.t, &*self.wall, self.unit_system()?, &listed)?;
+        let kept_open = |prefix: &str| -> oldbrainfix_core::Result<HashSet<String>> {
+            Ok(store
+                .local_settings_with_prefix(prefix)?
+                .into_iter()
+                .filter(|(_, v)| v == "true")
+                .filter_map(|(k, _)| k.strip_prefix(prefix).map(str::to_string))
+                .collect())
+        };
+        let struck_shown = kept_open(STRUCK_SHOWN)?;
+        let descriptions_unfolded = kept_open(DESCRIPTION_UNFOLDED)?;
         let (note_routines, newer_routines) = match &detail {
             Some((p, _)) if !p.note.is_trashed() => (
                 routines.of_note(&p.note.id)?,
@@ -4473,6 +4495,10 @@ impl App {
             box_ticks,
             show_ticks,
             compact,
+            switched,
+            glances,
+            struck_shown,
+            descriptions_unfolded,
             detail,
             capture_spawns: capture_choices::may_spawn(
                 &self.store,
@@ -4775,8 +4801,29 @@ impl App {
             Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
             Action::OpenTable(opening) => self.open_table(opening)?,
             Action::Table(asked) => self.table_asked(asked)?,
-            Action::Unfold(id) => {
-                self.unfolded.insert(id);
+            Action::Fold(setting, open) => {
+                // Nothing kept means folded, the default.
+                if open {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
+            Action::SwitchView(id) => {
+                if let Some(key) = self.cards_key() {
+                    let mut switched = self.view.switched.clone();
+                    if !switched.remove(&id) {
+                        switched.insert(id);
+                    }
+                    let setting = switched_setting(&key);
+                    if switched.is_empty() {
+                        self.store.remove_local_setting(&setting)?;
+                    } else {
+                        let mut ids: Vec<&str> = switched.iter().map(String::as_str).collect();
+                        ids.sort_unstable();
+                        self.store.set_local_setting(&setting, &ids.join(","))?;
+                    }
+                }
             }
             Action::Theme(choice) => {
                 // Shown even when it cannot be kept.
@@ -4793,8 +4840,9 @@ impl App {
                     } else {
                         self.store.remove_local_setting(&setting)?;
                     }
+                    // Every card shows that view again.
+                    self.store.remove_local_setting(&switched_setting(&key))?;
                 }
-                self.unfolded.clear();
             }
             Action::Speech(asked) => {
                 if let Some(speech) = &self.speech {
@@ -7790,9 +7838,10 @@ impl App {
                 }
                 ui.separator();
                 let compact = self.view.compact;
-                for (label, wanted) in
-                    [(t.menu_full_cards(), false), (t.menu_compact_cards(), true)]
-                {
+                for (label, wanted) in [
+                    (t.menu_detailed_views(), false),
+                    (t.menu_compact_views(), true),
+                ] {
                     let on = cards && compact == wanted;
                     let button = egui::Button::selectable(on, RichText::new(label).color(text));
                     if ui.add_enabled(cards, button).clicked() {
@@ -8699,7 +8748,7 @@ impl App {
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
             ui.heading(RichText::new(self.title()).color(text));
-            // Every Note list but the trash has its full/compact switch.
+            // Every Note list but the trash has its compact/detailed switch.
             if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
                 actions.push(Action::Compact(!self.view.compact));
             }
@@ -8783,6 +8832,9 @@ impl App {
             let order: Vec<String> = self.view.notes.iter().map(|p| p.note.id.clone()).collect();
             // Ctrl (Cmd on macOS) and Shift as the card is clicked (#148).
             let modifiers = ui.input(|i| i.modifiers);
+            // A list with its switch has the view button on its cards
+            // (#189).
+            let switches = self.cards_key().is_some();
             for placed in &self.view.notes {
                 let id = &placed.note.id;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
@@ -8796,7 +8848,13 @@ impl App {
                     transcribing: transcribing.as_deref(),
                 };
                 let look = CardLook {
-                    full: !self.view.compact || self.unfolded.contains(id),
+                    full: self.view.compact == self.view.switched.contains(id),
+                    glance: self.view.glances.get(id).map_or(&[], Vec::as_slice),
+                    switches,
+                    folds: CardFolds {
+                        struck: self.view.struck_shown.contains(id),
+                        description: self.view.descriptions_unfolded.contains(id),
+                    },
                     sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
@@ -8824,10 +8882,10 @@ impl App {
                     let moving = self.cards.moving(id, &order);
                     egui::DragAndDrop::set_payload(ui.ctx(), DraggedNotes(moving));
                 }
-                // A click selects the card and unfolds a compact Note,
-                // Ctrl-click and Shift-click select more (#148); a
-                // double-click or Edit opens the Note dialog (UI laws,
-                // "Desktop").
+                // A click selects the card, Ctrl-click and Shift-click
+                // select more (#148); its view button switches its view
+                // (#189); a double-click or Edit opens the Note dialog (UI
+                // laws, "Desktop").
                 if clicks.menu_opened {
                     actions.push(Action::Checklist(ChecklistAction::Menu(id.clone())));
                 }
@@ -8858,6 +8916,10 @@ impl App {
                     && author.clicked()
                 {
                     actions.push(Action::OpenPerson(profile.id.clone()));
+                } else if let Some((setting, open)) = clicks.folded {
+                    actions.push(Action::Fold(setting, open));
+                } else if clicks.view.clicked() {
+                    actions.push(Action::SwitchView(id.clone()));
                 } else if clicks.edit.clicked()
                         // A click soon after two more counts as well.
                         || clicks.card.double_clicked()
@@ -8873,9 +8935,6 @@ impl App {
                         Pick::One
                     };
                     actions.push(Action::PickCard(id.clone(), pick));
-                    if pick == Pick::One && !look.full {
-                        actions.push(Action::Unfold(id.clone()));
-                    }
                 }
             }
         });
@@ -11334,6 +11393,31 @@ const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 /// the phone names it.
 const FROGS_DONE_OPEN: &str = "frogsDoneOpen";
 
+/// What the settings of this Device start with that keep a Shopping
+/// List's struck Lines, or the description of a Note of a kind, unfolded
+/// on its card, the Note's id after it, as the phone names them (#189).
+const STRUCK_SHOWN: &str = "shoppingStruckShown:";
+const DESCRIPTION_UNFOLDED: &str = "descriptionUnfolded:";
+
+/// The setting that keeps the struck Lines of the Shopping List `note`
+/// unfolded on its card.
+fn struck_shown_setting(note: &str) -> String {
+    format!("{STRUCK_SHOWN}{note}")
+}
+
+/// The setting that keeps the description of the Note `note` unfolded on
+/// its card.
+fn description_unfolded_setting(note: &str) -> String {
+    format!("{DESCRIPTION_UNFOLDED}{note}")
+}
+
+/// The setting of this Device that keeps the Notes of the list `key`
+/// whose card shows the view the list does not start in, joined by commas
+/// (#189).
+fn switched_setting(key: &str) -> String {
+    format!("switchedNotes:{key}")
+}
+
 /// The setting of this Device that keeps the Note list `key` compact
 /// (#114), the phone's; none while it shows in full, the default.
 fn compact_setting(key: &str) -> String {
@@ -11341,7 +11425,7 @@ fn compact_setting(key: &str) -> String {
 }
 
 /// Which Note list `selection` shows, by the phone's names, each keeping
-/// its own full/compact choice (#114): all Notes, or a person's while
+/// its own compact/detailed choice (#114): all Notes, or a person's while
 /// `people` keeps only some, Unsorted, an Area (`area`) or a Topic. A
 /// search inside one follows its choice; the trash has none.
 fn cards_key(selection: &Selection, people: &PersonFilter, area: bool) -> Option<String> {
@@ -13720,14 +13804,20 @@ struct CardMedia<'a> {
     transcribing: Option<&'a str>,
 }
 
-/// How a card shows its Note (#114): `full`, the whole Note with its
-/// `sections`, or compact, by its first line; its Checklist or Shopping
-/// List, if it is one, as it shows now, with whether this Device may
-/// check its Lines, and what the card's menu offers of it once read for
-/// this Note (#120, #121, #122).
+/// How a card shows its Note (#114, #189): `full`, its detailed view,
+/// the whole Note with its `sections`, or its compact view, by its kind,
+/// with the `glance` of its Tally or of the Session it runs; whether it
+/// has the view button that switches it (`switches`); its Checklist or
+/// Shopping List, if it is one, as it shows now, with whether this Device
+/// may check its Lines, and what the card's menu offers of it once read
+/// for this Note (#120, #121, #122).
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
+    glance: &'a [String],
+    switches: bool,
+    /// Which of its folds this Device keeps open (#189).
+    folds: CardFolds,
     sections: &'a [Section],
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
@@ -13742,6 +13832,15 @@ struct CardLook<'a> {
     /// them this Device may tick, and whether Show ticks is on for it
     /// (ADR 0035).
     boxes: CardBoxes<'a>,
+}
+
+/// The folds of a card this Device keeps open (UI laws, "Lists"; #189):
+/// a Shopping List's struck Lines and the description of a Note of a
+/// kind.
+#[derive(Debug, Clone, Copy, Default)]
+struct CardFolds {
+    struck: bool,
+    description: bool,
 }
 
 /// How the boxes of the texts listed show, by id, the texts whose boxes
@@ -13771,6 +13870,11 @@ struct CardClicks {
     card: egui::Response,
     author: Option<egui::Response>,
     edit: egui::Response,
+    /// The view button, switching the card's view (#189).
+    view: egui::Response,
+    /// The setting of a fold clicked, a Shopping List's struck Lines or a
+    /// description, and whether it is open now (#189).
+    folded: Option<(String, bool)>,
     photo: Option<String>,
     check: Option<(String, bool)>,
     /// What a click on a box of the Note's text or a Section's asked,
@@ -13837,8 +13941,8 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
     picked
 }
 
-/// The bar button of a Note list's full/compact switch (#114): it says
-/// what clicking it does and shows as selected while the list is
+/// The bar button of a Note list's compact/detailed switch (#114, #189):
+/// it says what clicking it does and shows as selected while the list is
 /// `compact`; whether it was clicked.
 fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     let (icon, label) = if compact {
@@ -14562,15 +14666,19 @@ fn card_kinded_text(
 /// recording being transcribed, for [`whole`].
 type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 
-/// A Note as a card (UI laws, "Cards"): when it was captured, with ⋮
-/// (but in the trash) and Edit, and where it is filed, its Area's colour
-/// down the left edge and icon before the place; then, as `look` says,
-/// the whole Note under its Capture Context, a Checklist's or a Shopping
-/// List's Lines under its name and description (#188), checkable, with
-/// every Section oldest
-/// first, each under its own, its photos opening full screen on a click;
-/// or, compact, where it was captured, its first line, how many of its
-/// Lines are checked or open and its media. ⋮ and a right-click open
+/// A Note as a card (UI laws, "Cards"): Edit, ⋮ (but in the trash) and,
+/// in a list with its switch, the view button top right (#189), and where
+/// it is filed, its Area's colour down the left edge and icon before the
+/// place; then, as `look` says, its detailed view: the whole Note with its
+/// Capture Context as one line under its text (#170), a Checklist's or a
+/// Shopping List's Lines under its name and description (#188), checkable,
+/// a Shopping List's struck ones folded under its open ones, with every
+/// Section oldest first, each with its own line, its photos opening full
+/// screen on a click; or its compact view, a glance by its kind (#189): a
+/// plain Note's first line and the two lines after it or the `glance` of
+/// the Session it runs, a list's or a Tally's name with how many of its
+/// Lines are open or the Tally's `glance`, a Note without words its
+/// media; no Capture Context. ⋮ and a right-click open
 /// the same menu: Edit, then making it a Checklist, "Uncheck all", "Back
 /// to a plain Note" and making it a Shopping List as this Device may
 /// (#120, #122). Important cards carry the accent marker and a stronger
@@ -14598,10 +14706,16 @@ fn note_card(
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
+    let mut view_rect = None;
+    // Where the fold of a Shopping List's struck Lines shows in the
+    // detailed view, how many, and whether it is open (#189).
+    let struck_id = Id::new(("card struck", &note.id));
+    let struck_open = look.folds.struck;
+    let mut struck_rect = None;
     // Where the description of a Note of a kind shows on a full card, and
     // whether it is unfolded (#188).
     let fold_id = Id::new(("card description", &note.id));
-    let unfolded = ui.data(|d| d.get_temp::<bool>(fold_id)).unwrap_or(false);
+    let unfolded = look.folds.description;
     let mut description_rect = None;
     // The photos shown in full, where they lie, the checkboxes of its
     // Lines and the status marks and tags of its text and of its
@@ -14644,23 +14758,6 @@ fn note_card(
                     );
                     author_rect = Some(picture.rect);
                 }
-                // A full card shows it under the Note's text (#170).
-                if !look.full {
-                    ui.label(RichText::new(when(t, note.captured)).small().color(weak));
-                    // Where, and that the editor shows more (UI laws,
-                    // "Cards"); room is left for ⋮ and Edit.
-                    let room = (ui.available_width() - 88.0).max(0.0);
-                    if let Some(at) = where_captured(&note.context) {
-                        icons::show(ui, icons::CONTEXT_WHERE, 14.0, weak);
-                        ui.allocate_ui(egui::vec2(room, 20.0), |ui| {
-                            let at = RichText::new(at).small().color(weak);
-                            ui.add(egui::Label::new(at).truncate());
-                        });
-                    }
-                    if note.context.has_more() {
-                        icons::show(ui, icons::MORE, 16.0, weak);
-                    }
-                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     edit_rect = ui
                         .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
@@ -14668,6 +14765,14 @@ fn note_card(
                     // A Note in the trash is restored, not changed.
                     if !note.is_trashed() {
                         more_rect = Some(
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                .0,
+                        );
+                    }
+                    // Its view shows under the Note's text, its time and
+                    // place in the detailed view (#170, #189).
+                    if look.switches {
+                        view_rect = Some(
                             ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
                                 .0,
                         );
@@ -14709,7 +14814,23 @@ fn note_card(
                         let text = (part.text, part.format, look.boxes.look(part.id));
                         description_rect = card_kinded_text(ui, text, unfolded, &mut marks);
                         if let Some(lines) = &lines {
-                            boxes = checklist_view::card_lines(ui, tones, lines);
+                            // A Shopping List's struck Lines fold under its
+                            // open ones (#189).
+                            let (open, struck): (Vec<_>, Vec<_>) = lines
+                                .iter()
+                                .cloned()
+                                .partition(|l| look.shopping.is_none() || !l.checked);
+                            boxes = checklist_view::card_lines(ui, tones, &open);
+                            if !struck.is_empty() {
+                                let said = t.shopping_struck_count(struck.len() as i64);
+                                let row = folded_row(ui, struck_open, |ui| {
+                                    ui.label(RichText::new(&said).size(13.0).color(weak));
+                                });
+                                struck_rect = Some((row.response.rect, said));
+                                if struck_open {
+                                    boxes.extend(checklist_view::card_lines(ui, tones, &struck));
+                                }
+                            }
                         }
                         shown.extend(media_view::whole_media(
                             ui,
@@ -14745,18 +14866,56 @@ fn note_card(
                 });
                 return;
             }
-            // A photo Note may have no words.
+            // The compact view, by the Note's kind (#189).
+            let text_of = (
+                note.text.as_str(),
+                note.text_format.as_str(),
+                look.boxes.look(&note.id),
+            );
+            if look.checklist.is_some() || look.shopping.is_some() || look.tally {
+                // Its name, then how many Lines are open, or the Tally's
+                // totals today.
+                let named = note_kinds::name(&note.text).len();
+                if named > 0 {
+                    marks = text_marks_view::formatted_label(
+                        ui,
+                        text_of,
+                        (0, named),
+                        (Some(20.0), text),
+                        true,
+                    );
+                }
+                if let Some((list, _)) = look.checklist {
+                    checklist_view::card_count(ui, t, list);
+                } else if let Some((list, _)) = look.shopping {
+                    shopping_view::card_count(ui, t, list);
+                }
+                card_glance_lines(ui, look.glance);
+                return;
+            }
+            // A plain Note: its first line and the two after it, or, running
+            // a Session, its next run and this week (#189).
             if let Some(line) = first_line(&note.text) {
-                let shown = (Some(16.0), text);
-                let boxes = look.boxes.look(&note.id);
-                let text = (note.text.as_str(), note.text_format.as_str(), boxes);
-                marks = text_marks_view::formatted_label(ui, text, line, shown, true);
+                marks =
+                    text_marks_view::formatted_label(ui, text_of, line, (Some(16.0), text), true);
+                if look.glance.is_empty() {
+                    if let Some(next) = next_lines(&note.text, line.1) {
+                        let more = text_marks_view::formatted_label(
+                            ui,
+                            text_of,
+                            next,
+                            (Some(14.0), text),
+                            false,
+                        );
+                        marks.extend(more);
+                    }
+                } else {
+                    card_glance_lines(ui, look.glance);
+                }
+                return;
             }
-            if let Some((list, _)) = look.checklist {
-                checklist_view::card_count(ui, t, list);
-            } else if let Some((list, _)) = look.shopping {
-                shopping_view::card_count(ui, t, list);
-            }
+            card_glance_lines(ui, look.glance);
+            // Without words it shows what it holds instead.
             if !note.photos.is_empty() {
                 media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
             }
@@ -14825,12 +14984,56 @@ fn note_card(
         });
     let edit = ui.interact(edit_rect, Id::new(("edit", &note.id)), Sense::click());
     edit.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
+    // A fold clicked open or closed, kept per Note on this Device (#189).
+    let mut folded = None;
+    // The view button over the card, switching its view (#189).
+    let view_said = if look.full {
+        t.card_show_compact()
+    } else {
+        t.card_show_detailed()
+    };
+    let view = ui.interact(
+        view_rect.unwrap_or(egui::Rect::NOTHING),
+        Id::new(("view", &note.id)),
+        Sense::click(),
+    );
+    if let Some(view_rect) = view_rect {
+        view.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, view_said));
+        if ui.is_rect_visible(view_rect) {
+            if view.hovered() {
+                let fill = ui.visuals().widgets.hovered.weak_bg_fill;
+                ui.painter().rect_filled(view_rect, 6.0, fill);
+            }
+            let icon = if look.full {
+                icons::EXPAND_LESS
+            } else {
+                icons::EXPAND_MORE
+            };
+            icons::paint(
+                ui.painter(),
+                view_rect.shrink(2.0),
+                icon,
+                ui.visuals().weak_text_color(),
+            );
+        }
+    }
+    // A click on the struck Lines' fold shows or hides them (#189).
+    if let Some((rect, said)) = &struck_rect {
+        let fold = ui.interact(*rect, struck_id.with("fold"), Sense::click());
+        fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+        if fold
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            folded = Some((struck_shown_setting(&note.id), !struck_open));
+        }
+    }
     // Over the card too: a click on the description folds or unfolds it,
     // not the card's own (#188).
     if let Some(rect) = description_rect
         && description_fold(ui, t, (rect, fold_id), unfolded)
     {
-        ui.data_mut(|d| d.insert_temp(fold_id, !unfolded));
+        folded = Some((description_unfolded_setting(&note.id), !unfolded));
     }
     if ui.is_rect_visible(edit_rect) {
         let dim = |c: Color32| {
@@ -14995,6 +15198,8 @@ fn note_card(
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
         edit: edit.on_hover_text(t.edit()),
+        view: view.on_hover_text(view_said),
+        folded,
         photo,
         check,
         tick,
@@ -15013,6 +15218,33 @@ fn same_table((from, at): (&str, usize), to: &str) -> Option<usize> {
         .iter()
         .position(|t| t.start == at)?;
     markdown::table::all(to).get(index).map(|t| t.start)
+}
+
+/// Where the `2` lines after the byte `from` of `text` lie in it, from the
+/// first with words, without the spaces around them, as a compact card
+/// shows them under a plain Note's first line (#189); none when no words
+/// follow.
+fn next_lines(text: &str, from: usize) -> Option<(usize, usize)> {
+    let rest = text.get(from..)?;
+    let start = from + rest.len() - rest.trim_start().len();
+    let after = text.get(start..)?;
+    if after.is_empty() {
+        return None;
+    }
+    let end = match after.match_indices('\n').nth(1) {
+        Some((at, _)) => start + at,
+        None => text.len(),
+    };
+    let lines = text.get(start..end)?.trim_end();
+    Some((start, start + lines.len()))
+}
+
+/// The lines the compact view says of a Tally or of a Session (#189).
+fn card_glance_lines(ui: &mut Ui, glance: &[String]) {
+    let text = ui.visuals().text_color();
+    for line in glance {
+        ui.label(RichText::new(line).size(14.0).color(text));
+    }
 }
 
 /// Where the first line of `text` that a compact card shows lies in it,

@@ -1,7 +1,7 @@
-//! The Note lists' full and compact cards (#114), driven headless by
-//! egui_kittest: every Note in full with its Sections and its labelled
-//! Transcripts and Photo Texts by default, the full/compact switch kept
-//! per list on this Device, a click unfolding a compact Note, a
+//! The Note lists' detailed and compact views (#114, #189), driven
+//! headless by egui_kittest: every Note detailed with its Sections and its
+//! labelled Transcripts and Photo Texts by default, the list's switch kept
+//! per list on this Device, the view button switching a card, a
 //! double-click or Edit opening the editor, a photo of extreme
 //! proportions capped on its card, the Capture Context of the Note and
 //! of each Section as one weak line under its text (#170), and a click
@@ -111,6 +111,19 @@ fn edit<'a>(harness: &'a Harness<'_, App>, text: &str) -> egui_kittest::Node<'a>
         .unwrap_or_else(|| panic!("no Edit on the card of {text:?}"))
 }
 
+/// The view button `label` on the card of the Note with `text` (#189).
+fn view_button<'a>(
+    harness: &'a Harness<'_, App>,
+    text: &str,
+    label: &'a str,
+) -> egui_kittest::Node<'a> {
+    let card = card(harness, text).rect();
+    harness
+        .query_all_by_role_and_label(Role::Button, label)
+        .find(|n| card.contains_rect(n.rect()))
+        .unwrap_or_else(|| panic!("no {label} on the card of {text:?}"))
+}
+
 /// The setting this Device keeps for the Note list `key`.
 fn kept(store: &Store, key: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
     Ok(store.local_setting(&format!("compactNotes:{key}"))?)
@@ -155,14 +168,15 @@ fn the_switch_shows_a_list_compact_and_each_list_keeps_its_own() -> TestResult {
     let area = Places::new(&store).add_area("Household")?;
     Notes::new(&store).capture("Fix the tap", Some(&area.id), None)?;
     let mut harness = window(store.clone(), Selection::All);
-    press(&mut harness, "Show Notes compact");
+    press(&mut harness, "Show compact views");
     assert!(harness.state().compact());
     assert_eq!(kept(&store, "allNotes")?.as_deref(), Some("true"));
-    // Compact: the first line and the media, not the Sections.
+    // Compact: the first lines, not the media or the Sections (#189).
     assert!(shows(&harness, "Dentist number"));
     assert!(!shows(&harness, AMEND));
     assert!(!shows(&harness, "Photo Text"));
-    assert!(shows(&harness, "Show Notes in full"));
+    assert!(!shows(&harness, "Photo"));
+    assert!(shows(&harness, "Show detailed views"));
     // Unsorted and the Area keep their own choice: full.
     harness.state_mut().select(Selection::Unsorted);
     harness.run();
@@ -173,7 +187,7 @@ fn the_switch_shows_a_list_compact_and_each_list_keeps_its_own() -> TestResult {
         .select(Selection::Place(area.id.clone()));
     harness.run();
     assert!(!harness.state().compact());
-    press(&mut harness, "Show Notes compact");
+    press(&mut harness, "Show compact views");
     assert_eq!(
         kept(&store, &format!("area:{}", area.id))?.as_deref(),
         Some("true")
@@ -182,7 +196,7 @@ fn the_switch_shows_a_list_compact_and_each_list_keeps_its_own() -> TestResult {
     harness.state_mut().select(Selection::All);
     harness.run();
     assert!(harness.state().compact());
-    press(&mut harness, "Show Notes in full");
+    press(&mut harness, "Show detailed views");
     assert!(!harness.state().compact());
     assert_eq!(kept(&store, "allNotes")?, None);
     assert!(shows(&harness, AMEND));
@@ -191,27 +205,34 @@ fn the_switch_shows_a_list_compact_and_each_list_keeps_its_own() -> TestResult {
     harness.state_mut().select(Selection::Trash);
     harness.run();
     assert!(shows(&harness, AMEND));
-    assert!(!shows(&harness, "Show Notes compact"));
-    assert!(!shows(&harness, "Show Notes in full"));
+    assert!(!shows(&harness, "Show compact views"));
+    assert!(!shows(&harness, "Show detailed views"));
     Ok(())
 }
 
 #[test]
-fn a_click_unfolds_a_compact_note_and_a_double_click_or_edit_opens_the_editor() -> TestResult {
+fn the_view_button_switches_a_compact_note_and_a_double_click_or_edit_opens_the_editor()
+-> TestResult {
     let store = store()?;
     let (dentist, milk) = notes(&store)?;
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let mut harness = window(store, Selection::All);
     assert!(harness.state().compact());
     assert!(!shows(&harness, AMEND));
-    // A click unfolds it in place and opens nothing.
+    // A click only selects it (#148).
     card(&harness, TEXT).click();
+    harness.run();
+    assert!(!shows(&harness, AMEND));
+    assert_eq!(harness.state().selected_note(), None);
+    // Its view button shows it detailed in place and opens nothing (#189).
+    pause(&mut harness);
+    view_button(&harness, TEXT, "Show detailed view").click();
     harness.run();
     assert!(shows(&harness, AMEND));
     assert!(shows(&harness, "Photo Text"));
     assert!(harness.state().compact());
     assert_eq!(harness.state().selected_note(), None);
-    // On a full card a click does nothing, but on a photo; here on its
+    // On a detailed card a click does nothing, but on a photo; here on its
     // text.
     pause(&mut harness);
     harness.get_by_role_and_label(Role::Label, TEXT).click();
@@ -232,15 +253,18 @@ fn a_click_unfolds_a_compact_note_and_a_double_click_or_edit_opens_the_editor() 
     edit(&harness, TEXT).click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(dentist.as_str()));
-    // Another list folds what was unfolded.
+    // Another list and back: the card stays detailed (#189).
+    harness.state_mut().close_note();
+    harness.run();
     harness.state_mut().select(Selection::Unsorted);
     harness.run();
     harness.state_mut().select(Selection::All);
     harness.run();
-    assert!(!harness.query_all_by_label(AMEND).any(|n| {
-        // The Note dialog shows the Section; the card does not.
-        card(&harness, TEXT).rect().contains_rect(n.rect())
-    }));
+    assert!(
+        harness
+            .query_all_by_label(AMEND)
+            .any(|n| { card(&harness, TEXT).rect().contains_rect(n.rect()) })
+    );
     Ok(())
 }
 
@@ -420,7 +444,7 @@ fn a_section_of_another_day_keeps_its_date() -> TestResult {
 }
 
 #[test]
-fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -> TestResult {
+fn a_compact_card_shows_no_capture_context_and_the_editor_shows_it_whole() -> TestResult {
     let store = store()?;
     let id = noted(&store)?;
     let (_, amend_line) = meta_lines(&store, &id)?;
@@ -430,9 +454,8 @@ fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -
     );
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let mut harness = window(store, Selection::All);
-    // Compact: where, by its Named Place; the rest in the editor.
-    assert!(shows(&harness, NOTE_CONTEXT[0]));
-    for line in NOTE_CONTEXT[1..].iter().chain(&AMEND_CONTEXT) {
+    // Compact: none of it (#189); the detailed view and the editor show it.
+    for line in NOTE_CONTEXT.iter().chain(&AMEND_CONTEXT) {
         assert!(!shows(&harness, line), "{line}");
     }
     edit(&harness, TEXT).click();
@@ -450,13 +473,12 @@ fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -
     harness.key_press(egui::Key::Escape);
     harness.run();
     assert!(harness.state().note_open());
-    // The Note's own behind its Captured badge (#160), the place besides
-    // the compact card's.
+    // The Note's own behind its Captured badge (#160).
     let before: Vec<usize> = NOTE_CONTEXT
         .iter()
         .map(|line| harness.query_all_by_label(line).count())
         .collect();
-    assert_eq!(before, [1, 0, 0, 0]);
+    assert_eq!(before, [0, 0, 0, 0]);
     press(&mut harness, &format!("Captured: {note_time}"));
     for (line, before) in NOTE_CONTEXT.iter().zip(before) {
         let count = harness.query_all_by_label(line).count();

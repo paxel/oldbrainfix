@@ -189,14 +189,14 @@ fn the_view_menu_shows_the_places_and_switches_the_cards() -> TestResult {
         assert_eq!(harness.state().selection(), &place, "{entry}");
     }
     // The Agenda has no cards to switch.
-    assert!(!enabled(&mut harness, "View", "Compact cards"));
+    assert!(!enabled(&mut harness, "View", "Compact views"));
     pick(&mut harness, "View", "All Notes");
     harness.run();
     assert!(!harness.state().compact());
-    pick(&mut harness, "View", "Compact cards");
+    pick(&mut harness, "View", "Compact views");
     harness.run();
     assert!(harness.state().compact());
-    pick(&mut harness, "View", "Full cards");
+    pick(&mut harness, "View", "Detailed views");
     harness.run();
     assert!(!harness.state().compact());
     // The theme: the system's, light or dark (#147).

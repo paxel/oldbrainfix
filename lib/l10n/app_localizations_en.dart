@@ -3294,8 +3294,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checklistHeading => 'Checklist';
 
   @override
-  String checklistCount(int checked, int count) {
-    return '$checked of $count checked';
+  String checklistOpenCount(int open, int count) {
+    return '$open of $count open';
+  }
+
+  @override
+  String shoppingStruckCount(int count) {
+    return '$count struck through';
+  }
+
+  @override
+  String tallyCardTotal(String field, String total, String target) {
+    return '$field $total / $target';
+  }
+
+  @override
+  String tallyCardTotalOnly(String field, String total) {
+    return '$field $total';
+  }
+
+  @override
+  String sessionCardNext(String when) {
+    return 'Next: $when';
+  }
+
+  @override
+  String sessionCardWeek(int done, int skipped) {
+    return 'done $done / skipped $skipped this week';
   }
 
   @override
@@ -3779,10 +3804,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteBeingCaptured => 'The Note being captured';
 
   @override
-  String get showNotesCompact => 'Show Notes compact';
+  String get showNotesCompact => 'Show compact views';
 
   @override
-  String get showNotesFull => 'Show Notes in full';
+  String get showNotesFull => 'Show detailed views';
 
   @override
   String get transcriptLabel => 'Transcript';

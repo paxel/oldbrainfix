@@ -51,6 +51,19 @@
   recordings, and the Amends at the end. In the editor the name and the description are two fields;
   saving writes them back as one text, and a Note opened and left unchanged is not written.
 </p>
+<p>
+  In a list every card shows its Note in its <strong>compact view</strong> or its
+  <strong>detailed view</strong>. The detailed view, the default, shows the Note whole; the
+  compact view shows a glance by its kind: a Plain Note its first line and the two lines after it,
+  a Checklist its name and "3 of 7 open", a Shopping List its name and "4 open", a Tally its name
+  and each field's total today against its target, such as "Pages 30 / 50 pages", and a Note that
+  runs a Session its first line, its next run and "done 4 / skipped 1 this week". The compact view
+  has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right
+  and offers <strong>File into…</strong> and <strong>Merge into…</strong> after Edit.
+  The button on the list's bar shows every card compact or detailed. A tap on a card switches only
+  that card; the phone keeps it so for that list until the button on the bar is used again. A long
+  press still opens the editor.
+</p>
 <ul>
   <li>The kind badge in the Note editor shows the kind. A tap offers the kinds the Note can become: a Plain Note becomes a Checklist, a Shopping List or a Tally; a Checklist becomes a Shopping List or a Plain Note; a Shopping List becomes a Checklist or a Plain Note. A Tally stays a Tally.</li>
   <li>A Checklist that becomes a Shopping List keeps its Lines in their order, the checked ones struck, groups flattened; a Shopping List that becomes a Checklist keeps the Lines that show, the struck ones checked. The text stays as it is. The old Lines stay in the log and no longer show.</li>
@@ -65,7 +78,7 @@
   Note made a Checklist leaves Unsorted.
 </p>
 <ul>
-  <li>On a full card every Line has its checkbox; a checked Line is struck through in place. A compact card shows "2 of 5 checked".</li>
+  <li>In the detailed view every Line has its checkbox; a checked Line is struck through in place. The compact view shows "3 of 5 open".</li>
   <li>A Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks the Line above it, checking that Line checks its whole group, and unchecking one Line of the group unchecks it again.</li>
   <li>A group shows in a frame with the Line it is under.</li>
   <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard, Tab and Shift+Tab on the desktop, move the Line with the cursor into a group and out.</li>
@@ -117,7 +130,7 @@
   <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in, also the next time. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones.</li>
   <li>A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, and an open one stays.</li>
   <li>A Line left empty is dropped on leaving. ⋮ on a Line offers the reappear time as a choice and <strong>Delete</strong>.</li>
-  <li>On a full card the Lines show with their checkboxes, open ones first; a compact card shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Shopping List" write the Lines into the text, the struck ones marked "✓ ".</li>
+  <li>In the detailed view the open Lines show with their checkboxes; the struck ones are folded under them as "2 struck through", which a tap shows and hides again; the phone keeps them shown until they are folded again. The compact view shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Shopping List" write the Lines into the text, the struck ones marked "✓ ".</li>
 </ul>
 
 <figure class="frame phone">
@@ -246,6 +259,7 @@
 
 <h2>On the desktop</h2>
 <ul>
+  <li>A card's view button, at its top right beside ⋮ and the pencil, switches that card between its compact and its detailed view, as a tap does on the phone; a click on the card only selects it. <strong>Compact views</strong> and <strong>Detailed views</strong> in the View menu do what the button on the list's bar does.</li>
   <li>The Note dialog shows a Note of a kind as the phone's editor does: its name, its description folded under it, then the Lines or the Tally. Its kind badge changes the kind, as on the phone, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session.</li>
   <li>A Checklist shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. <strong>Show on the Agenda</strong> is a checkbox in the card's menu, before <strong>Uncheck all</strong>, and a badge in the Note dialog.</li>
   <li>A Shopping List shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. Its <strong>Show on the Agenda</strong> is three radio buttons in the card's menu, before <strong>Back to a plain Note</strong>, and a badge in the Note dialog whose dialog offers the same three; a click on one closes it.</li>

@@ -241,8 +241,6 @@ void main() {
     expect(find.byKey(ValueKey('note-remove-$hash')), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Call the plumber'));
-    await tester.pumpAndSettle();
     await reveal(tester, find.text('Tuesday after five'));
     // Nor take its Transcript over into the text, or remove it.
     for (final key in [

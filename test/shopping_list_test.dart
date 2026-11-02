@@ -200,10 +200,9 @@ void main() {
       expect(key('note-to-plain'), findsOneWidget);
     });
 
-    testWidgets('a full card checks a Line: struck through, at the end, with '
-        'the day it comes back; on that day it is open at the top', (
-      tester,
-    ) async {
+    testWidgets('a full card checks a Line: struck through, folded at the '
+        'end (#189), with the day it comes back; on that day it is open at '
+        'the top', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs\nTea').id;
       lists.make(note);
       final milk = idOf(note, 'Milk');
@@ -214,6 +213,9 @@ void main() {
 
       await tap(tester, key('checklist-check-$milk'));
       expect(shown(note), ['Eggs', 'Tea', '[x] Milk']);
+      expect(key('checklist-check-$milk'), findsNothing);
+      expect(find.text('1 struck through'), findsOneWidget);
+      await tap(tester, key('shopping-struck'));
       expect(struck(tester, milk), isTrue);
       expect(top(tester, milk), greaterThan(top(tester, tea)));
       final line = lineOf(note, 'Milk');
