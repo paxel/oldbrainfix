@@ -6,7 +6,8 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Geändert
 
-- Auf dem Telefon und dem Desktop zeigt ein Ort, der innerhalb eines benannten Orts erfasst wurde, nur noch dessen Namen, etwa „Zuhause“, auf den Karten, in der Plakette „Erfasst“ und ihrem Dialog und über jedem Abschnitt, wo er auch die Koordinaten zeigte; ein Ort ohne benannten Ort zeigt weiter seine Koordinaten.
+- Auf dem Telefon und dem Desktop zeigt ein Ort, der innerhalb eines benannten Orts erfasst wurde, nur noch dessen Namen, etwa „Zuhause“, auf den Karten, in der Plakette „Erfasst“ und ihrem Dialog und bei jedem Abschnitt, wo er auch die Koordinaten zeigte; ein Ort ohne benannten Ort zeigt weiter seine Koordinaten.
+- Auf dem Telefon und dem Desktop zeigt sich der Erfassungskontext einer Notiz und jedes Abschnitts als eine Zeile unter seinem Text, kleiner und in hellerer Farbe, damit der Text zuerst gelesen wird: Zeit, Ort, Kalendertermine, Bluetooth-Geräte und die App, aus der geteilt wurde, verbunden mit „ · “, etwa „12:40 · Zuhause · Zahnarzt“, der der Notiz auf ihrer vollen Karte und der jedes Abschnitts auf der vollen Karte und im Notiz-Editor, wo er auf vollen Karten über dem Text stand, mit einer eigenen Zeile für jede Angabe. Ein Abschnitt, der am selben Tag erfasst wurde wie der Teil davor, zeigt nur seine Uhrzeit, und im Notiz-Editor öffnet die Zeile eines Abschnitts seine erfassten Angaben, jede mit Entfernen.
 
 ## [0.3.1] - 2026-11-01
 

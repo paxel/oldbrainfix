@@ -203,7 +203,8 @@ void main() {
       await tap(tester, find.text('Add'));
       expect(find.text('sauce bought'), findsOneWidget);
       await arrive(tester, faraway);
-      expect(find.text('48.1472, 11.5761'), findsOneWidget);
+      // In the Section's one line under its text (#170).
+      expect(find.textContaining(' · 48.1472, 11.5761'), findsOneWidget);
       expect(notes.sections(note.id).single.context.location, faraway);
     });
   });
@@ -270,7 +271,8 @@ void main() {
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byIcon(Icons.search));
       await tap(tester, find.byTooltip('All Notes'));
-      expect(find.text('48.1372, 11.5761'), findsOneWidget);
+      // In the full card's one line under the text (#170).
+      expect(find.textContaining(' · 48.1372, 11.5761'), findsOneWidget);
     });
 
     testWidgets('+ explains and asks when the location is not allowed', (

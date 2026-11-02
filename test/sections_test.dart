@@ -123,11 +123,14 @@ void main() {
     notes.editSection(amend.id, 'Moved to Thursday');
     await edit(tester, note.id);
 
-    final lines = key('captured-details:${amend.id}');
+    // Under its text, its time only: it was added the Note's day (#170).
+    final lines = key('captured-line:${amend.id}');
     expect(
       find.descendant(
         of: lines,
-        matching: find.text(shown(DateTime.utc(2026, 11, 1, 8))),
+        matching: find.text(
+          DateFormat.Hm('en').format(DateTime.utc(2026, 11, 1, 8).toLocal()),
+        ),
       ),
       findsOneWidget,
     );

@@ -80,7 +80,14 @@ void main() {
     await tester.pumpAndSettle();
     await reveal(tester, find.text('need more sauce'));
     expect(find.text('need more sauce'), findsOneWidget);
-    expect(find.text(shown(DateTime.utc(2026, 10, 24, 9))), findsOneWidget);
+    // The same day as the Note, only its time (#170).
+    expect(find.text(shown(DateTime.utc(2026, 10, 24, 9))), findsNothing);
+    expect(
+      find.text(
+        DateFormat.Hm('en').format(DateTime.utc(2026, 10, 24, 9).toLocal()),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a card merges its Note; the picker searches', (tester) async {

@@ -2,8 +2,9 @@
 //! egui_kittest: an Amend this Device may edit, its author's or a
 //! Manager's, is edited in place in a field of its own and saved as the
 //! dialog closes, keeping its place, its capture time and its boxes with
-//! their ticks, the old text kept in the log; under its time it says when
-//! it was edited and by whom, in the dialog and on its card. Another
+//! their ticks, the old text kept in the log; under its line, its time
+//! alone the day of the part before it (#170), it says when it was
+//! edited and by whom, in the dialog and on its card. Another
 //! person's Amend and every text of a Note in the trash are only read,
 //! and select to be copied; "Copy as text" copies the Note and its
 //! Sections as they show.
@@ -13,7 +14,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use egui::accesskit::Role;
 use egui::{Event, Key, Modifiers, PointerButton};
 use egui_kittest::kittest::Queryable;
@@ -24,6 +25,8 @@ use oldbrainfix_core::{
     AreaRole, BoxState, Boxes, Invite, Notes, OwnProfile, PairedDevice, Places, Section,
     SigningKey, Store,
 };
+use oldbrainfix_gui::app::when;
+use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::media::Clipboard;
 use oldbrainfix_gui::{App, Selection};
 
@@ -387,5 +390,38 @@ fn copy_as_text_copies_the_note_and_its_edited_sections_as_they_show() -> TestRe
         "{text:?}"
     );
     assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn a_sections_line_under_its_text_shows_its_time_alone_the_same_day() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let tap = notes.capture("Fix the tap", None, None)?.id;
+    let washer = notes.amend(&tap, "Washer bought")?;
+    let harness = opened(&store, &tap);
+    let time = washer
+        .captured
+        .with_timezone(&Local)
+        .format("%H:%M")
+        .to_string();
+    // A button that opens its details, read as "Captured: <line>" (#170).
+    let line = harness
+        .get_by_role_and_label(Role::Button, &format!("Captured: {time}"))
+        .rect();
+    // The date only on the Note's own Captured badge.
+    let date = when(&L10n::new("en"), washer.captured);
+    let dated = format!("Captured: {date}");
+    assert_eq!(
+        harness
+            .query_all_by_role_and_label(Role::Button, &dated)
+            .count(),
+        1
+    );
+    let field = section_fields(&harness)
+        .first()
+        .ok_or("the Section's field")?
+        .rect();
+    assert!(field.bottom() <= line.top(), "{field:?} {line:?}");
     Ok(())
 }

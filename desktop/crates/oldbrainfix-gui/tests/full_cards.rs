@@ -4,19 +4,21 @@
 //! per list on this Device, a click unfolding a compact Note, a
 //! double-click or Edit opening the editor, a photo of extreme
 //! proportions capped on its card, the Capture Context of the Note and
-//! of each Section, and a click on a photo showing it full screen to
-//! zoom.
+//! of each Section as one weak line under its text (#170), and a click
+//! on a photo showing it full screen to zoom.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, Local, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{Notes, Places, SigningKey, Store, parse_time};
+use oldbrainfix_gui::app::when;
+use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::media;
 use oldbrainfix_gui::{App, Selection};
 
@@ -320,9 +322,9 @@ fn noted(store: &Store) -> Result<String, Box<dyn std::error::Error>> {
     Ok(note.id)
 }
 
-/// The Note's Capture Context and the Amend's, each line as it shows:
-/// the Note's place by its Named Place alone (#169), the Amend's, in
-/// none, by its coordinates.
+/// The Note's Capture Context and the Amend's, each line as its
+/// Captured dialog shows it: the Note's place by its Named Place alone
+/// (#169), the Amend's, in none, by its coordinates.
 const NOTE_CONTEXT: [&str; 4] = [
     "Home",
     "Shared from WhatsApp",
@@ -331,15 +333,43 @@ const NOTE_CONTEXT: [&str; 4] = [
 ];
 const AMEND_CONTEXT: [&str; 2] = ["48.1372, 11.5756", "During: Dentist"];
 
+/// `at` as a part of the same day as the one before it shows it: its
+/// time alone (#170).
+fn time(at: DateTime<Utc>) -> String {
+    at.with_timezone(&Local).format("%H:%M").to_string()
+}
+
+/// The one line of the Note `id` and of its Amend under their texts
+/// (#170): when, where, the calendar events, the Bluetooth devices and
+/// the app, joined by " · "; the Note's with its date, the Amend's of
+/// the same day with its time alone.
+fn meta_lines(store: &Store, id: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+    let notes = Notes::new(store);
+    let note = notes.by_id(id)?.ok_or("the Note")?;
+    let amend = notes.sections(id)?.into_iter().next().ok_or("the Amend")?;
+    let t = L10n::new("en");
+    Ok((
+        format!(
+            "{} · Home · Team call · Car kit, Headphones · WhatsApp",
+            when(&t, note.captured)
+        ),
+        format!("{} · 48.1372, 11.5756 · Dentist", time(amend.captured)),
+    ))
+}
+
 #[test]
-fn a_full_card_shows_the_capture_context_of_the_note_and_above_each_section() -> TestResult {
+fn a_full_card_shows_each_parts_capture_context_as_one_line_under_its_text() -> TestResult {
     let store = store()?;
-    noted(&store)?;
+    let id = noted(&store)?;
+    let (note_line, amend_line) = meta_lines(&store, &id)?;
     let harness = window(store, Selection::All);
     let dentist = card(&harness, TEXT).rect();
+    let note_meta = harness.get_by_label(&note_line).rect();
+    let amend_meta = harness.get_by_label(&amend_line).rect();
+    assert!(dentist.contains_rect(note_meta) && dentist.contains_rect(amend_meta));
+    // No line of its own per detail.
     for line in NOTE_CONTEXT.iter().chain(&AMEND_CONTEXT) {
-        let shown = harness.get_by_label(line).rect();
-        assert!(dentist.contains_rect(shown), "{line}");
+        assert!(!shows(&harness, line), "{line}");
     }
     // The Named Place hides its coordinates.
     assert!(
@@ -348,21 +378,44 @@ fn a_full_card_shows_the_capture_context_of_the_note_and_above_each_section() ->
             .next()
             .is_none()
     );
-    // The Note's in its header, above its text; the Amend's above it.
-    // The card is labelled with the text too.
+    // Each under its part's text, so the text reads first; the card is
+    // labelled with the text too.
     let text = harness.get_by_role_and_label(Role::Label, TEXT).rect();
     let amend = harness.get_by_label(AMEND).rect();
-    for line in NOTE_CONTEXT {
-        assert!(
-            harness.get_by_label(line).rect().bottom() <= text.top(),
-            "{line}"
-        );
-    }
-    for line in AMEND_CONTEXT {
-        let shown = harness.get_by_label(line).rect();
-        assert!(text.bottom() <= shown.top(), "{line}");
-        assert!(shown.bottom() <= amend.top(), "{line}");
-    }
+    assert!(text.bottom() <= note_meta.top());
+    assert!(note_meta.bottom() <= amend.top());
+    assert!(amend.bottom() <= amend_meta.top());
+    // One row each, smaller than the text's.
+    assert!(
+        note_meta.height() < amend.height(),
+        "{note_meta:?} {amend:?}"
+    );
+    assert!(amend_meta.height() < amend.height(), "{amend_meta:?}");
+    Ok(())
+}
+
+#[test]
+fn a_section_of_another_day_keeps_its_date() -> TestResult {
+    let start = parse_time("2026-10-26T09:00:00.000Z")?;
+    let days = Arc::new(AtomicI64::new(0));
+    let ticks = AtomicI64::new(0);
+    let later = days.clone();
+    let clock = move || {
+        start
+            + Duration::days(later.load(Ordering::Relaxed))
+            + Duration::seconds(ticks.fetch_add(1, Ordering::Relaxed))
+    };
+    let store = Store::in_memory(Box::new(clock), || Ok(SigningKey::from_seed([9; 32])))?;
+    let store = Arc::new(store);
+    let notes = Notes::new(&store);
+    let note = notes.capture(TEXT, None, None)?;
+    days.store(1, Ordering::Relaxed);
+    let amend = notes.amend(&note.id, AMEND)?;
+    let harness = window(store, Selection::All);
+    let t = L10n::new("en");
+    assert!(shows(&harness, &when(&t, note.captured)));
+    assert!(shows(&harness, &when(&t, amend.captured)));
+    assert!(!shows(&harness, &time(amend.captured)));
     Ok(())
 }
 
@@ -370,6 +423,11 @@ fn a_full_card_shows_the_capture_context_of_the_note_and_above_each_section() ->
 fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -> TestResult {
     let store = store()?;
     let id = noted(&store)?;
+    let (_, amend_line) = meta_lines(&store, &id)?;
+    let note_time = when(
+        &L10n::new("en"),
+        Notes::new(&store).by_id(&id)?.ok_or("the Note")?.captured,
+    );
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let mut harness = window(store, Selection::All);
     // Compact: where, by its Named Place; the rest in the editor.
@@ -380,23 +438,26 @@ fn a_compact_card_shows_where_and_the_editor_shows_the_whole_capture_context() -
     edit(&harness, TEXT).click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(id.as_str()));
-    // The Section's under it in the Note dialog; the Note's own behind
-    // its Captured badge (#160), each on a line of its own, the place
-    // besides the compact card's.
+    // The Section's as one line under it in the Note dialog (#170), its
+    // details each on a line of its own in the dialog the line opens.
     for line in AMEND_CONTEXT {
-        assert!(shows(&harness, line), "{line} in the editor");
+        assert!(!shows(&harness, line), "{line} in the editor");
     }
+    press(&mut harness, &format!("Captured: {amend_line}"));
+    for line in AMEND_CONTEXT {
+        assert!(shows(&harness, line), "{line} in its dialog");
+    }
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(harness.state().note_open());
+    // The Note's own behind its Captured badge (#160), the place besides
+    // the compact card's.
     let before: Vec<usize> = NOTE_CONTEXT
         .iter()
         .map(|line| harness.query_all_by_label(line).count())
         .collect();
     assert_eq!(before, [1, 0, 0, 0]);
-    let captured = harness
-        .query_all_by_label_contains("Captured: ")
-        .next()
-        .ok_or("the Captured badge")?;
-    captured.click();
-    harness.run();
+    press(&mut harness, &format!("Captured: {note_time}"));
     for (line, before) in NOTE_CONTEXT.iter().zip(before) {
         let count = harness.query_all_by_label(line).count();
         assert_eq!(count, before + 1, "{line}");

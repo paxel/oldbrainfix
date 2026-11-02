@@ -176,7 +176,7 @@ void main() {
       final note = notes.capture('nees mor sauce');
       await start(tester);
       await openEditor(tester, 'nees mor sauce');
-      expect(find.text('Connected: Headphones'), findsNothing);
+      expect(find.textContaining('Headphones'), findsNothing);
 
       await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));
@@ -188,7 +188,8 @@ void main() {
         'sauce bought',
       );
       await tap(tester, find.text('Add'));
-      expect(find.text('Connected: Headphones'), findsOneWidget);
+      // In the Section's one line under its text (#170).
+      expect(find.textContaining(' · Headphones'), findsOneWidget);
       expect(notes.sections(note.id).single.context.bluetoothDevices, [
         'Headphones',
       ]);

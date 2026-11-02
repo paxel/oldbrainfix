@@ -81,7 +81,7 @@ void main() {
   }
 
   group('a full card', () {
-    testWidgets('shows every Section oldest first, each under its date, '
+    testWidgets('shows every Section oldest first, each over its time, '
         'and the Transcripts and Photo Texts labelled', (tester) async {
       amendedNote();
       await start(tester);
@@ -90,16 +90,23 @@ void main() {
       final when = DateFormat.yMd('en').add_Hm();
       String at(int hours) =>
           when.format(DateTime.utc(2026, 10, 24, 8 + hours).toLocal());
+      // A Section of the same day as the part before it shows only its
+      // time (#170).
+      String time(int hours) =>
+          DateFormat.Hm('en')
+              .format(DateTime.utc(2026, 10, 24, 8 + hours).toLocal());
       final order = [
-        top(tester, at(0)),
         top(tester, 'Original first line\nOriginal second line'),
         top(tester, 'Words on the photo'),
         top(tester, 'Spoken words'),
-        top(tester, at(1)),
+        top(tester, at(0)),
         top(tester, 'Merged in'),
-        top(tester, at(2)),
+        top(tester, time(1)),
         top(tester, 'Amended later'),
+        top(tester, time(2)),
       ];
+      expect(find.text(at(1)), findsNothing);
+      expect(find.text(at(2)), findsNothing);
       for (var i = 1; i < order.length; i++) {
         expect(order[i], greaterThan(order[i - 1]), reason: 'step $i');
       }
@@ -112,6 +119,47 @@ void main() {
         matching: find.byType(NotePhoto),
       );
       expect(tester.widget<NotePhoto>(photo).size, isNull);
+    });
+
+    testWidgets('shows each part\'s Capture Context as one weak line under '
+        'its text; a Section of another day keeps its date', (tester) async {
+      final note = notes.capture(
+        'Toner',
+        sourceApp: const SourceApp('org.example.chat', label: 'Chat'),
+      );
+      notes.locate(note.id, Coordinates(52.52, 13.405));
+      notes.attachContext(
+        note.id,
+        calendarEvents: ['Dentist'],
+        bluetoothDevices: ['Headset'],
+      );
+      final captured = now;
+      now = now.add(const Duration(days: 1));
+      final amend = notes.amend(note.id, 'Ordered');
+      notes.attachContext(amend.id, calendarEvents: ['Standup']);
+      await start(tester);
+      await openAllNotes(tester);
+
+      final when = DateFormat.yMd('en').add_Hm();
+      final line =
+          '${when.format(captured.toLocal())} · 52.5200, 13.4050 · '
+          'Dentist · Headset · Chat';
+      final next = '${when.format(now.toLocal())} · Standup';
+      expect(find.text(line), findsOneWidget);
+      expect(find.text(next), findsOneWidget);
+      // No line of its own per detail.
+      expect(find.text('During: Dentist'), findsNothing);
+      expect(find.text('Connected: Headset'), findsNothing);
+      expect(top(tester, line), greaterThan(top(tester, 'Toner')));
+      expect(top(tester, 'Ordered'), greaterThan(top(tester, line)));
+      expect(top(tester, next), greaterThan(top(tester, 'Ordered')));
+      // Smaller and in the weak colour, so the text reads first.
+      final theme = Theme.of(tester.element(find.text(line)));
+      for (final shown in [line, next]) {
+        final style = tester.widget<Text>(find.text(shown)).style!;
+        expect(style.fontSize, theme.textTheme.bodySmall!.fontSize);
+        expect(style.color, theme.colorScheme.onSurfaceVariant);
+      }
     });
 
     testWidgets('a list reads the Sections of all its Notes in one pass, '
@@ -415,8 +463,9 @@ void main() {
       expect(image.width, greaterThanOrEqualTo(1));
       final shown = tester.getSize(find.byType(RawImage));
       expect(shown.height, NoteCard.photoHeight);
-      final card = tester.getSize(find.byType(Divider).first);
-      expect(shown.width, closeTo(card.width, 1));
+      // The card's width within its margin and padding, 16 each side.
+      final card = tester.getSize(find.byType(NoteCard)).width - 4 * 16;
+      expect(shown.width, closeTo(card, 1));
 
       // Full screen it is decoded no larger than a texture holds.
       await tap(tester, find.byType(NotePhoto));

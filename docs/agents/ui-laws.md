@@ -264,7 +264,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   background.
 - **A Note is read on its card; the editor is the last step.** A full
   card shows the whole Note: every Section oldest first, the original
-  and then each Amend and Merge, each under its date and Capture
+  and then each Amend and Merge, each with its date and Capture
   Context, with all its photos, recordings, Transcripts and Photo Texts.
   A Transcript or Photo Text shows whole under its recording or photo,
   dimmed and labelled "Transcript" or "Photo Text", so it never reads as
@@ -281,6 +281,17 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   the Note editor or full screen offers "Save image as…", "Copy image"
   and "Open in another program". Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
+- **A part's meta is one weak line under its text** (#170): under the
+  Note's text on its full card, and under each Section's on the full
+  card and in the Note editor, its time, place (the Named Place, else the coordinates),
+  calendar events, Bluetooth devices and source app go on one line,
+  joined by " · " ("12:40 · Home · Dentist"), wrapping only where it
+  must, smaller than the text and in the weak text colour, so the text
+  reads first. A Section captured the same day as the part before it
+  shows only its time; another day the date too, by the app's date
+  rule. A Section's "Edited … by …" is a second weak line under it. The
+  Captured badge's dialog keeps each detail on a line of its own, with
+  Remove; in the editor a Section's line opens the same dialog for it.
 - A compact card shows date, time and, when known, the Named Place or
   location, plus a Capture Context icon when there is more to see, the
   Note's first line, its media and the action row.
@@ -294,8 +305,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **A Section's text is edited in place in the Note editor** (#183), in
   the same field and with the same format bar as the Note's text, by the
   same people (the Section's author, in a Shared Area also the
-  Managers); others read it. Under its time it says, small and grey,
-  when it was last edited and by whom, once it was.
+  Managers); others read it. Under its meta line it says, small and
+  grey, when it was last edited and by whom, once it was.
 - **The Note editor shows each setting of the Note as a badge** (#160),
   in one wrapping row under the text: the setting's icon and its value,
   like a shield. Importance; Area and Topic in one; Captured (time, place,

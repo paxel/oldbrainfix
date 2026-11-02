@@ -9,7 +9,8 @@
 //! editor changes it; "+" makes a Note, a Checklist, a Shopping List, a
 //! Tally, a Session or a Frog where the list is, and the last card of a
 //! list scrolls fully clear of the window's edge (#158); a captured
-//! detail of the Note, in its Captured badge, or of a Section, under it,
+//! detail of the Note, in its Captured badge, or of a Section, in the
+//! dialog its line under it opens (#170),
 //! goes with its Remove after one question while the time stays, and
 //! where this Device may change the Note only (#162).
 
@@ -756,15 +757,19 @@ fn captured_in(store: &Store, area: Option<&str>) -> Result<String, Box<dyn std:
     Ok(note.id)
 }
 
+/// The label of the first "Captured: …" button `joined` or not: a
+/// Section's line, its details joined by " · " (#170), or the Note's
+/// badge, its time alone.
+fn captured_label(harness: &Harness<'_, App>, joined: bool) -> Option<String> {
+    harness
+        .query_all_by_label_contains("Captured: ")
+        .filter_map(|n| n.accesskit_node().label())
+        .find(|label| label.contains(" · ") == joined)
+}
+
 /// Opens the Captured badge of the Note open: the time it shows.
 fn open_captured(harness: &mut Harness<'_, App>) -> Result<String, Box<dyn std::error::Error>> {
-    let badge = harness
-        .query_all_by_label_contains("Captured: ")
-        .next()
-        .ok_or("Captured")?
-        .accesskit_node()
-        .label()
-        .unwrap_or_default();
+    let badge = captured_label(harness, false).ok_or("Captured")?;
     click(harness, &badge);
     harness.run_steps(8);
     assert!(shows(harness, "Captured"));
@@ -808,10 +813,10 @@ fn each_captured_detail_but_the_time_goes_from_the_captured_badge() -> TestResul
     assert!(context.location.is_none() && context.named_place.is_none());
     assert!(context.source_app.is_none());
     assert!(context.calendar_events.is_empty() && context.bluetooth_devices.is_empty());
-    // The time stays, with no Remove of its own; the two left are the
-    // Amend's, under it.
+    // The time stays, with no Remove of its own; the Amend's are behind
+    // its own line (#170).
     assert!(shows(&harness, &time), "{time}");
-    assert_eq!(harness.query_all_by_label_contains("Remove the").count(), 2);
+    assert_eq!(harness.query_all_by_label_contains("Remove the").count(), 0);
     Ok(())
 }
 
@@ -843,13 +848,21 @@ fn cancel_keeps_the_captured_detail() -> TestResult {
 }
 
 #[test]
-fn a_sections_captured_detail_goes_from_under_it() -> TestResult {
+fn a_sections_captured_detail_goes_from_the_dialog_its_line_opens() -> TestResult {
     let (store, _) = store()?;
     let tap = captured_in(&store, None)?;
     let mut harness = window(&store, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    // The Amend's own, under it in the Note dialog.
+    // The Amend's own as one line under it in the Note dialog (#170),
+    // with no Remove; its details in the dialog the line opens.
+    let line = captured_label(&harness, true).ok_or("the Amend's line")?;
+    assert!(line.contains(" · 48.1372, 11.5756 · Dentist"), "{line}");
+    assert!(!shows(&harness, "48.1372, 11.5756"));
+    assert!(!shows(&harness, "Remove the place"));
+    click(&mut harness, &line);
+    harness.run_steps(8);
+    assert!(shows(&harness, "Captured"));
     assert!(shows(&harness, "48.1372, 11.5756"));
     remove(
         &mut harness,
@@ -857,7 +870,9 @@ fn a_sections_captured_detail_goes_from_under_it() -> TestResult {
         "Remove the place from this Section?",
     );
     assert!(!shows(&harness, "48.1372, 11.5756"));
+    // The dialog stays open over the Note and shows what is left.
     assert!(shows(&harness, "During: Dentist"));
+    assert!(harness.state().note_open());
     let notes = Notes::new(&store);
     let amend = notes
         .sections(&tap)?
@@ -917,8 +932,9 @@ fn a_member_has_no_remove_on_another_persons_note() -> TestResult {
     let mut harness = window(&ben, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    // The Amend's details show, without a Remove.
-    assert!(shows(&harness, "48.1372, 11.5756"));
+    // The Amend's details show in its line, without a Remove.
+    let line = captured_label(&harness, true).ok_or("the Amend's line")?;
+    assert!(line.contains("48.1372, 11.5756"), "{line}");
     open_captured(&mut harness)?;
     // Ann's Named Place stays hers: Ben sees the coordinates.
     assert!(shows(&harness, "52.5200, 13.4050"));

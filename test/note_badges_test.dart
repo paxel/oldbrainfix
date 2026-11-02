@@ -392,19 +392,39 @@ void main() {
       expect(notes.byId(id)!.context.calendarEvents, ['Katzenklo']);
     });
 
-    testWidgets('a Section removes its own, under it in the editor; the '
-        'Note keeps its', (tester) async {
+    testWidgets('a Section removes its own in the dialog its line under it '
+        'opens; the Note keeps its', (tester) async {
       final id = captured(store);
       final section = notes.amend(id, 'Ordered').id;
       notes.attachContext(section, calendarEvents: ['Standup']);
       await edit(tester, id);
+      // One weak line in the editor, its details in the dialog (#170).
+      final line = key('captured-line:$section');
+      expect(
+        find.descendant(of: line, matching: find.textContaining('Standup')),
+        findsOneWidget,
+      );
+      expect(remove(CapturedDetail.event), findsNothing);
+      // Read once, as a badge is.
+      final semantics = tester.ensureSemantics();
+      expect(
+        find.bySemanticsLabel(RegExp(r'^Captured: .* · Standup$')),
+        findsOneWidget,
+      );
+      semantics.dispose();
+      await tester.ensureVisible(line);
+      await tester.pumpAndSettle();
+      await tap(tester, line);
+      expect(dialogTitle('Captured'), findsOneWidget);
       final lines = key('captured-details:$section');
       final button = find.descendant(
         of: lines,
         matching: remove(CapturedDetail.event),
       );
-      await tester.ensureVisible(button);
-      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: lines, matching: remove(CapturedDetail.place)),
+        findsNothing,
+      );
       await tap(tester, button);
       expect(
         find.text('Remove the calendar events from this Section?'),
@@ -418,6 +438,11 @@ void main() {
       expect(button, findsNothing);
       expect(notes.sections(id).single.context.calendarEvents, isEmpty);
       expect(notes.byId(id)!.context.calendarEvents, ['Katzenklo']);
+      await tap(tester, key('badge-close'));
+      expect(
+        find.descendant(of: line, matching: find.textContaining('Standup')),
+        findsNothing,
+      );
     });
 
     group('in a Shared Area', () {

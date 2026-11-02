@@ -1005,31 +1005,43 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The Captured badge's editor: the time, place, calendar event,
   /// Bluetooth device and app of the Capture Context, each on a line of
   /// its own, every detail but the time with a Remove where this Device
-  /// may remove it (ADR 0037). It shows what is left after each.
-  Future<void> _showCaptured(DateFormat when) => showDialog<void>(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialog) {
-        final note = _placed?.note;
-        return BadgeDialog(
-          setting: context.t.capturedHeading,
-          icon: Icons.schedule,
-          content: note == null
-              ? const SizedBox.shrink()
-              : CaptureContextLines(
-                  key: const ValueKey('captured-details'),
-                  capture: note.context,
-                  when: when,
-                  removable: _capturedOf(note.id),
-                  onRemove: (detail) async {
-                    await _removeCaptured(note.id, detail);
-                    if (context.mounted) setDialog(() {});
-                  },
-                ),
-        );
-      },
-    ),
-  );
+  /// may remove it (ADR 0037). It shows what is left after each. With
+  /// [section] it is that Section's, opened from its line (#170).
+  Future<void> _showCaptured(DateFormat when, {String? section}) =>
+      showDialog<void>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialog) {
+            final (id, capture) = switch (section) {
+              null => (_placed?.note.id, _placed?.note.context),
+              final section => (
+                section,
+                _sections.where((s) => s.id == section).firstOrNull?.context,
+              ),
+            };
+            return BadgeDialog(
+              setting: context.t.capturedHeading,
+              icon: Icons.schedule,
+              content: id == null || capture == null
+                  ? const SizedBox.shrink()
+                  : CaptureContextLines(
+                      key: ValueKey(
+                        section == null
+                            ? 'captured-details'
+                            : 'captured-details:$section',
+                      ),
+                      capture: capture,
+                      when: when,
+                      removable: _capturedOf(id),
+                      onRemove: (detail) async {
+                        await _removeCaptured(id, detail);
+                        if (context.mounted) setDialog(() {});
+                      },
+                    ),
+            );
+          },
+        ),
+      );
 
   /// The details of the Note or Section [id] this Device may remove.
   Set<CapturedDetail> _capturedOf(String id) => {
@@ -1792,7 +1804,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             const SizedBox(height: 16),
             // Nothing while the Note is no Tally.
             TallySection(notes: widget.notes, noteId: widget.noteId),
-            for (final section in _sections)
+            for (final (i, section) in _sections.indexed)
               EditorPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1906,13 +1918,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         photo: false,
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    CaptureContextLines.ofSection(
+                    const SizedBox(height: 4),
+                    // Its details, each removable on its own, in the
+                    // same dialog as the Note's Captured badge (#170).
+                    CaptureLine.ofSection(
                       section,
-                      key: ValueKey('captured-details:${section.id}'),
+                      key: ValueKey('captured-line:${section.id}'),
                       when: when,
-                      removable: _capturedOf(section.id),
-                      onRemove: (detail) => _removeCaptured(section.id, detail),
+                      after: i == 0
+                          ? note.captured
+                          : _sections[i - 1].context.captured,
+                      onTap: () => _showCaptured(when, section: section.id),
                     ),
                   ],
                 ),

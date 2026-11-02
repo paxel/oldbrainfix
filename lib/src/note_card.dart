@@ -398,9 +398,8 @@ class NoteCard extends StatelessWidget {
           _AuthorLine(noteId: note.id, author: author),
           const SizedBox(height: 4),
         ],
-        if (full)
-          CaptureContextLines(capture: note.context, when: when)
-        else
+        // A full card shows it under the Note's text (#170).
+        if (!full)
           Row(
             children: [
               Text(when.format(note.captured.toLocal()), style: text.bodySmall),
@@ -447,6 +446,16 @@ class NoteCard extends StatelessWidget {
         ],
       ],
     );
+    // A full card shows its time and place under the text (#170): with
+    // no Profile or place over the text it has no header.
+    final headed = !full || author != null || place != null;
+    final marker = important
+        ? Icon(
+            Icons.label_important,
+            color: scheme.primary,
+            semanticLabel: t.importanceImportant,
+          )
+        : null;
     final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Embossed(
@@ -471,27 +480,34 @@ class NoteCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: header),
-                        if (important)
-                          Icon(
-                            Icons.label_important,
-                            color: scheme.primary,
-                            semanticLabel: t.importanceImportant,
-                          ),
-                      ],
-                    ),
-                    const Divider(height: 24),
+                    // A full card with nothing over its text starts with
+                    // it, the Important marker beside it.
+                    if (headed) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: header),
+                          ?marker,
+                        ],
+                      ),
+                      const Divider(height: 24),
+                    ],
                     if (full)
-                      _FullNote(
-                        note: note,
-                        when: when,
-                        sections: sections,
-                        list: lists(true),
-                        boxes: boxes,
-                        onTable: onTable,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _FullNote(
+                              note: note,
+                              when: when,
+                              sections: sections,
+                              list: lists(true),
+                              boxes: boxes,
+                              onTable: onTable,
+                            ),
+                          ),
+                          if (!headed) ?marker,
+                        ],
                       )
                     else ...[
                       // A photo Note may have no words.
@@ -1032,21 +1048,17 @@ class _AuthorLineState extends State<_AuthorLine> {
   }
 }
 
-/// The Capture Context of a Note or Section, one line per thing known:
-/// the time; where it was, its Named Place, else its coordinates; the
-/// app it was shared in from; the calendar events running; the
-/// Bluetooth devices connected. Each detail in [removable] ends in a
-/// Remove that calls [onRemove] (ADR 0037); the time has none.
-///
-/// A Section whose text was [edited] says under its time, small and
-/// grey, when that was and, when known, who did it ([editedBy], #183).
+/// The Capture Context of a Note or Section in its Captured dialog, one
+/// line per thing known: the time; where it was, its Named Place, else
+/// its coordinates; the app it was shared in from; the calendar events
+/// running; the Bluetooth devices connected. Each detail in [removable]
+/// ends in a Remove that calls [onRemove] (ADR 0037); the time has none.
+/// Beside its text the same reads as one [CaptureLine] (#170).
 class CaptureContextLines extends StatelessWidget {
   final CaptureContext capture;
   final DateFormat when;
   final Set<CapturedDetail> removable;
   final void Function(CapturedDetail detail)? onRemove;
-  final DateTime? edited;
-  final String? editedBy;
 
   const CaptureContextLines({
     super.key,
@@ -1054,25 +1066,7 @@ class CaptureContextLines extends StatelessWidget {
     required this.when,
     this.removable = const {},
     this.onRemove,
-    this.edited,
-    this.editedBy,
   });
-
-  /// The lines of [section]: its Capture Context and when its text was
-  /// edited, and by whom.
-  CaptureContextLines.ofSection(
-    Section section, {
-    super.key,
-    required this.when,
-    this.removable = const {},
-    this.onRemove,
-  }) : capture = section.context,
-       edited = section.modified,
-       editedBy = switch (section.editedBy?.name.trim()) {
-         // A Profile without a name says nothing of who it is.
-         final name? when name.isNotEmpty => name,
-         _ => null,
-       };
 
   @override
   Widget build(BuildContext context) {
@@ -1104,7 +1098,6 @@ class CaptureContextLines extends StatelessWidget {
       children: [
         for (final (i, (icon, line, detail)) in lines.indexed) ...[
           if (i > 0) const SizedBox(height: 4),
-          if (i == 1) ?_edited(context),
           if (remove != null && detail != null && removable.contains(detail))
             Row(
               children: [
@@ -1133,40 +1126,120 @@ class CaptureContextLines extends StatelessWidget {
               ],
             ),
         ],
-        if (lines.length == 1) ?_edited(context),
       ],
     );
   }
+}
 
-  /// When the text was edited and by whom, one line under the time; none
-  /// while it never was.
-  Widget? _edited(BuildContext context) {
-    final at = edited;
-    if (at == null) return null;
+/// [capture] as one line read beside its text (#170): when, then where
+/// (its Named Place, else its coordinates), the calendar events running,
+/// the Bluetooth devices connected and the app it was shared in from,
+/// joined by " · ". A part captured the same local day as the one
+/// before it ([after]) shows only its time; another day the date too.
+String captureLine(CaptureContext capture, DateFormat when, {DateTime? after}) {
+  final at = capture.captured.toLocal();
+  final before = after?.toLocal();
+  final sameDay =
+      before != null &&
+      before.year == at.year &&
+      before.month == at.month &&
+      before.day == at.day;
+  return [
+    (sameDay ? DateFormat.Hm(when.locale) : when).format(at),
+    ?whereCaptured(capture),
+    if (capture.calendarEvents.isNotEmpty) capture.calendarEvents.join(', '),
+    if (capture.bluetoothDevices.isNotEmpty)
+      capture.bluetoothDevices.join(', '),
+    ?capture.sourceApp?.name,
+  ].join(' · ');
+}
+
+/// The Capture Context of a Note or Section under its text, in the
+/// background (#170): its [captureLine], small and in the weak colour,
+/// wrapping only where it must. A Section whose text was [edited] says
+/// under it, the same way, when that was and, when known, who did it
+/// ([editedBy], #183). With [onTap] it is a button that opens the
+/// details, read as "Captured: …" with its line.
+class CaptureLine extends StatelessWidget {
+  final CaptureContext capture;
+  final DateFormat when;
+
+  /// When the part before it was captured; null for a Note's own.
+  final DateTime? after;
+  final DateTime? edited;
+  final String? editedBy;
+  final VoidCallback? onTap;
+
+  const CaptureLine({
+    super.key,
+    required this.capture,
+    required this.when,
+    this.after,
+    this.onTap,
+  }) : edited = null,
+       editedBy = null;
+
+  /// The line of [section]: its Capture Context and when its text was
+  /// edited, and by whom.
+  CaptureLine.ofSection(
+    Section section, {
+    super.key,
+    required this.when,
+    this.after,
+    this.onTap,
+  }) : capture = section.context,
+       edited = section.modified,
+       editedBy = switch (section.editedBy?.name.trim()) {
+         // A Profile without a name says nothing of who it is.
+         final name? when name.isNotEmpty => name,
+         _ => null,
+       };
+
+  @override
+  Widget build(BuildContext context) {
     final t = context.t;
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    final shown = when.format(at.toLocal());
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final line = captureLine(capture, when, after: after);
+    final at = edited;
     final by = editedBy;
-    return Padding(
-      key: const ValueKey('section-edited'),
-      padding: const EdgeInsets.only(top: 2, bottom: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            child: Icon(Icons.edit_outlined, size: 16, color: muted),
+    final tap = onTap;
+    final shown = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Read once, as a badge is.
+        if (tap == null)
+          Text(line, style: style)
+        else
+          Semantics(
+            button: true,
+            label: t.settingBadgeLabel(t.capturedHeading, line),
+            excludeSemantics: true,
+            onTap: tap,
+            child: Text(line, style: style),
           ),
-          const SizedBox(width: 8),
-          Flexible(
+        if (at != null)
+          Padding(
+            key: const ValueKey('section-edited'),
+            padding: const EdgeInsets.only(top: 2),
             child: Text(
               by == null
-                  ? t.sectionEdited(shown)
-                  : t.sectionEditedBy(shown, by),
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: muted),
+                  ? t.sectionEdited(when.format(at.toLocal()))
+                  : t.sectionEditedBy(when.format(at.toLocal()), by),
+              style: style,
             ),
           ),
-        ],
+      ],
+    );
+    if (tap == null) return shown;
+    return InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: shown,
       ),
     );
   }
@@ -1245,14 +1318,18 @@ class _FullNoteState extends State<_FullNote> {
           list: widget.list,
           onTable: widget.onTable,
         ),
-        for (final section in _sections)
+        const SizedBox(height: 8),
+        CaptureLine(
+          key: ValueKey('captured-line:${note.id}'),
+          capture: note.context,
+          when: widget.when,
+        ),
+        for (final (i, section) in _sections.indexed)
           Column(
             key: ValueKey('section:${section.id}'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 24),
-              CaptureContextLines.ofSection(section, when: widget.when),
-              const SizedBox(height: 8),
               _Whole(
                 id: section.id,
                 text: section.shownText,
@@ -1266,6 +1343,15 @@ class _FullNoteState extends State<_FullNote> {
                 recordings: section.recordings,
                 transcripts: section.transcripts,
                 removedRecordings: section.removedRecordings,
+              ),
+              const SizedBox(height: 8),
+              CaptureLine.ofSection(
+                section,
+                key: ValueKey('captured-line:${section.id}'),
+                when: widget.when,
+                after: i == 0
+                    ? note.captured
+                    : _sections[i - 1].context.captured,
               ),
             ],
           ),

@@ -752,6 +752,9 @@ enum Dialog {
 enum NoteBadge {
     Importance,
     Captured,
+    /// The Captured details of the Note's Section at this place in its
+    /// list, opened from its line (#170).
+    SectionCaptured(usize),
     /// The kind, with "Back to a plain Note".
     Kind,
     OnAgenda,
@@ -8029,7 +8032,7 @@ impl App {
         let Some(open) = self.badge else {
             return;
         };
-        let Some((placed, _)) = &self.view.detail else {
+        let Some((placed, sections)) = &self.view.detail else {
             self.badge = None;
             return;
         };
@@ -8070,13 +8073,32 @@ impl App {
                 |ui| {
                     let id = &note.id;
                     let removable = |detail| captured_removable.contains(&(id.clone(), detail));
-                    let shown = (note.captured, &note.context, None);
+                    let shown = (note.captured, &note.context);
                     if let Some(detail) = capture_context(ui, &t, shown, removable) {
                         let id = id.clone();
                         actions.push(Action::AskRemoveCaptured { id, detail });
                     }
                 },
             ),
+            NoteBadge::SectionCaptured(at) => match sections.get(at) {
+                Some(section) => badge_dialog(
+                    ctx,
+                    shown,
+                    (icons::CONTEXT_WHEN, None),
+                    t.captured_heading(),
+                    |ui| {
+                        let id = &section.id;
+                        let removable = |detail| captured_removable.contains(&(id.clone(), detail));
+                        let shown = (section.captured, &section.context);
+                        if let Some(detail) = capture_context(ui, &t, shown, removable) {
+                            let id = id.clone();
+                            actions.push(Action::AskRemoveCaptured { id, detail });
+                        }
+                    },
+                ),
+                // Gone meanwhile.
+                None => true,
+            },
             NoteBadge::Kind => {
                 let kind = note_kind(&t, &self.view);
                 let (icon, name) = kind.map_or((icons::NOTE, ""), |(icon, name, _)| (icon, name));
@@ -8929,7 +8951,6 @@ impl App {
         let no_boxes = BoxLook::default();
         let box_looks = &self.view.box_looks;
         let box_ticks = &self.view.box_ticks;
-        let captured_removable = &self.view.captured_removable;
         let look_of = |id: &str| box_looks.get(id).unwrap_or(&no_boxes);
         let boxes = look_of(&note.id);
         let ticks = box_ticks.contains(&note.id);
@@ -9061,7 +9082,7 @@ impl App {
                     tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
                     actions.extend(asked.into_iter().map(Action::Tally));
                 }
-                for section in sections {
+                for (at, section) in sections.iter().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
                         if !section.text_editable {
                             ui.label(RichText::new(t.text_newer_format()).color(weak));
@@ -9154,13 +9175,17 @@ impl App {
                             (playing, transcribing, can_play, speed),
                             actions,
                         );
+                        // Its details, each removable on its own, in the
+                        // same dialog as the Note's Captured badge (#170).
+                        let before = match at {
+                            0 => note.captured,
+                            _ => sections[at - 1].captured,
+                        };
+                        let line =
+                            capture_line(&t, (section.captured, &section.context), Some(before));
                         let edited = section_edited(&t, section);
-                        let shown = (section.captured, &section.context, edited.as_deref());
-                        let id = &section.id;
-                        let removable = |detail| captured_removable.contains(&(id.clone(), detail));
-                        if let Some(detail) = capture_context(ui, &t, shown, removable) {
-                            let id = id.clone();
-                            actions.push(Action::AskRemoveCaptured { id, detail });
+                        if capture_meta(ui, &t, &line, edited.as_deref(), true) {
+                            actions.push(Action::Badge(Some(NoteBadge::SectionCaptured(at))));
                         }
                     });
                 }
@@ -12960,29 +12985,21 @@ fn section_edited(t: &L10n, section: &Section) -> Option<String> {
 }
 
 /// The whole Capture Context of a Note or Section `captured` then, line
-/// by line, as the phone's `CaptureContextLines`: when, under it, small
-/// and dimmed, a Section's `edited` line (#183, [`section_edited`]), then
-/// [`context_lines`]. Each detail `removable` says may go ends in a
-/// Remove (ADR 0037), the time in none; the detail whose Remove was
-/// clicked.
+/// by line, in its Captured dialog, as the phone's `CaptureContextLines`:
+/// when, then [`context_lines`]. Each detail `removable` says may go
+/// ends in a Remove (ADR 0037), the time in none; the detail whose
+/// Remove was clicked. Beside its text the same reads as one
+/// [`capture_line`] (#170).
 fn capture_context(
     ui: &mut Ui,
     t: &L10n,
-    (captured, context, edited): (DateTime<Utc>, &CaptureContext, Option<&str>),
+    (captured, context): (DateTime<Utc>, &CaptureContext),
     removable: impl Fn(CapturedDetail) -> bool,
 ) -> Option<CapturedDetail> {
     let mut asked = None;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         context_line(ui, icons::CONTEXT_WHEN, &when(t, captured));
-        if let Some(edited) = edited {
-            let weak = ui.visuals().weak_text_color();
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                icons::show(ui, icons::EDIT, 16.0, weak);
-                ui.add(egui::Label::new(RichText::new(edited).size(12.0).color(weak)).wrap());
-            });
-        }
         for (icon, line, detail) in context_lines(t, context) {
             if !removable(detail) {
                 context_line(ui, icon, &line);
@@ -13005,6 +13022,67 @@ fn capture_context(
         }
     });
     asked
+}
+
+/// A Capture Context `captured` then as one line read beside its text
+/// (#170), the phone's `captureLine`: when, then where (its Named Place,
+/// else its coordinates), the calendar events running, the Bluetooth
+/// devices connected and the app it was shared in from, joined by
+/// " · ". A part captured the same local day as the one before it
+/// (`after`) shows only its time; another day the date too.
+fn capture_line(
+    t: &L10n,
+    (captured, context): (DateTime<Utc>, &CaptureContext),
+    after: Option<DateTime<Utc>>,
+) -> String {
+    let local = captured.with_timezone(&Local);
+    let same_day =
+        after.is_some_and(|a| a.with_timezone(&Local).date_naive() == local.date_naive());
+    let mut parts = vec![if same_day {
+        local.format("%H:%M").to_string()
+    } else {
+        when(t, captured)
+    }];
+    parts.extend(where_captured(context));
+    if !context.calendar_events.is_empty() {
+        parts.push(context.calendar_events.join(", "));
+    }
+    if !context.bluetooth_devices.is_empty() {
+        parts.push(context.bluetooth_devices.join(", "));
+    }
+    if let Some(app) = &context.source_app {
+        parts.push(app.name().to_string());
+    }
+    parts.join(" · ")
+}
+
+/// A part's [`capture_line`] under its text, in the background (#170):
+/// small and in the weak colour, wrapped only where it must, and a
+/// Section's `edited` line (#183, [`section_edited`]) under it the same
+/// way. A `clickable` one is a button, read as "Captured: <line>", that
+/// opens the details; whether it was clicked.
+fn capture_meta(ui: &mut Ui, t: &L10n, line: &str, edited: Option<&str>, clickable: bool) -> bool {
+    let weak = ui.visuals().weak_text_color();
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 2.0;
+        let label = egui::Label::new(RichText::new(line).size(12.0).color(weak)).wrap();
+        let clicked = if clickable {
+            let shown = ui
+                .add(label.sense(Sense::click()))
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let name = t.setting_badge_label(t.captured_heading(), line);
+            shown.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &name));
+            shown.clicked()
+        } else {
+            ui.add(label);
+            false
+        };
+        if let Some(edited) = edited {
+            ui.add(egui::Label::new(RichText::new(edited).size(12.0).color(weak)).wrap());
+        }
+        clicked
+    })
+    .inner
 }
 
 /// Where a Note is filed, `Area / Topic`; `None` while it is in no
@@ -14034,9 +14112,8 @@ fn note_card(
                     );
                     author_rect = Some(picture.rect);
                 }
-                if look.full {
-                    context_line(ui, icons::CONTEXT_WHEN, &when(t, note.captured));
-                } else {
+                // A full card shows it under the Note's text (#170).
+                if !look.full {
                     ui.label(RichText::new(when(t, note.captured)).small().color(weak));
                     // Where, and that the editor shows more (UI laws,
                     // "Cards"); room is left for ⋮ and Edit.
@@ -14065,14 +14142,6 @@ fn note_card(
                     }
                 });
             });
-            if look.full {
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    for (icon, line, _) in context_lines(t, &note.context) {
-                        context_line(ui, icon, &line);
-                    }
-                });
-            }
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.
             let place = match place_line(t, placed) {
@@ -14120,17 +14189,23 @@ fn note_card(
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
                     }
+                    // Each part's Capture Context under its text (#170).
+                    let line = capture_line(t, (note.captured, &note.context), None);
+                    capture_meta(ui, t, &line, None, false);
+                    let mut before = note.captured;
                     for section in look.sections {
                         ui.separator();
-                        let edited = section_edited(t, section);
-                        let captured = (section.captured, &section.context, edited.as_deref());
-                        capture_context(ui, t, captured, |_| false);
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
                         section_marks.push((section, spots));
+                        let line =
+                            capture_line(t, (section.captured, &section.context), Some(before));
+                        let edited = section_edited(t, section);
+                        capture_meta(ui, t, &line, edited.as_deref(), false);
+                        before = section.captured;
                     }
                 });
                 return;
