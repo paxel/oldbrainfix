@@ -3604,12 +3604,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String tallyTargetValue(String value) {
-    return 'Target $value';
+  String tallyOlderEntries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count older entries',
+      one: '1 older entry',
+    );
+    return '$_temp0';
   }
-
-  @override
-  String get tallyMoreEntries => 'Show more';
 
   @override
   String get tallyRemovedEntries => 'Removed entries';

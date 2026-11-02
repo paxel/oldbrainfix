@@ -155,7 +155,7 @@ use crate::sync_view::{
 use crate::table_view::{self, Opening, TableView};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
-    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
+    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::theme::{self, AREA_PALETTE, Tones};
@@ -421,6 +421,9 @@ struct View {
     /// The Notes listed that are a Tally, read in one pass for the
     /// cards, which show their name and description (#188).
     tallies: HashSet<String>,
+    /// The Tallies listed whose card shows its detailed view, read for
+    /// their chart and entries on it (#190), by their Note.
+    card_tallies: HashMap<String, TallyShown>,
     /// The Notes listed whose text this Device may change from their
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
@@ -1083,8 +1086,12 @@ enum Action {
     /// Moves the Frog the dialog asks about to the trash.
     DeleteFrog,
     RestoreFrog(String),
-    /// Something asked of the Tally part of the Note's editor (#103).
+    /// Something asked of the Tally setup in the Note dialog (#103,
+    /// #190).
     Tally(TallyAction),
+    /// Something asked of the Tally on the detailed card of the Note with
+    /// this id (#190).
+    CardTally(String, TallyAction),
     /// Something asked of the field page or the entry page.
     TallyForm(FormIntent),
     /// Removes the entry the dialog asks about.
@@ -1393,7 +1400,9 @@ pub struct App {
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161).
     start_lines: bool,
-    tally_look: TallyLook,
+    /// Whose entries each Tally shows, by its Note, once picked (#190);
+    /// the default until then.
+    tally_whose: HashMap<String, Whose>,
     /// The Lines of the Note shown as they are typed in place, and what
     /// the Shopping List's field holds (#141); what the menu of the card
     /// last opened offers (#120).
@@ -1766,7 +1775,7 @@ impl App {
             quick_open: false,
             badge: None,
             start_lines: false,
-            tally_look: TallyLook::new(None),
+            tally_whose: HashMap::new(),
             lines: TypedLines::default(),
             card_menu: None,
             region: region_of(sys_locale::get_locale().as_deref()),
@@ -3688,15 +3697,19 @@ impl App {
             }
             _ => None,
         };
-        // Each Note opened is looked at afresh; a page of another Note's
-        // Tally goes.
-        if self.tally_look.of != self.selected_note {
-            self.tally_look = TallyLook::new(self.selected_note.clone());
-        }
-        if self
+        // A page of a Note's Tally goes with its Note, opened from its
+        // card or its dialog (#190).
+        let form_note = self
             .tally_form
             .as_ref()
-            .is_some_and(|f| !f.capturing() && Some(f.note_id()) != self.selected_note.as_deref())
+            .filter(|f| !f.capturing())
+            .map(|f| f.note_id().to_string());
+        if let Some(id) = form_note
+            && !Notes::new(&self.store)
+                .by_id(&id)
+                .ok()
+                .flatten()
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged())
         {
             self.tally_form = None;
         }
@@ -4099,6 +4112,20 @@ impl App {
             None => (false, HashSet::new()),
         };
         let glances = card_glance::read(store, &self.t, &*self.wall, self.unit_system()?, &listed)?;
+        // The Tallies on a detailed card, with their chart and entries
+        // (#190).
+        let mut card_tallies = HashMap::new();
+        for id in listed.iter().filter(|id| tallies.contains(*id)) {
+            if compact != switched.contains(id) {
+                continue;
+            }
+            let whose = self.tally_whose.get(id);
+            if let Some(shown) =
+                tally_view::read(store, id, whose, self.unit_system()?, &*self.wall)?
+            {
+                card_tallies.insert(id.clone(), shown);
+            }
+        }
         let kept_open = |prefix: &str| -> oldbrainfix_core::Result<HashSet<String>> {
             Ok(store
                 .local_settings_with_prefix(prefix)?
@@ -4129,7 +4156,7 @@ impl App {
             Some((p, _)) if !p.note.is_trashed() => tally_view::read(
                 store,
                 &p.note.id,
-                &self.tally_look,
+                self.tally_whose.get(&p.note.id),
                 self.unit_system()?,
                 &*self.wall,
             )?,
@@ -4490,6 +4517,7 @@ impl App {
             checklists,
             shopping_lists,
             tallies,
+            card_tallies,
             card_changes,
             box_looks,
             box_ticks,
@@ -5215,7 +5243,8 @@ impl App {
                 }
             }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
-            Action::Tally(asked) => self.tally_action(asked)?,
+            Action::Tally(asked) => self.tally_action(None, asked)?,
+            Action::CardTally(note, asked) => self.tally_action(Some(note), asked)?,
             Action::TallyForm(intent) => self.tally_form_action(intent)?,
             Action::DeleteEntry => {
                 if let Some(Dialog::DeleteEntry { id }) = self.dialog.take() {
@@ -6215,11 +6244,18 @@ impl App {
         Ok(line.map(|line| (list, line)))
     }
 
-    /// Does what was asked of the Tally part of the Note's editor (#103).
-    fn tally_action(&mut self, asked: TallyAction) -> oldbrainfix_core::Result<()> {
+    /// Does what was asked of the Tally of the Note `on`, of its card,
+    /// or of the selected Note's setup (#103, #190).
+    fn tally_action(
+        &mut self,
+        on: Option<String>,
+        asked: TallyAction,
+    ) -> oldbrainfix_core::Result<()> {
         let tallies = Tallies::new(&self.store);
         let system = self.unit_system()?;
-        let note = self.selected_note.clone().unwrap_or_default();
+        let note = on
+            .or_else(|| self.selected_note.clone())
+            .unwrap_or_default();
         match asked {
             TallyAction::Make(id) => {
                 self.save_text()?;
@@ -6265,9 +6301,26 @@ impl App {
             }
             TallyAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteEntry { id }),
             TallyAction::Restore(id) => tallies.restore_entry(&id)?,
-            TallyAction::Whose(whose) => self.tally_look.whose = Some(whose),
-            TallyAction::Period(period) => self.tally_look.period = period,
-            TallyAction::More => self.tally_look.count += tally_view::PAGE,
+            TallyAction::Whose(whose) => {
+                self.tally_whose.insert(note, whose);
+            }
+            TallyAction::Period(period) => {
+                let setting = tally_view::period_setting(&note);
+                if period == oldbrainfix_core::TallyPeriod::Day {
+                    self.store.remove_local_setting(&setting)?;
+                } else {
+                    self.store
+                        .set_local_setting(&setting, tally_view::period_name(period))?;
+                }
+            }
+            TallyAction::AllShown(shown) => {
+                let setting = tally_view::entries_shown_setting(&note);
+                if shown {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
             TallyAction::RemovedOpen(open) => {
                 let value = if open { "true" } else { "false" };
                 self.store
@@ -8859,6 +8912,7 @@ impl App {
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                     tally: self.view.tallies.contains(id),
+                    tally_shown: self.view.card_tallies.get(id),
                     menu: self.card_menu.as_ref(),
                     changes: self.view.card_changes.contains(id),
                     boxes: CardBoxes {
@@ -8889,6 +8943,12 @@ impl App {
                 if clicks.menu_opened {
                     actions.push(Action::Checklist(ChecklistAction::Menu(id.clone())));
                 }
+                actions.extend(
+                    clicks
+                        .tally
+                        .into_iter()
+                        .map(|asked| Action::CardTally(id.clone(), asked)),
+                );
                 if let Some(Action::AskFileInto(_)) = clicks.picked {
                     // The right-click's File into… files the cards selected
                     // with it.
@@ -9090,7 +9150,6 @@ impl App {
         let linked = &self.view.routines;
         let newer_routines = self.view.newer_routines;
         let tally = self.view.tally.as_ref();
-        let tally_count = self.tally_look.count;
         let checklist = self.view.checklist.as_ref();
         let shopping = self.view.shopping.as_ref();
         let typed = &mut self.lines;
@@ -9228,10 +9287,11 @@ impl App {
                     shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Shopping));
                 }
-                // Nothing while the Note is no Tally.
+                // Only its setup, nothing while the Note is no Tally; its
+                // chart and entries show on its card (#190).
                 if let Some(tally) = tally {
                     let mut asked = Vec::new();
-                    tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
+                    tally_view::setup(ui, &t, tones, tally, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Tally));
                 }
                 // Each setting as its badge, in one wrapping row under the
@@ -13824,6 +13884,9 @@ struct CardLook<'a> {
     /// Whether the Note is a Tally, whose full card shows its name and
     /// description as a list's does (#188).
     tally: bool,
+    /// The Tally a full card shows under them: its chart, its entries and
+    /// "Add entry" (#190).
+    tally_shown: Option<&'a TallyShown>,
     menu: Option<&'a CardMenu>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
@@ -13886,6 +13949,8 @@ struct CardClicks {
     tag: Option<String>,
     menu_opened: bool,
     picked: Option<Action>,
+    /// What was asked of the Tally on a full card (#190).
+    tally: Vec<TallyAction>,
 }
 
 /// The room after the last row of every list (#158): its last card,
@@ -14724,6 +14789,10 @@ fn note_card(
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
+    // Where the Tally of a full card lies, out of the card's own click,
+    // and what was asked of it (#190).
+    let mut tally_rect = None;
+    let mut tally_asked = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -14831,6 +14900,11 @@ fn note_card(
                                     boxes.extend(checklist_view::card_lines(ui, tones, &struck));
                                 }
                             }
+                        }
+                        if let Some(shown) = look.tally_shown {
+                            let drawn =
+                                ui.scope(|ui| tally_view::card(ui, t, shown, &mut tally_asked));
+                            tally_rect = Some(drawn.response.rect);
                         }
                         shown.extend(media_view::whole_media(
                             ui,
@@ -14967,7 +15041,17 @@ fn note_card(
     } else {
         Sense::click()
     };
-    let resp = ui.interact(rect, Id::new(("card", &note.id)), sense);
+    // Around the Tally of a full card, whose own buttons take its clicks
+    // (#190).
+    let resp = match tally_rect {
+        Some(hole) => {
+            let above = egui::Rect::from_min_max(rect.min, egui::pos2(rect.max.x, hole.min.y));
+            let below = egui::Rect::from_min_max(egui::pos2(rect.min.x, hole.max.y), rect.max);
+            let top = ui.interact(above, Id::new(("card", &note.id)), sense);
+            top.union(ui.interact(below, Id::new(("card below", &note.id)), sense))
+        }
+        None => ui.interact(rect, Id::new(("card", &note.id)), sense),
+    };
     let label = note.visible_text();
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
     // The author's picture and Edit lie over the card: registered after
@@ -15207,6 +15291,7 @@ fn note_card(
         tag,
         menu_opened,
         picked,
+        tally: tally_asked,
     }
 }
 

@@ -51,6 +51,10 @@ A chart is one bar per day, week (from Monday), month or year on the Device's wa
 - ADR 0008: the unit system is a Device setting.
 - ADR 0013: a Tally's fields are changed as its Note is; its entries are judged like Sections.
 
+## Shown on the card (#190)
+
+The charts and the entries show on the Tally's detailed card, with "Add entry"; the Note editor holds only the setup, the fields with their settings. The compact card's totals today take the same person filter the detailed view starts with: the user's own in a Shared Area. The length of a bar and whether the older entries show are kept per Note as local settings of the Device (`tallyPeriod:<note>`, `tallyEntriesShown:<note>`), the same keys in both apps; nothing is written to the log.
+
 ## A Note is its kind (ADR 0038)
 
 Amended by ADR 0038 (#188): a Tally's text shows as its name, the first line, heading its page and card, and its description, the rest, folded under it, above the Tally's content. A Tally stays a Tally: its kind badge offers no other kind.

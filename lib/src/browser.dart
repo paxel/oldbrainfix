@@ -681,6 +681,7 @@ List<Widget> diaryCards(
           sections: () => sectionsOf(note),
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
+          tally: notes,
           kind: () => NoteKinds(notes.store).of(note.id),
           glance: () => glances.of(note.id),
           boxes: boxTicks(notes, placed, onChanged),

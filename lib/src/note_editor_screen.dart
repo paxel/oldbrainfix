@@ -1981,7 +1981,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               startLine: widget.typeLines,
             ),
             if (_kind == NoteKind.tally) const SizedBox(height: 16),
-            TallySection(notes: widget.notes, noteId: widget.noteId),
+            TallySetup(notes: widget.notes, noteId: widget.noteId),
             // A list's or Tally's panel keeps its own space under it.
             if (!_named) const SizedBox(height: 16),
             _badges(placed, when, place, colour),

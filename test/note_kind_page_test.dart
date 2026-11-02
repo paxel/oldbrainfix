@@ -412,6 +412,11 @@ void main() {
         ),
         findsOneWidget,
       );
+      // Its content under them on the detailed card (#190).
+      expect(
+        tester.getTopLeft(key('tally-card')).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(key('card-description')).dy),
+      );
     });
   });
 }

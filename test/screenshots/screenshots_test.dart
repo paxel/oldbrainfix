@@ -1114,19 +1114,13 @@ void main() {
               scrollable: notesList.first,
             );
             await tester.pumpAndSettle();
-            await tester.longPress(reading);
-            await tester.pumpAndSettle();
-            expect(find.byType(NoteEditorScreen), findsOneWidget);
-            // The length of a bar and the chart of the pages read, with the
-            // target as a line.
+            // The detailed card (#190): "Add entry", the length of a bar and
+            // the chart of the pages read, with the target as a line.
             expect(
               find.text('${texts.pagesRead} (${texts.pages})'),
               findsOneWidget,
             );
-            Scrollable.ensureVisible(
-              tester.element(find.byKey(const ValueKey('tally-period'))),
-              alignment: 0.12,
-            );
+            Scrollable.ensureVisible(tester.element(reading));
             await tester.pumpAndSettle();
           });
 

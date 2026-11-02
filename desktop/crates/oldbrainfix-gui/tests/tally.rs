@@ -1,12 +1,14 @@
 //! Tallies in the window (#103, ADR 0028): "Make it a Tally" in a Note's
 //! editor opens the field page, whose name is required and whose unit
 //! is typed, the known units it may mean suggested under it in this
-//! Device's system (#159); "Add entry" opens the entry page
-//! prefilled with the targets; the Tally part lists the entries newest
-//! first, charts each field and edits, deletes and restores entries; a
-//! hidden field comes back with its values; the unit setting follows the
-//! region until chosen; in a Shared Area the own entries show until
-//! everyone's are picked.
+//! Device's system (#159); the Note dialog holds only the setup, each
+//! field's settings as badges (#190); the detailed card has "Add entry",
+//! which opens the entry page prefilled with the targets, charts each
+//! field, lists the entries newest first, the older folded, and edits,
+//! deletes and restores entries; a hidden field comes back with its
+//! values; the unit setting follows the region until chosen; in a Shared
+//! Area the own entries show until everyone's are picked, on the compact
+//! card too.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -185,14 +187,18 @@ fn make_it_a_tally_asks_for_a_name_and_saves_the_first_field() -> TestResult {
         ("Push-ups", "times", Some(20.0))
     );
     assert_eq!(field.rule, TallyRule::Sum);
-    // The editor shows its Tally part instead of "Make it a Tally".
+    // The editor shows its setup instead of "Make it a Tally" (#190).
     assert!(!shows(&harness, "New field"));
-    assert!(shows(&harness, "Tally"));
-    assert!(shows(&harness, "Add entry"));
-    assert!(shows(&harness, "times · Target 20 times"));
+    assert!(shows(&harness, "Fields"));
+    assert!(shows(&harness, "A day with several entries counts: Sum"));
+    assert!(shows(&harness, "Unit: times"));
+    assert!(shows(&harness, "Target: 20 times"));
+    assert!(shows(&harness, "Add field"));
     assert!(!shows(&harness, "Make it a Tally"));
-    assert!(shows(&harness, "No entries yet."));
-    assert!(shows(&harness, "No values yet."));
+    // Its chart, its entries and "Add entry" are the card's, once each.
+    assert_eq!(harness.query_all_by_label("Add entry").count(), 1);
+    assert_eq!(harness.query_all_by_label("No entries yet.").count(), 1);
+    assert_eq!(harness.query_all_by_label("One bar per").count(), 1);
     Ok(())
 }
 
@@ -223,7 +229,8 @@ fn a_known_unit_shows_in_imperial_and_its_kind_picks_the_rule() -> TestResult {
     assert_eq!(field.unit, "kg", "stored in metric");
     assert_eq!(field.rule, TallyRule::Max);
     assert!((field.target.ok_or("a target")? - 45.359237).abs() < 1e-9);
-    assert!(shows(&harness, "lb · Target 100 lb"));
+    assert!(shows(&harness, "Unit: lb"));
+    assert!(shows(&harness, "Target: 100 lb"));
     Ok(())
 }
 
@@ -343,8 +350,13 @@ fn add_entry_prefills_the_targets_and_one_click_saves_them() -> TestResult {
     let tallies = Tallies::new(&store);
     tallies.add_field(&note, "Push-ups", "times", Some(20.0), None)?;
     tallies.add_field(&note, "Run", "km", None, None)?;
-    let mut harness = window(&store, Some(&note));
-    click_button(&mut harness, "Add entry");
+    // On the detailed card, clicked with the pointer: the card leaves the
+    // click to it (#190).
+    let mut harness = window(&store, None);
+    harness
+        .get_by_role_and_label(Role::Button, "Add entry")
+        .click();
+    harness.run();
     assert!(shows(&harness, "New entry"));
     assert_eq!(holds(&harness, "Push-ups").as_deref(), Some("20"));
     assert_eq!(holds(&harness, "Run").as_deref(), Some(""));
@@ -440,7 +452,8 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
     let tallies = Tallies::new(&store);
     let pages = tallies.add_field(&note, "Pages", "pages", None, None)?;
     let entry = tallies.add(&note, &BTreeMap::from([(pages, 12.0)]), "Book", None)?;
-    let mut harness = window(&store, Some(&note));
+    // On its detailed card.
+    let mut harness = window(&store, None);
     assert!(!shows(&harness, "Removed entries"));
     let edits = |h: &Harness<'_, App>| h.query_all_by_label("Edit").count();
     let before = edits(&harness);
@@ -521,7 +534,7 @@ fn a_hidden_field_returns_with_its_values() -> TestResult {
     assert!(shows(&harness, "Hide field"));
     click_button(&mut harness, "Hide field");
     assert!(tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].hidden);
-    assert!(shows(&harness, "pages · Hidden"));
+    assert!(shows(&harness, "Hide field: Hidden"));
     assert!(!shows(&harness, "Chart of Pages, 1 bars"));
     click_button(&mut harness, "Pages");
     click_button(&mut harness, "Show field again");
@@ -577,7 +590,7 @@ fn once_entries_hold_values_only_units_of_the_same_kind_are_offered() -> TestRes
 }
 
 #[test]
-fn the_bars_follow_the_length_picked_and_show_more_shows_the_next_entries() -> TestResult {
+fn the_bars_follow_the_length_picked_kept_per_note_and_older_entries_fold() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     let pages = tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -588,23 +601,87 @@ fn the_bars_follow_the_length_picked_and_show_more_shows_the_next_entries() -> T
         let values = BTreeMap::from([(pages.clone(), 1.0)]);
         tallies.add(&note, &values, &format!("Read #{day}#"), Some(at))?;
     }
-    let mut harness = window(&store, Some(&note));
+    // On its detailed card.
+    let mut harness = window(&store, None);
     assert!(radio_on(&harness, "Day"));
     assert!(shows(&harness, "Chart of Pages, 10 bars"));
     assert!(shows(&harness, "Highest bar: 4 pages"));
-    // Newest first, 30 at a time: the oldest waits.
-    assert!(shows_part(&harness, "#30#"));
-    assert!(!shows_part(&harness, "#29#"));
+    // Newest first, the latest five, the older folded under how many:
+    // today's four, then yesterday's latest.
+    for shown in ["#0#", "#10#", "#20#", "#30#", "#1#"] {
+        assert!(shows_part(&harness, shown), "{shown}");
+    }
+    assert!(!shows_part(&harness, "#11#"));
     let first = entry_row(&harness, "#0#").rect().top();
     assert!(first < entry_row(&harness, "#1#").rect().top());
-    click_button(&mut harness, "Show more");
+    click_button(&mut harness, "26 older entries");
     assert!(shows_part(&harness, "#29#"));
-    assert!(!shows(&harness, "Show more"));
-    click_radio(&mut harness, "Month");
+    assert_eq!(
+        store
+            .local_setting(&format!("tallyEntriesShown:{note}"))?
+            .as_deref(),
+        Some("true")
+    );
+    click_button(&mut harness, "26 older entries");
+    assert!(!shows_part(&harness, "#11#"));
+    assert_eq!(
+        store.local_setting(&format!("tallyEntriesShown:{note}"))?,
+        None
+    );
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Month")
+        .click();
+    harness.run();
     // From the 21st of February to the 2nd of March.
     assert!(shows(&harness, "Chart of Pages, 2 bars"));
     assert!(shows(&harness, "Feb 2026 to Mar 2026"));
     assert!(shows(&harness, "Highest bar: 24 pages"));
+    // Kept per Note on this Device, the phone's.
+    assert_eq!(
+        store
+            .local_setting(&format!("tallyPeriod:{note}"))?
+            .as_deref(),
+        Some("month")
+    );
+    let mut again = window(&store, None);
+    assert!(radio_on(&again, "Month"));
+    click_radio(&mut again, "Day");
+    assert_eq!(store.local_setting(&format!("tallyPeriod:{note}"))?, None);
+    Ok(())
+}
+
+#[test]
+fn the_note_dialog_holds_only_the_setup_and_a_badge_opens_the_field() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let pages = tallies.add_field(&note, "Pages", "pages", Some(50.0), None)?;
+    tallies.add(&note, &BTreeMap::from([(pages, 30.0)]), "", None)?;
+    // The card in its compact view, so all a Tally shows is the dialog's.
+    store.set_local_setting("compactNotes:allNotes", "true")?;
+    let mut harness = window(&store, Some(&note));
+    assert!(shows(&harness, "Pages 30 / 50 pages"));
+    assert!(shows(&harness, "Fields"));
+    assert!(shows(&harness, "Unit: pages"));
+    assert!(shows(&harness, "Target: 50 pages"));
+    for gone in [
+        "Add entry",
+        "One bar per",
+        "Entries",
+        "Chart of Pages, 1 bars",
+    ] {
+        assert!(!shows(&harness, gone), "{gone}");
+    }
+    click_button(&mut harness, "Target: 50 pages");
+    assert!(shows(&harness, "Field"));
+    type_into(&mut harness, "Target (optional)", "60");
+    click_button(&mut harness, "Save");
+    assert_eq!(
+        tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].target,
+        Some(60.0)
+    );
+    assert!(shows(&harness, "Target: 60 pages"));
+    click_button(&mut harness, "Add field");
+    assert!(shows(&harness, "New field"));
     Ok(())
 }
 
@@ -689,7 +766,13 @@ fn in_a_shared_area_the_own_entries_show_until_everyones_are_picked() -> TestRes
     let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
     let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
     apply_answer_as(&ben, &answer, true, None)?;
-    let mut harness = window(&ann, Some(&note));
+    // The compact card counts Ann's own, as the detailed one does at
+    // first (#190).
+    ann.set_local_setting("compactNotes:allNotes", "true")?;
+    let harness = window(&ann, None);
+    assert!(shows(&harness, "Count 10 times"));
+    ann.set_local_setting("compactNotes:allNotes", "false")?;
+    let mut harness = window(&ann, None);
     assert!(shows(&harness, "Show entries"));
     assert!(radio_on(&harness, "Mine"));
     assert!(shows_part(&harness, "Ann's"));

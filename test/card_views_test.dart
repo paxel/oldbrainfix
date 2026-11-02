@@ -307,6 +307,35 @@ void main() {
       await tap(tester, find.byType(Checkbox).first);
       expect(lists.byNote(id, deviceWallClock)!.openCount, 0);
     });
+
+    testWidgets('of a Tally shows its chart, its entries and "Add entry"; '
+        'the compact one none of them', (tester) async {
+      final id = notes.capture('Reading').id;
+      final tallies = Tallies(store);
+      final pages = tallies.addField(
+        id,
+        name: 'Pages',
+        unit: 'pages',
+        target: 50,
+      );
+      tallies.add(id, values: {pages: 30}, line: 'on the train');
+      await start(tester);
+      await openAllNotes(tester);
+
+      expect(key('tally-card'), findsOneWidget);
+      expect(key('tally-chart-$pages'), findsOneWidget);
+      expect(key('tally-period'), findsOneWidget);
+      expect(find.text('Pages 30 pages\non the train'), findsOneWidget);
+      expect(key('tally-add-entry'), findsOneWidget);
+      // The setup stays in the editor.
+      expect(key('tally-fields'), findsNothing);
+      expect(key('tally-add-field'), findsNothing);
+
+      await tap(tester, find.text('Reading', findRichText: true));
+      expect(key('tally-card'), findsNothing);
+      expect(key('tally-add-entry'), findsNothing);
+      expect(find.text('Pages 30 / 50 pages'), findsOneWidget);
+    });
   });
 
   group('a tap', () {

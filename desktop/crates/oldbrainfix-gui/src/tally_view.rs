@@ -1,16 +1,19 @@
 //! Tallies on the desktop's screen (#103, ADR 0028), as the phone's
 //! `tally_view.dart`, `tally_field_screen.dart` and
-//! `tally_entry_screen.dart` draw them: the Tally part of a Note's
-//! editor, and the field page and the entry page, each in a dialog over
-//! the window as the Routine editor is, Save at their top.
+//! `tally_entry_screen.dart` draw them: the setup in the Note dialog, the
+//! Tally on its Note's detailed card, and the field page and the entry
+//! page, each in a dialog over the window as the Routine editor is, Save
+//! at their top.
 //!
-//! The Tally part lists the fields, each opening its field page for who
-//! may change the Note, with "Add entry" and "Add field"; in a Shared
-//! Area the choice of whose entries show, the user's own by default; the
-//! length of a bar; one chart per field shown; the entries, newest first,
-//! 30 at a time, each clicked to edit it and right-clicked for a menu;
-//! and a folded "Removed entries" with Restore, closed until opened,
-//! remembered on this Device.
+//! The setup (#190) lists the fields, each its name and its settings as
+//! badges, opening its field page for who may change the Note, and "Add
+//! field". The detailed card shows "Add entry"; in a Shared Area the
+//! choice of whose entries show, the user's own by default; the length of
+//! a bar, kept per Note on this Device; one chart per field shown; the
+//! entries, newest first, the older folded under the latest five until a
+//! click shows them, kept per Note on this Device, each clicked to edit
+//! it and right-clicked for a menu; and a folded "Removed entries" with
+//! Restore, closed until opened, remembered on this Device.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -28,14 +31,54 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
+use crate::setting_badges::{badge, badge_row};
 use crate::tally_unit_match::{self, UnitNames};
 use crate::theme::Tones;
 
 /// The local setting that keeps "Removed entries" open, the phone's.
 pub const REMOVED_OPEN: &str = "tallyRemovedOpen";
 
-/// How many entries show before "Show more".
-pub const PAGE: usize = 30;
+/// How many entries a card shows before the older ones fold (#190).
+pub const SHOWN_ENTRIES: usize = 5;
+
+/// The setting of this Device that keeps the length of a bar of the
+/// Tally of `note` (#190), the phone's; nothing kept means a day.
+pub fn period_setting(note: &str) -> String {
+    format!("tallyPeriod:{note}")
+}
+
+/// The setting of this Device that keeps all entries of the Tally of
+/// `note` shown on its card (#190), the phone's; nothing kept means
+/// folded after [`SHOWN_ENTRIES`].
+pub fn entries_shown_setting(note: &str) -> String {
+    format!("tallyEntriesShown:{note}")
+}
+
+/// The name a length of a bar is kept by, the phone's.
+pub fn period_name(period: TallyPeriod) -> &'static str {
+    match period {
+        TallyPeriod::Day => "day",
+        TallyPeriod::Week => "week",
+        TallyPeriod::Month => "month",
+        TallyPeriod::Year => "year",
+    }
+}
+
+/// The person filter the Tally of `note_id` counts by unless one is
+/// picked: the user's own entries in a Shared Area (ADR 0028), everyone's,
+/// which are the user's own too, elsewhere. The compact view's totals and
+/// the detailed view count alike (#190).
+pub fn default_filter(store: &Store, note_id: &str) -> oldbrainfix_core::Result<PersonFilter> {
+    let shared = match store.area_of(note_id)? {
+        Some(area) => store.is_shared(&area)?,
+        None => false,
+    };
+    Ok(if shared {
+        Whose::Mine.filter()
+    } else {
+        Whose::Everyone.filter()
+    })
+}
 
 /// How wide a bar of a chart is at least, with the gap after it.
 const SLOT: f32 = 10.0;
@@ -65,31 +108,6 @@ impl Whose {
     }
 }
 
-/// How the Tally part of the selected Note is looked at: whose entries,
-/// the length of a bar and how many entries show. It starts again for
-/// every Note opened.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TallyLook {
-    /// The Note it is for.
-    pub of: Option<String>,
-    /// `None` until picked: the user's own in a Shared Area, else
-    /// everyone's, which outside one are the user's own too.
-    pub whose: Option<Whose>,
-    pub period: TallyPeriod,
-    pub count: usize,
-}
-
-impl TallyLook {
-    pub fn new(of: Option<String>) -> TallyLook {
-        TallyLook {
-            of,
-            whose: None,
-            period: TallyPeriod::Day,
-            count: PAGE,
-        }
-    }
-}
-
 /// An entry with who wrote it, `None` for the user's own (ADR 0017),
 /// and whether this Device may change it.
 #[derive(Debug, Clone)]
@@ -99,7 +117,7 @@ pub struct EntryShown {
     pub changes: bool,
 }
 
-/// The Tally of the selected Note as its editor shows it.
+/// A Tally as its setup and its detailed card show it.
 #[derive(Debug, Clone)]
 pub struct TallyShown {
     pub tally: Tally,
@@ -115,8 +133,10 @@ pub struct TallyShown {
     /// The removed entries, the last removed first.
     pub removed: Vec<EntryShown>,
     pub removed_open: bool,
-    /// The length of a bar the charts were read with.
+    /// The length of a bar the charts were read with, kept per Note.
     pub period: TallyPeriod,
+    /// Whether the older entries show, kept per Note.
+    pub all_shown: bool,
     /// Whether this Device may add entries and fields.
     pub adds: bool,
     pub defines: bool,
@@ -125,12 +145,12 @@ pub struct TallyShown {
     pub system: UnitSystem,
 }
 
-/// Reads the Tally of the Note `note_id` as `look` asks, or `None` while
-/// it is no Tally.
+/// Reads the Tally of the Note `note_id`, with the entries of `whose`
+/// when picked, or `None` while it is no Tally.
 pub fn read(
     store: &Store,
     note_id: &str,
-    look: &TallyLook,
+    whose: Option<&Whose>,
     system: UnitSystem,
     wall: &WallClock,
 ) -> oldbrainfix_core::Result<Option<TallyShown>> {
@@ -159,7 +179,7 @@ pub fn read(
             }
         }
     }
-    let mut whose = match &look.whose {
+    let mut whose = match whose {
         Some(whose) => whose.clone(),
         None if shared => Whose::Mine,
         None => Whose::Everyone,
@@ -171,13 +191,19 @@ pub fn read(
         whose = Whose::Mine;
     }
     let filter = whose.filter();
+    let period = match store.local_setting(&period_setting(note_id))?.as_deref() {
+        Some("week") => TallyPeriod::Week,
+        Some("month") => TallyPeriod::Month,
+        Some("year") => TallyPeriod::Year,
+        _ => TallyPeriod::Day,
+    };
     let mut entries = Vec::new();
     for entry in tallies.entries(note_id, &filter)? {
         entries.push(shown(entry)?);
     }
     let mut charts = BTreeMap::new();
     for field in tally.shown() {
-        let bars = tallies.chart(note_id, &field.id, look.period, wall, &filter)?;
+        let bars = tallies.chart(note_id, &field.id, period, wall, &filter)?;
         charts.insert(field.id.clone(), bars);
     }
     let mut removed = Vec::new();
@@ -199,7 +225,11 @@ pub fn read(
         charts,
         removed,
         removed_open: store.local_setting(REMOVED_OPEN)?.as_deref() == Some("true"),
-        period: look.period,
+        period,
+        all_shown: store
+            .local_setting(&entries_shown_setting(note_id))?
+            .as_deref()
+            == Some("true"),
         adds: store.may_write_in(note_id)?,
         defines: store.may_change(note_id)?,
         changeable,
@@ -208,7 +238,7 @@ pub fn read(
     }))
 }
 
-/// What the user asked of the Tally part of a Note's editor.
+/// What the user asked of a Tally's setup or of its detailed card.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TallyAction {
     /// Opens the field page for the first field of the Note with this
@@ -224,9 +254,10 @@ pub enum TallyAction {
     /// Opens the field page of the field with this id, or of a new one.
     OpenField(Option<String>),
     Whose(Whose),
+    /// Keeps the length of a bar.
     Period(TallyPeriod),
-    /// Shows the next entries.
-    More,
+    /// Keeps whether the older entries show.
+    AllShown(bool),
     /// Keeps whether "Removed entries" is open.
     RemovedOpen(bool),
 }
@@ -292,73 +323,109 @@ fn values_line(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem) 
         .join(" · ")
 }
 
-/// The Tally part of a Note's editor: nothing to draw while the Note is
-/// no Tally.
-pub fn section(
+/// The setup of a Tally in the Note dialog (#190): a row per field, its
+/// name and its settings as badges as on the New Tally page (#161), how a
+/// day with several entries counts, its unit and its target, "Hidden"
+/// while it is hidden; a click on the name or a badge opens the field's
+/// page for who may change the Note, and "Add field" the page of a new
+/// one. The chart and the entries show on the card, not here.
+pub fn setup(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    (shown, count): (&TallyShown, usize),
+    shown: &TallyShown,
     actions: &mut Vec<TallyAction>,
 ) {
     let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
     let tally = &shown.tally;
     let system = shown.system;
     let decimal = decimal_sign(t);
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_heading()).strong().color(text));
+        ui.label(RichText::new(t.tally_fields()).strong().color(text));
         for field in &tally.fields {
+            let changes = shown.changeable.contains(&field.id);
+            let name = RichText::new(&field.name).strong().color(text);
+            if !changes {
+                ui.label(name);
+            } else if ui.add(egui::Button::new(name).frame(false)).clicked() {
+                actions.push(TallyAction::OpenField(Some(field.id.clone())));
+            }
             let unit = tally_units::shown_unit(&field.unit, system);
-            let mut parts = Vec::new();
-            if !unit.is_empty() {
-                parts.push(unit);
-            }
-            if let Some(target) = field.target {
-                let value = shown_value(target, &field.unit, system, decimal);
-                parts.push(t.tally_target_value(&value));
-            }
+            let rule = match field.rule {
+                TallyRule::Sum => t.tally_rule_sum_short(),
+                TallyRule::Max => t.tally_rule_max_short(),
+            };
+            let unit_value = if unit.is_empty() {
+                t.tally_no_unit().to_string()
+            } else {
+                unit
+            };
+            let target_value = match field.target {
+                Some(target) => shown_value(target, &field.unit, system, decimal),
+                None => t.tally_no_target().to_string(),
+            };
+            let mut badges = vec![
+                (icons::TALLY_RULE, t.tally_rule(), rule.to_string()),
+                (icons::TALLY_UNIT, t.tally_unit(), unit_value),
+                (icons::TALLY_TARGET, t.tally_target_badge(), target_value),
+            ];
             if field.hidden {
-                parts.push(t.tally_field_hidden().to_string());
+                badges.push((
+                    icons::TALLY_HIDDEN,
+                    t.tally_hide_field(),
+                    t.tally_field_hidden().to_string(),
+                ));
             }
-            let body = ui.vertical(|ui| {
-                ui.label(RichText::new(&field.name).color(text));
-                ui.label(RichText::new(parts.join(" · ")).small().color(weak));
-            });
-            if shown.changeable.contains(&field.id) {
-                let open = ui
-                    .interact(
-                        body.response.rect,
-                        Id::new(("tally field", &field.id)),
-                        Sense::click(),
-                    )
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
-                open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &field.name));
-                if open.clicked() {
-                    actions.push(TallyAction::OpenField(Some(field.id.clone())));
+            badge_row(ui, |ui| {
+                for (icon, setting, value) in badges {
+                    if badge(ui, (t, tones), (icon, None), setting, Some(&value), changes).clicked()
+                    {
+                        actions.push(TallyAction::OpenField(Some(field.id.clone())));
+                    }
                 }
-            }
+            });
+            ui.add_space(8.0);
         }
-        ui.horizontal_wrapped(|ui| {
-            if shown.adds
-                && ui
-                    .button(RichText::new(t.add_tally_entry()).color(text))
-                    .clicked()
-            {
-                actions.push(TallyAction::AddEntry);
-            }
-            if shown.defines
-                && ui
-                    .button(RichText::new(t.tally_add_field()).color(text))
-                    .clicked()
-            {
+        if shown.defines {
+            let add = ui.horizontal(|ui| {
+                icons::show(ui, icons::ADD, 20.0, text);
+                ui.button(RichText::new(t.tally_add_field()).color(text))
+            });
+            if add.inner.clicked() {
                 actions.push(TallyAction::OpenField(None));
             }
-        });
+        }
     });
-    if shown.shared {
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.tally_show_entries()).strong().color(text));
+}
+
+/// A Tally on its Note's detailed card (#190): "Add entry" for who may
+/// add one; in a Shared Area the choice of whose entries show; the length
+/// of a bar; one chart per field shown; the entries, newest first, the
+/// older folded under the latest [`SHOWN_ENTRIES`]; and the folded
+/// "Removed entries" with Restore. The card leaves its own click out of
+/// where this lies, so its buttons take theirs.
+pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAction>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let tally = &shown.tally;
+    let system = shown.system;
+    let heading = |ui: &mut Ui, words: &str| {
+        ui.add_space(4.0);
+        ui.label(RichText::new(words).strong().color(text));
+    };
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 6.0;
+        if shown.adds {
+            let add = ui.horizontal(|ui| {
+                icons::show(ui, icons::ADD, 20.0, text);
+                ui.button(RichText::new(t.add_tally_entry()).color(text))
+            });
+            if add.inner.clicked() {
+                actions.push(TallyAction::AddEntry);
+            }
+        }
+        if shown.shared {
+            heading(ui, t.tally_show_entries());
             let mut options = vec![
                 (Whose::Mine, t.tally_entries_mine().to_string()),
                 (Whose::Everyone, t.tally_entries_everyone().to_string()),
@@ -373,10 +440,8 @@ pub fn section(
                     actions.push(TallyAction::Whose(whose));
                 }
             }
-        });
-    }
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_period()).strong().color(text));
+        }
+        heading(ui, t.tally_period());
         let mut period = shown.period;
         let options = [
             (TallyPeriod::Day, t.tally_period_day().to_string()),
@@ -387,44 +452,57 @@ pub fn section(
         if radio_column(ui, &mut period, options) {
             actions.push(TallyAction::Period(period));
         }
-    });
-    for field in tally.shown() {
-        embossed(ui, tones, false, None, |ui| {
+        for field in tally.shown() {
             let unit = tally_units::shown_unit(&field.unit, system);
-            let heading = if unit.is_empty() {
+            let words = if unit.is_empty() {
                 field.name.clone()
             } else {
                 format!("{} ({unit})", field.name)
             };
-            ui.label(RichText::new(heading).strong().color(text));
+            heading(ui, &words);
             let bars = shown.charts.get(&field.id).map_or(&[][..], Vec::as_slice);
             chart(ui, t, field, bars, (shown.period, system));
-        });
-    }
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_entries()).strong().color(text));
+        }
+        heading(ui, t.tally_entries());
         if shown.entries.is_empty() {
             ui.label(RichText::new(t.tally_no_entries()).color(weak));
         }
+        let older = shown.entries.len().saturating_sub(SHOWN_ENTRIES);
+        let count = if shown.all_shown || older == 0 {
+            shown.entries.len()
+        } else {
+            SHOWN_ENTRIES
+        };
         for entry in shown.entries.iter().take(count) {
             entry_row(ui, t, (tally, system), entry, false, actions);
         }
-        if shown.entries.len() > count
-            && ui
-                .button(RichText::new(t.tally_more_entries()).color(text))
-                .clicked()
-        {
-            actions.push(TallyAction::More);
+        // The older ones folded under the latest (#190).
+        if older > 0 {
+            let icon = if shown.all_shown {
+                icons::EXPAND_LESS
+            } else {
+                icons::EXPAND_MORE
+            };
+            let said = t.tally_older_entries(older as i64);
+            let fold = ui.horizontal(|ui| {
+                icons::show(ui, icon, 20.0, weak);
+                ui.add(
+                    egui::Button::new(RichText::new(&said).color(weak))
+                        .frame(false)
+                        .selected(shown.all_shown),
+                )
+            });
+            if fold.inner.clicked() {
+                actions.push(TallyAction::AllShown(!shown.all_shown));
+            }
         }
-    });
-    if shown.removed.is_empty() {
-        return;
-    }
-    embossed(ui, tones, false, None, |ui| {
+        if shown.removed.is_empty() {
+            return;
+        }
         let open = shown.removed_open;
         let fold =
             egui::CollapsingHeader::new(RichText::new(t.tally_removed_entries()).color(text))
-                .id_salt("tally removed")
+                .id_salt(("tally removed", &tally.note_id))
                 .open(Some(open))
                 .show(ui, |ui| {
                     for entry in &shown.removed {

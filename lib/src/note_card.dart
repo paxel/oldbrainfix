@@ -16,6 +16,7 @@ import 'profile.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
 import 'table_screen.dart';
+import 'tally_view.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
@@ -288,6 +289,11 @@ class NoteCard extends StatelessWidget {
   /// compact one (#122, #189); nothing when null.
   final NoteShoppingList? shopping;
 
+  /// The Notes the Note's Tally is read from, if it is one: on a [full]
+  /// card its chart, its entries and "Add entry" under its name (#190);
+  /// nothing when null.
+  final Notes? tally;
+
   /// Reads the Note's kind (#188), never while building: a Note of a
   /// kind shows its name as the title, on a [full] card its description
   /// folded under it; a plain Note when null.
@@ -337,6 +343,7 @@ class NoteCard extends StatelessWidget {
     this.footer,
     this.checklist,
     this.shopping,
+    this.tally,
     this.kind,
     this.glance,
     this.boxes,
@@ -391,8 +398,11 @@ class NoteCard extends StatelessWidget {
     final actions = this.actions;
     final checklist = this.checklist;
     final shopping = this.shopping;
-    // A Note is at most one of them; the other draws nothing.
-    Widget? lists(bool full) => checklist == null && shopping == null
+    final tally = full ? this.tally : null;
+    // A Note is at most one of them; the others draw nothing. A Tally's
+    // compact view is its glance.
+    Widget? lists(bool full) =>
+        checklist == null && shopping == null && tally == null
         ? null
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,6 +419,7 @@ class NoteCard extends StatelessWidget {
                   shopping: shopping,
                   full: full,
                 ),
+              if (tally != null) CardTally(notes: tally, noteId: note.id),
             ],
           );
     final acts =

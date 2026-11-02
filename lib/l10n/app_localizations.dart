@@ -5846,17 +5846,11 @@ abstract class AppLocalizations {
   /// **'Chart of {field}, {bars} bars'**
   String tallyChartLabel(String field, int bars);
 
-  /// No description provided for @tallyTargetValue.
+  /// The detailed view of a Tally's card (#190): the older entries folded under the latest five, how many; a tap shows or hides them.
   ///
   /// In en, this message translates to:
-  /// **'Target {value}'**
-  String tallyTargetValue(String value);
-
-  /// No description provided for @tallyMoreEntries.
-  ///
-  /// In en, this message translates to:
-  /// **'Show more'**
-  String get tallyMoreEntries;
+  /// **'{count, plural, =1{1 older entry} other{{count} older entries}}'**
+  String tallyOlderEntries(int count);
 
   /// No description provided for @tallyRemovedEntries.
   ///

@@ -5,18 +5,20 @@
 use std::collections::HashMap;
 
 use oldbrainfix_core::{
-    Day, PersonFilter, Result, Routine, Routines, Sessions, Store, Tallies, TallyField,
-    TallyPeriod, UnitSystem, WallClock,
+    Day, Result, Routine, Routines, Sessions, Store, Tallies, TallyField, TallyPeriod, UnitSystem,
+    WallClock,
 };
 
 use crate::history_view;
 use crate::l10n::L10n;
 use crate::schedule_text::{day_text, occurrence_time};
-use crate::tally_view::{decimal_sign, shown_value, typed_value};
+use crate::tally_view::{self, decimal_sign, shown_value, typed_value};
 
 /// The lines of each Note of `listed` that is a Tally or runs a Session,
 /// by its id: a Tally's fields shown, each with its total today and its
-/// target ("Pages 30 / 50 pages"); else for a Note that runs a Session its
+/// target ("Pages 30 / 50 pages"), of the user's own entries in a Shared
+/// Area as its detailed view counts unless another choice is picked
+/// (#190); else for a Note that runs a Session its
 /// next run not Done and how many runs were Done and Missed this week.
 pub fn read(
     store: &Store,
@@ -55,7 +57,7 @@ pub fn read(
                     &field.id,
                     TallyPeriod::Day,
                     wall,
-                    &PersonFilter::default(),
+                    &tally_view::default_filter(store, id)?,
                 )?;
                 let total = bars
                     .last()

@@ -297,7 +297,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
   and how many are open ("4 open"), a Tally its name and each field's
-  total today against its target ("Steps 7000 / 10000 steps"), a Note
+  total today against its target ("Steps 7000 / 10000 steps"), in a
+  Shared Area of the user's own entries, as its detailed view counts at
+  first (#190), a Note
   that runs a Session its first line, the next run and "done 4 /
   skipped 1 this week"; a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
@@ -305,7 +307,17 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   offers File into… and Merge into… after Edit, as far as the action row
   would. In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
-  a tap shows them, kept open per Note on this Device; a Tally's and a Session's detailed view grow with #190 and #191.
+  a tap shows them, kept open per Note on this Device. **A Tally's
+  detailed view is the Tally** (#190): under its name and description
+  "Add entry", in a Shared Area "Show entries" (Mine at first,
+  Everyone's, or one person's), "One bar per" Day, Week, Month or Year
+  as radio buttons, kept per Note on this Device, a chart per field
+  shown, then its entries, newest first, the latest five and the older
+  folded under how many ("12 older entries") until a tap shows them,
+  kept open per Note on this Device; a tap on an entry edits it, a long
+  press offers Edit and Delete, and the folded "Removed entries" restore.
+  On the desktop the card shows the same, its buttons taking their own
+  clicks. A Session's detailed view grows with #191.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
 - **Copy text** in a card's ⋮ puts the text of the Note and of each
@@ -324,8 +336,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   **name**, the text's first line, as a heading, its **description**,
   the rest of the text, small right under it and folded to one line
   until a tap unfolds it (on a card kept open per Note on this Device,
-  #189), then **the kind's content** (the Lines, the
-  Tally), then the badges, the photos and recordings, and the Amends
+  #189), then **the kind's content** (the Lines; of a Tally its setup in
+  the editor, its chart and entries in the detailed view, #190), then
+  the badges, the photos and recordings, and the Amends
   below as the dated diary part. In the editor the name is a one-line
   field and the description its own field; nothing is rewritten for the
   display, and leaving both unchanged writes nothing.
@@ -335,7 +348,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   like a shield. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
   its schedule; the kind, Plain Note included (#188); Show on the Agenda for a Checklist without a Routine and for a
-  Shopping List (#186); Show ticks while it has a box. A setting that does not apply has no badge. A tap
+  Shopping List (#186); Show ticks while it has a box. A Tally's setup
+  is its fields (#190), each its name with its rule, unit and target as
+  badges, as on the Tally page, and "Hidden" while it is hidden, a tap
+  on the name or a badge opening the field's page, then "Add field"; the
+  editor shows no chart and no entries. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
   name, which changes it at once: Importance as radio buttons (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the

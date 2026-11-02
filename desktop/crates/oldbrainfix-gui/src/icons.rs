@@ -123,6 +123,8 @@ pub const SHOW_TICKS: char = '\u{e316}';
 pub const TALLY_RULE: char = '\u{e2cd}';
 pub const TALLY_UNIT: char = '\u{e60e}';
 pub const TALLY_TARGET: char = '\u{f07b}';
+/// A Tally field hidden (#190), `visibility_off_outlined`.
+pub const TALLY_HIDDEN: char = '\u{f4a0}';
 pub const SESSION_COUNT: char = '\u{e640}';
 pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';

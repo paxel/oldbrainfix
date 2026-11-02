@@ -1060,6 +1060,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                             .byNote(captured.note.id, deviceWallClock),
                     lists: ShoppingLists(widget.notes.store),
                   ),
+                  tally: widget.notes,
                   kind: () =>
                       NoteKinds(widget.notes.store).of(captured.note.id),
                   glance: () => glances.of(captured.note.id),
