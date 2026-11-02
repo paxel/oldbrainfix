@@ -632,8 +632,7 @@ impl CapturePopup {
                 if sorted || !quick.nudge_buttons {
                     // A sorted Note needs no Nudge (#113); without the
                     // Nudge buttons, Save nudges in 1 h (#142).
-                    let save = egui::Button::new(RichText::new(t.save()).color(text));
-                    if ui.add_enabled(typed, save).clicked() {
+                    if theme::primary(ui, typed, t.save()).clicked() {
                         picked = Some(Notes::default_nudge());
                     }
                 } else {

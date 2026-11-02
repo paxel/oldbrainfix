@@ -19,7 +19,7 @@ use crate::l10n::L10n;
 use crate::setting_badges::{BadgeValue, badge, badge_dialog, badge_row};
 use crate::tally_unit_match::{self, UnitNames};
 use crate::tally_view::{self, kind_name};
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What was asked of the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,7 +213,7 @@ impl TallyPage {
                 ui.add_space(4.0);
                 ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
                 ui.horizontal_wrapped(|ui| {
-                    if ui.button(RichText::new(t.save()).color(text)).clicked() {
+                    if theme::primary(ui, true, t.save()).clicked() {
                         intent = Some(PageIntent::Save);
                     }
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

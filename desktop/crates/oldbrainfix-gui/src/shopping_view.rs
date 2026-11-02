@@ -30,7 +30,7 @@ use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the menu of a Shopping List's Line does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,10 +176,7 @@ fn line_menu(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<ShopStep> {
         }
     }
     ui.separator();
-    if ui
-        .button(RichText::new(t.shopping_delete_for_good()).color(text))
-        .clicked()
-    {
+    if theme::destructive(ui, true, t.shopping_delete_for_good()).clicked() {
         picked = Some(ShopStep::Delete);
     }
     picked

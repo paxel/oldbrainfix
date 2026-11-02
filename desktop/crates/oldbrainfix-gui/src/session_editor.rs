@@ -23,7 +23,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::routine_editor::stepper;
 use crate::schedule_text::weekday_long;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The local setting that keeps the weekdays' counts open, the phone's.
 pub const WEEKDAYS_OPEN: &str = "sessionWeekdaysOpen";
@@ -365,7 +365,7 @@ impl SessionDraft {
                 let mut on = self.chosen.contains(id);
                 let last = page.is_some() && on && self.chosen.len() == 1;
                 let tick = egui::Checkbox::new(&mut on, RichText::new(&name).color(text));
-                if ui.add_enabled(changes && !last, tick).changed() {
+                if theme::square_boxes(ui, |ui| ui.add_enabled(changes && !last, tick)).changed() {
                     if on {
                         self.chosen.insert(id.clone());
                     } else {
@@ -404,10 +404,7 @@ impl SessionDraft {
         let weak = ui.visuals().weak_text_color();
         let day = weekday_long(t, index as u32 + 1);
         let mut own = self.counts[index].is_some();
-        if ui
-            .checkbox(&mut own, RichText::new(day).color(text))
-            .changed()
-        {
+        if theme::checkbox(ui, &mut own, RichText::new(day).color(text)).changed() {
             self.set_own(index, own);
         }
         match &mut self.counts[index] {

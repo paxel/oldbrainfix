@@ -34,7 +34,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_long, weekday_text};
 use crate::session_editor::{SessionDraft, SessionIntent};
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
 pub const RENAG_CHOICES: [i64; 5] = [5, 10, 15, 30, 60];
@@ -700,15 +700,11 @@ impl RoutineEditor {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
                         intent = Some(Intent::Close);
                     }
-                    if self.routine.is_some()
-                        && ui
-                            .button(RichText::new(t.delete()).color(ui.visuals().error_fg_color))
-                            .clicked()
+                    if self.routine.is_some() && theme::destructive(ui, true, t.delete()).clicked()
                     {
                         intent = Some(Intent::Delete);
                     }
-                    let save = egui::Button::new(RichText::new(t.save()).color(text));
-                    if ui.add_enabled(self.can_save(), save).clicked() {
+                    if theme::primary(ui, self.can_save(), t.save()).clicked() {
                         intent = Some(Intent::Save);
                     }
                 });
@@ -1087,9 +1083,12 @@ impl RoutineEditor {
         ui.label(RichText::new(summary).color(text));
         ui.label(RichText::new(t.escalation_explain()).small().color(weak));
         let mut on = self.escalation.is_some();
-        if ui
-            .checkbox(&mut on, RichText::new(t.escalation_switch()).color(text))
-            .changed()
+        if theme::checkbox(
+            ui,
+            &mut on,
+            RichText::new(t.escalation_switch()).color(text),
+        )
+        .changed()
         {
             self.escalation = on.then_some(DEFAULT_ESCALATION);
         }

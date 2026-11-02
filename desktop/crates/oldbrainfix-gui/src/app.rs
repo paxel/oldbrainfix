@@ -7224,13 +7224,7 @@ impl App {
                                     // the other Device fetched what it needs.
                                     if hosted
                                         && !joining
-                                        && ui
-                                            .button(
-                                                RichText::new(t.host_continue())
-                                                    .strong()
-                                                    .color(text),
-                                            )
-                                            .clicked()
+                                        && theme::primary(ui, true, t.host_continue()).clicked()
                                     {
                                         asked.push(WelcomeAction::Synced);
                                     }
@@ -8934,7 +8928,7 @@ impl App {
             if sorted || !quick.nudge_buttons {
                 // A sorted Note needs no Nudge (#113); without the Nudge
                 // buttons, Save nudges in 1 h (#142).
-                if ui.button(RichText::new(t.save()).color(text)).clicked() {
+                if theme::primary(ui, true, t.save()).clicked() {
                     actions.push(Action::Capture(Notes::default_nudge()));
                 }
                 let hint = if sorted {
@@ -9260,8 +9254,7 @@ impl App {
             .config(MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside))
             .ui(ui, |ui| {
                 let mut me = filter.me;
-                if ui
-                    .checkbox(&mut me, RichText::new(t.person_filter_me()).color(text))
+                if theme::checkbox(ui, &mut me, RichText::new(t.person_filter_me()).color(text))
                     .changed()
                 {
                     let mut next = filter.clone();
@@ -9271,10 +9264,7 @@ impl App {
                 for person in &self.view.people_shown {
                     let mut on = filter.people.contains(&person.id);
                     let name = profile_view::display_name(t, &person.name);
-                    if ui
-                        .checkbox(&mut on, RichText::new(name).color(text))
-                        .changed()
-                    {
+                    if theme::checkbox(ui, &mut on, RichText::new(name).color(text)).changed() {
                         let mut next = filter.clone();
                         next.toggle(&person.id);
                         actions.push(Action::FilterPeople(next));
@@ -9775,10 +9765,7 @@ impl App {
                     {
                         actions.push(Action::StartMerge);
                     }
-                    if ui
-                        .button(RichText::new(t.move_to_trash()).color(text))
-                        .clicked()
-                    {
+                    if theme::destructive(ui, true, t.move_to_trash()).clicked() {
                         actions.push(Action::Trash);
                     }
                 });
@@ -11129,16 +11116,14 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_computer()).strong().color(text));
                     let mut on = alerts;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.alerts_switch()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::Alerts(on)));
                     }
                     ui.label(RichText::new(t.alerts_detail()).small().color(weak));
                     let mut on = autostart;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.autostart_switch()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.autostart_switch()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::Autostart(on)));
@@ -11228,8 +11213,7 @@ impl App {
                         actions.push(Action::Setting(Setting::NudgeRepeat(m)));
                     });
                     let mut on = quiet_on;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.quiet_hours()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.quiet_hours()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::QuietOn(on)));
@@ -11303,9 +11287,12 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_history()).strong().color(text));
                     let mut on = streaks;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.show_streaks_device()).color(text))
-                        .changed()
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.show_streaks_device()).color(text),
+                    )
+                    .changed()
                     {
                         actions.push(Action::Setting(Setting::Streaks(on)));
                     }
@@ -11501,10 +11488,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
 pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
-    if resp.hovered() {
-        ui.painter()
-            .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);
-    }
+    theme::icon_button_back(ui, &resp, rect);
     icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
     resp.on_hover_text(label)
 }
@@ -11801,11 +11785,10 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
     });
 }
 
-/// A confirm button for a destructive step: its verb in the error colour
-/// (UI laws).
+/// A confirm button for a destructive step: its verb on the error
+/// colour (UI laws, #218).
 fn destructive(ui: &mut Ui, label: &str) -> bool {
-    let error = ui.visuals().error_fg_color;
-    ui.button(RichText::new(label).color(error)).clicked()
+    theme::destructive(ui, true, label).clicked()
 }
 
 /// Asks for a name: `(title, verb, done)` say what for. Enter takes it.
@@ -11824,9 +11807,7 @@ fn name_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let text = ui.visuals().text_color();
-        let button = egui::Button::new(RichText::new(verb).color(text));
-        if ui.add_enabled(ready, button).clicked() {
+        if theme::primary(ui, ready, verb).clicked() {
             actions.push(done);
         }
     });
@@ -11853,9 +11834,7 @@ fn link_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let text = ui.visuals().text_color();
-        let button = egui::Button::new(RichText::new(t.link_set()).color(text));
-        if ui.add_enabled(ready, button).clicked() {
+        if theme::primary(ui, ready, t.link_set()).clicked() {
             actions.push(Action::SetLink);
         }
     });
@@ -12168,7 +12147,7 @@ fn send_form(
         ui.label(RichText::new(t.send_plain_hint()).color(text));
     }
     if update {
-        ui.checkbox(cancelling, RichText::new(t.send_cancel()).color(text));
+        theme::checkbox(ui, cancelling, RichText::new(t.send_cancel()).color(text));
         ui.label(RichText::new(t.send_cancel_hint()).small().color(weak));
     }
     ui.label(RichText::new(t.send_what()).small().color(weak));
@@ -12629,10 +12608,7 @@ fn people_form(
                     role: next,
                 });
             }
-            if ui
-                .button(RichText::new(t.remove_person()).color(text))
-                .clicked()
-            {
+            if theme::destructive(ui, true, t.remove_person()).clicked() {
                 actions.push(Action::AskRemovePerson {
                     area: area.to_string(),
                     person: person.id.clone(),
@@ -12907,20 +12883,17 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
     ];
     for (control, shows, label) in switches {
         let mut on = shows;
-        if ui
-            .checkbox(&mut on, RichText::new(label).color(text))
-            .changed()
-        {
+        if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
             actions.push(Action::Setting(Setting::QuickNote(control, on)));
         }
     }
     let mut on = quick.nudge_buttons;
-    if ui
-        .checkbox(
-            &mut on,
-            RichText::new(t.quick_note_nudge_buttons()).color(text),
-        )
-        .changed()
+    if theme::checkbox(
+        ui,
+        &mut on,
+        RichText::new(t.quick_note_nudge_buttons()).color(text),
+    )
+    .changed()
     {
         actions.push(Action::Setting(Setting::QuickNoteNudgeButtons(on)));
     }
@@ -13672,8 +13645,7 @@ fn capture_context(
             // The Remove first, at the end of the line, so the line
             // wraps in what is left beside it.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                let text = ui.visuals().text_color();
-                let remove = ui.button(RichText::new(t.remove()).color(text));
+                let remove = theme::destructive(ui, true, t.remove());
                 let label = t.remove_captured_label(detail.name());
                 remove.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
                 if remove.clicked() {
@@ -14463,15 +14435,11 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     };
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
-    let fill = if compact {
-        tones.accent.gamma_multiply(0.3)
-    } else if resp.hovered() {
-        ui.visuals().widgets.hovered.weak_bg_fill
-    } else {
-        Color32::TRANSPARENT
-    };
-    if fill.a() > 0 {
-        ui.painter().rect_filled(rect, 6.0, fill);
+    // The hover under the tint, so the selected look stays.
+    theme::icon_button_back(ui, &resp, rect);
+    if compact {
+        let fill = tones.accent.gamma_multiply(0.3);
+        ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, fill);
     }
     let text = ui.visuals().text_color();
     icons::paint(ui.painter(), rect.shrink(2.0), icon, text);
@@ -14754,7 +14722,7 @@ fn edited_text(
         let changed = edited.trim();
         if !changed.is_empty()
             && changed != edit.stored
-            && ui.button(RichText::new(t.save()).color(text)).clicked()
+            && theme::primary(ui, true, t.save()).clicked()
         {
             actions.push(Action::SaveText);
         }
@@ -15639,7 +15607,7 @@ fn note_card(
         if has_boxes {
             let mut on = look.boxes.show;
             let label = RichText::new(t.box_show_ticks()).color(text);
-            if ui.checkbox(&mut on, label).clicked() {
+            if theme::checkbox(ui, &mut on, label).clicked() {
                 picked = Some(Action::ShowTicks {
                     note: note.id.clone(),
                     on,

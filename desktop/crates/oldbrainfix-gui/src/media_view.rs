@@ -23,6 +23,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::media::{dimensions, pixels, speed_number};
 use crate::speech::{SpeechModel, Status};
+use crate::theme;
 
 /// The long edge photos are shown at, at most.
 const SHOWN_EDGE: u32 = 1024;
@@ -486,11 +487,7 @@ fn generated_buttons(
             }
         }
     }
-    if offers.remove_text
-        && ui
-            .button(RichText::new(t.remove_generated_text()).color(text))
-            .clicked()
-    {
+    if offers.remove_text && theme::destructive(ui, true, t.remove_generated_text()).clicked() {
         asked = Some(Generated::Remove(hash.to_string()));
     }
     if let Some(busy) = offers.again {
@@ -534,7 +531,6 @@ pub fn photos(
     photo_texts: &BTreeMap<String, String>,
     offers: &dyn Fn(&str) -> Offers,
 ) -> Option<Photo> {
-    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut clicked = None;
     for hash in hashes {
@@ -572,10 +568,7 @@ pub fn photos(
         if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
             clicked = Some(Photo::Text(asked));
         }
-        if offered.remove_file
-            && ui
-                .button(RichText::new(t.remove_photo_keep_text()).color(text))
-                .clicked()
+        if offered.remove_file && theme::destructive(ui, true, t.remove_photo_keep_text()).clicked()
         {
             clicked = Some(Photo::Remove(hash.clone()));
         }
@@ -684,9 +677,7 @@ pub fn recordings(
             clicked = Some(Recording::Text(asked));
         }
         if offered.remove_file
-            && ui
-                .button(RichText::new(t.remove_recording_keep_text()).color(text))
-                .clicked()
+            && theme::destructive(ui, true, t.remove_recording_keep_text()).clicked()
         {
             clicked = Some(Recording::Remove(hash.clone()));
         }

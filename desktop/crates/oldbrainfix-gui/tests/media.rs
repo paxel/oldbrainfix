@@ -576,7 +576,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
 /// The Settings of `app`, tall enough for the speech model's card.
 fn settings(app: App) -> Harness<'static, App> {
     Harness::builder()
-        .with_size(egui::vec2(1280.0, 1400.0))
+        .with_size(egui::vec2(1280.0, 1600.0))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());

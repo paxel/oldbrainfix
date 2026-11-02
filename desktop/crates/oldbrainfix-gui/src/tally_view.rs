@@ -34,7 +34,7 @@ use crate::schedule_text::{day_text, month_short};
 use crate::setting_badges::BadgeValue::{self, Icon, Text};
 use crate::setting_badges::{badge, badge_row, switch_icon};
 use crate::tally_unit_match::{self, UnitNames};
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The local setting that keeps "Removed entries" open, the phone's.
 pub const REMOVED_OPEN: &str = "tallyRemovedOpen";
@@ -776,17 +776,13 @@ fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIn
     let mut intent = None;
     ui.label(RichText::new(heading).size(18.0).strong().color(text));
     ui.horizontal_wrapped(|ui| {
-        if ui.button(RichText::new(t.save()).color(text)).clicked() {
+        if theme::primary(ui, true, t.save()).clicked() {
             intent = Some(FormIntent::Save);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             intent = Some(FormIntent::Close);
         }
-        if delete
-            && ui
-                .button(RichText::new(t.delete()).color(ui.visuals().error_fg_color))
-                .clicked()
-        {
+        if delete && theme::destructive(ui, true, t.delete()).clicked() {
             intent = Some(FormIntent::Delete);
         }
     });

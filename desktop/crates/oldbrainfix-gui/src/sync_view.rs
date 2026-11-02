@@ -40,7 +40,7 @@ use crate::l10n::L10n;
 use crate::names::area_name;
 use crate::profile_view::{Pictures, display_name, person_picture};
 use crate::schedule_text::schedule_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the user asked for in the view this frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -617,12 +617,12 @@ impl SyncHost {
                             let when = wall(device.last_sync).format("%Y-%m-%d %H:%M").to_string();
                             ui.label(RichText::new(t.paired_last_sync(&when)).small().color(weak));
                             let mut on = store.auto_sync_on(&device.id).unwrap_or(true);
-                            if ui
-                                .checkbox(
-                                    &mut on,
-                                    RichText::new(t.sync_automatically()).color(text),
-                                )
-                                .changed()
+                            if theme::checkbox(
+                                ui,
+                                &mut on,
+                                RichText::new(t.sync_automatically()).color(text),
+                            )
+                            .changed()
                             {
                                 action = Some(SyncAction::AutoSync(device.id.clone(), on));
                             }

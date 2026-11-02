@@ -687,3 +687,18 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
   details how many moved and how many stayed.
+- **Buttons look like buttons** (#218): a rounded rectangle (radius
+  8 px) with a tonal fill and a 1 px outline in light and dark, darker
+  in light and lighter in dark under the pointer, and pressed or holding
+  the keyboard focus a step further with a 2 px ring. The main action of
+  a dialog or page (Save, Create, Done, Use, Restore, Continue) is
+  on the accent with its text in `on_accent`; Delete, Remove and Move to
+  Trash are on the error colour; every other button is secondary. The
+  text on every fill is at least 4.5:1. Links stay links, entries of a
+  menu stay flat, icon-only buttons (⋮, Edit, the view button, the
+  format bar) get the same rounded background under the pointer and the
+  ring while focused, and badges keep their own look (#192). The look
+  lives in `theme.rs`; a screen takes `theme::primary` or
+  `theme::destructive` for the two emphasised kinds, and
+  `theme::checkbox` (or `theme::square_boxes`) for a checkbox, whose
+  box stays square, not round as a radio button.

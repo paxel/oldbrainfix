@@ -11,6 +11,7 @@ use oldbrainfix_core::places::STARTER_SET;
 use crate::backup_view::WelcomeAction;
 use crate::l10n::L10n;
 use crate::names::offered_area_name;
+use crate::theme;
 
 /// Every slug of the Starter Set: what shows ticked at first.
 pub fn all() -> BTreeSet<String> {
@@ -63,10 +64,7 @@ pub fn starter_set(
         ui.add_space(8.0);
         let mut on = picked.contains(area.slug);
         let name = offered_area_name(t, Some(area.slug), area.name);
-        if ui
-            .checkbox(&mut on, RichText::new(name).strong().color(text))
-            .changed()
-        {
+        if theme::checkbox(ui, &mut on, RichText::new(name).strong().color(text)).changed() {
             tick_area(picked, area.slug, on);
         }
         for topic in topics {
@@ -74,10 +72,7 @@ pub fn starter_set(
                 ui.add_space(24.0);
                 let mut on = picked.contains(topic.slug);
                 let name = offered_area_name(t, Some(topic.slug), topic.name);
-                if ui
-                    .checkbox(&mut on, RichText::new(name).color(text))
-                    .changed()
-                {
+                if theme::checkbox(ui, &mut on, RichText::new(name).color(text)).changed() {
                     tick_topic(picked, area.slug, topic.slug, on);
                 }
             });
@@ -85,10 +80,7 @@ pub fn starter_set(
     }
     ui.add_space(12.0);
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.starter_set_done()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.starter_set_done()).clicked() {
             actions.push(WelcomeAction::Plant);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

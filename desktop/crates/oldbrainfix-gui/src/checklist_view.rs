@@ -38,7 +38,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::shopping_view;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
 /// of the Line above it, whether it shows checked and what shows dimmed
@@ -815,12 +815,12 @@ pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Check
         // "Show on the Agenda" before "Uncheck all", as on the phone.
         if i == 1
             && let Some(mut on) = menu.on_agenda
-            && ui
-                .checkbox(
-                    &mut on,
-                    RichText::new(t.checklist_show_on_agenda()).color(text),
-                )
-                .clicked()
+            && theme::checkbox(
+                ui,
+                &mut on,
+                RichText::new(t.checklist_show_on_agenda()).color(text),
+            )
+            .clicked()
         {
             picked = Some(ChecklistAction::ShowOnAgenda(note.clone(), on));
         }

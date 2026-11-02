@@ -345,13 +345,10 @@ fn button(
     });
     if ui.is_rect_visible(rect) {
         let fg = if holds {
-            ui.painter().rect_filled(rect, 6.0, accent);
+            ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, accent);
             theme::on_accent(ui.visuals().dark_mode)
         } else {
-            if resp.hovered() {
-                let fill = ui.visuals().widgets.hovered.weak_bg_fill;
-                ui.painter().rect_filled(rect, 6.0, fill);
-            }
+            theme::icon_button_back(ui, &resp, rect);
             colour
         };
         match format.glyph() {

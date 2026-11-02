@@ -179,8 +179,7 @@ pub fn badge_switch(ui: &mut Ui, t: &L10n, setting: &str, on: &mut bool) -> bool
     let text = ui.visuals().text_color();
     let value = if *on { t.setting_on() } else { t.setting_off() };
     ui.label(RichText::new(value).color(text));
-    ui.checkbox(on, RichText::new(setting).color(text))
-        .changed()
+    theme::checkbox(ui, on, RichText::new(setting).color(text)).changed()
 }
 
 /// Lays `badges` out in one wrapping row, 8 points apart.

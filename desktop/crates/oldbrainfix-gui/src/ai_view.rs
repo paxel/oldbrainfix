@@ -30,7 +30,7 @@ use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::schedule_text::{schedule_text, weekday_long};
 use crate::shopping_view::on_agenda_label;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the user asked of the AI port's card or of the review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -639,10 +639,7 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
                 ui.label(RichText::new(t.ai_port_copied()).small().color(weak));
             }
         }
-        if ui
-            .button(RichText::new(t.ai_port_done()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.ai_port_done()).clicked() {
             asked = Some(AiAction::Done);
         }
     });
@@ -663,21 +660,14 @@ pub fn review_page(
 ) -> Option<String> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let error = ui.visuals().error_fg_color;
     ui.heading(RichText::new(t.ai_review_title()).color(text));
     ui.label(RichText::new(t.ai_review_intro()).color(weak));
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.ai_accept_all()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.ai_accept_all()).clicked() {
             *asked = Some(AiAction::Accept);
         }
-        if ui
-            .button(RichText::new(t.ai_reject_all()).color(error))
-            .clicked()
-        {
+        if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
             *asked = Some(AiAction::AskReject);
         }
     });
