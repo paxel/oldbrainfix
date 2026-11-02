@@ -554,6 +554,38 @@ fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
 }
 
 #[test]
+fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_entry_stores_it_first() -> TestResult
+{
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    // An empty new Line has nothing to act on (#202).
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert!(!shows(&harness, "More: "));
+    type_line(&mut harness, "Tea");
+    assert_eq!(list(&harness, &note)?.count(), 3);
+    click(&mut harness, "More: Tea")?;
+    click(&mut harness, "2 weeks")?;
+    let tea = line_id(&store, &note, "Tea")?;
+    assert_eq!(
+        list(&harness, &note)?.line(&tea).ok_or("Tea")?.reappear,
+        Reappear::Week2
+    );
+
+    to_end_of(&mut harness, "Tea")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Salt");
+    click(&mut harness, "More: Salt")?;
+    click(&mut harness, "Delete")?;
+    click(&mut harness, "Delete")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Tea"]);
+    assert!(!shows(&harness, "More: Salt"));
+    Ok(())
+}
+
+#[test]
 fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
     let (store, note, _) = with_note()?;
     let lists = ShoppingLists::new(&store);

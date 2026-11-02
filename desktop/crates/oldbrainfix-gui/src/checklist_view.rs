@@ -24,7 +24,7 @@
 //! day a struck one comes back under it and a menu of its own, and the
 //! card's menu offers making a Note one (`shopping_view`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
@@ -271,6 +271,51 @@ pub fn steps(list: &Checklist, line: &Line) -> Vec<LineStep> {
         steps.push(LineStep::Indent);
     }
     if line.in_group() {
+        steps.push(LineStep::Outdent);
+    }
+    steps.push(LineStep::Delete);
+    steps
+}
+
+/// The steps the menu of the new Line at `at` of `rows` offers, as if it
+/// were stored where it shows among the stored Lines (#202).
+pub fn new_line_steps(rows: &[TypedLine], at: usize) -> Vec<LineStep> {
+    // The stored Lines and it: whether each is it, and in a group.
+    let lines: Vec<(bool, bool)> = rows
+        .iter()
+        .enumerate()
+        .filter(|(i, r)| *i == at || r.id.is_some())
+        .map(|(i, r)| (i == at, r.in_group))
+        .collect();
+    let Some(me) = lines.iter().position(|(it, _)| *it) else {
+        return Vec::new();
+    };
+    let in_group = lines[me].1 && me > 0;
+    // Its level: the Lines of its group, or those at the top.
+    let level: Vec<usize> = if in_group {
+        let head = lines[..me].iter().rposition(|(_, g)| !g).unwrap_or(0);
+        (head + 1..lines.len())
+            .take_while(|&i| lines[i].1)
+            .collect()
+    } else {
+        (0..lines.len())
+            .filter(|&i| i == me || !lines[i].1)
+            .collect()
+    };
+    let Some(on) = level.iter().position(|&i| i == me) else {
+        return Vec::new();
+    };
+    let mut steps = Vec::new();
+    if on > 0 {
+        steps.push(LineStep::Up);
+    }
+    if on + 1 < level.len() {
+        steps.push(LineStep::Down);
+    }
+    if !in_group && me > 0 {
+        steps.push(LineStep::Indent);
+    }
+    if in_group {
         steps.push(LineStep::Outdent);
     }
     steps.push(LineStep::Delete);
@@ -688,6 +733,15 @@ pub fn section(
             .filter(|r| in_place(r))
             .map(|r| r.key)
             .collect();
+        let menus = typed.with_menus(&shown.editable);
+        // A new Line's ⋮ offers what it would once stored where it shows.
+        let new_steps: HashMap<String, Vec<LineStep>> = typed
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| menus.contains(&r.shown_id()) && r.id.is_none())
+            .map(|(at, r)| (r.shown_id(), new_line_steps(&typed.rows, at)))
+            .collect();
         let mut typing = Vec::new();
         let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
             let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
@@ -706,13 +760,16 @@ pub fn section(
             );
             true
         };
-        let steps = |id: &str| list.line(id).map(|l| steps(list, l)).unwrap_or_default();
+        let steps = |id: &str| match list.line(id) {
+            Some(line) => steps(list, line),
+            None => new_steps.get(id).cloned().unwrap_or_default(),
+        };
         lines(
             ui,
             (t, tones),
             &rows,
             (shown.checks, list.on.as_ref()),
-            (Some((&shown.editable, &steps)), Some(&mut field)),
+            (Some((&menus, &steps)), Some(&mut field)),
             actions,
         );
         actions.extend(typing.into_iter().map(ChecklistAction::Typed));

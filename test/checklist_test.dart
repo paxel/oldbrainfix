@@ -549,6 +549,38 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
     });
 
+    testWidgets('a Line just typed has its ⋮ once it holds text, and each '
+        'entry stores it first (#202)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final eggs = idOf(note, 'Eggs');
+
+      // An empty new Line has nothing to act on.
+      await type(tester, eggs, 'Eggs\n', 5);
+      expect(key('checklist-menu-new-1'), findsNothing);
+      await type(tester, 'new-1', 'Tea', 3);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(key('checklist-menu-new-1'), findsOneWidget);
+      await lineMenu(tester, 'new-1');
+      await tap(tester, key('checklist-up'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs']);
+
+      await type(tester, eggs, 'Eggs\n', 5);
+      await type(tester, 'new-2', 'Soap', 4);
+      await lineMenu(tester, 'new-2');
+      await tap(tester, key('checklist-indent'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
+
+      await type(tester, idOf(note, 'Soap'), 'Soap\n', 5);
+      await type(tester, 'new-3', 'Salt', 4);
+      await lineMenu(tester, 'new-3');
+      await tap(tester, key('checklist-delete'));
+      await tap(tester, key('checklist-delete-confirm'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
+      expect(key('checklist-field-new-3'), findsNothing);
+    });
+
     testWidgets('checks and "Uncheck all" there too, "Back to a plain Note" '
         'in its kind badge; the field then holds the whole text', (
       tester,

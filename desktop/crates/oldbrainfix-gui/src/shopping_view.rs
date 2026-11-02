@@ -200,10 +200,8 @@ pub fn section(
             let current = list.line(id).map_or(Reappear::STANDARD, |l| l.reappear);
             line_menu(ui, t, current)
         };
-        let menus = (
-            &shown.editable,
-            &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>,
-        );
+        let menued = typed.with_menus(&shown.editable);
+        let menus = (&menued, &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>);
         let lines = shown_lines(t, list);
         let rows: Vec<ShownLine> = typed
             .rows

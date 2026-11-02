@@ -493,6 +493,32 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
     });
 
+    testWidgets('a Line just typed has its ⋮ once it holds text, and each '
+        'entry stores it first (#202)', (tester) async {
+      final note = notes.capture('Shop\nMilk').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+
+      // An empty new Line has nothing to act on.
+      await type(tester, milk, 'Milk\n', 5);
+      expect(key('checklist-menu-new-1'), findsNothing);
+      await type(tester, 'new-1', 'Tea', 3);
+      expect(shown(note), ['Milk']);
+      expect(key('checklist-menu-new-1'), findsOneWidget);
+      await lineMenu(tester, 'new-1');
+      await tap(tester, key('shopping-reappear-2w'));
+      expect(lineOf(note, 'Tea').reappear, Reappear.week2);
+
+      await type(tester, idOf(note, 'Tea'), 'Tea\n', 4);
+      await type(tester, 'new-2', 'Salt', 4);
+      await lineMenu(tester, 'new-2');
+      await tap(tester, key('shopping-delete'));
+      await tap(tester, key('checklist-delete-confirm'));
+      expect(shown(note), ['Milk', 'Tea']);
+      expect(key('shopping-field-new-2'), findsNothing);
+    });
+
     testWidgets('a Line is renamed in place, kept on leaving; one emptied '
         'goes', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs\nTea').id;

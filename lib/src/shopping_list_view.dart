@@ -332,8 +332,11 @@ class _ShoppingSectionState extends State<ShoppingSection>
       ? context.t.shoppingOnce
       : context.t.shoppingWeeks(reappear.weeks);
 
-  Future<void> _menu(String id, Offset at) async {
-    // What was typed is stored first, so the menu sees the list as shown.
+  Future<void> _menu(String shown, Offset at) async {
+    // A new Line is stored first, and what was typed, so the menu sees
+    // the list as shown.
+    final id = storedId(shown);
+    if (id == null) return;
     keepTyped(leaving: false);
     final line = _lists.byNote(widget.noteId, deviceWallClock)?.line(id);
     if (line == null) return;
@@ -431,7 +434,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
           lines: [for (final row in rows) shownRow(row)],
           onCheck: _checks ? _check : null,
           onMenu: _menu,
-          editable: _editable,
+          editable: withMenus(_editable),
           field: (shown) => typedField(
             shown,
             prefix: 'shopping',

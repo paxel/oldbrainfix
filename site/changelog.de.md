@@ -13,6 +13,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop liest der KI-Port Namen und Beschreibung einer Notiz einer Art und kann eine Checkliste zur Einkaufsliste machen oder zurück, als Änderung, die auf die Prüfung wartet.
 - Auf dem Telefon und dem Desktop klingelt eine ganztägige Routine oder Erinnerung ab 15:00, wo sie ab 09:00 klingelte und dann den ganzen Tag erneut erinnerte; vorher steht sie nur auf der Agenda. Die Uhrzeit wird für jedes Gerät in den Einstellungen unter Alarme eingestellt, „Ganztägiges erinnert ab“. Fällt sie in die Ruhezeit, wartet ihr erstes Klingeln, bis die Ruhezeit endet. Eine Kalenderdatei aus Exportieren oder Teilen gibt einem ganztägigen Termin seinen Alarm zur selben Uhrzeit, und read_settings des KI-Ports nennt sie.
 
+### Behoben
+
+- Auf dem Telefon und dem Desktop zeigt eine Zeile, die gerade in eine Checkliste oder eine Einkaufsliste im Notiz-Editor getippt wurde, ihr ⋮, sobald sie Text hat, wo es erst nach Eingabetaste und Rücktaste erschien. Ein Eintrag ihres ⋮ speichert die Zeile zuerst und handelt dann; eine leere neue Zeile hat kein ⋮.
+
 ## [0.3.1] - 2026-11-01
 
 ### Geändert

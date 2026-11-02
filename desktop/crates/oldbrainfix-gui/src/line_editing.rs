@@ -179,6 +179,22 @@ impl TypedLines {
         self.rows.iter().find(|r| r.shown_id() == id)
     }
 
+    /// The Lines with ⋮, by the id they show under: `editable`, and the
+    /// new ones that hold text, stored as an entry of their ⋮ is used
+    /// (#202). An empty new one has none.
+    pub fn with_menus(&self, editable: &HashSet<String>) -> HashSet<String> {
+        let mut menus = editable.clone();
+        if self.adds {
+            menus.extend(
+                self.rows
+                    .iter()
+                    .filter(|r| r.id.is_none() && !r.typed().is_empty())
+                    .map(TypedLine::shown_id),
+            );
+        }
+        menus
+    }
+
     /// Takes the Lines of the Note `note` as they are read now, keeping
     /// what is typed into them, and as `rights` allow an empty row to
     /// type in where none of them can be. Another Note starts afresh.

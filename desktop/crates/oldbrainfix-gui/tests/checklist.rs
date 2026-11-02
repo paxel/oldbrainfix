@@ -519,6 +519,46 @@ fn the_line_menu_moves_indents_and_deletes_after_asking() -> TestResult {
 }
 
 #[test]
+fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_step_stores_it_first() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    // An empty new Line has nothing to act on (#202).
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert!(!shows(&harness, "More: "));
+    type_in(&mut harness, "Seat");
+    assert_eq!(list(&harness, &note)?.count(), 3);
+    line_step(&mut harness, "Seat", "Move up")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket"]
+    );
+
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Enter);
+    type_in(&mut harness, "Window");
+    line_step(&mut harness, "Window", "Put under the Line above")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket", "  Window"]
+    );
+
+    into_line(&mut harness, "Window")?;
+    press(&mut harness, egui::Key::Enter);
+    type_in(&mut harness, "Bag");
+    line_step(&mut harness, "Bag", "Delete")?;
+    click(&mut harness, "Delete")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket", "  Window"]
+    );
+    assert!(!shows(&harness, "More: Bag"));
+    Ok(())
+}
+
+#[test]
 fn back_to_a_plain_note_marks_the_checked_lines_and_indents_the_groups() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;

@@ -552,8 +552,11 @@ class _ChecklistSectionState extends State<ChecklistSection>
     _lists.indent(line.id);
   }
 
-  Future<void> _menu(String id, Offset at) async {
-    // What was typed is stored first, so the menu sees the list as shown.
+  Future<void> _menu(String shown, Offset at) async {
+    // A new Line is stored first, and what was typed, so the menu sees
+    // the list as shown.
+    final id = storedId(shown);
+    if (id == null) return;
     keepTyped(leaving: false);
     final list = _lists.shownNow(widget.noteId, deviceWallClock);
     final line = list?.line(id);
@@ -681,7 +684,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
               ],
               onCheck: _checks ? _check : null,
               onMenu: _menu,
-              editable: _editable,
+              editable: withMenus(_editable),
               field: _adds ? _field : null,
               compact: true,
             ),

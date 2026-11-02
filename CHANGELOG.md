@@ -14,6 +14,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop the AI port reads the name and description of a Note of a kind, and can turn a Checklist into a Shopping List or back as a change that waits for the review.
 - On the phone and the desktop, an all-day Routine or Reminder rings from 15:00, where it rang from 09:00 and then Re-nagged all day; before that time it only shows on the Agenda. The time is set for each Device in Settings under Alarms, "All-day items remind from". When the Quiet Hours hold that time, its first ring waits until they end. A calendar file from Export or Share gives an all-day event its alarm at the same time, and the AI port's read_settings lists it.
 
+### Fixed
+
+- On the phone and the desktop, a Line just typed into a Checklist or a Shopping List in the Note editor shows its ⋮ as soon as it holds text, where it showed only after Return and Backspace. An entry of its ⋮ stores the Line first, then acts; an empty new Line has no ⋮.
+
 ---
 
 Historical changes have been moved to [OLDER_CHANGES.md](OLDER_CHANGES.md).

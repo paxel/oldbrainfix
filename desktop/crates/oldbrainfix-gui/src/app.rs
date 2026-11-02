@@ -5791,8 +5791,11 @@ impl App {
             }
             ChecklistAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ChecklistAction::Step(id, step) => {
-                // What was typed is stored first, so the step sees the
-                // list as shown.
+                // A new Line is stored first, and what was typed, so the
+                // step sees the list as shown (#202).
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &id)? else {
+                    return Ok(());
+                };
                 self.lines.keep(&self.store, &*self.wall)?;
                 let Some((list, line)) = self.line_of(&id)? else {
                     return Ok(());
@@ -5847,6 +5850,10 @@ impl App {
             }
             ShoppingAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ShoppingAction::Step(id, step) => {
+                // A new Line is stored first, and what was typed (#202).
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &id)? else {
+                    return Ok(());
+                };
                 self.lines.keep(&self.store, &*self.wall)?;
                 if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
                     return Ok(());
