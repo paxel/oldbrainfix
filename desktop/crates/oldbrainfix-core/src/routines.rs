@@ -649,6 +649,37 @@ impl<'a> Routines<'a> {
         })
     }
 
+    /// What the cards tick today (#215), by the id of the Note each
+    /// Routine and Reminder shows under, with days as `wall` shows them:
+    /// of each with an Occurrence today, in the order of today's Agenda,
+    /// its first one today not Done, else its last one today, Done. Read
+    /// once for all the cards of a list; the Notes in the order their
+    /// first Routine comes.
+    pub fn today_by_note(&self, wall: &WallClock) -> Result<Vec<(String, Vec<AgendaRow>)>> {
+        let mut by_routine: Vec<AgendaRow> = Vec::new();
+        for row in self.agenda(wall)?.today_rows {
+            match by_routine
+                .iter_mut()
+                .find(|held| held.routine.id == row.routine.id)
+            {
+                None => by_routine.push(row),
+                Some(held) if held.done().is_some() => *held = row,
+                Some(_) => {}
+            }
+        }
+        let mut by_note: Vec<(String, Vec<AgendaRow>)> = Vec::new();
+        for row in by_routine {
+            let Some(id) = row.note.as_ref().map(|n| n.id.clone()) else {
+                continue;
+            };
+            match by_note.iter_mut().find(|(held, _)| *held == id) {
+                Some((_, rows)) => rows.push(row),
+                None => by_note.push((id, vec![row])),
+            }
+        }
+        Ok(by_note)
+    }
+
     /// Writes the fields of `schedule` that differ from what is there.
     pub(crate) fn write_schedule(&self, id: &str, schedule: &Schedule) -> Result<()> {
         let current = self.store.current_fields(id)?;
@@ -828,6 +859,40 @@ mod tests {
         let before = store.all_entries()?.len();
         routines.reschedule(&routine.id, &daily_at_eight())?;
         assert_eq!(store.all_entries()?.len(), before);
+        Ok(())
+    }
+
+    #[test]
+    fn a_card_ticks_the_first_open_occurrence_today_else_the_last_done() -> Result<()> {
+        let store = crate::store::tests::store();
+        let routines = Routines::new(&store);
+        let wall = |utc: DateTime<Utc>| utc.naive_utc();
+        let times: Vec<ClockTime> = [ClockTime::new(8, 0), ClockTime::new(20, 0)]
+            .into_iter()
+            .flatten()
+            .collect();
+        let rule = Recurrence::every(Frequency::Daily, 1);
+        let Some(schedule) = Schedule::new(Day::new(2026, 1, 1), &times, Some(rule)) else {
+            panic!("a schedule");
+        };
+        let routine = routines.create("pills", &schedule)?;
+        let note = routine.note_id.clone();
+        let ticked = || -> Result<Vec<(String, bool)>> {
+            let by_note = routines.today_by_note(&wall)?;
+            let rows = by_note.iter().find(|(id, _)| *id == note);
+            Ok(rows
+                .map(|(_, rows)| rows.as_slice())
+                .unwrap_or_default()
+                .iter()
+                .map(|r| (r.occurrence.key(), r.done().is_some()))
+                .collect())
+        };
+        assert_eq!(ticked()?, [("2026-01-01T08:00".to_string(), false)]);
+        let at = |hour| Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(hour, 0));
+        routines.mark_done(&routine.id, &at(8), None)?;
+        assert_eq!(ticked()?, [("2026-01-01T20:00".to_string(), false)]);
+        routines.mark_done(&routine.id, &at(20), None)?;
+        assert_eq!(ticked()?, [("2026-01-01T20:00".to_string(), true)]);
         Ok(())
     }
 

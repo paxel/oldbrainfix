@@ -646,6 +646,12 @@ List<Widget> diaryCards(
   // What their compact cards say of a Tally or a Session (#189), read
   // when the first compact card asks.
   final glances = CardGlances.inContext(context, notes.store);
+  // Today's Occurrences of their Routines and Reminders (#215), read in
+  // one pass when the first card asks.
+  final routines = Routines(notes.store);
+  Map<String, List<AgendaRow>>? today;
+  List<AgendaRow> todayOf(Note note) =>
+      (today ??= routines.todayByNote(deviceWallClock))[note.id] ?? const [];
   return [
     for (final placed in shown)
       if (placed case (
@@ -687,6 +693,7 @@ List<Widget> diaryCards(
           glance: () => glances.of(note.id),
           boxes: boxTicks(notes, placed, onChanged),
           onTable: tableEdit(notes, placed, onChanged),
+          occurrences: (read: () => todayOf(note), routines: routines),
           onTap: onSwitch == null ? null : () => onSwitch(note),
           onEdit: () => onOpen(note),
         ),

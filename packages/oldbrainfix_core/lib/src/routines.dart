@@ -550,6 +550,24 @@ class Routines {
     );
   }
 
+  /// What the cards tick today (#215), by the id of the Note each
+  /// Routine and Reminder shows under, with days as [wallClock] shows
+  /// them: of each with an Occurrence today, in the order of today's
+  /// Agenda, its first one today not Done, else its last one today, Done.
+  /// Read once for all the cards of a list.
+  Map<String, List<AgendaRow>> todayByNote(WallClock wallClock) {
+    final byRoutine = <String, AgendaRow>{};
+    for (final row in agenda(wallClock).todayRows) {
+      final held = byRoutine[row.routine.id];
+      if (held == null || held.done != null) byRoutine[row.routine.id] = row;
+    }
+    final byNote = <String, List<AgendaRow>>{};
+    for (final row in byRoutine.values) {
+      if (row.note case final note?) (byNote[note.id] ??= []).add(row);
+    }
+    return byNote;
+  }
+
   /// Writes the fields of [schedule] that differ from what is there.
   void _writeSchedule(String id, Schedule schedule) {
     final current = store.currentFields(id);

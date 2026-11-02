@@ -4870,4 +4870,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hideCheckedOnAgendaDetail =>
       'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.';
+
+  @override
+  String occurrenceDue(String when) {
+    return 'Due $when';
+  }
+
+  @override
+  String occurrenceMissedAt(String when) {
+    return 'Missed $when';
+  }
+
+  @override
+  String get doneAndTrash => 'Done and move to trash';
 }

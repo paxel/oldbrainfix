@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'area_look.dart';
 import 'calendar_platform.dart';
+import 'card_occurrences.dart';
 import 'checklist_view.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -317,6 +318,11 @@ class NoteCard extends StatelessWidget {
   /// 0033); the table is only read there when null, as a Section's.
   final TableEditing? onTable;
 
+  /// Today's Occurrences of the Note's Routines and Reminders, a box for
+  /// each in either view that ticks it as on the Agenda (#215); none when
+  /// null.
+  final NoteOccurrences? occurrences;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -352,6 +358,7 @@ class NoteCard extends StatelessWidget {
     this.glance,
     this.boxes,
     this.onTable,
+    this.occurrences,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -496,6 +503,9 @@ class NoteCard extends StatelessWidget {
             header,
           const Divider(height: 24),
         ],
+        // Under where it is filed, over its text (#215).
+        if (occurrences case final occurrences?)
+          CardOccurrences(noteId: note.id, occurrences: occurrences),
         if (full)
           // With nothing over its text it starts with it, the Important
           // marker beside it.

@@ -2050,6 +2050,20 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
     let missed = alarms.missed(&berlin)?;
     let nudge = alarms.nudge(&berlin)?;
     let later = now + Duration::hours(3);
+    let mut open_of = serde_json::Map::new();
+    for note in Notes::new(store).all()? {
+        let open: Vec<Value> = alarms
+            .open_of(&note.id, &berlin)?
+            .iter()
+            .map(|o| json!([o.routine.id, o.occurrence.key(), o.missed]))
+            .collect();
+        open_of.insert(note.id, json!(open));
+    }
+    let today_by_note: Vec<Value> = Routines::new(store)
+        .today_by_note(&berlin)?
+        .iter()
+        .map(|(id, rows)| json!([id, rows_json(rows)]))
+        .collect();
     Ok(json!({
         "now": dart_iso(now),
         "local": local,
@@ -2095,6 +2109,8 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
         "recentlyDone": alarms.recently_done(&berlin)?.iter()
             .map(|(id, o)| json!([id, o.key()]))
             .collect::<Vec<_>>(),
+        "openOf": open_of,
+        "todayByNote": today_by_note,
     }))
 }
 
@@ -2140,6 +2156,8 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
             "missed",
             "nudge",
             "recentlyDone",
+            "openOf",
+            "todayByNote",
         ] {
             assert_eq!(ours[key], check[key], "{} {key}", check["now"]);
         }

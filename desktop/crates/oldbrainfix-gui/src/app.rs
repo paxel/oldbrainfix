@@ -93,11 +93,11 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
-    ListOnAgenda, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
-    PersonFilter, Places, Profile, QuickNoteControl, QuietHours, Routine, RoutineOccurrence,
-    Routines, Search, Section, SessionSetup, Sessions, ShoppingLine, ShoppingList, ShoppingLists,
-    ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic, UnitSystem, bundle, markdown,
-    text_format,
+    ListOnAgenda, MissedSummary, Note, Notes, NotesGo, Occurrence, OpenOccurrence, OwnProfile,
+    Person, PersonFilter, Places, Profile, QuickNoteControl, QuietHours, Routine,
+    RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
+    UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -112,6 +112,7 @@ use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
 use crate::card_glance;
+use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
 use crate::enrich::Enricher;
@@ -505,6 +506,13 @@ struct View {
     capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
+    /// What the selected Note asks to check off now (#215): of each of
+    /// them this Device may check off, the Occurrence due, else the
+    /// latest Missed one.
+    open: Vec<OpenOccurrence>,
+    /// Today's Occurrences of the Routines and Reminders of each Note
+    /// listed, read in one pass for the boxes on their cards (#215).
+    card_today: HashMap<String, Vec<CardOccurrence>>,
     /// How many of them a newer version of the app saved the schedule of,
     /// which shows only that (ADR 0034).
     newer_routines: usize,
@@ -1098,6 +1106,10 @@ enum Action {
     Toggle(String, Occurrence),
     /// Checks off a Missed Occurrence: Done, late.
     CheckMissed(String, Occurrence),
+    /// "Done and move to trash" at the top of the Note dialog (#215):
+    /// checks off the Occurrence of the open Note's one Reminder, moves
+    /// the Note with it to the trash and closes the dialog.
+    DoneAndTrash(String, Occurrence),
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
@@ -4130,6 +4142,13 @@ impl App {
         } else {
             notes.sections_of(&listed)?
         };
+        // A Note in the trash ticks nothing.
+        let card_today = if listed.is_empty() || self.selection == Selection::Trash {
+            HashMap::new()
+        } else {
+            let today = routines.today_by_note(&*self.wall)?;
+            card_occurrences::read(store, today, &listed)?
+        };
         let lists = Checklists::new(store);
         let mut checklists = BTreeMap::new();
         if !listed.is_empty() {
@@ -4254,6 +4273,16 @@ impl App {
             ),
             _ => (Vec::new(), 0),
         };
+        let mut open = Vec::new();
+        if let Some((p, _)) = &detail
+            && !p.note.is_trashed()
+        {
+            for o in Alarms::new(store).open_of(&p.note.id, &*self.wall)? {
+                if store.may_check_off(&o.routine.id)? {
+                    open.push(o);
+                }
+            }
+        }
         let mut note_frogs = Vec::new();
         if let Some((p, _)) = &detail
             && !p.note.is_trashed()
@@ -4672,6 +4701,8 @@ impl App {
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
             capture_quick: QuickNote::read(&self.store)?,
             routines: note_routines,
+            open,
+            card_today,
             newer_routines,
             note_frogs,
             tally,
@@ -5243,6 +5274,13 @@ impl App {
             }
             Action::CheckMissed(routine, occurrence) => {
                 Routines::new(&self.store).mark_done(&routine, &occurrence, None)?;
+            }
+            Action::DoneAndTrash(routine, occurrence) => {
+                self.leave_note()?;
+                let routines = Routines::new(&self.store);
+                routines.mark_done(&routine, &occurrence, None)?;
+                // The Reminder goes with it, and comes back with it.
+                routines.trash_note(&selected, true)?;
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -9135,6 +9173,7 @@ impl App {
                         ticks: &self.view.box_ticks,
                         show: self.view.show_ticks.contains(id),
                     },
+                    today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
                 };
                 let clicks = note_card(
                     ui,
@@ -9173,6 +9212,9 @@ impl App {
                     actions.push(picked);
                 } else if let Some(tag) = clicks.tag {
                     actions.push(Action::SearchFor(tag));
+                } else if let Some((routine, occurrence)) = clicks.occurrence {
+                    // As the Agenda row's box: it opens nothing (#215).
+                    actions.push(Action::Toggle(routine, occurrence));
                 } else if let Some((entity, asked)) = clicks.tick {
                     actions.push(box_action(entity, asked));
                 } else if let Some(opening) = clicks.table {
@@ -9410,12 +9452,26 @@ impl App {
         let ticked = ticked_in(&note.boxes);
         let show_ticks = self.view.show_ticks.contains(&note.id);
         let has_boxes = !note.boxes.is_empty() || sections.iter().any(|s| !s.boxes.is_empty());
+        let open = &self.view.open;
+        let today = Day::today(store.now(), &*self.wall);
+        // Its one Reminder goes with it, where this Device moves it.
+        let trashes = may.changes && linked.len() == 1;
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
+                // At the top, over its name (#215).
+                match card_occurrences::open_lines(ui, &t, open, (today, trashes)) {
+                    Some(OpenAsked::Done(routine, occurrence)) => {
+                        actions.push(Action::CheckMissed(routine, occurrence));
+                    }
+                    Some(OpenAsked::DoneAndTrash(routine, occurrence)) => {
+                        actions.push(Action::DoneAndTrash(routine, occurrence));
+                    }
+                    None => {}
+                }
                 embossed(ui, tones, false, None, |ui| {
                     // A Member reads someone else's Note (ADR 0013); a text
                     // in a format not known here shows as it is stored
@@ -14365,6 +14421,9 @@ struct CardLook<'a> {
     /// them this Device may tick, and whether Show ticks is on for it
     /// (ADR 0035).
     boxes: CardBoxes<'a>,
+    /// Today's Occurrences of its Routines and Reminders, a box for each
+    /// that ticks it as on the Agenda (#215).
+    today: &'a [CardOccurrence],
 }
 
 /// The folds of a card this Device keeps open (UI laws, "Lists"; #189):
@@ -14410,6 +14469,8 @@ struct CardClicks {
     folded: Option<(String, bool)>,
     photo: Option<String>,
     check: Option<(String, bool)>,
+    /// The box of today's Occurrence clicked, by its Routine (#215).
+    occurrence: Option<(String, Occurrence)>,
     /// What a click on a box of the Note's text or a Section's asked,
     /// with that text's id (ADR 0035).
     tick: Option<(String, BoxAsk)>,
@@ -15262,6 +15323,8 @@ fn note_card(
     let mut tally_rect = None;
     let mut tally_asked = Vec::new();
     let mut session_asked = Vec::new();
+    // Where the boxes of today's Occurrences lie (#215).
+    let mut today_rects = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -15337,6 +15400,8 @@ fn note_card(
                 });
             }
             ui.separator();
+            // Under where it is filed, over its text (#215).
+            today_rects = card_occurrences::card_rows(ui, t, tones, look.today);
             if look.full {
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
@@ -15706,6 +15771,8 @@ fn note_card(
     let checks = look.checklist.is_some_and(|(_, checks)| checks)
         || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
+    let occurrence =
+        card_occurrences::card_clicks(ui, (t, tones), &note.id, look.today, &today_rects);
     // Sections have no edit of their text: their marks only show. A
     // table opens full screen, to edit where its marks may change (#128);
     // taken first, its marks, tags and links keep their clicks.
@@ -15760,6 +15827,7 @@ fn note_card(
         folded,
         photo,
         check,
+        occurrence,
         tick,
         table,
         tag,

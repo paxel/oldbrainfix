@@ -25,6 +25,7 @@ pub mod backup_view;
 pub mod backups;
 pub mod capture_choices;
 pub mod card_glance;
+pub mod card_occurrences;
 pub mod card_selection;
 pub mod checklist_view;
 pub mod cli;

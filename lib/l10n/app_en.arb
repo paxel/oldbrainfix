@@ -2583,5 +2583,11 @@
   "hideCheckedOnAgenda": "Hide what's checked on the Agenda",
   "@hideCheckedOnAgenda": {"description": "The switch in Settings > Agenda that hides what is checked on the Agenda instead of striking it through (#217)."},
   "hideCheckedOnAgendaDetail": "A Done Occurrence, a checked Line and a Session's pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.",
-  "@hideCheckedOnAgendaDetail": {"description": "Under the switch hideCheckedOnAgenda on the phone."}
+  "@hideCheckedOnAgendaDetail": {"description": "Under the switch hideCheckedOnAgenda on the phone."},
+  "occurrenceDue": "Due {when}",
+  "@occurrenceDue": {"description": "At the top of the Note editor (#215): an Occurrence of the Note's Routine or Reminder that is due now, with its time (\"Due 15:00\"), before the Done button.", "placeholders": {"when": {"type": "String"}}},
+  "occurrenceMissedAt": "Missed {when}",
+  "@occurrenceMissedAt": {"description": "At the top of the Note editor (#215): the latest Missed Occurrence of the Note's Routine or Reminder, with its day and time, before the Done button.", "placeholders": {"when": {"type": "String"}}},
+  "doneAndTrash": "Done and move to trash",
+  "@doneAndTrash": {"description": "At the top of the Note editor (#215), beside Done for a one-time Reminder: checks it off and moves the Note with it to the trash."}
 }

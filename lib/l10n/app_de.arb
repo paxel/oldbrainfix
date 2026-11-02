@@ -1313,5 +1313,8 @@
   "settingOff": "Aus",
   "settingsAgenda": "Agenda",
   "hideCheckedOnAgenda": "Abgehaktes auf der Agenda ausblenden",
-  "hideCheckedOnAgendaDetail": "Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen."
+  "hideCheckedOnAgendaDetail": "Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.",
+  "occurrenceDue": "Fällig {when}",
+  "occurrenceMissedAt": "Verpasst {when}",
+  "doneAndTrash": "Erledigt und in den Papierkorb"
 }

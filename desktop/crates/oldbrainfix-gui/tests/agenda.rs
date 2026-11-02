@@ -61,6 +61,12 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// How many labels say "All day": the Routine editor's, and the time of
+/// an all-day Occurrence's box on a card behind it (#215).
+fn all_day(harness: &Harness<'_, App>) -> usize {
+    harness.query_all_by_label("All day").count()
+}
+
 /// The text field whose hint is `hint`.
 fn field<'a>(harness: &'a Harness<'_, App>, hint: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by(move |n| n.placeholder() == Some(hint))
@@ -321,6 +327,7 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     harness.run();
     edit(&harness, "Another thought").click();
     harness.run();
+    let behind = all_day(&harness);
     // The "+" badge of the Note dialog (#160).
     harness
         .get_by_label("Routine, Reminder, Frog or Session")
@@ -336,12 +343,12 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     assert!(shows(&harness, "From the Note"));
     // All day to start with; the time field holds the current time,
     // 12:00 in Berlin, which is typed over with 20:00 and added.
-    assert!(shows(&harness, "All day"));
+    assert!(all_day(&harness) > behind);
     type_over(&mut harness, "12:00", "20:00");
     harness.get_by_label("Add a time").click();
     harness.run();
     assert!(shows(&harness, "Remove 20:00"));
-    assert!(!shows(&harness, "All day"));
+    assert_eq!(all_day(&harness), behind);
     // The field holds the current time again, which "Add" takes as is.
     holding(&harness, "12:00");
     harness.get_by_label("Add a time").click();
@@ -401,6 +408,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     harness.run();
     edit(&harness, "Another thought").click();
     harness.run();
+    let behind = all_day(&harness);
     harness
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
@@ -415,7 +423,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     // 13:00, the next full hour after 12:00 in Berlin; with its one time
     // there is no time field.
     assert!(shows(&harness, "Remove 13:00"));
-    assert!(!shows(&harness, "All day"));
+    assert_eq!(all_day(&harness), behind);
     assert!(
         harness
             .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some("12:00"))
@@ -425,7 +433,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     // Without it, the field shows, holding the current time.
     harness.get_by_label("Remove 13:00").click();
     harness.run();
-    assert!(shows(&harness, "All day"));
+    assert!(all_day(&harness) > behind);
     holding(&harness, "12:00");
     Ok(())
 }

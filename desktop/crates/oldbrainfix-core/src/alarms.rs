@@ -433,6 +433,53 @@ pub fn missed_summary(
     }
 }
 
+/// An Occurrence that asks to be checked off: due now, or `missed`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenOccurrence {
+    pub routine: Routine,
+    pub occurrence: Occurrence,
+    pub missed: bool,
+}
+
+/// For each of `routines`, in their order, the Occurrence that asks to be
+/// checked off at `now` (#215): the one due now, started and not yet
+/// Missed, else the latest Missed one, whether the Missed Summary was
+/// "seen" or not, within [`ALARM_HORIZON_DAYS`]; none when neither is
+/// open. What is Done, from its check-off, its entries or its Lines, asks
+/// for nothing.
+pub fn open_occurrences(
+    routines: &[Routine],
+    now: DateTime<Utc>,
+    wall: &WallClock,
+    all_day_from: ClockTime,
+) -> Vec<OpenOccurrence> {
+    let today = Day::today(now, wall);
+    let from = today.add_days(-ALARM_HORIZON_DAYS);
+    let mut out = Vec::new();
+    for routine in routines {
+        let mut due = None;
+        let mut missed = None;
+        for t in timed(routine, from, today, wall, all_day_from) {
+            if routine.done_at(&t.occurrence).is_some() || t.start > now {
+                continue;
+            }
+            if t.ends_at > now {
+                due = Some(t.occurrence);
+            } else {
+                missed = Some(t.occurrence);
+            }
+        }
+        if let Some(occurrence) = due.or(missed) {
+            out.push(OpenOccurrence {
+                routine: routine.clone(),
+                occurrence,
+                missed: due.is_none(),
+            });
+        }
+    }
+    out
+}
+
 /// This Device's alarms: its snoozes, the plan over the store, and what a
 /// notification's Done and Snooze leave to be applied.
 pub struct Alarms<'a> {
@@ -559,6 +606,20 @@ impl<'a> Alarms<'a> {
         Ok(missed_summary(
             &routines,
             settings.missed_seen()?,
+            self.store.now(),
+            wall,
+            settings.all_day_from()?,
+        ))
+    }
+
+    /// What the Note `note_id` asks to check off at the store's now
+    /// ([`open_occurrences`]): of each of its Routines and Reminders the
+    /// Occurrence due, else the latest Missed one.
+    pub fn open_of(&self, note_id: &str, wall: &WallClock) -> Result<Vec<OpenOccurrence>> {
+        let routines = Routines::new(self.store).of_note(note_id)?;
+        let settings = DeviceSettings::new(self.store);
+        Ok(open_occurrences(
+            &routines,
             self.store.now(),
             wall,
             settings.all_day_from()?,

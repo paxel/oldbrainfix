@@ -7933,6 +7933,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.'**
   String get hideCheckedOnAgendaDetail;
+
+  /// At the top of the Note editor (#215): an Occurrence of the Note's Routine or Reminder that is due now, with its time ("Due 15:00"), before the Done button.
+  ///
+  /// In en, this message translates to:
+  /// **'Due {when}'**
+  String occurrenceDue(String when);
+
+  /// At the top of the Note editor (#215): the latest Missed Occurrence of the Note's Routine or Reminder, with its day and time, before the Done button.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed {when}'**
+  String occurrenceMissedAt(String when);
+
+  /// At the top of the Note editor (#215), beside Done for a one-time Reminder: checks it off and moves the Note with it to the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Done and move to trash'**
+  String get doneAndTrash;
 }
 
 class _AppLocalizationsDelegate

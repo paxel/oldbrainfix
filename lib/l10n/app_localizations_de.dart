@@ -4932,4 +4932,17 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get hideCheckedOnAgendaDetail =>
       'Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.';
+
+  @override
+  String occurrenceDue(String when) {
+    return 'Fällig $when';
+  }
+
+  @override
+  String occurrenceMissedAt(String when) {
+    return 'Verpasst $when';
+  }
+
+  @override
+  String get doneAndTrash => 'Erledigt und in den Papierkorb';
 }

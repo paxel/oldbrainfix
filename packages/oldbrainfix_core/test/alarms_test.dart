@@ -667,5 +667,87 @@ void main() {
         expect(alarms.missed(europe).count, alarmHorizonDays);
       });
     });
+
+    group('what a Note asks to check off (#215)', () {
+      List<String> open(String noteId) => [
+        for (final o in alarms.openOf(noteId, europe))
+          '${o.occurrence.key} ${o.missed ? 'missed' : 'due'}',
+      ];
+
+      test('the Occurrence due now, from its start until it is Missed', () {
+        now = DateTime.utc(2026, 10, 20, 4);
+        final note = notes.capture('pills').id;
+        routines.spawn(note, daily([at(8), at(20)]));
+        // 07:59: today's 08:00 has not started; yesterday's 20:00 is due.
+        now = DateTime.utc(2026, 10, 24, 5, 59);
+        expect(open(note), ['2026-10-23T20:00 due']);
+        now = DateTime.utc(2026, 10, 24, 6);
+        expect(open(note), ['2026-10-24T08:00 due']);
+        now = DateTime.utc(2026, 10, 24, 17, 59);
+        expect(open(note), ['2026-10-24T08:00 due']);
+      });
+
+      test('else the latest Missed one, "seen" or not', () {
+        now = DateTime.utc(2026, 10, 20, 4);
+        final note = notes.capture('call mum').id;
+        routines.spawn(
+          note,
+          Schedule(start: Day(2026, 10, 22), times: [at(15)]),
+        );
+        now = DateTime.utc(2026, 10, 24, 7);
+        alarms.markSeen();
+        expect(open(note), ['2026-10-22T15:00 missed']);
+      });
+
+      test('nothing Done, nothing ahead, nothing of another Note', () {
+        now = DateTime.utc(2026, 10, 23, 4);
+        final note = notes.capture('pills').id;
+        final id = routines.spawn(note, daily([at(8)])).id;
+        final other = notes.capture('dentist').id;
+        routines.spawn(
+          other,
+          Schedule(start: Day(2026, 10, 30), times: [at(9)]),
+        );
+        now = DateTime.utc(2026, 10, 24, 7);
+        routines.markDone(id, Occurrence(Day(2026, 10, 24), at(8)));
+        expect(open(note), [
+          '2026-10-23T08:00 missed',
+        ], reason: "today's is Done; yesterday's is the latest Missed");
+        routines.markDone(id, Occurrence(Day(2026, 10, 23), at(8)));
+        expect(open(note), isEmpty);
+        expect(open(other), isEmpty, reason: 'not started yet');
+      });
+
+      test('one for each of its Routines, in the order the Note has them', () {
+        now = DateTime.utc(2026, 10, 23, 4);
+        final note = notes.capture('pills').id;
+        final morning = routines.spawn(note, daily([at(8)])).id;
+        final reminder = routines
+            .spawn(note, Schedule(start: Day(2026, 10, 24), times: [at(7)]))
+            .id;
+        now = DateTime.utc(2026, 10, 24, 7);
+        expect(
+          [for (final o in alarms.openOf(note, europe)) o.routine.id],
+          [for (final r in routines.ofNote(note)) r.id],
+        );
+        expect(
+          {for (final r in routines.ofNote(note)) r.id},
+          {morning, reminder},
+        );
+        routines.trash(reminder);
+        expect(open(note), ['2026-10-24T08:00 due']);
+      });
+
+      test('an all-day one is due from the time all-day ones start', () {
+        now = DateTime.utc(2026, 10, 23, 4);
+        final note = notes.capture('tidy up').id;
+        routines.spawn(note, Schedule(start: Day(2026, 10, 24)));
+        store.allDayFrom = at(10);
+        now = DateTime.utc(2026, 10, 24, 7, 59);
+        expect(open(note), isEmpty);
+        now = DateTime.utc(2026, 10, 24, 8);
+        expect(open(note), ['2026-10-24 due']);
+      });
+    });
   });
 }

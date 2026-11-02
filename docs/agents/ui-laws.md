@@ -378,6 +378,24 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   without a Routine shows its pool alone.
 - The editor opens only through a long press on the card or Edit in its
   ⋮.
+- **A card ticks today's Occurrences of its Note** (#215): in either
+  view, under where it is filed and over its text, a box with the time
+  for each of its Routines and Reminders with an Occurrence today, its
+  first one not Done, else its last one, Done and struck through. The box
+  checks off and unchecks as the Agenda row's does and opens nothing; a
+  Session's only shows Done, one Done from every Line checked stays
+  checked, and where this Device may not check it off it only shows. A
+  long press on the card still opens the editor.
+- **The Note editor checks off what is due** (#215): at the top, over
+  the name, for each Routine and Reminder of the Note an Occurrence due
+  now, "Due 15:00" (with its day when it began on an earlier one), else
+  its latest Missed one, "Missed" with its day and time, whether the
+  Missed Summary was seen or not, each with **Done**, and for a one-time
+  Reminder that is the Note's only Routine or Reminder also **"Done and
+  move to trash"**, where this Device may move the Note: it checks it
+  off, moves the Note with the Reminder to the trash and closes the
+  editor. On the desktop the same lines open the Note dialog, Done on the
+  accent and "Done and move to trash" on the error colour.
 - **Copy text** in a card's ⋮ puts the text of the Note and of each
   Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183). In the Note editor a text that
@@ -639,7 +657,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 ## Alarms and notifications
 
 - An Occurrence's notification offers **Done** and **Snooze** (10 min,
-  30 min, 1 h) without opening the app.
+  30 min, 1 h) without opening the app. Done is also at the top of its
+  Note's editor and on its card (#215); Snooze stays in the
+  notification.
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".

@@ -69,7 +69,7 @@ pub mod text_format;
 pub mod text_tags;
 pub mod transcript_prompts;
 
-pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
+pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm};
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};
 pub use checklists::{

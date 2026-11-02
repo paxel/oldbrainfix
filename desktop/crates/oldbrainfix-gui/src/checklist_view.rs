@@ -636,7 +636,7 @@ pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox
     boxes
 }
 
-fn paint_box(ui: &Ui, tones: Tones, rect: egui::Rect, checked: bool, hovered: bool) {
+pub(crate) fn paint_box(ui: &Ui, tones: Tones, rect: egui::Rect, checked: bool, hovered: bool) {
     if hovered {
         ui.painter()
             .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);

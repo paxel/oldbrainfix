@@ -334,6 +334,34 @@ void main() {
     });
   });
 
+  group("a card's Occurrences today (#215)", () {
+    List<AgendaRow> cardRows(String note) =>
+        routines.todayByNote(europe)[note] ?? const [];
+
+    test('of each Routine the first open one today, else the last Done', () {
+      final note = notes.capture('pills').id;
+      final pills = routines.spawn(note, daily([at(8), at(20)]));
+      expect(rows(cardRows(note)), ['2026-10-24T08:00 pills']);
+      routines.markDone(pills.id, Occurrence(today, at(8)));
+      expect(rows(cardRows(note)), [
+        '2026-10-24T20:00 pills',
+      ], reason: 'one ahead today is open too');
+      routines.markDone(pills.id, Occurrence(today, at(20)));
+      final done = cardRows(note).single;
+      expect(done.occurrence, Occurrence(today, at(20)));
+      expect(done.done, now, reason: 'Done today, there all day');
+    });
+
+    test('none for a Routine without one today, nor of another Note', () {
+      final note = notes.capture('dentist').id;
+      routines.spawn(note, Schedule(start: tomorrow, times: [at(10)]));
+      final other = notes.capture('tidy up').id;
+      routines.spawn(other, daily([]));
+      expect(cardRows(note), isEmpty);
+      expect(rows(cardRows(other)), ['2026-10-24 tidy up']);
+    });
+  });
+
   group('trash', () {
     late Alarms alarms;
     setUp(() => alarms = Alarms(store));

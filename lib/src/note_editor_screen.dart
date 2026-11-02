@@ -564,6 +564,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   List<Section> _sections = const [];
   List<Routine> _routines = const [];
 
+  /// What the Note asks to check off now (#215): of each of its Routines
+  /// and Reminders this Device may check off, the Occurrence due, else
+  /// the latest Missed one.
+  List<OpenOccurrence> _open = const [];
+
   /// Those whose schedule a newer version of the app saved (ADR 0034).
   List<NewerRoutine> _newerRoutines = const [];
 
@@ -818,6 +823,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     };
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
+    _open = note == null || note.isTrashed
+        ? const []
+        : [
+            for (final open in Alarms(
+              widget.notes.store,
+            ).openOf(widget.noteId, deviceWallClock))
+              if (widget.notes.store.mayCheckOff(open.routine.id)) open,
+          ];
     _newerRoutines = _routineBook.newerOfNote(widget.noteId);
     final notes = widget.notes;
     final store = notes.store;
@@ -1923,6 +1936,69 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     Navigator.of(context).pop();
   }
 
+  /// Checks off [open] from the line at the top (#215); with [trash] the
+  /// Note goes to the trash with its one Reminder, and the editor closes.
+  void _checkOff(OpenOccurrence open, {bool trash = false}) {
+    _routineBook.markDone(open.routine.id, open.occurrence);
+    if (!trash) {
+      _reload();
+      return;
+    }
+    _routineBook.trashNote(widget.noteId, withRoutines: true);
+    Navigator.of(context).pop();
+  }
+
+  /// The lines at the top of the editor, above the name (#215): of each
+  /// Occurrence the Note asks to check off "Due 15:00" or "Missed" with
+  /// its day, and Done; for a one-time Reminder, the Note's only one, also
+  /// "Done and move to trash" where this Device may move the Note.
+  List<Widget> _openLines(AppLocalizations t, bool changes) {
+    final locale = Localizations.localeOf(context).toString();
+    final today = Day.today(widget.notes.store.clock(), deviceWallClock);
+    return [
+      for (final open in _open)
+        Padding(
+          key: ValueKey('open-${open.routine.id}@${open.occurrence.key}'),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(switch ((
+                open.missed,
+                occurrenceTime(t, locale, open.occurrence),
+              )) {
+                (true, final time) => t.occurrenceMissedAt(
+                  '${dayText(locale, open.occurrence.day)} $time',
+                ),
+                (false, final time) when open.occurrence.day == today =>
+                  t.occurrenceDue(time),
+                (false, final time) => t.occurrenceDue(
+                  '${dayText(locale, open.occurrence.day)} $time',
+                ),
+              }, style: Theme.of(context).textTheme.titleMedium),
+              FilledButton(
+                key: const ValueKey('open-done'),
+                onPressed: () => _checkOff(open),
+                child: Text(t.markDone),
+              ),
+              if (changes && open.routine.isReminder && _routines.length == 1)
+                OutlinedButton(
+                  key: const ValueKey('open-done-trash'),
+                  // It moves to the trash: the error colour, as Delete.
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () => _checkOff(open, trash: true),
+                  child: Text(t.doneAndTrash),
+                ),
+            ],
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -1997,6 +2073,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               const NewerFormatNote(key: ValueKey('note-newer-format')),
               const SizedBox(height: 8),
             ],
+            ..._openLines(t, changes),
             Embossed(
               strong: note.importance == Importance.important,
               child: Padding(

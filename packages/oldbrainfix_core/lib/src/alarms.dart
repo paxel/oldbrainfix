@@ -402,6 +402,52 @@ MissedSummary missedSummary({
   return MissedSummary(routines: result, nextChange: nextChange);
 }
 
+/// An Occurrence that asks to be checked off: due now, or [missed].
+typedef OpenOccurrence = ({
+  Routine routine,
+  Occurrence occurrence,
+  bool missed,
+});
+
+/// For each of [routines], in their order, the Occurrence that asks to be
+/// checked off at [now] (#215): the one due now, started and not yet
+/// Missed, else the latest Missed one, whether the Missed Summary was
+/// "seen" or not, within [alarmHorizonDays]; none when neither is open.
+/// What is Done, from its check-off, its entries or its Lines, asks for
+/// nothing.
+List<OpenOccurrence> openOccurrences({
+  required List<Routine> routines,
+  required DateTime now,
+  required WallClock wallClock,
+  ClockTime? allDayFrom,
+}) {
+  final today = Day.today(now, wallClock);
+  final from = today.addDays(-alarmHorizonDays);
+  final allDay = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
+  final result = <OpenOccurrence>[];
+  for (final routine in routines) {
+    _Timed? due;
+    _Timed? missed;
+    for (final t in _timed(routine, from, today, wallClock, allDay)) {
+      if (routine.doneAt(t.occurrence) != null) continue;
+      if (t.start.isAfter(now)) continue;
+      if (t.endsAt.isAfter(now)) {
+        due = t;
+      } else {
+        missed = t;
+      }
+    }
+    if (due ?? missed case final open?) {
+      result.add((
+        routine: routine,
+        occurrence: open.occurrence,
+        missed: due == null,
+      ));
+    }
+  }
+  return result;
+}
+
 /// This Device's alarms: its snoozes, the plan over the store, and what
 /// the notification's Done and Snooze leave to be applied.
 class Alarms {
@@ -496,6 +542,17 @@ class Alarms {
       allDayFrom: store.allDayFrom,
     );
   }
+
+  /// What the Note [noteId] asks to check off at the store's now
+  /// ([openOccurrences]): of each of its Routines and Reminders the
+  /// Occurrence due, else the latest Missed one.
+  List<OpenOccurrence> openOf(String noteId, WallClock wallClock) =>
+      openOccurrences(
+        routines: Routines(store).ofNote(noteId),
+        now: store.clock(),
+        wallClock: wallClock,
+        allDayFrom: store.allDayFrom,
+      );
 
   /// The user tapped "seen": the Missed Summary starts over from now.
   void markSeen() => store.missedSeen = store.clock();

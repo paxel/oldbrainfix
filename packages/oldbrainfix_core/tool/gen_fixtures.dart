@@ -3123,6 +3123,20 @@ Map<String, Object?> _alarms(Store store) {
               for (final (id, occurrence) in alarms.recentlyDone(_europe))
                 [id, occurrence.key],
             ],
+            // What each Note asks to check off, and what its card ticks
+            // today (#215).
+            'openOf': {
+              for (final note in Notes(store).all())
+                note.id: [
+                  for (final o in alarms.openOf(note.id, _europe))
+                    [o.routine.id, o.occurrence.key, o.missed],
+                ],
+            },
+            'todayByNote': [
+              for (final MapEntry(:key, :value)
+                  in routines.todayByNote(_europe).entries)
+                [key, rows(value)],
+            ],
           };
         }(),
     ],
@@ -7977,7 +7991,8 @@ Future<void> main(List<String> args) async {
     'names as typed in that order.\n'
     '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
     'Nudge of the `routines` log at held moments with this Device\'s '
-    'settings, on the same clock.\n'
+    'settings, and of each Note the Occurrence due or Missed of each of '
+    'its Routines and what its card ticks today, on the same clock.\n'
     '- `markers/markers.json`: what the values of a later version in the '
     '`markers` log come to (ADR 0034): the Routines read and those whose '
     'schedule needs a newer version, by Note too, the people of the '
