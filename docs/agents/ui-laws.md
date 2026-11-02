@@ -306,11 +306,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   unchecks it, and a tap on it does nothing, on every day. Tomorrow and
   later days show only the title and how many it picks: the picks are
   made on the day.
-- **The home-screen Agenda widget shows exactly what the Agenda shows
-  for today** (#153), in the Agenda's order: the Missed Summary with its
+- **The home-screen Agenda widget shows exactly what the Agenda shows**
+  (#153, #194), in the Agenda's order: the Missed Summary with its
   Missed Occurrences, the "x Unsorted" row, which opens the Unsorted
   list, then under "Today" the rows of today and the "Eat a frog"
-  section. It is one list that scrolls when it is taller than the
+  section, then the Agenda's coming days, "Tomorrow" and the five days
+  after it under their weekday and date, each with its rows and
+  appointments, dimmed, an empty one with "Nothing planned". It moves on
+  at midnight without the app, showing the days its snapshot still
+  holds. It is one list that scrolls when it is taller than the
   widget. **Its groups are the Agenda's** (#209): a Shopping List's and
   a Checklist's name as the heading, without a box, its words where a
   boxed heading's begin, with their open Lines under it; a Checklist
@@ -322,7 +326,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   there checks what the same box on the Agenda checks, with the same
   result: an Occurrence, a Line for its Occurrence, a Checklist's Line,
   a Frog, a Missed Occurrence, a Shopping List's Line; unchecking is
-  done in the app. **A Session's box only shows Done**, and a tap on it
+  done in the app. **Only today's rows and the Missed Occurrences tick
+  there** (#194): a coming day's box, unlike the Agenda's, checks
+  nothing and opens the app. **A Session's box only shows Done**, and a tap on it
   does nothing; a pick's box shows whether it has an entry, and a tap
   on the pick, box or words, opens the app at its entry form, its
   locked Area first, once the App Lock is open. Appointments, the lists'

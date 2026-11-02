@@ -163,12 +163,12 @@ class StoredValuesTest {
         assertEquals("Today", read?.today)
         assertNull(AgendaWidgetPlan.snapshotOf(null))
         for (text in garbled) assertNull(text, AgendaWidgetPlan.snapshotOf(text))
-        // Version 2 is this version's own (#153); every other one is later.
-        for (version in later.filter { it != "2" } + "3") {
+        // Versions 2 to 4 are this version's own (#153, #209, #194); every other one is later.
+        for (version in later.filter { it != "2" } + "5") {
             assertNull(AgendaWidgetPlan.snapshotOf(ofVersion(snapshot, version)))
         }
         // Without a snapshot the widget asks to open the app.
-        assertTrue(AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), emptyList(), "Open").stale)
+        assertTrue(AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), emptyMap(), "Open").stale)
     }
 
     @Test

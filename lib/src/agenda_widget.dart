@@ -142,8 +142,8 @@ class WidgetRow {
 class AgendaRead {
   final WallClock wallClock;
 
-  /// Today's and tomorrow's rows at least, without the calendar's
-  /// appointments, which the widget reads itself.
+  /// The days the Agenda shows, without the calendar's appointments,
+  /// which the widget reads itself.
   final AgendaDays days;
   final FrogsToday frogs;
   final MissedSummary missed;
@@ -159,21 +159,29 @@ class AgendaRead {
 }
 
 /// What the home-screen Agenda widget shows, handed to the platform
-/// whenever the alarms are synced: the Missed Summary, and today's rows
-/// in Agenda order as [AgendaDays] reads them for the Agenda, and
-/// tomorrow's as well, so the widget moves on to the new day at
-/// midnight without the app; the Unsorted count; the calendars whose
+/// whenever the alarms are synced: the Missed Summary, and the rows of
+/// the days the Agenda shows in Agenda order as [AgendaDays] reads them
+/// for the Agenda, each with its heading (#194), so the widget shows
+/// them and moves on to the new day at midnight without the app; the
+/// Unsorted count; the calendars whose
 /// appointments the widget reads itself, as nothing of an appointment is
 /// kept; and the texts, in the reader's language.
 class AgendaSnapshot {
   /// The version of its structure (ADR 0034): 2 since the widget shows
   /// every kind of row the Agenda does (#153), 3 since it shows the
   /// Agenda's groups (#209): a Session's heading and picks, and a
-  /// Checklist's and a Shopping List's heading with their Lines.
-  static const version = 3;
+  /// Checklist's and a Shopping List's heading with their Lines, 4 since
+  /// it holds the days the Agenda shows, each with its heading (#194).
+  static const version = 4;
 
-  /// The days, `YYYY-MM-DD`, with their rows: today and tomorrow.
+  /// The days, `YYYY-MM-DD`, with their rows: today and the days after
+  /// it the Agenda shows.
   final Map<String, List<WidgetRow>> days;
+
+  /// Each of [days]' own heading, its weekday and date; the widget calls
+  /// the day it shows as today [today] and the next [tomorrow], as they
+  /// are then.
+  final Map<String, String> headings;
 
   /// The Missed Summary's rows, with its heading; none while it is empty.
   final List<WidgetRow> missed;
@@ -183,11 +191,15 @@ class AgendaSnapshot {
   /// is off.
   final List<String> calendars;
 
-  /// The heading, "Today".
+  /// The headings "Today" and "Tomorrow".
   final String today;
+  final String tomorrow;
 
-  /// Shown when the day has nothing due.
+  /// Shown when today has nothing due.
   final String empty;
+
+  /// Shown when a later day has nothing due, "Nothing planned".
+  final String planned;
 
   /// "x Unsorted", with the number in.
   final String unsortedText;
@@ -204,11 +216,14 @@ class AgendaSnapshot {
 
   const AgendaSnapshot({
     required this.days,
+    required this.headings,
     required this.missed,
     required this.unsorted,
     required this.calendars,
     required this.today,
+    required this.tomorrow,
     required this.empty,
+    required this.planned,
     required this.unsortedText,
     required this.done,
     required this.allDay,
@@ -242,7 +257,7 @@ class AgendaSnapshot {
           store: store,
           places: Places(store),
           wallClock: wallClock,
-          days: 2,
+          days: AgendaDays.shown,
           sessions: Sessions(store).today(wallClock),
           frogsToday: frogs,
         ),
@@ -281,6 +296,15 @@ class AgendaSnapshot {
           if (read.showsFrogs(frogs)) ...words.frogs(read.frogs),
         ],
         '${read.tomorrow}': words.day(read.tomorrow, read.tomorrowRows),
+        for (final (:day, :rows) in read.later) '$day': words.day(day, rows),
+      },
+      headings: {
+        for (final day in [
+          read.today,
+          read.tomorrow,
+          for (final (:day, rows: _) in read.later) day,
+        ])
+          '$day': t.agendaDay(day.wall),
       },
       missed: words.missed(agenda.missed),
       unsorted: unsorted,
@@ -288,7 +312,9 @@ class AgendaSnapshot {
           ? ([...store.agendaCalendars]..sort())
           : const [],
       today: t.agendaToday,
+      tomorrow: t.agendaTomorrow,
       empty: t.widgetNothingToday,
+      planned: t.nothingPlanned,
       unsortedText: t.unsortedBanner(unsorted),
       done: t.markDone,
       allDay: t.allDay,
@@ -304,12 +330,15 @@ class AgendaSnapshot {
       for (final MapEntry(:key, :value) in days.entries)
         key: [for (final row in value) row.toMap()],
     },
+    'headings': headings,
     'missed': [for (final row in missed) row.toMap()],
     'unsorted': unsorted,
     'calendars': calendars,
     'labels': {
       'today': today,
+      'tomorrow': tomorrow,
       'empty': empty,
+      'planned': planned,
       'unsorted': unsortedText,
       'done': done,
       'allDay': allDay,

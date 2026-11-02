@@ -22,10 +22,12 @@ import java.util.TimeZone
 
 /**
  * The home-screen Agenda widget: what the Agenda shows for today, in its
- * order (#153), as a list that scrolls when it is taller than the
+ * order (#153), then the coming days the Agenda shows, each under its
+ * heading (#194), as a list that scrolls when it is taller than the
  * widget, its groups drawn as the Agenda's (#209): a heading, then its
- * entries indented under it, each with its box. A row's box checks it
- * as the Agenda's does, a Session's only shows Done, a pick opens its
+ * entries indented under it, each with its box. A row's box of today or
+ * the Missed Summary checks it as the Agenda's does, a coming day's
+ * opens the app, a Session's only shows Done, a pick opens its
  * entry form, the rest of a row opens the app, and the Unsorted count
  * opens the Unsorted list; every tap on the list goes through
  * [AgendaTapActivity]. It
@@ -33,7 +35,7 @@ import java.util.TimeZone
  * it syncs the alarms ([replace]), and a box checked here goes the way of
  * a Done tapped on a notification, into the [EventQueue] for the app to
  * apply. The calendar's appointments it reads itself as it shows, as
- * nothing of them is kept. The snapshot holds tomorrow too, so the
+ * nothing of them is kept. The snapshot holds the coming days, so the
  * widget moves on at local midnight without the app.
  */
 class AgendaWidget : AppWidgetProvider() {
@@ -57,6 +59,9 @@ class AgendaWidget : AppWidgetProvider() {
         private const val PREFS = "oldbrainfix_widget"
         private const val KEY_SNAPSHOT = "agenda"
         private const val ACTION_MIDNIGHT = "io.github.paxel.oldbrainfix.WIDGET_MIDNIGHT"
+
+        /** How opaque a coming day's box is, of 255 (#194). */
+        private const val AHEAD_ALPHA = 140
 
         /** Request codes of the widget's taps; apart from Capture's 0 to 2. */
         private const val REQUEST_OPEN = 100
@@ -119,13 +124,13 @@ class AgendaWidget : AppWidgetProvider() {
             return views
         }
 
-        /** The rows the widget shows now, with the calendar's appointments of today. */
+        /** The rows the widget shows now, with the calendar's appointments of each day it shows. */
         fun rows(context: Context): Pair<AgendaSnapshot?, List<WidgetRow>> {
             val now = System.currentTimeMillis()
             val zone = TimeZone.getDefault()
             val snapshot = snapshot(context)
             val today = AgendaWidgetPlan.dayKey(now, zone)
-            val appointments = if (snapshot == null) emptyList() else appointments(context, snapshot, today, now, zone)
+            val appointments = if (snapshot == null) emptyMap() else appointments(context, snapshot, today, now, zone)
             val view = AgendaWidgetPlan.view(
                 snapshot, today, EventQueue.pending(context), appointments,
                 context.getString(R.string.agenda_widget_open_app),
@@ -134,8 +139,9 @@ class AgendaWidget : AppWidgetProvider() {
         }
 
         /**
-         * Today's appointments of the calendars the Agenda shows, read now
-         * and kept nowhere; none while that is off or not allowed.
+         * The appointments of the calendars the Agenda shows on each day
+         * the widget shows ([AgendaWidgetPlan.shownDays]), read now and
+         * kept nowhere; none while that is off or not allowed.
          */
         private fun appointments(
             context: Context,
@@ -143,15 +149,17 @@ class AgendaWidget : AppWidgetProvider() {
             today: String,
             now: Long,
             zone: TimeZone,
-        ): List<WidgetRow> {
-            if (snapshot.calendars.isEmpty()) return emptyList()
+        ): Map<String, List<WidgetRow>> {
+            val days = AgendaWidgetPlan.shownDays(snapshot, today)
+            if (snapshot.calendars.isEmpty() || days.isEmpty()) return emptyMap()
             // Read as this app, not as the launcher asking for the rows.
             val identity = Binder.clearCallingIdentity()
             try {
                 val start = AgendaWidgetPlan.midnightOf(now, zone)
                 val read = runCatching {
                     val colours = Appointments.calendars(context).associate { it["id"] as String to it["colour"] as Int }
-                    Appointments.between(context, start - 86_400_000L, start + 2 * 86_400_000L, snapshot.calendars)
+                    // A day on either side, for the clock changes between.
+                    Appointments.between(context, start - 86_400_000L, start + (days.size + 1) * 86_400_000L, snapshot.calendars)
                         ?.map {
                             CalendarEntry(
                                 title = it["title"] as String,
@@ -161,8 +169,8 @@ class AgendaWidget : AppWidgetProvider() {
                                 colour = colours[it["calendar"] as String] ?: 0,
                             )
                         }
-                }.getOrNull() ?: return emptyList()
-                return AgendaWidgetPlan.appointmentRows(snapshot, read, today, zone)
+                }.getOrNull() ?: return emptyMap()
+                return days.associateWith { AgendaWidgetPlan.appointmentRows(snapshot, read, it, zone) }
             } finally {
                 Binder.restoreCallingIdentity(identity)
             }
@@ -222,14 +230,14 @@ class AgendaWidget : AppWidgetProvider() {
                 setViewPadding(R.id.agenda_time, dp(context, if (row.box) 0 else 12), 0, dp(context, 8), 0)
                 setContentDescription(R.id.agenda_check, snapshot?.done ?: "")
                 val title = SpannableString(row.title)
-                if (row.done) {
-                    strike(title)
-                    setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_checked)
-                    setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text_dim))
-                } else {
-                    setImageViewResource(R.id.agenda_check, R.drawable.ic_widget_check)
-                    setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text))
-                }
+                if (row.done) strike(title)
+                setImageViewResource(R.id.agenda_check, if (row.done) R.drawable.ic_widget_checked else R.drawable.ic_widget_check)
+                // A coming day is dimmed, as on the Agenda, its box too (#194).
+                setTextColor(
+                    R.id.agenda_title,
+                    context.getColor(if (row.done || row.ahead) R.color.agenda_widget_text_dim else R.color.agenda_widget_text),
+                )
+                setInt(R.id.agenda_check, "setImageAlpha", if (row.ahead) AHEAD_ALPHA else 255)
                 setTextViewText(R.id.agenda_title, title)
                 // A list's heading has no box; its words start where a
                 // box's heading's do, over its entries' boxes (#209).

@@ -38,6 +38,12 @@ data class WidgetRow(
     val at: Int? = null,
     /** An appointment's calendar colour, ARGB; 0 for none. */
     val colour: Int = 0,
+    /**
+     * Whether it is on a day after the one the widget shows as today
+     * (#194): its box checks nothing and opens the app, whatever
+     * [checks] says, as only today's and the Missed rows tick there.
+     */
+    val ahead: Boolean = false,
 ) {
     /** Whether it shows a box. */
     val box: Boolean
@@ -56,12 +62,13 @@ data class WidgetRow(
 
     /**
      * What its box queues for the app, as the Agenda's box does; null
-     * when it has none, is checked already or this Device may not check
-     * it, and a tap opens the app instead. A checked one is unchecked in
-     * the app. A Session's and a pick's box queue nothing.
+     * when it has none, is checked already, this Device may not check
+     * it or it is on a coming day ([ahead]), and a tap opens the app
+     * instead. A checked one is unchecked in the app. A Session's and a
+     * pick's box queue nothing.
      */
     val tap: WidgetTap?
-        get() = if (!box || done || !checks) {
+        get() = if (!box || done || !checks || ahead) {
             null
         } else {
             when (kind) {
@@ -90,11 +97,11 @@ data class WidgetRow(
         }
 
     /**
-     * What a tap on the rest of it does: a pick this Device may record
-     * for opens its entry form (#209), any other row the app.
+     * What a tap on the rest of it does: a pick of today this Device may
+     * record for opens its entry form (#209), any other row the app.
      */
     val onRow: AgendaTap
-        get() = if (kind == PICK && checks && routine.isNotEmpty() && occurrence.isNotEmpty() && note.isNotEmpty()) {
+        get() = if (kind == PICK && checks && !ahead && routine.isNotEmpty() && occurrence.isNotEmpty() && note.isNotEmpty()) {
             AgendaTap.Pick(routine, occurrence, note)
         } else {
             AgendaTap.Open
@@ -139,9 +146,9 @@ data class WidgetTap(val kind: String, val routine: String, val occurrence: Stri
 
 /**
  * What the app handed over for the Agenda widget: the Missed Summary,
- * the rows of today and tomorrow by `YYYY-MM-DD`, the Unsorted count,
- * the calendars whose appointments show, and the texts in the reader's
- * language.
+ * the rows of the days the Agenda shows by `YYYY-MM-DD` with each day's
+ * heading, the Unsorted count, the calendars whose appointments show,
+ * and the texts in the reader's language.
  */
 data class AgendaSnapshot(
     val days: Map<String, List<WidgetRow>>,
@@ -157,6 +164,15 @@ data class AgendaSnapshot(
     /** "from {time}" and "until {time}"; [AgendaWidgetPlan.appointmentRows] puts in the time. */
     val since: String,
     val until: String,
+    /**
+     * Each day's own heading, its weekday and date, since version 4
+     * (#194); none in an older one, which shows today alone.
+     */
+    val headings: Map<String, String> = emptyMap(),
+    /** The heading of the day after today, "Tomorrow". */
+    val tomorrow: String = "",
+    /** What a coming day with nothing due says, "Nothing planned". */
+    val planned: String = "",
 )
 
 /**
@@ -204,12 +220,13 @@ object AgendaWidgetPlan {
 
     /**
      * The snapshot the app handed over as [text] ([Stored]): null when
-     * there is none, it does not read or it is of a version after 3,
+     * there is none, it does not read or it is of a version after 4,
      * which makes the widget ask to open the app. Version 1, absent `v`,
      * holds Occurrences only, as 0.2.0 wrote it; version 2 every kind of
-     * row the Agenda shows; version 3 the Agenda's groups (#209). A row
-     * that does not read, or of a kind not known to its version, is left
-     * out.
+     * row the Agenda shows; version 3 the Agenda's groups (#209);
+     * version 4 the days the Agenda shows, each with its heading (#194).
+     * A row that does not read, or of a kind not known to its version,
+     * is left out, and so is a heading that is no text.
      */
     fun snapshotOf(text: String?): AgendaSnapshot? {
         val json = text?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return null
@@ -217,6 +234,17 @@ object AgendaWidgetPlan {
             Stored.current(json) -> runCatching { first(json) }.getOrNull()
             isVersion(json, 2) -> runCatching { second(json, WidgetRow.HANDED) }.getOrNull()
             isVersion(json, 3) -> runCatching { second(json, WidgetRow.HANDED_GROUPS) }.getOrNull()
+            isVersion(json, 4) -> runCatching {
+                val labels = json.getJSONObject("labels")
+                val headings = json.optJSONObject("headings") ?: JSONObject()
+                second(json, WidgetRow.HANDED_GROUPS).copy(
+                    headings = headings.keys().asSequence()
+                        .mapNotNull { day -> (headings.opt(day) as? String)?.let { day to it } }
+                        .toMap(),
+                    tomorrow = labels.optString("tomorrow"),
+                    planned = labels.optString("planned"),
+                )
+            }.getOrNull()
             else -> null
         }
     }
@@ -256,7 +284,7 @@ object AgendaWidgetPlan {
         )
     }
 
-    /** A snapshot of version 2 or 3, whose rows are of [kinds]. */
+    /** A snapshot of version 2, 3 or 4, whose rows are of [kinds]. */
     private fun second(json: JSONObject, kinds: Set<String>): AgendaSnapshot {
         val labels = json.getJSONObject("labels")
         val calendars = json.optJSONArray("calendars") ?: JSONArray()
@@ -282,7 +310,7 @@ object AgendaWidgetPlan {
             Stored.elementsOf(days.optJSONArray(day) ?: JSONArray(), read)
         }
 
-    /** A row of version 2 or 3; failing on one not of [kinds]. */
+    /** A row of version 2, 3 or 4; failing on one not of [kinds]. */
     private fun rowOf(row: JSONObject, kinds: Set<String>): WidgetRow {
         val kind = row.getString("kind")
         require(kind in kinds) { kind }
@@ -418,32 +446,52 @@ object AgendaWidgetPlan {
     }
 
     /**
+     * The days the widget shows on [today] from [snapshot], in order:
+     * today, then each later day of it with a heading (#194), so a
+     * snapshot of version 3 or before shows today alone; none when it
+     * does not reach today.
+     */
+    fun shownDays(snapshot: AgendaSnapshot, today: String): List<String> {
+        if (today !in snapshot.days) return emptyList()
+        return listOf(today) + snapshot.days.keys.filter { it > today && it in snapshot.headings }.sorted()
+    }
+
+    /**
      * What the widget shows on [today] from [snapshot], in Agenda order:
      * the Missed Summary, the Unsorted count, then the day under its
-     * heading with the [appointments] put in, "Nothing due today." where
-     * nothing is, then the Frogs. What was checked in the widget or on a
-     * notification and is still [pending] for the app shows checked, as
-     * the Agenda will show it: the last Line of an Occurrence checks it
-     * off, and a Frog checked off leaves the other one out. Without a
-     * snapshot that reaches today it shows [openApp].
+     * heading with its [appointments] put in, "Nothing due today." where
+     * nothing is, then the Frogs; then each coming day of the Agenda
+     * under its heading, "Tomorrow" first, with its appointments,
+     * "Nothing planned" where nothing is (#194). Only today's and the
+     * Missed rows tick: a coming day's row is [WidgetRow.ahead]. What was
+     * checked in the widget or on a notification and is still [pending]
+     * for the app shows checked, as the Agenda will show it: the last
+     * Line of an Occurrence checks it off, and a Frog checked off leaves
+     * the other one out. Without a snapshot that reaches today it shows
+     * [openApp].
      */
     fun view(
         snapshot: AgendaSnapshot?,
         today: String,
         pending: List<Action>,
-        appointments: List<WidgetRow>,
+        appointments: Map<String, List<WidgetRow>>,
         openApp: String,
     ): AgendaView {
         if (snapshot == null) return AgendaView(listOf(message(openApp)), stale = true)
         val top = checked(snapshot.missed, pending) +
             if (snapshot.unsorted > 0) listOf(WidgetRow(WidgetRow.UNSORTED, snapshot.unsortedText)) else emptyList()
         val day = snapshot.days[today] ?: return AgendaView(top + message(openApp), stale = true)
-        val rows = merged(checked(day, pending), appointments)
+        val rows = merged(checked(day, pending), appointments[today].orEmpty())
         val due = rows.filter { it.block != WidgetRow.FROGS }
         val frogs = rows.filter { it.block == WidgetRow.FROGS }
         val heading = WidgetRow(WidgetRow.HEADING, snapshot.today)
+        val coming = shownDays(snapshot, today).drop(1).flatMapIndexed { i, key ->
+            val later = merged(snapshot.days[key].orEmpty(), appointments[key].orEmpty()).map { it.copy(ahead = true) }
+            listOf(WidgetRow(WidgetRow.HEADING, if (i == 0) snapshot.tomorrow else snapshot.headings[key].orEmpty())) +
+                later.ifEmpty { listOf(message(snapshot.planned).copy(ahead = true)) }
+        }
         return AgendaView(
-            top + heading + due.ifEmpty { listOf(message(snapshot.empty)) } + frogs,
+            top + heading + due.ifEmpty { listOf(message(snapshot.empty)) } + frogs + coming,
             stale = false,
         )
     }

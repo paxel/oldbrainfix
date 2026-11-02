@@ -106,6 +106,10 @@ typedef ShownFrog = ({PlacedFrog placed, bool masked});
 /// two cannot drift apart: today's with its Shopping Lists and
 /// Checklists, tomorrow's and the days after, and today's Frogs.
 class AgendaDays {
+  /// How many days the Agenda shows, today included, and the widget with
+  /// it (#194).
+  static const shown = 7;
+
   final Day today;
   final Day tomorrow;
   final List<DayEntry> todayRows;

@@ -106,17 +106,36 @@ void main() {
       });
     });
 
-    test('holds tomorrow as well, so the widget moves on at midnight '
-        'without the app', () {
+    test('holds the days the Agenda shows, each with its heading, so the '
+        'widget shows them and moves on at midnight without the app '
+        '(#194)', () {
       routines.create('dentist', once(Day(2026, 10, 25), [ClockTime(10, 0)]));
+      routines.create('bins out', once(Day(2026, 10, 28)));
       routines.create('pills', daily([ClockTime(8, 0)]));
 
-      final days = snapshot().days;
+      final s = snapshot();
+      final days = s.days;
 
-      expect(days.keys, ['2026-10-24', '2026-10-25']);
+      expect(days.keys, [
+        '2026-10-24',
+        '2026-10-25',
+        '2026-10-26',
+        '2026-10-27',
+        '2026-10-28',
+        '2026-10-29',
+        '2026-10-30',
+      ]);
+      expect(days.length, AgendaScreen.days);
       expect(titles(days['2026-10-24']), ['pills']);
       expect(titles(days['2026-10-25']), ['pills', 'dentist']);
+      expect(titles(days['2026-10-28']), ['bins out', 'pills']);
       expect(days['2026-10-25']?.every((row) => !row.done), isTrue);
+      // Each day's own heading; the widget calls the first two Today and
+      // Tomorrow, as they are on the day it shows them.
+      expect(s.headings.keys, days.keys);
+      expect(s.headings['2026-10-24'], 'Saturday, 24 Oct');
+      expect(s.headings['2026-10-28'], 'Wednesday, 28 Oct');
+      expect(s.toMap()['headings'], s.headings);
     });
 
     test('titles a row by its Note\'s first line, "Photo" or "Voice '
@@ -163,11 +182,13 @@ void main() {
       expect(s.today, 'Today');
       expect(s.empty, 'Nothing due today.');
       expect(s.done, 'Done');
-      // 3 since it holds the Agenda's groups (#209).
-      expect(s.toMap()['v'], 3);
+      // 4 since it holds the days the Agenda shows (#194).
+      expect(s.toMap()['v'], 4);
       expect(s.toMap()['labels'], {
         'today': 'Today',
+        'tomorrow': 'Tomorrow',
         'empty': 'Nothing due today.',
+        'planned': 'Nothing planned',
         'unsorted': '2 Unsorted',
         'done': 'Done',
         'allDay': 'All day',
@@ -184,7 +205,10 @@ void main() {
       final s = snapshot(de, 'de');
 
       expect(s.today, 'Heute');
+      expect(s.tomorrow, 'Morgen');
       expect(s.empty, 'Heute steht nichts an.');
+      expect(s.planned, 'Nichts geplant');
+      expect(s.headings['2026-10-26'], de.agendaDay(DateTime(2026, 10, 26)));
       expect(s.unsortedText, '1 unsortiert');
       expect(s.done, 'Erledigt');
       expect(s.since, de.appointmentSince('{time}'));
@@ -671,6 +695,10 @@ void main() {
       await start(tester);
 
       expect(titles(alarms.agendas.last.days['2026-10-24']), ['pills']);
+      // The Agenda's days, each with its heading (#194).
+      expect(alarms.agendas.last.days, hasLength(AgendaScreen.days));
+      expect(titles(alarms.agendas.last.days['2026-10-30']), ['pills']);
+      expect(alarms.agendas.last.headings, hasLength(AgendaScreen.days));
       expect(alarms.agendas.last.unsorted, 1);
     });
 

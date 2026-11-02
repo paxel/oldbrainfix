@@ -114,7 +114,7 @@ class AgendaScreen extends StatefulWidget {
   static const tomorrowOpacity = 0.55;
 
   /// How many days the Agenda shows, today included.
-  static const days = 7;
+  static const days = AgendaDays.shown;
 
   final Notes notes;
   final Places places;
