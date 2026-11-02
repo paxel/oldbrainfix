@@ -60,12 +60,13 @@ const NOTE_FIELDS: [&str; 13] = [
     session_keys::RULE,
 ];
 /// The keys of a Tally's field on its Note, `tally:<field id>:<key>`.
-const TALLY_FIELD_KEYS: [&str; 5] = [
+const TALLY_FIELD_KEYS: [&str; 6] = [
     tally_keys::NAME,
     tally_keys::UNIT,
     tally_keys::TARGET,
     tally_keys::RULE,
     tally_keys::HIDDEN,
+    tally_keys::MULTIPLIES,
 ];
 const SECTION_FIELDS: [&str; 4] = [
     note_keys::TYPE,

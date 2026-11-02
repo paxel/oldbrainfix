@@ -10,6 +10,7 @@
         "target": null,
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:02:34.000Z"
       }

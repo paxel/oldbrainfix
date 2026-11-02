@@ -99,7 +99,9 @@ PersonFilter tallyDefaultFilter(Store store, String noteId) {
 /// The setup of a Note's Tally in its editor (#190), nothing while the
 /// Note is no Tally: a row per field, its name and its settings as badges
 /// as on the New Tally page (#161), how a day with several entries counts,
-/// its unit and its target, "Hidden" while it is hidden; a tap on the
+/// its unit and its target, the other field it multiplies (#200) while it
+/// does or may, a multiplier without a rule or a target, "Hidden" while
+/// it is hidden; a tap on the
 /// name or a badge opens the field's page for who may change the Note,
 /// and "Add field" the page of a new one. The chart and the entries show
 /// on the card, not here. It follows the log as it changes.
@@ -141,10 +143,14 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     setState(_load);
   }
 
-  Widget _fieldRow(TallyField field, String decimal) {
+  Widget _fieldRow(Tally tally, TallyField field, String decimal) {
     final t = context.t;
     final unit = shownUnit(field.unit, _system);
     final target = field.target;
+    final multiplies = switch (field.multiplies) {
+      final id? => tally.field(id),
+      null => null,
+    };
     final open = widget.notes.store.mayChange(field.noteId)
         ? () => _openField(field.id)
         : null;
@@ -169,15 +175,17 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
             spacing: 8,
             runSpacing: 8,
             children: [
-              SettingBadge(
-                key: ValueKey('tally-setup-rule-${field.id}'),
-                setting: t.tallyRule,
-                icon: Icons.functions,
-                value: field.rule == TallyRule.sum
-                    ? t.tallyRuleSumShort
-                    : t.tallyRuleMaxShort,
-                onTap: open == null ? null : (_) => open(),
-              ),
+              // A multiplier counts no value: no rule, no target (#200).
+              if (multiplies == null)
+                SettingBadge(
+                  key: ValueKey('tally-setup-rule-${field.id}'),
+                  setting: t.tallyRule,
+                  icon: Icons.functions,
+                  value: field.rule == TallyRule.sum
+                      ? t.tallyRuleSumShort
+                      : t.tallyRuleMaxShort,
+                  onTap: open == null ? null : (_) => open(),
+                ),
               SettingBadge(
                 key: ValueKey('tally-setup-unit-${field.id}'),
                 setting: t.tallyUnit,
@@ -185,15 +193,24 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                 value: unit.isEmpty ? t.tallyNoUnit : unit,
                 onTap: open == null ? null : (_) => open(),
               ),
-              SettingBadge(
-                key: ValueKey('tally-setup-target-${field.id}'),
-                setting: t.tallyTargetBadge,
-                icon: Icons.flag_outlined,
-                value: target == null
-                    ? t.tallyNoTarget
-                    : shownValue(target, field.unit, _system, decimal),
-                onTap: open == null ? null : (_) => open(),
-              ),
+              if (multiplies == null)
+                SettingBadge(
+                  key: ValueKey('tally-setup-target-${field.id}'),
+                  setting: t.tallyTargetBadge,
+                  icon: Icons.flag_outlined,
+                  value: target == null
+                      ? t.tallyNoTarget
+                      : shownValue(target, field.unit, _system, decimal),
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              if (multiplies != null || tally.multipliable(field.id).isNotEmpty)
+                SettingBadge(
+                  key: ValueKey('tally-setup-multiplies-${field.id}'),
+                  setting: t.tallyMultiplies,
+                  icon: Icons.calculate_outlined,
+                  value: multiplies?.name ?? t.tallyMultipliesNothing,
+                  onTap: open == null ? null : (_) => open(),
+                ),
               if (field.hidden)
                 SettingBadge(
                   key: ValueKey('tally-setup-hidden-${field.id}'),
@@ -223,7 +240,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final field in tally.fields) _fieldRow(field, decimal),
+            for (final field in tally.fields) _fieldRow(tally, field, decimal),
             if (widget.notes.store.mayChange(widget.noteId))
               FilledButton.tonalIcon(
                 key: const ValueKey('tally-add-field'),
@@ -241,7 +258,8 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
 /// A Tally on its Note's detailed card (#190), nothing while the Note is
 /// no Tally: "Add entry" for who may add one; in a Shared Area the choice
 /// of whose entries show, the user's own by default; the length of a bar,
-/// kept per Note on this Device; one chart per field shown; the entries,
+/// kept per Note on this Device; one chart per field shown but the
+/// multipliers, a multiplied field's of the products (#200); the entries,
 /// newest first, the latest [shownEntries] and the older folded under
 /// how many they are until a tap shows them, kept per Note on this
 /// Device; each tapped to edit it and long-pressed for a menu at the
@@ -339,7 +357,7 @@ class _CardTallyState extends State<CardTally> {
         shown(entry),
     ];
     _charts = {
-      for (final field in tally.shown)
+      for (final field in tally.counting)
         field.id: _tallies.chart(
           widget.noteId,
           field.id,
@@ -454,12 +472,34 @@ class _CardTallyState extends State<CardTally> {
     await run();
   }
 
-  /// What [entry] holds for the fields shown, one after the other.
-  String _values(Tally tally, TallyEntry entry, String decimal) => [
-    for (final field in tally.shown)
-      if (entry.values[field.id] case final value?)
-        '${field.name} ${shownValue(value, field.unit, _system, decimal)}',
-  ].join(' · ');
+  /// What [entry] holds for the fields shown, one after the other; a
+  /// multiplied field's value after the values of its multipliers the
+  /// entry holds, as bare numbers ("Reps 3 × 10 reps"), and a multiplier
+  /// not on its own (#200).
+  String _values(Tally tally, TallyEntry entry, String decimal) {
+    final t = context.t;
+    String times(TallyField field, double value) {
+      var text = shownValue(value, field.unit, _system, decimal);
+      for (final multiplier in tally.multipliersOf(field.id).reversed) {
+        if (entry.values[multiplier.id] case final factor?) {
+          final number = TallyUnits.formatShown(
+            factor,
+            multiplier.unit,
+            _system,
+            decimal: decimal,
+          );
+          text = t.tallyTimes(number, text);
+        }
+      }
+      return text;
+    }
+
+    return [
+      for (final field in tally.counting)
+        if (entry.values[field.id] case final value?)
+          '${field.name} ${times(field, value)}',
+    ].join(' · ');
+  }
 
   Widget _entryRow(
     Tally tally,
@@ -591,7 +631,7 @@ class _CardTallyState extends State<CardTally> {
                 ),
             ],
           ),
-          for (final field in tally.shown)
+          for (final field in tally.counting)
             Column(
               key: ValueKey('tally-chart-${field.id}'),
               crossAxisAlignment: CrossAxisAlignment.stretch,

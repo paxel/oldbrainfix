@@ -354,6 +354,124 @@ void main() {
     });
   });
 
+  group('multipliers', () {
+    test('a multiplier counts its field as the product, on read', () {
+      final tallies = Tallies(ann);
+      final (note, [reps]) = tally(ann, 'Push-ups', ['reps']);
+      tallies.setTarget(note, reps, 30);
+      final old = tallies.add(
+        note,
+        values: {reps: 10},
+        at: DateTime.utc(2026, 3, 1, 7),
+      );
+      final sets = tallies.addField(note, name: 'Sets', target: 4);
+      final entry = tallies.add(
+        note,
+        values: {reps: 10, sets: 3},
+        at: DateTime.utc(2026, 3, 1, 8),
+      );
+      final plain = tallies.byNote(note)!;
+      expect(plain.field(sets)!.multiplies, isNull);
+      expect(plain.counted(entry, reps), 10);
+      expect(plain.counted(entry, sets), 3);
+
+      tallies.setMultiplies(note, sets, reps);
+      final made = tallies.byNote(note)!;
+      expect(made.field(sets)!.multiplies, reps);
+      expect(made.multipliersOf(reps).map((f) => f.id), [sets]);
+      expect(made.counting.map((f) => f.id), [reps]);
+      expect(made.shown.map((f) => f.id), [reps, sets]);
+      // The multiplier counts as no value, with no target of its own.
+      expect(made.field(sets)!.target, isNull);
+      expect(made.targets, {reps: 30});
+      expect(made.counted(entry, reps), 30);
+      expect(made.counted(entry, sets), isNull);
+      // An entry without a multiplier value counts as is.
+      expect(made.counted(old, reps), 10);
+      expect(values(tallies.chart(note, reps, TallyPeriod.day, utcWall)), [40]);
+      expect(tallies.chart(note, sets, TallyPeriod.day, utcWall), isEmpty);
+      expect(
+        ann.current(note, TallyKeys.field(sets, TallyKeys.multiplies)),
+        reps,
+      );
+
+      tallies.setMultiplies(note, sets, null);
+      final again = tallies.byNote(note)!;
+      expect(again.counted(entry, reps), 10);
+      expect(again.field(sets)!.target, 4);
+    });
+
+    test('several multipliers multiply in turn, rounded and held', () {
+      final tallies = Tallies(ann);
+      final (note, [reps, sets, rounds]) = tally(ann, 'Gym', [
+        'reps',
+        'sets',
+        'rounds',
+      ]);
+      tallies.setMultiplies(note, sets, reps);
+      tallies.setMultiplies(note, rounds, reps);
+      final entry = tallies.add(
+        note,
+        values: {reps: 0.000003, sets: 0.5, rounds: -1},
+      );
+      final made = tallies.byNote(note)!;
+      expect(made.multipliersOf(reps).map((f) => f.id), [sets, rounds]);
+      // 0.000003 × 0.5 = 0.0000015, half away from zero, then × -1.
+      expect(made.counted(entry, reps), -0.000002);
+      final big = tallies.add(
+        note,
+        values: {reps: 1e9, sets: 1e9, rounds: 1e9},
+      );
+      expect(made.counted(big, reps), 0x7fffffffffffffff / 1000000);
+    });
+
+    test('a multiplier multiplies one shown other field, never a chain', () {
+      final tallies = Tallies(ann);
+      final (note, [a, b, c]) = tally(ann, 'Gym', ['a', 'b', 'c']);
+      expect(() => tallies.setMultiplies(note, a, a), throwsArgumentError);
+      expect(() => tallies.setMultiplies(note, a, 'x'), throwsArgumentError);
+      tallies.setMultiplies(note, b, a);
+      expect(tallies.byNote(note)!.multipliable(c).map((f) => f.id), [a]);
+      // A multiplier is never multiplied, and a multiplied field never
+      // multiplies.
+      expect(() => tallies.setMultiplies(note, c, b), throwsArgumentError);
+      expect(() => tallies.setMultiplies(note, a, c), throwsArgumentError);
+      expect(tallies.byNote(note)!.multipliable(a), isEmpty);
+      tallies.hideField(note, c);
+      expect(() => tallies.setMultiplies(note, b, c), throwsArgumentError);
+      // Nor does a hidden field multiply.
+      expect(() => tallies.setMultiplies(note, c, a), throwsArgumentError);
+    });
+
+    test('hiding the multiplied field leaves the multiplier plain', () {
+      final tallies = Tallies(ann);
+      final (note, [reps, sets]) = tally(ann, 'Gym', ['reps', 'sets']);
+      tallies.setMultiplies(note, sets, reps);
+      final entry = tallies.add(note, values: {reps: 10, sets: 3});
+      tallies.hideField(note, reps);
+      final hidden = tallies.byNote(note)!;
+      expect(hidden.field(sets)!.multiplies, isNull);
+      expect(hidden.counting.map((f) => f.id), [sets]);
+      expect(hidden.counted(entry, sets), 3);
+      tallies.restoreField(note, reps);
+      expect(tallies.byNote(note)!.counted(entry, reps), 30);
+    });
+
+    test('settings the cores read as no multiplier', () {
+      final tallies = Tallies(ann);
+      final (note, [a, b, c]) = tally(ann, 'Gym', ['a', 'b', 'c']);
+      final key = TallyKeys.multiplies;
+      // Each other's multipliers, as two Devices might set them.
+      ann.append(note, TallyKeys.field(a, key), b);
+      ann.append(note, TallyKeys.field(b, key), a);
+      ann.append(note, TallyKeys.field(c, key), c);
+      final read = tallies.byNote(note)!;
+      expect([for (final f in read.fields) f.multiplies], [null, null, null]);
+      final added = tallies.addField(note, name: 'd', multiplies: c);
+      expect(tallies.byNote(note)!.field(added)!.multiplies, c);
+    });
+  });
+
   group('in a Shared Area', () {
     late Store ben;
     late String area;

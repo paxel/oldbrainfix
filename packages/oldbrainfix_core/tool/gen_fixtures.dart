@@ -699,8 +699,13 @@ final _scenarios = <Scenario>[
         'one removed and one removed and restored; fields renamed, given '
         'another unit of their kind, their target taken away, their rule '
         'changed, hidden and hidden and restored; a Tally merged into '
-        'another Note and recorded in there; a Tally in the trash; an '
-        'Unsorted Note beside them.',
+        'another Note and recorded in there; a Tally in the trash; '
+        'multipliers (#200): one added multiplying a field, with entries '
+        'of whole, fractional, negative and rounded products and one '
+        'without the multiplier, one whose multiplied field is hidden, one '
+        'on the Note a Tally was merged into multiplying a field of the '
+        'merged one, and settings no app writes: one naming a multiplier, '
+        'one itself; an Unsorted Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final tallies = Tallies(store);
@@ -788,6 +793,23 @@ final _scenarios = <Scenario>[
       final evenings = notes.capture('Evenings').id;
       notes.merge(reading, evenings);
       tallies.add(evenings, values: {pages: 8}, line: 'Novel');
+      final sets = tallies.addField(gym, name: 'Sets', multiplies: reps);
+      tallies.add(gym, values: {reps: 10, sets: 3}, line: 'Sets');
+      tallies.add(gym, values: {reps: 2.5, sets: 1.5});
+      tallies.add(gym, values: {reps: -3, sets: 0.5});
+      tallies.add(gym, values: {reps: 0.000003, sets: 0.5});
+      tallies.add(gym, values: {sets: 4});
+      final laps = tallies.addField(gym, name: 'Laps', unit: 'laps');
+      tallies.setMultiplies(gym, laps, run);
+      tallies.add(gym, values: {run: 400, laps: 2});
+      tallies.hideField(gym, run);
+      final odd = tallies.addField(gym, name: 'Rounds');
+      store.append(gym, TallyKeys.field(odd, TallyKeys.multiplies), sets);
+      final self = tallies.addField(gym, name: 'Self');
+      store.append(gym, TallyKeys.field(self, TallyKeys.multiplies), self);
+      final books = tallies.addField(evenings, name: 'Books');
+      tallies.setMultiplies(evenings, books, pages);
+      tallies.add(evenings, values: {pages: 8, books: 2});
       final steps = notes.capture('Steps').id;
       final count = tallies.addField(steps, name: 'Steps', unit: 'steps');
       tallies.add(steps, values: {count: 8000});
@@ -2341,12 +2363,15 @@ Map<String, Object?> _tallies(Store store) {
     for (final id in store.entitiesOfType(NoteKeys.typeNote)..sort())
       if (tallies.isTally(id)) id,
   ];
-  Map<String, Object?> entry(TallyEntry e) => {
+  Map<String, Object?> entry(Tally tally, TallyEntry e) => {
     'id': e.id,
     'noteId': e.noteId,
     'at': e.at.toIso8601String(),
     'values': {
       for (final id in e.values.keys.toList()..sort()) id: number(e.values[id]),
+    },
+    'counted': {
+      for (final f in tally.fields) f.id: ?tally.countedMicro(e, f.id),
     },
     'line': e.line,
     'trashed': e.trashed?.toIso8601String(),
@@ -2367,6 +2392,7 @@ Map<String, Object?> _tallies(Store store) {
                 'target': number(f.target),
                 'rule': f.rule.name,
                 'hidden': f.hidden,
+                'multiplies': f.multiplies,
                 'hasEntries': f.hasEntries,
                 'added': f.added.toIso8601String(),
               },
@@ -2375,7 +2401,9 @@ Map<String, Object?> _tallies(Store store) {
     'all': [for (final tally in tallies.all()) tally.noteId],
     'entries': {
       for (final id in noteIds)
-        id: [for (final e in tallies.entries(id)) entry(e)],
+        id: [
+          for (final e in tallies.entries(id)) entry(tallies.byNote(id)!, e),
+        ],
     },
     'mine': {
       for (final id in noteIds)
@@ -2389,7 +2417,10 @@ Map<String, Object?> _tallies(Store store) {
     },
     'removed': {
       for (final id in noteIds)
-        id: [for (final e in tallies.removedEntries(id)) entry(e)],
+        id: [
+          for (final e in tallies.removedEntries(id))
+            entry(tallies.byNote(id)!, e),
+        ],
     },
     'charts': {
       for (final tally in tallies.all())
@@ -7936,7 +7967,9 @@ Future<void> main(List<String> args) async {
     'frog" section the day before, on and after the clock held, on the '
     'same clock.\n'
     '- `tallies/tallies.json`: each Tally of the `tallies` log with its '
-    'fields, the Tallies in the lists, the entries of each, everyone\'s '
+    'fields and what each multiplies, the Tallies in the lists, the '
+    'entries of each with what each counts for its fields in millionths, '
+    'everyone\'s '
     'and the user\'s own, its removed entries, its charts by day, week, month and year on the '
     'same clock, and the known units and a typed one converted both ways, '
     'shown and read in both systems, numbers kept and read back, and the '

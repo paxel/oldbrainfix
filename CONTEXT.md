@@ -186,7 +186,7 @@ The phone's page for its calendars: "Read from your calendar", which shows the a
 ### Tallies
 
 **Tally**:
-A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. German: Strichliste.
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. A field may instead multiply another of its fields (#200), as Rounds multiply Push-ups: the other field then counts the product in each entry, and the multiplier counts no value of its own. German: Strichliste.
 _Avoid_: tracker, log, workout, exercise, habit
 
 **Entry**:

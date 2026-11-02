@@ -3546,6 +3546,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyNoTarget => 'No target';
 
   @override
+  String get tallyMultiplies => 'Multiplies';
+
+  @override
+  String get tallyMultipliesNothing => 'Nothing';
+
+  @override
+  String get tallyMultipliesDetail =>
+      'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.';
+
+  @override
+  String tallyTimes(String factor, String value) {
+    return '$factor × $value';
+  }
+
+  @override
   String get tallyFields => 'Fields';
 
   @override

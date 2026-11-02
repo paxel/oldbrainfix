@@ -6404,15 +6404,19 @@ impl App {
                     Some(TallyForm::Field(FieldForm::new(&id, None, system, &self.t)));
             }
             TallyAction::OpenField(field) => {
-                let field = match field {
-                    Some(id) => tallies.by_note(&note)?.and_then(|t| t.field(&id).cloned()),
-                    None => None,
+                let tally = tallies.by_note(&note)?;
+                let field = match (field, &tally) {
+                    (Some(id), Some(tally)) => tally.field(&id).cloned(),
+                    _ => None,
                 };
                 self.save_text()?;
                 self.editor = None;
-                self.tally_form = Some(TallyForm::Field(FieldForm::new(
-                    &note, field, system, &self.t,
-                )));
+                let form = FieldForm::new(&note, field, system, &self.t);
+                let form = match &tally {
+                    Some(tally) => form.multiplying(tally),
+                    None => form,
+                };
+                self.tally_form = Some(TallyForm::Field(form));
             }
             TallyAction::AddEntry | TallyAction::EditEntry(_) => {
                 let Some(tally) = tallies.by_note(&note)? else {

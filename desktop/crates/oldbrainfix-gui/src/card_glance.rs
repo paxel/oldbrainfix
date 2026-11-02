@@ -15,8 +15,9 @@ use crate::schedule_text::{day_text, occurrence_time};
 use crate::tally_view::{self, decimal_sign, shown_value, typed_value};
 
 /// The lines of each Note of `listed` that is a Tally or a Session, by
-/// its id: a Tally's fields shown, each with its total today and its
-/// target ("Pages 30 / 50 pages"), of the user's own entries in a Shared
+/// its id: a Tally's fields shown but its multipliers, each with its
+/// total today, a multiplied field's the products (#200), and its target
+/// ("Pages 30 / 50 pages"), of the user's own entries in a Shared
 /// Area as its detailed view counts unless another choice is picked
 /// (#190); else of a Session Note (#191) the next run of any of its
 /// Routines not Done and how many runs of all of them were Done and
@@ -40,7 +41,7 @@ pub fn read(
     for id in listed {
         if let Some(tally) = tallies.by_note(id)? {
             let mut lines = Vec::new();
-            for field in tally.shown() {
+            for field in tally.counting() {
                 let bars = tallies.chart(
                     id,
                     &field.id,

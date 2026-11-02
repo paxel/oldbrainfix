@@ -49,7 +49,10 @@ Future<bool> openTallyField(
 /// typed, only of its kind once entries hold values for it; its target,
 /// optional, prefilled in each new entry; and how a day with several
 /// entries counts, their sum or the largest, which follows the kind of
-/// unit until it is picked. A field that exists has "Hide field" at the
+/// unit until it is picked. In a Tally with another field it may multiply
+/// (#200), "Multiplies" offers Nothing and those fields; a multiplier has
+/// no target and no rule, so they leave the page while one is picked. A
+/// field that exists has "Hide field" at the
 /// bottom, or "Show field again" when hidden; its values stay stored.
 /// Leaving without Save changes nothing.
 class TallyFieldScreen extends StatefulWidget {
@@ -112,6 +115,19 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
   final _targetFocus = FocusNode();
   final _unitFocus = FocusNode();
   late TallyRule _rule = _field?.rule ?? TallyRule.sum;
+
+  /// The fields this one may multiply, those of a written Note's Tally.
+  late final List<TallyField> _multipliable = switch (widget.noteId) {
+    final noteId? =>
+      _tallies.byNote(noteId)?.multipliable(widget.fieldId) ?? const [],
+    null => const [],
+  };
+
+  /// The id of the field it multiplies, or [_nothing].
+  late String _multiplies = _field?.multiplies ?? _nothing;
+
+  /// What [_multiplies] holds while it multiplies nothing.
+  static const _nothing = '';
 
   /// Whether the rule was picked here; until then it follows the unit.
   var _rulePicked = false;
@@ -198,7 +214,9 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
   void _save() {
     final name = _name.text.trim();
     final unit = _chosenUnit;
-    final targetText = _target.text.trim();
+    // A multiplier has no target (#200).
+    final multiplies = _multiplies == _nothing ? null : _multiplies;
+    final targetText = multiplies == null ? _target.text.trim() : '';
     final target = targetText.isEmpty
         ? null
         : TallyUnits.parseShown(targetText, unit, _system);
@@ -241,16 +259,24 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
         unit: unit,
         target: target,
         rule: _rule,
+        multiplies: multiplies,
       );
     } else {
       if (name != field.name) _tallies.renameField(noteId, field.id, name);
       final unitChanged = unit != field.unit;
       if (unitChanged) _tallies.setUnit(noteId, field.id, unit);
-      // Read again in the unit now shown next to it.
-      if (unitChanged || targetText != _targetAsOpened) {
-        _tallies.setTarget(noteId, field.id, target);
+      if (multiplies != field.multiplies) {
+        _tallies.setMultiplies(noteId, field.id, multiplies);
       }
-      if (_rule != field.rule) _tallies.setRule(noteId, field.id, _rule);
+      // A multiplier's target and rule stay as they were, for when it is
+      // a field of its own again.
+      if (multiplies == null) {
+        // Read again in the unit now shown next to it.
+        if (unitChanged || targetText != _targetAsOpened) {
+          _tallies.setTarget(noteId, field.id, target);
+        }
+        if (_rule != field.rule) _tallies.setRule(noteId, field.id, _rule);
+      }
     }
     Navigator.of(context).pop(true);
   }
@@ -337,43 +363,76 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
                 ],
               ),
             ),
-            EditorPanel(
-              child: TextField(
-                key: const ValueKey('tally-field-target'),
-                controller: _target,
-                focusNode: _targetFocus,
-                keyboardType: const TextInputType.numberWithOptions(
-                  signed: true,
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: t.tallyTarget,
-                  helperText: t.tallyTargetHint,
-                  suffixText: shownUnit(_chosenUnit, _system),
-                  errorText: _targetInvalid ? t.tallyNotANumber : null,
+            if (_multipliable.isNotEmpty || _field?.multiplies != null)
+              EditorPanel(
+                heading: t.tallyMultiplies,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RadioColumn<String>(
+                      key: const ValueKey('tally-multiplies'),
+                      value: _multiplies,
+                      onChanged: (id) => setState(() => _multiplies = id),
+                      options: [
+                        RadioOption(
+                          key: const ValueKey('tally-multiplies-nothing'),
+                          value: _nothing,
+                          title: Text(t.tallyMultipliesNothing),
+                        ),
+                        for (final other in _multipliable)
+                          RadioOption(
+                            key: ValueKey('tally-multiplies-${other.id}'),
+                            value: other.id,
+                            title: Text(other.name),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      t.tallyMultipliesDetail,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ),
-            ),
-            EditorPanel(
-              heading: t.tallyRule,
-              child: RadioColumn<TallyRule>(
-                key: const ValueKey('tally-rule'),
-                value: _rule,
-                onChanged: _pickRule,
-                options: [
-                  RadioOption(
-                    key: const ValueKey('tally-rule-sum'),
-                    value: TallyRule.sum,
-                    title: Text(t.tallyRuleSum),
+            if (_multiplies == _nothing) ...[
+              EditorPanel(
+                child: TextField(
+                  key: const ValueKey('tally-field-target'),
+                  controller: _target,
+                  focusNode: _targetFocus,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                    decimal: true,
                   ),
-                  RadioOption(
-                    key: const ValueKey('tally-rule-max'),
-                    value: TallyRule.max,
-                    title: Text(t.tallyRuleMax),
+                  decoration: InputDecoration(
+                    labelText: t.tallyTarget,
+                    helperText: t.tallyTargetHint,
+                    suffixText: shownUnit(_chosenUnit, _system),
+                    errorText: _targetInvalid ? t.tallyNotANumber : null,
                   ),
-                ],
+                ),
               ),
-            ),
+              EditorPanel(
+                heading: t.tallyRule,
+                child: RadioColumn<TallyRule>(
+                  key: const ValueKey('tally-rule'),
+                  value: _rule,
+                  onChanged: _pickRule,
+                  options: [
+                    RadioOption(
+                      key: const ValueKey('tally-rule-sum'),
+                      value: TallyRule.sum,
+                      title: Text(t.tallyRuleSum),
+                    ),
+                    RadioOption(
+                      key: const ValueKey('tally-rule-max'),
+                      value: TallyRule.max,
+                      title: Text(t.tallyRuleMax),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             // A secondary state change: a row at the bottom.
             if (field != null)
               ListTile(

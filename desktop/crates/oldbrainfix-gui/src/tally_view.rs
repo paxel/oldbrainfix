@@ -202,7 +202,7 @@ pub fn read(
         entries.push(shown(entry)?);
     }
     let mut charts = BTreeMap::new();
-    for field in tally.shown() {
+    for field in tally.counting() {
         let bars = tallies.chart(note_id, &field.id, period, wall, &filter)?;
         charts.insert(field.id.clone(), bars);
     }
@@ -305,19 +305,26 @@ pub(crate) fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
     }
 }
 
-/// What `entry` holds for the fields shown, one after the other.
+/// What `entry` holds for the fields shown, one after the other; a
+/// multiplied field's value after the values of its multipliers the
+/// entry holds, as bare numbers ("Reps 3 × 10 reps"), and a multiplier
+/// not on its own (#200).
 fn values_line(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem) -> String {
     let decimal = decimal_sign(t);
     tally
-        .shown()
+        .counting()
         .into_iter()
         .filter_map(|field| {
             let value = entry.values.get(&field.id)?;
-            Some(format!(
-                "{} {}",
-                field.name,
-                shown_value(*value, &field.unit, system, decimal)
-            ))
+            let mut shown = shown_value(*value, &field.unit, system, decimal);
+            for multiplier in tally.multipliers_of(&field.id).into_iter().rev() {
+                if let Some(factor) = entry.values.get(&multiplier.id) {
+                    let number =
+                        tally_units::format_shown(*factor, &multiplier.unit, system, decimal);
+                    shown = t.tally_times(&number, &shown);
+                }
+            }
+            Some(format!("{} {shown}", field.name))
         })
         .collect::<Vec<_>>()
         .join(" · ")
@@ -325,8 +332,10 @@ fn values_line(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem) 
 
 /// The setup of a Tally in the Note dialog (#190): a row per field, its
 /// name and its settings as badges as on the New Tally page (#161), how a
-/// day with several entries counts, its unit and its target, "Hidden"
-/// while it is hidden; a click on the name or a badge opens the field's
+/// day with several entries counts, its unit and its target, the other
+/// field it multiplies (#200) while it does or may, a multiplier without
+/// a rule or a target, "Hidden" while it is hidden; a click on the name
+/// or a badge opens the field's
 /// page for who may change the Note, and "Add field" the page of a new
 /// one. The chart and the entries show on the card, not here.
 pub fn setup(
@@ -364,11 +373,23 @@ pub fn setup(
                 Some(target) => shown_value(target, &field.unit, system, decimal),
                 None => t.tally_no_target().to_string(),
             };
-            let mut badges = vec![
-                (icons::TALLY_RULE, t.tally_rule(), rule.to_string()),
-                (icons::TALLY_UNIT, t.tally_unit(), unit_value),
-                (icons::TALLY_TARGET, t.tally_target_badge(), target_value),
-            ];
+            let multiplies = field.multiplies.as_deref().and_then(|id| tally.field(id));
+            let mut badges = Vec::new();
+            // A multiplier counts no value: no rule, no target (#200).
+            if multiplies.is_none() {
+                badges.push((icons::TALLY_RULE, t.tally_rule(), rule.to_string()));
+            }
+            badges.push((icons::TALLY_UNIT, t.tally_unit(), unit_value));
+            if multiplies.is_none() {
+                badges.push((icons::TALLY_TARGET, t.tally_target_badge(), target_value));
+            }
+            if multiplies.is_some() || !tally.multipliable(Some(&field.id)).is_empty() {
+                let value = multiplies.map_or_else(
+                    || t.tally_multiplies_nothing().to_string(),
+                    |m| m.name.clone(),
+                );
+                badges.push((icons::TALLY_MULTIPLIES, t.tally_multiplies(), value));
+            }
             if field.hidden {
                 badges.push((
                     icons::TALLY_HIDDEN,
@@ -400,7 +421,8 @@ pub fn setup(
 
 /// A Tally on its Note's detailed card (#190): "Add entry" for who may
 /// add one; in a Shared Area the choice of whose entries show; the length
-/// of a bar; one chart per field shown; the entries, newest first, the
+/// of a bar; one chart per field shown but the multipliers, a multiplied
+/// field's of the products (#200); the entries, newest first, the
 /// older folded under the latest [`SHOWN_ENTRIES`]; and the folded
 /// "Removed entries" with Restore. The card leaves its own click out of
 /// where this lies, so its buttons take theirs.
@@ -452,7 +474,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAc
         if radio_column(ui, &mut period, options) {
             actions.push(TallyAction::Period(period));
         }
-        for field in tally.shown() {
+        for field in tally.counting() {
             let unit = tally_units::shown_unit(&field.unit, system);
             let words = if unit.is_empty() {
                 field.name.clone()
@@ -778,8 +800,11 @@ fn field_error(ui: &mut Ui, error: &str) {
 /// Device's system (#159), a known one or one as typed, only of its kind
 /// once entries hold values for it; its target, optional; and how a
 /// day with several entries counts, which follows the kind of unit until
-/// it is picked. A field that exists has "Hide field", or "Show field
-/// again", at the bottom. Leaving without Save changes nothing. For the
+/// it is picked. In a Tally with another field it may multiply (#200),
+/// "Multiplies" offers Nothing and those fields; a multiplier has no
+/// target and no rule, so they leave the page while one is picked. A
+/// field that exists has "Hide field", or "Show field again", at the
+/// bottom. Leaving without Save changes nothing. For the
 /// Note being captured (#113) Save hands the field back instead
 /// ([`FieldForm::choice`]), as the phone's `chooseTallyField`.
 #[derive(Debug, Clone)]
@@ -806,6 +831,10 @@ pub struct FieldForm {
     target_as_opened: String,
     pub rule: TallyRule,
     rule_picked: bool,
+    /// The fields this one may multiply, by id and name (#200).
+    multipliable: Vec<(String, String)>,
+    /// The id of the field it multiplies.
+    pub multiplies: Option<String>,
     system: UnitSystem,
     name_missing: bool,
     target_invalid: bool,
@@ -853,6 +882,8 @@ impl FieldForm {
             target,
             rule: field.as_ref().map_or(TallyRule::Sum, |f| f.rule),
             rule_picked: false,
+            multipliable: Vec::new(),
+            multiplies: field.as_ref().and_then(|f| f.multiplies.clone()),
             system,
             name_missing: false,
             target_invalid: false,
@@ -892,6 +923,17 @@ impl FieldForm {
         }
     }
 
+    /// The page with the fields of `tally` this one may multiply.
+    pub fn multiplying(mut self, tally: &Tally) -> FieldForm {
+        let id = self.field.as_ref().map(|f| f.id.as_str());
+        self.multipliable = tally
+            .multipliable(id)
+            .into_iter()
+            .map(|f| (f.id.clone(), f.name.clone()))
+            .collect();
+        self
+    }
+
     /// The page of the first field of the Note being captured.
     pub fn choose(system: UnitSystem, t: &L10n) -> FieldForm {
         FieldForm {
@@ -920,9 +962,17 @@ impl FieldForm {
         let target_text = self.target.trim().to_string();
         let tallies = Tallies::new(store);
         let note = &self.note_id;
+        let multiplies = self.multiplies.as_deref();
         match &self.field {
             None => {
-                tallies.add_field(note, &name, &unit, target, Some(self.rule))?;
+                tallies.add_field_multiplying(
+                    note,
+                    &name,
+                    &unit,
+                    target,
+                    Some(self.rule),
+                    multiplies,
+                )?;
             }
             Some(field) => {
                 if name != field.name {
@@ -932,12 +982,19 @@ impl FieldForm {
                 if unit_changed {
                     tallies.set_unit(note, &field.id, &unit)?;
                 }
-                // Read again in the unit now shown next to it.
-                if unit_changed || target_text != self.target_as_opened {
-                    tallies.set_target(note, &field.id, target)?;
+                if multiplies != field.multiplies.as_deref() {
+                    tallies.set_multiplies(note, &field.id, multiplies)?;
                 }
-                if self.rule != field.rule {
-                    tallies.set_rule(note, &field.id, self.rule)?;
+                // A multiplier's target and rule stay as they were, for
+                // when it is a field of its own again.
+                if multiplies.is_none() {
+                    // Read again in the unit now shown next to it.
+                    if unit_changed || target_text != self.target_as_opened {
+                        tallies.set_target(note, &field.id, target)?;
+                    }
+                    if self.rule != field.rule {
+                        tallies.set_rule(note, &field.id, self.rule)?;
+                    }
                 }
             }
         }
@@ -950,7 +1007,11 @@ impl FieldForm {
     fn checked(&mut self) -> Option<(String, String, Option<f64>)> {
         let name = self.name.trim().to_string();
         let unit = self.chosen_unit();
-        let target_text = self.target.trim().to_string();
+        // A multiplier has no target (#200).
+        let target_text = match self.multiplies {
+            None => self.target.trim().to_string(),
+            Some(_) => String::new(),
+        };
         let target = if target_text.is_empty() {
             None
         } else {
@@ -1080,38 +1141,66 @@ impl FieldForm {
                         self.unit_changed();
                     }
                 });
-                embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
-                    ui.horizontal(|ui| {
-                        let unit = tally_units::shown_unit(&self.chosen_unit(), self.system);
-                        let field = ui
-                            .add(
-                                TextEdit::singleline(&mut self.target)
-                                    .id(Id::new(TARGET_FIELD))
-                                    .text_color(text)
-                                    .desired_width(120.0),
-                            )
-                            .labelled_by(label.id);
-                        if focus == Some(TARGET_FIELD) {
-                            field.request_focus();
+                let offered = !self.multipliable.is_empty()
+                    || self.field.as_ref().is_some_and(|f| f.multiplies.is_some());
+                if offered {
+                    embossed(ui, tones, false, None, |ui| {
+                        ui.label(RichText::new(t.tally_multiplies()).strong().color(text));
+                        let mut picked = self
+                            .multiplies
+                            .as_ref()
+                            .and_then(|id| self.multipliable.iter().position(|(o, _)| o == id));
+                        let options = std::iter::once((None, t.tally_multiplies_nothing().into()))
+                            .chain(
+                                self.multipliable
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, (_, name))| (Some(i), name.clone())),
+                            );
+                        if radio_column(ui, &mut picked, options) {
+                            self.multiplies = picked.map(|i| self.multipliable[i].0.clone());
                         }
-                        ui.label(RichText::new(unit).color(text));
+                        ui.label(
+                            RichText::new(t.tally_multiplies_detail())
+                                .small()
+                                .color(weak),
+                        );
                     });
-                    if self.target_invalid {
-                        field_error(ui, t.tally_not_a_number());
-                    }
-                    ui.label(RichText::new(t.tally_target_hint()).small().color(weak));
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.tally_rule()).strong().color(text));
-                    let options = [
-                        (TallyRule::Sum, t.tally_rule_sum().to_string()),
-                        (TallyRule::Max, t.tally_rule_max().to_string()),
-                    ];
-                    if radio_column(ui, &mut self.rule, options) {
-                        self.rule_picked = true;
-                    }
-                });
+                }
+                if self.multiplies.is_none() {
+                    embossed(ui, tones, false, None, |ui| {
+                        let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
+                        ui.horizontal(|ui| {
+                            let unit = tally_units::shown_unit(&self.chosen_unit(), self.system);
+                            let field = ui
+                                .add(
+                                    TextEdit::singleline(&mut self.target)
+                                        .id(Id::new(TARGET_FIELD))
+                                        .text_color(text)
+                                        .desired_width(120.0),
+                                )
+                                .labelled_by(label.id);
+                            if focus == Some(TARGET_FIELD) {
+                                field.request_focus();
+                            }
+                            ui.label(RichText::new(unit).color(text));
+                        });
+                        if self.target_invalid {
+                            field_error(ui, t.tally_not_a_number());
+                        }
+                        ui.label(RichText::new(t.tally_target_hint()).small().color(weak));
+                    });
+                    embossed(ui, tones, false, None, |ui| {
+                        ui.label(RichText::new(t.tally_rule()).strong().color(text));
+                        let options = [
+                            (TallyRule::Sum, t.tally_rule_sum().to_string()),
+                            (TallyRule::Max, t.tally_rule_max().to_string()),
+                        ];
+                        if radio_column(ui, &mut self.rule, options) {
+                            self.rule_picked = true;
+                        }
+                    });
+                }
                 // A secondary state change: a row at the bottom.
                 if let Some(field) = &self.field {
                     embossed(ui, tones, false, None, |ui| {

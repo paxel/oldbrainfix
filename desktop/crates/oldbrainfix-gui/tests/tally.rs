@@ -686,6 +686,75 @@ fn the_note_dialog_holds_only_the_setup_and_a_badge_opens_the_field() -> TestRes
 }
 
 #[test]
+fn the_field_page_makes_a_field_multiply_another_without_a_rule_or_target() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let reps = tallies.add_field(&note, "Reps", "reps", Some(30.0), None)?;
+    let sets = tallies.add_field(&note, "Sets", "", Some(4.0), None)?;
+    store.set_local_setting("compactNotes:allNotes", "true")?;
+    let mut harness = window(&store, Some(&note));
+    // Each may multiply the other; the second row is Sets'.
+    assert_eq!(harness.query_all_by_label("Multiplies: Nothing").count(), 2);
+    click(&mut harness, "Multiplies: Nothing")?;
+    assert!(shows(&harness, "Field"));
+    let itself = harness.query_all_by_role_and_label(Role::RadioButton, "Sets");
+    assert_eq!(itself.count(), 0, "not itself");
+    click_radio(&mut harness, "Reps");
+    // A multiplier has no target and no rule.
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::TextInput, "Target (optional)")
+            .next()
+            .is_none()
+    );
+    assert!(!shows(&harness, "Their sum"));
+    click_button(&mut harness, "Save");
+    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(
+        tally.field(&sets).ok_or("sets")?.multiplies.as_ref(),
+        Some(&reps)
+    );
+    assert!(shows(&harness, "Multiplies: Reps"));
+    assert!(!shows(&harness, "Target: 4"));
+    // The field multiplied multiplies nothing itself.
+    assert!(!shows(&harness, "Multiplies: Nothing"));
+    assert!(shows(&harness, "Target: 30 reps"));
+    // Nothing again: a field of its own, its target back.
+    click_button(&mut harness, "Multiplies: Reps");
+    click_radio(&mut harness, "Nothing");
+    click_button(&mut harness, "Save");
+    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(tally.field(&sets).ok_or("sets")?.multiplies, None);
+    assert!(shows(&harness, "Target: 4"));
+    Ok(())
+}
+
+#[test]
+fn an_entry_shows_3_times_10_reps_and_counts_30_in_the_chart_and_the_compact_total() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let reps = tallies.add_field(&note, "Reps", "reps", Some(50.0), None)?;
+    let sets = tallies.add_field(&note, "Sets", "", None, None)?;
+    let both = BTreeMap::from([(reps.clone(), 10.0), (sets.clone(), 3.0)]);
+    tallies.add(&note, &both, "", None)?;
+    // Recorded before it multiplied: counted on read alike.
+    tallies.set_multiplies(&note, &sets, Some(&reps))?;
+    tallies.add(&note, &BTreeMap::from([(reps, 5.0)]), "", None)?;
+    let harness = window(&store, None);
+    assert!(shows_part(&harness, "Reps 3 × 10 reps"));
+    assert!(shows_part(&harness, "Reps 5 reps"));
+    assert!(shows(&harness, "Chart of Reps, 1 bars"));
+    assert!(shows(&harness, "Highest bar: 35 reps"));
+    assert!(!shows_part(&harness, "Chart of Sets"));
+    assert!(!shows_part(&harness, "Sets 3"));
+    store.set_local_setting("compactNotes:allNotes", "true")?;
+    let compact = window(&store, None);
+    assert!(shows(&compact, "Reps 35 / 50 reps"));
+    assert!(!shows_part(&compact, "Sets"));
+    Ok(())
+}
+
+#[test]
 fn the_unit_setting_follows_the_region_until_a_system_is_chosen() -> TestResult {
     let store = Arc::new(device(4, "Desk")?);
     let mut harness = window(&store, None);

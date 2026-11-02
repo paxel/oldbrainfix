@@ -58,3 +58,13 @@ The charts and the entries show on the Tally's detailed card, with "Add entry"; 
 ## A Note is its kind (ADR 0038)
 
 Amended by ADR 0038 (#188): a Tally's text shows as its name, the first line, heading its page and card, and its description, the rest, folded under it, above the Tally's content. A Tally stays a Tally: its kind badge offers no other kind.
+
+## Multipliers (#200)
+
+A field can multiply one other field of the same Tally, as Sets multiply Reps: the key `tally:<field id>:multiplies` holds the other field's id, null when it multiplies nothing. It is written as the other keys of a field are, by who may change the Note, latest wins.
+
+It is read, never written into the entries: per entry the multiplied field counts as its value times the value of each of its multipliers the entry holds, a multiplier without a value counting as 1; totals, targets, the charts and the AI port count that product. The product is taken in millionths, each step rounded half away from zero and held at the 64-bit limits, in the same order in both cores. A multiplier counts no value of its own: it has no total, no chart and no target, its stored target and rule are kept for when it is a field of its own again, and the entry form still asks for its value. An entry shows a multiplied field's value after its multipliers' values, as bare numbers ("3 × 10 reps"). Making a field a multiplier later applies to the entries already there, and nothing is rewritten.
+
+Lead's choices, as both cores read them: a field's setting multiplies when it names a field shown other than itself whose own setting names no field shown other than that field, and the field itself is shown. So no chain forms, two fields naming each other both stay plain, and hiding the field multiplied, which is what removing a field is (fields are never removed), leaves the multiplier a plain field until the field is shown again. Several fields may multiply one field; the product takes them all, in the fields' order. Setting one is refused for itself, a field hidden or not of the Tally, a field whose setting already multiplies, and on a field hidden or one another field multiplies. The fields of a Note merged into the Tally take part like its own.
+
+- Considered: the product written into each entry (rejected: old entries would need rewriting, and a later change of the setting would leave them wrong); one multiplier per field only (rejected: the product of several reads plainly and needs no rule to pick one).

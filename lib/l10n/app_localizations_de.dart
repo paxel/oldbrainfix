@@ -3582,6 +3582,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyNoTarget => 'Kein Ziel';
 
   @override
+  String get tallyMultiplies => 'Multipliziert';
+
+  @override
+  String get tallyMultipliesNothing => 'Nichts';
+
+  @override
+  String get tallyMultipliesDetail =>
+      'In jedem Eintrag multipliziert sein Wert das gewählte Feld, etwa 3 Runden × 10 Liegestütze zu 30 Liegestützen. Es zählt dann keinen eigenen Wert: keine Summe, kein Diagramm, kein Ziel.';
+
+  @override
+  String tallyTimes(String factor, String value) {
+    return '$factor × $value';
+  }
+
+  @override
   String get tallyFields => 'Felder';
 
   @override

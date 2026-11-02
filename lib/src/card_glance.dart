@@ -9,7 +9,8 @@ import 'tally_view.dart';
 
 /// What the compact view of a card says under the Note's name of its
 /// Tally or of its Session (#189), read once per list: a Tally's
-/// fields shown, each with its total today and its target ("Pages 30 / 50
+/// fields shown but its multipliers, each with its total today, a
+/// multiplied field's the products (#200), and its target ("Pages 30 / 50
 /// pages"), of the user's own entries in a Shared Area as its detailed
 /// view counts unless another choice is picked (#190); else of a Session
 /// Note (#191) the next run of any of its Routines not Done and how many
@@ -56,7 +57,7 @@ class CardGlances {
   /// The lines of the Note [noteId].
   List<String> of(String noteId) {
     if (_tallies.byNote(noteId) case final tally?) {
-      return [for (final field in tally.shown) _fieldLine(noteId, field)];
+      return [for (final field in tally.counting) _fieldLine(noteId, field)];
     }
     final setup = _sessions.setupOf(noteId);
     if (setup == null) return const [];

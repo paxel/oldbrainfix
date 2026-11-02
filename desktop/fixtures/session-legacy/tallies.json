@@ -10,6 +10,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:05.000Z"
       }
@@ -24,6 +25,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:15.000Z"
       }
@@ -38,6 +40,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:25.000Z"
       }
@@ -52,6 +55,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:35.000Z"
       }

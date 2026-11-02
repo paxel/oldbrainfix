@@ -10,6 +10,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:05.000Z"
       }
@@ -24,6 +25,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:15.000Z"
       }
@@ -38,6 +40,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:47.000Z"
       }
@@ -56,6 +59,7 @@
         "noteId": "note:00000000000000000000000000000003",
         "at": "2026-01-01T10:01:05.000Z",
         "values": {},
+        "counted": {},
         "line": "Better",
         "trashed": null,
         "author": null
@@ -65,6 +69,7 @@
         "noteId": "note:00000000000000000000000000000003",
         "at": "2026-01-01T10:00:37.000Z",
         "values": {},
+        "counted": {},
         "line": "Shaky",
         "trashed": null,
         "author": null
@@ -76,6 +81,7 @@
         "noteId": "note:00000000000000000000000000000008",
         "at": "2026-01-01T10:00:55.000Z",
         "values": {},
+        "counted": {},
         "line": "Slow",
         "trashed": null,
         "author": null

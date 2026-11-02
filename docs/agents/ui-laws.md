@@ -298,7 +298,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
   and how many are open ("4 open"), a Tally its name and each field's
-  total today against its target ("Steps 7000 / 10000 steps"), in a
+  but a multiplier's total today, a multiplied field's the product
+  (#200), against its target ("Steps 7000 / 10000 steps"), in a
   Shared Area of the user's own entries, as its detailed view counts at
   first (#190), a Session
   its name, the next run of any of its Routines and "done 4 / skipped 1
@@ -313,7 +314,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   "Add entry", in a Shared Area "Show entries" (Mine at first,
   Everyone's, or one person's), "One bar per" Day, Week, Month or Year
   as radio buttons, kept per Note on this Device, a chart per field
-  shown, then its entries, newest first, the latest five and the older
+  shown but its multipliers (#200), then its entries (a multiplied
+  field's value after its multipliers', "Reps 3 × 10 reps"), newest
+  first, the latest five and the older
   folded under how many ("12 older entries") until a tap shows them,
   kept open per Note on this Device; a tap on an entry edits it, a long
   press offers Edit and Delete, and the folded "Removed entries" restore.
@@ -358,7 +361,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   its schedule; the kind, Plain Note included (#188); Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box. A Tally's setup
   is its fields (#190), each its name with its rule, unit and target as
-  badges, as on the Tally page, and "Hidden" while it is hidden, a tap
+  badges, as on the Tally page, what it multiplies (#200) while it does
+  or may ("Multiplies: Reps", "Nothing"), a multiplier without its rule
+  and target, and "Hidden" while it is hidden, a tap
   on the name or a badge opening the field's page, then "Add field"; the
   editor shows no chart and no entries. A Session's setup (#191) is its
   pool, a list of checkboxes ending in "New Tally" as on its "+" page,

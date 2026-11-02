@@ -34,7 +34,7 @@ use oldbrainfix_core::{
     NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
     RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
     ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, SimpleRepeat,
-    Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso,
+    Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso,
     parse_time,
 };
 use serde_json::{Value, json};
@@ -3719,6 +3719,40 @@ fn write_tallies(store: &Store) -> Built {
     let evenings = notes.capture("Evenings", None, None)?.id;
     notes.merge(&reading, &evenings)?;
     tallies.add(&evenings, &by_field(&[(&pages, 8.0)]), "Novel", None)?;
+    let sets = tallies.add_field_multiplying(&gym, "Sets", "", None, None, Some(&reps))?;
+    tallies.add(
+        &gym,
+        &by_field(&[(&reps, 10.0), (&sets, 3.0)]),
+        "Sets",
+        None,
+    )?;
+    tallies.add(&gym, &by_field(&[(&reps, 2.5), (&sets, 1.5)]), "", None)?;
+    tallies.add(&gym, &by_field(&[(&reps, -3.0), (&sets, 0.5)]), "", None)?;
+    tallies.add(
+        &gym,
+        &by_field(&[(&reps, 0.000003), (&sets, 0.5)]),
+        "",
+        None,
+    )?;
+    tallies.add(&gym, &by_field(&[(&sets, 4.0)]), "", None)?;
+    let laps = tallies.add_field(&gym, "Laps", "laps", None, None)?;
+    tallies.set_multiplies(&gym, &laps, Some(&run))?;
+    tallies.add(&gym, &by_field(&[(&run, 400.0), (&laps, 2.0)]), "", None)?;
+    tallies.hide_field(&gym, &run)?;
+    let multiplies = oldbrainfix_core::tallies::keys::MULTIPLIES;
+    let field_key = oldbrainfix_core::tallies::keys::field;
+    let odd = tallies.add_field(&gym, "Rounds", "", None, None)?;
+    store.append(&gym, &field_key(&odd, multiplies), Some(&sets), None)?;
+    let own = tallies.add_field(&gym, "Self", "", None, None)?;
+    store.append(&gym, &field_key(&own, multiplies), Some(&own), None)?;
+    let books = tallies.add_field(&evenings, "Books", "", None, None)?;
+    tallies.set_multiplies(&evenings, &books, Some(&pages))?;
+    tallies.add(
+        &evenings,
+        &by_field(&[(&pages, 8.0), (&books, 2.0)]),
+        "",
+        None,
+    )?;
     let steps = notes.capture("Steps", None, None)?.id;
     let count = tallies.add_field(&steps, "Steps", "steps", None, None)?;
     tallies.add(&steps, &by_field(&[(&count, 8000.0)]), "", None)?;
@@ -3732,17 +3766,27 @@ fn tally_number(value: Option<f64>) -> Value {
     json!(value.and_then(tally_units::encode_number))
 }
 
-fn tally_entry_json(store: &Store, e: &TallyEntry) -> Result<Value, Box<dyn std::error::Error>> {
+fn tally_entry_json(
+    store: &Store,
+    tally: &Tally,
+    e: &TallyEntry,
+) -> Result<Value, Box<dyn std::error::Error>> {
     let values: serde_json::Map<String, Value> = e
         .values
         .iter()
         .map(|(id, v)| (id.clone(), tally_number(Some(*v))))
+        .collect();
+    let counted: serde_json::Map<String, Value> = tally
+        .fields
+        .iter()
+        .filter_map(|f| Some((f.id.clone(), json!(tally.counted_micro(e, &f.id)?))))
         .collect();
     Ok(json!({
         "id": e.id,
         "noteId": e.note_id,
         "at": dart_iso(e.at),
         "values": values,
+        "counted": counted,
         "line": e.line,
         "trashed": iso(e.trashed),
         "author": store.author_of(&e.id)?.map(|p| p.id),
@@ -3869,6 +3913,7 @@ fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
                     "target": tally_number(f.target),
                     "rule": f.rule.name(),
                     "hidden": f.hidden,
+                    "multiplies": f.multiplies,
                     "hasEntries": f.has_entries,
                     "added": dart_iso(f.added),
                 })
@@ -3877,7 +3922,7 @@ fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         every.insert(id.clone(), json!(fields));
         let mut listed = Vec::new();
         for e in tallies.entries(id, &PersonFilter::default())? {
-            listed.push(tally_entry_json(&store, &e)?);
+            listed.push(tally_entry_json(&store, &tally, &e)?);
         }
         entries.insert(id.clone(), json!(listed));
         let own: Vec<String> = tallies
@@ -3888,7 +3933,7 @@ fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         mine.insert(id.clone(), json!(own));
         let mut gone = Vec::new();
         for e in tallies.removed_entries(id)? {
-            gone.push(tally_entry_json(&store, &e)?);
+            gone.push(tally_entry_json(&store, &tally, &e)?);
         }
         removed.insert(id.clone(), json!(gone));
     }

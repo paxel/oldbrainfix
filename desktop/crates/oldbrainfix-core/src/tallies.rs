@@ -28,6 +28,8 @@ pub mod keys {
     pub const TARGET: &str = "target";
     pub const RULE: &str = "rule";
     pub const HIDDEN: &str = "hidden";
+    /// The id of the other field a field multiplies (#200), as stored.
+    pub const MULTIPLIES: &str = "multiplies";
 
     /// The key of `key` of the field `field_id` on the Note.
     pub fn field(field_id: &str, key: &str) -> String {
@@ -67,10 +69,15 @@ pub struct TallyField {
     pub name: String,
     /// A known unit's code ([`tally_units::KNOWN`]) or the unit as typed.
     pub unit: String,
-    /// The target in the base unit.
+    /// The target in the base unit; a multiplier has none.
     pub target: Option<f64>,
     pub rule: TallyRule,
     pub hidden: bool,
+    /// The id of the other field this one multiplies (#200), or `None`
+    /// while it is a field of its own: a multiplier counts as no value.
+    pub multiplies: Option<String>,
+    /// The id of the field its setting names, read or not.
+    stored: Option<String>,
     /// Whether an entry holds a value for it, a removed one included: its
     /// kind of unit is fixed then.
     pub has_entries: bool,
@@ -104,14 +111,115 @@ impl Tally {
         self.fields.iter().find(|f| f.id == id)
     }
 
+    /// The fields shown that count values of their own: all but the
+    /// multipliers (#200). Totals, targets and charts are theirs.
+    pub fn counting(&self) -> Vec<&TallyField> {
+        self.fields
+            .iter()
+            .filter(|f| !f.hidden && f.multiplies.is_none())
+            .collect()
+    }
+
     /// What the entry form starts with: the target of every field shown
-    /// that has one, by field id.
+    /// that has one, by field id; a multiplier has none.
     pub fn targets(&self) -> BTreeMap<String, f64> {
         self.shown()
             .into_iter()
             .filter_map(|f| f.target.map(|t| (f.id.clone(), t)))
             .collect()
     }
+
+    /// The fields that multiply the field `id`, in their order.
+    pub fn multipliers_of(&self, id: &str) -> Vec<&TallyField> {
+        self.fields
+            .iter()
+            .filter(|f| f.multiplies.as_deref() == Some(id))
+            .collect()
+    }
+
+    /// The fields the field `id`, or a new one when `None`, may multiply:
+    /// the other fields shown whose own setting names no other field
+    /// shown; none while it is hidden or another multiplies it.
+    pub fn multipliable(&self, id: Option<&str>) -> Vec<&TallyField> {
+        if id.is_some_and(|id| {
+            self.field(id).is_some_and(|f| f.hidden) || !self.multipliers_of(id).is_empty()
+        }) {
+            return Vec::new();
+        }
+        self.fields
+            .iter()
+            .filter(|f| !f.hidden && Some(f.id.as_str()) != id && !self.would_multiply(f))
+            .collect()
+    }
+
+    /// What `entry` counts for the field `id` (#200): its value times the
+    /// value of each multiplier of it the entry holds, one held none
+    /// counting as 1; `None` for a multiplier or a value it does not hold.
+    pub fn counted(&self, entry: &TallyEntry, id: &str) -> Option<f64> {
+        self.counted_micro(entry, id)
+            .map(|micro| micro as f64 / 1_000_000.0)
+    }
+
+    /// [`Tally::counted`] in millionths: each product rounded half away
+    /// from zero and held at the 64-bit limits, as in both cores.
+    pub fn counted_micro(&self, entry: &TallyEntry, id: &str) -> Option<i64> {
+        let field = self.field(id)?;
+        if field.multiplies.is_some() {
+            return None;
+        }
+        let mut micro = entry.values.get(id).and_then(|v| tally_units::micro(*v))?;
+        for multiplier in self.multipliers_of(id) {
+            if let Some(factor) = entry
+                .values
+                .get(&multiplier.id)
+                .and_then(|v| tally_units::micro(*v))
+            {
+                micro = times(micro, factor);
+            }
+        }
+        Some(micro)
+    }
+
+    /// Whether the setting of `field` names a shown field other than it:
+    /// such a field is never multiplied, so no chain forms.
+    fn would_multiply(&self, field: &TallyField) -> bool {
+        let other = field.stored.as_deref().and_then(|id| self.field(id));
+        !field.hidden && other.is_some_and(|o| o.id != field.id && !o.hidden)
+    }
+
+    /// `self` with the multipliers its settings make (#200): a field
+    /// whose setting names a shown other field multiplies it, unless that
+    /// field's own setting names a shown other field too. A hidden field
+    /// multiplies nothing and is multiplied by nothing.
+    fn multiplied(mut self) -> Tally {
+        let read: Vec<Option<String>> = self
+            .fields
+            .iter()
+            .map(|f| {
+                let other = f.stored.as_deref().and_then(|id| self.field(id))?;
+                (self.would_multiply(f) && !self.would_multiply(other)).then(|| other.id.clone())
+            })
+            .collect();
+        for (field, multiplies) in self.fields.iter_mut().zip(read) {
+            if multiplies.is_some() {
+                field.target = None;
+            }
+            field.multiplies = multiplies;
+        }
+        self
+    }
+}
+
+/// `micro` × `factor` millionths, rounded half away from zero and held
+/// at the largest and smallest 64-bit numbers.
+fn times(micro: i64, factor: i64) -> i64 {
+    const MILLION: i128 = 1_000_000;
+    let product = i128::from(micro) * i128::from(factor);
+    let mut whole = product / MILLION;
+    if (product % MILLION).abs() * 2 >= MILLION {
+        whole += product.signum();
+    }
+    i64::try_from(whole).unwrap_or(if whole < 0 { i64::MIN } else { i64::MAX })
 }
 
 /// One record of a Tally: values for its fields, a date, a text line and
@@ -213,10 +321,13 @@ impl<'a> Tallies<'a> {
             return Ok(None);
         }
         fields.sort_by(|a, b| a.added.cmp(&b.added).then_with(|| utf16_cmp(&a.id, &b.id)));
-        Ok(Some(Tally {
-            note_id: note_id.to_string(),
-            fields,
-        }))
+        Ok(Some(
+            Tally {
+                note_id: note_id.to_string(),
+                fields,
+            }
+            .multiplied(),
+        ))
     }
 
     /// Whether the Note `note_id` is a Tally.
@@ -251,6 +362,20 @@ impl<'a> Tallies<'a> {
         target: Option<f64>,
         rule: Option<TallyRule>,
     ) -> Result<String> {
+        self.add_field_multiplying(note_id, name, unit, target, rule, None)
+    }
+
+    /// [`Tallies::add_field`] with a field that multiplies the field
+    /// `multiplies` when given, as [`Tallies::set_multiplies`] allows.
+    pub fn add_field_multiplying(
+        &self,
+        note_id: &str,
+        name: &str,
+        unit: &str,
+        target: Option<f64>,
+        rule: Option<TallyRule>,
+        multiplies: Option<&str>,
+    ) -> Result<String> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let Some(note) = note.filter(|n| !n.is_trashed() && !n.is_merged()) else {
             return Err(Error::Invalid(format!(
@@ -270,6 +395,9 @@ impl<'a> Tallies<'a> {
             Some(target) => Some(encoded(target)?),
             None => None,
         };
+        if let Some(other) = multiplies {
+            self.require_multipliable(note_id, None, other)?;
+        }
         let id = self.store.new_id()?;
         let rule = rule.unwrap_or_else(|| tally_units::default_rule(tally_units::kind_of(&typed)));
         self.store.batch(|| {
@@ -284,6 +412,14 @@ impl<'a> Tallies<'a> {
             )?;
             if let Some(goal) = &goal {
                 s.append(note_id, &keys::field(&id, keys::TARGET), Some(goal), None)?;
+            }
+            if let Some(other) = multiplies {
+                s.append(
+                    note_id,
+                    &keys::field(&id, keys::MULTIPLIES),
+                    Some(other),
+                    None,
+                )?;
             }
             if !note.spawned {
                 let at = dart_iso(s.now());
@@ -326,6 +462,37 @@ impl<'a> Tallies<'a> {
     /// Sets how the field `field_id` counts a day with several entries.
     pub fn set_rule(&self, note_id: &str, field_id: &str, rule: TallyRule) -> Result<()> {
         self.set(note_id, field_id, keys::RULE, Some(rule.name()))
+    }
+
+    /// Makes the field `field_id` multiply the field `other` of the same
+    /// Tally (#200), or a field of its own again when `None`. `other` is
+    /// a field shown, not `field_id`, that multiplies nothing; `field_id`
+    /// is multiplied by none.
+    pub fn set_multiplies(&self, note_id: &str, field_id: &str, other: Option<&str>) -> Result<()> {
+        if let Some(other) = other {
+            self.require_multipliable(note_id, Some(field_id), other)?;
+        }
+        self.set(note_id, field_id, keys::MULTIPLIES, other)
+    }
+
+    /// Refuses `other` as what the field `field_id`, or a new one when
+    /// `None`, of the Tally of `note_id` multiplies.
+    fn require_multipliable(
+        &self,
+        note_id: &str,
+        field_id: Option<&str>,
+        other: &str,
+    ) -> Result<()> {
+        let allowed = self
+            .by_note(note_id)?
+            .is_some_and(|t| t.multipliable(field_id).iter().any(|f| f.id == other));
+        if allowed {
+            Ok(())
+        } else {
+            Err(Error::Invalid(format!(
+                "not a field it may multiply: {other}"
+            )))
+        }
     }
 
     /// Hides the field `field_id`: its values stay stored and return when
@@ -541,7 +708,8 @@ impl<'a> Tallies<'a> {
     /// bar per `period` on `wall`, weeks from Monday, from the first with
     /// a value to today's, at most [`MAX_BUCKETS`] of the latest. Each bar
     /// holds the sum or the largest of the values in it, by the field's
-    /// rule; entries after today stay out.
+    /// rule, a multiplied field's values multiplied (#200); a multiplier
+    /// has none. Entries after today stay out.
     pub fn chart(
         &self,
         note_id: &str,
@@ -560,11 +728,7 @@ impl<'a> Tallies<'a> {
         let last = bucket_start(today, period);
         let mut micros: HashMap<Day, Vec<i64>> = HashMap::new();
         for entry in self.entries(note_id, filter)? {
-            let Some(micro) = entry
-                .values
-                .get(field_id)
-                .and_then(|v| tally_units::micro(*v))
-            else {
+            let Some(micro) = tally.counted_micro(&entry, field_id) else {
                 continue;
             };
             let day = Day::today(entry.at, wall);
@@ -666,6 +830,8 @@ impl<'a> Tallies<'a> {
                         .and_then(TallyRule::parse)
                         .unwrap_or(TallyRule::Sum),
                     hidden: get(&id, keys::HIDDEN) == Some("true"),
+                    multiplies: None,
+                    stored: get(&id, keys::MULTIPLIES).map(str::to_string),
                     has_entries: counted.contains(&id),
                     added: date,
                     id,
@@ -1143,6 +1309,169 @@ mod tests {
         );
         assert!(chart("none", TallyPeriod::Day)?.is_empty());
         assert_eq!(tallies.entries(&note, &everyone())?.len(), 5);
+        Ok(())
+    }
+
+    #[test]
+    fn a_multiplier_counts_its_field_as_the_product_on_read() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Push-ups", &["reps"], None)?;
+        let reps = &fields[0];
+        tallies.set_target(&note, reps, Some(30.0))?;
+        let old = tallies.add(
+            &note,
+            &values(&[(reps, 10.0)]),
+            "",
+            Some(at(2026, 1, 1, 7)?),
+        )?;
+        let sets = tallies.add_field(&note, "Sets", "", Some(4.0), None)?;
+        let entry = tallies.add(
+            &note,
+            &values(&[(reps, 10.0), (&sets, 3.0)]),
+            "",
+            Some(at(2026, 1, 1, 8)?),
+        )?;
+        let plain = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(plain.field(&sets).ok_or("sets")?.multiplies, None);
+        assert_eq!(plain.counted(&entry, reps), Some(10.0));
+        assert_eq!(plain.counted(&entry, &sets), Some(3.0));
+
+        tallies.set_multiplies(&note, &sets, Some(reps))?;
+        let made = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(
+            made.field(&sets).ok_or("sets")?.multiplies.as_ref(),
+            Some(reps)
+        );
+        let ids = |fields: Vec<&TallyField>| -> Vec<String> {
+            fields.into_iter().map(|f| f.id.clone()).collect()
+        };
+        assert_eq!(ids(made.multipliers_of(reps)), std::slice::from_ref(&sets));
+        assert_eq!(ids(made.counting()), std::slice::from_ref(reps));
+        assert_eq!(ids(made.shown()), [reps.clone(), sets.clone()]);
+        // The multiplier counts as no value, with no target of its own.
+        assert_eq!(made.field(&sets).ok_or("sets")?.target, None);
+        assert_eq!(made.targets(), values(&[(reps, 30.0)]));
+        assert_eq!(made.counted(&entry, reps), Some(30.0));
+        assert_eq!(made.counted(&entry, &sets), None);
+        // An entry without a multiplier value counts as is.
+        assert_eq!(made.counted(&old, reps), Some(10.0));
+        let chart =
+            |field: &str| tallies.chart(&note, field, TallyPeriod::Day, &utc_wall, &everyone());
+        assert_eq!(bars(&chart(reps)?), [Some(40.0)]);
+        assert!(chart(&sets)?.is_empty());
+        assert_eq!(
+            ann.current(&note, &keys::field(&sets, keys::MULTIPLIES))?
+                .as_ref(),
+            Some(reps)
+        );
+
+        tallies.set_multiplies(&note, &sets, None)?;
+        let again = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(again.counted(&entry, reps), Some(10.0));
+        assert_eq!(again.field(&sets).ok_or("sets")?.target, Some(4.0));
+        Ok(())
+    }
+
+    #[test]
+    fn several_multipliers_multiply_in_turn_rounded_and_held() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Gym", &["reps", "sets", "rounds"], None)?;
+        let (reps, sets, rounds) = (&fields[0], &fields[1], &fields[2]);
+        tallies.set_multiplies(&note, sets, Some(reps))?;
+        tallies.set_multiplies(&note, rounds, Some(reps))?;
+        let entry = tallies.add(
+            &note,
+            &values(&[(reps, 0.000003), (sets, 0.5), (rounds, -1.0)]),
+            "",
+            None,
+        )?;
+        let made = tallies.by_note(&note)?.ok_or("a Tally")?;
+        let ids: Vec<&str> = made
+            .multipliers_of(reps)
+            .iter()
+            .map(|f| f.id.as_str())
+            .collect();
+        assert_eq!(ids, [sets.as_str(), rounds.as_str()]);
+        // 0.000003 × 0.5 = 0.0000015, half away from zero, then × -1.
+        assert_eq!(made.counted(&entry, reps), Some(-0.000002));
+        let big = tallies.add(
+            &note,
+            &values(&[(reps, 1e9), (sets, 1e9), (rounds, 1e9)]),
+            "",
+            None,
+        )?;
+        assert_eq!(
+            made.counted(&big, reps),
+            Some(i64::MAX as f64 / 1_000_000.0)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_multiplier_multiplies_one_shown_other_field_never_a_chain() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Gym", &["a", "b", "c"], None)?;
+        let (a, b, c) = (&fields[0], &fields[1], &fields[2]);
+        assert!(tallies.set_multiplies(&note, a, Some(a)).is_err());
+        assert!(tallies.set_multiplies(&note, a, Some("x")).is_err());
+        tallies.set_multiplies(&note, b, Some(a))?;
+        let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+        let ids: Vec<&str> = tally
+            .multipliable(Some(c))
+            .iter()
+            .map(|f| f.id.as_str())
+            .collect();
+        assert_eq!(ids, [a.as_str()]);
+        // A multiplier is never multiplied, and a multiplied field never
+        // multiplies.
+        assert!(tallies.set_multiplies(&note, c, Some(b)).is_err());
+        assert!(tallies.set_multiplies(&note, a, Some(c)).is_err());
+        assert!(tally.multipliable(Some(a)).is_empty());
+        tallies.hide_field(&note, c)?;
+        assert!(tallies.set_multiplies(&note, b, Some(c)).is_err());
+        // Nor does a hidden field multiply.
+        assert!(tallies.set_multiplies(&note, c, Some(a)).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hiding_the_multiplied_field_leaves_the_multiplier_plain() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Gym", &["reps", "sets"], None)?;
+        let (reps, sets) = (&fields[0], &fields[1]);
+        tallies.set_multiplies(&note, sets, Some(reps))?;
+        let entry = tallies.add(&note, &values(&[(reps, 10.0), (sets, 3.0)]), "", None)?;
+        tallies.hide_field(&note, reps)?;
+        let hidden = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(hidden.field(sets).ok_or("sets")?.multiplies, None);
+        let ids: Vec<&str> = hidden.counting().iter().map(|f| f.id.as_str()).collect();
+        assert_eq!(ids, [sets.as_str()]);
+        assert_eq!(hidden.counted(&entry, sets), Some(3.0));
+        tallies.restore_field(&note, reps)?;
+        let back = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(back.counted(&entry, reps), Some(30.0));
+        Ok(())
+    }
+
+    #[test]
+    fn settings_the_cores_read_as_no_multiplier() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Gym", &["a", "b", "c"], None)?;
+        let (a, b, c) = (&fields[0], &fields[1], &fields[2]);
+        // Each other's multipliers, as two Devices might set them.
+        ann.append(&note, &keys::field(a, keys::MULTIPLIES), Some(b), None)?;
+        ann.append(&note, &keys::field(b, keys::MULTIPLIES), Some(a), None)?;
+        ann.append(&note, &keys::field(c, keys::MULTIPLIES), Some(c), None)?;
+        let read = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert!(read.fields.iter().all(|f| f.multiplies.is_none()));
+        let added = tallies.add_field_multiplying(&note, "d", "", None, None, Some(c))?;
+        let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+        assert_eq!(tally.field(&added).ok_or("d")?.multiplies.as_ref(), Some(c));
         Ok(())
     }
 

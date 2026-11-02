@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.4.0]
 
+### Neu
+
+- Auf dem Telefon und dem Desktop kann ein Feld einer Strichliste ein anderes Feld derselben Strichliste multiplizieren, etwa Runden von Liegestützen: Seine Seite hat „Multipliziert“ mit Nichts und den anderen Feldern, und die Einrichtung zeigt es als Plakette. In jedem Eintrag zählt das andere Feld als die beiden Werte multipliziert, sodass 3 Runden zu 10 Liegestützen in den Summen, Zielen und Diagrammen als 30 zählen, und der Eintrag zeigt „Liegestütze 3 × 10 mal“; ein Eintrag ohne Wert für den Multiplikator zählt, wie er ist. Der Multiplikator hat keine eigene Summe, kein Diagramm und kein Ziel. Er wird aus den Einträgen gelesen, wie sie sind, sodass ältere Einträge genauso zählen; wird das Feld, das er multipliziert, ausgeblendet, ist er wieder ein eigenes Feld. Auf dem Desktop richtet der KI-Port ihn ein und liest Einträge mit dem Produkt.
+
 ### Geändert
 
 - Auf dem Telefon und dem Desktop zeigt ein Ort, der innerhalb eines benannten Orts erfasst wurde, nur noch dessen Namen, etwa „Zuhause“, auf den Karten, in der Plakette „Erfasst“ und ihrem Dialog und bei jedem Abschnitt, wo er auch die Koordinaten zeigte; ein Ort ohne benannten Ort zeigt weiter seine Koordinaten.

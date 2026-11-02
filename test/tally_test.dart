@@ -387,6 +387,109 @@ void main() {
     });
   });
 
+  group('multipliers', () {
+    testWidgets('the field page makes a field multiply another; its badge '
+        'names it, and a multiplier has no rule and no target', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(
+        note.id,
+        name: 'Reps',
+        unit: 'reps',
+        target: 30,
+      );
+      final sets = tallies.addField(note.id, name: 'Sets', target: 4);
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
+
+      Finder badge(String setting, String field) =>
+          key('tally-setup-$setting-$field');
+      expect(
+        find.descendant(
+          of: badge('multiplies', sets),
+          matching: find.text('Nothing'),
+        ),
+        findsOneWidget,
+      );
+      await tap(tester, badge('multiplies', sets));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      expect(key('tally-multiplies-$sets'), findsNothing);
+      await tap(tester, key('tally-multiplies-$reps'));
+      // A multiplier has no target and no rule.
+      expect(key('tally-field-target'), findsNothing);
+      expect(key('tally-rule'), findsNothing);
+      await tap(tester, key('tally-field-save'));
+
+      expect(tallies.byNote(note.id)!.field(sets)!.multiplies, reps);
+      expect(
+        find.descendant(
+          of: badge('multiplies', sets),
+          matching: find.text('Reps'),
+        ),
+        findsOneWidget,
+      );
+      expect(badge('target', sets), findsNothing);
+      expect(badge('rule', sets), findsNothing);
+      // The field multiplied multiplies nothing itself.
+      expect(badge('multiplies', reps), findsNothing);
+      expect(badge('target', reps), findsOneWidget);
+
+      // Nothing again: a field of its own, with its target back.
+      await tap(tester, badge('multiplies', sets));
+      await tap(tester, key('tally-multiplies-nothing'));
+      expect(key('tally-field-target'), findsOneWidget);
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.field(sets)!.multiplies, isNull);
+      expect(tallies.byNote(note.id)!.field(sets)!.target, 4);
+    });
+
+    testWidgets('a new field can multiply one already there', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(note.id, name: 'Reps', unit: 'reps');
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-add-field'));
+      await enter(tester, key('tally-field-name'), 'Sets');
+      await tap(tester, key('tally-multiplies-$reps'));
+      await tap(tester, key('tally-field-save'));
+      final tally = tallies.byNote(note.id)!;
+      expect(tally.multipliersOf(reps).map((f) => f.name), ['Sets']);
+    });
+
+    testWidgets('an entry shows "3 × 10 reps" and counts 30 in the chart and '
+        'the compact total, one without the multiplier as is; the multiplier '
+        'shows no value of its own', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(
+        note.id,
+        name: 'Reps',
+        unit: 'reps',
+        target: 50,
+      );
+      final sets = tallies.addField(note.id, name: 'Sets');
+      tallies.add(note.id, values: {reps: 10, sets: 3});
+      // Recorded before it multiplied: counted on read alike.
+      tallies.setMultiplies(note.id, sets, reps);
+      now = now.add(const Duration(hours: 1));
+      tallies.add(note.id, values: {reps: 5});
+      await startAtNotes(tester);
+
+      await reveal(tester, key('tally-entries'));
+      expect(find.text('Reps 3 × 10 reps'), findsOneWidget);
+      expect(find.text('Reps 5 reps'), findsOneWidget);
+      expect(find.textContaining('Sets'), findsNothing);
+      await reveal(tester, key('tally-chart-$reps'));
+      expect(find.text('Highest bar: 35 reps'), findsOneWidget);
+      expect(key('tally-chart-$sets'), findsNothing);
+
+      await tap(tester, find.text('Push-ups').first);
+      expect(find.byType(CardTally), findsNothing);
+      expect(find.text('Reps 35 / 50 reps'), findsOneWidget);
+      expect(find.textContaining('Sets'), findsNothing);
+    });
+  });
+
   group('entries', () {
     testWidgets('"Add entry" in the card\'s ⋮ starts with the targets, so '
         'saving them is one tap', (tester) async {

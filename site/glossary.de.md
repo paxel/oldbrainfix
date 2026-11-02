@@ -184,7 +184,7 @@ Die Seite des Telefons für seine Kalender: „Aus deinem Kalender lesen“, das
 ## Strichlisten
 
 **Strichliste** [Tally]:
-Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt.
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt. Ein Feld kann stattdessen ein anderes ihrer Felder multiplizieren (#200), wie Runden Liegestütze: Das andere Feld zählt dann in jedem Eintrag das Produkt, und der Multiplikator zählt keinen eigenen Wert.
 _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 
 **Eintrag** [Entry]:

@@ -5738,6 +5738,30 @@ abstract class AppLocalizations {
   /// **'No target'**
   String get tallyNoTarget;
 
+  /// A Tally field's setting (#200), a badge in its setup and a heading on its page: the other field of the Tally it multiplies, such as Sets multiplying Reps.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiplies'**
+  String get tallyMultiplies;
+
+  /// The value of a Tally field's Multiplies badge and the first choice on its page (#200): the field multiplies no other field and counts values of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing'**
+  String get tallyMultipliesNothing;
+
+  /// Under the Multiplies choices on a Tally field's page (#200).
+  ///
+  /// In en, this message translates to:
+  /// **'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.'**
+  String get tallyMultipliesDetail;
+
+  /// An entry's value of a Tally field another field multiplies (#200): the multiplier's value, a bare number, before the value with its unit, such as '3 × 10 reps'.
+  ///
+  /// In en, this message translates to:
+  /// **'{factor} × {value}'**
+  String tallyTimes(String factor, String value);
+
   /// No description provided for @tallyFields.
   ///
   /// In en, this message translates to:
