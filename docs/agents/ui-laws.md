@@ -266,7 +266,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
-  through; the box unchecks it. Checking off opens nothing.
+  through; the box unchecks it. Checking off opens nothing. **Unless the
+  Device hides what is checked** (#217): with "Hide what's checked on
+  the Agenda" in Settings ▸ Agenda, off by default, a Done Occurrence, a
+  checked Line and a pick with its entry leave the Agenda and the widget
+  at once instead of striking through, and a group with nothing left
+  goes with them, a Session's heading once it is Done and "Eat a frog"
+  once today's Frog is eaten.
 - **A Session's group today lists its picks under its title** (#208),
   in the order picked, each an entry with its box, checked and struck
   through once it has an entry, each Tally's name with its targets

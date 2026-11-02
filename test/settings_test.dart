@@ -10,6 +10,7 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -207,6 +208,39 @@ void main() {
       expect(store.streaksOn, isFalse);
       expect(store.twoRowEditorOn, isFalse);
       expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+    });
+
+    testWidgets('strike through what is checked on the Agenda until it is '
+        'hidden, which the Agenda follows on the way back (#217)', (
+      tester,
+    ) async {
+      final routines = Routines(store);
+      final today = Day.today(DateTime.now(), deviceWallClock);
+      final pills = routines.create('pills', Schedule(start: today));
+      routines.markDone(pills.id, Occurrence(today));
+      await start(tester);
+      expect(find.text('pills'), findsOneWidget);
+      await openDeviceSettings(tester);
+      expect(find.text('Agenda'), findsOneWidget);
+      final hide = find.byKey(const ValueKey('agendaHideChecked'));
+      if (hide.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(
+          hide,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+      }
+      expect(tester.widget<Switch>(hide).value, isFalse);
+      final logged = store.allEntries().length;
+      await tap(tester, hide);
+      expect(store.agendaHidesChecked, isTrue);
+      expect(store.allEntries(), hasLength(logged), reason: 'never logged');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.text('pills'), findsNothing);
     });
 
     testWidgets('are radio columns that keep a value outside the choices', (

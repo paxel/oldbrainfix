@@ -26,8 +26,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    Day, Notes, Occurrence, OwnProfile, Recurrence, Routines, Schedule, SessionRule, Sessions,
-    SigningKey, Store, Tallies,
+    Day, DeviceSettings, Notes, Occurrence, OwnProfile, Recurrence, Routines, Schedule,
+    SessionRule, Sessions, SigningKey, Store, Tallies,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::session_editor::WEEKDAYS_OPEN;
@@ -964,5 +964,45 @@ fn with_no_tally_a_session_is_offered_shows_the_hint_and_save_makes_nothing() ->
     assert!(Sessions::new(&store).all()?.is_empty());
     let notes = Notes::new(&store);
     assert!(notes.all()?.iter().all(|n| n.text != "Morning sport"));
+    Ok(())
+}
+
+#[test]
+fn with_checked_items_hidden_a_pick_with_its_entry_leaves_and_then_the_heading() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    DeviceSettings::new(&device.store).set_agenda_hides_checked(true)?;
+    let sessions = Sessions::new(&device.store);
+    sessions.pick_today(&berlin)?;
+    sessions.record(
+        &id,
+        &occurrence(),
+        &device.tallies[0],
+        &BTreeMap::new(),
+        "done",
+    )?;
+    let mut harness = window(&device.store, None);
+    // The pick with its entry is gone, the open one and the heading stay
+    // (#217).
+    assert!(!shows(&harness, "Push-ups 20 times"));
+    assert!(shows(&harness, "Wall sit 30 times"));
+    let headings = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by_role_and_label(Role::CheckBox, "Done: All day Sport")
+            .count()
+    };
+    assert_eq!(headings(&harness), 7);
+    sessions.record(
+        &id,
+        &occurrence(),
+        &device.tallies[1],
+        &BTreeMap::new(),
+        "done",
+    )?;
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    // Done, today's heading goes with its picks; the coming days stay.
+    assert_eq!(headings(&harness), 6);
+    assert!(!shows(&harness, "Wall sit 30 times"));
     Ok(())
 }

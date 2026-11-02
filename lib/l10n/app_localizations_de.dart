@@ -4922,4 +4922,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingOff => 'Aus';
+
+  @override
+  String get settingsAgenda => 'Agenda';
+
+  @override
+  String get hideCheckedOnAgenda => 'Abgehaktes auf der Agenda ausblenden';
+
+  @override
+  String get hideCheckedOnAgendaDetail =>
+      'Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.';
 }

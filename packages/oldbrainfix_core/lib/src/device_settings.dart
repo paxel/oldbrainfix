@@ -55,6 +55,7 @@ extension DeviceSettings on Store {
   static const _agendaCalendar = 'agendaCalendar';
   static const _agendaCalendars = 'agendaCalendars';
   static const _streaksOff = 'streaksOff';
+  static const _agendaHideChecked = 'agendaHideChecked';
   static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
@@ -225,6 +226,14 @@ extension DeviceSettings on Store {
   bool get streaksOn => localSetting(_streaksOff) != 'true';
 
   set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
+
+  /// Whether this Device's Agenda, and its widget, hide what is checked
+  /// instead of striking it through (#217): a Done Occurrence, a checked
+  /// Line, a pick with its entry, and a group with nothing left; off
+  /// until switched on.
+  bool get agendaHidesChecked => localSetting(_agendaHideChecked) == 'true';
+
+  set agendaHidesChecked(bool on) => setLocalSetting(_agendaHideChecked, '$on');
 
   /// Whether the Note editor and Amend on this Device type in two rows,
   /// the bottom one above the keyboard; on unless switched off, which

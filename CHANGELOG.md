@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Added
 
 - On the phone and the desktop, a field of a Tally can multiply another field of the same Tally, such as Rounds of Push-ups: its page has "Multiplies" with Nothing and the other fields, and the setup shows it as a badge. In each entry the other field counts as the two values multiplied, so 3 rounds of 10 push-ups count as 30 in the totals, targets and charts, and the entry shows "Push-ups 3 × 10 times"; an entry without a value for the multiplier counts as it is. The multiplier has no total, chart or target of its own. It is read from the entries as they are, so older entries count the same; hiding the field it multiplies makes it a field of its own again. On the desktop the AI port sets it up and reads entries with the product.
+- On the phone and the desktop, Settings has an Agenda section with "Hide what's checked on the Agenda", off by default and kept for each Device. Switched on, a Done Occurrence, a Checklist Routine's checked Line and a Session's pick with its entry leave the Agenda at once instead of staying struck through, and a group with nothing left goes with them, "Eat a frog" too once today's Frog is eaten; the phone's widget follows. On the desktop the AI port reads the setting.
 
 ### Changed
 

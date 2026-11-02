@@ -27,6 +27,7 @@ const ALARM_SOUND: &str = "alarmSound";
 const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
+const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const THEME: &str = "theme";
 
@@ -278,6 +279,19 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(STREAKS_OFF, &(!on).to_string())
     }
 
+    /// Whether this Device's Agenda hides what is checked instead of
+    /// striking it through (#217): a Done Occurrence, a checked Line, a
+    /// pick with its entry, and a group with nothing left; off until
+    /// switched on.
+    pub fn agenda_hides_checked(&self) -> Result<bool> {
+        Ok(self.store.local_setting(AGENDA_HIDE_CHECKED)?.as_deref() == Some("true"))
+    }
+
+    pub fn set_agenda_hides_checked(&self, on: bool) -> Result<()> {
+        self.store
+            .set_local_setting(AGENDA_HIDE_CHECKED, &on.to_string())
+    }
+
     /// Whether the quick note on this Device shows `control`; off until
     /// switched on.
     pub fn quick_note_shows(&self, control: QuickNoteControl) -> Result<bool> {
@@ -440,6 +454,7 @@ mod tests {
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
         assert!(settings.streaks_on()?);
+        assert!(!settings.agenda_hides_checked()?);
         for control in QuickNoteControl::ALL {
             assert!(!settings.quick_note_shows(control)?, "{control:?}");
         }
@@ -497,6 +512,18 @@ mod tests {
         assert_eq!(store.local_setting(STREAKS_OFF)?.as_deref(), Some("true"));
         settings.set_streaks_on(true)?;
         assert!(settings.streaks_on()?);
+        // The Agenda strikes through what is checked until this Device
+        // hides it (#217), under the Dart core's key.
+        settings.set_agenda_hides_checked(true)?;
+        assert!(settings.agenda_hides_checked()?);
+        assert_eq!(
+            store.local_setting(AGENDA_HIDE_CHECKED)?.as_deref(),
+            Some("true")
+        );
+        settings.set_agenda_hides_checked(false)?;
+        assert!(!settings.agenda_hides_checked()?);
+        store.set_local_setting(AGENDA_HIDE_CHECKED, "garbled")?;
+        assert!(!settings.agenda_hides_checked()?);
         for control in QuickNoteControl::ALL {
             settings.set_quick_note_shows(control, true)?;
             assert!(settings.quick_note_shows(control)?, "{control:?}");

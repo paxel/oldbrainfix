@@ -786,3 +786,30 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     Ok(())
 }
+
+#[test]
+fn with_checked_items_hidden_a_done_occurrence_leaves_the_agenda() -> TestResult {
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    // Off, as by default: checked off, it strikes through and stays.
+    harness.get_by_label("Done: 09:00 Dentist").click();
+    harness.run();
+    assert!(shows(&harness, "Done: 09:00 Dentist"));
+    // Switched on in the settings, for this computer only (#217).
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    assert!(shows(&harness, "Agenda"));
+    harness
+        .get_by_label("Hide what's checked on the Agenda")
+        .click();
+    harness.run();
+    assert!(DeviceSettings::new(harness.state().store()).agenda_hides_checked()?);
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().page(), None);
+    assert!(!shows(&harness, "Done: 09:00 Dentist"));
+    // Its day says nothing is planned, as every other one.
+    assert_eq!(harness.query_all_by_label("Nothing planned").count(), 6);
+    Ok(())
+}

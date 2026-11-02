@@ -560,5 +560,7 @@
   "fileSomeStayedFix": "Nothing was lost: those Notes stay where they were. A Manager of their Area can move them.",
   "@fileSomeStayedFix": {"description": "The fix in the dialog behind 'fileSomeStayed'."},
   "fileSomeStayedDetails": "Filed: {filed}. Stayed where they were: {stayed}.",
-  "@fileSomeStayedDetails": {"description": "The details in the dialog behind 'fileSomeStayed': how many of the cards filed together moved and how many stayed.", "placeholders": {"filed": {"type": "int"}, "stayed": {"type": "int"}}}
+  "@fileSomeStayedDetails": {"description": "The details in the dialog behind 'fileSomeStayed': how many of the cards filed together moved and how many stayed.", "placeholders": {"filed": {"type": "int"}, "stayed": {"type": "int"}}},
+  "hideCheckedOnAgendaDetailDevice": "A Done Occurrence, a checked Line and a Session's pick with its entry leave the Agenda at once instead of staying struck through; a group with nothing left goes with them.",
+  "@hideCheckedOnAgendaDetailDevice": {"description": "Under the switch hideCheckedOnAgenda in the desktop's settings (#217)."}
 }

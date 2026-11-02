@@ -155,6 +155,25 @@ void main() {
       expect(shown(tester, all), ['cupboard', 'windows']);
     });
 
+    testWidgets('with checked items hidden, the section leaves once today\'s '
+        'Frog is eaten, and comes back when it is unchecked (#217)', (
+      tester,
+    ) async {
+      store.agendaHidesChecked = true;
+      final all = [frog('cupboard'), frog('windows')];
+      await start(tester);
+      expect(shown(tester, all), ['cupboard', 'windows']);
+
+      await tap(tester, box(all[0]));
+      expect(frogs.byId(all[0].id)?.isDone, isTrue);
+      expect(find.text('Eat a frog'), findsNothing);
+      expect(shown(tester, all), isEmpty);
+
+      frogs.unmarkDone(all[0].id);
+      await tester.pumpAndSettle();
+      expect(shown(tester, all), ['cupboard', 'windows']);
+    });
+
     testWidgets('"Another one" swaps a Frog for the next in its place', (
       tester,
     ) async {

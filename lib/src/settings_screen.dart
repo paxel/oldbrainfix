@@ -72,6 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late ThemeChoice _theme = widget.store.themeChoice;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
+  late bool _hidesChecked = widget.store.agendaHidesChecked;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
@@ -133,6 +134,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _UnitChoice.imperial => UnitSystem.imperial,
     };
     setState(() => _units = choice);
+  }
+
+  void _setHidesChecked(bool on) {
+    widget.store.agendaHidesChecked = on;
+    setState(() => _hidesChecked = on);
   }
 
   void _setStreaks(bool on) {
@@ -529,6 +535,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 onChanged: _setUnits,
               ),
+            ),
+            SettingsHeading(t.settingsAgenda),
+            SettingsSection(
+              children: [
+                SwitchBelow(
+                  switchKey: const ValueKey('agendaHideChecked'),
+                  leading: const Icon(Icons.playlist_remove),
+                  value: _hidesChecked,
+                  onChanged: _setHidesChecked,
+                  title: Text(t.hideCheckedOnAgenda),
+                  subtitle: Text(t.hideCheckedOnAgendaDetail),
+                ),
+              ],
             ),
             SettingsHeading(t.settingsAlarms),
             SettingsSection(

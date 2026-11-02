@@ -310,13 +310,25 @@ struct ChecklistRow {
 
 /// The Lines a Checklist shows under its heading on the Agenda (#208): a
 /// Checklist Routine's Occurrence every Line, checked ones struck
-/// through; a Checklist without a Routine its open ones. The one place
+/// through, or only its open ones where this Device `hides_checked`
+/// (#217); a Checklist without a Routine its open ones. The one place
 /// that decides it.
-fn agenda_lines(list: &Checklist) -> Vec<ShownLine> {
+fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
     checklist_view::shown_lines(list)
         .into_iter()
-        .filter(|line| list.on.is_some() || !line.checked)
+        .filter(|line| (list.on.is_some() && !hides_checked) || !line.checked)
         .collect()
+}
+
+/// Whether `row` shows as Done: checked off, or Done from the entries of
+/// every pick or from every Line checked.
+fn shown_done(row: &Row) -> bool {
+    row.row.done().is_some()
+        || matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
+        || row
+            .lines
+            .as_ref()
+            .is_some_and(|(list, _)| list.all_checked())
 }
 
 /// What the Agenda shows.
@@ -343,6 +355,10 @@ struct AgendaView {
     /// show.
     frogs: Option<FrogsToday>,
     frog_rows: Vec<FrogShown>,
+    /// Whether this Device hides what is checked instead of striking it
+    /// through (#217): the rows shown as Done are left out already; the
+    /// checked Lines and the picks with an entry go as they are drawn.
+    hides_checked: bool,
 }
 
 /// What this Device may do to the selected Note in a Shared Area
@@ -1332,6 +1348,9 @@ enum Setting {
     Units(Option<UnitSystem>),
     /// Whether a Routine's History shows its Streak (Q400).
     Streaks(bool),
+    /// Whether the Agenda hides what is checked instead of striking it
+    /// through (#217).
+    HideChecked(bool),
     /// Whether the quick note shows this control (#142).
     QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
@@ -4428,14 +4447,22 @@ impl App {
                         lines,
                     })
                 };
+                // What shows as Done leaves where this Device hides it
+                // (#217).
+                let hides_checked = DeviceSettings::new(store).agenda_hides_checked()?;
+                let rows = |rows: Vec<AgendaRow>| -> oldbrainfix_core::Result<Vec<Row>> {
+                    let mut shown = Vec::new();
+                    for placed in rows.into_iter().map(row) {
+                        let placed = placed?;
+                        if !hides_checked || !shown_done(&placed) {
+                            shown.push(placed);
+                        }
+                    }
+                    Ok(shown)
+                };
                 let mut later = Vec::new();
-                for (i, rows) in agenda.later_rows.iter().enumerate() {
-                    let rows = rows
-                        .iter()
-                        .cloned()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?;
-                    later.push((agenda.later(i), rows));
+                for (i, day) in agenda.later_rows.iter().enumerate() {
+                    later.push((agenda.later(i), rows(day.clone())?));
                 }
                 // Read as the Agenda shows, never while it is drawn:
                 // today's pick is written for the user's own Devices when
@@ -4483,7 +4510,8 @@ impl App {
                     let ChecklistAgendaRow { list, shows } = row;
                     let lines = match shows {
                         ListOnAgenda::Count => Vec::new(),
-                        _ => agenda_lines(&list),
+                        // Its checked Lines never show (#143).
+                        _ => agenda_lines(&list, true),
                     };
                     let text = if lines.is_empty() {
                         let (open, count) = (list.open_count() as i64, list.count() as i64);
@@ -4503,16 +4531,8 @@ impl App {
                     later,
                     shopping: shopping_rows,
                     checklists: checklist_rows,
-                    today: agenda
-                        .today_rows
-                        .into_iter()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?,
-                    tomorrow: agenda
-                        .tomorrow_rows
-                        .into_iter()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?,
+                    today: rows(agenda.today_rows)?,
+                    tomorrow: rows(agenda.tomorrow_rows)?,
                     missed: Alarms::new(&self.store).missed(wall)?,
                     unsorted: notes.unsorted()?.len(),
                     // Counted from the pending sets, without reading each
@@ -4531,6 +4551,7 @@ impl App {
                         .count(),
                     frogs: Some(today),
                     frog_rows,
+                    hides_checked,
                 })
             }
             _ => None,
@@ -6885,6 +6906,7 @@ impl App {
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
+            Setting::HideChecked(on) => settings.set_agenda_hides_checked(on)?,
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
         }
@@ -10425,7 +10447,7 @@ impl App {
                 .unwrap_or(agenda.today.len());
             let (all_day, timed) = agenda.today.split_at(timed);
             for row in all_day {
-                agenda_row(ui, &t, tones, row, actions);
+                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
             }
             for row in &agenda.shopping {
                 shopping_row(ui, tones, row, actions);
@@ -10434,10 +10456,15 @@ impl App {
                 checklist_row(ui, tones, row, actions);
             }
             for row in timed {
-                agenda_row(ui, &t, tones, row, actions);
+                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
             }
-            // Under what is due, never above it (#101).
-            if let Some(frogs) = agenda.frogs.as_ref().filter(|f| f.visible) {
+            // Under what is due, never above it (#101); gone once today's
+            // Frog is eaten where this Device hides what is checked (#217).
+            if let Some(frogs) = agenda
+                .frogs
+                .as_ref()
+                .filter(|f| f.visible && !(agenda.hides_checked && f.eaten))
+            {
                 let mut asked = Vec::new();
                 ui.add_space(4.0);
                 frogs_view::heading(ui, &t, &mut asked);
@@ -10464,7 +10491,7 @@ impl App {
                     );
                 }
                 for row in &agenda.tomorrow {
-                    agenda_row(ui, &t, tones, row, actions);
+                    agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
                 }
             });
             // The days after, each under its weekday and date; one
@@ -10486,7 +10513,7 @@ impl App {
                         );
                     }
                     for row in rows {
-                        agenda_row(ui, &t, tones, row, actions);
+                        agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
                     }
                 });
             }
@@ -11103,6 +11130,7 @@ impl App {
         let units = settings.chosen_unit_system().ok().flatten();
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
+        let hides_checked = settings.agenda_hides_checked().unwrap_or(false);
         let quick = self.view.capture_quick;
         egui::ScrollArea::vertical()
             .id_salt("settings")
@@ -11280,6 +11308,24 @@ impl App {
                     if radio_column(ui, &mut chosen, options) && chosen != units {
                         actions.push(Action::Setting(Setting::Units(chosen)));
                     }
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_agenda()).strong().color(text));
+                    let mut on = hides_checked;
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.hide_checked_on_agenda()).color(text),
+                    )
+                    .changed()
+                    {
+                        actions.push(Action::Setting(Setting::HideChecked(on)));
+                    }
+                    ui.label(
+                        RichText::new(t.hide_checked_on_agenda_detail_device())
+                            .small()
+                            .color(weak),
+                    );
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_history()).strong().color(text));
@@ -13150,8 +13196,16 @@ fn agenda_entry(
 /// own box only shows Done: once every pick has an entry it checks
 /// itself, and nothing else checks it. A Routine spawned from a
 /// Checklist lists its Lines under it, checked for this Occurrence; once
-/// every Line is checked, its box stays checked too (#121).
-fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
+/// every Line is checked, its box stays checked too (#121). Where
+/// `hides_checked` (#217), the checked Lines and the picks with an entry
+/// are left out.
+fn agenda_row(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (row, hides_checked): (&Row, bool),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let routine = &row.row.routine;
@@ -13244,10 +13298,10 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
         });
         // The entries go under the heading, outside its click.
         if let Some(SessionPart::Today(shown)) = &row.session {
-            session_picks(ui, t, tones, shown, actions);
+            session_picks(ui, t, tones, (shown, hides_checked), actions);
         } else if let Some((list, checks)) = &row.lines {
             // The Lines go there too, checked for this Occurrence.
-            for line in agenda_lines(list) {
+            for line in agenda_lines(list, hides_checked) {
                 let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
                 let shown = (id, line.text.as_str(), usize::from(line.in_group));
                 let clicks = agenda_entry(
@@ -13276,12 +13330,13 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
 /// picked, each an entry with its box, checked once it has an entry and
 /// struck through; its box and its words open its entry form where this
 /// Device may; "Another one" goes under each without an entry while they
-/// swap (the control goes below its text).
+/// swap (the control goes below its text). Where `hides_checked`
+/// (#217), a pick with an entry is left out.
 fn session_picks(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    shown: &PicksShown,
+    (shown, hides_checked): (&PicksShown, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -13289,6 +13344,9 @@ fn session_picks(
     let session = today.session.id();
     let occurrence = today.occurrence;
     for (i, pick) in today.picks.iter().enumerate() {
+        if hides_checked && pick.done() {
+            continue;
+        }
         let words = shown.texts.get(i).map(String::as_str).unwrap_or_default();
         let opens = shown.opens.get(i).copied().unwrap_or(false);
         let id = Id::new(("session pick", session, occurrence.key(), &pick.note_id));

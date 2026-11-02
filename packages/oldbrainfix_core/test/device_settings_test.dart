@@ -149,6 +149,21 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the Agenda strikes through what is checked until this Device hides '
+      'it (#217)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.agendaHidesChecked, isFalse);
+    store.agendaHidesChecked = true;
+    expect(store.agendaHidesChecked, isTrue);
+    expect(store.localSetting('agendaHideChecked'), 'true');
+    store.agendaHidesChecked = false;
+    expect(store.agendaHidesChecked, isFalse);
+    store.setLocalSetting('agendaHideChecked', 'garbled');
+    expect(store.agendaHidesChecked, isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the Agenda showed a row per Shopping List with Lines back unless '
       'this Device chose another way', () {
     final store = Store.inMemory();

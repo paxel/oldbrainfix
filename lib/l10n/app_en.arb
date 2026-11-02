@@ -2577,5 +2577,11 @@
   "settingOn": "On",
   "@settingOn": {"description": "The value of a Note editor's badge for a setting that is switched on, such as Show ticks (#160)."},
   "settingOff": "Off",
-  "@settingOff": {"description": "The value of a Note editor's badge for a setting that is switched off (#160)."}
+  "@settingOff": {"description": "The value of a Note editor's badge for a setting that is switched off (#160)."},
+  "settingsAgenda": "Agenda",
+  "@settingsAgenda": {"description": "The heading of the Agenda's section in Settings (#217)."},
+  "hideCheckedOnAgenda": "Hide what's checked on the Agenda",
+  "@hideCheckedOnAgenda": {"description": "The switch in Settings > Agenda that hides what is checked on the Agenda instead of striking it through (#217)."},
+  "hideCheckedOnAgendaDetail": "A Done Occurrence, a checked Line and a Session's pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.",
+  "@hideCheckedOnAgendaDetail": {"description": "Under the switch hideCheckedOnAgenda on the phone."}
 }

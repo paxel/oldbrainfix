@@ -203,7 +203,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1244,6 +1244,7 @@ impl Store {
                 let quiet = settings.quiet_hours()?;
                 let shows = |control| settings.quick_note_shows(control);
                 ToolOutput::json(&json!({
+                    "agendaHidesChecked": settings.agenda_hides_checked()?,
                     "aiReach": self.ai_reach()?.name(),
                     "alertsOn": settings.alerts_on()?,
                     "allDayFrom": settings.all_day_from()?.to_string(),
@@ -2231,6 +2232,7 @@ mod tests {
         assert_eq!(routines.pointer("/0/rule"), Some(&json!("FREQ=DAILY")));
         assert_eq!(store.all_entries()?.len(), logged);
         DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
+        DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
         let settings = call(&store, &task, "read_settings", &json!({}))?;
         assert!(!settings.is_error);
         let [ToolContent::Text(text)] = &settings.content[..] else {
@@ -2243,6 +2245,7 @@ mod tests {
         assert_eq!(read.pointer("/theme"), Some(&json!("system")));
         assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
         assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
+        assert_eq!(read.pointer("/agendaHidesChecked"), Some(&json!(true)));
         Ok(())
     }
 

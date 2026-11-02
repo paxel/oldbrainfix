@@ -392,6 +392,48 @@ void main() {
       expect(done.first.checks, isFalse);
     });
 
+    test('with checked items hidden, what the Agenda hides it leaves out '
+        'too (#217)', () {
+      store.agendaHidesChecked = true;
+      final pills = routines.create('pills', daily([ClockTime(8, 0)]));
+      routines.markDone(
+        pills.id,
+        Occurrence(Day(2026, 10, 24), ClockTime(8, 0)),
+      );
+      final routine = packing();
+      final occurrence = Occurrence(Day(2026, 10, 24));
+      final lists = Checklists(store);
+      final on = (routineId: routine.id, occurrence: occurrence);
+      final bath = lists.forOccurrence(on)!.lines.first;
+      lists.check(bath.id, on: on);
+      final session = sport();
+      final at = Occurrence(Day(2026, 10, 24), ClockTime(7, 0));
+      final pool = Sessions(store).pickToday(deviceWallClock).single.picks;
+      void record(SessionPick pick) => Sessions(store).record(
+        session.id,
+        at,
+        pick.noteId,
+        values: {Tallies(store).byNote(pick.noteId)!.shown.single.id: 20},
+      );
+      record(pool.first);
+
+      final today = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
+
+      expect(kinds(today), ['occurrence', 'line', 'line', 'session', 'pick']);
+      expect(titles(today).take(3), ['Packing', 'Tent', 'Map']);
+      expect(today.last.title, contains('Squats'));
+      expect([for (final row in today) row.done], everyElement(isFalse));
+      // Tomorrow's, nothing checked, shows whole.
+      expect(titles(snapshot().days['2026-10-25']), contains('pills'));
+
+      record(pool.last);
+      expect(kinds(snapshot().days['2026-10-24']), [
+        'occurrence',
+        'line',
+        'line',
+      ]);
+    });
+
     test('a Checklist\'s open Lines under its name, each checkable '
         '(#209)', () {
       final id = trip();
@@ -439,6 +481,18 @@ void main() {
       final eaten = snapshot().days['2026-10-24'] ?? const <WidgetRow>[];
       expect(titles(eaten), ['Eat a frog', 'taxes']);
       expect(eaten[1].done, isTrue);
+    });
+
+    test('with checked items hidden, "Eat a frog" leaves once today\'s Frog '
+        'is eaten (#217)', () {
+      store.agendaHidesChecked = true;
+      final frogs = Frogs(store);
+      final taxes = frogs.spawn(notes.capture('taxes').id);
+      frogs.pickToday(deviceWallClock);
+      expect(titles(snapshot().days['2026-10-24']), ['Eat a frog', 'taxes']);
+
+      frogs.markDone(taxes.id);
+      expect(titles(snapshot().days['2026-10-24']), isEmpty);
     });
 
     test('Checklists as the user chose for each (#219)', () {

@@ -62,11 +62,30 @@ typedef ChecklistRow = ({
 
 /// The Lines a Checklist shows under its heading on the Agenda (#208): a
 /// Checklist Routine's Occurrence every Line, checked ones struck
-/// through; a Checklist without a Routine its open ones. The one place
+/// through, or only its open ones where this Device [hidesChecked]
+/// (#217); a Checklist without a Routine its open ones. The one place
 /// that decides it, for the Agenda and its widget alike.
-List<Line> agendaLines(Checklist list) => [
+List<Line> agendaLines(Checklist list, {required bool hidesChecked}) => [
   for (final line in list.lines)
-    if (list.on != null || !line.checked) line,
+    if ((list.on != null && !hidesChecked) || !line.checked) line,
+];
+
+/// Whether [placed] shows as Done: checked off, or Done from the entries
+/// of every pick or from every Line checked.
+bool shownDone(PlacedRow placed) =>
+    placed.row.done != null ||
+    (placed.picks?.today.complete ?? false) ||
+    (placed.lines?.list.allChecked ?? false);
+
+/// The picks of [picks] that show on the Agenda with their index: every
+/// one, or only those without an entry where this Device [hidesChecked]
+/// (#217).
+List<(int, SessionPick)> agendaPicks(
+  ShownPicks picks, {
+  required bool hidesChecked,
+}) => [
+  for (final (i, pick) in picks.today.picks.indexed)
+    if (!hidesChecked || !pick.done) (i, pick),
 ];
 
 /// One row of a day on the Agenda: an Occurrence, a part of a calendar
@@ -101,6 +120,18 @@ class AgendaDays {
   /// The units a Session's targets show in.
   final UnitSystem system;
 
+  /// Whether this Device hides what is checked instead of striking it
+  /// through (#217): the rows shown as Done are left out already; the
+  /// checked Lines and the picks with an entry go with [agendaLines] and
+  /// [agendaPicks].
+  final bool hidesChecked;
+
+  /// Whether the "Eat a frog" section of [frogs] shows today: while it is
+  /// [FrogsToday.visible], unless this Device [hidesChecked] and today's
+  /// Frog is eaten (#217).
+  bool showsFrogs(FrogsToday frogs) =>
+      frogs.visible && !(hidesChecked && frogs.eaten);
+
   /// What the days' rows are made of before the appointments go in, so
   /// a new calendar read goes in without reading the log again (#205).
   final _DayParts _parts;
@@ -110,6 +141,7 @@ class AgendaDays {
     List<Appointment> appointments, {
     required this.frogs,
     required this.system,
+    required this.hidesChecked,
   }) : _parts = parts,
        today = parts.today.day,
        tomorrow = parts.tomorrow.day,
@@ -122,8 +154,13 @@ class AgendaDays {
 
   /// These days with the calendar's [appointments] in place of those
   /// they were read with; the log is not read again.
-  AgendaDays withAppointments(List<Appointment> appointments) =>
-      AgendaDays._(_parts, appointments, frogs: frogs, system: system);
+  AgendaDays withAppointments(List<Appointment> appointments) => AgendaDays._(
+    _parts,
+    appointments,
+    frogs: frogs,
+    system: system,
+    hidesChecked: hidesChecked,
+  );
 
   /// Reads the [days] of the Agenda from [store] on [wallClock], with
   /// today's Session Occurrences [sessions], today's "Eat a frog" section
@@ -139,7 +176,15 @@ class AgendaDays {
     required FrogsToday frogsToday,
     List<Appointment> appointments = const [],
   }) {
+    final hidesChecked = store.agendaHidesChecked;
     final reader = _Reader(store, places, wallClock, sessions);
+    // What shows as Done leaves where this Device hides it (#217).
+    List<PlacedRow> placed(List<AgendaRow> rows) => [
+      for (final row in rows)
+        if (reader.place(row) case final placed
+            when !hidesChecked || !shownDone(placed))
+          placed,
+    ];
     final agenda = Routines(store).agenda(wallClock, days: days);
     reader.listNotes = reader.checklists
         .ofNotes({
@@ -159,18 +204,14 @@ class AgendaDays {
         wallClock: wallClock,
         today: _DayPart(
           agenda.today,
-          [for (final row in agenda.todayRows) reader.place(row)],
+          placed(agenda.todayRows),
           shopping: reader.shoppingRows(),
           checklists: reader.checklistRows(),
         ),
-        tomorrow: _DayPart(agenda.tomorrow, [
-          for (final row in agenda.tomorrowRows) reader.place(row),
-        ]),
+        tomorrow: _DayPart(agenda.tomorrow, placed(agenda.tomorrowRows)),
         later: [
           for (final (i, rows) in agenda.laterRows.indexed)
-            _DayPart(agenda.later(i), [
-              for (final row in rows) reader.place(row),
-            ]),
+            _DayPart(agenda.later(i), placed(rows)),
         ],
       ),
       appointments,
@@ -180,6 +221,7 @@ class AgendaDays {
             (placed: placed, masked: reader.masksNote(placed.note)),
       ],
       system: deviceUnitSystem(store),
+      hidesChecked: hidesChecked,
     );
   }
 }
@@ -351,7 +393,10 @@ class _Reader {
     area: placeNote(places, note).area,
     masked: masked,
     list: list,
-    lines: masked || count ? const <Line>[] : agendaLines(list),
+    // Its checked Lines never show (#143).
+    lines: masked || count
+        ? const <Line>[]
+        : agendaLines(list, hidesChecked: true),
     checks: checklists.mayCheck(note.id),
   );
 

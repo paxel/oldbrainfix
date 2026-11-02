@@ -271,13 +271,14 @@ class AgendaSnapshot {
       store,
       read.system,
       NumberFormat.decimalPattern(locale).symbols.DECIMAL_SEP,
+      read.hidesChecked,
     );
     final unsorted = agenda.unsorted;
     return AgendaSnapshot(
       days: {
         '${read.today}': [
           ...words.day(read.today, read.todayRows),
-          if (frogs.visible) ...words.frogs(read.frogs),
+          if (read.showsFrogs(frogs)) ...words.frogs(read.frogs),
         ],
         '${read.tomorrow}': words.day(read.tomorrow, read.tomorrowRows),
       },
@@ -330,7 +331,18 @@ class _Words {
   final UnitSystem system;
   final String decimal;
 
-  _Words(this.t, this.locale, this.store, this.system, this.decimal);
+  /// Whether this Device hides what is checked, as the Agenda read it
+  /// (#217).
+  final bool hidesChecked;
+
+  _Words(
+    this.t,
+    this.locale,
+    this.store,
+    this.system,
+    this.decimal,
+    this.hidesChecked,
+  );
 
   /// The first line of [note]'s text, "Photo" for a photo Note without
   /// words.
@@ -393,7 +405,10 @@ class _Words {
             at: at,
           )
         else
-          for (final (i, pick) in picks.today.picks.indexed)
+          for (final (i, pick) in agendaPicks(
+            picks,
+            hidesChecked: hidesChecked,
+          ))
             WidgetRow(
               kind: WidgetRow.pick,
               title: picks.masked[i]
@@ -409,7 +424,7 @@ class _Words {
               at: at,
             )
       else if (!masked && lines != null)
-        for (final line in lines.list.lines)
+        for (final line in agendaLines(lines.list, hidesChecked: hidesChecked))
           WidgetRow(
             kind: WidgetRow.line,
             title: line.text,

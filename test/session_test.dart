@@ -543,6 +543,30 @@ void main() {
       expect(struck(tester, 'Half bridge 15 times'), isTrue);
     });
 
+    testWidgets('with checked items hidden, a pick with its entry leaves and '
+        'the heading goes once each has one (#217)', (tester) async {
+      store.agendaHidesChecked = true;
+      final pushUps = tally('Push-ups');
+      final squats = tally('Squats');
+      final made = session([pushUps, squats]);
+      await start(tester);
+      expect(key('session-pick-$pushUps'), findsOneWidget);
+
+      await tap(tester, key('session-pick-$pushUps'));
+      await tap(tester, key('tally-entry-save'));
+      expect(sessions.on(made.id, today).picks.first.done, isTrue);
+      expect(key('session-pick-$pushUps'), findsNothing);
+      expect(key('session-another-$pushUps'), findsNothing);
+      expect(key('session-pick-$squats'), findsOneWidget);
+      expect(key('row-${made.id}@${today.key}'), findsOneWidget);
+
+      await tap(tester, key('session-pick-$squats'));
+      await tap(tester, key('tally-entry-save'));
+      expect(sessions.on(made.id, today).complete, isTrue);
+      expect(key('row-${made.id}@${today.key}'), findsNothing);
+      expect(key('session-pick-$squats'), findsNothing);
+    });
+
     testWidgets('a pick with an entry opens that entry; removing it undoes '
         'the Done', (tester) async {
       final pushUps = tally('Push-ups');

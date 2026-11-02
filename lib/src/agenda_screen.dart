@@ -391,6 +391,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
         : placeNote(widget.places, captured);
   }
 
+  /// Whether this Device hides what is checked on the Agenda (#217), as
+  /// the rows were read.
+  bool get _hidesChecked => _days?.hidesChecked ?? false;
+
   /// Shows the rows of [days].
   void _show(AgendaDays days) {
     _days = days;
@@ -832,7 +836,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final (:today, masked: hidden, :opens, :swaps) = picks;
     final decimal = decimalSign(context);
     return [
-      for (final (i, pick) in today.picks.indexed) ...[
+      for (final (i, pick) in agendaPicks(
+        picks,
+        hidesChecked: _hidesChecked,
+      )) ...[
         AgendaEntry(
           key: ValueKey('session-pick-${pick.noteId}'),
           boxKey: ValueKey('session-check-${pick.noteId}'),
@@ -873,7 +880,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final line in agendaLines(list))
+            for (final line in agendaLines(list, hidesChecked: _hidesChecked))
               _lineEntry(
                 line,
                 onBox: checks
@@ -1255,7 +1262,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
               else
                 ...rows(_today),
               // Under what is due, never above it (#101).
-              if (_frogsToday case final frogs? when frogs.visible) ...[
+              if (_frogsToday case final frogs?
+                  when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
                 _FrogsHeading(onTap: _openFrogs),
                 for (final (:placed, :masked) in _frogRows)
                   FrogRow(

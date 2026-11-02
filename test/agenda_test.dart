@@ -308,6 +308,51 @@ void main() {
       expect(agendaRows(tester).first, '08:00 pills');
     });
 
+    testWidgets('with checked items hidden, a Done Occurrence leaves the '
+        'Agenda; off, it strikes through (#217)', (tester) async {
+      store.agendaHidesChecked = true;
+      final pills = routines.create('pills', daily([at(8), at(14)]));
+      routines.create(
+        'weekly report',
+        Schedule(start: tomorrow, rule: Recurrence.parse('FREQ=WEEKLY')),
+      );
+      routines.markDone(pills.id, Occurrence(tomorrow, at(8)));
+      await start(tester);
+      // Tomorrow's checked off already is gone too.
+      expect(agendaRows(tester).take(4), [
+        '08:00 pills',
+        '14:00 pills',
+        'All day weekly report',
+        '14:00 pills',
+      ]);
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).take(3), [
+        '14:00 pills',
+        'All day weekly report',
+        '14:00 pills',
+      ]);
+      expect(
+        routines.byId(pills.id)?.doneAt(Occurrence(today, at(8))),
+        isNotNull,
+      );
+      // Everything of today checked off: the day says so.
+      await tap(tester, find.byType(Checkbox).first);
+      expect(
+        find.text('Nothing due today. Tap + to capture a thought.'),
+        findsOneWidget,
+      );
+      store.agendaHidesChecked = false;
+      routines.markDone(pills.id, Occurrence(tomorrow, at(14)));
+      await tester.pumpAndSettle();
+      expect(agendaRows(tester).take(5), [
+        '[x] 08:00 pills',
+        '[x] 14:00 pills',
+        'All day weekly report',
+        '[x] 08:00 pills',
+        '[x] 14:00 pills',
+      ]);
+    });
+
     testWidgets('moves on to the new day at midnight while open', (
       tester,
     ) async {

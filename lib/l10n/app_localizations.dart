@@ -7915,6 +7915,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get settingOff;
+
+  /// The heading of the Agenda's section in Settings (#217).
+  ///
+  /// In en, this message translates to:
+  /// **'Agenda'**
+  String get settingsAgenda;
+
+  /// The switch in Settings > Agenda that hides what is checked on the Agenda instead of striking it through (#217).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide what\'s checked on the Agenda'**
+  String get hideCheckedOnAgenda;
+
+  /// Under the switch hideCheckedOnAgenda on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.'**
+  String get hideCheckedOnAgendaDetail;
 }
 
 class _AppLocalizationsDelegate

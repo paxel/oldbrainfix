@@ -165,6 +165,24 @@ void main() {
     expect(rowCheckbox(tester, routine, today).onChanged, isNotNull);
   });
 
+  testWidgets('with checked items hidden, a checked Line leaves the row and '
+      'the last one takes the row with it (#217)', (tester) async {
+    store.agendaHidesChecked = true;
+    final routine = packing();
+    await start(tester);
+    await tap(tester, lineBox(routine, today, 'Bath'));
+    expect(lineBox(routine, today, 'Bath'), findsNothing);
+    expect(lineBox(routine, today, 'Tent'), findsOneWidget);
+    // Tomorrow's keeps it.
+    expect(lineBox(routine, tomorrow, 'Bath'), findsOneWidget);
+
+    await tap(tester, lineBox(routine, today, 'Tent'));
+    await tap(tester, lineBox(routine, today, 'Map'));
+    expect(doneAt(routine, today), isNotNull);
+    expect(row(routine, today), findsNothing);
+    expect(rowBox(routine, tomorrow), findsOneWidget);
+  });
+
   testWidgets('the row is still checked off by hand, its Lines unchecked', (
     tester,
   ) async {
