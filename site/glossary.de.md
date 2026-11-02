@@ -112,7 +112,7 @@ Die zweite und letzte Ebene, innerhalb eines Bereichs, etwa Haushalt/Küche, Kin
 _Avoid_: Kategorie, Unterkategorie, Schlagwort (ein #Wort ist ein Wort des Textes)
 
 **Browser** [Browser]:
-Wo du abgelegte Notizen findest und öffnest. Auf dem Handy die Seite, die „Suchen und stöbern“ (die Lupe der Agenda) öffnet: die Bereichsliste mit einer Suche über alle Notizen, Alle Notizen, Frösche und Papierkorb in ihrer Leiste, und von ihr aus jeder Bereich und jedes Thema. Auf dem Desktop die Seitenleiste und die Liste daneben.
+Wo du abgelegte Notizen findest und öffnest. Auf dem Handy die Seite, die „Suchen und stöbern“ (der Ordner in der oberen Leiste der Agenda) öffnet: die Bereichsliste mit einer Suche über alle Notizen, Alle Notizen, Frösche und Papierkorb in ihrer Leiste, und von ihr aus jeder Bereich und jedes Thema. Auf dem Desktop die Seitenleiste und die Liste daneben.
 _Avoid_: Suchseite, Bibliothek
 
 **Unsortiert** [Unsorted]:

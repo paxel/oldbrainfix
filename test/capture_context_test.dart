@@ -185,7 +185,7 @@ void main() {
       final note = notes.capture('nees mor sauce');
       notes.locate(note.id, home);
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.byTooltip('All Notes'));
       await tester.longPress(find.text('nees mor sauce'));
       await tester.pumpAndSettle();
@@ -273,7 +273,7 @@ void main() {
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.byTooltip('All Notes'));
       // In the full card's one line under the text (#170).
       expect(find.textContaining(' · 48.1372, 11.5761'), findsOneWidget);

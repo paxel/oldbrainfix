@@ -323,7 +323,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.byTooltip('All Notes'));
     }
 

@@ -129,7 +129,7 @@ void main() {
     invite(AreaRole.member);
     await tester.pumpWidget(OldBrainFixApp(store: ben));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     expect(find.text('Household'), findsOneWidget);
     expect(find.text('Ben, Ann'), findsOneWidget);
@@ -155,7 +155,7 @@ void main() {
     invite(AreaRole.member);
     await tester.pumpWidget(OldBrainFixApp(store: ben));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Household'));
     await tester.pumpAndSettle();
@@ -199,7 +199,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(Frogs(ben).byId(frog.id)?.isDone, isTrue);
 
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Household'));
     await tester.pumpAndSettle();
@@ -222,7 +222,7 @@ void main() {
     invite(AreaRole.member);
     await tester.pumpWidget(OldBrainFixApp(store: ben));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Household'));
     await tester.pumpAndSettle();
@@ -260,7 +260,7 @@ void main() {
     invite(AreaRole.manager);
     await tester.pumpWidget(OldBrainFixApp(store: ben));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await rowMenu(tester, 'Household');
     for (final item in ['Rename', 'Share…', 'People', 'Delete']) {
@@ -310,7 +310,7 @@ void main() {
     ]) {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.search));
+      await tester.tap(find.byKey(const ValueKey('browse')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Household'));
       await tester.pumpAndSettle();

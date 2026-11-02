@@ -82,14 +82,31 @@ void main() {
       .any((o) => o.opacity == AgendaScreen.tomorrowOpacity);
 
   group('the Agenda', () {
-    testWidgets('is the home screen, with "+" and the magnifier floating', (
-      tester,
-    ) async {
+    testWidgets('is the home screen, with only "+" floating and the folder '
+        'in the top bar', (tester) async {
       await start(tester);
       expect(find.byType(AgendaScreen), findsOneWidget);
-      expect(find.byType(FloatingActionButton), findsNWidgets(2));
+      expect(find.byType(FloatingActionButton), findsOneWidget);
       expect(find.byTooltip('Capture a Note'), findsOneWidget);
-      expect(find.byTooltip('Search and browse'), findsOneWidget);
+      final folder = find.byKey(const ValueKey('browse'));
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: folder),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: folder,
+          matching: find.byIcon(Icons.folder_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byTooltip('Search and browse'),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.text('Nothing due today. Tap + to capture a thought.'),
         findsOneWidget,

@@ -47,7 +47,7 @@ void main() {
   }
 
   Future<void> openAllNotes(WidgetTester tester) async {
-    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.byKey(const ValueKey('browse')));
     await tap(tester, find.byTooltip('All Notes'));
   }
 

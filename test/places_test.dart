@@ -19,7 +19,7 @@ void main() {
   }
 
   Future<void> openAreas(WidgetTester tester) async {
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
   }
 

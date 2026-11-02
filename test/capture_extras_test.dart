@@ -67,7 +67,7 @@ void main() {
   }
 
   Future<void> openEditor(WidgetTester tester, String text) async {
-    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.byKey(const ValueKey('browse')));
     await tap(tester, find.byTooltip('All Notes'));
     await tester.longPress(find.text(text));
     await tester.pumpAndSettle();
@@ -351,14 +351,14 @@ void main() {
     testWidgets('the Agenda bar keeps its order', (tester) async {
       await start(tester);
       final xs = [
-        for (final key in ['allRoutines', 'calendarPage', 'profile'])
+        for (final key in ['browse', 'allRoutines', 'calendarPage', 'profile'])
           tester.getTopLeft(find.byKey(ValueKey(key))).dx,
       ];
       final newRoutine = tester.getTopLeft(find.byIcon(Icons.add_alarm)).dx;
       expect(
-        [xs[0], xs[1], newRoutine, xs[2]],
+        [xs[0], xs[1], xs[2], newRoutine, xs[3]],
         [
-          ...[xs[0], xs[1], newRoutine, xs[2]]..sort(),
+          ...[xs[0], xs[1], xs[2], newRoutine, xs[3]]..sort(),
         ],
       );
     });

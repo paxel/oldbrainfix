@@ -55,10 +55,11 @@ enum _RowChoice { history, share }
 /// today. "+"
 /// fans out Text, Voice, Photo, Gallery and Paste to capture a Note, whose card
 /// then shows on top with its enrich options
-/// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar opens the list of all Routines and
-/// Reminders and the Calendar page, makes a Routine without a Note, and
-/// has the Profile picture in its corner, the only way to Settings. Each
+/// until the browser opens or the app comes back. The app bar's folder,
+/// its first action, opens the notes browser; the bar also opens the list
+/// of all Routines and Reminders and the Calendar page, makes a Routine
+/// without a Note, and has the Profile picture in its corner, the only
+/// way to Settings. Each
 /// row's ⋮, or a long press on it, shares its Routine or Reminder as a
 /// calendar file, and a Routine's leads to its history. A red
 /// banner on top shows while alarms lack a permission, and leads to the
@@ -1121,7 +1122,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         else if (entry.checklist case final checklist?)
           _checklistRow(t, checklist),
     ];
-    // Swipe left opens the notes browser, as the magnifier does.
+    // Swipe left opens the notes browser, as the folder does.
     return BrowserSwipes(
       forwardRoute: _areasRoute,
       back: false,
@@ -1140,6 +1141,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
               excludeFromSemantics: true,
             ),
             actions: [
+              // The Areas list, first in the bar (#221).
+              IconButton(
+                key: const ValueKey('browse'),
+                tooltip: t.browseTooltip,
+                onPressed: _browse,
+                icon: const Icon(Icons.folder_outlined),
+              ),
               IconButton(
                 key: const ValueKey('allRoutines'),
                 tooltip: t.allRoutinesTitle,
@@ -1172,8 +1180,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
             padding: clearOfFloatingButtons(
               context,
               const EdgeInsets.only(top: 8),
-              // "+" with the magnifier above it.
-              buttons: 40 + 16 + floatingButtonHeight,
             ),
             children: [
               if (widget.alarms.missing.isNotEmpty)
@@ -1316,24 +1322,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
               ],
             ],
           ),
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton.small(
-                heroTag: 'browse',
-                tooltip: t.browseTooltip,
-                onPressed: _browse,
-                child: const Icon(Icons.search),
-              ),
-              const SizedBox(height: 16),
-              FloatingActionButton(
-                key: _plus,
-                heroTag: 'capture',
-                tooltip: t.captureTooltip,
-                onPressed: _capture,
-                child: const Icon(Icons.add),
-              ),
-            ],
+          floatingActionButton: FloatingActionButton(
+            key: _plus,
+            heroTag: 'capture',
+            tooltip: t.captureTooltip,
+            onPressed: _capture,
+            child: const Icon(Icons.add),
           ),
         ),
       ),

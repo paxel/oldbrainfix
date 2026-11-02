@@ -54,7 +54,7 @@ void main() {
   }
 
   Future<void> openAllNotes(WidgetTester tester) async {
-    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.byKey(const ValueKey('browse')));
     await tap(tester, find.byTooltip('All Notes'));
   }
 
@@ -381,7 +381,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
 
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tester.enterText(find.byType(TextField), 'plumber');
       await tester.pumpAndSettle();
       expect(find.text('Call the plumber\ntomorrow'), findsOneWidget);

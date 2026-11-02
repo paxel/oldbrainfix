@@ -16,9 +16,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   fully above them, their margin and a gap included. On the desktop
   nothing floats over a list; every list ends with the same room after
   its last card, so that card scrolls fully into view.
-- The Agenda carries two floating buttons: **"+"** captures a Note and
-  **the magnifier** opens the notes browser. Nothing else floats, except
-  the ways "+" fans out while it is open (see Capture).
+- The Agenda carries one floating button: **"+"** captures a Note.
+  Nothing else floats, except the ways "+" fans out while it is open (see
+  Capture). **The folder**, first in the Agenda's top bar, opens the
+  Areas list (#221); search by text and by #tag stays inside the
+  browser.
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**. It
   opens the Profile page: picture, name and short code; Backups and
@@ -27,7 +29,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   menu bar leads to them instead (see Desktop).
 - The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
   level above the Areas list**. **Swipe left on the Agenda opens the
-  Areas list**, as the magnifier does. In the notes browser, **swipe
+  Areas list**, as the folder does. In the notes browser, **swipe
   right goes back** one level (Topic, Area, Areas list, Agenda) and
   **swipe left goes forward** into the last selected Area or Topic, if
   there is one. The last selected Area and Topic are highlighted.

@@ -787,7 +787,7 @@ void main() {
       notes.capture('', recordings: [first]);
       notes.capture('call the garage');
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tester.enterText(
         find.descendant(
           of: find.byType(AreasScreen),
