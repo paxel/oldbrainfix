@@ -602,7 +602,7 @@ impl<'a> Checklists<'a> {
 
     /// Whether the Note `note_id` is a Checklist.
     pub fn is_checklist(&self, note_id: &str) -> Result<bool> {
-        Ok(self.by_note(note_id)?.is_some())
+        Ok(self.making(note_id)?.is_some())
     }
 
     /// The Checklists of the Notes `note_ids` that are one, read in one

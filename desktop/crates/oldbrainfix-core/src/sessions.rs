@@ -2179,6 +2179,30 @@ mod tests {
     }
 
     #[test]
+    fn it_reads_its_pool_without_the_entries_of_its_tallies() -> TestResult {
+        use std::sync::atomic::Ordering::SeqCst;
+        let ann = device(1, "Ann")?;
+        let sessions = Sessions::new(&ann);
+        let pool = tallies(&ann, &["A", "B", "C"], None)?;
+        let setup = session(&ann, &pool, 2, SessionRule::Rolling, None)?.setup;
+        let pool_reads = || -> Made<usize> {
+            // After a change, so nothing worked out before is kept.
+            Notes::new(&ann).capture("Change", None, None)?;
+            let before = ann.history_reads.load(SeqCst);
+            assert_eq!(sessions.pool(&setup)?, pool);
+            Ok(ann.history_reads.load(SeqCst) - before)
+        };
+        let none = pool_reads()?;
+        for id in &pool {
+            for _ in 0..10 {
+                Tallies::new(&ann).add(id, &BTreeMap::new(), "ok", None)?;
+            }
+        }
+        assert_eq!(pool_reads()?, none);
+        Ok(())
+    }
+
+    #[test]
     fn it_finds_the_setups_without_reading_every_routine() -> TestResult {
         use std::sync::atomic::Ordering::SeqCst;
         let ann = device(1, "Ann")?;

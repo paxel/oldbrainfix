@@ -1402,6 +1402,29 @@ impl Store {
 
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for id in self.ever_of_type(ty)? {
+            if self.current(&id, "$type")?.as_deref() == Some(ty) {
+                out.push(id);
+            }
+        }
+        Ok(out)
+    }
+
+    /// What [`Store::current_fields`] gives for each entity whose current
+    /// `$type` is `ty`, read in one [`Store::current_fields_of`] query
+    /// rather than one per entity (#216), as the Dart core's
+    /// `currentFieldsOfType`.
+    pub fn current_fields_of_type(&self, ty: &str) -> Result<HashMap<String, Fields>> {
+        let ids = self.ever_of_type(ty)?;
+        let mut out = self.current_fields_of(ids.iter().map(String::as_str))?;
+        out.retain(|_, fields| fields.get("$type") == Some(ty));
+        Ok(out)
+    }
+
+    /// Entities whose `$type` was `ty` at some time, the shown pending
+    /// sets included.
+    fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
@@ -1416,13 +1439,7 @@ impl Store {
                 ids.push(e.entity.clone());
             }
         }
-        let mut out = Vec::new();
-        for id in ids {
-            if self.current(&id, "$type")?.as_deref() == Some(ty) {
-                out.push(id);
-            }
-        }
-        Ok(out)
+        Ok(ids)
     }
 
     /// Latest-wins order: date, then recording time, then device, then
@@ -1800,6 +1817,41 @@ pub(crate) mod tests {
             ]))
         );
         assert!(store.current_fields_of([])?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn it_reads_the_fields_of_every_entity_of_a_type_in_one_query_as_one_by_one() -> Result<()> {
+        let store = store();
+        for i in 0..30 {
+            let id = format!("thing:{i}");
+            store.append(&id, "$type", Some("thing"), None)?;
+            store.append(&id, "text", Some(&format!("t{i}")), None)?;
+        }
+        store.append("thing:0", "$type", Some("other"), None)?;
+        store.append("other:a", "$type", Some("other"), None)?;
+        // Shown pending changes count as they do one by one.
+        let set = store.open_pending("ai-task", true, None)?;
+        store.draft_pending(&set, "thing:new", "$type", Some("thing"), None)?;
+        store.draft_pending(&set, "thing:1", "text", Some("drafted"), None)?;
+        let before = store.history_reads.load(AtomicOrdering::SeqCst);
+        let read = store.current_fields_of_type("thing")?;
+        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
+        let mut one_by_one = HashMap::new();
+        for id in store.entities_of_type("thing")? {
+            let fields = store.current_fields(&id)?;
+            one_by_one.insert(id, fields);
+        }
+        assert_eq!(read, one_by_one);
+        assert!(!read.contains_key("thing:0"));
+        assert!(read.contains_key("thing:new"));
+        assert_eq!(
+            read.get("thing:1"),
+            Some(&Fields::new(vec![
+                ("$type".into(), Some("thing".into())),
+                ("text".into(), Some("drafted".into())),
+            ]))
+        );
         Ok(())
     }
 

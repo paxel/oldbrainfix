@@ -32,6 +32,32 @@ void main() {
     expect(kinds.of(check), NoteKind.plain);
   });
 
+  test('reads the fields of a Note once to tell its kind (#216)', () {
+    final notes = Notes(ann);
+    final plain = notes.capture('Call Ben').id;
+    final check = notes.capture('Trip\nSocks\nShirts').id;
+    Checklists(ann).make(check);
+    final shop = notes.capture('Shop\nMilk\nBread').id;
+    ShoppingLists(ann).make(shop);
+    final gym = notes.capture('Gym').id;
+    Tallies(ann).addField(gym, name: 'Reps', unit: 'reps');
+    final kinds = NoteKinds(ann);
+    // What every Note shares is worked out once.
+    kinds.of(plain);
+    for (final (id, kind) in [
+      (plain, NoteKind.plain),
+      (check, NoteKind.checklist),
+      (shop, NoteKind.shoppingList),
+    ]) {
+      final before = ann.historyReads;
+      expect(kinds.of(id), kind);
+      expect(ann.historyReads - before, 1, reason: '$kind');
+    }
+    final before = ann.historyReads;
+    expect(kinds.of(gym), NoteKind.tally);
+    expect(ann.historyReads, before);
+  });
+
   group('name and description', () {
     test('the first line is the name, the rest the description, as '
         'stored', () {

@@ -651,6 +651,27 @@ void main() {
       expect(NoteKinds(ann).of(note), NoteKind.plain);
     });
 
+    test('reads its pool without the entries of its Tallies (#216)', () {
+      final sessions = Sessions(ann);
+      final pool = tallies(ann, ['A', 'B', 'C']);
+      final setup = session(ann, pool).setup;
+      int poolReads() {
+        // After a change, so nothing worked out before is kept.
+        Notes(ann).capture('Change');
+        final before = ann.historyReads;
+        expect(sessions.pool(setup), pool);
+        return ann.historyReads - before;
+      }
+
+      final none = poolReads();
+      for (final id in pool) {
+        for (var i = 0; i < 10; i++) {
+          Tallies(ann).add(id, line: 'ok');
+        }
+      }
+      expect(poolReads(), none);
+    });
+
     test('finds the setups without reading every Routine (#203)', () {
       final sessions = Sessions(ann);
       final [a] = tallies(ann, ['A']);

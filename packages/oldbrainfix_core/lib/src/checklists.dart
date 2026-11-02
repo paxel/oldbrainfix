@@ -236,7 +236,7 @@ class Checklists {
   Checklist? byNote(String noteId) => ofNotes([noteId])[noteId];
 
   /// Whether the Note [noteId] is a Checklist.
-  bool isChecklist(String noteId) => byNote(noteId) != null;
+  bool isChecklist(String noteId) => _making(noteId) != null;
 
   /// The Checklists of the Notes [noteIds] that are one, read in one
   /// pass over the Lines: for a list that shows many Notes in full.

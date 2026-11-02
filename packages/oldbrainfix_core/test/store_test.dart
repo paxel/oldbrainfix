@@ -55,6 +55,32 @@ void main() {
     expect(store.currentFieldsOf(const []), isEmpty);
   });
 
+  test('reads the fields of every entity of a type in one query as one '
+      'by one (#216)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    for (var i = 0; i < 30; i++) {
+      store.append('thing:$i', r'$type', 'thing');
+      store.append('thing:$i', 'text', 't$i');
+    }
+    store.append('thing:0', r'$type', 'other');
+    store.append('other:a', r'$type', 'other');
+    // Shown pending changes count as they do one by one.
+    final set = store.openPending('ai-task', shown: true);
+    store.draftPending(set, 'thing:new', r'$type', 'thing');
+    store.draftPending(set, 'thing:1', 'text', 'drafted');
+    final before = store.historyReads;
+    final read = store.currentFieldsOfType('thing');
+    expect(store.historyReads - before, 1);
+    expect(read, {
+      for (final id in store.entitiesOfType('thing'))
+        id: store.currentFields(id),
+    });
+    expect(read.keys, isNot(contains('thing:0')));
+    expect(read['thing:1'], {r'$type': 'thing', 'text': 'drafted'});
+    expect(read.keys, contains('thing:new'));
+  });
+
   test('the latest date wins, not the latest append', () {
     final store = Store.inMemory();
     addTearDown(store.close);

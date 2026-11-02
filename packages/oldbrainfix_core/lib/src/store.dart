@@ -1100,22 +1100,33 @@ class Store {
   static const _inChunk = 500;
 
   /// Entities whose current `$type` is [type].
-  List<String> entitiesOfType(String type) {
-    final ids = {
-      for (final r in _db.select(
-        'SELECT DISTINCT entity FROM entries WHERE $_applied '
-        r"AND field = '$type' AND value = ?",
-        [type],
-      ))
-        r['entity'] as String,
-      for (final e in _shown)
-        if (e.field == r'$type' && e.value == type) e.entity,
-    };
-    return [
-      for (final id in ids)
-        if (current(id, r'$type') == type) id,
-    ];
-  }
+  List<String> entitiesOfType(String type) => [
+    for (final id in _everOfType(type))
+      if (current(id, r'$type') == type) id,
+  ];
+
+  /// What [currentFields] gives for each entity whose current `$type` is
+  /// [type], read in one [currentFieldsOf] query rather than one per
+  /// entity (#216).
+  Map<String, Map<String, String?>> currentFieldsOfType(String type) => {
+    for (final MapEntry(key: id, value: fields) in currentFieldsOf(
+      _everOfType(type),
+    ).entries)
+      if (fields[r'$type'] == type) id: fields,
+  };
+
+  /// Entities whose `$type` was [type] at some time, the shown pending
+  /// sets included.
+  Set<String> _everOfType(String type) => {
+    for (final r in _db.select(
+      'SELECT DISTINCT entity FROM entries WHERE $_applied '
+      r"AND field = '$type' AND value = ?",
+      [type],
+    ))
+      r['entity'] as String,
+    for (final e in _shown)
+      if (e.field == r'$type' && e.value == type) e.entity,
+  };
 
   /// Latest-wins order: date, then recording time, then device, then
   /// dseq. Sorting a field's entries by it puts the current value last.

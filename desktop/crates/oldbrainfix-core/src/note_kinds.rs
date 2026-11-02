@@ -5,9 +5,10 @@
 //! is shown only, nothing is written.
 
 use crate::Result;
-use crate::checklists::Checklists;
+use crate::checklists::{keys as checklist_keys, parse_list_kind};
+use crate::notes::keys as note_keys;
 use crate::sessions::Sessions;
-use crate::shopping_lists::ShoppingLists;
+use crate::shopping_lists::keys as shopping_keys;
 use crate::store::Store;
 use crate::tallies::Tallies;
 
@@ -36,13 +37,16 @@ impl NoteKind {
         if Sessions::new(store).is_session_note(note_id)? {
             return Ok(NoteKind::Session);
         }
-        if Checklists::new(store).is_checklist(note_id)? {
-            return Ok(NoteKind::Checklist);
+        // Its fields are read once (#216).
+        let fields = store.current_fields(note_id)?;
+        if fields.get(note_keys::TYPE) != Some(note_keys::TYPE_NOTE) {
+            return Ok(NoteKind::Plain);
         }
-        if ShoppingLists::new(store).is_shopping_list(note_id)? {
-            return Ok(NoteKind::ShoppingList);
-        }
-        Ok(NoteKind::Plain)
+        Ok(match parse_list_kind(fields.get(checklist_keys::KIND)) {
+            Some((checklist_keys::CHECKLIST, _)) => NoteKind::Checklist,
+            Some((shopping_keys::SHOPPING, _)) => NoteKind::ShoppingList,
+            _ => NoteKind::Plain,
+        })
     }
 }
 
@@ -80,8 +84,9 @@ pub fn join(name: &str, description: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::checklists::keys as checklist_keys;
+    use crate::checklists::Checklists;
     use crate::notes::Notes;
+    use crate::shopping_lists::ShoppingLists;
     use crate::signing::SigningKey;
     use crate::{OwnProfile, Store};
     use chrono::{DateTime, TimeZone, Utc};
@@ -125,6 +130,38 @@ mod tests {
         assert_eq!(NoteKind::of(&ann, &gym)?, NoteKind::Tally);
         Checklists::new(&ann).to_plain(&check)?;
         assert_eq!(NoteKind::of(&ann, &check)?, NoteKind::Plain);
+        Ok(())
+    }
+
+    #[test]
+    fn it_reads_the_fields_of_a_note_once_to_tell_its_kind() -> TestResult {
+        let ann = ann()?;
+        let notes = Notes::new(&ann);
+        let plain = notes.capture("Call Ben", None, None)?.id;
+        let check = notes.capture("Trip\nSocks\nShirts", None, None)?.id;
+        Checklists::new(&ann).make(&check)?;
+        let shop = notes.capture("Shop\nMilk\nBread", None, None)?.id;
+        ShoppingLists::new(&ann).make(&shop)?;
+        let gym = notes.capture("Gym", None, None)?.id;
+        Tallies::new(&ann).add_field(&gym, "Reps", "reps", None, None)?;
+        // What every Note shares is worked out once.
+        NoteKind::of(&ann, &plain)?;
+        for (id, kind) in [
+            (&plain, NoteKind::Plain),
+            (&check, NoteKind::Checklist),
+            (&shop, NoteKind::ShoppingList),
+        ] {
+            let before = ann.history_reads.load(Ordering::SeqCst);
+            assert_eq!(NoteKind::of(&ann, id)?, kind);
+            assert_eq!(
+                ann.history_reads.load(Ordering::SeqCst) - before,
+                1,
+                "{kind:?}"
+            );
+        }
+        let before = ann.history_reads.load(Ordering::SeqCst);
+        assert_eq!(NoteKind::of(&ann, &gym)?, NoteKind::Tally);
+        assert_eq!(ann.history_reads.load(Ordering::SeqCst), before);
         Ok(())
     }
 

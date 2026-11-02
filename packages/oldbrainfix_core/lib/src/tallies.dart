@@ -97,6 +97,21 @@ class TallyField {
 
   UnitKind get kind => TallyUnits.kindOf(unit);
 
+  /// This field with [hasEntries] as read.
+  TallyField _counting(bool hasEntries) => TallyField(
+    id: id,
+    noteId: noteId,
+    name: name,
+    unit: unit,
+    target: target,
+    rule: rule,
+    hidden: hidden,
+    hasEntries: hasEntries,
+    added: added,
+    multiplies: multiplies,
+    stored: _stored,
+  );
+
   /// This field with [multiplies] as read, without its target while it
   /// multiplies.
   TallyField _multiplying(String? multiplies) => TallyField(
@@ -297,21 +312,14 @@ class Tallies {
   /// The Tally of the Note [noteId], with the fields of the Notes merged
   /// into it, or null while it has no field.
   Tally? byNote(String noteId) {
-    final holders = [
-      for (final MapEntry(:key, :value) in _shownUnder().entries)
-        if (value == noteId) key,
-    ]..sort();
-    if (holders.isEmpty) return null;
-    final counted = _counted(noteId);
-    final fields = [
-      for (final holder in holders) ..._fieldsOn(holder, counted),
-    ];
-    if (fields.isEmpty) return null;
-    fields.sort((a, b) {
-      final byAdded = a.added.compareTo(b.added);
-      return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
-    });
-    return _multiplied(Tally(noteId, fields));
+    final shape = _shapes()[noteId];
+    if (shape == null) return null;
+    final counted = _counted()[noteId] ?? const <String>{};
+    return _multiplied(
+      Tally(noteId, [
+        for (final field in shape) field._counting(counted.contains(field.id)),
+      ]),
+    );
   }
 
   /// [tally] with the multipliers its settings make (#200): a field
@@ -328,8 +336,9 @@ class Tallies {
       ),
   ]);
 
-  /// Whether the Note [noteId] is a Tally.
-  bool isTally(String noteId) => byNote(noteId) != null;
+  /// Whether the Note [noteId] is a Tally: told by its fields alone,
+  /// without reading its entries (#216).
+  bool isTally(String noteId) => _shapes().containsKey(noteId);
 
   /// Every Tally whose Note is in the lists, newest capture first.
   List<Tally> all() {
@@ -762,9 +771,33 @@ class Tallies {
     };
   }
 
-  /// The fields lying on the Note [holder], with whether [counted] holds
-  /// a value for each.
-  List<TallyField> _fieldsOn(String holder, Set<String> counted) {
+  /// The fields of every Tally, by its Note, in the order they were
+  /// added, each as if it had no entries: read from the Notes alone, not
+  /// from the entries, and kept until the log changes (#216). Shared by
+  /// every caller, so nobody changes it.
+  Map<String, List<TallyField>> _shapes() => store.workedOut(
+    (Tallies, #shapes),
+    () {
+      final holders = <String, List<String>>{};
+      for (final MapEntry(key: holder, value: note) in _shownUnder().entries) {
+        (holders[note] ??= []).add(holder);
+      }
+      final shapes = <String, List<TallyField>>{};
+      for (final MapEntry(key: note, value: on) in holders.entries) {
+        final fields = [for (final holder in on..sort()) ..._fieldsOn(holder)];
+        if (fields.isEmpty) continue;
+        fields.sort((a, b) {
+          final byAdded = a.added.compareTo(b.added);
+          return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
+        });
+        shapes[note] = fields;
+      }
+      return shapes;
+    },
+  );
+
+  /// The fields lying on the Note [holder], as if none had entries.
+  List<TallyField> _fieldsOn(String holder) {
     final fields = store.currentFields(holder);
     final added = <String, DateTime>{};
     for (final e in store.history(holder)) {
@@ -791,7 +824,7 @@ class Tallies {
                 )]] ??
                 TallyRule.sum,
             hidden: fields[TallyKeys.field(id, TallyKeys.hidden)] == 'true',
-            hasEntries: counted.contains(id),
+            hasEntries: false,
             added: date.toUtc(),
             stored: fields[TallyKeys.field(id, TallyKeys.multiplies)],
           ),
@@ -812,29 +845,41 @@ class Tallies {
     return id.isEmpty || id.contains(':') ? null : id;
   }
 
-  /// The ids of the fields some entry of the Tally of [noteId] holds a
-  /// value for, removed entries included.
-  Set<String> _counted(String noteId) {
-    final shownUnder = _shownUnder();
-    return {
-      for (final entry in _entries())
-        if ((shownUnder[entry.noteId] ?? entry.noteId) == noteId)
-          ...entry.values.keys,
-    };
-  }
+  /// The ids of the fields some entry holds a value for, removed entries
+  /// included, by the Note of the Tally the entry shows under: every
+  /// entry read in one query, kept until the log changes (#216). Shared
+  /// by every caller, so nobody changes it.
+  Map<String, Set<String>> _counted() =>
+      store.workedOut((Tallies, #counted), () {
+        final shownUnder = _shownUnder();
+        final counted = <String, Set<String>>{};
+        for (final MapEntry(key: id, value: fields)
+            in store.currentFieldsOfType(TallyKeys.typeEntry).entries) {
+          if (_entryFrom(id, fields) case final entry?) {
+            (counted[shownUnder[entry.noteId] ?? entry.noteId] ??= {}).addAll(
+              entry.values.keys,
+            );
+          }
+        }
+        return counted;
+      });
 
   /// Every Note with a field of a Tally on it, by the Note it shows
-  /// under: itself, or the one it was merged into.
-  Map<String, String> _shownUnder() {
-    final notes = Notes(store);
-    final under = <String, String>{};
-    for (final (entity, _) in store.fieldsWithPrefix(TallyKeys.fieldPrefix)) {
-      if (under.containsKey(entity)) continue;
-      final note = notes.byId(entity);
-      if (note != null) under[entity] = note.mergedInto ?? entity;
-    }
-    return under;
-  }
+  /// under: itself, or the one it was merged into. Kept until the log
+  /// changes (#216) and shared by every caller, so nobody changes it.
+  Map<String, String> _shownUnder() => store.workedOut(
+    (Tallies, #shownUnder),
+    () {
+      final notes = Notes(store);
+      final under = <String, String>{};
+      for (final (entity, _) in store.fieldsWithPrefix(TallyKeys.fieldPrefix)) {
+        if (under.containsKey(entity)) continue;
+        final note = notes.byId(entity);
+        if (note != null) under[entity] = note.mergedInto ?? entity;
+      }
+      return under;
+    },
+  );
 
   /// Newest first, by id on the same moment.
   static int _newestFirst(TallyEntry a, TallyEntry b) {

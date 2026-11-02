@@ -174,6 +174,36 @@ void main() {
       expect(tallies.byNote(note)!.field(weight)?.target, isNull);
     });
 
+    test('a Tally and its fields are read without its entries, once per '
+        'change (#216)', () {
+      final tallies = Tallies(ann);
+      final (note, [reps]) = tally(ann, 'Push-ups', ['times']);
+      for (var i = 0; i < 20; i++) {
+        tallies.add(note, values: {reps: 1});
+      }
+      final plain = Notes(ann).capture('Plain').id;
+      // Worked out once: the Note and its fields, no entry.
+      final before = ann.historyReads;
+      expect(tallies.isTally(note), isTrue);
+      expect(tallies.isTally(plain), isFalse);
+      expect(ann.historyReads - before, 4);
+      // Then kept until the log changes.
+      final kept = ann.historyReads;
+      expect(tallies.isTally(note), isTrue);
+      expect(tallies.isTally(plain), isFalse);
+      expect(ann.historyReads, kept);
+      // What has entries is read for all of them in one go.
+      expect(tallies.byNote(note)!.field(reps)!.hasEntries, isTrue);
+      expect(tallies.byNote(note)!.field(reps)!.hasEntries, isTrue);
+      expect(ann.historyReads - kept, 1);
+      // A change counts at once.
+      final (other, [km]) = tally(ann, 'Run', ['km']);
+      expect(tallies.isTally(other), isTrue);
+      expect(tallies.byNote(other)!.field(km)!.hasEntries, isFalse);
+      tallies.add(other, values: {km: 5});
+      expect(tallies.byNote(other)!.field(km)!.hasEntries, isTrue);
+    });
+
     test('keys that are no field of a Tally are passed over', () {
       final (note, [reps]) = tally(ann, 'Push-ups', ['times']);
       // As a modified app would.

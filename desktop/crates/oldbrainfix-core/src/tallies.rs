@@ -6,6 +6,7 @@
 //! and read from the clock as often, as the Dart core's.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 
@@ -302,25 +303,19 @@ impl<'a> Tallies<'a> {
     /// The Tally of the Note `note_id`, with the fields of the Notes
     /// merged into it, or `None` while it has no field.
     pub fn by_note(&self, note_id: &str) -> Result<Option<Tally>> {
-        let mut holders: Vec<String> = self
-            .shown_under()?
-            .into_iter()
-            .filter(|(_, under)| under == note_id)
-            .map(|(holder, _)| holder)
+        let shapes = self.shapes()?;
+        let Some(shape) = shapes.get(note_id) else {
+            return Ok(None);
+        };
+        let counted = self.counted()?;
+        let counted = counted.get(note_id);
+        let fields = shape
+            .iter()
+            .map(|field| TallyField {
+                has_entries: counted.is_some_and(|c| c.contains(&field.id)),
+                ..field.clone()
+            })
             .collect();
-        if holders.is_empty() {
-            return Ok(None);
-        }
-        holders.sort_by(|a, b| utf16_cmp(a, b));
-        let counted = self.counted(note_id)?;
-        let mut fields = Vec::new();
-        for holder in &holders {
-            fields.extend(self.fields_on(holder, &counted)?);
-        }
-        if fields.is_empty() {
-            return Ok(None);
-        }
-        fields.sort_by(|a, b| a.added.cmp(&b.added).then_with(|| utf16_cmp(&a.id, &b.id)));
         Ok(Some(
             Tally {
                 note_id: note_id.to_string(),
@@ -330,14 +325,15 @@ impl<'a> Tallies<'a> {
         ))
     }
 
-    /// Whether the Note `note_id` is a Tally.
+    /// Whether the Note `note_id` is a Tally: told by its fields alone,
+    /// without reading its entries (#216).
     pub fn is_tally(&self, note_id: &str) -> Result<bool> {
-        Ok(self.by_note(note_id)?.is_some())
+        Ok(self.shapes()?.contains_key(note_id))
     }
 
     /// Every Tally whose Note is in the lists, newest capture first.
     pub fn all(&self) -> Result<Vec<Tally>> {
-        let notes: BTreeSet<String> = self.shown_under()?.into_values().collect();
+        let notes: BTreeSet<String> = self.shown_under()?.values().cloned().collect();
         let mut out = Vec::new();
         for note in Notes::new(self.store).all()? {
             if notes.contains(&note.id)
@@ -812,9 +808,38 @@ impl<'a> Tallies<'a> {
         Ok(entry)
     }
 
-    /// The fields lying on the Note `holder`, with whether `counted` holds
-    /// a value for each.
-    fn fields_on(&self, holder: &str, counted: &BTreeSet<String>) -> Result<Vec<TallyField>> {
+    /// The fields of every Tally, by its Note, in the order they were
+    /// added, each as if it had no entries: read from the Notes alone,
+    /// not from the entries, and kept until the log changes (#216), as
+    /// the Dart core's `_shapes`.
+    fn shapes(&self) -> Result<Arc<HashMap<String, Vec<TallyField>>>> {
+        self.store.worked_out("tallies:shapes", || {
+            let mut holders: BTreeMap<String, Vec<String>> = BTreeMap::new();
+            for (holder, note) in self.shown_under()?.iter() {
+                holders
+                    .entry(note.clone())
+                    .or_default()
+                    .push(holder.clone());
+            }
+            let mut shapes = HashMap::new();
+            for (note, mut on) in holders {
+                on.sort_by(|a, b| utf16_cmp(a, b));
+                let mut fields = Vec::new();
+                for holder in &on {
+                    fields.extend(self.fields_on(holder)?);
+                }
+                if fields.is_empty() {
+                    continue;
+                }
+                fields.sort_by(|a, b| a.added.cmp(&b.added).then_with(|| utf16_cmp(&a.id, &b.id)));
+                shapes.insert(note, fields);
+            }
+            Ok(shapes)
+        })
+    }
+
+    /// The fields lying on the Note `holder`, as if none had entries.
+    fn fields_on(&self, holder: &str) -> Result<Vec<TallyField>> {
         let fields = self.store.current_fields(holder)?;
         let mut added: Vec<(String, DateTime<Utc>)> = Vec::new();
         for e in self.store.history(holder)? {
@@ -846,7 +871,7 @@ impl<'a> Tallies<'a> {
                     hidden: get(&id, keys::HIDDEN) == Some("true"),
                     multiplies: None,
                     stored: get(&id, keys::MULTIPLIES).map(str::to_string),
-                    has_entries: counted.contains(&id),
+                    has_entries: false,
                     added: date,
                     id,
                 })
@@ -854,34 +879,48 @@ impl<'a> Tallies<'a> {
             .collect())
     }
 
-    /// The ids of the fields some entry of the Tally of `note_id` holds a
-    /// value for, removed entries included.
-    fn counted(&self, note_id: &str) -> Result<BTreeSet<String>> {
-        let shown_under = self.shown_under()?;
-        let mut out = BTreeSet::new();
-        for entry in self.all_entries()? {
-            if shown_under.get(&entry.note_id).unwrap_or(&entry.note_id) == note_id {
-                out.extend(entry.values.into_keys());
+    /// The ids of the fields some entry holds a value for, removed
+    /// entries included, by the Note of the Tally the entry shows under:
+    /// every entry read in one query, kept until the log changes (#216),
+    /// as the Dart core's `_counted`.
+    fn counted(&self) -> Result<Arc<HashMap<String, BTreeSet<String>>>> {
+        self.store.worked_out("tallies:counted", || {
+            let shown_under = self.shown_under()?;
+            let mut counted: HashMap<String, BTreeSet<String>> = HashMap::new();
+            for (id, fields) in self.store.current_fields_of_type(keys::TYPE_ENTRY)? {
+                if let Some(entry) = Self::entry_from(&id, &fields) {
+                    let under = shown_under
+                        .get(&entry.note_id)
+                        .cloned()
+                        .unwrap_or(entry.note_id);
+                    counted
+                        .entry(under)
+                        .or_default()
+                        .extend(entry.values.into_keys());
+                }
             }
-        }
-        Ok(out)
+            Ok(counted)
+        })
     }
 
     /// Every Note with a field of a Tally on it, by the Note it shows
-    /// under: itself, or the one it was merged into.
-    fn shown_under(&self) -> Result<BTreeMap<String, String>> {
-        let notes = Notes::new(self.store);
-        let mut under = BTreeMap::new();
-        for (entity, _) in self.store.fields_with_prefix(keys::FIELD_PREFIX)? {
-            if under.contains_key(&entity) {
-                continue;
+    /// under: itself, or the one it was merged into. Kept until the log
+    /// changes (#216).
+    fn shown_under(&self) -> Result<Arc<BTreeMap<String, String>>> {
+        self.store.worked_out("tallies:shown_under", || {
+            let notes = Notes::new(self.store);
+            let mut under = BTreeMap::new();
+            for (entity, _) in self.store.fields_with_prefix(keys::FIELD_PREFIX)? {
+                if under.contains_key(&entity) {
+                    continue;
+                }
+                if let Some(note) = notes.by_id(&entity)? {
+                    let end = note.merged_into.unwrap_or_else(|| entity.clone());
+                    under.insert(entity, end);
+                }
             }
-            if let Some(note) = notes.by_id(&entity)? {
-                let end = note.merged_into.unwrap_or_else(|| entity.clone());
-                under.insert(entity, end);
-            }
-        }
-        Ok(under)
+            Ok(under)
+        })
     }
 
     /// Every entry, removed ones included.
@@ -1180,6 +1219,45 @@ mod tests {
             tallies.entries(&note, &everyone())?[0].values.get(weight),
             Some(&80.0)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_tally_and_its_fields_are_read_without_its_entries_once_per_change() -> TestResult {
+        use std::sync::atomic::Ordering::SeqCst;
+        let ann = device(1, "Ann")?;
+        let tallies = Tallies::new(&ann);
+        let (note, fields) = tally(&ann, "Push-ups", &["times"], None)?;
+        let reps = &fields[0];
+        for _ in 0..20 {
+            tallies.add(&note, &values(&[(reps, 1.0)]), "", None)?;
+        }
+        let plain = Notes::new(&ann).capture("Plain", None, None)?.id;
+        // Worked out once: the Note and its fields, no entry.
+        let before = ann.history_reads.load(SeqCst);
+        assert!(tallies.is_tally(&note)?);
+        assert!(!tallies.is_tally(&plain)?);
+        assert_eq!(ann.history_reads.load(SeqCst) - before, 4);
+        // Then kept until the log changes.
+        let kept = ann.history_reads.load(SeqCst);
+        assert!(tallies.is_tally(&note)?);
+        assert!(!tallies.is_tally(&plain)?);
+        assert_eq!(ann.history_reads.load(SeqCst), kept);
+        // What has entries is read for all of them in one go.
+        let has = |id: &str, field: &str| -> Made<bool> {
+            let tally = tallies.by_note(id)?.ok_or("a Tally")?;
+            Ok(tally.field(field).ok_or("a field")?.has_entries)
+        };
+        assert!(has(&note, reps)?);
+        assert!(has(&note, reps)?);
+        assert_eq!(ann.history_reads.load(SeqCst) - kept, 1);
+        // A change counts at once.
+        let (other, fields) = tally(&ann, "Run", &["km"], None)?;
+        let km = &fields[0];
+        assert!(tallies.is_tally(&other)?);
+        assert!(!has(&other, km)?);
+        tallies.add(&other, &values(&[(km, 5.0)]), "", None)?;
+        assert!(has(&other, km)?);
         Ok(())
     }
 

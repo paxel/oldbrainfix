@@ -1,4 +1,5 @@
 import 'checklists.dart';
+import 'notes.dart';
 import 'sessions.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
@@ -29,14 +30,17 @@ class NoteKinds {
   /// wins over the rest (ADR 0030), else a Session while it has a pool,
   /// on the Note or as an older version left it on a Routine (ADR 0039),
   /// else the list its `kind` names, else a plain Note.
+  /// Its fields are read once (#216).
   NoteKind of(String noteId) {
     if (Tallies(store).isTally(noteId)) return NoteKind.tally;
     if (Sessions(store).isSessionNote(noteId)) return NoteKind.session;
-    if (Checklists(store).isChecklist(noteId)) return NoteKind.checklist;
-    if (ShoppingLists(store).isShoppingList(noteId)) {
-      return NoteKind.shoppingList;
-    }
-    return NoteKind.plain;
+    final fields = store.currentFields(noteId);
+    if (fields[NoteKeys.type] != NoteKeys.typeNote) return NoteKind.plain;
+    return switch (parseListKind(fields[ChecklistKeys.kind])?.list) {
+      ChecklistKeys.checklist => NoteKind.checklist,
+      ShoppingKeys.shopping => NoteKind.shoppingList,
+      _ => NoteKind.plain,
+    };
   }
 
   /// The name of a Note of a kind with the text [text]: its first line,
