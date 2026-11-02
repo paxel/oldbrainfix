@@ -68,6 +68,7 @@ class AlarmSync extends ChangeNotifier {
   var _nudgeOpened = false;
   var _changesOpened = false;
   var _unsortedOpened = false;
+  WidgetPick? _pickOpened;
 
   AlarmSync({
     required this.store,
@@ -142,6 +143,14 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// The Session's pick tapped on the Agenda widget whose entry form is
+  /// still to open, or null; taking it clears it (#209).
+  WidgetPick? takePickOpened() {
+    final opened = _pickOpened;
+    _pickOpened = null;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -169,6 +178,8 @@ class AlarmSync extends ChangeNotifier {
           _applyFrog(frogId, at);
         case ShoppingTapped(:final lineId):
           _applyShopping(lineId);
+        case ChecklistTapped(:final lineId):
+          _applyChecklist(lineId);
       }
     }
     final granted = await platform.permissions();
@@ -176,10 +187,12 @@ class AlarmSync extends ChangeNotifier {
     final nudgeOpened = await platform.nudgeOpened();
     final changesOpened = await platform.changesOpened();
     final unsortedOpened = await platform.unsortedOpened();
+    final pickOpened = await platform.pickOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
+    if (pickOpened != null) _pickOpened = pickOpened;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -198,7 +211,8 @@ class AlarmSync extends ChangeNotifier {
             ringingChanged ||
             nudgeOpened ||
             changesOpened ||
-            unsortedOpened)) {
+            unsortedOpened ||
+            pickOpened != null)) {
       notifyListeners();
     }
   });
@@ -238,6 +252,19 @@ class AlarmSync extends ChangeNotifier {
   void _applyShopping(String lineId) {
     try {
       ShoppingLists(store).check(lineId, wallClock);
+    } on ArgumentError {
+      return;
+    } on StateError {
+      return;
+    }
+  }
+
+  /// Checks the Line [lineId] of a Checklist without a Routine, as the
+  /// Agenda's box does (#209); one gone or no longer allowed changes
+  /// nothing.
+  void _applyChecklist(String lineId) {
+    try {
+      Checklists(store).check(lineId);
     } on ArgumentError {
       return;
     } on StateError {

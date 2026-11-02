@@ -36,12 +36,14 @@ import 'nudge_screen.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
+import 'place_names.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
 import 'ring_screen.dart';
+import 'session_view.dart';
 import 'routine_editor_screen.dart';
 import 'sent_item_screen.dart';
 import 'setup_screen.dart';
@@ -423,14 +425,15 @@ class RouteStack extends NavigatorObserver {
 /// then the alarm setup where there are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
-/// tapped, and the Unsorted list when the Agenda widget's Unsorted
-/// count was, and imports the bundles other apps opened with this one
+/// tapped, the Unsorted list when the Agenda widget's Unsorted
+/// count was and a pick's entry form when its pick was, and imports the bundles other apps opened with this one
 /// and opens the Profile card links tapped in them.
 /// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
 /// again, while Capture and the full-screen alarm stay, and the Nudge
-/// screen and the Unsorted list wait for the unlock.
+/// screen, the Unsorted list and a pick's entry form wait for the
+/// unlock.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -511,6 +514,7 @@ class _HomeState extends State<_Home> {
   var _nudgeWaiting = false;
   var _changesWaiting = false;
   var _unsortedWaiting = false;
+  WidgetPick? _pickWaiting;
 
   /// Whether the bundles of the Changes Nudge are going out now.
   var _sendingChanges = false;
@@ -534,6 +538,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_changesOpened);
     widget.alarms.addListener(_unsortedOpened);
+    widget.alarms.addListener(_pickOpened);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
@@ -644,6 +649,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_changesOpened);
     widget.alarms.removeListener(_unsortedOpened);
+    widget.alarms.removeListener(_pickOpened);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
@@ -731,6 +737,10 @@ class _HomeState extends State<_Home> {
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));
+    }
+    if (_pickWaiting case final pick?) {
+      _pickWaiting = null;
+      unawaited(_openPick(pick));
     }
   }
 
@@ -829,6 +839,56 @@ class _HomeState extends State<_Home> {
       return;
     }
     unawaited(openUnsorted(context, widget.notes, widget.places));
+  }
+
+  /// Opens a pick's entry form when it was tapped on the Agenda widget
+  /// (#209); behind the App Lock it waits for the unlock.
+  void _pickOpened() {
+    if (!mounted) return;
+    final pick = widget.alarms.takePickOpened();
+    if (pick == null) return;
+    if (widget.lock.locked) {
+      _pickWaiting = pick;
+      return;
+    }
+    unawaited(_openPick(pick));
+  }
+
+  /// Opens the entry form of today's [pick], as its box on the Agenda
+  /// does: its locked Area first. A pick no longer there, or one this
+  /// Device may not record for, opens nothing, the Agenda being open.
+  Future<void> _openPick(WidgetPick pick) async {
+    final store = widget.store;
+    final today = Sessions(store)
+        .today(deviceWallClock)
+        .where(
+          (o) =>
+              o.session.id == pick.sessionId &&
+              o.occurrence.key == pick.occurrenceKey,
+        )
+        .firstOrNull;
+    final picked = today?.picks
+        .where((p) => p.noteId == pick.noteId)
+        .firstOrNull;
+    if (today == null || picked == null) return;
+    if (!opensPick(store, pick.sessionId, picked)) return;
+    final lock = LockScope.of(context);
+    final areaId = switch (picked.note) {
+      final note? => AreaLocks(store).lockedAreaOf(note),
+      null => null,
+    };
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await openPick(context, widget.notes, today, picked);
+    lock?.closeAreas();
   }
 
   /// Plants what the user kept of the Starter Set; it is not offered

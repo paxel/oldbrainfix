@@ -362,8 +362,107 @@ class AgendaWidgetPlanTest {
     }
 
     @Test
+    fun aSnapshotOfVersionTwoTakesNoKindOfALaterOne() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val day = JSONArray()
+            .put(row("occurrence", "Sport").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00"))
+            .put(row("pick", "Push-ups").put("note", "note:push-ups"))
+            .put(row("checklistLine", "Tickets").put("line", "line:tickets"))
+        val snapshot = JSONObject().put("v", 2).put("days", JSONObject().put("2026-10-24", day)).put("labels", JSONObject())
+
+        val rows = AgendaWidgetPlan.snapshotOf(snapshot.toString())?.days?.get("2026-10-24") ?: emptyList()
+
+        assertEquals(listOf("Sport"), rows.map { it.title })
+    }
+
+    @Test
+    fun aSnapshotOfVersionThreeReadsTheGroups() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val day = JSONArray()
+            .put(row("shopping", "Groceries").put("block", "lists"))
+            .put(row("shopping", "Milk").put("line", "line:milk").put("checks", true).put("indent", 1).put("block", "lists"))
+            .put(row("checklist", "Before the trip").put("block", "lists"))
+            .put(row("checklistLine", "Tickets").put("line", "line:tickets").put("checks", true).put("indent", 1).put("block", "lists"))
+            .put(row("session", "Sport").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00").put("time", "07:00").put("block", "timed").put("at", 420))
+            .put(row("pick", "Push-ups 20 times").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00").put("note", "note:push-ups").put("checks", true).put("indent", 1).put("block", "timed").put("at", 420))
+            .put(row("laterKind", "?"))
+        val snapshot = JSONObject()
+            .put("v", 3)
+            .put("days", JSONObject().put("2026-10-24", day))
+            .put("unsorted", 0)
+            .put("labels", JSONObject().put("today", "Today"))
+
+        val read = AgendaWidgetPlan.snapshotOf(snapshot.toString())
+
+        val rows = read?.days?.get("2026-10-24") ?: emptyList()
+        assertEquals(listOf("shopping", "shopping", "checklist", "checklistLine", "session", "pick"), rows.map { it.kind })
+        assertEquals(listOf(0, 1, 0, 1, 0, 1), rows.map { it.indent })
+        assertEquals("note:push-ups", rows[5].note)
+        assertEquals("Today", read?.today)
+        // The headings of the lists have no box; their Lines, the Session and its picks have.
+        assertEquals(listOf(false, true, false, true, true, true), rows.map { it.box })
+        assertEquals(listOf(true, false, true, false, false, false), rows.map { it.heading })
+    }
+
+    @Test
+    fun aSessionsBoxOnlyShowsDoneAndAPickOpensItsEntryForm() {
+        val sport = WidgetRow(
+            WidgetRow.SESSION, "Sport", "07:00", checks = false,
+            routine = "session:sport", occurrence = "2026-10-24T07:00", block = WidgetRow.TIMED, at = 420,
+        )
+        val pick = WidgetRow(
+            WidgetRow.PICK, "Push-ups 20 times", checks = true, indent = 1,
+            routine = "session:sport", occurrence = "2026-10-24T07:00", note = "note:push-ups",
+            block = WidgetRow.TIMED, at = 420,
+        )
+
+        assertTrue(sport.box)
+        assertNull(sport.tap)
+        assertEquals(AgendaTap.None, sport.onBox)
+        assertEquals(AgendaTap.Open, sport.onRow)
+        // Even with checks, as a snapshot might say.
+        assertEquals(AgendaTap.None, sport.copy(checks = true).onBox)
+        val opens = AgendaTap.Pick("session:sport", "2026-10-24T07:00", "note:push-ups")
+        assertTrue(pick.box)
+        assertNull(pick.tap)
+        assertEquals(opens, pick.onBox)
+        assertEquals(opens, pick.onRow)
+        // Its entry form open here or not, its box shows whether it has an entry.
+        assertEquals(opens, pick.copy(done = true).onRow)
+        assertEquals(AgendaTap.Open, pick.copy(checks = false).onBox)
+        assertEquals(AgendaTap.Open, pick.copy(note = "").onRow)
+        // Done on its notification and not yet applied, it shows Done.
+        val day = snapshot.copy(days = mapOf("2026-10-24" to listOf(sport, pick)))
+        val view = AgendaWidgetPlan.view(day, "2026-10-24", listOf(action(1, "done", "session:sport", "2026-10-24T07:00")), emptyList(), "")
+        assertTrue(view.rows.single { it.title == "Sport" }.done)
+    }
+
+    @Test
+    fun aChecklistsLineChecksItAndShowsCheckedUntilTheAppHasIt() {
+        val tickets = WidgetRow(
+            WidgetRow.CHECKLIST_LINE, "Tickets", checks = true, indent = 1, line = "line:tickets", block = WidgetRow.LISTS,
+        )
+        val day = snapshot.copy(days = mapOf("2026-10-24" to listOf(WidgetRow(WidgetRow.CHECKLIST, "Before the trip", block = WidgetRow.LISTS), tickets)))
+
+        assertEquals(WidgetTap("checklist", "", "", "line:tickets"), tickets.tap)
+        assertEquals(AgendaTap.Check("checklist", Alarm("", "", "", null, null, "Tickets", ""), "line:tickets"), tickets.onBox)
+        assertEquals(AgendaTap.Open, tickets.onRow)
+        assertNull(tickets.copy(checks = false).tap)
+        val view = AgendaWidgetPlan.view(day, "2026-10-24", listOf(action(1, "checklist", "", line = "line:tickets")), emptyList(), "")
+        assertTrue(view.rows.single { it.title == "Tickets" }.done)
+    }
+
+    @Test
+    fun everyGroupsEntriesAreIndentedAlikeTheirBoxesWhereTheHeadingsWordsBegin() {
+        assertEquals(0, AgendaWidgetPlan.indentDp(0))
+        // A box is 40 wide: an entry's box stands where its heading's words begin.
+        assertEquals(AgendaWidgetPlan.BOX_DP, AgendaWidgetPlan.indentDp(1))
+        assertEquals(AgendaWidgetPlan.BOX_DP + AgendaWidgetPlan.STEP_DP, AgendaWidgetPlan.indentDp(2))
+    }
+
+    @Test
     fun aSnapshotOfALaterVersionAsksToOpenTheApp() {
-        for (version in listOf("3", "\"2\"", "2.0", "0")) {
+        for (version in listOf("4", "\"3\"", "3.0", "0")) {
             val text = """{"v":$version,"days":{"2026-10-24":[]},"labels":{}}"""
             assertNull(version, AgendaWidgetPlan.snapshotOf(text))
         }

@@ -23,9 +23,12 @@ import java.util.TimeZone
 /**
  * The home-screen Agenda widget: what the Agenda shows for today, in its
  * order (#153), as a list that scrolls when it is taller than the
- * widget. A row's box checks it as the Agenda's does, the rest of a row
- * opens the app, and the Unsorted count opens the Unsorted list; every
- * tap on the list goes through [AgendaTapActivity]. It
+ * widget, its groups drawn as the Agenda's (#209): a heading, then its
+ * entries indented under it, each with its box. A row's box checks it
+ * as the Agenda's does, a Session's only shows Done, a pick opens its
+ * entry form, the rest of a row opens the app, and the Unsorted count
+ * opens the Unsorted list; every tap on the list goes through
+ * [AgendaTapActivity]. It
  * never reads the log: it shows the snapshot the app hands over whenever
  * it syncs the alarms ([replace]), and a box checked here goes the way of
  * a Done tapped on a notification, into the [EventQueue] for the app to
@@ -58,9 +61,6 @@ class AgendaWidget : AppWidgetProvider() {
         /** Request codes of the widget's taps; apart from Capture's 0 to 2. */
         private const val REQUEST_OPEN = 100
         private const val REQUEST_ROWS = 102
-
-        /** How far a row moves in per [WidgetRow.indent], in dp. */
-        private const val INDENT_DP = 24
 
         /** Keeps the app's new [snapshot] and shows it. */
         fun replace(context: Context, snapshot: JSONObject) {
@@ -181,11 +181,14 @@ class AgendaWidget : AppWidgetProvider() {
             else -> R.layout.widget_agenda_row
         }
 
-        /** The views of [row]: its box checks it, the rest opens the app; the Unsorted count opens the Unsorted list. */
+        /**
+         * The views of [row]: its box does [WidgetRow.onBox], the rest
+         * [WidgetRow.onRow]; the Unsorted count opens the Unsorted list.
+         */
         fun rowViews(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow): RemoteViews = when (layoutOf(row.kind)) {
             R.layout.widget_agenda_unsorted -> RemoteViews(context.packageName, R.layout.widget_agenda_unsorted).apply {
                 setTextViewText(R.id.agenda_unsorted, row.title)
-                setOnClickFillInIntent(R.id.agenda_unsorted, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_UNSORTED))
+                setOnClickFillInIntent(R.id.agenda_unsorted, fillIn(AgendaTap.Unsorted))
             }
             R.layout.widget_agenda_text ->
                 RemoteViews(context.packageName, R.layout.widget_agenda_text).apply {
@@ -199,14 +202,16 @@ class AgendaWidget : AppWidgetProvider() {
                         R.id.agenda_text,
                         context.getColor(if (row.kind == WidgetRow.HEADING) R.color.agenda_widget_text else R.color.agenda_widget_text_dim),
                     )
-                    setViewPadding(R.id.agenda_text, dp(context, 8 + INDENT_DP * row.indent), dp(context, 4), dp(context, 8), dp(context, 4))
-                    setOnClickFillInIntent(R.id.agenda_text, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN))
+                    // Under a heading its words start where the heading's do.
+                    val start = maxOf(8, AgendaWidgetPlan.indentDp(row.indent))
+                    setViewPadding(R.id.agenda_text, dp(context, start), dp(context, 4), dp(context, 8), dp(context, 4))
+                    setOnClickFillInIntent(R.id.agenda_text, fillIn(AgendaTap.Open))
                 }
             else -> RemoteViews(context.packageName, R.layout.widget_agenda_row).apply {
-                setViewPadding(R.id.agenda_row, dp(context, INDENT_DP * row.indent), 0, 0, dp(context, 4))
+                setViewPadding(R.id.agenda_row, dp(context, AgendaWidgetPlan.indentDp(row.indent)), 0, 0, dp(context, 4))
                 setTextViewText(R.id.agenda_time, row.time)
                 setViewVisibility(R.id.agenda_time, if (row.time.isEmpty()) View.GONE else View.VISIBLE)
-                setOnClickFillInIntent(R.id.agenda_row, Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN))
+                setOnClickFillInIntent(R.id.agenda_row, fillIn(row.onRow))
                 if (row.kind == WidgetRow.APPOINTMENT) {
                     setViewVisibility(R.id.agenda_strip, View.VISIBLE)
                     if (row.colour != 0) setInt(R.id.agenda_strip, "setBackgroundColor", row.colour or 0xFF000000.toInt())
@@ -226,24 +231,21 @@ class AgendaWidget : AppWidgetProvider() {
                     setTextColor(R.id.agenda_title, context.getColor(R.color.agenda_widget_text))
                 }
                 setTextViewText(R.id.agenda_title, title)
-                setViewPadding(R.id.agenda_title, dp(context, if (row.box || row.time.isNotEmpty()) 0 else 12), 0, dp(context, 8), 0)
-                val tap = row.tap
-                setOnClickFillInIntent(
-                    R.id.agenda_check,
-                    if (tap == null) {
-                        Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_OPEN)
-                    } else {
-                        Intent().putExtra(AgendaTap.EXTRA_TAP, AgendaTap.TAP_CHECK)
-                            .putExtra(AgendaTap.EXTRA_KIND, tap.kind)
-                            .putExtra(AlarmReceiver.EXTRA_ROUTINE, tap.routine)
-                            .putExtra(AlarmReceiver.EXTRA_OCCURRENCE, tap.occurrence)
-                            .putExtra(AgendaTap.EXTRA_LINE, tap.line)
-                            .putExtra(AlarmReceiver.EXTRA_TITLE, row.title)
-                            .putExtra(AlarmReceiver.EXTRA_BODY, row.time)
-                    },
-                )
+                // A list's heading has no box; its words start where a
+                // box's heading's do, over its entries' boxes (#209).
+                val titleStart = when {
+                    row.box || row.time.isNotEmpty() -> 0
+                    row.heading -> AgendaWidgetPlan.BOX_DP
+                    else -> 12
+                }
+                setViewPadding(R.id.agenda_title, dp(context, titleStart), 0, dp(context, 8), 0)
+                setOnClickFillInIntent(R.id.agenda_check, fillIn(row.onBox))
             }
         }
+
+        /** The fill-in intent that tells [AgendaTapActivity] to do [tap]. */
+        private fun fillIn(tap: AgendaTap): Intent =
+            Intent().apply { for ((name, value) in tap.extras()) putExtra(name, value) }
 
         private fun strike(text: SpannableString) =
             text.setSpan(StrikethroughSpan(), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

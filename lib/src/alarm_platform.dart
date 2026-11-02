@@ -184,6 +184,19 @@ class ShoppingTapped extends AlarmAction {
   const ShoppingTapped(int seq, this.lineId, DateTime at) : super(seq, at);
 }
 
+/// A Line of a Checklist without a Routine checked in the Agenda widget
+/// (#209).
+class ChecklistTapped extends AlarmAction {
+  final String lineId;
+
+  const ChecklistTapped(int seq, this.lineId, DateTime at) : super(seq, at);
+}
+
+/// A Session's pick tapped on the Agenda widget (#209): the pick of the
+/// Tally [noteId] for the Occurrence [occurrenceKey] of the Session
+/// [sessionId], whose entry form opens.
+typedef WidgetPick = ({String sessionId, String occurrenceKey, String noteId});
+
 /// A snooze tapped on the Nudge: the Notes Unsorted then wait until
 /// [until].
 class NudgeSnoozed extends AlarmAction {
@@ -259,6 +272,10 @@ abstract interface class AlarmPlatform {
   /// was last asked; asking clears it.
   Future<bool> unsortedOpened();
 
+  /// The Session's pick tapped on the Agenda widget since this was last
+  /// asked, or null; asking clears it.
+  Future<WidgetPick?> pickOpened();
+
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
 
@@ -316,6 +333,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<bool> unsortedOpened() async => false;
+
+  @override
+  Future<WidgetPick?> pickOpened() async => null;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -470,6 +490,17 @@ class AndroidAlarms implements AlarmPlatform {
       await _channel.invokeMethod<bool>('unsortedOpened') ?? false;
 
   @override
+  Future<WidgetPick?> pickOpened() async {
+    final raw = await _channel.invokeMapMethod<String, Object?>('pickOpened');
+    return switch ((raw?['session'], raw?['occurrence'], raw?['note'])) {
+      (final String session, final String occurrence, final String note)
+          when session.isNotEmpty && occurrence.isNotEmpty && note.isNotEmpty =>
+        (sessionId: session, occurrenceKey: occurrence, noteId: note),
+      _ => null,
+    };
+  }
+
+  @override
   Future<List<AlarmAction>> pendingActions() async {
     final raw = await _channel.invokeListMethod<Map>('pending') ?? const [];
     return [for (final m in raw) ?_action(m)];
@@ -562,6 +593,14 @@ class AndroidAlarms implements AlarmPlatform {
       ('frog', _) when routine.isNotEmpty => FrogTapped(seq, routine, tapped),
       ('shopping', _) => switch (m['line']) {
         final String line when line.isNotEmpty => ShoppingTapped(
+          seq,
+          line,
+          tapped,
+        ),
+        _ => null,
+      },
+      ('checklist', _) => switch (m['line']) {
+        final String line when line.isNotEmpty => ChecklistTapped(
           seq,
           line,
           tapped,

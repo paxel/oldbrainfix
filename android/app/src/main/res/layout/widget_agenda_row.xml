@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One row of the Agenda widget with a box or without: an Occurrence, a
-     Line, a Frog, a Missed Occurrence, a Shopping List's or a Checklist's
-     row, or an appointment with its calendar's colour down its side. -->
+     Session and its picks, a Line, a Frog, a Missed Occurrence, a Shopping
+     List's or a Checklist's heading and its Lines, or an appointment with
+     its calendar's colour down its side. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/agenda_row"
     android:layout_width="match_parent"

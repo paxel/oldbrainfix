@@ -12,22 +12,39 @@ import 'schedule_text.dart';
 
 /// One row of the home-screen Agenda widget, in the words it shows: an
 /// Occurrence, a Line of its Checklist or a pick of its Session under
-/// it, a Shopping List's or a Checklist's row, a Frog, a Missed
-/// Occurrence, or a heading or a line of text.
+/// it, a Shopping List's or a Checklist's heading and its Lines under
+/// it, a Frog, a Missed Occurrence, or a heading or a line of text. A
+/// group of the Agenda (#208) is its heading's row with its entries'
+/// rows after it, indented (#209).
 class WidgetRow {
   /// An Occurrence; its box checks it off as Done.
   static const occurrence = 'occurrence';
+
+  /// A Session's Occurrence, its picks' heading; its box only shows
+  /// whether it is Done, and a tap on it does nothing (#209).
+  static const session = 'session';
+
+  /// A pick of a Session's Occurrence today, the Tally [noteId]; its box
+  /// shows whether it has an entry, and a tap on it opens its entry form
+  /// where this Device may ([checks]) (#209).
+  static const pick = 'pick';
 
   /// A Line of a Checklist Routine's Occurrence; its box checks it for
   /// that Occurrence.
   static const line = 'line';
 
-  /// A Shopping List's row: with [lineId] a Line that came back, whose
-  /// box checks it, else the list's count, with no box.
+  /// A Shopping List's row: with [lineId] an open Line under the list's
+  /// heading, whose box checks it, else the heading, with no box: the
+  /// list's name, or its count when it shows no Lines.
   static const shopping = 'shopping';
 
-  /// A Checklist without a Routine, with how many Lines are open; no box.
+  /// A Checklist without a Routine, its Lines' heading, with no box: its
+  /// name, or how many Lines are open when it shows none.
   static const checklist = 'checklist';
+
+  /// An open Line of a Checklist without a Routine, under its heading;
+  /// its box checks it (#209).
+  static const checklistLine = 'checklistLine';
 
   /// A Frog of today's "Eat a frog"; its box checks it off.
   static const frog = 'frog';
@@ -61,7 +78,8 @@ class WidgetRow {
   /// Whether this Device may check it here, where it has a box.
   final bool checks;
 
-  /// How far it is indented: 1 under its Occurrence, 2 in a group.
+  /// How far it is indented: 1 under its heading, 2 for a Line under
+  /// another Line.
   final int indent;
 
   /// The Routine and the [Occurrence.key] an Occurrence, a Missed one or
@@ -74,6 +92,9 @@ class WidgetRow {
 
   /// The Frog its box checks off.
   final String? frogId;
+
+  /// The Tally a [pick] opens the entry form of.
+  final String? noteId;
 
   /// Where it sorts among the appointments: [allDay], [lists], [timed]
   /// or [frogs]; null outside a day.
@@ -93,6 +114,7 @@ class WidgetRow {
     this.occurrenceKey,
     this.lineId,
     this.frogId,
+    this.noteId,
     this.block,
     this.at,
   });
@@ -108,6 +130,7 @@ class WidgetRow {
     'occurrence': ?occurrenceKey,
     'line': ?lineId,
     'frog': ?frogId,
+    'note': ?noteId,
     'block': ?block,
     'at': ?at,
   };
@@ -144,8 +167,10 @@ class AgendaRead {
 /// kept; and the texts, in the reader's language.
 class AgendaSnapshot {
   /// The version of its structure (ADR 0034): 2 since the widget shows
-  /// every kind of row the Agenda does (#153).
-  static const version = 2;
+  /// every kind of row the Agenda does (#153), 3 since it shows the
+  /// Agenda's groups (#209): a Session's heading and picks, and a
+  /// Checklist's and a Shopping List's heading with their Lines.
+  static const version = 3;
 
   /// The days, `YYYY-MM-DD`, with their rows: today and tomorrow.
   final Map<String, List<WidgetRow>> days;
@@ -320,7 +345,7 @@ class _Words {
       else if (entry.shopping case final shopping?)
         ..._shopping(shopping)
       else if (entry.checklist case final checklist?)
-        _checklist(checklist),
+        ..._checklist(checklist),
   ];
 
   List<WidgetRow> _occurrence(Day day, PlacedRow placed) {
@@ -335,15 +360,16 @@ class _Words {
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
     return [
       WidgetRow(
-        kind: WidgetRow.occurrence,
+        kind: session == null ? WidgetRow.occurrence : WidgetRow.session,
         title: masked
             ? maskedText(t, locale, row.routine, row.occurrence)
             : note == null
             ? t.noteGone
             : _firstLine(note),
         time: occurrenceTime(t, locale, row.occurrence),
-        done: row.done != null,
-        checks: !complete,
+        done: row.done != null || complete,
+        // A Session's box only shows Done: its picks make it (#208).
+        checks: !complete && session == null,
         routineId: row.routine.id,
         occurrenceKey: row.occurrence.key,
         block: block,
@@ -358,15 +384,27 @@ class _Words {
             block: block,
             at: at,
           )
+        else if (picks.today.picks.isEmpty)
+          WidgetRow(
+            kind: WidgetRow.text,
+            title: t.sessionNothingToPick,
+            indent: 1,
+            block: block,
+            at: at,
+          )
         else
           for (final (i, pick) in picks.today.picks.indexed)
             WidgetRow(
-              kind: WidgetRow.text,
+              kind: WidgetRow.pick,
               title: picks.masked[i]
                   ? t.maskedTally
                   : pickText(t, pick, system, decimal),
               done: pick.done,
+              checks: picks.opens[i],
               indent: 1,
+              routineId: row.routine.id,
+              occurrenceKey: row.occurrence.key,
+              noteId: pick.noteId,
               block: block,
               at: at,
             )
@@ -392,44 +430,60 @@ class _Words {
     final title => title,
   };
 
-  /// A Shopping List's rows: each open Line on its own, the list's name
-  /// after its text, or the list with how many are open.
+  /// A Shopping List's group, as the Agenda's (#208): its name as the
+  /// heading, without a box, and its open Lines under it, each with its
+  /// box; or the heading alone with how many are open.
   List<WidgetRow> _shopping(ShoppingRow shopping) {
     final (:note, :masked, :lines, :count, :checks, area: _) = shopping;
     final title = _listTitle(note, t.shoppingHeading);
     final shown = masked ? t.maskedShoppingList : title;
-    if (lines.isEmpty) {
-      return [
-        WidgetRow(
-          kind: WidgetRow.shopping,
-          title: t.shoppingRowOpen(shown, count),
-          checks: false,
-          block: WidgetRow.lists,
-        ),
-      ];
-    }
     return [
+      WidgetRow(
+        kind: WidgetRow.shopping,
+        title: lines.isEmpty ? t.shoppingRowOpen(shown, count) : title,
+        block: WidgetRow.lists,
+      ),
       for (final line in lines)
         WidgetRow(
           kind: WidgetRow.shopping,
-          title: '${line.text} · $title',
+          title: line.text,
           checks: checks,
+          indent: 1,
           lineId: line.id,
           block: WidgetRow.lists,
         ),
     ];
   }
 
-  WidgetRow _checklist(ChecklistRow row) {
-    final (:note, :masked, :list, area: _, lines: _, checks: _) = row;
-    final title = masked
-        ? t.maskedChecklist
-        : _listTitle(note, t.checklistHeading);
-    return WidgetRow(
-      kind: WidgetRow.checklist,
-      title: t.checklistRowOpen(title, list.openCount, list.count),
-      block: WidgetRow.lists,
-    );
+  /// A Checklist's group, as the Agenda's (#208): its name as the
+  /// heading, without a box, and the Lines it shows under it, each with
+  /// its box; or, Masked, the heading alone with how many are open.
+  List<WidgetRow> _checklist(ChecklistRow row) {
+    final (:note, :masked, :list, :lines, :checks, area: _) = row;
+    final title = _listTitle(note, t.checklistHeading);
+    return [
+      WidgetRow(
+        kind: WidgetRow.checklist,
+        title: lines.isEmpty
+            ? t.checklistRowOpen(
+                masked ? t.maskedChecklist : title,
+                list.openCount,
+                list.count,
+              )
+            : title,
+        block: WidgetRow.lists,
+      ),
+      for (final line in lines)
+        WidgetRow(
+          kind: WidgetRow.checklistLine,
+          title: line.text,
+          done: line.checked,
+          checks: checks,
+          indent: line.inGroup ? 2 : 1,
+          lineId: line.id,
+          block: WidgetRow.lists,
+        ),
+    ];
   }
 
   /// Today's "Eat a frog" section, under what is due.

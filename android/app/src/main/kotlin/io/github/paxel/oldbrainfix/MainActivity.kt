@@ -99,6 +99,7 @@ class MainActivity : FlutterActivity() {
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
+        if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -106,8 +107,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge, the Changes Nudge or the Agenda
-     * widget's Unsorted count opened the running app: the app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge, the Agenda
+     * widget's Unsorted count or a pick on it opened the running app: the
+     * app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -122,6 +124,10 @@ class MainActivity : FlutterActivity() {
         }
         if (opensUnsorted(intent)) {
             unsortedOpened = true
+            actionsArrived()
+        }
+        pickOf(intent)?.let {
+            pickOpened = it
             actionsArrived()
         }
         // Something was shared in while the app runs: it takes it now.
@@ -494,6 +500,10 @@ class MainActivity : FlutterActivity() {
                     "unsortedOpened" -> {
                         result.success(unsortedOpened)
                         unsortedOpened = false
+                    }
+                    "pickOpened" -> {
+                        result.success(pickOpened)
+                        pickOpened = null
                     }
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
@@ -971,6 +981,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * The pick a tap on the Agenda widget opens the entry form of (#209),
+     * as the app reads it; null for any other intent, or one brought
+     * back from the recent apps.
+     */
+    private fun pickOf(intent: Intent?): Map<String, String>? {
+        if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
+        val session = intent.getStringExtra(EXTRA_PICK_SESSION) ?: return null
+        val occurrence = intent.getStringExtra(EXTRA_PICK_OCCURRENCE) ?: return null
+        val note = intent.getStringExtra(EXTRA_PICK_NOTE) ?: return null
+        return mapOf("session" to session, "occurrence" to occurrence, "note" to note)
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -1022,6 +1045,11 @@ class MainActivity : FlutterActivity() {
         /** Marks the launch from the Agenda widget's Unsorted count. */
         const val EXTRA_UNSORTED = "oldbrainfix.unsorted"
 
+        /** The Session, Occurrence and Tally of a pick tapped on the Agenda widget (#209). */
+        const val EXTRA_PICK_SESSION = "oldbrainfix.pick.session"
+        const val EXTRA_PICK_OCCURRENCE = "oldbrainfix.pick.occurrence"
+        const val EXTRA_PICK_NOTE = "oldbrainfix.pick.note"
+
         /** Marks the launch by a share from another app ([ShareActivity]). */
         const val EXTRA_SHARED = "oldbrainfix.shared"
 
@@ -1036,6 +1064,9 @@ class MainActivity : FlutterActivity() {
 
         /** The Agenda widget's Unsorted count was tapped and the app has not shown the list yet. */
         private var unsortedOpened = false
+
+        /** The pick tapped on the Agenda widget whose entry form the app has not opened yet. */
+        private var pickOpened: Map<String, String>? = null
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null
