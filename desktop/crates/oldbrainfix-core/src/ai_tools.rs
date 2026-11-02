@@ -31,6 +31,7 @@ use crate::frogs::Frogs;
 use crate::note_kinds;
 use crate::notes::{CapturedDetail, Importance, Note, Notes};
 use crate::people::PersonFilter;
+use crate::person_settings::PersonSettings;
 use crate::places::{NotesGo, Places};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
@@ -203,7 +204,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1264,6 +1265,7 @@ impl Store {
                     },
                     "renagMinutes": settings.renag_interval()?.num_minutes(),
                     "theme": settings.theme()?.name(),
+                    "trashesDoneReminder": PersonSettings::new(self).trashes_done_reminder()?,
                 }))
             }
             other => ToolOutput::json(&self.ai_read_data(other, args, wall)?),
@@ -2233,6 +2235,7 @@ mod tests {
         assert_eq!(store.all_entries()?.len(), logged);
         DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
         DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
+        PersonSettings::new(&store).set_trashes_done_reminder(true)?;
         let settings = call(&store, &task, "read_settings", &json!({}))?;
         assert!(!settings.is_error);
         let [ToolContent::Text(text)] = &settings.content[..] else {
@@ -2246,6 +2249,7 @@ mod tests {
         assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
         assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
         assert_eq!(read.pointer("/agendaHidesChecked"), Some(&json!(true)));
+        assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
         Ok(())
     }
 

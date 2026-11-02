@@ -14,8 +14,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    ClockTime, Day, Notes, Occurrence, Recurrence, Routines, Schedule, SigningKey, Store,
-    parse_time,
+    ClockTime, Day, Notes, Occurrence, PersonSettings, Recurrence, Routines, Schedule, SigningKey,
+    Store, parse_time,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -230,5 +230,38 @@ fn a_cards_box_ticks_todays_open_occurrence_and_unchecks_it_again() -> TestResul
     tick(&mut harness, "Done: 20:00")?;
     let read = routines.by_id(&id)?.ok_or("the Routine")?;
     assert!(read.done_at(&at(monday(), 20)).is_none());
+    Ok(())
+}
+
+#[test]
+fn with_done_reminders_trashed_the_dialogs_done_trashes_the_note_and_closes() -> TestResult {
+    let (store, now) = store("2026-10-26T07:00:00.000Z")?;
+    let note = Notes::new(&store).capture("Call mum", None, None)?.id;
+    Routines::new(&store).spawn(&note, &reminder(monday(), 8)?)?;
+    PersonSettings::new(&store).set_trashes_done_reminder(true)?;
+    set(&now, "2026-10-26T09:00:00.000Z")?;
+    let mut harness = window(&store);
+    harness.state_mut().select_note(&note);
+    harness.run();
+    click(&mut harness, "Done")?;
+    assert!(!harness.state().note_open(), "it went with its Note (#211)");
+    let trashed = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert!(trashed.is_trashed());
+    Ok(())
+}
+
+#[test]
+fn with_done_reminders_trashed_a_cards_box_trashes_the_note() -> TestResult {
+    let (store, now) = store("2026-10-26T07:00:00.000Z")?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Call mum", None, None)?.id;
+    Routines::new(&store).spawn(&note, &reminder(monday(), 8)?)?;
+    PersonSettings::new(&store).set_trashes_done_reminder(true)?;
+    set(&now, "2026-10-26T09:00:00.000Z")?;
+    let mut harness = window(&store);
+    tick(&mut harness, "Done: 08:00")?;
+    let trashed = notes.by_id(&note)?.ok_or("the Note")?;
+    assert!(trashed.is_trashed());
+    assert!(ticked(&harness, "Done: 08:00").is_none(), "its card went");
     Ok(())
 }

@@ -136,7 +136,7 @@ Etwas, das nach einem wiederkehrenden Plan zu tun ist (Tabletten, Hausaufgaben, 
 _Avoid_: Pflicht, Aufgabe, Gewohnheit, To-do
 
 **Erinnerung** [Reminder]:
-Eine Routine, die nur einmal stattfindet.
+Eine Routine, die nur einmal stattfindet. Ist „Notiz in den Papierkorb legen, wenn ihre einmalige Erinnerung erledigt ist“ eingeschaltet, eine Einstellung der Person, auf allen ihren eigenen Geräten gleich, legt „Erledigt“ bei einer Erinnerung, der einzigen Routine oder Erinnerung einer einfachen Notiz, die Notiz mit ihr in den Papierkorb; Zurücknehmen holt sie nicht zurück, der Papierkorb schon.
 _Avoid_: Alarm, Termin, Ereignis
 
 **Frosch** [Frog]:

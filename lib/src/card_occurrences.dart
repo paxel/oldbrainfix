@@ -75,7 +75,8 @@ class _CardOccurrencesState extends State<CardOccurrences> {
   void _toggle(AgendaRow row) {
     final routines = widget.occurrences.routines;
     if (row.done == null) {
-      routines.markDone(row.routine.id, row.occurrence);
+      // Its Note may go to the trash with it (#211).
+      routines.checkOff(row.routine.id, row.occurrence);
     } else {
       routines.unmarkDone(row.routine.id, row.occurrence);
     }

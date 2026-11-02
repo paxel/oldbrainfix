@@ -583,7 +583,7 @@ class Alarms {
     }
     if (routine.doneAt(occurrence) != null) return false;
     try {
-      Routines(store).markDone(routineId, occurrence, at: at);
+      Routines(store).checkOff(routineId, occurrence, at: at);
       return true;
     } on ArgumentError {
       return false;

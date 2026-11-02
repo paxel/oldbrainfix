@@ -668,8 +668,8 @@ impl<'a> Alarms<'a> {
         if routine.is_trashed() || routine.done_at(&occurrence).is_some() {
             return Ok(false);
         }
-        match routines.mark_done(routine_id, &occurrence, Some(at)) {
-            Ok(()) => Ok(true),
+        match routines.check_off(routine_id, &occurrence, Some(at)) {
+            Ok(_) => Ok(true),
             Err(Error::Invalid(_)) => Ok(false),
             Err(e) => Err(e),
         }

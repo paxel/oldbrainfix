@@ -73,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
   late bool _hidesChecked = widget.store.agendaHidesChecked;
+  late bool _trashesDone = widget.store.trashesDoneReminder;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
@@ -139,6 +140,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setHidesChecked(bool on) {
     widget.store.agendaHidesChecked = on;
     setState(() => _hidesChecked = on);
+  }
+
+  /// The person's own setting, on all of their own Devices (#211).
+  void _setTrashesDone(bool on) {
+    widget.store.trashesDoneReminder = on;
+    setState(() => _trashesDone = on);
   }
 
   void _setStreaks(bool on) {
@@ -546,6 +553,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: _setHidesChecked,
                   title: Text(t.hideCheckedOnAgenda),
                   subtitle: Text(t.hideCheckedOnAgendaDetail),
+                ),
+                SwitchBelow(
+                  switchKey: const ValueKey('trashDoneReminder'),
+                  leading: const Icon(Icons.auto_delete_outlined),
+                  value: _trashesDone,
+                  onChanged: _setTrashesDone,
+                  title: Text(t.trashDoneReminder),
+                  subtitle: Text(t.trashDoneReminderDetail),
                 ),
               ],
             ),

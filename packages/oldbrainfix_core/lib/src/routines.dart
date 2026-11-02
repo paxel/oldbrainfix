@@ -1,5 +1,7 @@
 import 'checklists.dart';
+import 'note_kinds.dart';
 import 'notes.dart';
+import 'person_settings.dart';
 import 'schedule.dart';
 import 'sessions.dart';
 import 'shared_areas.dart';
@@ -362,6 +364,36 @@ class Routines {
       RoutineKeys.done(occurrence),
       (at ?? store.clock()).toUtc().toIso8601String(),
     );
+  }
+
+  /// Checks off [occurrence] of the Routine [id] as [markDone] does, the
+  /// way the user's Done does it everywhere (#211): with "Move a Note to
+  /// the Trash when its one-time Reminder is done" on
+  /// ([PersonSettings.trashesDoneReminder]), a Reminder that is the only
+  /// Routine or Reminder of a plain Note this Device may change moves the
+  /// Note to the trash with it, as "Done and move to trash" does (#215).
+  /// Returns whether it did. Unchecking it later leaves the Note there;
+  /// it comes back from the trash.
+  bool checkOff(String id, Occurrence occurrence, {DateTime? at}) =>
+      store.batch(() {
+        markDone(id, occurrence, at: at);
+        final note = _trashedWhenDone(_require(id));
+        if (note == null) return false;
+        trashNote(note.id, withRoutines: true);
+        return true;
+      });
+
+  /// The Note Done on [routine] moves to the trash ([checkOff]); null
+  /// when none does.
+  Note? _trashedWhenDone(Routine routine) {
+    if (!store.trashesDoneReminder || !routine.isReminder) return null;
+    final note = this.note(routine);
+    if (note == null || note.isTrashed || note.isMerged) return null;
+    if (NoteKinds(store).of(note.id) != NoteKind.plain) return null;
+    if (!store.mayChange(note.id)) return null;
+    final linked = ofNote(note.id);
+    if (linked.length != 1 || linked.single.id != routine.id) return null;
+    return note;
   }
 
   /// Unchecks [occurrence] of the Routine [id] again.

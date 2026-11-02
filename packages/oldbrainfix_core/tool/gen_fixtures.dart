@@ -376,6 +376,53 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'done-trash',
+    about:
+        'Done with "Move a Note to the Trash when its one-time Reminder is '
+        'done" (#211): a plain Note\'s one-time Reminder checked off with '
+        'the setting off, with a value no app writes and on, moving the '
+        'Note to the trash with it; with it on, a Routine, a Note with a '
+        'Reminder and a Routine, a Checklist\'s and a Tally\'s Reminder '
+        'checked off and staying; the setting switched off again.',
+    build: (store) {
+      final notes = Notes(store);
+      final routines = Routines(store);
+      final once = Schedule(start: Day(2026, 1, 1), times: [_at(8)]);
+      final daily = Schedule(
+        start: Day(2026, 1, 1),
+        times: [_at(8)],
+        rule: Recurrence(frequency: Frequency.daily),
+      );
+      final eight = Occurrence(Day(2026, 1, 1), _at(8));
+      Routine reminder(String text) =>
+          routines.spawn(notes.capture(text).id, once);
+      routines.checkOff(reminder('Dentist').id, eight);
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.trashDoneReminder,
+        'yes',
+      );
+      routines.checkOff(reminder('Post the letter').id, eight);
+      store.trashesDoneReminder = true;
+      routines.checkOff(reminder('Call the plumber').id, eight);
+      routines.checkOff(
+        routines.spawn(notes.capture('Pills').id, daily).id,
+        eight,
+      );
+      final passport = reminder('Passport');
+      routines.spawn(passport.noteId, daily);
+      routines.checkOff(passport.id, eight);
+      final packing = reminder('Packing');
+      Checklists(store).make(packing.noteId);
+      routines.checkOff(packing.id, eight);
+      final gym = reminder('Gym');
+      Tallies(store).addField(gym.noteId, name: 'Push-ups', unit: 'times');
+      routines.checkOff(gym.id, eight);
+      store.trashesDoneReminder = false;
+      routines.checkOff(reminder('Water the plants').id, eight);
+    },
+  ),
+  (
     name: 'edits',
     about:
         'What the desktop writes beyond the other scenarios: Areas and '

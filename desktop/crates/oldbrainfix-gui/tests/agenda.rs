@@ -11,8 +11,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, Schedule, SigningKey,
-    SimpleRepeat, Store, WireEntry, parse_time,
+    ClockTime, Day, DeviceSettings, Notes, Occurrence, PersonSettings, Routines, Schedule,
+    SigningKey, SimpleRepeat, Store, WireEntry, parse_time,
 };
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -792,6 +792,31 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     harness.run();
     assert_eq!(harness.state().page(), None);
     assert_eq!(harness.state().selection(), &Selection::Agenda);
+    Ok(())
+}
+
+#[test]
+fn with_done_reminders_trashed_done_moves_the_note_to_the_trash() -> TestResult {
+    let mut harness = window(dentist_store("2026-11-02T11:00:00.000Z")?, "en");
+    // Switched on in the settings, for the person (#211).
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    harness
+        .get_by_label("Move a Note to the Trash when its one-time Reminder is done")
+        .click();
+    harness.run();
+    let store = harness.state().store();
+    assert!(PersonSettings::new(store).trashes_done_reminder()?);
+    assert!(!DeviceSettings::new(store).agenda_hides_checked()?);
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    harness.get_by_label("Done: 09:00 Dentist").click();
+    harness.run();
+    assert!(!shows(&harness, "Done: 09:00 Dentist"));
+    let notes = Notes::new(harness.state().store()).all()?;
+    assert!(notes.is_empty(), "the Dentist went to the trash");
     Ok(())
 }
 

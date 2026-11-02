@@ -35,6 +35,7 @@ export 'src/nudges.dart';
 export 'src/pair_code.dart';
 export 'src/pairing.dart';
 export 'src/pending.dart';
+export 'src/person_settings.dart';
 export 'src/photos.dart';
 export 'src/places.dart';
 export 'src/profiles.dart';

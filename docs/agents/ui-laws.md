@@ -282,6 +282,17 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   at once instead of striking through, and a group with nothing left
   goes with them, a Session's heading once it is Done and "Eat a frog"
   once today's Frog is eaten.
+- **Done can move its Note to the trash** (#211): with "Move a Note to
+  the Trash when its one-time Reminder is done" in Settings ▸ Agenda,
+  off by default and the person's, the same on all of their own Devices,
+  Done on a one-time Reminder that is a Plain Note's only Routine or
+  Reminder moves the Note with it to the trash wherever it is checked
+  off: the Agenda and its Missed rows, the widget, the notification and
+  the full-screen alarm, the Note editor and dialog, which close, and the
+  card's box. Its row and card go at once. Lists, Tallies, Sessions and
+  Notes with a Routine or a second Reminder stay, and so does a Note this
+  Device may not change. Unchecking brings nothing back; the Note comes
+  back from the trash, still Done.
 - **A Session's group today lists its picks under its title** (#208),
   in the order picked, each an entry with its box, checked and struck
   through once it has an entry, each Tally's name with its targets
@@ -668,7 +679,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - An Occurrence's notification offers **Done** and **Snooze** (10 min,
   30 min, 1 h) without opening the app. Done is also at the top of its
   Note's editor and on its card (#215); Snooze stays in the
-  notification.
+  notification. Done moves a Plain Note with its only Reminder to the
+  trash where the person chose so (#211, "Agenda").
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".

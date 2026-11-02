@@ -94,7 +94,7 @@ use oldbrainfix_core::{
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, Notes, NotesGo, Occurrence, OpenOccurrence, OwnProfile,
-    Person, PersonFilter, Places, Profile, QuickNoteControl, QuietHours, Routine,
+    Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl, QuietHours, Routine,
     RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
     ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
     UnitSystem, bundle, markdown, text_format,
@@ -1363,6 +1363,9 @@ enum Setting {
     /// Whether the Agenda hides what is checked instead of striking it
     /// through (#217).
     HideChecked(bool),
+    /// Whether Done on a plain Note's only Reminder moves the Note to the
+    /// trash: the person's, on all of their own Devices (#211).
+    TrashDoneReminder(bool),
     /// Whether the quick note shows this control (#142).
     QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
@@ -5278,12 +5281,10 @@ impl App {
                 if done {
                     routines.unmark_done(&routine, &occurrence)?;
                 } else {
-                    routines.mark_done(&routine, &occurrence, None)?;
+                    self.check_off(&routine, &occurrence)?;
                 }
             }
-            Action::CheckMissed(routine, occurrence) => {
-                Routines::new(&self.store).mark_done(&routine, &occurrence, None)?;
-            }
+            Action::CheckMissed(routine, occurrence) => self.check_off(&routine, &occurrence)?,
             Action::DoneAndTrash(routine, occurrence) => {
                 self.leave_note()?;
                 let routines = Routines::new(&self.store);
@@ -6760,6 +6761,25 @@ impl App {
         Ok(())
     }
 
+    /// The user's Done on `occurrence` of the Routine `routine`, from the
+    /// Agenda, a card or the Note dialog: its Note may go to the trash
+    /// with it by the person's setting (#211), and the dialog showing it
+    /// closes first, as for "Done and move to trash".
+    fn check_off(
+        &mut self,
+        routine: &str,
+        occurrence: &Occurrence,
+    ) -> oldbrainfix_core::Result<()> {
+        let trashes = Routines::new(&self.store).trashes_when_done(routine)?;
+        if let Some(note) = trashes
+            && self.selected_note.as_deref() == Some(note.as_str())
+        {
+            self.leave_note()?;
+        }
+        Routines::new(&self.store).check_off(routine, occurrence, None)?;
+        Ok(())
+    }
+
     /// Closes the Note dialog, keeping what was typed into it: its text,
     /// its Lines and a Section typed into Amend (#146).
     fn leave_note(&mut self) -> oldbrainfix_core::Result<()> {
@@ -6965,6 +6985,9 @@ impl App {
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
             Setting::HideChecked(on) => settings.set_agenda_hides_checked(on)?,
+            Setting::TrashDoneReminder(on) => {
+                PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
+            }
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
         }
@@ -11207,6 +11230,9 @@ impl App {
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
         let hides_checked = settings.agenda_hides_checked().unwrap_or(false);
+        let trashes_done = PersonSettings::new(&self.store)
+            .trashes_done_reminder()
+            .unwrap_or(false);
         let quick = self.view.capture_quick;
         egui::ScrollArea::vertical()
             .id_salt("settings")
@@ -11399,6 +11425,21 @@ impl App {
                     }
                     ui.label(
                         RichText::new(t.hide_checked_on_agenda_detail_device())
+                            .small()
+                            .color(weak),
+                    );
+                    let mut on = trashes_done;
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.trash_done_reminder()).color(text),
+                    )
+                    .changed()
+                    {
+                        actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                    }
+                    ui.label(
+                        RichText::new(t.trash_done_reminder_detail())
                             .small()
                             .color(weak),
                     );

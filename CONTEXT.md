@@ -138,7 +138,7 @@ Something to be done on a repeating schedule (pills, homework, cleaning), always
 _Avoid_: chore, task, habit, to-do
 
 **Reminder**:
-A Routine that happens only once. German: Erinnerung.
+A Routine that happens only once. With "Move a Note to the Trash when its one-time Reminder is done" on, a setting of the person kept on all of their own Devices, Done on a Reminder that is a Plain Note's only Routine or Reminder moves the Note with it to the trash; unchecking does not bring it back, the trash does. German: Erinnerung.
 _Avoid_: alarm, appointment, event
 
 **Frog**:

@@ -7940,6 +7940,18 @@ abstract class AppLocalizations {
   /// **'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.'**
   String get hideCheckedOnAgendaDetail;
 
+  /// The switch in Settings > Agenda that moves a plain Note to the trash once its only Reminder is checked off (#211); a setting of the person, the same on all of their own Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Move a Note to the Trash when its one-time Reminder is done'**
+  String get trashDoneReminder;
+
+  /// Under the switch trashDoneReminder, on the phone and the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Done on a one-time Reminder that is a plain Note\'s only Routine or Reminder moves the Note to the trash with it, wherever you check it off. Lists, Tallies and Sessions stay. The same on all your own Devices; unchecking doesn\'t bring the Note back, the trash does for 30 days.'**
+  String get trashDoneReminderDetail;
+
   /// At the top of the Note editor (#215): an Occurrence of the Note's Routine or Reminder that is due now, with its time ("Due 15:00"), before the Done button.
   ///
   /// In en, this message translates to:

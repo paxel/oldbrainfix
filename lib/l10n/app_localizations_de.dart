@@ -4945,6 +4945,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.';
 
   @override
+  String get trashDoneReminder =>
+      'Notiz in den Papierkorb legen, wenn ihre einmalige Erinnerung erledigt ist';
+
+  @override
+  String get trashDoneReminderDetail =>
+      '„Erledigt“ bei einer einmaligen Erinnerung, der einzigen Routine oder Erinnerung einer einfachen Notiz, legt die Notiz mit ihr in den Papierkorb, wo auch immer du sie abhakst. Listen, Strichlisten und Einheiten bleiben. Auf allen deinen eigenen Geräten gleich; Zurücknehmen holt die Notiz nicht zurück, der Papierkorb 30 Tage lang schon.';
+
+  @override
   String occurrenceDue(String when) {
     return 'Fällig $when';
   }

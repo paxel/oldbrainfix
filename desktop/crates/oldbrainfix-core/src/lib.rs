@@ -45,6 +45,7 @@ pub mod overrides;
 pub mod pairing;
 pub mod pending;
 pub mod people;
+pub mod person_settings;
 pub mod photos;
 pub mod places;
 pub mod profile;
@@ -94,6 +95,7 @@ pub use pending::{
     AcceptedChanges, KeptEdit, PendingChange, PendingDraft, PendingEntry, PendingSet,
 };
 pub use people::{PersonFilter, PersonTaken};
+pub use person_settings::PersonSettings;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
 pub use routines::{Agenda, AgendaRow, NewerRoutine, Routine, Routines};

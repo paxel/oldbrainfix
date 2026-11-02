@@ -1946,13 +1946,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Checks off [open] from the line at the top (#215); with [trash] the
   /// Note goes to the trash with its one Reminder, and the editor closes.
+  /// It closes too when the Done moved the Note there by the person's
+  /// setting (#211).
   void _checkOff(OpenOccurrence open, {bool trash = false}) {
-    _routineBook.markDone(open.routine.id, open.occurrence);
-    if (!trash) {
+    final trashed = _routineBook.checkOff(open.routine.id, open.occurrence);
+    if (!trash && !trashed) {
       _reload();
       return;
     }
-    _routineBook.trashNote(widget.noteId, withRoutines: true);
+    if (!trashed) _routineBook.trashNote(widget.noteId, withRoutines: true);
     Navigator.of(context).pop();
   }
 

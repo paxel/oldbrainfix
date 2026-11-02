@@ -663,7 +663,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   void _toggle(AgendaRow row) {
     if (row.done == null) {
-      _routines.markDone(row.routine.id, row.occurrence);
+      // Its Note may go to the trash with it (#211).
+      _routines.checkOff(row.routine.id, row.occurrence);
     } else {
       _routines.unmarkDone(row.routine.id, row.occurrence);
     }
@@ -672,7 +673,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// Checks off a Missed Occurrence: Done, late.
   void _checkMissed(Routine routine, Occurrence occurrence) {
-    _routines.markDone(routine.id, occurrence);
+    _routines.checkOff(routine.id, occurrence);
     _reload();
   }
 

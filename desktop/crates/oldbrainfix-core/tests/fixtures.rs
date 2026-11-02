@@ -42,11 +42,12 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 24] = [
+const SCENARIOS: [&str; 25] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
     "checklists",
+    "done-trash",
     "edits",
     "formats",
     "frogs",
@@ -1464,6 +1465,41 @@ fn write_trash(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `done-trash` scenario (#211).
+fn write_done_trash(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    let notes = Notes::new(store);
+    let routines = Routines::new(store);
+    let start = Day::new(2026, 1, 1);
+    let once = schedule(start, &[at(8, 0)?], None)?;
+    let daily = Schedule::new(start, &[at(8, 0)?], daily()).ok_or("daily")?;
+    let eight = Occurrence::new(start, Some(at(8, 0)?));
+    let reminder = |text: &str| -> Result<Routine, Box<dyn std::error::Error>> {
+        Ok(routines.spawn(&notes.capture(text, None, None)?.id, &once)?)
+    };
+    routines.check_off(&reminder("Dentist")?.id, &eight, None)?;
+    store.append(keys::ENTITY, keys::TRASH_DONE_REMINDER, Some("yes"), None)?;
+    routines.check_off(&reminder("Post the letter")?.id, &eight, None)?;
+    let settings = PersonSettings::new(store);
+    settings.set_trashes_done_reminder(true)?;
+    routines.check_off(&reminder("Call the plumber")?.id, &eight, None)?;
+    let pills = routines.spawn(&notes.capture("Pills", None, None)?.id, &daily)?;
+    routines.check_off(&pills.id, &eight, None)?;
+    let passport = reminder("Passport")?;
+    routines.spawn(&passport.note_id, &daily)?;
+    routines.check_off(&passport.id, &eight, None)?;
+    let packing = reminder("Packing")?;
+    Checklists::new(store).make(&packing.note_id)?;
+    routines.check_off(&packing.id, &eight, None)?;
+    let gym = reminder("Gym")?;
+    Tallies::new(store).add_field(&gym.note_id, "Push-ups", "times", None, None)?;
+    routines.check_off(&gym.id, &eight, None)?;
+    settings.set_trashes_done_reminder(false)?;
+    routines.check_off(&reminder("Water the plants")?.id, &eight, None)?;
+    Ok(())
+}
+
 /// The generator's `edits` scenario: what the desktop writes beyond the
 /// others.
 fn write_edits(store: &Store) -> Built {
@@ -1835,11 +1871,12 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 24] = [
+    let writers: [(&str, Writer); 25] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
+        ("done-trash", write_done_trash),
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
@@ -3150,6 +3187,7 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
         "checklist-agenda",
         "checklist-routines",
         "checklists",
+        "done-trash",
         "history",
         "keep",
         "list-switch",
@@ -3900,7 +3938,7 @@ fn units_json() -> Value {
 
 #[test]
 fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["history", "list-switch", "tallies"] {
+    for scenario in ["done-trash", "history", "list-switch", "tallies"] {
         tallies_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
