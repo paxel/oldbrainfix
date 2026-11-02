@@ -28,7 +28,9 @@ AppBar pageBar(
   Widget? titleIcon,
   List<Widget> actions = const [],
 }) {
-  final back = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
+  // Only whether it can go back, not the whole route: a page coming on
+  // top does not build this page again (#210).
+  final back = ModalRoute.canPopOf(context) ?? false;
   final width = MediaQuery.sizeOf(context).width;
   if (width >= wideScreenWidth || (actions.isEmpty && !back)) {
     return AppBar(

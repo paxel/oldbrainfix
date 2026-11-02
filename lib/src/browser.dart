@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
@@ -218,7 +219,9 @@ class BrowserRoute<T> extends MaterialPageRoute<T> {
   );
 
   /// How the page under a browser level leaves alongside it, when that
-  /// page is no browser level itself: the Agenda.
+  /// page is no browser level itself, as a Note's page under a tag's
+  /// search. The Agenda leaves in its own transitions
+  /// ([BrowserHomeRoute]).
   @override
   DelegatedTransitionBuilder? get delegatedTransition => _slideAway;
 
@@ -298,6 +301,58 @@ class BrowserRoute<T> extends MaterialPageRoute<T> {
     _following = false;
     if (_gesture) navigator?.didStopUserGesture();
     _gesture = false;
+  }
+}
+
+/// The app's first page, the Agenda's, under the notes browser's first
+/// level: it slides out to the left as that level comes in, as a
+/// [BrowserRoute] does. It does so in its own transitions, which keep
+/// their shape whatever comes on top, rather than in the level's
+/// delegated one, which wraps the Agenda in one more widget when the
+/// level is pushed: moving the page into it built the whole Agenda anew
+/// in the frame the finger let go (#210).
+class BrowserHomeRoute<T> extends MaterialPageRoute<T> {
+  BrowserHomeRoute({required super.builder, super.settings});
+
+  /// Whether a browser level is on top, coming or going.
+  var _browserNext = false;
+
+  /// The level's own while one is on top, so the navigator leaves this
+  /// page's transitions as they are instead of wrapping them in it.
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition =>
+      _browserNext ? BrowserRoute._slideAway : super.delegatedTransition;
+
+  @override
+  void didChangeNext(Route<dynamic>? nextRoute) {
+    _browserNext = nextRoute is BrowserRoute;
+    super.didChangeNext(nextRoute);
+  }
+
+  @override
+  void didPopNext(Route<dynamic> nextRoute) {
+    _browserNext = nextRoute is BrowserRoute;
+    super.didPopNext(nextRoute);
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final browser = _browserNext;
+    return SlideTransition(
+      position: (browser ? secondaryAnimation : kAlwaysDismissedAnimation)
+          .drive(BrowserRoute._leave),
+      child: super.buildTransitions(
+        context,
+        animation,
+        browser ? kAlwaysDismissedAnimation : secondaryAnimation,
+        child,
+      ),
+    );
   }
 }
 
@@ -533,6 +588,10 @@ class _BrowserSwipesState extends State<BrowserSwipes>
   Widget build(BuildContext context) => GestureDetector(
     // Empty space swipes too, not only the cards and rows.
     behavior: HitTestBehavior.opaque,
+    // The way to the touch slop counts: the pages start where the finger
+    // is, and a quick flick that passes the slop with its last move
+    // before letting go still knows its way.
+    dragStartBehavior: DragStartBehavior.down,
     onHorizontalDragStart: _started,
     onHorizontalDragUpdate: _updated,
     onHorizontalDragEnd: _ended,

@@ -361,24 +361,34 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
         ),
       ),
     ),
-    home: _Home(
-      store: widget.store,
-      notes: _notes,
-      places: _places,
-      trail: _trail,
-      alarms: _alarms,
-      autoSync: _autoSync,
-      mirror: _mirror,
-      lock: _lock,
-      routes: _routes,
-      requests: widget.requests,
-      bundles: widget.bundles,
-      profile: _profile,
-      speech: _speechModel,
-      join: widget.join,
-      hosting: widget.hosting,
-      onThemeChanged: _themeChanged,
-    ),
+    // Its own route, so the notes browser coming does not build the
+    // Agenda anew (BrowserHomeRoute). There are no named pages.
+    onGenerateRoute: (_) => null,
+    onGenerateInitialRoutes: (_) => [
+      BrowserHomeRoute<void>(
+        settings: const RouteSettings(name: Navigator.defaultRouteName),
+        builder: (_) => _home(),
+      ),
+    ],
+  );
+
+  _Home _home() => _Home(
+    store: widget.store,
+    notes: _notes,
+    places: _places,
+    trail: _trail,
+    alarms: _alarms,
+    autoSync: _autoSync,
+    mirror: _mirror,
+    lock: _lock,
+    routes: _routes,
+    requests: widget.requests,
+    bundles: widget.bundles,
+    profile: _profile,
+    speech: _speechModel,
+    join: widget.join,
+    hosting: widget.hosting,
+    onThemeChanged: _themeChanged,
   );
 
   /// Shows the theme this Device chose in Settings at once.

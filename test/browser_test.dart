@@ -555,6 +555,82 @@ void main() {
       expect(find.byType(AgendaScreen), findsOneWidget);
     });
 
+    testWidgets('a fast short flick switches at once, forward and back', (
+      tester,
+    ) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+
+      // 40 pixels in 16 ms, past the touch slop only with the last move,
+      // as a quick thumb sends it.
+      Future<void> flick(double dx) async {
+        final finger = await tester.startGesture(
+          tester.getCenter(find.byType(BrowserSwipes)),
+        );
+        await finger.moveBy(
+          Offset(dx / 4, 0),
+          timeStamp: const Duration(milliseconds: 8),
+        );
+        await finger.moveBy(
+          Offset(dx * 3 / 4, 0),
+          timeStamp: const Duration(milliseconds: 16),
+        );
+        await finger.up(timeStamp: const Duration(milliseconds: 24));
+        await tester.pumpAndSettle();
+      }
+
+      await flick(-40);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+
+      await flick(40);
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+
+      // A short fling of the test's own, 60 pixels in 30 ms: its last
+      // twenty moves must pass the touch slop to count as a fling.
+      await tester.fling(
+        find.byType(BrowserSwipes),
+        const Offset(-60, 0),
+        2000,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+    });
+
+    testWidgets('the Agenda is not built again while the browser comes', (
+      tester,
+    ) async {
+      final routines = Routines(store);
+      for (var i = 0; i < 5; i++) {
+        routines.create(
+          'routine $i',
+          Schedule(
+            start: Day(2026, 10, 1),
+            times: [ClockTime(9 + i, 0)],
+            rule: Recurrence.parse('FREQ=DAILY'),
+          ),
+        );
+      }
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      final built = <Type, int>{};
+      debugOnRebuildDirtyWidget = (element, _) {
+        final type = element.widget.runtimeType;
+        built[type] = (built[type] ?? 0) + 1;
+      };
+      addTearDown(() => debugOnRebuildDirtyWidget = null);
+
+      await swipe(tester, -150);
+      debugOnRebuildDirtyWidget = null;
+      expect(find.byType(AreasScreen), findsOneWidget);
+      // Neither the Agenda under it nor the preview beside it is built
+      // again when the browser's page is pushed: only the preview and
+      // the pushed page are built, once each.
+      expect(built[AgendaScreen] ?? 0, 0);
+      expect(built[AreasScreen], 2);
+    });
+
     testWidgets('with animations off nothing follows; letting go changes '
         'at once', (tester) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
