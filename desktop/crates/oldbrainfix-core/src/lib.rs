@@ -37,6 +37,7 @@ pub mod keys;
 pub mod lan;
 pub mod markdown;
 pub mod named_places;
+pub mod note_history;
 pub mod note_kinds;
 pub mod notes;
 pub mod nudges;
@@ -85,6 +86,7 @@ pub use history::{
 };
 pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
+pub use note_history::{NoteChange, NoteChangeKind, NoteHistory};
 pub use notes::{
     Blob, CaptureContext, CapturedDetail, Importance, Note, Notes, Section, SourceApp, Wordless,
 };

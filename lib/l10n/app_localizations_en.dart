@@ -4923,4 +4923,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keepAsCode => 'Keep as code';
+
+  @override
+  String get noteHistoryHint =>
+      'Every change of this Note, its Amends and its Lines, the newest first.';
+
+  @override
+  String get noteHistoryCaptured => 'Captured';
+
+  @override
+  String get noteHistoryText => 'Text changed';
+
+  @override
+  String get noteHistoryAmended => 'Amended';
+
+  @override
+  String get noteHistoryAmendEdited => 'Amend changed';
+
+  @override
+  String get noteHistoryMergedIn => 'Note merged in';
+
+  @override
+  String get noteHistoryLineAdded => 'Line added';
+
+  @override
+  String get noteHistoryLineRenamed => 'Line renamed';
+
+  @override
+  String get noteHistoryLineChecked => 'Line checked';
+
+  @override
+  String get noteHistoryLineUnchecked => 'Line unchecked';
+
+  @override
+  String get noteHistoryLineRemoved => 'Line deleted';
+
+  @override
+  String get noteHistoryLineRestored => 'Line restored';
+
+  @override
+  String get noteHistoryTrashed => 'Moved to the trash';
+
+  @override
+  String get noteHistoryRestored => 'Restored from the trash';
+
+  @override
+  String get noteHistoryPhotoAdded => 'Photo added';
+
+  @override
+  String get noteHistoryPhotoRemoved => 'Photo removed';
+
+  @override
+  String get noteHistoryRecordingAdded => 'Recording added';
+
+  @override
+  String get noteHistoryRecordingRemoved => 'Recording removed';
+
+  @override
+  String get noteHistoryPlaceGone => 'An Area or Topic that is gone';
+
+  @override
+  String get noteHistoryLocked => 'A locked Area';
+
+  @override
+  String get noteHistoryBefore => 'Before';
+
+  @override
+  String get noteHistoryAfter => 'After';
+
+  @override
+  String get useThisVersion => 'Use this version';
+
+  @override
+  String get useThisVersionDone =>
+      'The old text is back. The History keeps every version.';
 }

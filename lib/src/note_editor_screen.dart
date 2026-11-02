@@ -22,6 +22,7 @@ import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
+import 'note_history_screen.dart';
 import 'ocr_platform.dart';
 import 'page_bar.dart';
 import 'photo_views.dart';
@@ -944,6 +945,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _reload() => setState(_load);
+
+  /// The Note's History (#193); a text brought back there shows here, in
+  /// the Note's field and its Sections'.
+  Future<void> _openHistory() async {
+    _saveText();
+    final used = await openNoteHistory(
+      context,
+      widget.notes,
+      widget.places,
+      widget.noteId,
+    );
+    if (!mounted || !used) return;
+    setState(() {
+      _load();
+      _show();
+      for (final section in _sections) {
+        if (_sectionTexts[section.id] case final field?) {
+          _takeStored(field, section.text);
+        }
+      }
+    });
+  }
 
   /// Puts the Note's text as it is stored into the field, in its format;
   /// a Note of a kind's into its name and description fields (#188), the
@@ -2155,6 +2178,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: const Icon(Icons.share_outlined),
             ),
             CalendarButton(choices: _calendarChoices),
+            IconButton(
+              key: const ValueKey('note-history'),
+              tooltip: t.historyTitle,
+              onPressed: _openHistory,
+              icon: const Icon(Icons.history),
+            ),
             if (changes) ...[
               IconButton(
                 tooltip: t.mergeInto,

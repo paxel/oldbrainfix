@@ -428,6 +428,21 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   same people (the Section's author, in a Shared Area also the
   Managers); others read it. Under its meta line it says, small and
   grey, when it was last edited and by whom, once it was.
+- **A Note's History** (#193) is History on the Note editor's bar on
+  the phone (the clock with an arrow, before Merge and Move to trash)
+  and Note ▸ History on the desktop, over the Note dialog. It lists
+  every change of the Note, **the newest first** (unlike a box's
+  History, which goes oldest first): its text before and after, its
+  Amends added and changed, its Lines added, renamed, checked,
+  unchecked, deleted and restored, its Importance, Area and Topic, kind
+  and text format before and after, the trash, and photos and
+  recordings added and removed; each with who made it, by their
+  Profile's name (none for a person not known or blocked), and when.
+  An Area or Topic of a locked Area that is not open is named "A
+  locked Area", never by its name. **Use this version** under an old
+  text of the Note or an Amend, where this Device may edit it and it is
+  not the text showing now, writes it as a new edit; nothing is
+  deleted, and the History keeps every version.
 - **A Note is its kind** (#188): a Plain Note, a Checklist, a Shopping
   List, a Tally or a Session (#191). A Plain Note shows as its text. Every other kind's
   page, in the Note editor and in the detailed view, starts with its

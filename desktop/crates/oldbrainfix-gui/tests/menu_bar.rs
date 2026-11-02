@@ -225,6 +225,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Reminder…",
         "Make it a Checklist",
         "Send to a person",
+        "History",
         "Delete",
     ] {
         assert!(!enabled(&mut harness, "Note", entry), "{entry}");
@@ -244,6 +245,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Make it a Tally",
         "Send to a person",
         "Copy as text",
+        "History",
         "Delete",
     ] {
         assert!(enabled(&mut harness, "Note", entry), "{entry}");

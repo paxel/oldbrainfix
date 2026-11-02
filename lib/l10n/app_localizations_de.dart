@@ -4985,4 +4985,79 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get keepAsCode => 'Als Code behalten';
+
+  @override
+  String get noteHistoryHint =>
+      'Jede Änderung dieser Notiz, ihrer Ergänzungen und ihrer Zeilen, die neueste zuerst.';
+
+  @override
+  String get noteHistoryCaptured => 'Erfasst';
+
+  @override
+  String get noteHistoryText => 'Text geändert';
+
+  @override
+  String get noteHistoryAmended => 'Ergänzt';
+
+  @override
+  String get noteHistoryAmendEdited => 'Ergänzung geändert';
+
+  @override
+  String get noteHistoryMergedIn => 'Notiz zusammengeführt';
+
+  @override
+  String get noteHistoryLineAdded => 'Zeile hinzugefügt';
+
+  @override
+  String get noteHistoryLineRenamed => 'Zeile umbenannt';
+
+  @override
+  String get noteHistoryLineChecked => 'Zeile abgehakt';
+
+  @override
+  String get noteHistoryLineUnchecked => 'Haken entfernt';
+
+  @override
+  String get noteHistoryLineRemoved => 'Zeile gelöscht';
+
+  @override
+  String get noteHistoryLineRestored => 'Zeile wiederhergestellt';
+
+  @override
+  String get noteHistoryTrashed => 'In den Papierkorb gelegt';
+
+  @override
+  String get noteHistoryRestored => 'Aus dem Papierkorb geholt';
+
+  @override
+  String get noteHistoryPhotoAdded => 'Foto hinzugefügt';
+
+  @override
+  String get noteHistoryPhotoRemoved => 'Foto entfernt';
+
+  @override
+  String get noteHistoryRecordingAdded => 'Aufnahme hinzugefügt';
+
+  @override
+  String get noteHistoryRecordingRemoved => 'Aufnahme entfernt';
+
+  @override
+  String get noteHistoryPlaceGone =>
+      'Ein Bereich oder Thema, das es nicht mehr gibt';
+
+  @override
+  String get noteHistoryLocked => 'Ein gesperrter Bereich';
+
+  @override
+  String get noteHistoryBefore => 'Vorher';
+
+  @override
+  String get noteHistoryAfter => 'Nachher';
+
+  @override
+  String get useThisVersion => 'Diese Version verwenden';
+
+  @override
+  String get useThisVersionDone =>
+      'Der alte Text ist zurück. Der Verlauf behält jede Version.';
 }

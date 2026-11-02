@@ -1,0 +1,174 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:05.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "importance",
+          "before": null,
+          "after": "important",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Buy more sauce",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:10.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "nees mor sauce",
+          "after": "Needs more sauce",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "nees mor sauce",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:17.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "importance",
+          "before": "normal",
+          "after": "unimportant",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:16.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "importance",
+          "before": "unimportant",
+          "after": "normal",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:15.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "importance",
+          "before": null,
+          "after": "unimportant",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:11.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Maybe paint the shed",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:18.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "text",
+          "before": "Dated back",
+          "after": "First text",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2025-12-31T00:00:00.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Dated back",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-02T09:00:00.000500Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "text",
+          "before": "Earlier, written later",
+          "after": "Half a millisecond later",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-02T09:00:00.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "text",
+          "before": "Sub-millisecond",
+          "after": "Earlier, written later",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:23.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "Sub-millisecond",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:29.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "captured",
+          "before": null,
+          "after": "Quote \" backslash \\ slash / newline \n tab \t bell \u0001 umlaut ü emoji 🧠",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

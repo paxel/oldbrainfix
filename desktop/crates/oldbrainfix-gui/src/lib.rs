@@ -48,6 +48,7 @@ pub mod media;
 pub mod media_view;
 pub mod names;
 pub mod navigation;
+pub mod note_history_view;
 pub mod notify;
 pub mod paste;
 pub mod person_view;

@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:01:27.000Z",
+  "now": "2026-01-02T10:01:28.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -342,7 +342,7 @@
       {
         "id": "section:00000000000000000000000000000002",
         "noteId": "note:00000000000000000000000000000005",
-        "text": "Moved to Wednesday",
+        "text": "Moved to Thursday",
         "textFormat": "plain",
         "textVersion": 1,
         "textEditable": true,
@@ -368,7 +368,7 @@
         "removedRecordings": [],
         "removedTranscripts": [],
         "removedPhotoTexts": [],
-        "modified": null,
+        "modified": "2026-01-01T10:01:28.000Z",
         "editedBy": null
       },
       {
@@ -493,7 +493,7 @@
       "html": null,
       "photos": [],
       "recordings": [],
-      "text": "Dentist number\n\n2026-01-01T10:00:01.000Z\nDentist on Tuesday\n\n2026-01-01T10:00:05.000Z\nMoved to Wednesday\n\n2026-01-01T10:00:10.000Z\nAsk about the crown\n\n2026-01-01T10:00:14.000Z\nBring the old X-ray\n\n2026-01-01T10:00:25.000Z\nCalled, all set"
+      "text": "Dentist number\n\n2026-01-01T10:00:01.000Z\nDentist on Tuesday\n\n2026-01-01T10:00:05.000Z\nMoved to Thursday\n\n2026-01-01T10:00:10.000Z\nAsk about the crown\n\n2026-01-01T10:00:14.000Z\nBring the old X-ray\n\n2026-01-01T10:00:25.000Z\nCalled, all set"
     }
   },
   "search": {

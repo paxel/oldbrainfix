@@ -4,7 +4,7 @@
 //! scenario again to the same log, byte for byte. Schedules, the alarm
 //! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
 //! of Tallies, the Lines of Checklists and Shopping Lists and the picks
-//! of Sessions and the histories of Routines must
+//! of Sessions and the histories of Routines and Notes must
 //! come to the same on the
 //! same European wall clock, Europe/Berlin here; the calendar files of
 //! Routines and Reminders must be the same bytes.
@@ -791,6 +791,7 @@ fn write_sections(store: &Store) -> Built {
             (SOURCE_LABEL, Some("  ")),
         ],
     )?;
+    notes.edit_section(&moved.id, "Moved to Thursday")?;
     Ok(())
 }
 
@@ -949,6 +950,48 @@ fn tick_json(t: &oldbrainfix_core::text_boxes::BoxTick) -> Value {
         "own": t.own,
         "state": t.state.name(),
     })
+}
+
+#[test]
+fn note_histories_come_to_what_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::NoteHistory;
+    let mut checked = 0;
+    for scenario in SCENARIOS {
+        let dir = fixtures().join(scenario);
+        let path = dir.join("note_history.json");
+        if !path.is_file() {
+            continue;
+        }
+        let now = read_json(&dir.join("expected.json"))?["now"]
+            .as_str()
+            .ok_or("expected.json names now")?
+            .to_string();
+        let store = load(scenario, &now)?;
+        let history = NoteHistory::new(&store);
+        let mut ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
+        ids.sort();
+        let mut out = Vec::new();
+        for id in ids {
+            let mut changes = Vec::new();
+            for c in history.of(&id)? {
+                changes.push(json!({
+                    "at": dart_iso(c.at),
+                    "entity": c.entity,
+                    "kind": c.kind.name(),
+                    "before": c.before,
+                    "after": c.after,
+                    "format": c.format,
+                    "by": c.by.as_ref().map(|p| p.name.clone()),
+                    "mayUse": history.may_use(&id, &c)?,
+                }));
+            }
+            out.push(json!({"id": id, "history": changes}));
+        }
+        assert_eq!(json!({ "notes": out }), read_json(&path)?, "{scenario}");
+        checked += 1;
+    }
+    assert_eq!(checked, SCENARIOS.len());
+    Ok(())
 }
 
 #[test]

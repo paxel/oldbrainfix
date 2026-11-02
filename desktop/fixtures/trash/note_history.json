@@ -1,0 +1,139 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Old shopping list",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:13.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "restored",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:12.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:07.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "Not so old after all",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:18.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:14.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Long gone",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:19.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Into the bin with the other",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:29.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:27.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "Into the bin with the other",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:23.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "The other",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

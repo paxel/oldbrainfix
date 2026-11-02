@@ -1,0 +1,314 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:05.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "text",
+          "before": "Plain milk",
+          "after": "Plain oat milk",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Plain milk",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:11.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "Written before the format",
+          "after": "{\"format\":\"plain\"}",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:10.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "Before the format",
+          "after": "Written before the format",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "Before the format",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:22.000Z",
+          "entity": "section:00000000000000000000000000000004",
+          "kind": "amendEdited",
+          "before": "Amended here",
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:17.000Z",
+          "entity": "section:00000000000000000000000000000004",
+          "kind": "amended",
+          "before": null,
+          "after": "Amended here",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:16.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "text",
+          "before": "Formatted later",
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:12.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Formatted later",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:27.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:23.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "Plain host",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:22.000Z",
+          "entity": "section:00000000000000000000000000000004",
+          "kind": "amendEdited",
+          "before": "Amended here",
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:17.000Z",
+          "entity": "section:00000000000000000000000000000004",
+          "kind": "amended",
+          "before": null,
+          "after": "Amended here",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:16.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "amendEdited",
+          "before": "Formatted later",
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:32.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "text",
+          "before": "Formatted, standing alone",
+          "after": "# Heading\n**bold** ü",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:28.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "captured",
+          "before": null,
+          "after": "Formatted, standing alone",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:37.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "text",
+          "before": "Versioned",
+          "after": "Version one written out",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "captured",
+          "before": null,
+          "after": "Versioned",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000008",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:42.000Z",
+          "entity": "note:00000000000000000000000000000008",
+          "kind": "text",
+          "before": "Versioned",
+          "after": "# Version one",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:38.000Z",
+          "entity": "note:00000000000000000000000000000008",
+          "kind": "captured",
+          "before": null,
+          "after": "Versioned",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:47.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "text",
+          "before": "Versioned",
+          "after": "Version two",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:43.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "captured",
+          "before": null,
+          "after": "Versioned",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:52.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "text",
+          "before": "Versioned",
+          "after": "",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:48.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "captured",
+          "before": null,
+          "after": "Versioned",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:57.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "text",
+          "before": "Versioned",
+          "after": "{\"format\":\"plain\",\"text\":\"Odd version\",\"v\":\"1\"}",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:53.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "captured",
+          "before": null,
+          "after": "Versioned",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    }
+  ]
+}

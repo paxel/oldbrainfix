@@ -8011,6 +8011,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep as code'**
   String get keepAsCode;
+
+  /// Line under the title of a Note's History page (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'Every change of this Note, its Amends and its Lines, the newest first.'**
+  String get noteHistoryHint;
+
+  /// A Note's History: the Note was captured with the text shown under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get noteHistoryCaptured;
+
+  /// A Note's History: the Note's text was changed; the old and the new text show under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Text changed'**
+  String get noteHistoryText;
+
+  /// A Note's History: an Amend added a Section, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amended'**
+  String get noteHistoryAmended;
+
+  /// A Note's History: the text of an Amend (a Section) was changed; old and new text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amend changed'**
+  String get noteHistoryAmendEdited;
+
+  /// A Note's History: another Note was merged into this one, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Note merged in'**
+  String get noteHistoryMergedIn;
+
+  /// A Note's History: a Line of a Checklist or Shopping List was added, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line added'**
+  String get noteHistoryLineAdded;
+
+  /// A Note's History: a Line was renamed; old and new text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line renamed'**
+  String get noteHistoryLineRenamed;
+
+  /// A Note's History: a Line was checked, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line checked'**
+  String get noteHistoryLineChecked;
+
+  /// A Note's History: a Line was unchecked, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line unchecked'**
+  String get noteHistoryLineUnchecked;
+
+  /// A Note's History: a Line was deleted, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line deleted'**
+  String get noteHistoryLineRemoved;
+
+  /// A Note's History: a deleted Line came back, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line restored'**
+  String get noteHistoryLineRestored;
+
+  /// A Note's History: the Note went to the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the trash'**
+  String get noteHistoryTrashed;
+
+  /// A Note's History: the Note came back from the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored from the trash'**
+  String get noteHistoryRestored;
+
+  /// A Note's History: a photo was added.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo added'**
+  String get noteHistoryPhotoAdded;
+
+  /// A Note's History: a photo was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo removed'**
+  String get noteHistoryPhotoRemoved;
+
+  /// A Note's History: a voice recording was added.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording added'**
+  String get noteHistoryRecordingAdded;
+
+  /// A Note's History: a voice recording was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording removed'**
+  String get noteHistoryRecordingRemoved;
+
+  /// A Note's History: the Area or Topic the Note was filed into, deleted since.
+  ///
+  /// In en, this message translates to:
+  /// **'An Area or Topic that is gone'**
+  String get noteHistoryPlaceGone;
+
+  /// A Note's History: the Area or Topic the Note was filed into lies in a locked Area that is not open now, so its name is not shown.
+  ///
+  /// In en, this message translates to:
+  /// **'A locked Area'**
+  String get noteHistoryLocked;
+
+  /// A Note's History: the label of the text before a change.
+  ///
+  /// In en, this message translates to:
+  /// **'Before'**
+  String get noteHistoryBefore;
+
+  /// A Note's History: the label of the text after a change.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get noteHistoryAfter;
+
+  /// A Note's History: writes this old text as the Note's or the Amend's text again, as a new change; nothing is deleted (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'Use this version'**
+  String get useThisVersion;
+
+  /// Short message after Use this version (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'The old text is back. The History keeps every version.'**
+  String get useThisVersionDone;
 }
 
 class _AppLocalizationsDelegate

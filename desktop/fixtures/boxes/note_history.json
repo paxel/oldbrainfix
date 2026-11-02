@@ -1,0 +1,89 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "text",
+          "before": "Trip a☐passport\n✅ tickets \n☐ charger ☐",
+          "after": "Trip a☐passport\n✅ tickets \n☐ charger ☐\n❌ from a photo",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:31.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "☐ shoes",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:20.000Z",
+          "entity": "section:0000000000000000000000000000000b",
+          "kind": "amended",
+          "before": null,
+          "after": "☐ insurance",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:13.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "text",
+          "before": "Trip a☐passport\n✅ tickets ❌ visa ✅‍🔥",
+          "after": "Trip a☐passport\n✅ tickets \n☐ charger ☐",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Trip a☐passport\n✅ tickets ❌ visa ✅‍🔥",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:15.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "captured",
+          "before": null,
+          "after": "- ☐ a `☐` [☐ b](https://x.org/☐)\n\n| ☐ c | d |\n| --- | --- |",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:26.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "captured",
+          "before": null,
+          "after": "☐ shoes",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

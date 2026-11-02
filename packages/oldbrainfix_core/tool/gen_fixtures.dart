@@ -123,7 +123,7 @@ final _scenarios = <Scenario>[
         'Contexts on the Notes and Amends: locations in a Named Place, in '
         'the smaller of two, in none and in one deleted, source apps, '
         'calendar events and Bluetooth devices, and garbled values of '
-        'each.',
+        'each; an Amend edited after them.',
     build: (store) {
       final notes = Notes(store);
       final a = notes.capture('Dentist on Tuesday');
@@ -145,6 +145,7 @@ final _scenarios = <Scenario>[
         [a.id, moved.id, b.id, c.id, called.id],
         [x.id, y.id, z.id],
       );
+      notes.editSection(moved.id, 'Moved to Thursday');
     },
   ),
   (
@@ -7140,6 +7141,35 @@ Map<String, Object?> _boxesOf(Store store) {
   };
 }
 
+/// The History of every Note of [store] (#193), newest first: each
+/// change with its kind, its values, the format of its text, who made it
+/// and whether this Device may use its text again.
+Map<String, Object?> _noteHistory(Store store) {
+  final history = NoteHistory(store);
+  final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
+  return {
+    'notes': [
+      for (final id in ids)
+        {
+          'id': id,
+          'history': [
+            for (final c in history.of(id))
+              {
+                'at': c.at.toUtc().toIso8601String(),
+                'entity': c.entity,
+                'kind': c.kind.name,
+                'before': c.before,
+                'after': c.after,
+                'format': c.format,
+                'by': c.by?.name,
+                'mayUse': history.mayUse(id, c),
+              },
+          ],
+        },
+    ],
+  };
+}
+
 /// Tags in texts (ADR 0032): for each text the tags found, each as
 /// written, as searched and where it lies, counted in code points, so
 /// that the cores' UTF-16 and UTF-8 offsets compare.
@@ -8226,6 +8256,10 @@ Future<void> main(List<String> args) async {
     'late, and snoozed, the Streaks, the last seven days and the Adherence '
     'of this week, this month, the last 30 days and January, on the same '
     'clock.\n'
+    '- `note_history.json` in every scenario with a Note: the History of '
+    'each Note (#193), newest first, each change with its kind, the '
+    'values before and after, the format of its text, the name of who '
+    'made it and whether this Device may use its text again.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
     '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
     '- `keep/keep.json`: the same of the import from Google Keep of the '
@@ -8577,6 +8611,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/boxes.json'),
           '${_json.convert(_boxesOf(store))}\n',
+        );
+      }
+      if (noteIds.isNotEmpty) {
+        _write(
+          File('${out.path}/note_history.json'),
+          '${_json.convert(_noteHistory(store))}\n',
         );
       }
       if (scenario.name == 'import' || scenario.name == 'keep') {

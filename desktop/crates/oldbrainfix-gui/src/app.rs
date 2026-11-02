@@ -93,11 +93,11 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
     CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
-    ListOnAgenda, MissedSummary, Note, Notes, NotesGo, Occurrence, OpenOccurrence, OwnProfile,
-    Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl, QuietHours, Routine,
-    RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
-    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
-    UnitSystem, bundle, markdown, text_format,
+    ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
+    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl,
+    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
+    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
+    ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
@@ -136,6 +136,7 @@ use crate::media_view::{
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
+use crate::note_history_view;
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
@@ -612,6 +613,12 @@ enum Dialog {
     /// set it when (ADR 0035).
     BoxHistory {
         lines: Vec<(BoxState, String)>,
+    },
+    /// Every change of the Note `note`, the newest first (#193), each
+    /// with "Use this version" where it brings an old text back.
+    NoteHistory {
+        note: String,
+        rows: Vec<note_history_view::ChangeRow>,
     },
     /// The address of a link on the bytes `start..end` of the text being
     /// edited, `linked` when they are in a link already (#127).
@@ -1192,6 +1199,11 @@ enum Action {
         entity: String,
         id: String,
     },
+    /// Shows the History of the Note with this id (#193).
+    NoteHistory(String),
+    /// Writes the text of the change at this place in the open Note
+    /// History again, as a new change (#193).
+    UseVersion(usize),
     /// Shows after each box of the Note's text, and its Sections', who
     /// ticked it last and when, or no more, on this Device.
     ShowTicks {
@@ -5539,6 +5551,39 @@ impl App {
                 }
                 self.dialog = Some(Dialog::BoxHistory { lines });
             }
+            Action::NoteHistory(note) => {
+                self.save_text()?;
+                let rows = note_history_view::rows(&self.store, &self.t, &note)?;
+                self.dialog = Some(Dialog::NoteHistory { note, rows });
+            }
+            Action::UseVersion(at) => {
+                let Some(Dialog::NoteHistory { note, rows }) = &self.dialog else {
+                    return Ok(());
+                };
+                let Some(row) = rows.get(at) else {
+                    return Ok(());
+                };
+                let (note, change) = (note.clone(), row.change.clone());
+                let history = NoteHistory::new(&self.store);
+                // A sync since the dialog opened may have changed it.
+                if !history.may_use(&note, &change)? {
+                    return Ok(());
+                }
+                history.use_version(&note, &change)?;
+                let now = self
+                    .store
+                    .current(&change.entity, oldbrainfix_core::notes::keys::TEXT)?;
+                let now = oldbrainfix_core::text_format::StoredText::read(now.as_deref()).text;
+                if self.text_of.as_deref() == Some(change.entity.as_str()) {
+                    self.put_typed(now);
+                } else if let Some(field) = self.section_texts.get_mut(&change.entity) {
+                    // A Section's field shows the text it has now, or the
+                    // next save would put the old one back (#183).
+                    field.text = now;
+                }
+                let rows = note_history_view::rows(&self.store, &self.t, &note)?;
+                self.dialog = Some(Dialog::NoteHistory { note, rows });
+            }
             Action::ShowTicks { note, on } => {
                 self.store
                     .set_local_setting(&show_ticks_key(&note), if on { "true" } else { "false" })?;
@@ -8306,6 +8351,17 @@ impl App {
                 ui.separator();
                 menu_entries(
                     ui,
+                    [(
+                        t.history_title(),
+                        None,
+                        note.is_some(),
+                        Action::NoteHistory(id.clone()),
+                    )],
+                    actions,
+                );
+                ui.separator();
+                menu_entries(
+                    ui,
                     [(t.delete(), None, may(|n| n.changes), Action::Trash)],
                     actions,
                 );
@@ -10042,6 +10098,25 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
+                    Dialog::NoteHistory { rows, .. } => {
+                        title(ui, t.history_title());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.note_history_hint()).color(text));
+                        // As high as the window allows, the title, the
+                        // hint and Close around it.
+                        let high = (ui.ctx().content_rect().height() - 220.0).max(240.0);
+                        egui::ScrollArea::vertical()
+                            .max_height(high)
+                            .show(ui, |ui| {
+                                for (i, row) in rows.iter().enumerate() {
+                                    note_change(ui, &t, (i, row), (text, weak), actions);
+                                }
+                            });
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
                     Dialog::Link {
                         address, linked, ..
                     } => link_form(ui, &t, (address, focus), *linked, actions),
@@ -11745,6 +11820,40 @@ pub(crate) fn name_field(ui: &Ui, field: &egui::Response, name: &str) {
 }
 
 /// The heading of a dialog.
+/// One change of a Note's History (#193): what it changed, who made it
+/// and when, the values before and after it, and "Use this version"
+/// where it brings an old text back.
+fn note_change(
+    ui: &mut Ui,
+    t: &L10n,
+    (i, row): (usize, &note_history_view::ChangeRow),
+    (text, weak): (Color32, Color32),
+    actions: &mut Vec<Action>,
+) {
+    ui.vertical(|ui| {
+        ui.label(RichText::new(&row.title).strong().color(text));
+        ui.label(RichText::new(&row.said).small().color(weak));
+        if let Some(before) = &row.before {
+            ui.label(RichText::new(t.note_history_before()).small().color(weak));
+            ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
+        }
+        if let Some(after) = &row.after {
+            if row.before.is_some() {
+                ui.label(RichText::new(t.note_history_after()).small().color(weak));
+            }
+            ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
+        }
+        if row.may_use
+            && ui
+                .button(RichText::new(t.use_this_version()).color(text))
+                .clicked()
+        {
+            actions.push(Action::UseVersion(i));
+        }
+    });
+    ui.separator();
+}
+
 fn title(ui: &mut Ui, title: &str) {
     let text = ui.visuals().text_color();
     ui.label(RichText::new(title).size(18.0).strong().color(text));

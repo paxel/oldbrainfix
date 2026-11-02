@@ -28,6 +28,7 @@ use crate::checklists::{
 };
 use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
+use crate::note_history::NoteHistory;
 use crate::note_kinds;
 use crate::notes::{CapturedDetail, Importance, Note, Notes};
 use crate::people::PersonFilter;
@@ -643,6 +644,13 @@ fn data_tools() -> Vec<Value> {
             true,
             range_properties(json!({})),
             &[],
+        ),
+        tool(
+            "read_note_history",
+            "Reads a Note's History, newest first: each change of its text, its settings (Importance, Area or Topic, kind, text format, trash), its photos and recordings, its Amends and the Notes merged into it, and its Lines, with what it was before and after, who made it and when.",
+            true,
+            range_properties(json!({"note": id("Note")})),
+            &["note"],
         ),
         tool(
             "read_session_picks",
@@ -1471,6 +1479,27 @@ impl Store {
                         "text": note.map(|n| n.text),
                     });
                     found.push((at, value));
+                }
+            }
+            "read_note_history" => {
+                let note = text_arg(args, "note")?;
+                if Notes::new(self).by_id(note)?.is_none() {
+                    return Err(Error::Invalid(format!("not a Note: {note}")));
+                }
+                for c in NoteHistory::new(self).of(note)? {
+                    if !range.holds(day(c.at)) {
+                        continue;
+                    }
+                    let value = json!({
+                        "after": c.after,
+                        "at": dart_iso(c.at),
+                        "before": c.before,
+                        "by": c.by.as_ref().map(|p| p.name.clone()),
+                        "change": c.kind.name(),
+                        "day": day(c.at).to_string(),
+                        "in": c.entity,
+                    });
+                    found.push((c.at, value));
                 }
             }
             "read_session_picks" => {
@@ -2867,6 +2896,7 @@ mod tests {
             "read_ticks",
             "read_check_offs",
             "read_eaten_frogs",
+            "read_note_history",
             "read_session_picks",
         ] {
             assert!(readers.iter().any(|r| r == data), "{data} reads");
@@ -3112,6 +3142,31 @@ mod tests {
             picks
                 .pointer("/0/picks/0/entries/0/at")
                 .is_some_and(Value::is_string)
+        );
+        let changes = read("read_note_history", json!({"note": trip}))?;
+        assert_eq!(changes.pointer("/0/change"), Some(&json!("lineChecked")));
+        assert_eq!(changes.pointer("/0/after"), Some(&json!("Socks")));
+        assert_eq!(changes.pointer("/0/day"), Some(&json!("2026-01-01")));
+        let last = changes
+            .as_array()
+            .and_then(|c| c.last())
+            .ok_or("a change")?;
+        assert_eq!(last.get("change"), Some(&json!("captured")));
+        assert_eq!(
+            read(
+                "read_note_history",
+                json!({"note": trip, "until": "2025-12-31"})
+            )?,
+            json!([])
+        );
+        assert!(
+            call(
+                &store,
+                &task,
+                "read_note_history",
+                &json!({"note": "note:none"})
+            )?
+            .is_error
         );
         let bad = call(
             &store,
