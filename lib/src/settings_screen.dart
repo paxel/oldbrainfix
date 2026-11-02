@@ -74,6 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _streaksOn = widget.store.streaksOn;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
+  late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
     null => _UnitChoice.region,
     UnitSystem.metric => _UnitChoice.metric,
@@ -94,6 +95,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setRenag(Duration interval) {
     widget.store.renagInterval = interval;
     setState(() => _renag = interval);
+    unawaited(widget.alarms.refresh());
+  }
+
+  /// Picks from when all-day items ring (#201); backing out changes
+  /// nothing.
+  Future<void> _pickAllDayFrom() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: _allDayFrom.hour,
+        minute: _allDayFrom.minute,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    widget.store.allDayFrom = ClockTime(picked.hour, picked.minute);
+    setState(() => _allDayFrom = widget.store.allDayFrom);
     unawaited(widget.alarms.refresh());
   }
 
@@ -545,6 +562,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         RadioOption(value: m, title: Text(t.renagMinutes(m))),
                     ],
                   ),
+                ),
+                ListTile(
+                  key: const ValueKey('allDayFrom'),
+                  leading: const Icon(Icons.wb_sunny_outlined),
+                  title: Text(t.allDayFrom),
+                  subtitle: Text(t.allDayFromDetail),
+                  trailing: Text(
+                    clockText(
+                      Localizations.localeOf(context).toString(),
+                      _allDayFrom,
+                    ),
+                  ),
+                  onTap: _pickAllDayFrom,
                 ),
                 if (widget.alarms.platform.available)
                   ListTile(

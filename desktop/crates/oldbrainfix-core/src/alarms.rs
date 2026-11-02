@@ -12,16 +12,13 @@ use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Note, Notes, Wordless};
 use crate::nudges::{
-    NudgeSnooze, PlannedChangesNudge, PlannedNudge, changes_nudge_plan, nudge_plan,
+    NudgeSnooze, PlannedChangesNudge, PlannedNudge, QuietHours, changes_nudge_plan, nudge_plan,
 };
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Occurrence, WallClock};
 use crate::settings::DeviceSettings;
 use crate::store::{Store, utf16_cmp};
 use crate::{Error, Result};
-
-/// When an all-day Occurrence's alarm fires, on the wall clock.
-pub const ALL_DAY_ALARM_TIME: ClockTime = ClockTime { hour: 9, minute: 0 };
 
 /// How many days back and ahead the plan looks.
 pub const ALARM_HORIZON_DAYS: i64 = 30;
@@ -108,11 +105,11 @@ impl fmt::Display for WallMoment {
 }
 
 /// When `occurrence` starts: at its time, an all-day one at
-/// [`ALL_DAY_ALARM_TIME`].
-pub fn start_of(occurrence: &Occurrence) -> WallMoment {
+/// `all_day_from`, this Device's [`DeviceSettings::all_day_from`].
+pub fn start_of(occurrence: &Occurrence, all_day_from: ClockTime) -> WallMoment {
     WallMoment {
         day: occurrence.day,
-        time: occurrence.time.unwrap_or(ALL_DAY_ALARM_TIME),
+        time: occurrence.time.unwrap_or(all_day_from),
     }
 }
 
@@ -143,7 +140,13 @@ struct Timed {
 
 /// The Occurrences of `routine` from `from` to `to` that were asked for
 /// (due at or after when it was scheduled), placed on `wall`.
-fn timed(routine: &Routine, from: Day, to: Day, wall: &WallClock) -> Vec<Timed> {
+fn timed(
+    routine: &Routine,
+    from: Day,
+    to: Day,
+    wall: &WallClock,
+    all_day_from: ClockTime,
+) -> Vec<Timed> {
     let schedule = &routine.schedule;
     let occurrences = schedule.between(from, to);
     let after = if schedule.once() {
@@ -154,7 +157,7 @@ fn timed(routine: &Routine, from: Day, to: Day, wall: &WallClock) -> Vec<Timed> 
     let mut out = Vec::new();
     for (i, occurrence) in occurrences.iter().enumerate() {
         let next = occurrences.get(i + 1).or(after.as_ref());
-        let start = start_of(occurrence);
+        let start = start_of(occurrence, all_day_from);
         let ends = missed_from(occurrence, next);
         let t = Timed {
             occurrence: *occurrence,
@@ -257,13 +260,17 @@ pub fn snooze_key(routine_id: &str, occurrence: &Occurrence) -> String {
 /// [`ALARMS_PER_ROUTINE`], the soonest first and at most [`ALARM_LIMIT`].
 /// A snoozed one rings at its snooze instead; a snooze reaching past when
 /// the Occurrence counts as Missed is dropped. Each Re-nags at its
-/// Routine's interval, else at `renag`.
+/// Routine's interval, else at `renag`. An all-day Occurrence rings from
+/// `all_day_from` (#201), or once `quiet` ends when they hold that time,
+/// and has no alarm when they last until it counts as Missed.
 pub fn alarm_plan(
     routines: &[(Routine, Option<Note>)],
     snoozes: &BTreeMap<String, DateTime<Utc>>,
     now: DateTime<Utc>,
     wall: &WallClock,
     renag: Duration,
+    all_day_from: ClockTime,
+    quiet: Option<QuietHours>,
 ) -> Vec<PlannedAlarm> {
     let today = Day::today(now, wall);
     let mut alarms = Vec::new();
@@ -274,6 +281,7 @@ pub fn alarm_plan(
             today.add_days(-ALARM_HORIZON_DAYS),
             today.add_days(ALARM_HORIZON_DAYS),
             wall,
+            all_day_from,
         );
         for t in placed {
             if planned >= ALARMS_PER_ROUTINE {
@@ -287,6 +295,21 @@ pub fn alarm_plan(
             if snoozed.is_some_and(|s| s >= t.ends_at) {
                 continue;
             }
+            let mut start = t.start;
+            let mut moment = start_of(&occurrence, all_day_from);
+            if let Some(quiet) = quiet.filter(|_| snoozed.is_none() && occurrence.time.is_none()) {
+                // Quiet Hours win over the all-day time, not over a timed one.
+                start = quiet.defer(t.start, wall);
+                if start >= t.ends_at {
+                    continue;
+                }
+                if start != t.start {
+                    moment = WallMoment {
+                        day: Day::of(wall(start)),
+                        time: quiet.end,
+                    };
+                }
+            }
             alarms.push(PlannedAlarm {
                 kind: if snoozed.is_some() {
                     AlarmKind::Snooze
@@ -295,8 +318,8 @@ pub fn alarm_plan(
                 },
                 routine_id: routine.id.clone(),
                 occurrence,
-                at: snoozed.unwrap_or(t.start),
-                wall: snoozed.is_none().then(|| start_of(&occurrence)),
+                at: snoozed.unwrap_or(start),
+                wall: snoozed.is_none().then_some(moment),
                 renag: routine.renag.unwrap_or(renag),
                 escalation: routine.escalation,
                 ends: t.ends,
@@ -362,6 +385,7 @@ pub fn missed_summary(
     seen: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
     wall: &WallClock,
+    all_day_from: ClockTime,
 ) -> MissedSummary {
     let today = Day::today(now, wall);
     let from = today.add_days(-ALARM_HORIZON_DAYS);
@@ -369,7 +393,7 @@ pub fn missed_summary(
     let mut next_change: Option<DateTime<Utc>> = None;
     for (routine, note) in routines {
         let mut missed = Vec::new();
-        for t in timed(routine, from, today, wall) {
+        for t in timed(routine, from, today, wall, all_day_from) {
             if routine.done_at(&t.occurrence).is_some() {
                 continue;
             }
@@ -444,13 +468,20 @@ impl<'a> Alarms<'a> {
         let routines = self
             .store
             .log_only(|| Routines::new(self.store).all_with_notes())?;
-        let renag = DeviceSettings::new(self.store).renag_interval()?;
+        let settings = DeviceSettings::new(self.store);
+        let quiet = if settings.quiet_hours_on()? {
+            Some(settings.quiet_hours()?)
+        } else {
+            None
+        };
         Ok(alarm_plan(
             &routines,
             &self.snoozes()?,
             self.store.now(),
             wall,
-            renag,
+            settings.renag_interval()?,
+            settings.all_day_from()?,
+            quiet,
         ))
     }
 
@@ -524,8 +555,14 @@ impl<'a> Alarms<'a> {
     /// marked it "seen".
     pub fn missed(&self, wall: &WallClock) -> Result<MissedSummary> {
         let routines = Routines::new(self.store).all_with_notes()?;
-        let seen = DeviceSettings::new(self.store).missed_seen()?;
-        Ok(missed_summary(&routines, seen, self.store.now(), wall))
+        let settings = DeviceSettings::new(self.store);
+        Ok(missed_summary(
+            &routines,
+            settings.missed_seen()?,
+            self.store.now(),
+            wall,
+            settings.all_day_from()?,
+        ))
     }
 
     /// The user tapped "seen": the Missed Summary starts over from now.
@@ -616,7 +653,7 @@ mod tests {
     fn alarm(at: &str, renag: i64, ends: &str) -> Result<PlannedAlarm> {
         let moment = WallMoment {
             day: Day::new(2026, 1, 1),
-            time: ALL_DAY_ALARM_TIME,
+            time: crate::settings::DEFAULT_ALL_DAY_FROM,
         };
         Ok(PlannedAlarm {
             kind: AlarmKind::Occurrence,
@@ -704,6 +741,94 @@ mod tests {
             instant_of(day, half_past_two, &utc_wall),
             utc_at(day, half_past_two)
         );
+    }
+
+    /// An all-day Reminder today, 1 January, made at 10:00; its one alarm.
+    fn all_day_today(store: &Store) -> Result<Vec<PlannedAlarm>> {
+        let note = Notes::new(store).capture("bins out", None, None)?;
+        let schedule = crate::schedule::Schedule::new(Day::new(2026, 1, 1), &[], None)
+            .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+        Routines::new(store).spawn(&note.id, &schedule)?;
+        Alarms::new(store).plan(&utc_wall)
+    }
+
+    #[test]
+    fn an_all_day_occurrence_rings_from_15_and_renags_after() -> Result<()> {
+        let store = crate::store::tests::store();
+        let [alarm] = &all_day_today(&store)?[..] else {
+            return Err(Error::Invalid("one alarm".into()));
+        };
+        let three = parse_time("2026-01-01T15:00:00.000Z")?;
+        assert_eq!(alarm.at, three);
+        assert_eq!(
+            alarm.wall.map(|w| w.time),
+            Some(ClockTime {
+                hour: 15,
+                minute: 0
+            })
+        );
+        assert_eq!(alarm.fires_after(store.now()), Some(three), "none before");
+        assert_eq!(
+            alarm.fires_after(three),
+            Some(three + Duration::minutes(10))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_all_day_occurrence_rings_from_the_devices_own_time() -> Result<()> {
+        let store = crate::store::tests::store();
+        let half_past_eleven = ClockTime {
+            hour: 11,
+            minute: 30,
+        };
+        DeviceSettings::new(&store).set_all_day_from(half_past_eleven)?;
+        let plan = all_day_today(&store)?;
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].at, parse_time("2026-01-01T11:30:00.000Z")?);
+        assert_eq!(plan[0].wall.map(|w| w.time), Some(half_past_eleven));
+        Ok(())
+    }
+
+    #[test]
+    fn quiet_hours_win_over_the_all_day_time() -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        let end = ClockTime {
+            hour: 16,
+            minute: 30,
+        };
+        settings.set_quiet_hours(QuietHours {
+            start: ClockTime {
+                hour: 14,
+                minute: 0,
+            },
+            end,
+        })?;
+        let plan = all_day_today(&store)?;
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].at, parse_time("2026-01-01T16:30:00.000Z")?);
+        assert_eq!(
+            plan[0].wall,
+            Some(WallMoment {
+                day: Day::new(2026, 1, 1),
+                time: end
+            })
+        );
+        settings.set_quiet_hours_on(false)?;
+        let off = Alarms::new(&store).plan(&utc_wall)?;
+        assert_eq!(off[0].at, parse_time("2026-01-01T15:00:00.000Z")?);
+        // Lasting past midnight, they leave it to the Agenda.
+        settings.set_quiet_hours_on(true)?;
+        settings.set_quiet_hours(QuietHours {
+            start: ClockTime {
+                hour: 14,
+                minute: 0,
+            },
+            end: ClockTime { hour: 8, minute: 0 },
+        })?;
+        assert!(Alarms::new(&store).plan(&utc_wall)?.is_empty());
+        Ok(())
     }
 
     #[test]

@@ -153,6 +153,117 @@ fn an_occurrence_rings_renags_escalates_and_stops_when_done() -> TestResult {
     Ok(())
 }
 
+/// An all-day Reminder on Tuesday, 3 November 2026, made that morning;
+/// the key its notification shows under.
+fn bins_out(store: &Store, clock: &Clock) -> Result<String, Box<dyn std::error::Error>> {
+    clock.set("2026-11-03T05:00:00.000Z")?;
+    let note = Notes::new(store).capture("Bins out", None, None)?;
+    let schedule =
+        oldbrainfix_core::Schedule::new(Day::new(2026, 11, 3), &[], None).ok_or("a schedule")?;
+    let routine = Routines::new(store).spawn(&note.id, &schedule)?;
+    Ok(occurrence_key(
+        &routine.id,
+        &Occurrence::new(Day::new(2026, 11, 3), None),
+    ))
+}
+
+/// Whether a tick at `at` shows `key`.
+fn rings_at(
+    alerts: &mut Alerts,
+    store: &Store,
+    clock: &Clock,
+    record: &RecordingNotifier,
+    at: &str,
+    key: &str,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    clock.set(at)?;
+    alerts.tick(store, &berlin)?;
+    Ok(shown(&record.take()).iter().any(|n| n.key == key))
+}
+
+#[test]
+fn an_all_day_occurrence_rings_from_15_and_renags_after() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let key = bins_out(&store, &clock)?;
+    // In the morning it only shows on the Agenda.
+    assert!(!rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T08:00:00.000Z",
+        &key
+    )?);
+    assert!(!rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T13:59:00.000Z",
+        &key
+    )?);
+    // 15:00 in Europe: it rings once, then Re-nags every 10 minutes.
+    assert!(rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T14:00:05.000Z",
+        &key
+    )?);
+    assert!(!rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T14:05:00.000Z",
+        &key
+    )?);
+    assert!(rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T14:10:01.000Z",
+        &key
+    )?);
+    Ok(())
+}
+
+#[test]
+fn an_all_day_occurrence_rings_from_this_devices_time_after_quiet_hours() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let key = bins_out(&store, &clock)?;
+    let settings = DeviceSettings::new(&store);
+    settings.set_all_day_from(ClockTime::new(11, 30).ok_or("11:30")?)?;
+    // Quiet Hours over 11:30 hold back its first ring until they end.
+    settings.set_quiet_hours(oldbrainfix_core::nudges::QuietHours {
+        start: ClockTime::new(11, 0).ok_or("11:00")?,
+        end: ClockTime::new(12, 15).ok_or("12:15")?,
+    })?;
+    assert!(!rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T10:30:05.000Z",
+        &key
+    )?);
+    assert!(rings_at(
+        &mut alerts,
+        &store,
+        &clock,
+        &record,
+        "2026-11-03T11:15:05.000Z",
+        &key
+    )?);
+    Ok(())
+}
+
 /// A mono 16-bit WAV of a tenth of a second of 440 Hz.
 fn tone_wav() -> Vec<u8> {
     let samples: Vec<i16> = (0..800)

@@ -17,3 +17,7 @@ Amended by #186: each person chooses how each Shopping List shows on their Agend
 ## Units (ADR 0028)
 
 Amended by ADR 0028 (#103): whether a Device shows the known units of Tallies in metric or imperial is a setting of its own, following the region the system reports until one is chosen.
+
+## From when all-day items remind (#201)
+
+Amended by #201: from when on an all-day Occurrence rings is a setting of each Device ("All-day items remind from", 15:00 unless changed), replacing the fixed 09:00 of both cores; before it the Occurrence only shows on the Agenda. A calendar file a Device exports gives an all-day event its alarm at that Device's time.

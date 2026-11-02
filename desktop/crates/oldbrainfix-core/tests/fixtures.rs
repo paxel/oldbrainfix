@@ -25,6 +25,7 @@ use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::schedule::Frequency;
+use oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
@@ -3928,7 +3929,7 @@ fn calendar_files_and_the_list_by_name_come_out_as_the_dart_core_has_them() -> T
             .filter_map(|id| routines.iter().find(|r| r.id == *id))
             .collect();
         assert_eq!(picked.len(), ids.len());
-        let ours = routines_ics(picked, text_of, stamp);
+        let ours = routines_ics(picked, text_of, stamp, DEFAULT_ALL_DAY_FROM);
         assert_eq!(ours, file["ics"].as_str().ok_or("ics")?, "{ids:?}");
     }
     let ids = |list: Vec<Routine>| json!(list.into_iter().map(|r| r.id).collect::<Vec<_>>());

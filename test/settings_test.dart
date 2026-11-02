@@ -270,6 +270,64 @@ void main() {
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
+    testWidgets('ring all-day items from 15:00 until another time is picked, '
+        'which is kept on this Device and armed at once (#201)', (
+      tester,
+    ) async {
+      final note = Notes(store).capture('water the plants');
+      Routines(store).spawn(
+        note.id,
+        Schedule(
+          start: Day.today(store.clock(), (utc) => utc.toLocal()),
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      await start(tester);
+      List<ClockTime?> allDayTimes() => [
+        for (final a in alarms.armed)
+          if (a.alarm.occurrence.time == null) a.alarm.wall?.time,
+      ];
+      expect(allDayTimes(), isNotEmpty);
+      expect(allDayTimes().toSet(), {ClockTime(15, 0)});
+
+      await openDeviceSettings(tester);
+      final tile = find.byKey(const ValueKey('allDayFrom'));
+      await tap(tester, tile);
+      expect(find.byType(TimePickerDialog), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(store.localSetting('allDayFrom'), isNull, reason: 'backed out');
+      expect(
+        find.descendant(of: tile, matching: find.text('15:00')),
+        findsOneWidget,
+      );
+
+      await tap(tester, tile);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(TimePickerDialog),
+          matching: find.byIcon(Icons.keyboard_outlined),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final fields = find.descendant(
+        of: find.byType(TimePickerDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(fields.at(0), '4');
+      await tester.enterText(fields.at(1), '30');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(store.allDayFrom, ClockTime(16, 30));
+      expect(
+        find.descendant(of: tile, matching: find.text('16:30')),
+        findsOneWidget,
+      );
+      expect(allDayTimes().toSet(), {ClockTime(16, 30)});
+      expect(store.allEntries().where((e) => e.field == 'allDayFrom'), isEmpty);
+    });
+
     testWidgets('offer no alarm setup where there are no alarms', (
       tester,
     ) async {

@@ -180,15 +180,77 @@ void main() {
       expect(plan(), isEmpty);
     });
 
-    test('an all-day Occurrence rings in the morning', () {
+    test('an all-day Occurrence rings from 15:00 by default', () {
       routines.spawn(
         notes.capture('bins out').id,
         Schedule(start: Day(2026, 10, 25)),
       );
       final [alarm] = alarms.plan(europe);
       expect(alarm.occurrence, Occurrence(Day(2026, 10, 25)));
-      expect(alarm.wall?.time, allDayAlarmTime);
-      expect(alarm.at, DateTime.utc(2026, 10, 25, 8));
+      expect(alarm.wall, (day: Day(2026, 10, 25), time: at(15)));
+      expect(alarm.at, DateTime.utc(2026, 10, 25, 14));
+    });
+
+    group('all-day items remind from a set time', () {
+      String allDayToday() => routines
+          .spawn(
+            notes.capture('bins out').id,
+            Schedule(start: Day(2026, 10, 24)),
+          )
+          .id;
+
+      test('before it no alarm fires; at it one; then it Re-nags', () {
+        allDayToday();
+        final [alarm] = alarms.plan(europe);
+        // 15:00 in summer time is 13:00 UTC; now is 09:00.
+        final threePm = DateTime.utc(2026, 10, 24, 13);
+        expect(alarm.at, threePm);
+        expect(alarm.firesAfter(now), threePm, reason: 'nothing before 15:00');
+        expect(alarm.firesAfter(DateTime.utc(2026, 10, 24, 12, 59)), threePm);
+        expect(
+          alarm.firesAfter(threePm),
+          threePm.add(const Duration(minutes: 10)),
+          reason: 'rung once at 15:00, then Re-nag as usual',
+        );
+        expect(alarm.ends, (day: Day(2026, 10, 25), time: at(0)));
+      });
+
+      test('a Device rings them from its own time, in .wall too', () {
+        store.allDayFrom = at(11, 30);
+        allDayToday();
+        final [alarm] = alarms.plan(europe);
+        expect(alarm.at, DateTime.utc(2026, 10, 24, 9, 30));
+        expect(alarm.wall, (day: Day(2026, 10, 24), time: at(11, 30)));
+      });
+
+      test('timed Occurrences keep their time', () {
+        store.allDayFrom = at(20);
+        routines.spawn(
+          notes.capture('dentist').id,
+          Schedule(start: Day(2026, 10, 24), times: [at(10)]),
+        );
+        expect(alarms.plan(europe).single.at, DateTime.utc(2026, 10, 24, 8));
+      });
+
+      test('Quiet Hours win: the first ring waits for their end', () {
+        store.quietHours = QuietHours(at(14), at(16, 30));
+        allDayToday();
+        final [alarm] = alarms.plan(europe);
+        expect(alarm.at, DateTime.utc(2026, 10, 24, 14, 30));
+        expect(alarm.wall, (day: Day(2026, 10, 24), time: at(16, 30)));
+        store.quietHoursOn = false;
+        expect(
+          alarms.plan(europe).single.at,
+          DateTime.utc(2026, 10, 24, 13),
+          reason: 'switched off, they hold nothing back',
+        );
+      });
+
+      test('Quiet Hours lasting past midnight leave it to the Agenda', () {
+        store.quietHours = QuietHours(at(14), at(8));
+        allDayToday();
+        expect(alarms.plan(europe), isEmpty);
+      });
     });
 
     test('an Occurrence in the skipped hour rings once the clock jumps', () {
@@ -423,7 +485,7 @@ void main() {
           ),
         );
         final today = alarmOf(id, Occurrence(Day(2026, 10, 24)));
-        expect(today.at, DateTime.utc(2026, 10, 24, 7));
+        expect(today.at, DateTime.utc(2026, 10, 24, 13));
         expect(today.ends, (day: Day(2026, 10, 25), time: at(0)));
       });
 

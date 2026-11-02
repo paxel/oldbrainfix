@@ -48,6 +48,7 @@ extension DeviceSettings on Store {
   static const _missedSeen = 'missedSeen';
   static const _quietHours = 'quietHours';
   static const _quietHoursOff = 'quietHoursOff';
+  static const _allDayFrom = 'allDayFrom';
   static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
   static const _calendarContext = 'calendarContext';
   static const _bluetoothContext = 'bluetoothContext';
@@ -73,6 +74,10 @@ extension DeviceSettings on Store {
     ClockTime(22, 0),
     ClockTime(8, 0),
   );
+
+  /// When all-day Occurrences start to ring when nothing else is set
+  /// (#201).
+  static final defaultAllDayFrom = ClockTime(15, 0);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -156,6 +161,13 @@ extension DeviceSettings on Store {
   bool get quietHoursOn => localSetting(_quietHoursOff) != 'true';
 
   set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
+
+  /// From when on this Device an all-day Occurrence rings, on the wall
+  /// clock; before that it only shows on the Agenda (#201).
+  ClockTime get allDayFrom =>
+      ClockTime.tryParse(localSetting(_allDayFrom) ?? '') ?? defaultAllDayFrom;
+
+  set allDayFrom(ClockTime time) => setLocalSetting(_allDayFrom, '$time');
 
   /// How long an ignored Nudge waits before it comes again.
   Duration get nudgeRepeat {

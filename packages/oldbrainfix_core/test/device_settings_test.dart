@@ -26,6 +26,18 @@ void main() {
     expect(store.themeChoice, ThemeChoice.system);
   });
 
+  test('all-day items remind from 15:00 until this Device sets a time', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.allDayFrom, ClockTime(15, 0));
+    store.allDayFrom = ClockTime(11, 30);
+    expect(store.allDayFrom, ClockTime(11, 30));
+    expect(store.localSetting('allDayFrom'), '11:30');
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+    store.setLocalSetting('allDayFrom', 'noon');
+    expect(store.allDayFrom, ClockTime(15, 0), reason: 'unreadable: default');
+  });
+
   test('the Starter Set is offered until this Device has offered it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

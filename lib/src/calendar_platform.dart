@@ -166,7 +166,11 @@ Future<void> shareCalendarFile(
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
-  final ics = writeIcs(events, stamp: store.clock());
+  final ics = writeIcs(
+    events,
+    stamp: store.clock(),
+    allDayFrom: store.allDayFrom,
+  );
   if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
   _announceFileNotShared(t, announcements, navigator);
 }
@@ -183,10 +187,15 @@ Future<void> shareRoutinesFile(
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
-  final ics = routinesIcs(list, (routine) {
-    final note = routines.note(routine);
-    return note == null ? t.noteGone : noteText(t, note);
-  }, stamp: routines.store.clock());
+  final ics = routinesIcs(
+    list,
+    (routine) {
+      final note = routines.note(routine);
+      return note == null ? t.noteGone : noteText(t, note);
+    },
+    stamp: routines.store.clock(),
+    allDayFrom: routines.store.allDayFrom,
+  );
   if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
   _announceFileNotShared(t, announcements, navigator);
 }

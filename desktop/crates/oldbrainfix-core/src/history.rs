@@ -12,7 +12,8 @@ use crate::Result;
 use crate::alarms::{Alarms, instant_of, missed_from, start_of};
 use crate::entry::Entry;
 use crate::routines::{Routine, Routines, keys};
-use crate::schedule::{Day, Occurrence, Schedule, WallClock};
+use crate::schedule::{ClockTime, Day, Occurrence, Schedule, WallClock};
+use crate::settings::DeviceSettings;
 use crate::store::{Fields, Store};
 
 /// Monday, the day weeks start on unless the app says otherwise.
@@ -144,9 +145,11 @@ pub struct HistoryEntry {
 
 impl HistoryEntry {
     /// Whether it was Done early, on time or late; `None` unless Done.
+    /// An all-day one is due all its day, before it rings too (#201), so
+    /// it is never early.
     pub fn timing(&self) -> Option<DoneTiming> {
         let done = self.done_at?;
-        Some(if done < self.start {
+        Some(if self.occurrence.time.is_some() && done < self.start {
             DoneTiming::Early
         } else if done < self.missed_at {
             DoneTiming::OnTime
@@ -316,7 +319,8 @@ impl RoutineHistory {
 /// until `snoozes`, both by [`Occurrence::key`], with days as `wall`
 /// shows them. An Occurrence is Missed as the Missed Summary says: when
 /// the next one starts, unless the schedule changed or the Routine went
-/// to the trash before. Whatever was Done counts, asked for or not.
+/// to the trash before. Whatever was Done counts, asked for or not. An
+/// all-day Occurrence starts at `all_day_from`, as the alarm plan has it.
 pub fn routine_history(
     spans: &[ScheduleSpan],
     done: &BTreeMap<String, DateTime<Utc>>,
@@ -324,6 +328,7 @@ pub fn routine_history(
     now: DateTime<Utc>,
     wall: &WallClock,
     week_start: u32,
+    all_day_from: ClockTime,
 ) -> RoutineHistory {
     let today = Day::today(now, wall);
     let mut asked: BTreeMap<String, HistoryEntry> = BTreeMap::new();
@@ -361,7 +366,7 @@ pub fn routine_history(
                 break;
             }
             let next = occurrences.get(i + 1).or(after.as_ref());
-            let wall_start = start_of(occurrence);
+            let wall_start = start_of(occurrence, all_day_from);
             let wall_ends = missed_from(occurrence, next);
             let start = instant_of(wall_start.day, wall_start.time, wall);
             let missed_at = instant_of(wall_ends.day, wall_ends.time, wall);
@@ -406,7 +411,7 @@ pub fn routine_history(
         if occurrence.day > today {
             continue;
         }
-        let wall_start = start_of(&occurrence);
+        let wall_start = start_of(&occurrence, all_day_from);
         let wall_ends = missed_from(&occurrence, None);
         let e = entry(
             occurrence,
@@ -446,6 +451,7 @@ impl Routines<'_> {
             self.store.now(),
             wall,
             week_start,
+            DeviceSettings::new(self.store).all_day_from()?,
         ))
     }
 }
@@ -699,6 +705,23 @@ mod tests {
     }
 
     #[test]
+    fn an_all_day_occurrence_done_before_it_rings_is_on_time() {
+        let all_day = |done_at| HistoryEntry {
+            occurrence: Occurrence::new(Day::new(2026, 10, 24), None),
+            status: OccurrenceStatus::Done,
+            start: wall(10, 24, 15, 0),
+            missed_at: wall(10, 25, 0, 0),
+            done_at: Some(done_at),
+            snoozed_until: None,
+        };
+        assert_eq!(
+            all_day(wall(10, 24, 9, 0)).timing(),
+            Some(DoneTiming::OnTime)
+        );
+        assert_eq!(all_day(wall(10, 25, 9, 0)).timing(), Some(DoneTiming::Late));
+    }
+
+    #[test]
     fn missed_agrees_with_the_missed_summary() -> Made<()> {
         let w = World::new()?;
         let pills = w.made_at(
@@ -713,7 +736,13 @@ mod tests {
         }
         w.done(&pills, on(10, 15, at(8, 0)), wall(10, 15, 8, 0))?;
         let routine = w.routines().by_id(&pills.id)?.ok_or("the Routine")?;
-        let summary = missed_summary(&[(routine, None)], None, w.store.now(), &europe);
+        let summary = missed_summary(
+            &[(routine, None)],
+            None,
+            w.store.now(),
+            &europe,
+            crate::settings::DEFAULT_ALL_DAY_FROM,
+        );
         let history = w.history_of(&pills, MONDAY)?;
         let missed: Vec<&HistoryEntry> = history
             .entries

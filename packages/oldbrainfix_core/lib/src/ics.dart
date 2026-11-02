@@ -10,7 +10,7 @@
 /// VTIMEZONE with daylight-saving rules the core does not have.
 library;
 
-import 'alarms.dart';
+import 'device_settings.dart';
 import 'routines.dart';
 import 'schedule.dart';
 
@@ -111,19 +111,29 @@ List<CalendarEvent> routineEvents(Routine routine, String text) {
 
 /// [routines] as one iCalendar file, every event of each in turn, each
 /// titled by [textOf]: the export of all of them, or one Routine with
-/// its whole series and its end, or one Reminder, to share.
+/// its whole series and its end, or one Reminder, to share. An all-day
+/// event's alarm is at [allDayFrom], the exporting Device's time.
 String routinesIcs(
   Iterable<Routine> routines,
   String Function(Routine routine) textOf, {
   required DateTime stamp,
-}) => writeIcs([
-  for (final routine in routines) ...routineEvents(routine, textOf(routine)),
-], stamp: stamp);
+  ClockTime? allDayFrom,
+}) => writeIcs(
+  [for (final routine in routines) ...routineEvents(routine, textOf(routine))],
+  stamp: stamp,
+  allDayFrom: allDayFrom,
+);
 
 /// [events] as an iCalendar file (RFC 5545), each with an alarm when it
-/// starts (an all-day one at [allDayAlarmTime], as the app rings it).
-/// Events without a start are left out. [stamp] is when it was made.
-String writeIcs(Iterable<CalendarEvent> events, {required DateTime stamp}) {
+/// starts (an all-day one at [allDayFrom], as this Device rings it, by
+/// default [DeviceSettings.defaultAllDayFrom]). Events without a start
+/// are left out. [stamp] is when it was made.
+String writeIcs(
+  Iterable<CalendarEvent> events, {
+  required DateTime stamp,
+  ClockTime? allDayFrom,
+}) {
+  final allDay = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final lines = <String>[
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -155,7 +165,7 @@ String writeIcs(Iterable<CalendarEvent> events, {required DateTime stamp}) {
       lines.add('DESCRIPTION:${_escape(event.description)}');
     }
     final trigger = start.time == null
-        ? 'PT${allDayAlarmTime.hour * 60 + allDayAlarmTime.minute}M'
+        ? 'PT${allDay.hour * 60 + allDay.minute}M'
         : 'PT0M';
     lines
       ..add('BEGIN:VALARM')

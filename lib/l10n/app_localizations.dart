@@ -1517,7 +1517,7 @@ abstract class AppLocalizations {
   /// No description provided for @nudgeSettingsExplain.
   ///
   /// In en, this message translates to:
-  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.'**
+  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.'**
   String get nudgeSettingsExplain;
 
   /// No description provided for @nudgeRepeat.
@@ -2371,6 +2371,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'How often an ignored alarm rings again, unless its Routine has its own interval.'**
   String get settingsRenagDetail;
+
+  /// No description provided for @allDayFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'All-day items remind from'**
+  String get allDayFrom;
+
+  /// No description provided for @allDayFromDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.'**
+  String get allDayFromDetail;
 
   /// No description provided for @alarmSound.
   ///

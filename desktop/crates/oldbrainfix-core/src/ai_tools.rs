@@ -201,7 +201,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1195,6 +1195,7 @@ impl Store {
                 ToolOutput::json(&json!({
                     "aiReach": self.ai_reach()?.name(),
                     "alertsOn": settings.alerts_on()?,
+                    "allDayFrom": settings.all_day_from()?.to_string(),
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
                     "quickNote": {
                         "fileInto": shows(QuickNoteControl::FileInto)?,
@@ -2114,6 +2115,7 @@ mod tests {
         assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
         assert_eq!(read.pointer("/theme"), Some(&json!("system")));
         assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
+        assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
         Ok(())
     }
 

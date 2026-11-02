@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Datelike, Timelike, Utc};
 
-use crate::alarms::ALL_DAY_ALARM_TIME;
 use crate::routines::Routine;
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Until};
 use crate::transcript_prompts::dart_trim;
@@ -111,24 +110,29 @@ pub fn routine_events(routine: &Routine, text: &str) -> Vec<CalendarEvent> {
 
 /// `routines` as one iCalendar file, every event of each in turn, each
 /// titled by `text_of`: the export of all of them, or one Routine with
-/// its whole series and its end, or one Reminder, to share.
+/// its whole series and its end, or one Reminder, to share. An all-day
+/// event's alarm is at `all_day_from`, the exporting Device's time.
 pub fn routines_ics<'a>(
     routines: impl IntoIterator<Item = &'a Routine>,
     mut text_of: impl FnMut(&Routine) -> String,
     stamp: DateTime<Utc>,
+    all_day_from: ClockTime,
 ) -> String {
     let events: Vec<CalendarEvent> = routines
         .into_iter()
         .flat_map(|routine| routine_events(routine, &text_of(routine)))
         .collect();
-    write_ics(&events, stamp)
+    write_ics(&events, stamp, all_day_from)
 }
 
 /// `events` as an iCalendar file (RFC 5545), each with an alarm when it
-/// starts (an all-day one at [`ALL_DAY_ALARM_TIME`], as the app rings
-/// it). Events without a start are left out. `stamp` is when it was
-/// made.
-pub fn write_ics(events: &[CalendarEvent], stamp: DateTime<Utc>) -> String {
+/// starts (an all-day one at `all_day_from`, as this Device rings it).
+/// Events without a start are left out. `stamp` is when it was made.
+pub fn write_ics(
+    events: &[CalendarEvent],
+    stamp: DateTime<Utc>,
+    all_day_from: ClockTime,
+) -> String {
     let mut lines = Vec::from(
         [
             "BEGIN:VCALENDAR",
@@ -165,10 +169,7 @@ pub fn write_ics(events: &[CalendarEvent], stamp: DateTime<Utc>) -> String {
             lines.push(format!("DESCRIPTION:{}", escape(&event.description)));
         }
         let trigger = match start.time {
-            None => format!(
-                "PT{}M",
-                ALL_DAY_ALARM_TIME.hour * 60 + ALL_DAY_ALARM_TIME.minute
-            ),
+            None => format!("PT{}M", all_day_from.hour * 60 + all_day_from.minute),
             Some(_) => "PT0M".to_string(),
         };
         lines.push("BEGIN:VALARM".into());
@@ -266,6 +267,7 @@ fn fold(line: &str, out: &mut String) {
 mod tests {
     use super::*;
     use crate::schedule::Schedule;
+    use crate::settings::DEFAULT_ALL_DAY_FROM;
     use chrono::TimeZone;
     use std::collections::BTreeMap;
 
@@ -315,12 +317,29 @@ mod tests {
     #[test]
     fn a_calendar_around_the_events_every_line_ending_in_crlf() {
         let r = routine("routine:r1", saturday(), &[at(8, 0)], None);
-        let ics = write_ics(&routine_events(&r, "Pills"), stamp());
+        let ics = write_ics(&routine_events(&r, "Pills"), stamp(), DEFAULT_ALL_DAY_FROM);
         assert!(ics.starts_with("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:"));
         assert!(ics.ends_with("END:VEVENT\r\nEND:VCALENDAR\r\n"));
         let bare = ics.replace("\r\n", "");
         assert!(!bare.contains('\n') && !bare.contains('\r'));
         assert!(unfolded(&ics).contains(&"DTSTAMP:20261024T070509Z".to_string()));
+    }
+
+    #[test]
+    fn an_all_day_alarm_is_at_the_exporting_devices_time() {
+        let r = routine("routine:r1", saturday(), &[], None);
+        let events = routine_events(&r, "Party");
+        let ics = unfolded(&write_ics(&events, stamp(), DEFAULT_ALL_DAY_FROM));
+        assert!(
+            ics.contains(&"TRIGGER:PT900M".to_string()),
+            "15:00 by default"
+        );
+        let own = ClockTime {
+            hour: 11,
+            minute: 30,
+        };
+        let ics = unfolded(&write_ics(&events, stamp(), own));
+        assert!(ics.contains(&"TRIGGER:PT690M".to_string()));
     }
 
     #[test]
@@ -332,7 +351,7 @@ mod tests {
             start: None,
             rule: None,
         };
-        assert!(!write_ics(&[event], stamp()).contains("VEVENT"));
+        assert!(!write_ics(&[event], stamp(), DEFAULT_ALL_DAY_FROM).contains("VEVENT"));
     }
 
     #[test]
@@ -341,6 +360,7 @@ mod tests {
         let ics = write_ics(
             &routine_events(&r, "Buy a\\b; milk, eggs\r\nand bread\nnow\rthen"),
             stamp(),
+            DEFAULT_ALL_DAY_FROM,
         );
         let lines = unfolded(&ics);
         assert!(lines.contains(&r"SUMMARY:Buy a\\b\; milk\, eggs".to_string()));
@@ -354,7 +374,7 @@ mod tests {
     fn long_lines_fold_at_75_octets_without_cutting_a_character() {
         let text = format!("{}Ende", "Medikament für Oma ü 💊 ".repeat(8));
         let r = routine("routine:r1", saturday(), &[at(8, 0)], None);
-        let ics = write_ics(&routine_events(&r, &text), stamp());
+        let ics = write_ics(&routine_events(&r, &text), stamp(), DEFAULT_ALL_DAY_FROM);
         let mut physical: Vec<&str> = ics.split("\r\n").collect();
         physical.pop();
         assert!(physical.iter().all(|l| l.len() <= 75));
@@ -366,7 +386,7 @@ mod tests {
     fn a_line_of_exactly_75_octets_is_not_folded() {
         let text = "x".repeat(67);
         let r = routine("routine:r1", saturday(), &[at(8, 0)], None);
-        let ics = write_ics(&routine_events(&r, &text), stamp());
+        let ics = write_ics(&routine_events(&r, &text), stamp(), DEFAULT_ALL_DAY_FROM);
         assert!(ics.contains(&format!("\r\nSUMMARY:{text}\r\nBEGIN:VALARM")));
     }
 
@@ -479,14 +499,21 @@ mod tests {
         );
         let party = routine("routine:party", Day::new(2026, 12, 31), &[], None);
         let text_of = |r: &Routine| r.id.trim_start_matches("routine:").to_string();
-        let one = routines_ics([&bins], text_of, stamp());
-        assert_eq!(one, write_ics(&routine_events(&bins, "bins"), stamp()));
+        let one = routines_ics([&bins], text_of, stamp(), DEFAULT_ALL_DAY_FROM);
+        assert_eq!(
+            one,
+            write_ics(
+                &routine_events(&bins, "bins"),
+                stamp(),
+                DEFAULT_ALL_DAY_FROM
+            )
+        );
         assert!(unfolded(&one).contains(&"DTSTART:20261027T070000".to_string()));
         assert!(
             unfolded(&one)
                 .contains(&"RRULE:FREQ=WEEKLY;UNTIL=20261124T235900;BYDAY=TU".to_string())
         );
-        let all = routines_ics([&party, &bins], text_of, stamp());
+        let all = routines_ics([&party, &bins], text_of, stamp(), DEFAULT_ALL_DAY_FROM);
         let uids: Vec<_> = unfolded(&all)
             .into_iter()
             .filter(|l| l.starts_with("UID:"))

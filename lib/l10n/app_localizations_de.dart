@@ -945,7 +945,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich.';
+      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich; nur eine ganztägige wartet, bis sie endet.';
 
   @override
   String get nudgeRepeat => 'Erneut stupsen nach';
@@ -1471,6 +1471,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsRenagDetail =>
       'Wie oft ein unbeachteter Alarm erneut klingelt, wenn seine Routine keinen eigenen Abstand hat.';
+
+  @override
+  String get allDayFrom => 'Ganztägiges erinnert ab';
+
+  @override
+  String get allDayFromDetail =>
+      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor.';
 
   @override
   String get alarmSound => 'Alarmton';

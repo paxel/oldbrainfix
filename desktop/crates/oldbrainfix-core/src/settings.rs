@@ -16,6 +16,7 @@ const RENAG_MINUTES: &str = "renagMinutes";
 const MISSED_SEEN: &str = "missedSeen";
 const QUIET_HOURS: &str = "quietHours";
 const QUIET_HOURS_OFF: &str = "quietHoursOff";
+const ALL_DAY_FROM: &str = "allDayFrom";
 const NUDGE_REPEAT_MINUTES: &str = "nudgeRepeatMinutes";
 const ALERTS_OFF: &str = "alertsOff";
 const AUTOSTART_OFF: &str = "autostartOff";
@@ -140,6 +141,13 @@ pub const DEFAULT_QUIET_HOURS: QuietHours = QuietHours {
     end: ClockTime { hour: 8, minute: 0 },
 };
 
+/// When all-day Occurrences start to ring when nothing else is set
+/// (#201).
+pub const DEFAULT_ALL_DAY_FROM: ClockTime = ClockTime {
+    hour: 15,
+    minute: 0,
+};
+
 /// This Device's settings in the store's local settings.
 pub struct DeviceSettings<'a> {
     store: &'a Store,
@@ -214,6 +222,18 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_quiet_hours_on(&self, on: bool) -> Result<()> {
         self.store
             .set_local_setting(QUIET_HOURS_OFF, &(!on).to_string())
+    }
+
+    /// From when on this Device an all-day Occurrence rings, on the
+    /// wall clock; before that it only shows on the Agenda (#201).
+    pub fn all_day_from(&self) -> Result<ClockTime> {
+        let text = self.store.local_setting(ALL_DAY_FROM)?.unwrap_or_default();
+        Ok(ClockTime::parse(&text).unwrap_or(DEFAULT_ALL_DAY_FROM))
+    }
+
+    pub fn set_all_day_from(&self, time: ClockTime) -> Result<()> {
+        self.store
+            .set_local_setting(ALL_DAY_FROM, &time.to_string())
     }
 
     /// How long an ignored Nudge waits before it comes again.
@@ -416,6 +436,7 @@ mod tests {
         assert_eq!(settings.nudge_repeat()?, Duration::hours(1));
         assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
         assert!(settings.quiet_hours_on()?);
+        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
         assert!(settings.streaks_on()?);
@@ -432,6 +453,8 @@ mod tests {
         assert_eq!(settings.renag_interval()?, Duration::minutes(10));
         store.set_local_setting(QUIET_HOURS, "23:00")?;
         assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
+        store.set_local_setting(ALL_DAY_FROM, "noon")?;
+        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
         Ok(())
     }
 
@@ -450,6 +473,13 @@ mod tests {
         };
         settings.set_quiet_hours(quiet)?;
         settings.set_quiet_hours_on(false)?;
+        let half_past_eleven = ClockTime {
+            hour: 11,
+            minute: 30,
+        };
+        settings.set_all_day_from(half_past_eleven)?;
+        assert_eq!(settings.all_day_from()?, half_past_eleven);
+        assert_eq!(store.local_setting(ALL_DAY_FROM)?.as_deref(), Some("11:30"));
         settings.set_alerts_on(false)?;
         settings.set_autostart_on(false)?;
         settings.set_streaks_on(false)?;

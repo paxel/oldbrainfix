@@ -939,7 +939,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.';
+      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.';
 
   @override
   String get nudgeRepeat => 'Nudge again after';
@@ -1462,6 +1462,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsRenagDetail =>
       'How often an ignored alarm rings again, unless its Routine has its own interval.';
+
+  @override
+  String get allDayFrom => 'All-day items remind from';
+
+  @override
+  String get allDayFromDetail =>
+      'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.';
 
   @override
   String get alarmSound => 'Alarm sound';

@@ -732,6 +732,11 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     type_over(&mut harness, "22:00", "21:30");
     let quiet = DeviceSettings::new(harness.state().store()).quiet_hours()?;
     assert_eq!(quiet.to_string(), "21:30-08:00");
+    // All-day items remind from 15:00 until another time is typed (#201).
+    assert!(shows(&harness, "All-day items remind from"));
+    type_over(&mut harness, "15:00", "11:30");
+    let from = DeviceSettings::new(harness.state().store()).all_day_from()?;
+    assert_eq!(from.to_string(), "11:30");
     // The Re-nag default, a radio button per choice.
     assert!(radio(&harness, "20 min").accesskit_node().toggled() == Some(Toggled::True));
     radio(&harness, "15 min").click();

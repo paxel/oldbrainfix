@@ -113,6 +113,18 @@ void main() {
       expect(history.longestStreak, 6);
     });
 
+    test('an all-day Occurrence Done before it rings is on time (#201)', () {
+      HistoryEntry allDay(DateTime doneAt) => HistoryEntry(
+        occurrence: Occurrence(Day(2026, 10, 24)),
+        status: OccurrenceStatus.done,
+        start: wall(10, 24, 15),
+        missedAt: wall(10, 25, 0),
+        doneAt: doneAt,
+      );
+      expect(allDay(wall(10, 24, 9)).timing, DoneTiming.onTime);
+      expect(allDay(wall(10, 25, 9)).timing, DoneTiming.late);
+    });
+
     test('Done early, on time or late, and late Done keeps the Streak', () {
       final pills = madeAt(wall(10, 22, 6), daily([at(8), at(20)]));
       done(pills, 10, 22, at(8), wall(10, 22, 7, 50));

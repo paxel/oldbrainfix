@@ -116,7 +116,7 @@ Die Erinnerung, dass unsortierte Notizen warten. Ihre Zeit wird beim Erfassen ge
 _Avoid_: Erinnerung (das ist etwas anderes), Nörgeln (das ist Erneut erinnern)
 
 **Ruhezeit** [Quiet Hours]:
-Ein tägliches Zeitfenster, in dem Stupser warten. Routinen und Erinnerungen sind davon nicht betroffen.
+Ein tägliches Zeitfenster, in dem Stupser warten. Routinen und Erinnerungen sind davon nicht betroffen, bis auf das erste Klingeln einer ganztägigen Fälligkeit, das wartet, bis das Zeitfenster endet.
 
 **Startauswahl** [Starter Set]:
 Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, welche du behältst.

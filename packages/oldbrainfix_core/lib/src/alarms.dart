@@ -14,9 +14,6 @@ import 'routines.dart';
 import 'schedule.dart';
 import 'store.dart';
 
-/// When an all-day Occurrence's alarm fires, on the wall clock.
-final allDayAlarmTime = ClockTime(9, 0);
-
 /// How many days ahead the plan looks. The platform keeps the whole
 /// plan and arms one alarm after the other, so alarms keep coming for
 /// this long even when the app is never opened.
@@ -89,9 +86,9 @@ DateTime instantOf(Day day, ClockTime time, WallClock wallClock) {
 typedef WallMoment = ({Day day, ClockTime time});
 
 /// When [occurrence] starts: at its time, an all-day one at
-/// [allDayAlarmTime].
-WallMoment startOf(Occurrence occurrence) =>
-    (day: occurrence.day, time: occurrence.time ?? allDayAlarmTime);
+/// [allDayFrom], this Device's [DeviceSettings.allDayFrom].
+WallMoment startOf(Occurrence occurrence, ClockTime allDayFrom) =>
+    (day: occurrence.day, time: occurrence.time ?? allDayFrom);
 
 /// When [occurrence] counts as Missed unless it is Done (CONTEXT.md):
 /// when [next], the Occurrence after it, starts (an all-day one at the
@@ -114,7 +111,13 @@ class _Timed {
 
 /// The Occurrences of [routine] from [from] to [to] that were asked for
 /// (due at or after [Routine.scheduledAt]), placed on [wallClock].
-List<_Timed> _timed(Routine routine, Day from, Day to, WallClock wallClock) {
+List<_Timed> _timed(
+  Routine routine,
+  Day from,
+  Day to,
+  WallClock wallClock,
+  ClockTime allDayFrom,
+) {
   final schedule = routine.schedule;
   final occurrences = schedule.between(from, to);
   final after = schedule.once ? null : schedule.next(to.addDays(1), 1);
@@ -124,14 +127,19 @@ List<_Timed> _timed(Routine routine, Day from, Day to, WallClock wallClock) {
     final next = i + 1 < occurrences.length
         ? occurrences[i + 1]
         : after?.firstOrNull;
-    final t = _place(occurrences[i], next, wallClock);
+    final t = _place(occurrences[i], next, wallClock, allDayFrom);
     if (since == null || !t.start.isBefore(since)) timed.add(t);
   }
   return timed;
 }
 
-_Timed _place(Occurrence occurrence, Occurrence? next, WallClock wallClock) {
-  final start = startOf(occurrence);
+_Timed _place(
+  Occurrence occurrence,
+  Occurrence? next,
+  WallClock wallClock,
+  ClockTime allDayFrom,
+) {
+  final start = startOf(occurrence, allDayFrom);
   final ends = missedFrom(occurrence, next);
   return _Timed(
     occurrence,
@@ -244,7 +252,10 @@ String snoozeKey(String routineId, Occurrence occurrence) =>
 /// rung stays while it Re-nags. A snoozed one rings at its snooze
 /// instead and Re-nags from there; a snooze reaching past when the
 /// Occurrence counts as Missed is dropped. Each Re-nags at its Routine's
-/// interval, else at [renag], and escalates as its Routine says. [snoozes] are this Device's (ADR 0008),
+/// interval, else at [renag], and escalates as its Routine says. An
+/// all-day Occurrence rings from [allDayFrom] (#201), or once [quiet]
+/// ends when they hold that time, and has no alarm when they last
+/// until it counts as Missed. [snoozes] are this Device's (ADR 0008),
 /// keyed by [snoozeKey].
 List<PlannedAlarm> alarmPlan({
   required List<(Routine, Note?)> routines,
@@ -252,7 +263,10 @@ List<PlannedAlarm> alarmPlan({
   required DateTime now,
   required WallClock wallClock,
   Duration renag = DeviceSettings.defaultRenag,
+  ClockTime? allDayFrom,
+  QuietHours? quiet,
 }) {
+  final from = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final today = Day.today(now, wallClock);
   final alarms = <PlannedAlarm>[];
   for (final (routine, note) in routines) {
@@ -262,6 +276,7 @@ List<PlannedAlarm> alarmPlan({
       today.addDays(-alarmHorizonDays),
       today.addDays(alarmHorizonDays),
       wallClock,
+      from,
     );
     for (final t in timed) {
       if (planned >= alarmsPerRoutine) break;
@@ -270,13 +285,23 @@ List<PlannedAlarm> alarmPlan({
       if (!t.endsAt.isAfter(now)) continue;
       final snoozed = snoozes[snoozeKey(routine.id, occurrence)]?.toUtc();
       if (snoozed != null && !snoozed.isBefore(t.endsAt)) continue;
+      var start = t.start;
+      WallMoment? wall = startOf(occurrence, from);
+      if (snoozed == null && occurrence.time == null && quiet != null) {
+        // Quiet Hours win over the all-day time, not over a timed one.
+        start = quiet.defer(t.start, wallClock);
+        if (!start.isBefore(t.endsAt)) continue;
+        if (start != t.start) {
+          wall = (day: Day.of(wallClock(start)), time: quiet.end);
+        }
+      }
       alarms.add(
         PlannedAlarm(
           kind: snoozed == null ? AlarmKind.occurrence : AlarmKind.snooze,
           routineId: routine.id,
           occurrence: occurrence,
-          at: snoozed ?? t.start,
-          wall: snoozed == null ? startOf(occurrence) : null,
+          at: snoozed ?? start,
+          wall: snoozed == null ? wall : null,
           renag: routine.renag ?? renag,
           escalation: routine.escalation,
           ends: t.ends,
@@ -341,14 +366,16 @@ MissedSummary missedSummary({
   required DateTime? seen,
   required DateTime now,
   required WallClock wallClock,
+  ClockTime? allDayFrom,
 }) {
   final today = Day.today(now, wallClock);
   final from = today.addDays(-alarmHorizonDays);
+  final allDay = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final result = <MissedRoutine>[];
   DateTime? nextChange;
   for (final (routine, note) in routines) {
     final missed = <MissedOccurrence>[];
-    for (final t in _timed(routine, from, today, wallClock)) {
+    for (final t in _timed(routine, from, today, wallClock, allDay)) {
       if (routine.doneAt(t.occurrence) != null) continue;
       if (t.endsAt.isAfter(now)) {
         if (nextChange == null || t.endsAt.isBefore(nextChange)) {
@@ -410,13 +437,15 @@ class Alarms {
       now: store.clock(),
       wallClock: wallClock,
       renag: store.renagInterval,
+      allDayFrom: store.allDayFrom,
+      quiet: store.quietHoursOn ? store.quietHours : null,
     );
   }
 
   /// The Nudge at the store's now over the Unsorted Notes, with this
   /// Device's snooze, repeat interval and Quiet Hours; null when nothing
-  /// is Unsorted. Quiet Hours hold back only the Nudge, never the
-  /// Occurrences of [plan].
+  /// is Unsorted. Of the Occurrences of [plan], Quiet Hours hold back
+  /// only the first ring of an all-day one.
   PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
     unsorted: Notes(store).unsorted(),
     snooze: nudgeSnooze,
@@ -464,6 +493,7 @@ class Alarms {
       seen: store.missedSeen,
       now: store.clock(),
       wallClock: wallClock,
+      allDayFrom: store.allDayFrom,
     );
   }
 

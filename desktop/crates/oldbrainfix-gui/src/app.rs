@@ -1253,6 +1253,8 @@ enum Setting {
     NudgeRepeat(i64),
     QuietOn(bool),
     Quiet(QuietHours),
+    /// From when all-day Occurrences ring (#201).
+    AllDayFrom(ClockTime),
     /// The capture popup's key chord, as the settings show it.
     Hotkey(String),
     /// The sound file Occurrences ring with; `None` for the app's own
@@ -1399,6 +1401,8 @@ pub struct App {
     read_at: DateTime<Utc>,
     /// The Quiet Hours as typed in the Settings.
     quiet_text: (String, String),
+    /// The settings' "All-day items remind from" field as typed (#201).
+    all_day_text: String,
     /// The capture popup's hotkey, which the Settings move.
     hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
     /// The hotkey as typed in the Settings.
@@ -1762,6 +1766,7 @@ impl App {
             autostart: None,
             read_at,
             quiet_text: (String::new(), String::new()),
+            all_day_text: String::new(),
             hotkey: None,
             hotkey_text: String::new(),
             recorder: None,
@@ -2350,6 +2355,7 @@ impl App {
             list,
             |r| names.get(&r.id).cloned().unwrap_or_default(),
             self.store.now(),
+            DeviceSettings::new(&self.store).all_day_from()?,
         );
         let Some(mut path) =
             (self.calendar_saver)(t.calendar_file_save_title(), CALENDAR_FILE_NAME)
@@ -3781,6 +3787,9 @@ impl App {
         }
         if let Ok(quiet) = DeviceSettings::new(&self.store).quiet_hours() {
             self.quiet_text = (quiet.start.to_string(), quiet.end.to_string());
+        }
+        if let Ok(from) = DeviceSettings::new(&self.store).all_day_from() {
+            self.all_day_text = from.to_string();
         }
         // What a click unfolded stays while its list shows.
         let cards = self.cards_key();
@@ -6583,6 +6592,7 @@ impl App {
             }
             Setting::QuietOn(on) => settings.set_quiet_hours_on(on)?,
             Setting::Quiet(quiet) => settings.set_quiet_hours(quiet)?,
+            Setting::AllDayFrom(from) => settings.set_all_day_from(from)?,
             Setting::Hotkey(chord) => {
                 settings.set_capture_hotkey(&chord)?;
                 if let (Some(hotkey), Ok(chord)) = (&self.hotkey, chord.parse::<Chord>()) {
@@ -10737,6 +10747,10 @@ impl App {
         ui.label(RichText::new(t.settings_intro()).color(weak));
         ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
+        let all_day_text = &mut self.all_day_text;
+        let all_day_from = settings
+            .all_day_from()
+            .unwrap_or(oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM);
         let hotkey_text = &mut self.hotkey_text;
         let stored_hotkey = settings
             .capture_hotkey()
@@ -10825,6 +10839,28 @@ impl App {
                         actions.push(Action::Setting(Setting::Renag(m)));
                     });
                     ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(t.all_day_from()).color(text));
+                        let field = ui.add(
+                            TextEdit::singleline(all_day_text)
+                                .id(Id::new("all day from"))
+                                .hint_text(t.time_hint())
+                                .text_color(text)
+                                .desired_width(60.0),
+                        );
+                        if field.changed()
+                            && let Some(time) = ClockTime::parse(all_day_text.trim())
+                            && time != all_day_from
+                        {
+                            actions.push(Action::Setting(Setting::AllDayFrom(time)));
+                        }
+                    });
+                    if ClockTime::parse(all_day_text.trim()).is_none() {
+                        ui.label(
+                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
+                        );
+                    }
+                    ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
                     alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {

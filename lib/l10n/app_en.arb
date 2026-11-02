@@ -541,7 +541,7 @@
     }
   },
   "nudgeBody": "Tap to sort them.",
-  "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.",
+  "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.",
   "nudgeRepeat": "Nudge again after",
   "quietHours": "Quiet Hours",
   "quietFrom": "From",
@@ -908,6 +908,8 @@
   "settingsAlarms": "Alarms",
   "settingsAlarmSetupDetail": "The permissions alarms need to ring on time.",
   "settingsRenagDetail": "How often an ignored alarm rings again, unless its Routine has its own interval.",
+  "allDayFrom": "All-day items remind from",
+  "allDayFromDetail": "Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.",
   "alarmSound": "Alarm sound",
   "alarmSoundOwn": "Old Brain Fix's own chime. Tap to choose another sound of the phone.",
   "alarmSoundChosen": "A sound of the phone. Tap to choose another, or Old Brain Fix's own chime.",
