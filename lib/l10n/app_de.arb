@@ -1206,6 +1206,7 @@
   "formatQuote": "Zitat",
   "formatLink": "Link",
   "formatCode": "Code",
+  "formatCodeBlock": "Codeblock",
   "formatIndent": "Listenpunkt einrücken",
   "formatOutdent": "Listenpunkt ausrücken",
   "moreFormats": "Weitere Formate",

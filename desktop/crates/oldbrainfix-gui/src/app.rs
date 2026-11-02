@@ -14741,12 +14741,13 @@ fn edited_text(
         // ticks room after each for who ticked it.
         let accent = ui.visuals().hyperlink_color;
         let weak = ui.visuals().weak_text_color();
+        let code = ui.visuals().code_bg_color;
         let small = FontId::proportional(13.0);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(size);
             let job = if formatted {
-                text_marks_view::source_job(typed, font, (written, accent, weak))
+                text_marks_view::source_job(typed, font, (written, accent, weak, code))
             } else {
                 text_marks_view::tag_job(typed, (0, typed.len()), font, (written, accent))
             };
@@ -15092,6 +15093,7 @@ fn name_edit(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let accent = ui.visuals().hyperlink_color;
+    let code = ui.visuals().code_bg_color;
     let mut moved = false;
     if ui.memory(|m| m.has_focus(id)) {
         ui.input_mut(|i| {
@@ -15106,7 +15108,7 @@ fn name_edit(
         let typed = typed.as_str();
         let font = FontId::proportional(NAME_SIZE);
         let job = if formatted {
-            text_marks_view::source_job(typed, font, (text, accent, weak))
+            text_marks_view::source_job(typed, font, (text, accent, weak, code))
         } else {
             text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
         };
@@ -15569,7 +15571,9 @@ fn note_card(
             }
             // A plain Note: its first line and the two after it, or, running
             // a Session, its next run and this week (#189).
-            if let Some(line) = first_line(&note.text) {
+            if let Some(line) =
+                card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
+            {
                 marks =
                     text_marks_view::formatted_label(ui, text_of, line, (Some(16.0), text), true);
                 if look.glance.is_empty() {
@@ -15926,6 +15930,25 @@ fn next_lines(text: &str, from: usize) -> Option<(usize, usize)> {
     };
     let lines = text.get(start..end)?.trim_end();
     Some((start, start + lines.len()))
+}
+
+/// Where the first line a compact card shows of `text` lies, in bytes:
+/// [`first_line`], or, a formatted text opening with a code block, the
+/// first line with words after its opening fence, which shows nothing
+/// (#212).
+fn card_first_line(text: &str, formatted: bool) -> Option<(usize, usize)> {
+    let line = first_line(text)?;
+    if formatted
+        && let Some(block) = markdown::parse(text).get(markdown::line_at(text, line.0))
+        && block
+            .code
+            .as_ref()
+            .is_some_and(|c| c.first_line == block.line)
+        && let Some((a, b)) = text.get(block.end..).and_then(first_line)
+    {
+        return Some((block.end + a, block.end + b));
+    }
+    Some(line)
 }
 
 /// The lines the compact view says of a Tally or of a Session (#189).

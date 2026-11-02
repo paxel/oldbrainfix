@@ -2368,6 +2368,8 @@
   "@formatLink": {"description": "Format bar button and title of the dialog asking for a link's address."},
   "formatCode": "Code",
   "@formatCode": {"description": "Format bar button: shows the selection or word as code, in a fixed-width font."},
+  "formatCodeBlock": "Code block",
+  "@formatCodeBlock": {"description": "Format bar button: puts the lines the selection touches into a fenced code block, shown in a fixed-width font with nothing in it read as a format; in a code block, takes its fences off."},
   "formatIndent": "Indent list item",
   "@formatIndent": {"description": "Format bar button: moves a list item one level in."},
   "formatOutdent": "Move list item out",

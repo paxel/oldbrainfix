@@ -8,7 +8,8 @@
 <h2>Formatted text</h2>
 <p>
   The text of a Note and of a Section can be bold, italic or struck through, have two heading
-  levels, bulleted and numbered lists one level in, quotes, links, inline code and tables. It is
+  levels, bulleted and numbered lists one level in, quotes, links, inline code, code blocks and
+  tables. It is
   kept as Markdown, exactly as written. A text stays plain until it is first formatted, and stays
   formatted from then on: by a button of the format bar, by a format typed as Markdown, or by
   pasting a text that uses one. Cards, Sections, Sent Items and Backups show it formatted. A Device
@@ -26,7 +27,7 @@
   <li><strong>Bold</strong>, <strong>Italic</strong> and <strong>Strike through</strong>.</li>
   <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
   <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
-  <li><strong>Link</strong> and <strong>Code</strong>.</li>
+  <li><strong>Link</strong>, <strong>Code</strong> and <strong>Code block</strong>.</li>
   <li><strong>Indent list item</strong> and <strong>Move list item out</strong>.</li>
   <li><strong>Table</strong>.</li>
 </ul>
@@ -57,12 +58,30 @@
 <ul>
   <li>At the start of a line, followed by a space: <code>#</code> for a large heading, <code>##</code> for a small one, <code>-</code>, <code>*</code> or <code>+</code> for a bulleted item, <code>1.</code> for a numbered item and <code>&gt;</code> for a quote.</li>
   <li>Within a line: <code>**bold**</code>, <code>*italic*</code> or <code>_italic_</code>, <code>~~struck~~</code>, <code>`code`</code> and <code>[label](address)</code>.</li>
+  <li>On a line of its own: <code>```</code> or <code>~~~</code> opens a code block, and the same fence on a later line closes it; typing the closing fence makes a plain text formatted.</li>
 </ul>
 <p>
   Every line break shows as one, so lines typed one under the other stay apart. An item indented by
   two spaces or more is one level in; deeper items show one level in. Numbered items that follow one
   another count on, so <code>1.</code> on every line shows 1, 2, 3. Deeper headings
-  (<code>###</code>), code blocks, images and other Markdown show as written.
+  (<code>###</code>), images and other Markdown show as written.
+</p>
+
+<h3>Code blocks</h3>
+<p>
+  A code block is the lines between two fences of three backticks, <code>```</code>, or three
+  tildes, <code>~~~</code>, each fence on a line of its own. It shows in a fixed-width font on a
+  grey ground, its lines exactly as written: nothing in it is a format, a table, a #tag or a box. A
+  word after the opening fence, such as <code>```bash</code>, names the language; it is kept in the
+  text but does not show. A block ends only at a fence of the same character at least as long as
+  the one that opened it, so in a block opened with four backticks a line of three is a line of the
+  block. Without a closing fence the block runs to the end of the text.
+</p>
+<p>
+  <strong>Code block</strong> in the format bar puts the lines the selection touches into a block,
+  an empty one at an empty line; in a block it takes the block's fences off. Its fences are longer
+  than any run of backticks inside. On a compact card a code block shows its lines without the
+  fences.
 </p>
 <p>
   On a capture screen there is no format bar, but a text typed or pasted with Markdown is saved as a
@@ -125,7 +144,7 @@
   text itself stays as it is.
 </p>
 <ul>
-  <li>A box can stand in the middle of a word or line, in a list item, a quote, a link's words and a table's cell. In inline code or a link's address it does not; nor do other boxes and ticks such as ☑ or ✓.</li>
+  <li>A box can stand in the middle of a word or line, in a list item, a quote, a link's words and a table's cell. In inline code, a code block or a link's address it does not; nor do other boxes and ticks such as ☑ or ✓.</li>
   <li>Boxes are ticked on the Note's card, in its Sections, in the Note editor and in a table full screen. A box being typed can be ticked once the text is saved.</li>
   <li>☐ in the format bar puts ☐ in at the cursor, also in the middle of a word.</li>
   <li>Each box carries an id that is never seen. The cursor steps over a box as one character; deleting the box's character deletes the box.</li>
@@ -144,7 +163,7 @@
 </p>
 <ul>
   <li>A tag is made of letters, digits, "_" and "-", and holds at least one letter: "#to-do" and "#v2" are tags, "#126" is a number.</li>
-  <li>"# Title" with a space, "C#" and the "#" in a web address are no tags. In a formatted text, a "#word" inside code or inside a link's address is none either.</li>
+  <li>"# Title" with a space, "C#" and the "#" in a web address are no tags. In a formatted text, a "#word" inside code, a code block or a link's address is none either.</li>
   <li>The search for "#garden" finds every Note holding it in any case, also "#gardening", which begins with it, but not the word "garden" without "#".</li>
 </ul>
 

@@ -4468,6 +4468,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get formatCode => 'Code';
 
   @override
+  String get formatCodeBlock => 'Code block';
+
+  @override
   String get formatIndent => 'Indent list item';
 
   @override

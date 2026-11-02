@@ -97,6 +97,8 @@ pub const FORMAT_NUMBERS: char = '\u{e2b9}';
 pub const FORMAT_QUOTE: char = '\u{e2bc}';
 pub const LINK: char = '\u{e380}';
 pub const CODE: char = '\u{e176}';
+/// The format bar's code block (#212), as the phone's: `data_object`.
+pub const CODE_BLOCK: char = '\u{f04e6}';
 pub const INDENT: char = '\u{e2b5}';
 pub const OUTDENT: char = '\u{e2b4}';
 /// The format bar's table and the table view's, as the phone's (#128):

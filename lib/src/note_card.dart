@@ -362,14 +362,26 @@ class NoteCard extends StatelessWidget {
   });
 
   /// Where the first line with words of [text] starts and ends, without
-  /// the spaces around it, as a compact card shows it.
-  static (int, int) firstLine(String text) {
+  /// the spaces around it, as a compact card shows it; in a [formatted]
+  /// text opening with a code block, the first after its fence.
+  static (int, int) firstLine(String text, {bool formatted = false}) {
     final start = text.length - text.trimLeft().length;
     var end = start;
     while (end < text.length && text[end] != '\n' && text[end] != '\r') {
       end++;
     }
-    return (start, start + text.substring(start, end).trimRight().length);
+    final first = (
+      start,
+      start + text.substring(start, end).trimRight().length,
+    );
+    if (!formatted) return first;
+    // A code block's opening fence shows nothing: its first line stands
+    // in (#212).
+    final block = Markdown.parse(text)[Markdown.lineAt(text, start)];
+    if (block.code case final code? when code.firstLine == block.line) {
+      return nextLines(text, block.end, 1) ?? first;
+    }
+    return first;
   }
 
   /// Where the [count] lines after [from] in [text] start and end, from
@@ -1359,7 +1371,10 @@ class _CompactNoteState extends State<_CompactNote> {
         ],
       );
     }
-    final (start, end) = NoteCard.firstLine(shown);
+    final (start, end) = NoteCard.firstLine(
+      shown,
+      formatted: note.textFormat == TextFormats.markdown,
+    );
     final next = glance.isEmpty ? NoteCard.nextLines(shown, end) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

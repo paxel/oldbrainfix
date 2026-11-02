@@ -6289,7 +6289,8 @@ fn markdown_table(text: &str, table: &oldbrainfix_core::markdown::table::Table) 
 #[test]
 fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::markdown::{
-        self, BlockKind, Change, SpanKind, indent, link, may_open, table, toggle, toggle_line,
+        self, BlockKind, Change, SpanKind, code_block, indent, link, may_open, table, toggle,
+        toggle_line,
     };
     let fixture = read_json(&fixtures().join("markdown.json"))?;
     let cases = fixture["cases"].as_array().ok_or("cases")?;
@@ -6330,6 +6331,22 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                 block
             })
             .collect();
+        let code_blocks: Vec<Value> = markdown::parse(text)
+            .iter()
+            .filter_map(|b| b.code.as_ref().filter(|c| c.first_line == b.line))
+            .map(|c| {
+                json!({
+                    "closed": c.closed,
+                    "end": points(c.end),
+                    "fence": c.fence,
+                    "firstLine": c.first_line,
+                    "info": c.info,
+                    "language": c.language(),
+                    "lastLine": c.last_line,
+                    "start": points(c.start),
+                })
+            })
+            .collect();
         let tables: Vec<Value> = table::all(text)
             .iter()
             .map(|t| markdown_table(text, t))
@@ -6357,6 +6374,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             .collect();
         let ours = json!({
             "blocks": blocks,
+            "codeBlocks": code_blocks,
             "escaped": markdown::escape(text),
             "html": markdown::html(text),
             "lines": lines,
@@ -6385,6 +6403,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         "numbered" => Ok(BlockKind::Numbered),
         "quote" => Ok(BlockKind::Quote),
         "table" => Ok(BlockKind::Table),
+        "code" => Ok(BlockKind::Code),
         _ => Err(format!("a block kind: {name}")),
     };
     let edits = fixture["edits"].as_array().ok_or("edits")?;
@@ -6404,6 +6423,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "link" => link(text, start, end, edit["url"].as_str().ok_or("url")?),
             "line" => toggle_line(text, start, end, block_kind(kind)?),
             "indent" => indent(text, start, end, false),
+            "codeBlock" => code_block(text, start, end),
             "outdent" => indent(text, start, end, true),
             "setCell" => table::set_cell(
                 text,

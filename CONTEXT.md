@@ -84,7 +84,7 @@ _Avoid_: Pack (a Pack brings copies of Old Brain Fix Notes), Paste, bundle (a bu
 ### Text
 
 **Formatted text**:
-A Note's or Section's text kept as Markdown of the app's own subset: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links, inline code and Tables. A text stays plain until it is first formatted, from the Format bar, by typing Markdown or by a Paste that uses a format, and stays formatted from then on. Transcripts and Photo Texts stay plain. German: Formatierter Text.
+A Note's or Section's text kept as Markdown of the app's own subset: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links, inline code, code blocks and Tables. A text stays plain until it is first formatted, from the Format bar, by typing Markdown or by a Paste that uses a format, and stays formatted from then on. Transcripts and Photo Texts stay plain. German: Formatierter Text.
 _Avoid_: rich text, styled text
 
 **Format bar**:
@@ -96,7 +96,7 @@ Rows and columns in a Formatted text, written as a GitHub Markdown table: a head
 _Avoid_: spreadsheet, grid
 
 **Box**:
-A ☐ (open), ✅ (done) or ❌ (failed) anywhere in a Note's or Section's text, in the middle of a word and in a Table's cell too, but not in inline code; it becomes a Box, with an id of its own kept invisibly in the text, when the text is saved, and the glyph it was written with is the state it starts in. A tap or click on one offers the other two states. Each change of its state is kept beside the text, the latest one winning, so the Boxes of a Section can be changed too while its text stays as it is, and in a Shared Area anyone with a role there changes any Box, while adding, moving and deleting Boxes stays an edit of the text. Copies, shares and Sent Items show each Box in its state now. Transcripts and Photo Texts hold no Boxes. German: Statuskästchen.
+A ☐ (open), ✅ (done) or ❌ (failed) anywhere in a Note's or Section's text, in the middle of a word and in a Table's cell too, but not in inline code or a code block; it becomes a Box, with an id of its own kept invisibly in the text, when the text is saved, and the glyph it was written with is the state it starts in. A tap or click on one offers the other two states. Each change of its state is kept beside the text, the latest one winning, so the Boxes of a Section can be changed too while its text stays as it is, and in a Shared Area anyone with a role there changes any Box, while adding, moving and deleting Boxes stays an edit of the text. Copies, shares and Sent Items show each Box in its state now. Transcripts and Photo Texts hold no Boxes. German: Statuskästchen.
 _Avoid_: status mark (its earlier name), checkbox (a Line of a Checklist has the checkbox)
 
 **Tag**:

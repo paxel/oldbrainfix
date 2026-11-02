@@ -550,7 +550,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
 - **The format bar goes with the field**: ☐, bold, italic,
-  strike-through, two headings, bullets, numbers, quote, link, code, in
+  strike-through, two headings, bullets, numbers, quote, link, code,
+  code block (on the lines touched, or taking a block's fences off), in
   and out, each on the selection or the word at the cursor, and table,
   which puts a new table at the cursor or opens the one it is in. On the phone
   it sits directly above the bottom row while the keyboard is open, and

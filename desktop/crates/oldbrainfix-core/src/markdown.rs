@@ -40,6 +40,14 @@
 //! the delimiter row under it, `| --- | :-: |`, with as many cells, and
 //! the rows under those; [`table`] reads and edits them, every line of
 //! one a [`BlockKind::Table`] block.
+//!
+//! A fenced code block (#212) is CommonMark's: a line of up to three
+//! spaces and at least three backticks or tildes opens it, an info string
+//! after them, whose first word is the language; it runs to the first
+//! line of up to three spaces and at least as many of the same character
+//! with only spaces and tabs after them, or to the end of the text. Its
+//! lines are [`BlockKind::Code`] blocks, shown as written; nothing in
+//! them is read as a format, a table, a tag or a box.
 
 pub mod table;
 
@@ -61,6 +69,9 @@ pub enum BlockKind {
     /// A line of a table: its header row, its delimiter row, one of its
     /// rows, or the line marking its first column as headings.
     Table,
+    /// A line of a fenced code block: one of its fences or a line between
+    /// them, shown as written.
+    Code,
 }
 
 impl BlockKind {
@@ -74,6 +85,7 @@ impl BlockKind {
             BlockKind::Numbered => "numbered",
             BlockKind::Quote => "quote",
             BlockKind::Table => "table",
+            BlockKind::Code => "code",
         }
     }
 
@@ -160,6 +172,37 @@ impl Span {
     }
 }
 
+/// A fenced code block: where it lies in the text, `start..end`, its
+/// fences included, on the lines from `first_line`, its opening fence, to
+/// `last_line`, its closing fence when `closed`, else the text's last
+/// line. Its `fence` is the run of backticks or tildes that opened it,
+/// its `info` the info string after that without the spaces and tabs
+/// around it, as written. Offsets are bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeBlock {
+    pub start: usize,
+    pub end: usize,
+    pub first_line: usize,
+    pub last_line: usize,
+    pub fence: String,
+    pub info: String,
+    pub closed: bool,
+}
+
+impl CodeBlock {
+    /// The first word of `info`, what a highlighter would go by; empty
+    /// when there is none.
+    pub fn language(&self) -> &str {
+        self.info.split([' ', '\t']).next().unwrap_or_default()
+    }
+
+    /// Whether the line `line` is one of its fences rather than a line of
+    /// its content.
+    pub fn is_fence(&self, line: usize) -> bool {
+        line == self.first_line || (self.closed && line == self.last_line)
+    }
+}
+
 /// A line of a formatted text: its kind, the line it is, counted as
 /// [`line_at`] counts lines, where it lies in the text, `start..end`
 /// without its line break, and where its content begins after the mark,
@@ -169,6 +212,9 @@ impl Span {
 /// row there, the header row 0; its spans are those of its cells, left to
 /// right. The delimiter row and the line marking the first column as
 /// headings have no row.
+///
+/// A line of a fenced code block holds the code block it belongs to; a
+/// line of its content is one part shown as written, a fence none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub kind: BlockKind,
@@ -183,12 +229,13 @@ pub struct Block {
     pub spans: Vec<Span>,
     pub table: Option<Arc<Table>>,
     pub row: Option<usize>,
+    pub code: Option<Arc<CodeBlock>>,
 }
 
 impl Block {
     /// The text this line shows, without its marks: a table's row its
     /// cells that show something, a space between them, its other lines
-    /// nothing.
+    /// nothing; a code block's fence nothing.
     pub fn visible(&self) -> String {
         match (&self.table, self.row) {
             (Some(table), Some(row)) => table
@@ -197,8 +244,21 @@ impl Block {
                 .map(table::Row::visible)
                 .unwrap_or_default(),
             (Some(_), None) => String::new(),
+            _ if self.is_fence() => String::new(),
             _ => self.spans.iter().map(Span::visible).collect(),
         }
+    }
+
+    /// Whether it is one of a code block's fences.
+    fn is_fence(&self) -> bool {
+        self.code.as_ref().is_some_and(|c| c.is_fence(self.line))
+    }
+
+    /// Whether it shows nothing and goes with a line break: a table's
+    /// delimiter row and the line marking its first column as headings,
+    /// and a code block's fence.
+    fn hidden(&self) -> bool {
+        (self.table.is_some() && self.row.is_none()) || self.is_fence()
     }
 }
 
@@ -217,6 +277,11 @@ pub fn parse(text: &str) -> Vec<Block> {
     let lines = lines(text);
     let mut i = 0;
     while let Some(&(start, end)) = lines.get(i) {
+        if let Some(code) = code_at(text, &lines, i) {
+            i = code.last_line + 1;
+            blocks.extend(code_blocks(text, code, &lines));
+            continue;
+        }
         if let Some(table) = table::table_at(text, &lines, i) {
             i = table.last_line + 1;
             blocks.extend(table::blocks(table, &lines));
@@ -250,6 +315,7 @@ pub fn parse(text: &str) -> Vec<Block> {
             spans,
             table: None,
             row: None,
+            code: None,
         });
         i += 1;
     }
@@ -260,15 +326,16 @@ pub fn parse(text: &str) -> Vec<Block> {
 /// what search looks in and what a preview shows. A table's delimiter row
 /// and the line marking its first column as headings go with a line
 /// break; each of its rows reads as its cells that show something, a
-/// space between them.
+/// space between them. So does a code block's fence, its other lines
+/// reading as written.
 pub fn plain(text: &str) -> String {
     let mut out = String::new();
     let mut at = 0;
     let blocks = parse(text);
     for (i, block) in blocks.iter().enumerate() {
-        if block.table.is_some() && block.row.is_none() {
+        if block.hidden() {
             // The line break before it goes, or the one after the first
-            // line, which is followed by its table's header row.
+            // line.
             at = if i == 0 {
                 blocks.get(1).map_or(block.end, |b| b.start)
             } else {
@@ -292,8 +359,10 @@ pub fn plain(text: &str) -> String {
 /// in a list inside the item above them; another kind of item starts a
 /// list of its own. A table is a `<table>`, its header row in `<thead>`
 /// with `<th>` cells, the first cell of each other row a `<th>` too when
-/// its first column holds headings, a column's alignment as `align`.
-/// Bold is `<strong>`, italic `<em>`, strike-through `<del>`, code
+/// its first column holds headings, a column's alignment as `align`. A
+/// code block is a `<pre><code>`, `class="language-…"` its language when
+/// it has one, each line of its content followed by a line break. Bold
+/// is `<strong>`, italic `<em>`, strike-through `<del>`, code
 /// `<code>`; a link is an `<a>` only when [`may_open`] allows its
 /// destination, else its label alone. Every character of the text is
 /// escaped, so nothing in it is markup; status marks and tags are text. A
@@ -301,8 +370,34 @@ pub fn plain(text: &str) -> String {
 pub fn html(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut html = Html::default();
-    for block in parse(text) {
+    let blocks = parse(text);
+    for block in &blocks {
         match block.kind {
+            BlockKind::Code => {
+                let Some(code) = &block.code else { continue };
+                if block.line != code.first_line {
+                    continue;
+                }
+                html.close();
+                match code.language() {
+                    "" => html.out.push_str("<pre><code>"),
+                    language => {
+                        html.out.push_str("<pre><code class=\"language-");
+                        html_escape(&mut html.out, language);
+                        html.out.push_str("\">");
+                    }
+                }
+                for line in code.first_line + 1..=code.last_line {
+                    if code.is_fence(line) {
+                        continue;
+                    }
+                    if let Some(b) = blocks.get(line) {
+                        html_escape(&mut html.out, slice(text, b.start, b.end));
+                    }
+                    html.out.push('\n');
+                }
+                html.out.push_str("</code></pre>\n");
+            }
             BlockKind::Table => {
                 let Some(table) = &block.table else { continue };
                 if block.line != table.first_line {
@@ -532,8 +627,19 @@ pub fn escape(text: &str) -> String {
 }
 
 /// The tags of `text` as [`text_tags::find`] finds them, but those in
-/// code or in a link's destination.
+/// code, in a code block or in a link's destination.
 pub fn tags(text: &str) -> Vec<FoundTag> {
+    let hidden = literal_ranges(text);
+    text_tags::find(text)
+        .into_iter()
+        .filter(|t| !hidden.iter().any(|&(a, b)| t.start < b && a < t.end))
+        .collect()
+}
+
+/// Where `text` holds characters taken as written, so no tag and no box:
+/// code, a code block, its fences included, and a link's destination, as
+/// (start, end) in bytes.
+pub fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
     fn hide(spans: &[Span], hidden: &mut Vec<(usize, usize)>) {
         for s in spans {
             if s.kind == SpanKind::Code {
@@ -547,12 +653,15 @@ pub fn tags(text: &str) -> Vec<FoundTag> {
     }
     let mut hidden = Vec::new();
     for block in parse(text) {
+        if let Some(code) = &block.code {
+            if block.line == code.first_line {
+                hidden.push((code.start, code.end));
+            }
+            continue;
+        }
         hide(&block.spans, &mut hidden);
     }
-    text_tags::find(text)
-        .into_iter()
-        .filter(|t| !hidden.iter().any(|&(a, b)| t.start < b && a < t.end))
-        .collect()
+    hidden
 }
 
 /// Whether a link to `url` may be opened: a web address, `http://` or
@@ -617,7 +726,8 @@ pub fn word_at(text: &str, offset: usize) -> (usize, usize) {
 /// a part of that kind, marks included, those parts lose their marks;
 /// otherwise every piece that does not gets them. Code gets more
 /// backticks than any run inside it, and a space inside when it starts
-/// or ends with one. The selection keeps what it selected.
+/// or ends with one. The selection keeps what it selected. The lines of
+/// a code block stay as they are.
 pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Change> {
     if !matches!(
         kind,
@@ -634,6 +744,9 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
         let Some(block) = blocks.get(line_at(text, s)) else {
             return Ok(unchanged(text, s, e));
         };
+        if block.code.is_some() {
+            return Ok(unchanged(text, s, e));
+        }
         if let Some(inside) = deepest(&block.spans, kind, &|span| {
             span.content_start <= s && s <= span.content_end
         }) {
@@ -654,7 +767,10 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
         }
         return Ok(apply(text, wrap(text, from, to, kind), s, e));
     }
-    let pieces = pieces(text, &blocks, s, e);
+    let pieces: Vec<_> = pieces(text, &blocks, s, e)
+        .into_iter()
+        .filter(|(block, _, _)| block.code.is_none())
+        .collect();
     if pieces.is_empty() {
         return Ok(unchanged(text, s, e));
     }
@@ -684,13 +800,17 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
 /// destination becomes `url`, and a blank `url` takes the link off.
 /// Without a word, the link is put at the cursor with `url` as its
 /// label, selected. Spaces and control characters in `url` are written
-/// %-encoded, `(`, `)` and `\` escaped.
+/// %-encoded, `(`, `)` and `\` escaped. A code block's lines stay as
+/// they are.
 pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
     let (s, e) = ordered(text, start, end);
     let blocks = parse(text);
     let Some(block) = blocks.get(line_at(text, s)) else {
         return unchanged(text, s, e);
     };
+    if block.code.is_some() {
+        return unchanged(text, s, e);
+    }
     let e = e.min(block.end);
     let address = trimmed_url(url);
     let destination = destination(address);
@@ -752,11 +872,12 @@ pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
 /// The old mark goes and the new one comes at the line's start, an item
 /// keeping how far in it is; numbered items count on from one of their
 /// level right above, or from 1. A cursor in a line's mark goes after
-/// the new one. A table's lines stay as they are, and
-/// [`BlockKind::Table`] changes nothing.
+/// the new one. A table's and a code block's lines stay as they are, and
+/// [`BlockKind::Table`] and [`BlockKind::Code`] change nothing;
+/// [`code_block`] makes one.
 pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Change {
     let (s, e) = ordered(text, start, end);
-    if kind == BlockKind::Table {
+    if matches!(kind, BlockKind::Table | BlockKind::Code) {
         return unchanged(text, s, e);
     }
     let bytes = text.as_bytes();
@@ -765,10 +886,10 @@ pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Cha
     let Some(lines) = blocks.get(first..=last) else {
         return unchanged(text, s, e);
     };
-    // A table's lines stay its own.
+    // A table's and a code block's lines stay their own.
     let lines: Vec<&Block> = lines
         .iter()
-        .filter(|b| b.kind != BlockKind::Table)
+        .filter(|b| !matches!(b.kind, BlockKind::Table | BlockKind::Code))
         .collect();
     let target = if kind != BlockKind::Paragraph && lines.iter().all(|b| b.kind == kind) {
         BlockKind::Paragraph
@@ -789,7 +910,7 @@ pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Cha
             ""
         };
         let prefix = match target {
-            BlockKind::Paragraph | BlockKind::Table => String::new(),
+            BlockKind::Paragraph | BlockKind::Table | BlockKind::Code => String::new(),
             BlockKind::Heading1 => "# ".into(),
             BlockKind::Heading2 => "## ".into(),
             BlockKind::Quote => "> ".into(),
@@ -846,16 +967,140 @@ pub fn indent(text: &str, start: usize, end: usize, out: bool) -> Change {
     apply(text, edits, s, e)
 }
 
+/// `text` with the lines the selection `start..end` touches put into a
+/// fenced code block, or, when they all are lines of one block, that
+/// block's fences taken off. A selection ending at a line's start leaves
+/// that line out; a code block or a table it touches goes in whole. The
+/// fences are backticks, more than any run of them inside and at least
+/// three, on lines of their own with the text's first kind of line
+/// break, `\n` when there is none. At an empty line the block is empty,
+/// the cursor in it. The selection keeps what it selected.
+pub fn code_block(text: &str, start: usize, end: usize) -> Change {
+    let (s, e) = ordered(text, start, end);
+    let blocks = parse(text);
+    let (first, last) = touched(text, &blocks, s, e);
+    let (Some(top), Some(bottom)) = (blocks.get(first), blocks.get(last)) else {
+        return unchanged(text, s, e);
+    };
+    if let (Some(code), Some(other)) = (&top.code, &bottom.code)
+        && Arc::ptr_eq(code, other)
+    {
+        return unfence(text, &blocks, code, s, e);
+    }
+    let first = top
+        .table
+        .as_ref()
+        .map(|t| t.first_line)
+        .or(top.code.as_ref().map(|c| c.first_line))
+        .unwrap_or(first);
+    let last = bottom
+        .table
+        .as_ref()
+        .map(|t| t.last_line)
+        .or(bottom.code.as_ref().map(|c| c.last_line))
+        .unwrap_or(last);
+    let (Some(top), Some(bottom)) = (blocks.get(first), blocks.get(last)) else {
+        return unchanged(text, s, e);
+    };
+    let (from, to) = (top.start, bottom.end);
+    let br = table::first_break(text);
+    let (mut longest, mut run) = (0, 0);
+    for c in slice(text, from, to).bytes() {
+        run = if c == b'`' { run + 1 } else { 0 };
+        longest = longest.max(run);
+    }
+    let fence = "`".repeat(if longest < 3 { 3 } else { longest + 1 });
+    if from == to {
+        let cursor = from + fence.len() + br.len();
+        return Change {
+            text: format!(
+                "{}{fence}{br}{br}{fence}{}",
+                slice(text, 0, from),
+                slice(text, from, text.len())
+            ),
+            start: cursor,
+            end: cursor,
+        };
+    }
+    let edits = vec![
+        Edit {
+            at: from,
+            remove: 0,
+            insert: format!("{fence}{br}"),
+            after: true,
+        },
+        Edit {
+            at: to,
+            remove: 0,
+            insert: format!("{br}{fence}"),
+            after: false,
+        },
+    ];
+    apply(text, edits, s, e)
+}
+
+/// `text` with the fences of `code` taken off, each with the line break
+/// between it and the content; a block without content goes whole.
+fn unfence(text: &str, blocks: &[Block], code: &CodeBlock, s: usize, e: usize) -> Change {
+    let last = if code.closed {
+        code.last_line.saturating_sub(1)
+    } else {
+        code.last_line
+    };
+    let content = blocks
+        .get(code.first_line + 1)
+        .zip(blocks.get(last))
+        .filter(|_| last > code.first_line)
+        .map(|(a, b)| (a.start, b.end));
+    let Some((content_start, content_end)) = content else {
+        let edit = Edit {
+            at: code.start,
+            remove: code.end - code.start,
+            insert: String::new(),
+            after: false,
+        };
+        return apply(text, vec![edit], s, e);
+    };
+    let mut edits = vec![Edit {
+        at: code.start,
+        remove: content_start - code.start,
+        insert: String::new(),
+        after: true,
+    }];
+    if code.end > content_end {
+        edits.push(Edit {
+            at: content_end,
+            remove: code.end - content_end,
+            insert: String::new(),
+            after: false,
+        });
+    }
+    apply(text, edits, s, e)
+}
+
 /// Whether a shortcut ends at the byte offset `cursor` of `text`: a
 /// line's mark with its space typed just before it, such as "# ", "- "
 /// or "1. ", or the closing mark of bold, italic, strike-through, code
-/// or a link. A plain text becomes formatted when one is typed.
+/// or a link, or a code block's closing fence. A plain text becomes
+/// formatted when one is typed.
 pub fn shortcut_at(text: &str, cursor: usize) -> bool {
     let at = floor(text, cursor);
     let blocks = parse(text);
     let Some(block) = blocks.get(line_at(text, at)) else {
         return false;
     };
+    if let Some(code) = &block.code {
+        if !code.closed || block.line != code.last_line {
+            return false;
+        }
+        let bytes = text.as_bytes();
+        let mark = code.fence.as_bytes().first().copied();
+        let mut end = skip_blank(bytes, block.start, block.end);
+        while end < block.end && bytes.get(end).copied() == mark {
+            end += 1;
+        }
+        return at == end;
+    }
     if block.kind != BlockKind::Paragraph
         && at == block.content_start
         && at > block.start
@@ -954,6 +1199,91 @@ fn skip_blank(bytes: &[u8], mut at: usize, end: usize) -> usize {
         at += 1;
     }
     at
+}
+
+/// The run of backticks or tildes a fence `start..end` is written with,
+/// and where it ends: up to three spaces, at least three of one of them;
+/// a run of backticks with no backtick after it. None when the line is
+/// no fence.
+fn fence_at(text: &str, start: usize, end: usize) -> Option<(&str, usize)> {
+    let bytes = text.as_bytes();
+    let mut at = start;
+    while at < end && at - start < 4 && bytes.get(at) == Some(&b' ') {
+        at += 1;
+    }
+    if at - start > 3 || at >= end {
+        return None;
+    }
+    let c = *bytes.get(at)?;
+    if c != b'`' && c != b'~' {
+        return None;
+    }
+    let mut to = at;
+    while to < end && bytes.get(to) == Some(&c) {
+        to += 1;
+    }
+    if to - at < 3 || (c == b'`' && slice(text, to, end).contains('`')) {
+        return None;
+    }
+    Some((slice(text, at, to), to))
+}
+
+/// The code block whose opening fence is the line `first` of `lines`:
+/// up to the first line that closes it, a fence of its character at
+/// least as long with only spaces and tabs after it, or to the last line.
+fn code_at(text: &str, lines: &[(usize, usize)], first: usize) -> Option<CodeBlock> {
+    let &(start, end) = lines.get(first)?;
+    let (fence, after) = fence_at(text, start, end)?;
+    let bytes = text.as_bytes();
+    let closes = |&(s, e): &(usize, usize)| {
+        fence_at(text, s, e).is_some_and(|(f, to)| {
+            f.as_bytes().first() == fence.as_bytes().first()
+                && f.len() >= fence.len()
+                && skip_blank(bytes, to, e) == e
+        })
+    };
+    let close = (first + 1..lines.len()).find(|&i| lines.get(i).is_some_and(closes));
+    let last = close.unwrap_or(lines.len().saturating_sub(1));
+    Some(CodeBlock {
+        start,
+        end: lines.get(last)?.1,
+        first_line: first,
+        last_line: last,
+        fence: fence.to_string(),
+        info: slice(text, after, end)
+            .trim_matches([' ', '\t'])
+            .to_string(),
+        closed: close.is_some(),
+    })
+}
+
+/// The blocks of the lines of `code`, each with the code block; a line of
+/// its content one part shown as written.
+fn code_blocks(text: &str, code: CodeBlock, lines: &[(usize, usize)]) -> Vec<Block> {
+    let code = Arc::new(code);
+    (code.first_line..=code.last_line)
+        .map(|i| {
+            let (start, end) = lines.get(i).copied().unwrap_or_default();
+            let spans = if code.is_fence(i) || start == end {
+                Vec::new()
+            } else {
+                vec![Span::literal(text, start, end)]
+            };
+            Block {
+                kind: BlockKind::Code,
+                line: i,
+                level: 0,
+                number: 0,
+                start,
+                end,
+                content_start: start,
+                spans,
+                table: None,
+                row: None,
+                code: Some(Arc::clone(&code)),
+            }
+        })
+        .collect()
 }
 
 /// A line's kind, level, the number written for a numbered item and
@@ -1786,5 +2116,262 @@ mod tests {
              </tbody></table>\n"
         );
         assert_eq!(html(""), "");
+    }
+
+    // ------------------------------------------------------ Code blocks
+
+    /// The kinds of the lines of `text`, `c` for a code block's.
+    fn kinds(text: &str) -> String {
+        parse(text)
+            .iter()
+            .map(|b| match b.kind {
+                BlockKind::Code => 'c',
+                kind => kind.name().chars().next().unwrap_or('?'),
+            })
+            .collect()
+    }
+
+    /// The content lines of the code blocks of `text`.
+    fn content(text: &str) -> Vec<&str> {
+        parse(text)
+            .iter()
+            .filter(|b| b.code.as_ref().is_some_and(|c| !c.is_fence(b.line)))
+            .map(|b| slice(text, b.start, b.end))
+            .collect()
+    }
+
+    fn code_of(text: &str, line: usize) -> Option<Arc<CodeBlock>> {
+        parse(text).get(line).and_then(|b| b.code.clone())
+    }
+
+    #[test]
+    fn a_fence_of_backticks_or_tildes_holds_lines_read_as_nothing() -> Result<()> {
+        let text = "```\n# no *heading*\n- ☐ `x` [a](b)\n```\nafter";
+        assert_eq!(kinds(text), "ccccp");
+        let blocks = parse(text);
+        let code = blocks[0]
+            .code
+            .clone()
+            .ok_or(Error::Invalid("no block".into()))?;
+        assert_eq!((code.first_line, code.last_line, code.closed), (0, 3, true));
+        assert_eq!(
+            (code.fence.as_str(), code.info.as_str(), code.language()),
+            ("```", "", "")
+        );
+        assert_eq!(
+            slice(text, code.start, code.end),
+            "```\n# no *heading*\n- ☐ `x` [a](b)\n```"
+        );
+        assert_eq!(tree(&blocks[1].spans), "\"# no *heading*\"");
+        assert_eq!(tree(&blocks[2].spans), "\"- ☐ `x` [a](b)\"");
+        assert!(blocks[0].spans.is_empty() && blocks[3].spans.is_empty());
+        assert!(blocks[4].code.is_none());
+        assert_eq!(kinds("~~~\n**x**\n~~~"), "ccc");
+        assert_eq!(
+            code_of("~~~~ x", 0).map(|c| c.fence.clone()).as_deref(),
+            Some("~~~~")
+        );
+        assert_eq!(kinds("``\nx\n``"), "ppp");
+        assert_eq!(kinds("``` a`b\nx"), "pp");
+        Ok(())
+    }
+
+    #[test]
+    fn the_closing_fence_is_of_the_same_character_and_at_least_as_long() {
+        let four = "````\n```\nx\n````\ny";
+        assert_eq!(kinds(four), "ccccp");
+        assert_eq!(content(four), ["```", "x"]);
+        assert_eq!(kinds("```\nx\n`````\ny"), "cccp");
+        assert_eq!(code_of("```\nx\n`````\ny", 0).map(|c| c.last_line), Some(2));
+        assert_eq!(content("~~~\n```\n~~~"), ["```"]);
+        assert_eq!(content("```\n~~~\n```"), ["~~~"]);
+        assert_eq!(kinds("```\n~~~\n```\n~~~"), "cccc");
+        assert_eq!(
+            code_of("```\n~~~\n```\n~~~", 3).map(|c| c.first_line),
+            Some(3)
+        );
+        let nested = "`````\n````\n```\nx\n```\n````\n`````\nz";
+        assert_eq!(kinds(nested), "cccccccp");
+        assert_eq!(content(nested), ["````", "```", "x", "```", "````"]);
+    }
+
+    #[test]
+    fn a_closing_fence_is_up_to_three_spaces_in_with_only_blanks_after() {
+        assert_eq!(kinds("```\nx\n   ```  \t\ny"), "cccp");
+        assert_eq!(kinds("```\nx\n    ```\ny"), "cccc");
+        assert_eq!(kinds("```\nx\n``` no\ny"), "cccc");
+        assert_eq!(kinds("   ```\nx\n```"), "ccc");
+        assert_eq!(kinds("    ```\nx\n```"), "ppc");
+        assert_eq!(kinds("\t```\nx"), "pp");
+    }
+
+    #[test]
+    fn an_unclosed_fence_runs_to_the_end_of_the_text() -> Result<()> {
+        let text = "a\n```js\nb\n| c | d |\n|---|---|\n# e";
+        assert_eq!(kinds(text), "pccccc");
+        let code = code_of(text, 1).ok_or(Error::Invalid("no block".into()))?;
+        assert_eq!(
+            (code.first_line, code.last_line, code.closed),
+            (1, 5, false)
+        );
+        assert!(!code.is_fence(5));
+        assert!(table::all(text).is_empty());
+        assert_eq!(plain(text), "a\nb\n| c | d |\n|---|---|\n# e");
+        assert_eq!(kinds("```"), "c");
+        assert_eq!(plain("```"), "");
+        assert_eq!(plain("```\n```"), "");
+        Ok(())
+    }
+
+    #[test]
+    fn the_info_string_is_kept_its_first_word_the_language() -> Result<()> {
+        let text = "```bash  -e  \necho hi\n```";
+        let code = code_of(text, 0).ok_or(Error::Invalid("no block".into()))?;
+        assert_eq!((code.info.as_str(), code.language()), ("bash  -e", "bash"));
+        assert_eq!(plain(text), "echo hi");
+        assert_eq!(
+            code_of("~~~ py `x`\n", 0)
+                .map(|c| c.language().to_string())
+                .as_deref(),
+            Some("py")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_table_a_tag_and_a_box_in_a_block_are_text() -> Result<()> {
+        let text = "#a\n```\n| x | y |\n|---|---|\n#b ☐ c\n```\n#c";
+        assert!(table::all(text).is_empty());
+        let found: Vec<String> = tags(text).into_iter().map(|t| t.tag).collect();
+        assert_eq!(found, ["#a", "#c"]);
+        assert!(tags("``` #x\ny").is_empty());
+        let mut n = 0;
+        let saved = crate::text_boxes::convert(
+            "☐ a\n```\n☐ b\n```",
+            crate::text_format::MARKDOWN,
+            || {
+                n += 1;
+                Ok(n.to_string())
+            },
+        )?;
+        assert_eq!(crate::text_boxes::find(&saved).len(), 1);
+        assert!(saved.contains("☐ b"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_fence_ends_a_table_and_a_table_may_follow_a_block() {
+        let text = "a | b\n-|-\nc\n```\nx\n```\nd | e\n-|-";
+        assert_eq!(kinds(text), "tttccctt");
+        assert_eq!(table::all(text).len(), 2);
+        assert_eq!(
+            table::insert("```\nx\n```\ny", 5).text,
+            "```\nx\n```\n\n|  |  |\n| --- | --- |\n|  |  |\n\ny"
+        );
+    }
+
+    #[test]
+    fn lines_of_any_line_break_are_lines_of_the_block() {
+        let text = "```\r\na\rb\r\n```\r\nc";
+        assert_eq!(kinds(text), "ccccp");
+        assert_eq!(plain(text), "a\rb\r\nc");
+    }
+
+    #[test]
+    fn html_of_a_block_is_a_pre_with_the_language_as_a_class() {
+        assert_eq!(
+            html("a\n```bash x\n<b> & \"q\"\n\n```\nb"),
+            "<p>a</p>\n<pre><code class=\"language-bash\">&lt;b&gt; &amp; &quot;q&quot;\n\n</code></pre>\n<p>b</p>\n"
+        );
+        assert_eq!(html("~~~\n"), "<pre><code>\n</code></pre>\n");
+        assert_eq!(html("```\nx"), "<pre><code>x\n</code></pre>\n");
+    }
+
+    #[test]
+    fn a_text_with_a_block_uses_a_format_an_escaped_one_has_no_block() {
+        assert!(uses("```\nx\n```"));
+        assert!(uses("~~~"));
+        for text in ["```\nx\n```", "~~~ sh\n# y\n~~~", "````"] {
+            let escaped = escape(text);
+            assert!(!uses(&escaped), "{escaped}");
+            assert_eq!(plain(&escaped), text);
+        }
+    }
+
+    #[test]
+    fn formats_and_line_formats_leave_a_block_as_it_is() -> Result<()> {
+        let text = "a\n```\nb c\n```";
+        assert_eq!(toggle(text, 7, 7, SpanKind::Bold)?, unchanged(text, 7, 7));
+        assert_eq!(
+            toggle(text, 0, text.len(), SpanKind::Italic)?.text,
+            "*a*\n```\nb c\n```"
+        );
+        assert_eq!(link(text, 6, 9, "https://x.org").text, text);
+        assert_eq!(
+            toggle_line(text, 0, text.len(), BlockKind::Quote).text,
+            "> a\n```\nb c\n```"
+        );
+        assert_eq!(
+            toggle_line(text, 0, 0, BlockKind::Code),
+            unchanged(text, 0, 0)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_closing_fence_typed_is_a_shortcut_an_opening_one_is_not() {
+        let text = "x\n```\na\n````";
+        let at: Vec<usize> = (0..=text.len()).filter(|&i| shortcut_at(text, i)).collect();
+        assert_eq!(at, [text.len()]);
+        assert!(!shortcut_at("```\na\n```", 3));
+    }
+
+    fn change(text: &str, start: usize, end: usize) -> Change {
+        Change {
+            text: text.into(),
+            start,
+            end,
+        }
+    }
+
+    #[test]
+    fn code_block_puts_the_lines_touched_into_a_fence() {
+        assert_eq!(
+            code_block("a\nb c\nd", 3, 4),
+            change("a\n```\nb c\n```\nd", 7, 8)
+        );
+        assert_eq!(
+            code_block("a\nb\nc", 0, 3),
+            change("```\na\nb\n```\nc", 4, 7)
+        );
+        assert_eq!(code_block("a\n\nb", 2, 2), change("a\n```\n\n```\nb", 6, 6));
+        assert_eq!(code_block("", 0, 0), change("```\n\n```", 4, 4));
+        assert_eq!(
+            code_block("x ```` y\r\nz", 0, 0).text,
+            "`````\r\nx ```` y\r\n`````\r\nz"
+        );
+        assert_eq!(
+            code_block("a\n```\nb\n```", 0, 3).text,
+            "````\na\n```\nb\n```\n````"
+        );
+        assert_eq!(
+            code_block("x | y\n-|-\nz", 0, 0).text,
+            "```\nx | y\n-|-\nz\n```"
+        );
+    }
+
+    #[test]
+    fn code_block_in_a_block_takes_its_fences_off() {
+        assert_eq!(
+            code_block("a\n```sh\nb\nc\n```\nd", 9, 9),
+            change("a\nb\nc\nd", 3, 3)
+        );
+        assert_eq!(code_block("```\nb", 5, 5), change("b", 1, 1));
+        assert_eq!(code_block("```\n```", 0, 0), change("", 0, 0));
+        assert_eq!(code_block("x\n```", 3, 3), change("x\n", 2, 2));
+        assert_eq!(
+            code_block("```\na\n```\nb", 4, 11).text,
+            "````\n```\na\n```\nb\n````"
+        );
     }
 }

@@ -183,6 +183,14 @@ void main() {
       expect(find.text('# not\n**kept**'), findsOneWidget);
     });
 
+    test('a compact card starts a text opening with a code block at its '
+        'first line', () {
+      const source = '```sh\n\n  echo hi\n```\nmore';
+      expect(NoteCard.firstLine(source), (0, 5));
+      final (start, end) = NoteCard.firstLine(source, formatted: true);
+      expect(source.substring(start, end), 'echo hi');
+    });
+
     testWidgets('a compact line keeps the size of the text', (tester) async {
       const source = '# Big title\nmore';
       final (start, end) = NoteCard.firstLine(source);
@@ -280,6 +288,43 @@ void main() {
       expect(tags, findsNWidgets(2));
       await tester.tap(key('tag-7'));
       expect(searched, ['#Garten']);
+    });
+
+    testWidgets('a code block shows its lines in monospace, read as '
+        'nothing, without its fences', (tester) async {
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes
+          .capture(
+            '#a\n```bash\n**x** #tag ☐\n# no\n```\nafter',
+            format: TextFormats.markdown,
+          )
+          .id;
+      final note = notes.byId(id)!;
+      expect(note.boxes, isEmpty);
+      await pump(
+        tester,
+        note.shownText,
+        boxes: note.boxes,
+        onSearch: (_, _) {},
+      );
+      expect(key('code-1'), findsOneWidget);
+      const content = '**x** #tag ☐\n# no';
+      expect(styleOf(tester, text, content)?.fontFamily, 'monospace');
+      final shown = shownUnder(tester, text);
+      expect(shown, endsWith('#a|$content|after'));
+      expect(shown, isNot(contains('`')));
+      expect(shown, isNot(contains('bash')));
+      final tags = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && '${w.key}'.contains("'tag-"),
+      );
+      expect(tags, findsOneWidget);
+
+      // A compact card shows its lines one by one.
+      await pump(tester, note.shownText, maxLines: 1);
+      expect(shownUnder(tester, text), '#a|**x** #tag ☐|# no|after');
+      expect(styleOf(tester, text, '# no')?.fontFamily, 'monospace');
     });
   });
 
@@ -487,6 +532,39 @@ void main() {
       await tester.pump();
       await press(tester, 'format-code');
       expect(controller.text, '1. *one two*\n- `three`');
+      semantics.dispose();
+    });
+
+    testWidgets('Code block puts the lines touched into a fence, drawn as '
+        'code, and takes it off again', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final controller = await pumpField(tester, text: 'a\nb\nc');
+      controller.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 3,
+      );
+      await tester.pump();
+      await press(tester, 'format-code-block');
+      expect(controller.text, '```\na\nb\n```\nc');
+      expect(controller.markdown, isTrue);
+      expect(
+        tester.getSemantics(key('format-code-block')),
+        isSemantics(
+          label: 'Code block',
+          isButton: true,
+          hasToggledState: true,
+          isToggled: true,
+        ),
+      );
+      final field = find.byType(EditableText);
+      expect(fieldStyleOf(tester, field, 'a')?.fontFamily, 'monospace');
+      expect(fieldStyleOf(tester, field, 'c')?.fontFamily, isNull);
+      // Its fences are marks with the line break after them, drawn as
+      // nothing on top.
+      expect(fieldStyleOf(tester, field, '```\n')?.color, Colors.transparent);
+      expect(fieldStyleOf(tester, field, '```\n')?.fontSize, 0.01);
+      await press(tester, 'format-code-block');
+      expect(controller.text, 'a\nb\nc');
       semantics.dispose();
     });
 

@@ -4,7 +4,9 @@
 //! text edits its Markdown, and the format bar, Ctrl+B, a shortcut typed
 //! and a paste with a format make a plain text a formatted one, kept at
 //! once. "Add to Note" has the format bar too, without ☐, and the text
-//! fields have names a screen reader says once they hold text.
+//! fields have names a screen reader says once they hold text. A code
+//! block (#212) reads as written, without its fences, and the format
+//! bar's "Code block" puts one in and takes it off.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -241,6 +243,51 @@ fn the_format_bar_makes_a_plain_text_formatted_at_once() -> TestResult {
     // The line's format too, on the formatted text.
     format(&mut harness, "Bulleted list")?;
     assert!(field(&harness, "- **buy** milk"));
+    Ok(())
+}
+
+#[test]
+fn a_code_block_reads_as_written_without_its_fences() -> TestResult {
+    let (store, note) = with_note("#a\n```bash\n**x** #tag\n# no\n```\nafter", MARKDOWN)?;
+    let harness = editor(&store, &note);
+    // Its lines in one label, as written; its fences nowhere.
+    assert!(shows(&harness, "**x** #tag\n# no"));
+    assert!(shows(&harness, "after"));
+    for source in ["```bash", "```", "bash"] {
+        assert!(!shows(&harness, source), "{source}");
+    }
+    // A compact card shows its lines one by one.
+    let mut harness = window(&store, Selection::All, None);
+    click(&mut harness, L10n::new("en").show_notes_compact())?;
+    assert!(shows(&harness, "**x** #tag"));
+    assert!(!shows(&harness, "```bash"));
+    Ok(())
+}
+
+#[test]
+fn a_compact_card_of_a_text_opening_with_a_code_block_starts_at_its_first_line() -> TestResult {
+    let (store, _) = with_note("```sh\n\n  echo hi\n```\nmore", MARKDOWN)?;
+    let mut harness = window(&store, Selection::All, None);
+    click(&mut harness, L10n::new("en").show_notes_compact())?;
+    // As written, its spaces at the start kept.
+    assert!(shows(&harness, "  echo hi"));
+    assert!(shows(&harness, "more"));
+    Ok(())
+}
+
+#[test]
+fn the_format_bar_puts_lines_into_a_code_block_and_takes_it_off() -> TestResult {
+    let (store, note) = with_note("echo hi", "plain")?;
+    let mut harness = editor(&store, &note);
+    format(&mut harness, "Code block")?;
+    assert_eq!(
+        stored(&store, &note)?,
+        ("```\necho hi\n```".into(), MARKDOWN.into())
+    );
+    assert!(field(&harness, "```\necho hi\n```"));
+    // In the block it takes the fences off again.
+    format(&mut harness, "Code block")?;
+    assert!(field(&harness, "echo hi"));
     Ok(())
 }
 

@@ -82,7 +82,7 @@ _Avoid_: Paket (ein Paket bringt Kopien von Old-Brain-Fix-Notizen), Einfügen, B
 ## Text
 
 **Formatierter Text** [Formatted text]:
-Der Text einer Notiz oder eines Abschnitts, als Markdown in der eigenen Auswahl der App gespeichert: fett, kursiv, durchgestrichen, zwei Überschriftenebenen, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate, Links, Code im Text und Tabellen. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, über die Formatleiste, durch getipptes Markdown oder durch Einfügen eines Texts, der ein Format verwendet, und bleibt von da an formatiert. Transkripte und Fototexte bleiben unformatiert.
+Der Text einer Notiz oder eines Abschnitts, als Markdown in der eigenen Auswahl der App gespeichert: fett, kursiv, durchgestrichen, zwei Überschriftenebenen, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate, Links, Code im Text, Codeblöcke und Tabellen. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, über die Formatleiste, durch getipptes Markdown oder durch Einfügen eines Texts, der ein Format verwendet, und bleibt von da an formatiert. Transkripte und Fototexte bleiben unformatiert.
 _Avoid_: Rich Text, gestalteter Text
 
 **Formatleiste** [Format bar]:
@@ -94,7 +94,7 @@ Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle 
 _Avoid_: Tabellenkalkulation, Raster
 
 **Statuskästchen** [Box]:
-Ein ☐ (offen), ✅ (erledigt) oder ❌ (gescheitert) irgendwo im Text einer Notiz oder eines Abschnitts, auch mitten in einem Wort und in einer Zelle einer Tabelle, aber nicht in Code im Text; es wird beim Speichern des Textes zu einem Statuskästchen mit einer eigenen Kennung, die unsichtbar im Text steht, und das Zeichen, mit dem es geschrieben wurde, ist der Zustand, mit dem es beginnt. Ein Tippen oder Klicken darauf bietet die beiden anderen Zustände an. Jede Änderung seines Zustands wird neben dem Text gespeichert, die neueste gilt, darum lassen sich auch die Statuskästchen eines Abschnitts ändern, während sein Text bleibt, wie er ist, und in einem geteilten Bereich ändert jeder mit einer Rolle dort jedes Statuskästchen, während das Hinzufügen, Verschieben und Löschen von Statuskästchen eine Änderung des Textes bleibt. Kopien, Weitergaben und gesendete Notizen zeigen jedes Statuskästchen in seinem jetzigen Zustand. Transkripte und Fototexte enthalten keine Statuskästchen.
+Ein ☐ (offen), ✅ (erledigt) oder ❌ (gescheitert) irgendwo im Text einer Notiz oder eines Abschnitts, auch mitten in einem Wort und in einer Zelle einer Tabelle, aber nicht in Code im Text oder in einem Codeblock; es wird beim Speichern des Textes zu einem Statuskästchen mit einer eigenen Kennung, die unsichtbar im Text steht, und das Zeichen, mit dem es geschrieben wurde, ist der Zustand, mit dem es beginnt. Ein Tippen oder Klicken darauf bietet die beiden anderen Zustände an. Jede Änderung seines Zustands wird neben dem Text gespeichert, die neueste gilt, darum lassen sich auch die Statuskästchen eines Abschnitts ändern, während sein Text bleibt, wie er ist, und in einem geteilten Bereich ändert jeder mit einer Rolle dort jedes Statuskästchen, während das Hinzufügen, Verschieben und Löschen von Statuskästchen eine Änderung des Textes bleibt. Kopien, Weitergaben und gesendete Notizen zeigen jedes Statuskästchen in seinem jetzigen Zustand. Transkripte und Fototexte enthalten keine Statuskästchen.
 _Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
 
 **#Wort** [Tag]:

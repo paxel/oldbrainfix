@@ -44,7 +44,7 @@ use egui::{
     TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
-use oldbrainfix_core::markdown::{self, Block, BlockKind, Span, SpanKind};
+use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format, text_tags};
 
@@ -265,8 +265,10 @@ pub fn marked_label(
 /// Draws the bytes `shown` of the source `text`, in `format`, its boxes
 /// as `boxes` says, as [`marked_label`] draws them: a formatted text as
 /// it reads, line by line, a table as a grid (a row's cells one after
-/// another while cut off), a plain one as it is written. Gives where its
-/// boxes, tags, links and tables lie.
+/// another while cut off), a code block as its lines in the fixed-width
+/// font on the background of code (its lines without the fences while
+/// cut off), a plain one as it is written. Gives where its boxes, tags,
+/// links and tables lie.
 pub fn formatted_label(
     ui: &mut Ui,
     (text, format, boxes): (&str, &str, &BoxLook),
@@ -289,6 +291,16 @@ pub fn formatted_label(
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         for block in blocks.get(first..=last).unwrap_or_default() {
+            if let Some(code) = &block.code {
+                if !truncate {
+                    if block.line == code.first_line.max(first) {
+                        code_label(ui, text, (&blocks, code), (first, last), &look);
+                    }
+                } else if !code.is_fence(block.line) {
+                    spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+                }
+                continue;
+            }
             match &block.table {
                 // A table is drawn once, at its first line shown; cut
                 // off, each line as its row reads.
@@ -302,6 +314,37 @@ pub fn formatted_label(
         }
     });
     spots
+}
+
+/// Draws the lines of `code`, among `blocks` of `text`, from the line
+/// `first` to `last` as written, in the fixed-width font on the
+/// background of code: nothing in them is a format, a tag or a box.
+fn code_label(
+    ui: &mut Ui,
+    text: &str,
+    (blocks, code): (&[Block], &CodeBlock),
+    (first, last): (usize, usize),
+    look: &Look,
+) {
+    let lines: Vec<String> = (code.first_line.max(first)..=code.last_line.min(last))
+        .filter(|&l| !code.is_fence(l))
+        .filter_map(|l| blocks.get(l))
+        .map(|b| text_boxes::strip(text.get(b.start..b.end).unwrap_or_default()))
+        .collect();
+    // Only its closing fence shown: nothing to draw.
+    if lines.is_empty() && code.first_line < first {
+        return;
+    }
+    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let job = LayoutJob::single_section(lines.join("\n"), format);
+    egui::Frame::NONE
+        .fill(look.code)
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(8, 6))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(egui::Label::new(job).wrap());
+        });
 }
 
 /// How a formatted text is drawn: its font, its colour, the accent for
@@ -650,6 +693,11 @@ fn block_label(
                     add_spans(&mut line, text, &cell.spans, style, (found, &look));
                 }
             }
+        }
+        // A line of a code block as written, in the fixed-width font.
+        None if block.kind == BlockKind::Code => {
+            let shown = text_boxes::strip(text.get(block.start..block.end).unwrap_or_default());
+            line.push(&shown, part_format(&look, style, true), false);
         }
         None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
     }
@@ -1031,13 +1079,15 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
 /// The source `text` of a formatted text laid out for its edit field in
 /// `font` and `colour`: every character where it is, its marks in `dim`
 /// and its tags in `accent`, unwrapped. A table's pipes, its delimiter
-/// row and the line marking its first column as headings are marks.
+/// row and the line marking its first column as headings are marks; so
+/// are a code block's fences, its lines in the fixed-width font on the
+/// background `code`.
 pub fn source_job(
     text: &str,
     font: FontId,
-    (colour, accent, dim): (Color32, Color32, Color32),
+    (colour, accent, dim, code): (Color32, Color32, Color32, Color32),
 ) -> LayoutJob {
-    // What each byte is: 0 words, 1 a mark, 2 a tag.
+    // What each byte is: 0 words, 1 a mark, 2 a tag, 3 code.
     let mut kind = vec![0u8; text.len()];
     let mut mark = |a: usize, b: usize, k: u8| {
         for slot in kind.get_mut(a..b).unwrap_or_default() {
@@ -1063,7 +1113,16 @@ pub fn source_job(
     // A line's mark, or a table's line whole; then its cells' words
     // again; then the marks of its words.
     let (mut lines, mut cells, mut inline) = (Vec::new(), Vec::new(), Vec::new());
+    let mut code_lines = Vec::new();
     for block in markdown::parse(text) {
+        if let Some(c) = &block.code {
+            if c.is_fence(block.line) {
+                lines.push((block.start, block.end));
+            } else {
+                code_lines.push((block.start, block.end));
+            }
+            continue;
+        }
         match (&block.table, block.row) {
             (Some(table), row) => {
                 lines.push((block.start, block.end));
@@ -1086,16 +1145,21 @@ pub fn source_job(
     for (a, b) in inline {
         mark(a, b, 1);
     }
+    for (a, b) in code_lines {
+        mark(a, b, 3);
+    }
     for tag in markdown::tags(text) {
         mark(tag.start, tag.end, 2);
     }
-    let format = |k: u8| {
-        let c = match k {
-            1 => dim,
-            2 => accent,
-            _ => colour,
-        };
-        TextFormat::simple(font.clone(), c)
+    let format = |k: u8| match k {
+        1 => TextFormat::simple(font.clone(), dim),
+        2 => TextFormat::simple(font.clone(), accent),
+        3 => {
+            let mut format = TextFormat::simple(FontId::monospace(font.size * 0.9), colour);
+            format.background = code;
+            format
+        }
+        _ => TextFormat::simple(font.clone(), colour),
     };
     let mut job = LayoutJob::default();
     let mut run = 0;

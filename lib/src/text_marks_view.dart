@@ -596,6 +596,17 @@ class TagTextController extends TextEditingController {
               from = math.max(from, cell.end);
             }
           }
+        case MarkdownBlockKind.code:
+          // A code block's lines are code, its fences marks with the line
+          // break after them, so a fence drawn as nothing takes no row.
+          if (block.code?.isFence(block.line) ?? false) {
+            var end = block.end;
+            if (end < text.length && text[end] == '\r') end++;
+            if (end < text.length && text[end] == '\n') end++;
+            set(block.start, end, _mark);
+          } else {
+            set(block.start, block.end, _code);
+          }
         case MarkdownBlockKind.paragraph:
           break;
       }
@@ -946,7 +957,9 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   }
 
   /// Each line of a formatted text in [start] to [end], one under the
-  /// other; a table once, as a grid.
+  /// other; a table once, as a grid, and a code block once, as its lines
+  /// in monospace on a grey ground. A compact card shows a code block's
+  /// lines one by one, without its fences.
   Widget _formatted(BuildContext context) {
     final found = _foundIn;
     final text = found.shown;
@@ -957,10 +970,20 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final base = DefaultTextStyle.of(context).style.merge(widget.style);
     final compact = widget.maxLines != null;
     final lines = <Widget>[];
+    MarkdownCodeBlock? drawn;
     for (final block in found.blocks) {
       if (block.end < from || block.start > to) continue;
       final table = block.table;
-      if (table == null) {
+      if (block.code case final code?) {
+        if (compact) {
+          if (!code.isFence(block.line)) {
+            lines.add(_line(context, block, base, boxes, tags));
+          }
+        } else if (!identical(code, drawn)) {
+          drawn = code;
+          lines.add(_codeBlock(context, code, base, from, to));
+        }
+      } else if (table == null) {
         lines.add(_line(context, block, base, boxes, tags));
       } else if (compact) {
         // Its comment line reads as nothing: the header row stands in.
@@ -1001,6 +1024,10 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         fontSize: grows ? size * 1.25 : null,
       ),
       MarkdownBlockKind.quote => base.copyWith(color: scheme.onSurfaceVariant),
+      MarkdownBlockKind.code => base.copyWith(
+        fontFamily: 'monospace',
+        backgroundColor: scheme.surfaceContainerHighest,
+      ),
       _ => base,
     };
     final spans = <InlineSpan>[];
@@ -1014,7 +1041,9 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       overflow: widget.overflow,
     );
     return switch (block.kind) {
-      MarkdownBlockKind.paragraph || MarkdownBlockKind.table => words,
+      MarkdownBlockKind.paragraph ||
+      MarkdownBlockKind.table ||
+      MarkdownBlockKind.code => words,
       MarkdownBlockKind.heading1 ||
       MarkdownBlockKind.heading2 => Semantics(header: true, child: words),
       MarkdownBlockKind.bullet => _item(
@@ -1041,6 +1070,35 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         ),
       ),
     };
+  }
+
+  /// The lines of [code] in [from] to [to] as written, in monospace on a
+  /// grey ground: nothing in them is a format, a tag or a box.
+  Widget _codeBlock(
+    BuildContext context,
+    MarkdownCodeBlock code,
+    TextStyle base,
+    int from,
+    int to,
+  ) {
+    final found = _foundIn;
+    final text = found.shown;
+    final content = [
+      for (var l = code.firstLine; l <= code.lastLine; l++)
+        if (found.blocks[l] case final b
+            when !code.isFence(l) && b.end >= from && b.start <= to)
+          text.substring(b.start, b.end),
+    ].join('\n');
+    return Container(
+      key: ValueKey('code-${code.firstLine}'),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(content, style: base.copyWith(fontFamily: 'monospace')),
+    );
   }
 
   /// A row of a table on one line: the cells that show something, a

@@ -1232,6 +1232,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         ),
         if (widget.lineFormats) ...[
           _Format(
+            key: 'format-code-block',
+            label: t.formatCodeBlock,
+            icon: (_) => const Icon(Icons.data_object),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.code,
+            run: () => _format(Markdown.codeBlock),
+          ),
+          _Format(
             key: 'format-indent',
             label: t.formatIndent,
             icon: (_) => const Icon(Icons.format_indent_increase),

@@ -87,7 +87,7 @@ void main() {
       for (final text in [
         '### Three',
         '#NoSpace',
-        '```',
+        '``',
         '| a | b |',
         '![photo](u)',
         '<https://x.org>',
@@ -973,6 +973,242 @@ void main() {
       expect(
         Markdown.html(Markdown.escape(text)),
         '<p># not a heading<br>- *no* list | 1. x</p>\n',
+      );
+    });
+  });
+
+  group('code blocks', () {
+    /// The kinds of the lines of [text], `c` for a code block's.
+    String kinds(String text) => [
+      for (final b in Markdown.parse(text))
+        b.kind == MarkdownBlockKind.code ? 'c' : b.kind.name[0],
+    ].join();
+
+    /// The content lines of the code block at the top of [text].
+    List<String> content(String text) => [
+      for (final b in Markdown.parse(text))
+        if (b.code case final code? when !code.isFence(b.line))
+          text.substring(b.start, b.end),
+    ];
+
+    test('a fence of backticks or tildes holds lines read as nothing', () {
+      const text = '```\n# no *heading*\n- ☐ `x` [a](b)\n```\nafter';
+      expect(kinds(text), 'ccccp');
+      final blocks = Markdown.parse(text);
+      final code = blocks.first.code!;
+      expect((code.firstLine, code.lastLine, code.closed), (0, 3, true));
+      expect((code.fence, code.info, code.language), ('```', '', ''));
+      expect(
+        text.substring(code.start, code.end),
+        '```\n# no *heading*\n'
+        '- ☐ `x` [a](b)\n```',
+      );
+      expect(_tree(blocks[1].spans), '"# no *heading*"');
+      expect(_tree(blocks[2].spans), '"- ☐ `x` [a](b)"');
+      expect(blocks.first.spans, isEmpty);
+      expect(blocks[3].spans, isEmpty);
+      expect(blocks.last.code, isNull);
+      expect(kinds('~~~\n**x**\n~~~'), 'ccc');
+      expect(Markdown.parse('~~~~ x').single.code?.fence, '~~~~');
+      expect(kinds('``\nx\n``'), 'ppp');
+      expect(kinds('``` a`b\nx'), 'pp');
+    });
+
+    test('the closing fence is of the same character and at least as long', () {
+      // Opened with four backticks, three are content.
+      const four = '````\n```\nx\n````\ny';
+      expect(kinds(four), 'ccccp');
+      expect(content(four), ['```', 'x']);
+      // A longer one closes too.
+      expect(kinds('```\nx\n`````\ny'), 'cccp');
+      expect(Markdown.parse('```\nx\n`````\ny').first.code?.lastLine, 2);
+      // Tildes do not close backticks, nor backticks tildes.
+      expect(content('~~~\n```\n~~~'), ['```']);
+      expect(content('```\n~~~\n```'), ['~~~']);
+      expect(kinds('```\n~~~\n```\n~~~'), 'cccc');
+      expect(Markdown.parse('```\n~~~\n```\n~~~')[3].code?.firstLine, 3);
+      // Nested: the inner fences are lines of the outer block.
+      const nested = '`````\n````\n```\nx\n```\n````\n`````\nz';
+      expect(kinds(nested), 'cccccccp');
+      expect(content(nested), ['````', '```', 'x', '```', '````']);
+    });
+
+    test('a closing fence is up to three spaces in with only blanks after', () {
+      expect(kinds('```\nx\n   ```  \t\ny'), 'cccp');
+      expect(kinds('```\nx\n    ```\ny'), 'cccc');
+      expect(kinds('```\nx\n``` no\ny'), 'cccc');
+      expect(kinds('   ```\nx\n```'), 'ccc');
+      expect(kinds('    ```\nx\n```'), 'ppc');
+      expect(kinds('\t```\nx'), 'pp');
+    });
+
+    test('an unclosed fence runs to the end of the text', () {
+      const text = 'a\n```js\nb\n| c | d |\n|---|---|\n# e';
+      expect(kinds(text), 'pccccc');
+      final code = Markdown.parse(text)[1].code!;
+      expect((code.firstLine, code.lastLine, code.closed), (1, 5, false));
+      expect(code.isFence(5), isFalse);
+      expect(MarkdownTables.all(text), isEmpty);
+      expect(Markdown.plain(text), 'a\nb\n| c | d |\n|---|---|\n# e');
+      expect(kinds('```'), 'c');
+      expect(Markdown.plain('```'), '');
+      expect(Markdown.plain('```\n```'), '');
+    });
+
+    test('the info string is kept, its first word the language', () {
+      const text = '```bash  -e  \necho hi\n```';
+      final code = Markdown.parse(text).first.code!;
+      expect((code.info, code.language), ('bash  -e', 'bash'));
+      expect(Markdown.plain(text), 'echo hi');
+      expect(Markdown.parse('~~~ py `x`\n').first.code?.language, 'py');
+    });
+
+    test('a table, a #tag and a box in a block are text', () {
+      const text = '#a\n```\n| x | y |\n|---|---|\n#b ☐ c\n```\n#c';
+      expect(MarkdownTables.all(text), isEmpty);
+      expect([for (final t in Markdown.tags(text)) t.tag], ['#a', '#c']);
+      expect([for (final t in Markdown.tags('``` #x\ny')) t.tag], isEmpty);
+      var n = 0;
+      final saved = TextBoxes.convert(
+        '☐ a\n```\n☐ b\n```',
+        format: TextFormats.markdown,
+        newId: () => '${n++}',
+      );
+      expect(TextBoxes.find(saved), hasLength(1));
+      expect(saved.indexOf('☐ b'), greaterThan(0));
+    });
+
+    test('a fence ends a table and a table may follow a block', () {
+      const text = 'a | b\n-|-\nc\n```\nx\n```\nd | e\n-|-';
+      expect(kinds(text), 'tttccctt');
+      expect(MarkdownTables.all(text), hasLength(2));
+    });
+
+    test('a new table goes after the block the cursor is in', () {
+      final change = MarkdownTables.insert('```\nx\n```\ny', 5);
+      expect(
+        change.text,
+        '```\nx\n```\n\n|  |  |\n| --- | --- |\n|  |  |\n\ny',
+      );
+    });
+
+    test('lines of any line break are lines of the block', () {
+      const text = '```\r\na\rb\r\n```\r\nc';
+      expect(kinds(text), 'ccccp');
+      expect(Markdown.plain(text), 'a\rb\r\nc');
+    });
+
+    test('html is a pre with the language as a class', () {
+      expect(
+        Markdown.html('a\n```bash x\n<b> & "q"\n\n```\nb'),
+        '<p>a</p>\n<pre><code class="language-bash">&lt;b&gt; &amp; '
+        '&quot;q&quot;\n\n</code></pre>\n<p>b</p>\n',
+      );
+      expect(Markdown.html('~~~\n'), '<pre><code>\n</code></pre>\n');
+      expect(Markdown.html('```\nx'), '<pre><code>x\n</code></pre>\n');
+    });
+
+    test('a text with a block uses a format; an escaped one has no block', () {
+      expect(Markdown.uses('```\nx\n```'), isTrue);
+      expect(Markdown.uses('~~~'), isTrue);
+      for (final text in ['```\nx\n```', '~~~ sh\n# y\n~~~', '````']) {
+        final escaped = Markdown.escape(text);
+        expect(Markdown.uses(escaped), isFalse, reason: escaped);
+        expect(Markdown.plain(escaped), text);
+      }
+    });
+
+    test('formats and line formats leave a block as it is', () {
+      const text = 'a\n```\nb c\n```';
+      expect(Markdown.toggle(text, 7, 7, MarkdownSpanKind.bold), (
+        text: text,
+        start: 7,
+        end: 7,
+      ));
+      expect(
+        Markdown.toggle(text, 0, text.length, MarkdownSpanKind.italic).text,
+        '*a*\n```\nb c\n```',
+      );
+      expect(Markdown.link(text, 6, 9, 'https://x.org').text, text);
+      expect(
+        Markdown.toggleLine(text, 0, text.length, MarkdownBlockKind.quote).text,
+        '> a\n```\nb c\n```',
+      );
+      expect(Markdown.toggleLine(text, 0, 0, MarkdownBlockKind.code), (
+        text: text,
+        start: 0,
+        end: 0,
+      ));
+    });
+
+    test('a closing fence typed is a shortcut, an opening one is not', () {
+      const text = 'x\n```\na\n````';
+      final at = [
+        for (var i = 0; i <= text.length; i++)
+          if (Markdown.shortcutAt(text, i)) i,
+      ];
+      expect(at, [text.length]);
+      expect(Markdown.shortcutAt('```\na\n```', 3), isFalse);
+    });
+
+    test('Code block puts the lines touched into a fence', () {
+      expect(Markdown.codeBlock('a\nb c\nd', 3, 4), (
+        text: 'a\n```\nb c\n```\nd',
+        start: 7,
+        end: 8,
+      ));
+      expect(Markdown.codeBlock('a\nb\nc', 0, 3), (
+        text: '```\na\nb\n```\nc',
+        start: 4,
+        end: 7,
+      ));
+      // At an empty line, a cursor goes into an empty block.
+      expect(Markdown.codeBlock('a\n\nb', 2, 2), (
+        text: 'a\n```\n\n```\nb',
+        start: 6,
+        end: 6,
+      ));
+      expect(Markdown.codeBlock('', 0, 0), (
+        text: '```\n\n```',
+        start: 4,
+        end: 4,
+      ));
+      // Longer than any run of backticks inside, the text's line breaks.
+      expect(
+        Markdown.codeBlock('x ```` y\r\nz', 0, 0).text,
+        '`````\r\nx ```` y\r\n`````\r\nz',
+      );
+      // A block or a table touched is taken whole.
+      expect(
+        Markdown.codeBlock('a\n```\nb\n```', 0, 3).text,
+        '````\na\n```\nb\n```\n````',
+      );
+      expect(
+        Markdown.codeBlock('x | y\n-|-\nz', 0, 0).text,
+        '```\nx | y\n-|-\nz\n```',
+      );
+    });
+
+    test('Code block in a block takes its fences off', () {
+      expect(Markdown.codeBlock('a\n```sh\nb\nc\n```\nd', 9, 9), (
+        text: 'a\nb\nc\nd',
+        start: 3,
+        end: 3,
+      ));
+      expect(Markdown.codeBlock('```\nb', 5, 5), (text: 'b', start: 1, end: 1));
+      expect(Markdown.codeBlock('```\n```', 0, 0), (
+        text: '',
+        start: 0,
+        end: 0,
+      ));
+      expect(Markdown.codeBlock('x\n```', 3, 3), (
+        text: 'x\n',
+        start: 2,
+        end: 2,
+      ));
+      expect(
+        Markdown.codeBlock('```\na\n```\nb', 4, 11).text,
+        '````\n```\na\n```\nb\n````',
       );
     });
   });

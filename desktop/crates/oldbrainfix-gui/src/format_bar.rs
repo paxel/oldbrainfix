@@ -1,7 +1,8 @@
 //! The format bar of the desktop's Note editor (#127, ADR 0033), with the
 //! phone's buttons: ☐ at the cursor (ADR 0035), bold, italic,
 //! strike-through, the two headings, bulleted and numbered items, a
-//! quote, a link, code, an item one level in and out, and a table (#128),
+//! quote, a link, code, a code block (#212), an item one level in and
+//! out, and a table (#128),
 //! which the window puts in or opens. The Amend field has the bar too,
 //! without ☐, as the phone's "Add to Note". Each works on the selection of the
 //! edit field, or on the word at its cursor, with the core's helpers; a
@@ -34,6 +35,7 @@ pub enum Format {
     Quote,
     Link,
     Code,
+    CodeBlock,
     Indent,
     Outdent,
     Table,
@@ -41,7 +43,7 @@ pub enum Format {
 
 impl Format {
     /// The buttons in the phone's order.
-    pub const ALL: [Format; 14] = [
+    pub const ALL: [Format; 15] = [
         Format::Mark,
         Format::Bold,
         Format::Italic,
@@ -53,6 +55,7 @@ impl Format {
         Format::Quote,
         Format::Link,
         Format::Code,
+        Format::CodeBlock,
         Format::Indent,
         Format::Outdent,
         Format::Table,
@@ -61,7 +64,7 @@ impl Format {
     /// The buttons of the quick note's bar, where it is switched on
     /// (#142): those that change the text in place, without ☐, a link or
     /// a table, which ask for more than the capture holds.
-    pub const CAPTURE: [Format; 11] = [
+    pub const CAPTURE: [Format; 12] = [
         Format::Bold,
         Format::Italic,
         Format::Strike,
@@ -71,6 +74,7 @@ impl Format {
         Format::Numbers,
         Format::Quote,
         Format::Code,
+        Format::CodeBlock,
         Format::Indent,
         Format::Outdent,
     ];
@@ -89,6 +93,7 @@ impl Format {
             Format::Quote => t.format_quote(),
             Format::Link => t.format_link(),
             Format::Code => t.format_code(),
+            Format::CodeBlock => t.format_code_block(),
             Format::Indent => t.format_indent(),
             Format::Outdent => t.format_outdent(),
             Format::Table => t.format_table(),
@@ -109,6 +114,7 @@ impl Format {
             Format::Quote => Ok(icons::FORMAT_QUOTE),
             Format::Link => Ok(icons::LINK),
             Format::Code => Ok(icons::CODE),
+            Format::CodeBlock => Ok(icons::CODE_BLOCK),
             Format::Indent => Ok(icons::INDENT),
             Format::Outdent => Ok(icons::OUTDENT),
             Format::Table => Ok(icons::TABLE),
@@ -183,6 +189,9 @@ impl At {
         if format == Format::Table {
             return self.line == Some(BlockKind::Table);
         }
+        if format == Format::CodeBlock {
+            return self.line == Some(BlockKind::Code);
+        }
         if let Some(kind) = format.block() {
             return self.line == Some(kind);
         }
@@ -204,6 +213,7 @@ pub fn change(format: Format, text: &str, (start, end): (usize, usize)) -> Optio
     match format {
         Format::Indent => Some(markdown::indent(text, start, end, false)),
         Format::Outdent => Some(markdown::indent(text, start, end, true)),
+        Format::CodeBlock => Some(markdown::code_block(text, start, end)),
         Format::Mark => {
             let at = start.min(end);
             if !text.is_char_boundary(at) {

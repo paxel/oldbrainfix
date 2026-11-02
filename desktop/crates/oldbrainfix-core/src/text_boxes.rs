@@ -21,7 +21,7 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::error::Result;
-use crate::markdown::{self, Span, SpanKind};
+use crate::markdown;
 use crate::text_format;
 
 /// The state a box shows, and the character it is written as.
@@ -317,9 +317,9 @@ pub fn baked(text: &str, ticks: &BTreeMap<String, BoxTick>) -> String {
 /// `text` in `format` as it is saved: every bare ☐, ✅ or ❌, one not
 /// part of another emoji, becomes a box with a new id, and a box whose
 /// id came up before in the text gets a new one. In a formatted text a
-/// glyph in inline code or in a link's address stays as it is. Each id
-/// is drawn from `new_id`, the store's maker of entity ids, again while
-/// it is in the text already.
+/// glyph in inline code, in a code block or in a link's address stays as
+/// it is. Each id is drawn from `new_id`, the store's maker of entity
+/// ids, again while it is in the text already.
 pub fn convert(
     text: &str,
     format: &str,
@@ -335,7 +335,7 @@ pub fn convert(
         .filter_map(|b| b.id.clone())
         .collect();
     let skipped = if format == text_format::MARKDOWN {
-        literal_ranges(text)
+        markdown::literal_ranges(text)
     } else {
         Vec::new()
     };
@@ -371,28 +371,6 @@ fn drawn(new_id: &mut impl FnMut() -> Result<String>) -> Result<String> {
         .take(ID_LENGTH)
         .map(|b| char::from(alphabet[usize::from(*b) % alphabet.len()]))
         .collect())
-}
-
-/// Where a glyph of the formatted text `text` is no box: inline code and
-/// links' addresses, as (start, end).
-fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
-    fn walk(spans: &[Span], ranges: &mut Vec<(usize, usize)>) {
-        for s in spans {
-            match s.kind {
-                SpanKind::Code => ranges.push((s.start, s.end)),
-                SpanKind::Link => {
-                    ranges.push((s.content_end, s.end));
-                    walk(&s.children, ranges);
-                }
-                _ => walk(&s.children, ranges),
-            }
-        }
-    }
-    let mut ranges = Vec::new();
-    for block in markdown::parse(text) {
-        walk(&block.spans, &mut ranges);
-    }
-    ranges
 }
 
 #[cfg(test)]

@@ -4529,6 +4529,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get formatCode => 'Code';
 
   @override
+  String get formatCodeBlock => 'Codeblock';
+
+  @override
   String get formatIndent => 'Listenpunkt einrücken';
 
   @override

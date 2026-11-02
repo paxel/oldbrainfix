@@ -7203,7 +7203,7 @@ Map<String, Object?> _markdown() {
     '<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n'
         '❌ c | d\n☐\u200d x |\n# ☐ end',
     'a | b\n|---|\na | b\n- | -\n# a | b\n--|--\na\n---\na | b\n|--|:x:|',
-    'a | b\n-|-\nc\n```\ne | f\n-|-\n---\ng | h\n-|-\n    x | y\n'
+    'a | b\n-|-\nc\n```\n```\ne | f\n-|-\n---\ng | h\n-|-\n    x | y\n'
         'i | j\n-|-\n<!-- x -->\nk | l\n-|-\n* * *',
     'x\n  <!-- first column headings --> \na|b\n-|-\n\n'
         '<!-- first column headings -->\nno table',
@@ -7211,6 +7211,15 @@ Map<String, Object?> _markdown() {
     '- a\n  - b\n  1. c\n- d\n1. e\n\n3. f\n  - g\n> q\n>\n> r\nx\ny\n  \n'
         '## z\n<i>\'&"</i> [j](javascript:x) [m](MAILTO:a@b.c) '
         '[w](http://x.org/?a=1&b=2)',
+    '````\n```\nx\n````\ny',
+    '~~~ sh\n```\n# no\n~~~\n- a',
+    '```\nx\n`````\nafter',
+    '`````\n````\n```\nx\n```\n````\n`````',
+    'a\n```bash  -e\n| x | y |\n|---|---|\n#tag ☐ **b** `c` [l](u)\n'
+        '   ```  \nz #t',
+    '``` a`b\n    ```\n\t~~~\n   ~~~ 🧠 x\nopen #t ☐\r\n\r\n',
+    '```',
+    'x\n~~~\n``` no close\n~~~ x\n~~~~',
   ];
   int cp(String text, int offset) => text.substring(0, offset).runes.length;
   int u16(String text, int point) =>
@@ -7294,6 +7303,16 @@ Map<String, Object?> _markdown() {
           Markdown.toggleLine(text, u16(text, start), u16(text, end), kind),
         ),
       });
+  void codeBlock(String text, int start, int end) => edits.add({
+    'op': 'codeBlock',
+    'start': start,
+    'end': end,
+    'text': text,
+    'result': change(
+      text,
+      Markdown.codeBlock(text, u16(text, start), u16(text, end)),
+    ),
+  });
   void indent(String text, int start, int end, bool out) => edits.add({
     'op': out ? 'outdent' : 'indent',
     'start': start,
@@ -7342,6 +7361,28 @@ Map<String, Object?> _markdown() {
   link('see', 1, 1, '  ');
   link('one two\nthree', 4, 13, 'u');
   link('🧠 x', 2, 3, 'https://x.org/ ü');
+  for (final (text, start, end) in [
+    ('a\nb c\nd', 3, 4),
+    ('a\nb\nc', 0, 3),
+    ('a\n\nb', 2, 2),
+    ('', 0, 0),
+    ('x ```` y\r\nz', 0, 0),
+    ('a\n```\nb\n```', 0, 3),
+    ('x | y\n-|-\nz', 0, 0),
+    ('a\n```sh\nb\nc\n```\nd', 9, 9),
+    ('```\nb', 5, 5),
+    ('```\n```', 0, 0),
+    ('x\n```', 3, 3),
+    ('```\na\n```\nb', 4, 11),
+    ('🧠\n~~~\nü\n~~~', 4, 4),
+    ('🧠 ü', 3, 1),
+  ]) {
+    codeBlock(text, start, end);
+  }
+  toggle('a\n```\nb c\n```', 7, 7, MarkdownSpanKind.bold);
+  toggle('a\n```\nb c\n```', 0, 13, MarkdownSpanKind.italic);
+  link('a\n```\nb c\n```', 6, 9, 'https://x.org');
+  line('a\n```\nb c\n```', 0, 13, MarkdownBlockKind.quote);
   for (final kind in MarkdownBlockKind.values) {
     line('one\ntwo', 0, 7, kind);
     line('# a\n- b\n  1. c\n> d', 0, 17, kind);
@@ -7483,6 +7524,20 @@ Map<String, Object?> _markdown() {
                 'spans': [for (final s in b.spans) span(text, s)],
                 'start': cp(text, b.start),
               },
+          ],
+          'codeBlocks': [
+            for (final b in Markdown.parse(text))
+              if (b.code case final c? when b.line == c.firstLine)
+                {
+                  'closed': c.closed,
+                  'end': cp(text, c.end),
+                  'fence': c.fence,
+                  'firstLine': c.firstLine,
+                  'info': c.info,
+                  'language': c.language,
+                  'lastLine': c.lastLine,
+                  'start': cp(text, c.start),
+                },
           ],
           'escaped': Markdown.escape(text),
           'html': Markdown.html(text),

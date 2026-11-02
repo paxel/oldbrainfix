@@ -7280,6 +7280,12 @@ abstract class AppLocalizations {
   /// **'Code'**
   String get formatCode;
 
+  /// Format bar button: puts the lines the selection touches into a fenced code block, shown in a fixed-width font with nothing in it read as a format; in a code block, takes its fences off.
+  ///
+  /// In en, this message translates to:
+  /// **'Code block'**
+  String get formatCodeBlock;
+
   /// Format bar button: moves a list item one level in.
   ///
   /// In en, this message translates to:

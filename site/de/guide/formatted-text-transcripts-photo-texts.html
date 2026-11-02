@@ -9,7 +9,7 @@
 <p>
   Der Text einer Notiz und eines Abschnitts kann fett, kursiv oder durchgestrichen sein, zwei
   Überschriftenebenen haben, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate,
-  Links, Code im Text und Tabellen. Er wird als Markdown gespeichert, genau so, wie er geschrieben
+  Links, Code im Text, Codeblöcke und Tabellen. Er wird als Markdown gespeichert, genau so, wie er geschrieben
   ist. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, und bleibt von da an
   formatiert: durch eine Taste der Formatleiste, durch ein als Markdown getipptes Format oder durch
   Einfügen eines Texts, der eines verwendet. Karten, Abschnitte, gesendete Notizen und Sicherungen
@@ -27,7 +27,7 @@
   <li><strong>Fett</strong>, <strong>Kursiv</strong> und <strong>Durchstreichen</strong>.</li>
   <li><strong>H1</strong> und <strong>H2</strong>: <strong>Große Überschrift</strong> und <strong>Kleine Überschrift</strong>.</li>
   <li><strong>Aufzählung</strong>, <strong>Nummerierte Liste</strong> und <strong>Zitat</strong>.</li>
-  <li><strong>Link</strong> und <strong>Code</strong>.</li>
+  <li><strong>Link</strong>, <strong>Code</strong> und <strong>Codeblock</strong>.</li>
   <li><strong>Listenpunkt einrücken</strong> und <strong>Listenpunkt ausrücken</strong>.</li>
   <li><strong>Tabelle</strong>.</li>
 </ul>
@@ -58,13 +58,32 @@
 <ul>
   <li>Am Anfang einer Zeile, gefolgt von einem Leerzeichen: <code>#</code> für eine große Überschrift, <code>##</code> für eine kleine, <code>-</code>, <code>*</code> oder <code>+</code> für einen Aufzählungspunkt, <code>1.</code> für einen nummerierten Punkt und <code>&gt;</code> für ein Zitat.</li>
   <li>Innerhalb einer Zeile: <code>**fett**</code>, <code>*kursiv*</code> oder <code>_kursiv_</code>, <code>~~durchgestrichen~~</code>, <code>`Code`</code> und <code>[Text](Adresse)</code>.</li>
+  <li>Auf einer eigenen Zeile: <code>```</code> oder <code>~~~</code> beginnt einen Codeblock, und derselbe Zaun auf einer späteren Zeile beendet ihn; das Tippen des schließenden Zauns macht einen unformatierten Text formatiert.</li>
 </ul>
 <p>
   Jeder Zeilenumbruch bleibt einer, sodass untereinander getippte Zeilen getrennt bleiben. Ein
   Punkt, der um zwei Leerzeichen oder mehr eingerückt ist, steht eine Ebene weiter innen; tiefere
   Punkte erscheinen eine Ebene weiter innen. Aufeinanderfolgende nummerierte Punkte zählen weiter,
   sodass <code>1.</code> auf jeder Zeile 1, 2, 3 zeigt. Tiefere Überschriften (<code>###</code>),
-  Codeblöcke, Bilder und anderes Markdown erscheinen so, wie sie geschrieben sind.
+  Bilder und anderes Markdown erscheinen so, wie sie geschrieben sind.
+</p>
+
+<h3>Codeblöcke</h3>
+<p>
+  Ein Codeblock sind die Zeilen zwischen zwei Zäunen aus drei Backticks, <code>```</code>, oder drei
+  Tilden, <code>~~~</code>, jeder Zaun auf einer eigenen Zeile. Er erscheint in einer Schrift mit
+  fester Breite auf grauem Grund, seine Zeilen genau so, wie sie geschrieben sind: Nichts darin ist
+  ein Format, eine Tabelle, ein #Wort oder ein Statuskästchen. Ein Wort nach dem öffnenden Zaun, etwa
+  <code>```bash</code>, nennt die Sprache; es bleibt im Text, erscheint aber nicht. Ein Block endet
+  erst an einem Zaun aus demselben Zeichen, der mindestens so lang ist wie der öffnende, sodass in
+  einem mit vier Backticks begonnenen Block eine Zeile aus drei eine Zeile des Blocks ist. Ohne
+  schließenden Zaun reicht der Block bis zum Ende des Texts.
+</p>
+<p>
+  <strong>Codeblock</strong> in der Formatleiste setzt die Zeilen, die die Auswahl berührt, in einen
+  Block, an einer leeren Zeile einen leeren; in einem Block nimmt es dessen Zäune weg. Seine Zäune
+  sind länger als jede Folge von Backticks darin. Auf einer kompakten Karte zeigt ein Codeblock seine
+  Zeilen ohne die Zäune.
 </p>
 <p>
   Ein Erfassungsbildschirm hat keine Formatleiste, aber ein Text, der mit Markdown getippt oder
@@ -131,7 +150,7 @@
   der Text selbst bleibt, wie er ist.
 </p>
 <ul>
-  <li>Ein Statuskästchen kann mitten in einem Wort oder einer Zeile stehen, in einem Listenpunkt, einem Zitat, den Wörtern eines Links und einer Tabellenzelle. In Code im Text oder in der Adresse eines Links zählt es nicht; ebenso wenig andere Kästchen und Haken wie ☑ oder ✓.</li>
+  <li>Ein Statuskästchen kann mitten in einem Wort oder einer Zeile stehen, in einem Listenpunkt, einem Zitat, den Wörtern eines Links und einer Tabellenzelle. In Code im Text, in einem Codeblock oder in der Adresse eines Links zählt es nicht; ebenso wenig andere Kästchen und Haken wie ☑ oder ✓.</li>
   <li>Statuskästchen werden auf der Karte der Notiz, in ihren Abschnitten, im Notiz-Editor und in einer Tabelle im Vollbild abgehakt. Ein Statuskästchen, das gerade getippt wird, lässt sich abhaken, sobald der Text gespeichert ist.</li>
   <li>☐ in der Formatleiste setzt ☐ am Cursor ein, auch mitten in einem Wort.</li>
   <li>Jedes Statuskästchen trägt eine Kennung, die nie zu sehen ist. Der Cursor springt über ein Statuskästchen wie über ein Zeichen; wird sein Zeichen gelöscht, ist das Statuskästchen gelöscht.</li>
@@ -150,7 +169,7 @@
 </p>
 <ul>
   <li>Ein #Wort besteht aus Buchstaben, Ziffern, „_“ und „-“ und enthält mindestens einen Buchstaben: „#to-do“ und „#v2“ zählen, „#126“ ist eine Zahl.</li>
-  <li>„# Titel“ mit Leerzeichen, „C#“ und das „#“ in einer Webadresse zählen nicht. In einem formatierten Text zählt auch ein „#Wort“ in Code oder in der Adresse eines Links nicht.</li>
+  <li>„# Titel“ mit Leerzeichen, „C#“ und das „#“ in einer Webadresse zählen nicht. In einem formatierten Text zählt auch ein „#Wort“ in Code, in einem Codeblock oder in der Adresse eines Links nicht.</li>
   <li>Die Suche nach „#Garten“ findet jede Notiz, die es in beliebiger Groß- und Kleinschreibung enthält, auch „#Gartenarbeit“, das damit beginnt, aber nicht das Wort „Garten“ ohne „#“.</li>
 </ul>
 
