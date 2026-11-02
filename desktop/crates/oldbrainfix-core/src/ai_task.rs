@@ -1029,6 +1029,7 @@ mod tests {
                 serde_json::json!({"id": milk, "list": "checklist"}),
             ),
             ("list_to_plain", serde_json::json!({"id": trip})),
+            ("switch_list", serde_json::json!({"id": trip})),
             ("move_line", serde_json::json!({"id": socks})),
             (
                 "group_line",

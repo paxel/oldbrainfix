@@ -117,6 +117,14 @@ fn card<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> Node<'a> {
     }
 }
 
+/// Picks the radio button `label` of the open small editor (#188).
+fn pick(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_by_role_and_label(Role::RadioButton, label)
+        .click_accesskit();
+    harness.run();
+}
+
 /// The Note dialog's text field.
 fn note_field<'a>(harness: &'a Harness<'_, App>) -> Node<'a> {
     harness.get_by_label("Note text")
@@ -272,13 +280,9 @@ fn each_setting_is_a_badge_read_as_setting_and_value() -> TestResult {
             .next()
             .is_some()
     );
-    // A plain Note has no kind, no Checklist's Show on the Agenda.
-    assert!(
-        harness
-            .query_all_by_label_contains("Kind: ")
-            .next()
-            .is_none()
-    );
+    // A plain Note has its kind too (#188), no Checklist's Show on the
+    // Agenda.
+    assert!(shows(&harness, "Kind: Plain Note"));
     assert!(
         harness
             .query_all_by_label_contains("Show on the Agenda")
@@ -365,21 +369,16 @@ fn a_lists_kind_badge_goes_back_to_a_plain_note_and_its_agenda_badge_switches() 
     click(&mut harness, "Close");
     assert!(shows(&harness, "Show on the Agenda: Off"));
     click(&mut harness, "Kind: Checklist");
-    click(&mut harness, "Back to a plain Note");
+    pick(&mut harness, "Plain Note");
     assert!(Checklists::new(&store).by_note(&list)?.is_none());
-    assert!(
-        harness
-            .query_all_by_label_contains("Kind: ")
-            .next()
-            .is_none()
-    );
+    assert!(shows(&harness, "Kind: Plain Note"));
     // A Shopping List's too.
     ShoppingLists::new(&store).make(&list)?;
     harness.state_mut().close_note();
     harness.state_mut().select_note(&list);
     harness.run();
     click(&mut harness, "Kind: Shopping List");
-    click(&mut harness, "Back to a plain Note");
+    pick(&mut harness, "Plain Note");
     let wall = |at: DateTime<Utc>| at.naive_utc();
     assert!(ShoppingLists::new(&store).by_note(&list, &wall)?.is_none());
     Ok(())
@@ -537,8 +536,18 @@ fn a_shopping_list_from_plus_starts_with_one_line_the_cursor_in_it() -> TestResu
     let focused = harness.get_by(|n| n.is_focused());
     assert_eq!(focused.accesskit_node().role(), Role::TextInput);
     assert_eq!(focused.value().as_deref(), Some(""));
+    // Under its name (#188).
+    assert_eq!(
+        harness
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .value()
+            .as_deref(),
+        Some("Market")
+    );
     let lines = harness.query_all_by(|n| {
-        n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+        n.role() == Role::TextInput
+            && n.placeholder().unwrap_or_default().is_empty()
+            && n.label().as_deref() != Some("Name")
     });
     assert_eq!(lines.count(), 1);
     assert!(!shows(&harness, "Add"));

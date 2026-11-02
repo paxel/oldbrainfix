@@ -1288,6 +1288,11 @@
   "settingBadgeLabel": "{setting}: {value}",
   "badgePlace": "Bereich und Thema",
   "badgeKind": "Art",
+  "kindPlain": "Einfache Notiz",
+  "noteName": "Name",
+  "noteDescription": "Beschreibung",
+  "noteDescriptionUnfold": "Ganze Beschreibung zeigen",
+  "noteDescriptionFold": "Beschreibung einklappen",
   "settingOn": "Ein",
   "settingOff": "Aus"
 }

@@ -658,6 +658,7 @@ List<Widget> diaryCards(
           sections: () => sectionsOf(note),
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
+          kind: () => NoteKinds(notes.store).of(note.id),
           boxes: boxTicks(notes, placed, onChanged),
           onTable: tableEdit(notes, placed, onChanged),
           // A full Note has nothing to unfold (#114).

@@ -4830,6 +4830,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get badgeKind => 'Art';
 
   @override
+  String get kindPlain => 'Einfache Notiz';
+
+  @override
+  String get noteName => 'Name';
+
+  @override
+  String get noteDescription => 'Beschreibung';
+
+  @override
+  String get noteDescriptionUnfold => 'Ganze Beschreibung zeigen';
+
+  @override
+  String get noteDescriptionFold => 'Beschreibung einklappen';
+
+  @override
   String get settingOn => 'Ein';
 
   @override

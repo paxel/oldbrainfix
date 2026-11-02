@@ -28,6 +28,7 @@ use crate::checklists::{
 };
 use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
+use crate::note_kinds;
 use crate::notes::{CapturedDetail, Importance, Note, Notes};
 use crate::people::PersonFilter;
 use crate::places::{NotesGo, Places};
@@ -165,7 +166,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: a Tally's fields, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
+            "Reads one Note in full: its text, Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, the Lines of a Checklist or Shopping List, how a Shopping List shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -498,6 +499,13 @@ fn set_up_tools() -> Vec<Value> {
         tool(
             "list_to_plain",
             "Turns a Checklist or Shopping List back into a plain Note: every Line becomes a line of its text.",
+            false,
+            json!({"id": id("Note")}),
+            &["id"],
+        ),
+        tool(
+            "switch_list",
+            "Makes a Checklist a Shopping List, or a Shopping List a Checklist: its Lines that show carry over in their order, at the top, each with the reappear time of a new Line; the text stays. A list with a checked or struck Line is refused, as that Line would be checked again.",
             false,
             json!({"id": id("Note")}),
             &["id"],
@@ -1086,9 +1094,21 @@ impl Store {
                     true => Some(shopping.on_agenda(id)?.code()),
                     false => None,
                 };
-                let mut out = note_summary(&note, &self.kind_of(&self.kinds()?, &note)?);
+                let kind = self.kind_of(&self.kinds()?, &note)?;
+                // The text of a Note of a kind is its name and its
+                // description (#188); a plain Note's is its content.
+                let (name, description) = match kind.kind {
+                    "plain" => (None, None),
+                    _ => (
+                        Some(note_kinds::name(&note.text)),
+                        Some(note_kinds::description(&note.text)),
+                    ),
+                };
+                let mut out = note_summary(&note, &kind);
                 if let Some(all) = out.as_object_mut() {
                     all.insert("agenda".into(), json!(agenda));
+                    all.insert("name".into(), json!(name));
+                    all.insert("description".into(), json!(description));
                     all.insert("boxes".into(), json!(boxes_json(&note.boxes)));
                     all.insert("captureContext".into(), Value::Object(context));
                     all.insert("frogs".into(), json!(frogs));
@@ -1685,6 +1705,29 @@ impl Store {
                         )));
                     }
                 }
+                done(note)
+            }
+            "switch_list" => {
+                let note = id()?;
+                let ticked = match list_of(self, note)? {
+                    Some(CHECKLIST) => checklists
+                        .by_note(note)?
+                        .is_some_and(|l| l.lines.iter().any(|l| l.checked)),
+                    Some(_) => shopping
+                        .by_note(note, wall)?
+                        .is_some_and(|l| l.lines.iter().any(|l| l.struck)),
+                    None => {
+                        return Err(Error::Invalid(format!(
+                            "neither a Checklist nor a Shopping List: {note}"
+                        )));
+                    }
+                };
+                if ticked {
+                    return Err(Error::Invalid(format!(
+                        "{note} has checked Lines, which would be checked again in the other list, and an AI Task checks nothing: leave this to the user"
+                    )));
+                }
+                shopping.switch_list(note, wall)?;
                 done(note)
             }
             "add_line" => {
@@ -2297,6 +2340,15 @@ mod tests {
             |s, a| Ok(!Checklists::new(s).is_checklist(&arg(a, "id")?)?),
         )?;
         lands_as_pending(
+            "switch_list",
+            |s| Ok(json!({"id": checklist(s, "Trip\nSocks")?})),
+            |s, a| {
+                ShoppingLists::new(s)
+                    .is_shopping_list(&arg(a, "id")?)
+                    .map_err(Into::into)
+            },
+        )?;
+        lands_as_pending(
             "add_line",
             |s| Ok(json!({"at": 0, "id": checklist(s, "Trip\nSocks")?, "text": "Passport"})),
             |s, a| Ok(lines(s, &arg(a, "id")?)?[0].text == "Passport"),
@@ -2459,6 +2511,7 @@ mod tests {
             "set_session",
             "make_list",
             "list_to_plain",
+            "switch_list",
             "add_line",
             "rename_line",
             "move_line",
@@ -2579,6 +2632,16 @@ mod tests {
             Some(&json!("1w"))
         );
         assert_eq!(read(&shop)?.pointer("/agenda"), Some(&json!("count")));
+        assert_eq!(read(&trip)?.pointer("/name"), Some(&json!("Trip")));
+        assert_eq!(read(&trip)?.pointer("/description"), Some(&json!("")));
+        assert_eq!(read(&plain)?.pointer("/name"), Some(&Value::Null));
+        let gym = tally(&store, "Gym\nMondays and Thursdays")?.0;
+        let gymmed = read(&gym)?;
+        assert_eq!(gymmed.pointer("/name"), Some(&json!("Gym")));
+        assert_eq!(
+            gymmed.pointer("/description"),
+            Some(&json!("Mondays and Thursdays"))
+        );
         assert_eq!(read(&trip)?.pointer("/agenda"), Some(&Value::Null));
         let banked = read(&bank)?;
         assert_eq!(banked.pointer("/frogs/0/id"), Some(&json!(frog.id)));

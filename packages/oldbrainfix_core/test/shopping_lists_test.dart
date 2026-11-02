@@ -546,6 +546,68 @@ void main() {
     });
   });
 
+  group('switching the list (#188)', () {
+    /// How many entries the log holds for [field] of [note].
+    int writes(Store store, String note, String field) =>
+        store.history(note).where((e) => e.field == field).length;
+
+    test('a Checklist becomes a Shopping List of its Lines in their order, '
+        'checked ones struck, flat, the text not touched', () {
+      final note = Notes(ann).capture('Trip\nPassport\n Socks\nTickets').id;
+      Checklists(ann).make(note);
+      final lists = Checklists(ann);
+      lists.check(lists.byNote(note)!.lines[2].id);
+      final texts = writes(ann, note, NoteKeys.text);
+      expect(ShoppingLists(ann).maySwitch(note), isTrue);
+      ShoppingLists(ann).switchList(note, _wall);
+      expect(Checklists(ann).byNote(note), isNull);
+      expect(shown(ann, note), ['Passport', 'Socks', '~Tickets']);
+      expect(lineOf(ann, note, 'Socks').reappear, Reappear.week1);
+      expect(writes(ann, note, NoteKeys.text), texts, reason: 'no text');
+      expect(Notes(ann).byId(note)!.text, 'Trip');
+    });
+
+    test('a Shopping List becomes a Checklist of the Lines that show, '
+        'struck ones checked, gone ones left behind', () {
+      final note = shopping(ann, 'Shop\nMilk\nBread\nEggs');
+      final shops = ShoppingLists(ann);
+      shops.setReappear(idOf(ann, note, 'Bread'), Reappear.once);
+      shops.check(idOf(ann, note, 'Bread'), _wall);
+      shops.check(idOf(ann, note, 'Milk'), _wall);
+      shops.switchList(note, _wall);
+      expect(shops.isShoppingList(note), isFalse);
+      final list = Checklists(ann).byNote(note)!;
+      expect(
+        [for (final l in list.lines) '${l.checked ? '~' : ''}${l.text}'],
+        ['Eggs', '~Milk'],
+      );
+      expect(list.lines.any((l) => l.inGroup), isFalse);
+    });
+
+    test('back and forth starts a new making each time, the old Lines '
+        'staying in the log', () {
+      final note = shopping(ann, 'Shop\nMilk');
+      final first = ShoppingLists(ann).making(note)!;
+      ShoppingLists(ann).switchList(note, _wall);
+      ShoppingLists(ann).switchList(note, _wall);
+      expect(ShoppingLists(ann).making(note), isNot(first));
+      expect(shown(ann, note), ['Milk']);
+      expect(ann.entitiesWithPrefix(ChecklistKeys.linePrefix), hasLength(3));
+    });
+
+    test('neither a plain Note nor a Tally switches', () {
+      final plain = Notes(ann).capture('Shop\nMilk').id;
+      expect(ShoppingLists(ann).maySwitch(plain), isFalse);
+      expect(
+        () => ShoppingLists(ann).switchList(plain, _wall),
+        throwsStateError,
+      );
+      final tally = Notes(ann).capture('Gym').id;
+      Tallies(ann).addField(tally, name: 'Reps', unit: 'reps');
+      expect(ShoppingLists(ann).maySwitch(tally), isFalse);
+    });
+  });
+
   test('a Routine spawned from a Shopping List is Done only when checked '
       'off', () {
     final note = shopping(ann, 'Shop\nMilk');

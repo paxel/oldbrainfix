@@ -128,6 +128,10 @@ pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';
 pub const TALLY: char = '\u{e0cc}';
 pub const NEW_NOTE: char = '\u{f04f6}';
+/// A folded description of a Note of a kind (#188), `expand_more`, and
+/// one unfolded, `expand_less`.
+pub const EXPAND_MORE: char = '\u{e246}';
+pub const EXPAND_LESS: char = '\u{e245}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

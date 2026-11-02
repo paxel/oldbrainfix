@@ -4768,6 +4768,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get badgeKind => 'Kind';
 
   @override
+  String get kindPlain => 'Plain Note';
+
+  @override
+  String get noteName => 'Name';
+
+  @override
+  String get noteDescription => 'Description';
+
+  @override
+  String get noteDescriptionUnfold => 'Show the whole description';
+
+  @override
+  String get noteDescriptionFold => 'Fold the description';
+
+  @override
   String get settingOn => 'On';
 
   @override

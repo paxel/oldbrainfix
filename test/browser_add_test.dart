@@ -188,6 +188,19 @@ void main() {
         await openPage(tester, page);
         await pick(tester, NewKind.checklist);
         await name(tester, 'Before the trip');
+        // Its name on top, the kind's content under it (#188).
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: key('note-name'),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller!
+              .text,
+          'Before the trip',
+        );
         expect(find.byType(NoteEditorScreen), findsOneWidget);
         // The cursor waits in its first Line.
         final line = find.descendant(
@@ -224,6 +237,19 @@ void main() {
         await openPage(tester, page);
         await pick(tester, NewKind.shopping);
         await name(tester, 'Groceries');
+        // Its name on top, the kind's content under it (#188).
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: key('note-name'),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller!
+              .text,
+          'Groceries',
+        );
         // The cursor waits in its first Line, as a Checklist's (#184).
         expect(key('shopping-add-text'), findsNothing);
         final line = find.descendant(

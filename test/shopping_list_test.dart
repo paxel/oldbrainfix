@@ -267,6 +267,14 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     }
 
+    /// Makes the Note the kind [kind] through its kind badge (#188).
+    Future<void> pickKind(WidgetTester tester, NoteKind kind) async {
+      await tester.ensureVisible(key('badge-kind'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-${kind.name}'));
+    }
+
     Future<void> lineMenu(WidgetTester tester, String id) =>
         tap(tester, key('checklist-menu-$id'));
 
@@ -285,16 +293,14 @@ void main() {
       return true;
     }
 
-    testWidgets('"Make it a Shopping List" makes the text as typed one; the '
-        'field keeps the title, also after leaving', (tester) async {
+    testWidgets('Shopping List in the kind badge makes the text as typed '
+        'one; the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
       await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
-      await tap(tester, key('shopping-make'));
+      await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('shopping'), findsOneWidget);
-      expect(key('shopping-make'), findsNothing);
-      expect(key('checklist-make'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
         'Shop',
@@ -370,7 +376,7 @@ void main() {
         'editor is opened again, then below the open ones', (tester) async {
       final note = notes.capture('Trip').id;
       await openEditor(tester, 'Trip');
-      await tap(tester, key('shopping-make'));
+      await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), isEmpty);
       expect(cursor(tester), ('', 0));
       await backspaceAtStart(tester, 'new-1');
@@ -526,7 +532,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tap(tester, key('kind-to-plain'));
+      await tap(tester, key('kind-plain'));
       expect(lists.isShoppingList(note), isFalse);
       expect(key('shopping'), findsNothing);
       expect(

@@ -240,6 +240,7 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
                       // A Note in the trash is read before it is restored.
                       full: true,
                       sections: () => widget.notes.sections(note.id),
+                      kind: () => NoteKinds(widget.notes.store).of(note.id),
                       // Only who may change it restores it (ADR 0013).
                       footer: changes
                           ? _footer(

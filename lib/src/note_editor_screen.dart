@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
@@ -483,6 +484,11 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Note or a Section, has a button under it that removes it and keeps the
 /// text (ADR 0020).
 ///
+/// A Note of a kind (#188), a Checklist, Shopping List or Tally, shows its
+/// text as its name, a heading, and its description under it, folded to
+/// one line until a tap; then the kind's content, its Lines or its Tally,
+/// and the rest under it. Its kind badge changes the kind.
+///
 /// Under each Transcript and Photo Text, "Replace Note text" and "Append
 /// to Note text" take it over into the text of its Note or Section, and
 /// "Remove generated text" removes it while the file stays; "Transcribe
@@ -531,6 +537,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     hideMarks: widget.notes.store.twoRowEditorOn,
   );
   late final _twoRows = widget.notes.store.twoRowEditorOn;
+
+  /// The name of a Note of a kind (#188): the first line of its text,
+  /// [_text] then holding its description, the rest. A line break typed
+  /// or pasted into it moves what follows into the description.
+  late final _name = TagTextController(hideMarks: _twoRows);
+
+  /// Whether the fields hold the Note's text as a name and a description:
+  /// for a Note of a kind, as it was when its text was put into them.
+  var _named = false;
+
+  /// Whether the description shows whole: while it is edited, or, where
+  /// it is only read, once a tap unfolded it.
+  var _descriptionOpen = false;
+  final _descriptionFocus = FocusNode();
   late final AppLifecycleListener _lifecycle;
   Timer? _draftTimer;
 
@@ -583,17 +603,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Whether this Device may Amend the Note: anywhere it holds a role.
   bool _amends = true;
 
-  /// Whether this Device may make the Note a Checklist, and whether it is
-  /// one (#120).
-  bool _makesList = false;
-  bool _isList = false;
-
-  /// The same for a Shopping List (#122).
-  bool _makesShopping = false;
-  bool _isShopping = false;
-
-  /// Whether it is a Tally (ADR 0028).
-  bool _isTally = false;
+  /// The kind of the Note (#188), and the kinds this Device may change
+  /// it to.
+  NoteKind _kind = NoteKind.plain;
+  Set<NoteKind> _kinds = const {};
 
   /// The "Show on the Agenda" switch of a Checklist without a Routine
   /// (#143); null for any other Note.
@@ -609,6 +622,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _load();
     _show();
     _text.addListener(_typed);
+    _name
+      ..addListener(_typed)
+      ..addListener(_nameTyped);
+    _descriptionFocus.addListener(_descriptionFocused);
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
     _restoreDraft();
   }
@@ -618,6 +635,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
+    _name.dispose();
+    _descriptionFocus.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
     }
@@ -638,12 +657,86 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _draftTimer = Timer(NoteEditorScreen.draftPause, _writeDraft);
   }
 
+  /// The Note's text as typed: of a Note of a kind its name and its
+  /// description joined (#188).
+  String get _typedText =>
+      _named ? NoteKinds.join(_name.text, _text.text) : _text.text;
+
+  /// The text [stored] as the fields hold it once put into them; of a Note
+  /// of a kind its line break after the name is a "\n".
+  String _asTyped(String stored) => _named
+      ? NoteKinds.join(NoteKinds.name(stored), NoteKinds.description(stored))
+      : stored;
+
+  /// Puts [text] into the fields, a Note of a kind's split into its name
+  /// and description.
+  void _setTyped(String text) {
+    if (!_named) {
+      _text.text = text;
+      return;
+    }
+    _name.text = NoteKinds.name(text);
+    _text.text = NoteKinds.description(text);
+  }
+
+  /// A name holds one line: at a line break, typed with Return or pasted,
+  /// what follows goes to the start of the description, a line of its own
+  /// before what it held, and the cursor follows it there.
+  void _nameTyped() {
+    final typed = _name.text;
+    final name = NoteKinds.name(typed);
+    if (name.length == typed.length) return;
+    final rest = NoteKinds.description(typed);
+    final description = _text.text;
+    _name.value = TextEditingValue(
+      text: name,
+      selection: TextSelection.collapsed(offset: name.length),
+    );
+    _text.value = TextEditingValue(
+      text: rest.isEmpty
+          ? description
+          : description.isEmpty
+          ? rest
+          : '$rest\n$description',
+      selection: TextSelection.collapsed(offset: rest.length),
+    );
+    _openDescription();
+  }
+
+  /// Unfolds the description; where it is edited, the cursor goes into
+  /// it.
+  void _openDescription({bool atEnd = false}) {
+    setState(() => _descriptionOpen = true);
+    final placed = _placed;
+    if (placed == null || !placed.changes || !placed.note.textEditable) return;
+    if (atEnd) {
+      _text.selection = TextSelection.collapsed(offset: _text.text.length);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _descriptionFocus.requestFocus();
+    });
+  }
+
+  /// An edited description shows whole while it is edited, and folds
+  /// when the cursor leaves it.
+  void _descriptionFocused() {
+    final open = _descriptionFocus.hasFocus;
+    if (open == _descriptionOpen || !mounted) return;
+    setState(() => _descriptionOpen = open);
+  }
+
+  /// Folds the description again.
+  void _foldDescription() {
+    _descriptionFocus.unfocus();
+    setState(() => _descriptionOpen = false);
+  }
+
   /// Keeps the text as typed in a draft while it differs from the Note's.
   void _writeDraft() {
     final note = _placed?.note;
     if (note == null || !note.textEditable) return;
-    final text = _text.text;
-    if (text.trim().isEmpty || text.trim() == note.text) {
+    final text = _typedText;
+    if (text.trim().isEmpty || text.trim() == _asTyped(note.text)) {
       unawaited(widget.drafts.delete(note.id));
     } else {
       unawaited(
@@ -664,7 +757,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final setAt = widget.notes.textSetAt(widget.noteId);
     if (note == null || setAt == null || !note.textEditable) return;
     if (draft.saved.isAfter(setAt) && draft.text.trim() != note.text) {
-      if (_text.text == note.text) _text.text = draft.text;
+      if (_typedText == _asTyped(note.text)) _setTyped(draft.text);
     } else {
       unawaited(widget.drafts.delete(widget.noteId));
     }
@@ -675,14 +768,32 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _placed = note == null ? null : placeNote(widget.places, note);
     _amends = widget.notes.store.mayWriteIn(widget.noteId);
     final lists = Checklists(widget.notes.store);
-    _makesList = lists.mayMake(widget.noteId);
-    _isList = lists.isChecklist(widget.noteId);
     _onAgenda = showOnAgendaEntry(lists, widget.noteId, _reload);
     final shopping = ShoppingLists(widget.notes.store);
-    _makesShopping = shopping.mayMake(widget.noteId);
-    _isShopping = shopping.isShoppingList(widget.noteId);
     _shoppingOnAgenda = shoppingOnAgendaEntry(shopping, widget.noteId, _reload);
-    _isTally = Tallies(widget.notes.store).isTally(widget.noteId);
+    _kind = NoteKinds(widget.notes.store).of(widget.noteId);
+    final changes = _placed?.changes ?? false;
+    // Back to a plain Note where its text may change, as the card's ⋮.
+    final plainable = changes && (note?.textEditable ?? false);
+    _kinds = switch (_kind) {
+      NoteKind.plain => {
+        if (lists.mayMake(widget.noteId)) NoteKind.checklist,
+        if (shopping.mayMake(widget.noteId)) NoteKind.shoppingList,
+        // As the card's "Make it a Tally": only a Note in the lists.
+        if (changes && note != null && !note.isTrashed && !note.isMerged)
+          NoteKind.tally,
+      },
+      NoteKind.checklist => {
+        if (plainable) NoteKind.plain,
+        if (shopping.maySwitch(widget.noteId)) NoteKind.shoppingList,
+      },
+      NoteKind.shoppingList => {
+        if (plainable) NoteKind.plain,
+        if (shopping.maySwitch(widget.noteId)) NoteKind.checklist,
+      },
+      // No way leads out of a Tally.
+      NoteKind.tally => const {},
+    };
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
     _newerRoutines = _routineBook.newerOfNote(widget.noteId);
@@ -742,6 +853,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
     _ticking = note == null ? null : ticking(note.id, note.boxes);
     _text.boxes = _ticking;
+    _name.boxes = _ticking;
     _sectionTicking = {
       for (final section in _sections)
         section.id: ticking(section.id, section.boxes),
@@ -785,11 +897,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _reload() => setState(_load);
 
-  /// Puts the Note's text as it is stored into the field, in its format.
+  /// Puts the Note's text as it is stored into the field, in its format;
+  /// a Note of a kind's into its name and description fields (#188), the
+  /// description folded.
   void _show() {
     final note = _placed?.note;
-    _text.markdown = note?.textFormat == TextFormats.markdown;
-    _text.text = note?.text ?? '';
+    _named = _kind != NoteKind.plain;
+    _descriptionOpen = false;
+    final markdown = note?.textFormat == TextFormats.markdown;
+    _text.markdown = markdown;
+    _name.markdown = markdown;
+    _setTyped(note?.text ?? '');
   }
 
   /// Writes the text when it changed; a blank text keeps the old one.
@@ -809,9 +927,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     unawaited(widget.drafts.delete(note.id));
     // A text in a format not known here is never overwritten.
     if (!note.textEditable) return;
-    final text = _text.text.trim();
+    // An emptied name gets the stored one back: nothing of the
+    // description becomes the name (#188).
+    if (_named && _name.text.trim().isEmpty) {
+      _takeStored(_name, NoteKinds.name(note.text));
+    }
+    final typed = _typedText;
     // The first format makes it formatted for good (ADR 0033).
     final formats = _text.markdown && note.textFormat != TextFormats.markdown;
+    // A name and description left as they were write nothing (#188).
+    if (typed == _asTyped(note.text) && !formats) return;
+    final text = typed.trim();
     if (text.isEmpty || (text == note.text && !formats)) return;
     widget.notes.edit(
       note.id,
@@ -819,7 +945,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       format: _text.markdown ? TextFormats.markdown : null,
     );
     _load();
-    _takeStored(_text, _placed?.note.text);
+    final stored = _placed?.note.text;
+    if (!_named || stored == null) {
+      _takeStored(_text, stored);
+      return;
+    }
+    _name.markdown = _text.markdown;
+    _takeStored(_name, NoteKinds.name(stored));
+    _takeStored(_text, NoteKinds.description(stored));
   }
 
   /// Writes the text of each Section whose field changed, as the Note's
@@ -887,11 +1020,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// A tap on the box at [start] of the field, the Note's or that of the
-  /// Section [section], the finger at [at]: the text is kept first, so
-  /// the box is the one stored, then its menu opens there (ADR 0035).
-  Future<void> _tapBox(int start, Offset at, {String? section}) async {
-    final field = section == null ? _text : _sectionTexts[section];
+  /// A tap on the box at [start] of the field, the Note's (its name's
+  /// with [name]) or that of the Section [section], the finger at [at]:
+  /// the text is kept first, so the box is the one stored, then its menu
+  /// opens there (ADR 0035).
+  Future<void> _tapBox(
+    int start,
+    Offset at, {
+    String? section,
+    bool name = false,
+  }) async {
+    final field = name
+        ? _name
+        : section == null
+        ? _text
+        : _sectionTexts[section];
     if (field == null) return;
     final id = TextBoxes.find(field.text)
         .where((box) => box.start == start)
@@ -1100,27 +1243,68 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// The kind badge's editor: the kind in words, and "Back to a plain
-  /// Note" where this Device may turn it back.
-  Future<void> _editKind(({IconData icon, String name}) kind) async {
+  /// The kind badge's editor (#188): the kinds as radio buttons, the
+  /// Note's marked, and those this Device may change it to; a tap on
+  /// another changes it and closes.
+  Future<void> _editKind() async {
     final t = context.t;
-    final back = await showDialog<bool>(
+    final current = _kind;
+    final picked = await showDialog<NoteKind>(
       context: context,
       builder: (context) => BadgeDialog(
         setting: t.badgeKind,
-        icon: kind.icon,
-        content: Text(kind.name),
-        actions: [
-          TextButton(
-            key: const ValueKey('kind-to-plain'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.checklistToPlain),
-          ),
-        ],
+        icon: kindIcon(current),
+        content: RadioColumn<NoteKind>(
+          value: current,
+          options: [
+            for (final kind in NoteKind.values)
+              if (kind == current || _kinds.contains(kind))
+                RadioOption(
+                  key: ValueKey('kind-${kind.name}'),
+                  value: kind,
+                  title: Text(kindName(t, kind)),
+                ),
+          ],
+          onChanged: (picked) => Navigator.of(context).pop(picked),
+        ),
       ),
     );
-    if (!mounted || back != true) return;
-    _toPlain();
+    if (!mounted || picked == null || picked == current) return;
+    await _changeKind(picked);
+  }
+
+  /// Makes the Note the kind [kind], its text and Lines as typed kept
+  /// first, then shows it as it is now: a list made of a plain Note's text
+  /// has its first line as name and the rest as Lines, a plain Note made
+  /// of a list every Line as a line of its text, and a list switched to
+  /// the other kind of list the same Lines (ADR 0030). A Tally starts with
+  /// the page of its first field.
+  Future<void> _changeKind(NoteKind kind) async {
+    _saveText();
+    final notes = widget.notes;
+    final id = widget.noteId;
+    final changed = switch ((_kind, kind)) {
+      (NoteKind.shoppingList, NoteKind.plain) => shoppingListToPlain(notes, id),
+      (_, NoteKind.plain) => checklistToPlain(notes, id),
+      (NoteKind.plain, NoteKind.checklist) => makeChecklist(notes, id),
+      (NoteKind.plain, NoteKind.shoppingList) => makeShoppingList(notes, id),
+      (NoteKind.plain, NoteKind.tally) => await makeTally(context, notes, id),
+      (_, NoteKind.checklist || NoteKind.shoppingList) => _switchList(),
+      _ => false,
+    };
+    if (!mounted || !changed) return;
+    setState(_load);
+    _show();
+  }
+
+  /// Switches a Checklist to a Shopping List or back, its Lines carried
+  /// over; whether it did.
+  bool _switchList() {
+    final shopping = ShoppingLists(widget.notes.store);
+    // A sync while the dialog was open may have changed it.
+    if (!shopping.maySwitch(widget.noteId)) return false;
+    shopping.switchList(widget.noteId, deviceWallClock);
+    return true;
   }
 
   /// The editor of an on-or-off badge: its switch, writing at once.
@@ -1195,14 +1379,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final locale = Localizations.localeOf(context).toString();
     final (:note, :area, :changes, :schedules, topic: _, amends: _, author: _) =
         placed;
-    final kind = _isList
-        ? (icon: Icons.checklist, name: t.checklistHeading)
-        : _isShopping
-        ? (icon: Icons.shopping_cart_outlined, name: t.shoppingHeading)
-        : _isTally
-        ? (icon: Icons.bar_chart, name: t.tallyHeading)
-        : null;
-    final plainable = (_isList || _isShopping) && changes && note.textEditable;
     final ticks = _showsTicks;
     return Wrap(
       key: const ValueKey('note-badges'),
@@ -1253,14 +1429,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.update,
             value: t.newerVersionNeeded,
           ),
-        if (kind != null)
-          SettingBadge(
-            key: const ValueKey('badge-kind'),
-            setting: t.badgeKind,
-            icon: kind.icon,
-            value: kind.name,
-            onTap: plainable ? (_) => _editKind(kind) : null,
-          ),
+        // Every Note has a kind (#188); with nothing to change it to,
+        // the badge only shows it.
+        SettingBadge(
+          key: const ValueKey('badge-kind'),
+          setting: t.badgeKind,
+          icon: kindIcon(_kind),
+          value: kindName(t, _kind),
+          onTap: _kinds.isEmpty ? null : (_) => _editKind(),
+        ),
         if (_onAgenda case final agenda?)
           SettingBadge(
             key: const ValueKey('badge-agenda'),
@@ -1370,7 +1547,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       context,
       _routineBook,
       note,
-      text: TextBoxes.strip(_text.text),
+      text: TextBoxes.strip(_typedText),
     );
     return [...add, ?file];
   }
@@ -1576,32 +1753,109 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
-  /// Makes the Note a Checklist of its text as typed: the field then holds
-  /// its first line, the rest are its Lines.
-  void _makeChecklist() {
-    _saveText();
-    if (!makeChecklist(widget.notes, widget.noteId)) return;
-    setState(_load);
-    _show();
-  }
-
-  /// Makes the Note a Shopping List of its text as typed, as
-  /// [_makeChecklist] does.
-  void _makeShoppingList() {
-    _saveText();
-    if (!makeShoppingList(widget.notes, widget.noteId)) return;
-    setState(_load);
-    _show();
-  }
-
-  /// Turns the Checklist or Shopping List back into a plain Note: the
-  /// field then holds every Line as a line of its text.
-  void _toPlain() {
-    _saveText();
-    final back = _isShopping ? shoppingListToPlain : checklistToPlain;
-    if (!back(widget.notes, widget.noteId)) return;
-    setState(_load);
-    _show();
+  /// The text of a Note of a kind (#188): its name as a heading, one line,
+  /// and under it its description, small and weak, folded to one line
+  /// while it is not edited; a tap unfolds it, and puts the cursor in it
+  /// where this Device may change it ([editable]), else only shows it
+  /// whole. An empty one that may change is a field with its hint.
+  Widget _nameAndDescription(Note note, {required bool editable}) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final weak = theme.colorScheme.onSurfaceVariant;
+    final small = theme.textTheme.bodyMedium?.copyWith(color: weak);
+    final description = _text.text;
+    final open = _descriptionOpen || (editable && description.isEmpty);
+    final Widget shown;
+    if (open) {
+      shown = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TwoRowTextField(
+              key: const ValueKey('note-description'),
+              controller: _text,
+              focusNode: _descriptionFocus,
+              twoRows: _twoRows,
+              readOnly: !editable,
+              boxes: true,
+              onBox: _tapBox,
+              formats: true,
+              onFormatted: () => setState(_saveText),
+              style: small,
+              decoration: InputDecoration(
+                filled: false,
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.only(bottom: 12),
+                hintText: t.noteDescription,
+              ),
+            ),
+          ),
+          if (description.isNotEmpty)
+            IconButton(
+              key: const ValueKey('note-description-fold'),
+              tooltip: t.noteDescriptionFold,
+              visualDensity: VisualDensity.compact,
+              onPressed: _foldDescription,
+              icon: Icon(Icons.expand_less, color: weak),
+            ),
+        ],
+      );
+    } else if (description.isEmpty) {
+      // Only read and empty: nothing to show.
+      shown = const SizedBox(height: 12);
+    } else {
+      final visible = TextBoxes.strip(description);
+      final (start, end) = NoteCard.firstLine(visible);
+      shown = Semantics(
+        key: const ValueKey('note-description-folded'),
+        container: true,
+        button: true,
+        hint: t.noteDescriptionUnfold,
+        child: InkWell(
+          onTap: () => _openDescription(atEnd: true),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: MarkedText(
+                    visible,
+                    format: note.textFormat,
+                    start: start,
+                    end: end,
+                    style: small,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.expand_more, color: weak, size: 20),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TwoRowTextField(
+          key: const ValueKey('note-name'),
+          controller: _name,
+          twoRows: _twoRows,
+          readOnly: !editable,
+          boxes: true,
+          onBox: (start, at) => _tapBox(start, at, name: true),
+          style: theme.textTheme.titleLarge,
+          decoration: InputDecoration(
+            filled: false,
+            border: InputBorder.none,
+            hintText: t.noteName,
+          ),
+        ),
+        shown,
+      ],
+    );
   }
 
   /// Asks once whether the Note goes to the trash, with the same dialog
@@ -1622,6 +1876,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // In a Shared Area a Member changes only their own Notes, and only a
     // Manager their Routines (ADR 0013); Amend stays.
     final amends = _amends;
+    final editable = changes && note.textEditable;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     final colour = areaColour(area?.colour);
@@ -1689,42 +1944,47 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               strong: note.importance == Importance.important,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TwoRowTextField(
-                  key: const ValueKey('note-text'),
-                  controller: _text,
-                  twoRows: _twoRows,
-                  readOnly: !changes || !note.textEditable,
-                  // ☐ goes in at the cursor; a tap on a box ticks it,
-                  // also where the text is only read (ADR 0035).
-                  boxes: true,
-                  onBox: _tapBox,
-                  // The first format is written at once (ADR 0033).
-                  formats: true,
-                  onFormatted: () => setState(_saveText),
-                  style: Theme.of(context).textTheme.bodyLarge,
-                  decoration: const InputDecoration(
-                    filled: false,
-                    border: InputBorder.none,
-                  ),
-                ),
+                child: _named
+                    ? _nameAndDescription(note, editable: editable)
+                    : TwoRowTextField(
+                        key: const ValueKey('note-text'),
+                        controller: _text,
+                        twoRows: _twoRows,
+                        readOnly: !editable,
+                        // ☐ goes in at the cursor; a tap on a box ticks it,
+                        // also where the text is only read (ADR 0035).
+                        boxes: true,
+                        onBox: _tapBox,
+                        // The first format is written at once (ADR 0033).
+                        formats: true,
+                        onFormatted: () => setState(_saveText),
+                        style: Theme.of(context).textTheme.bodyLarge,
+                        decoration: const InputDecoration(
+                          filled: false,
+                          border: InputBorder.none,
+                        ),
+                      ),
               ),
             ),
-            const SizedBox(height: 16),
-            _badges(placed, when, place, colour),
-            // Nothing while the Note is no Checklist.
+            // The kind's content right under its name (#188): nothing
+            // while the Note is no Checklist, Shopping List or Tally.
             ChecklistSection(
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
               startLine: widget.typeLines,
             ),
-            // Nothing while the Note is no Shopping List.
             ShoppingSection(
               notes: widget.notes,
               noteId: widget.noteId,
               typed: _lines,
               startLine: widget.typeLines,
             ),
+            if (_kind == NoteKind.tally) const SizedBox(height: 16),
+            TallySection(notes: widget.notes, noteId: widget.noteId),
+            // A list's or Tally's panel keeps its own space under it.
+            if (!_named) const SizedBox(height: 16),
+            _badges(placed, when, place, colour),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
               NotePhoto(
@@ -1802,8 +2062,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            // Nothing while the Note is no Tally.
-            TallySection(notes: widget.notes, noteId: widget.noteId),
             for (final (i, section) in _sections.indexed)
               EditorPanel(
                 child: Column(
@@ -1934,32 +2192,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            if (amends || _makesList || _makesShopping)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (amends)
-                    FilledButton.tonalIcon(
-                      onPressed: _amend,
-                      icon: const Icon(Icons.add),
-                      label: Text(t.amend),
-                    ),
-                  if (_makesList)
-                    FilledButton.tonalIcon(
-                      key: const ValueKey('checklist-make'),
-                      onPressed: _makeChecklist,
-                      icon: const Icon(Icons.checklist),
-                      label: Text(t.makeChecklist),
-                    ),
-                  if (_makesShopping)
-                    FilledButton.tonalIcon(
-                      key: const ValueKey('shopping-make'),
-                      onPressed: _makeShoppingList,
-                      icon: const Icon(Icons.shopping_cart_outlined),
-                      label: Text(t.makeShoppingList),
-                    ),
-                ],
+            if (amends)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  onPressed: _amend,
+                  icon: const Icon(Icons.add),
+                  label: Text(t.amend),
+                ),
               ),
           ],
         ),
@@ -1967,6 +2207,22 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 }
+
+/// The icon of the kind [kind] (#188), in its badge and its editor.
+IconData kindIcon(NoteKind kind) => switch (kind) {
+  NoteKind.plain => Icons.notes,
+  NoteKind.checklist => Icons.checklist,
+  NoteKind.shoppingList => Icons.shopping_cart_outlined,
+  NoteKind.tally => Icons.bar_chart,
+};
+
+/// The kind [kind] in words.
+String kindName(AppLocalizations t, NoteKind kind) => switch (kind) {
+  NoteKind.plain => t.kindPlain,
+  NoteKind.checklist => t.checklistHeading,
+  NoteKind.shoppingList => t.shoppingHeading,
+  NoteKind.tally => t.tallyHeading,
+};
 
 /// Says that a text is in a format this version does not know and shows
 /// as it is stored: a newer version of the app is needed to change it.

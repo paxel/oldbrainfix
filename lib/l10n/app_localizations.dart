@@ -7772,11 +7772,41 @@ abstract class AppLocalizations {
   /// **'Area and Topic'**
   String get badgePlace;
 
-  /// The name of the Note editor's badge that shows whether the Note is a Checklist, a Shopping List or a Tally (#160).
+  /// The name of the Note editor's badge that shows the Note's kind: a plain Note, a Checklist, a Shopping List or a Tally (#160, #188).
   ///
   /// In en, this message translates to:
   /// **'Kind'**
   String get badgeKind;
+
+  /// The kind of a Note of text alone (#188): the value of the kind badge and a choice in its dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain Note'**
+  String get kindPlain;
+
+  /// The label of the one-line field for the name of a Note of a kind, a Checklist, Shopping List or Tally (#188): the first line of its text, shown as its title.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get noteName;
+
+  /// The label of the field for the description of a Note of a kind (#188): the rest of its text after the name, shown small under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get noteDescription;
+
+  /// What a screen reader reads, and the tooltip, for the description of a Note of a kind folded to one line under its name (#188): a tap unfolds it.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the whole description'**
+  String get noteDescriptionUnfold;
+
+  /// What a screen reader reads, and the tooltip, for an unfolded description of a Note of a kind (#188): a tap folds it back to one line.
+  ///
+  /// In en, this message translates to:
+  /// **'Fold the description'**
+  String get noteDescriptionFold;
 
   /// The value of a Note editor's badge for a setting that is switched on, such as Show ticks (#160).
   ///

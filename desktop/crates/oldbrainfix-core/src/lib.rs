@@ -37,6 +37,7 @@ pub mod keys;
 pub mod lan;
 pub mod markdown;
 pub mod named_places;
+pub mod note_kinds;
 pub mod notes;
 pub mod nudges;
 pub mod offers;

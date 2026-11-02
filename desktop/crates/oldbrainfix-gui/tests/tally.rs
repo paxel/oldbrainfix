@@ -130,26 +130,31 @@ fn entry_row<'a>(harness: &'a Harness<'_, App>, part: &'a str) -> egui_kittest::
     harness.get_by(move |n| n.role() == Role::Button && n.label().is_some_and(|l| l.contains(part)))
 }
 
+/// The field labelled `label`, the last of that name: a page's over the
+/// Note dialog, whose name is one too (#188).
+fn field<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
+    match harness
+        .query_all_by_role_and_label(Role::TextInput, label)
+        .next_back()
+    {
+        Some(node) => node,
+        None => panic!("no field {label}"),
+    }
+}
+
 /// Types `text` over what the field labelled `label` holds.
 fn type_into(harness: &mut Harness<'_, App>, label: &str, text: &str) {
-    harness
-        .get_by_role_and_label(Role::TextInput, label)
-        .click();
+    field(harness, label).click();
     harness.run();
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
     harness.run();
-    harness
-        .get_by_role_and_label(Role::TextInput, label)
-        .type_text(text);
+    field(harness, label).type_text(text);
     harness.run();
 }
 
 /// What the field labelled `label` holds.
 fn holds(harness: &Harness<'_, App>, label: &str) -> Option<String> {
-    harness
-        .get_by_role_and_label(Role::TextInput, label)
-        .accesskit_node()
-        .value()
+    field(harness, label).accesskit_node().value()
 }
 
 #[test]

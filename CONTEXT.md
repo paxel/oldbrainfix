@@ -7,8 +7,24 @@ A local-first, privacy-first memory aid for anyone who forgets things. Capturing
 ### Capturing
 
 **Note**:
-Anything the user captured: text, a voice recording, a photo, or something shared in from another app, together with its Capture Context. The diary entry everything else hangs off.
+Anything the user captured: text, a voice recording, a photo, or something shared in from another app, together with its Capture Context. The diary entry everything else hangs off. Every Note has one Kind.
 _Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
+
+**Kind**:
+What a Note is, and with it its page: a Plain Note, a Checklist, a Shopping List or a Tally (a Session joins them later). A Plain Note is its text; every other kind shows its content first, its text only as its Name and Description above it. The kind changes on the kind badge of the Note editor: a Plain Note becomes a Checklist, a Shopping List or a Tally, a list becomes the other list, keeping its Lines, or a Plain Note again; a Tally stays a Tally. What belonged to the old kind stays in the log and shows no more. A Frog is no kind but a mark any Note can carry. German: Art.
+_Avoid_: type, template, mode
+
+**Plain Note**:
+A Note of the Kind that is its text alone, with no Lines and no Tally fields. German: einfache Notiz.
+_Avoid_: text note, normal note
+
+**Name**:
+The first line of the text of a Note of any Kind but a Plain Note, shown as the heading of its page and card. In the editor it is a one-line field; the text is not rewritten for it. German: Name.
+_Avoid_: title, heading, label
+
+**Description**:
+The rest of the text of a Note of any Kind but a Plain Note, after its Name: shown small right under the Name, folded to one line until a tap unfolds it. In the editor it is its own field; saved, Name and Description are one text again. German: Beschreibung.
+_Avoid_: body, notes, details
 
 **Capture**:
 The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut (which the phone's own key or gesture settings or a button-mapper app can also start; the app reads no key itself), the desktop hotkey). Capturing never asks for sorting or unlocking.
@@ -162,7 +178,7 @@ The phone's page for its calendars: "Read from your calendar", which shows the a
 ### Tallies
 
 **Tally**:
-A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. German: Strichliste.
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. German: Strichliste.
 _Avoid_: tracker, log, workout, exercise, habit
 
 **Entry**:
@@ -176,11 +192,11 @@ _Avoid_: workout, training, playlist, set
 ### Checklists and Shopping Lists
 
 **Checklist**:
-A Note whose Lines are checked off, such as a packing list: its text stays above as title and description, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally, a Checklist and a Shopping List; it turns back into a plain Note with every Line a line of its text. A Routine or Reminder spawned from a Checklist starts each Occurrence with every Line unchecked, on all of the user's own Devices and for everyone in a Shared Area alike; the Occurrence is Done once every Line is checked for it, by anyone, or when checked off. Today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row, such as "Before the trip: 3 of 7 open", unless the user switched "Show on the Agenda" off for it: a choice of their own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda. German: Checkliste.
+A Note whose Lines are checked off, such as a packing list: its text is its Name and Description above the Lines, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally, a Checklist and a Shopping List; it turns back into a Plain Note with every Line a line of its text, or into a Shopping List of its Lines, the checked ones struck. A Routine or Reminder spawned from a Checklist starts each Occurrence with every Line unchecked, on all of the user's own Devices and for everyone in a Shared Area alike; the Occurrence is Done once every Line is checked for it, by anyone, or when checked off. Today's Agenda shows each Checklist without a Routine or Reminder that has open Lines as one row, such as "Before the trip: 3 of 7 open", unless the user switched "Show on the Agenda" off for it: a choice of their own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda. German: Checkliste.
 _Avoid_: to-do list, task list, todo
 
 **Shopping List**:
-A Note whose Lines come back a while after they are checked, such as the weekly shopping: its text stays above as title and description, and its Lines have no groups. The open Lines keep the order they were typed in, a new Line added at the end. Each Line has its reappear time, Once or one to four weeks, one week for a new Line. Checking a Line strikes it through and moves it to the end, showing the day it comes back; at the start of that day, the same weekday as many weeks on by the Device's wall clock, it is open again, in its place. A Line Once is gone when checked. Adding a name the list already has, in any case and with spaces around it, adds nothing: a struck or gone Line of that name comes back at once, in its place, and an open one stays. It is made from a Note and turns back into a plain Note as a Checklist does, the struck Lines marked "✓ ". A Routine or Reminder spawned from it is Done only when checked off. Today's Agenda shows each Shopping List with open Lines the way the user chose with "Show on the Agenda" for it: one row with the number of its open Lines, such as "Groceries: 4 open", the default; each open Line on its own row, checkable there; or not at all. A list without open Lines never shows. The choice is the user's own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda; a list nobody chose for starts as the Device's earlier setting for all Shopping Lists showed them. A Capture can go into a Shopping List instead of becoming a Note: each of its lines, typed or in a recording's Transcript, becomes a Line of the list, and no Note is kept. German: Einkaufsliste.
+A Note whose Lines come back a while after they are checked, such as the weekly shopping: its text is its Name and Description above the Lines, and its Lines have no groups. The open Lines keep the order they were typed in, a new Line added at the end. Each Line has its reappear time, Once or one to four weeks, one week for a new Line. Checking a Line strikes it through and moves it to the end, showing the day it comes back; at the start of that day, the same weekday as many weeks on by the Device's wall clock, it is open again, in its place. A Line Once is gone when checked. Adding a name the list already has, in any case and with spaces around it, adds nothing: a struck or gone Line of that name comes back at once, in its place, and an open one stays. It is made from a Note and turns back into a Plain Note as a Checklist does, the struck Lines marked "✓ ", or into a Checklist of its Lines, the struck ones checked. A Routine or Reminder spawned from it is Done only when checked off. Today's Agenda shows each Shopping List with open Lines the way the user chose with "Show on the Agenda" for it: one row with the number of its open Lines, such as "Groceries: 4 open", the default; each open Line on its own row, checkable there; or not at all. A list without open Lines never shows. The choice is the user's own, kept on their own Devices as an Override is, so in a Shared Area each person decides for their own Agenda; a list nobody chose for starts as the Device's earlier setting for all Shopping Lists showed them. A Capture can go into a Shopping List instead of becoming a Note: each of its lines, typed or in a recording's Transcript, becomes a Line of the list, and no Note is kept. German: Einkaufsliste.
 _Avoid_: grocery list, perpetual list, to-buy list
 
 **Line**:

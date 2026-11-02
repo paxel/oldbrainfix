@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
+import 'package:oldbrainfix/src/line_editing.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/tally_field_screen.dart';
 import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -57,6 +59,8 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
+  final radios = find.byWidgetPredicate((w) => w is RadioGroup<NoteKind>);
+
   Finder inDialog(Finder finder) =>
       find.descendant(of: find.byType(AlertDialog), matching: finder);
 
@@ -64,8 +68,8 @@ void main() {
   Finder dialogTitle(String text) => inDialog(find.text(text));
 
   group('a plain Note', () {
-    testWidgets('shows Importance, Area and Topic and Captured, and "+"; '
-        'no kind, Show on the Agenda or Show ticks', (tester) async {
+    testWidgets('shows Importance, Area and Topic and Captured, its kind and '
+        '"+"; no Show on the Agenda or Show ticks', (tester) async {
       final home = places.addArea('Household');
       final kitchen = places.addTopic(home.id, 'Kitchen');
       final id = notes.capture('sauce', place: kitchen.id).id;
@@ -77,7 +81,9 @@ void main() {
         DateFormat.yMd('en_US').add_Hm().format(now.toLocal()),
       );
       expect(key('badge-add'), findsOneWidget);
-      for (final none in ['badge-kind', 'badge-agenda', 'badge-ticks']) {
+      // Every Note has a kind (#188).
+      expect(value(tester, 'badge-kind'), 'Plain Note');
+      for (final none in ['badge-agenda', 'badge-ticks']) {
         expect(key(none), findsNothing, reason: none);
       }
       // One row under the text, before anything else of the page.
@@ -96,6 +102,7 @@ void main() {
       expect(find.bySemanticsLabel('Importance: Normal'), findsOneWidget);
       expect(find.bySemanticsLabel('Area and Topic: Unsorted'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Captured: ')), findsOneWidget);
+      expect(find.bySemanticsLabel('Kind: Plain Note'), findsOneWidget);
       expect(
         find.bySemanticsLabel('Routine, Reminder, Frog or Session'),
         findsOneWidget,
@@ -196,8 +203,8 @@ void main() {
   });
 
   group('a Checklist', () {
-    testWidgets('shows its kind, Show on the Agenda and Show ticks; Back to '
-        'a plain Note in the kind\'s editor', (tester) async {
+    testWidgets('shows its kind, Show on the Agenda and Show ticks; Plain '
+        'Note in the kind\'s editor turns it back', (tester) async {
       final id = notes.capture('Trip\nPassport\nTickets').id;
       Checklists(store).make(id);
       await edit(tester, id);
@@ -207,10 +214,15 @@ void main() {
 
       await tap(tester, key('badge-kind'));
       expect(dialogTitle('Kind'), findsOneWidget);
-      expect(inDialog(find.text('Checklist')), findsOneWidget);
-      await tap(tester, key('kind-to-plain'));
+      expect(inDialog(find.byIcon(Icons.checklist)), findsOneWidget);
+      expect(
+        tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
+        NoteKind.checklist,
+      );
+      await tap(tester, key('kind-plain'));
+      expect(find.byType(AlertDialog), findsNothing);
       expect(Checklists(store).isChecklist(id), isFalse);
-      expect(key('badge-kind'), findsNothing);
+      expect(value(tester, 'badge-kind'), 'Plain Note');
       expect(key('badge-agenda'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
@@ -255,6 +267,135 @@ void main() {
     });
   });
 
+  group('the kind badge changes the kind (#188)', () {
+    /// The kinds the open kind editor offers, by their keys.
+    List<String> offered(WidgetTester tester) => [
+      for (final kind in NoteKind.values)
+        if (inDialog(key('kind-${kind.name}')).evaluate().isNotEmpty) kind.name,
+    ];
+
+    /// The fields of the Lines that hold [text].
+    Finder lineFields(String text) => find.byWidgetPredicate(
+      (w) =>
+          w is TextField &&
+          w.controller?.text.replaceAll(lineStart, '') == text,
+    );
+
+    List<String> shoppingLines(String id) => [
+      for (final line
+          in ShoppingLists(store).byNote(id, deviceWallClock)?.lines ??
+              const <ShoppingLine>[])
+        line.text,
+    ];
+
+    testWidgets('a plain Note offers every kind as radio buttons, its own '
+        'marked; Checklist makes it one at once, its first line the name, '
+        'the rest its Lines', (tester) async {
+      final id = notes.capture('Trip\nPassport\nTickets').id;
+      await edit(tester, id);
+      // The badge replaces the buttons at the bottom.
+      expect(key('checklist-make'), findsNothing);
+      expect(key('shopping-make'), findsNothing);
+      await tap(tester, key('badge-kind'));
+      expect(dialogTitle('Kind'), findsOneWidget);
+      expect(inDialog(find.byIcon(Icons.notes)), findsOneWidget);
+      expect(offered(tester), ['plain', 'checklist', 'shoppingList', 'tally']);
+      expect(
+        tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
+        NoteKind.plain,
+      );
+      await tap(tester, key('kind-checklist'));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(Checklists(store).isChecklist(id), isTrue);
+      expect(value(tester, 'badge-kind'), 'Checklist');
+      expect(key('note-text'), findsNothing);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        'Trip',
+      );
+      expect(
+        [for (final line in Checklists(store).byNote(id)!.lines) line.text],
+        ['Passport', 'Tickets'],
+      );
+      expect(lineFields('Passport'), findsOneWidget);
+    });
+
+    testWidgets('a Checklist becomes a Shopping List with its Lines, the '
+        'checked one checked, and back; its text stays', (tester) async {
+      final id = notes.capture('Trip\nPassport\nTickets').id;
+      final lists = Checklists(store)..make(id);
+      lists.check(lists.byNote(id)!.lines.first.id);
+      final text = notes.byId(id)!.text;
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      expect(offered(tester), ['plain', 'checklist', 'shoppingList']);
+      await tap(tester, key('kind-shoppingList'));
+      expect(ShoppingLists(store).isShoppingList(id), isTrue);
+      expect(lists.isChecklist(id), isFalse);
+      expect(value(tester, 'badge-kind'), 'Shopping List');
+      expect(shoppingLines(id), unorderedEquals(['Passport', 'Tickets']));
+      final passport = ShoppingLists(store)
+          .byNote(id, deviceWallClock)!
+          .lines
+          .firstWhere((l) => l.text == 'Passport');
+      expect(passport.struck, isTrue);
+      // Each Line once, in the Shopping List only.
+      expect(key('shopping'), findsOneWidget);
+      expect(key('checklist'), findsNothing);
+      expect(lineFields('Tickets'), findsOneWidget);
+      expect(notes.byId(id)!.text, text);
+
+      await tap(tester, key('badge-kind'));
+      expect(offered(tester), ['plain', 'checklist', 'shoppingList']);
+      await tap(tester, key('kind-checklist'));
+      expect(lists.isChecklist(id), isTrue);
+      expect(value(tester, 'badge-kind'), 'Checklist');
+      expect([
+        for (final line in lists.byNote(id)!.lines) (line.text, line.checked),
+      ], unorderedEquals([('Passport', true), ('Tickets', false)]));
+      expect(key('checklist'), findsOneWidget);
+      expect(key('shopping'), findsNothing);
+      expect(notes.byId(id)!.text, text);
+    });
+
+    testWidgets('a Shopping List turns back into a plain Note, its Lines '
+        'the lines of its text', (tester) async {
+      final id = notes.capture('Groceries\nMilk\nBread').id;
+      ShoppingLists(store).make(id);
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-plain'));
+      expect(ShoppingLists(store).isShoppingList(id), isFalse);
+      expect(value(tester, 'badge-kind'), 'Plain Note');
+      expect(key('note-name'), findsNothing);
+      final text = tester
+          .widget<TextField>(
+            find.descendant(
+              of: key('note-text'),
+              matching: find.byType(TextField),
+            ),
+          )
+          .controller!
+          .text;
+      expect(text.split('\n').first, 'Groceries');
+      expect(text, contains('Milk'));
+      expect(text, contains('Bread'));
+    });
+
+    testWidgets('Tally opens the page of its first field', (tester) async {
+      final id = notes.capture('Reading').id;
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-tally'));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      // Left without Save it stays a plain Note.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(Tallies(store).isTally(id), isFalse);
+      expect(value(tester, 'badge-kind'), 'Plain Note');
+    });
+  });
+
   testWidgets('Show ticks shows while the text has a box; its switch writes '
       'it for this Device', (tester) async {
     final id = notes.capture('☐ milk').id;
@@ -274,7 +415,9 @@ void main() {
     await edit(tester, shop);
     expect(value(tester, 'badge-kind'), 'Shopping List');
     await tap(tester, key('badge-kind'));
-    expect(inDialog(key('kind-to-plain')), findsOneWidget);
+    expect(inDialog(key('kind-plain')), findsOneWidget);
+    expect(inDialog(key('kind-checklist')), findsOneWidget);
+    expect(inDialog(key('kind-tally')), findsNothing);
     await tap(tester, key('badge-close'));
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -284,6 +427,17 @@ void main() {
     final agenda = tester.element(find.byType(AgendaScreen));
     unawaited(openNote(agenda, notes, places, notes.byId(reading)!));
     await tester.pumpAndSettle();
+    // Under the Tally's content (#188).
+    await tester.scrollUntilVisible(
+      key('badge-kind'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(NoteEditorScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(value(tester, 'badge-kind'), 'Tally');
     // A Tally stays one: nothing to change there.
     expect(tester.widget<SettingBadge>(key('badge-kind')).onTap, isNull);

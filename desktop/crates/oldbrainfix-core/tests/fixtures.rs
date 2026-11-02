@@ -41,7 +41,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 22] = [
+const SCENARIOS: [&str; 23] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -52,6 +52,7 @@ const SCENARIOS: [&str; 22] = [
     "history",
     "import",
     "keep",
+    "list-switch",
     "markdown",
     "markers",
     "media",
@@ -1832,7 +1833,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 22] = [
+    let writers: [(&str, Writer); 23] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1843,6 +1844,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("history", write_history),
         ("import", write_import),
         ("keep", write_keep),
+        ("list-switch", write_list_switch),
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),
@@ -2994,6 +2996,7 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
         "checklists",
         "history",
         "keep",
+        "list-switch",
     ] {
         checklists_come_to_what_the_dart_core_says(scenario)?;
     }
@@ -3149,6 +3152,75 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
 }
 
 // ------------------------------------------------------- Shopping Lists
+
+/// The generator's `list-switch` scenario.
+fn write_list_switch(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let lists = ShoppingLists::new(store);
+    let checklists = Checklists::new(store);
+    let wall = frog_day(0);
+    let line = |note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(note, &wall)?.ok_or("a Shopping List")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let trip = notes
+        .capture("Trip\nPassport\n Socks\n✓ Tickets", None, None)?
+        .id;
+    checklists.make(&trip)?;
+    notes.edit(&trip, "Trip\nfor the weekend")?;
+    lists.switch_list(&trip, &wall)?;
+    let shop = notes.capture("Shop\nMilk\nBread\nEggs", None, None)?.id;
+    lists.make(&shop)?;
+    lists.set_reappear(&line(&shop, "Bread")?, Reappear::Once)?;
+    lists.check(&line(&shop, "Bread")?, &wall)?;
+    lists.check(&line(&shop, "Milk")?, &wall)?;
+    lists.switch_list(&shop, &wall)?;
+    let hardware = notes.capture("Hardware\nNails\nGlue", None, None)?.id;
+    lists.make(&hardware)?;
+    lists.switch_list(&hardware, &wall)?;
+    lists.switch_list(&hardware, &wall)?;
+    let gym = notes.capture("Gym\nMondays and Thursdays", None, None)?.id;
+    Tallies::new(store).add_field(&gym, "Reps", "reps", None, None)?;
+    notes.capture("Call Ben\nabout the car", None, None)?;
+    Ok(())
+}
+
+#[test]
+fn every_note_of_the_list_switch_log_is_of_the_kind_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::note_kinds::{self, NoteKind};
+    let dir = fixtures().join("list-switch");
+    let expected = read_json(&dir.join("kinds.json"))?;
+    let read_at = read_json(&dir.join("expected.json"))?;
+    let store = load("list-switch", read_at["now"].as_str().ok_or("now")?)?;
+    let mut ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
+    ids.sort();
+    let mut kinds = serde_json::Map::new();
+    for id in ids {
+        let text = Notes::new(&store).by_id(&id)?.ok_or("the Note")?.text;
+        let kind = match NoteKind::of(&store, &id)? {
+            NoteKind::Plain => "plain",
+            NoteKind::Checklist => "checklist",
+            NoteKind::ShoppingList => "shoppingList",
+            NoteKind::Tally => "tally",
+        };
+        kinds.insert(
+            id,
+            json!({
+                "kind": kind,
+                "name": note_kinds::name(&text),
+                "description": note_kinds::description(&text),
+            }),
+        );
+    }
+    assert_eq!(Value::Object(kinds), expected);
+    Ok(())
+}
 
 /// The generator's `shopping-lists` scenario.
 fn write_shopping_lists(store: &Store) -> Built {
@@ -3335,14 +3407,21 @@ fn shopping_list_json(list: &ShoppingList) -> Value {
 
 #[test]
 fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
-    let dir = fixtures().join("shopping-lists");
+    for scenario in ["list-switch", "shopping-lists"] {
+        shopping_lists_of_come_to_what_the_dart_core_says(scenario)?;
+    }
+    Ok(())
+}
+
+fn shopping_lists_of_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
+    let dir = fixtures().join(scenario);
     let expected = read_json(&dir.join("shopping.json"))?;
     let wall = frog_day(0);
     // Each Shopping List at each moment, read with nothing written.
     let mut at = Vec::new();
     for moment in expected["at"].as_array().ok_or("at")? {
         let now = moment["now"].as_str().ok_or("now")?;
-        let store = load("shopping-lists", now)?;
+        let store = load(scenario, now)?;
         let lists = ShoppingLists::new(&store);
         let mut ids = store.entities_of_type("note")?;
         ids.sort();
@@ -3367,7 +3446,7 @@ fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
     }
     assert_eq!(json!(at), expected["at"]);
     let read_at = read_json(&dir.join("expected.json"))?;
-    let store = load("shopping-lists", read_at["now"].as_str().ok_or("now")?)?;
+    let store = load(scenario, read_at["now"].as_str().ok_or("now")?)?;
     let lists = ShoppingLists::new(&store);
     let mut ids = store.entities_of_type("note")?;
     ids.sort();
@@ -3615,7 +3694,7 @@ fn units_json() -> Value {
 
 #[test]
 fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["history", "tallies"] {
+    for scenario in ["history", "list-switch", "tallies"] {
         tallies_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())

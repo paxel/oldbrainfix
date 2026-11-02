@@ -290,6 +290,11 @@ class NoteCard extends StatelessWidget {
   /// how many are open on a compact one (#122); nothing when null.
   final NoteShoppingList? shopping;
 
+  /// Reads the Note's kind (#188) for a [full] card, never while
+  /// building: a Note of a kind shows its name as the title and its
+  /// description folded under it; a plain Note when null.
+  final NoteKind Function()? kind;
+
   /// How the boxes of the Note's text, or of a Section's, given by its
   /// entity and its boxes, are ticked (ADR 0035): each ☐, ✅ or ❌ opens
   /// Check, Fail, Open and its History at the finger; they are plain
@@ -329,6 +334,7 @@ class NoteCard extends StatelessWidget {
     this.footer,
     this.checklist,
     this.shopping,
+    this.kind,
     this.boxes,
     this.onTable,
   });
@@ -502,6 +508,7 @@ class NoteCard extends StatelessWidget {
                               when: when,
                               sections: sections,
                               list: lists(true),
+                              kind: kind,
                               boxes: boxes,
                               onTable: onTable,
                             ),
@@ -1256,6 +1263,9 @@ class _FullNote extends StatefulWidget {
   /// The Note's Checklist, under its text.
   final Widget? list;
 
+  /// Reads the Note's kind (#188); a plain Note when null.
+  final NoteKind Function()? kind;
+
   /// How the boxes of the Note's text and of its Sections' are ticked.
   final BoxTicking Function(String entity, List<ShownBox> boxes)? boxes;
 
@@ -1267,6 +1277,7 @@ class _FullNote extends StatefulWidget {
     required this.when,
     this.sections,
     this.list,
+    this.kind,
     this.boxes,
     this.onTable,
   });
@@ -1277,6 +1288,7 @@ class _FullNote extends StatefulWidget {
 
 class _FullNoteState extends State<_FullNote> {
   List<Section> _sections = const [];
+  NoteKind _kind = NoteKind.plain;
 
   @override
   void initState() {
@@ -1287,14 +1299,22 @@ class _FullNoteState extends State<_FullNote> {
   @override
   void didUpdateWidget(_FullNote old) {
     super.didUpdateWidget(old);
-    // Read again only when the Note was.
+    // Read again only when the Note was; its kind may change without its
+    // text, as a Tally made of it.
     if (old.note != widget.note ||
         (old.sections == null) != (widget.sections == null)) {
       _read();
+    } else {
+      _readKind();
     }
   }
 
-  void _read() => _sections = widget.sections?.call() ?? const [];
+  void _read() {
+    _sections = widget.sections?.call() ?? const [];
+    _readKind();
+  }
+
+  void _readKind() => _kind = widget.kind?.call() ?? NoteKind.plain;
 
   @override
   Widget build(BuildContext context) {
@@ -1317,6 +1337,7 @@ class _FullNoteState extends State<_FullNote> {
           removedRecordings: note.removedRecordings,
           list: widget.list,
           onTable: widget.onTable,
+          named: _kind != NoteKind.plain,
         ),
         const SizedBox(height: 8),
         CaptureLine(
@@ -1391,6 +1412,10 @@ class _Whole extends StatelessWidget {
   /// Changes a table of the text; it is only read when null.
   final TableEditing? onTable;
 
+  /// Whether the text is a name and a description, of a Note of a kind
+  /// (#188).
+  final bool named;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1406,41 +1431,42 @@ class _Whole extends StatelessWidget {
     this.list,
     this.ticking,
     this.onTable,
+    this.named = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
+    // A photo Note may have no words.
+    final Widget? words = text.isEmpty
+        ? null
+        : named
+        ? _NameAndDescription(
+            text: text,
+            source: source,
+            boxes: boxes,
+            format: format,
+            ticking: ticking,
+            onTable: onTable,
+          )
+        : MarkedText(
+            text,
+            format: format,
+            style: style,
+            boxes: boxes,
+            source: source,
+            ticking: ticking,
+            tableEdit: onTable,
+          );
     final parts = <Widget>[
-      // A photo Note may have no words.
-      if (text.isNotEmpty && list == null)
-        MarkedText(
-          text,
-          format: format,
-          style: style,
-          boxes: boxes,
-          source: source,
-          ticking: ticking,
-          tableEdit: onTable,
-        ),
+      if (list == null)
+        ?words
       // It keeps its own space: it is nothing on a Note that is none.
-      if (list != null)
+      else
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (text.isNotEmpty)
-              MarkedText(
-                text,
-                format: format,
-                style: style,
-                boxes: boxes,
-                source: source,
-                ticking: ticking,
-                tableEdit: onTable,
-              ),
-            list,
-          ],
+          children: [?words, list],
         ),
       for (final hash in photos)
         Column(
@@ -1499,6 +1525,97 @@ class _Whole extends StatelessWidget {
           if (i > 0) const SizedBox(height: 8),
           part,
         ],
+      ],
+    );
+  }
+}
+
+/// The text of a Note of a kind on its full card (#188): its name as the
+/// title, and its description under it, small and weak, folded to one
+/// line until a tap unfolds it; a tap on the description folds or unfolds
+/// it and nothing else, the card's own tap not included. [text] is the
+/// text as it shows, its [boxes] in it, as [MarkedText] takes it.
+class _NameAndDescription extends StatefulWidget {
+  final String text;
+  final String source;
+  final List<ShownBox> boxes;
+  final String format;
+  final BoxTicking? ticking;
+  final TableEditing? onTable;
+
+  const _NameAndDescription({
+    required this.text,
+    required this.source,
+    required this.boxes,
+    required this.format,
+    this.ticking,
+    this.onTable,
+  });
+
+  @override
+  State<_NameAndDescription> createState() => _NameAndDescriptionState();
+}
+
+class _NameAndDescriptionState extends State<_NameAndDescription> {
+  var _unfolded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final text = widget.text;
+    final nameEnd = NoteKinds.name(text).length;
+    final from = text.length - NoteKinds.description(text).length;
+    final description = text.substring(from);
+    final (start, end) = NoteCard.firstLine(description);
+    Widget part({required int start, int? end, TextStyle? style, int? lines}) =>
+        MarkedText(
+          text,
+          format: widget.format,
+          start: start,
+          end: end,
+          style: style,
+          maxLines: lines,
+          overflow: lines == null ? null : TextOverflow.ellipsis,
+          boxes: widget.boxes,
+          source: widget.source,
+          ticking: widget.ticking,
+          tableEdit: widget.onTable,
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KeyedSubtree(
+          key: const ValueKey('card-name'),
+          child: part(
+            start: 0,
+            end: nameEnd,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+        if (description.trim().isNotEmpty)
+          Semantics(
+            key: const ValueKey('card-description'),
+            container: true,
+            button: true,
+            hint: _unfolded ? t.noteDescriptionFold : t.noteDescriptionUnfold,
+            // Its own tap, so the card's does not run too.
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _unfolded = !_unfolded),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: part(
+                  start: _unfolded ? from : from + start,
+                  end: _unfolded ? null : from + end,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  lines: _unfolded ? null : 1,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

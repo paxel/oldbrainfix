@@ -733,6 +733,86 @@ impl<'a> ShoppingLists<'a> {
         })
     }
 
+    /// Whether this Device may switch the list the Note `note_id` is, a
+    /// Checklist to a Shopping List or the other way ([`Self::switch_list`]):
+    /// a Note in the lists that is one of the two, which it may change.
+    pub fn may_switch(&self, note_id: &str) -> Result<bool> {
+        let Some(note) = Notes::new(self.store).by_id(note_id)? else {
+            return Ok(false);
+        };
+        Ok(!note.is_trashed()
+            && !note.is_merged()
+            && (self.making(note_id)?.is_some()
+                || Checklists::new(self.store).is_checklist(note_id)?)
+            && self.store.may_change(note_id)?)
+    }
+
+    /// Switches the list the Note `note_id` is (#188): a Checklist becomes
+    /// a Shopping List and a Shopping List a Checklist, in a new making.
+    /// The Lines that show carry over, as Lines of the new making, in the
+    /// order they show, at one moment: a checked Line checked, a struck one
+    /// checked, each at the top with the reappear time a new Line gets on
+    /// a Shopping List. A Checklist's Lines show their own checks here, not
+    /// those of an Occurrence. The text is not touched; the Lines of the
+    /// old making stay in the log.
+    pub fn switch_list(&self, note_id: &str, wall: &WallClock) -> Result<()> {
+        if !self.may_switch(note_id)? {
+            return Err(Error::Invalid(format!(
+                "the list of {note_id} may not be switched here"
+            )));
+        }
+        let shopping = self.by_note(note_id, wall)?;
+        let carried: Vec<(String, bool)> = match &shopping {
+            Some(list) => list
+                .lines
+                .iter()
+                .map(|l| (l.text.clone(), l.struck))
+                .collect(),
+            None => Checklists::new(self.store)
+                .by_note(note_id)?
+                .map(|list| list.lines)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|l| (l.text, l.checked))
+                .collect(),
+        };
+        let making = self.store.new_id()?;
+        self.store.batch(|| {
+            let s = self.store;
+            let kind = match shopping {
+                Some(_) => checklist_keys::kind_of(&making),
+                None => keys::kind_of(&making),
+            };
+            s.append(note_id, checklist_keys::KIND, Some(&kind), None)?;
+            let now = s.now();
+            let mut key = String::new();
+            for (text, checked) in &carried {
+                key = order::after(&key);
+                match shopping {
+                    Some(_) => {
+                        write_line(
+                            s,
+                            note_id,
+                            &making,
+                            &NewLine {
+                                text,
+                                order: &key,
+                                indent: false,
+                                checked: *checked,
+                                received: None,
+                                at: Some(now),
+                            },
+                        )?;
+                    }
+                    None => {
+                        self.write_line(note_id, &making, text, &key, *checked, Some(now))?;
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
     /// Turns the Shopping List of `note_id` back into a plain Note: every
     /// Line that shows goes into its text, one per line, under its text, a
     /// struck one marked "✓ ", in the format the text is in. The Lines and
@@ -1172,6 +1252,95 @@ mod tests {
 
     fn id_of(store: &Store, note: &str, text: &str) -> Made<String> {
         Ok(line_of(store, note, text)?.id)
+    }
+
+    /// How many entries the log holds for `field` of `entity`.
+    fn writes(store: &Store, entity: &str, field: &str) -> Made<usize> {
+        Ok(store
+            .history(entity)?
+            .iter()
+            .filter(|e| e.field == field)
+            .count())
+    }
+
+    #[test]
+    fn a_checklist_switches_to_a_shopping_list_of_its_lines_the_text_untouched() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = Notes::new(&ann)
+            .capture("Trip\nPassport\n Socks\nTickets", None, None)?
+            .id;
+        let lists = Checklists::new(&ann);
+        lists.make(&note)?;
+        let third = lists.by_note(&note)?.ok_or("a Checklist")?.lines[2]
+            .id
+            .clone();
+        lists.check(&third)?;
+        let texts = writes(&ann, &note, note_keys::TEXT)?;
+        let shops = ShoppingLists::new(&ann);
+        assert!(shops.may_switch(&note)?);
+        shops.switch_list(&note, &wall)?;
+        assert!(lists.by_note(&note)?.is_none());
+        assert_eq!(shown(&ann, &note)?, ["Passport", "Socks", "~Tickets"]);
+        assert_eq!(line_of(&ann, &note, "Socks")?.reappear, Reappear::Week1);
+        assert_eq!(writes(&ann, &note, note_keys::TEXT)?, texts, "no text");
+        let made = Notes::new(&ann).by_id(&note)?.ok_or("the Note")?;
+        assert_eq!(made.text, "Trip");
+        Ok(())
+    }
+
+    #[test]
+    fn a_shopping_list_switches_to_a_checklist_of_the_lines_that_show() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nBread\nEggs", None)?;
+        let shops = ShoppingLists::new(&ann);
+        shops.set_reappear(&id_of(&ann, &note, "Bread")?, Reappear::Once)?;
+        shops.check(&id_of(&ann, &note, "Bread")?, &wall)?;
+        shops.check(&id_of(&ann, &note, "Milk")?, &wall)?;
+        shops.switch_list(&note, &wall)?;
+        assert!(!shops.is_shopping_list(&note)?);
+        let list = Checklists::new(&ann).by_note(&note)?.ok_or("a Checklist")?;
+        let lines: Vec<String> = list
+            .lines
+            .iter()
+            .map(|l| format!("{}{}", if l.checked { "~" } else { "" }, l.text))
+            .collect();
+        assert_eq!(lines, ["Eggs", "~Milk"]);
+        assert!(list.lines.iter().all(|l| !l.in_group()));
+        Ok(())
+    }
+
+    #[test]
+    fn switching_back_and_forth_starts_a_new_making_each_time() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk", None)?;
+        let shops = ShoppingLists::new(&ann);
+        let first = shops.making(&note)?.ok_or("a making")?;
+        shops.switch_list(&note, &wall)?;
+        shops.switch_list(&note, &wall)?;
+        assert_ne!(shops.making(&note)?.ok_or("a making")?, first);
+        assert_eq!(shown(&ann, &note)?, ["Milk"]);
+        assert_eq!(
+            ann.entities_with_prefix(checklist_keys::LINE_PREFIX)?.len(),
+            3
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn neither_a_plain_note_nor_a_tally_switches() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let shops = ShoppingLists::new(&ann);
+        let plain = Notes::new(&ann).capture("Shop\nMilk", None, None)?.id;
+        assert!(!shops.may_switch(&plain)?);
+        assert!(shops.switch_list(&plain, &wall).is_err());
+        let tally = Notes::new(&ann).capture("Gym", None, None)?.id;
+        Tallies::new(&ann).add_field(&tally, "Reps", "reps", None, None)?;
+        assert!(!shops.may_switch(&tally)?);
+        Ok(())
     }
 
     #[test]

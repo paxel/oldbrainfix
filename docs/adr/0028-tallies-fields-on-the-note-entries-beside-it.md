@@ -50,3 +50,7 @@ A chart is one bar per day, week (from Monday), month or year on the Device's wa
 - ADR 0005: making a Note a Tally takes it out of Unsorted, as spawning does.
 - ADR 0008: the unit system is a Device setting.
 - ADR 0013: a Tally's fields are changed as its Note is; its entries are judged like Sections.
+
+## A Note is its kind (ADR 0038)
+
+Amended by ADR 0038 (#188): a Tally's text shows as its name, the first line, heading its page and card, and its description, the rest, folded under it, above the Tally's content. A Tally stays a Tally: its kind badge offers no other kind.

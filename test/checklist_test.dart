@@ -273,18 +273,25 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     }
 
+    /// Makes the Note the kind [kind] through its kind badge (#188).
+    Future<void> pickKind(WidgetTester tester, NoteKind kind) async {
+      await tester.ensureVisible(key('badge-kind'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-${kind.name}'));
+    }
+
     Future<void> lineMenu(WidgetTester tester, String id) =>
         tap(tester, key('checklist-menu-$id'));
 
-    testWidgets('"Make it a Checklist" makes the text as typed one; the '
-        'field keeps the title, also after leaving', (tester) async {
+    testWidgets('Checklist in the kind badge makes the text as typed one; '
+        'the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
       await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
-      await tap(tester, key('checklist-make'));
+      await pickKind(tester, NoteKind.checklist);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('checklist'), findsOneWidget);
-      expect(key('checklist-make'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
         'Shop',
@@ -366,7 +373,7 @@ void main() {
         'Return makes the next, and the only Line stays', (tester) async {
       final note = notes.capture('Trip').id;
       await openEditor(tester, 'Trip');
-      await tap(tester, key('checklist-make'));
+      await pickKind(tester, NoteKind.checklist);
       expect(shown(note), isEmpty);
       expect(key('checklist-field-new-1'), findsOneWidget);
       expect(cursor(tester), ('', 0));
@@ -558,8 +565,7 @@ void main() {
       expect(shown(note), ['Milk', 'Eggs']);
 
       await tap(tester, key('checklist-check-$milk'));
-      await tap(tester, key('badge-kind'));
-      await tap(tester, key('kind-to-plain'));
+      await pickKind(tester, NoteKind.plain);
       expect(lists.isChecklist(note), isFalse);
       expect(key('checklist'), findsNothing);
       expect(

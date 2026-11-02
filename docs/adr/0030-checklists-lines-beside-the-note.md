@@ -133,3 +133,7 @@ The choice lies on the same entity `agenda:<note id>` as a Checklist's switch, k
 - ADR 0017: so does each person's choice of how a Shopping List shows on the Agenda (#186).
 - ADR 0008: how a Device's Agenda shows Shopping Lists is no longer a setting of the Device; the old setting only gives the default of a list nobody chose for.
 - ADR 0026: the AI port reads and sets a Shopping List's Agenda choice as a Pending Change.
+
+## A Note is its kind (ADR 0038)
+
+Amended by ADR 0038 (#188): the text no longer stays above the list as a block of its own. Its first line is the list's name, heading the page and the card, the rest its description, folded under it, and the Lines follow. A Checklist becomes a Shopping List, and a Shopping List a Checklist, on its kind badge, with a new making: the Lines that show carry over in their order, checked ones checked, all at the top with the reappear time of a new Line; the text is not touched (`ShoppingLists.switchList`, `switch_list`).

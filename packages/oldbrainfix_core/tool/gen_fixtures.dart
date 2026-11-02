@@ -1107,6 +1107,40 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'list-switch',
+    about:
+        'Lists switched to the other list (#188): a Checklist with a group, '
+        'a checked Line and a description typed after it was made becoming a '
+        'Shopping List, a Shopping List with a struck Line and one gone Once '
+        'becoming a Checklist, and one switched there and back; a Tally with '
+        'a description and a plain Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final lists = ShoppingLists(store);
+      final checklists = Checklists(store);
+      final wall = _frogDay(0);
+      String line(String note, String text) =>
+          lists.byNote(note, wall)!.lines.firstWhere((l) => l.text == text).id;
+      final trip = notes.capture('Trip\nPassport\n Socks\n✓ Tickets').id;
+      checklists.make(trip);
+      notes.edit(trip, 'Trip\nfor the weekend');
+      lists.switchList(trip, wall);
+      final shop = notes.capture('Shop\nMilk\nBread\nEggs').id;
+      lists.make(shop);
+      lists.setReappear(line(shop, 'Bread'), Reappear.once);
+      lists.check(line(shop, 'Bread'), wall);
+      lists.check(line(shop, 'Milk'), wall);
+      lists.switchList(shop, wall);
+      final hardware = notes.capture('Hardware\nNails\nGlue').id;
+      lists.make(hardware);
+      lists.switchList(hardware, wall);
+      lists.switchList(hardware, wall);
+      final gym = notes.capture('Gym\nMondays and Thursdays').id;
+      Tallies(store).addField(gym, name: 'Reps', unit: 'reps');
+      notes.capture('Call Ben\nabout the car');
+    },
+  ),
+  (
     name: 'sessions',
     about:
         'Sessions spawned with their Notes behind the scenes, picking from '
@@ -1934,6 +1968,20 @@ const _markdownRows = [
 /// Each Checklist of [store] with its Lines, the one-pass read of them
 /// all, which Notes may become one, what each goes back to as a plain
 /// Note, and how lines of text and keys are read and made.
+/// The kind of each Note of [store], with its name and description
+/// (#188).
+Map<String, Object?> _kinds(Store store) {
+  final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
+  return {
+    for (final id in ids)
+      id: {
+        'kind': NoteKinds(store).of(id).name,
+        'name': NoteKinds.name(Notes(store).byId(id)!.text),
+        'description': NoteKinds.description(Notes(store).byId(id)!.text),
+      },
+  };
+}
+
 Map<String, Object?> _checklists(Store store) {
   final lists = Checklists(store);
   final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
@@ -7803,6 +7851,9 @@ Future<void> main(List<String> args) async {
     'Checklists on today\'s Agenda with their open and total Lines, '
     'whether each Note shows there by the user\'s own choice and whether '
     'the choice applies to it.\n'
+    '- `list-switch/kinds.json`: the kind of each Note of the '
+    '`list-switch` log, with the name and description its text shows as; '
+    'its `checklists.json` and `shopping.json` as for the logs above.\n'
     '- `shopping-lists/shopping.json`: each Shopping List of the '
     '`shopping-lists` log with its Lines in the order they show, their '
     'reappear times, which are struck, the day each comes back and the day '
@@ -8204,6 +8255,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
+        );
+      }
+      if (scenario.name == 'list-switch') {
+        _write(
+          File('${out.path}/kinds.json'),
+          '${_json.convert(_kinds(store))}\n',
         );
       }
       if (scenario.name == 'markers') {

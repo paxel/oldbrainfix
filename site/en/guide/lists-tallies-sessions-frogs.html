@@ -41,11 +41,26 @@
   <figcaption>A new Session with its pool and badges.</figcaption>
 </figure>
 
+<h2>A Note's kind</h2>
+<p>
+  Every Note has one kind: a <strong>Plain Note</strong>, a <strong>Checklist</strong>, a
+  <strong>Shopping List</strong> or a <strong>Tally</strong>. A Plain Note is its text. For the
+  other kinds the Note's first line is its name, shown as a heading at the top of its card and
+  editor; the rest of its text is its description, small under the name and folded to one line
+  until a tap unfolds it. The Lines or the Tally come right after it, then the badges, photos and
+  recordings, and the Amends at the end. In the editor the name and the description are two fields;
+  saving writes them back as one text, and a Note opened and left unchanged is not written.
+</p>
+<ul>
+  <li>The kind badge in the Note editor shows the kind. A tap offers the kinds the Note can become: a Plain Note becomes a Checklist, a Shopping List or a Tally; a Checklist becomes a Shopping List or a Plain Note; a Shopping List becomes a Checklist or a Plain Note. A Tally stays a Tally.</li>
+  <li>A Checklist that becomes a Shopping List keeps its Lines in their order, the checked ones struck, groups flattened; a Shopping List that becomes a Checklist keeps the Lines that show, the struck ones checked. The text stays as it is. The old Lines stay in the log and no longer show.</li>
+</ul>
+
 <h2>Checklists</h2>
 <p>
   A Checklist is a Note whose Lines are checked off, such as a packing list. <strong>Make it a
-  Checklist</strong> is in the ⋮ of the Note's card and in the Note's editor. The Note's first line
-  stays its text, as title; every other line that is not blank becomes a Line. A line that starts
+  Checklist</strong> is in the ⋮ of the Note's card, and the kind badge in the Note's editor offers
+  it. The Note's first line stays its text, as its name; every other line that is not blank becomes a Line. A line that starts
   with a space or a tab goes under the Line above, and one that starts with "✓ " is checked. A
   Note made a Checklist leaves Unsorted.
 </p>
@@ -55,7 +70,7 @@
   <li>A group shows in a frame with the Line it is under.</li>
   <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard, Tab and Shift+Tab on the desktop, move the Line with the cursor into a group and out.</li>
   <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>.</li>
-  <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card and, in the editor, behind the badge "Checklist", turns it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
+  <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Checklist" turn it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
 </ul>
 
 <figure class="frame phone">
@@ -92,8 +107,8 @@
 <h2>Shopping Lists</h2>
 <p>
   A Shopping List is a Note whose Lines come back a while after they are checked, such as the weekly
-  shopping. <strong>Make it a Shopping List</strong> is in the ⋮ of the Note's card and in the Note's
-  editor. As for a Checklist, the first line stays the title and every other line becomes a Line;
+  shopping. <strong>Make it a Shopping List</strong> is in the ⋮ of the Note's card, and the kind badge in
+  the Note's editor offers it. As for a Checklist, the first line stays the name and every other line becomes a Line;
   Shopping Lists have no groups, and a line marked "✓ " is struck.
 </p>
 <ul>
@@ -102,7 +117,7 @@
   <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in, also the next time. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones.</li>
   <li>A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, and an open one stays.</li>
   <li>A Line left empty is dropped on leaving. ⋮ on a Line offers the reappear time as a choice and <strong>Delete</strong>.</li>
-  <li>On a full card the Lines show with their checkboxes, open ones first; a compact card shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card and behind the editor's badge "Shopping List", writes the Lines into the text, the struck ones marked "✓ ".</li>
+  <li>On a full card the Lines show with their checkboxes, open ones first; a compact card shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Shopping List" write the Lines into the text, the struck ones marked "✓ ".</li>
 </ul>
 
 <figure class="frame phone">
@@ -231,7 +246,7 @@
 
 <h2>On the desktop</h2>
 <ul>
-  <li><strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong> and <strong>Make it a Tally</strong> are in the Note dialog, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session; the kind's badge holds <strong>Back to a plain Note</strong>.</li>
+  <li>The Note dialog shows a Note of a kind as the phone's editor does: its name, its description folded under it, then the Lines or the Tally. Its kind badge changes the kind, as on the phone, and the card's menu offers the lists as well. The "+" badge of the Note dialog holds Routine, Reminder, Frog and Session.</li>
   <li>A Checklist shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. <strong>Show on the Agenda</strong> is a checkbox in the card's menu, before <strong>Uncheck all</strong>, and a badge in the Note dialog.</li>
   <li>A Shopping List shows on today's Agenda as on the phone, and a click on its row opens it in the Note dialog. Its <strong>Show on the Agenda</strong> is three radio buttons in the card's menu, before <strong>Back to a plain Note</strong>, and a badge in the Note dialog whose dialog offers the same three; a click on one closes it.</li>
   <li>The "+" at the top of All Notes, an Area or a Topic opens a menu with Note, Checklist, Shopping List, Tally, Session and Frog, Session and Frog for who may set them up. The New Tally page and the New Session page are dialogs over the window. On the New Tally page each field's rule, unit and target are badges whose click opens their small editor; the unit is typed with the known units as small buttons under it. The New Session page is the Routine editor's page for a Session: its name, its pool with <strong>New Tally</strong> at its end, which opens the New Tally page over it and comes back with the new Tally ticked, its count and rule, and its schedule, every day, all day, at first.</li>

@@ -1,5 +1,5 @@
-//! Shopping Lists in the window (#122, ADR 0030): "Make it a Shopping
-//! List" in a Note's editor and in its card's ⋮ turns its lines into
+//! Shopping Lists in the window (#122, ADR 0030): the kind badge of a
+//! Note's editor (#188) and its card's ⋮ turn its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
 //! it comes back, and at the start of that day it is open in its place
 //! again; the Lines are typed in place as one block of text, as a
@@ -206,7 +206,10 @@ fn type_line(harness: &mut Harness<'_, App>, text: &str) {
 fn rows(harness: &Harness<'_, App>) -> Vec<String> {
     let mut fields: Vec<(f32, String)> = harness
         .query_all_by(|n| {
-            n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+            // Not the Note's name (#188).
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.label().as_deref() != Some("Name")
         })
         .map(|n| (n.rect().top(), n.value().unwrap_or_default()))
         .collect();
@@ -267,19 +270,21 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
     let (store, note, _) = with_note()?;
     let mut harness = window(&store, Some(&note));
     assert!(!shows(&harness, "Shopping List"));
-    click(&mut harness, "Make it a Shopping List")?;
+    click(&mut harness, "Kind: Plain Note")?;
+    pick(&mut harness, "Shopping List")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
     assert_eq!(now.text, "Weekly");
-    // The field holds the title now, so leaving it writes nothing old.
-    assert!(
+    // The name holds the title now, so leaving it writes nothing old
+    // (#188).
+    assert_eq!(
         harness
-            .query_by(
-                |n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Weekly")
-            )
-            .is_some()
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .value()
+            .as_deref(),
+        Some("Weekly")
     );
     assert!(shows(&harness, "Shopping List"));
     assert!(!shows(&harness, "Make it a Shopping List"));
@@ -557,7 +562,7 @@ fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
     let mut harness = window(&store, Some(&note));
     // In the Note dialog's kind badge (#160).
     click(&mut harness, "Kind: Shopping List")?;
-    click(&mut harness, "Back to a plain Note")?;
+    pick(&mut harness, "Plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
@@ -573,7 +578,7 @@ fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
                 && n.value().as_deref() == Some(now.text.as_str()))
             .is_some()
     );
-    assert!(shows(&harness, "Make it a Shopping List"));
+    assert!(shows(&harness, "Kind: Plain Note"));
     Ok(())
 }
 

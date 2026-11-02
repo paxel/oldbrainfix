@@ -80,6 +80,7 @@ use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::ics::routines_ics;
+use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::routines::routines_by_name;
@@ -416,6 +417,9 @@ struct View {
     /// pass for the cards, each with whether this Device may check its
     /// Lines (#122).
     shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
+    /// The Notes listed that are a Tally, read in one pass for the
+    /// cards, which show their name and description (#188).
+    tallies: HashSet<String>,
     /// The Notes listed whose text this Device may change from their
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
@@ -465,6 +469,11 @@ struct View {
     /// whether this Device may make the selected Note one (#122).
     shopping: Option<ShoppingShown>,
     makes_shopping: bool,
+    /// Whether this Device may switch the selected Note's list, a
+    /// Checklist to a Shopping List or back (#188).
+    switches_list: bool,
+    /// The kind of the selected Note (#188), plain while none is.
+    kind: Option<NoteKind>,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -1328,9 +1337,13 @@ pub struct App {
     /// The Note "To full editor" opens, until its text takes the
     /// keyboard in the Note dialog (#142).
     edit_wanted: Option<String>,
-    /// The selected Note's text as it is being edited, and that Note.
+    /// The selected Note's text as it is being edited, and that Note;
+    /// of a Note of a kind its description, its name in `name` (#188),
+    /// whether it is one in `text_kinded`.
     text: String,
     text_of: Option<String>,
+    name: String,
+    text_kinded: bool,
     /// Whether its text is being edited: a formatted text shows its
     /// source in the field meanwhile, and as it reads otherwise (#127).
     text_editing: bool,
@@ -1722,6 +1735,8 @@ impl App {
             edit_wanted: None,
             text: String::new(),
             text_of: None,
+            name: String::new(),
+            text_kinded: false,
             text_editing: false,
             text_focus: false,
             text_select: None,
@@ -3774,9 +3789,12 @@ impl App {
             self.unfolded_of = cards;
         }
         let shown = self.view.detail.as_ref().map(|(p, _)| &p.note);
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
-            self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
+            let stored = shown.map(|n| n.text.clone()).unwrap_or_default();
             self.text_of = shown.map(|n| n.id.clone());
+            self.text_kinded = kinded;
+            self.put_typed(stored);
             self.text_editing = false;
             self.text_focus = false;
             self.text_select = None;
@@ -3784,6 +3802,12 @@ impl App {
             self.amend_focus = false;
             self.amend_select = None;
             self.section_texts.clear();
+        } else if kinded != self.text_kinded {
+            // Its kind changed while it shows: what is typed stays, now
+            // as the other kind holds it.
+            let typed = self.typed_text();
+            self.text_kinded = kinded;
+            self.put_typed(typed);
         }
         // Each Section this Device may edit has its field (#183), none
         // while the Note is in the trash; what is typed in one stays as
@@ -4015,6 +4039,14 @@ impl App {
                 shopping_lists.insert(id, (list, checks));
             }
         }
+        // A Tally wins over a list (ADR 0030).
+        let mut tallies = HashSet::new();
+        let tally_notes = Tallies::new(store);
+        for id in &listed {
+            if tally_notes.is_tally(id)? {
+                tallies.insert(id.clone());
+            }
+        }
         let mut card_changes = HashSet::new();
         for p in &placed {
             let note = &p.note;
@@ -4095,6 +4127,14 @@ impl App {
                 shopping.may_make(&p.note.id)?,
             ),
             _ => (None, false),
+        };
+        let switches_list = match &detail {
+            Some((p, _)) => shopping.may_switch(&p.note.id)?,
+            None => false,
+        };
+        let kind = match &detail {
+            Some((p, _)) => Some(NoteKind::of(store, &p.note.id)?),
+            None => None,
         };
         let mut removable = HashSet::new();
         let mut text_removable = HashSet::new();
@@ -4418,6 +4458,7 @@ impl App {
             sections,
             checklists,
             shopping_lists,
+            tallies,
             card_changes,
             box_looks,
             box_ticks,
@@ -4439,6 +4480,8 @@ impl App {
             makes_checklist,
             shopping: shopping_shown,
             makes_shopping,
+            switches_list,
+            kind,
             frogs_open,
             all_routines,
             all_newer,
@@ -5515,7 +5558,7 @@ impl App {
                 // (ADR 0033).
                 let written = notes.take_over(&note, generated, append)?;
                 if self.text_of.as_deref() == Some(note.as_str()) {
-                    self.text = written;
+                    self.put_typed(written);
                 } else if let Some(field) = self.section_texts.get_mut(&note) {
                     // A Section's field shows the text it has now, or the
                     // next save would put the old one back (#183).
@@ -5828,7 +5871,24 @@ impl App {
         }
         let lists = Checklists::new(&self.store);
         let shopping = ShoppingLists::new(&self.store);
+        // The other list switches, its Lines carried over (#188).
+        let other_list = match kind {
+            Kind::Checklist => shopping.is_shopping_list(note)?,
+            Kind::ShoppingList => lists.is_checklist(note)?,
+            Kind::Plain => false,
+        };
         match kind {
+            Kind::Checklist | Kind::ShoppingList if other_list => {
+                if !shopping.may_switch(note)? {
+                    return Ok(());
+                }
+                shopping.switch_list(note, &*self.wall)?;
+                // Its rows start again from the Lines of the new list, what
+                // was typed kept above.
+                if shown {
+                    self.lines = TypedLines::default();
+                }
+            }
             Kind::Checklist => {
                 if !lists.may_make(note)? {
                     return Ok(());
@@ -5857,7 +5917,9 @@ impl App {
             }
         }
         if shown && let Some(now) = Notes::new(&self.store).by_id(note)? {
-            self.text = now.text;
+            // Of the kind it is now, the view read again only after.
+            self.text_kinded = NoteKind::of(&self.store, note)? != NoteKind::Plain;
+            self.put_typed(now.text);
         }
         Ok(())
     }
@@ -6061,7 +6123,7 @@ impl App {
             table.take_stored(stored.clone(), at);
         }
         if self.text_of.as_deref() == Some(note.as_str()) {
-            self.text = stored;
+            self.put_typed(stored);
         } else if let Some(field) = self.section_texts.get_mut(&note) {
             field.text = stored;
         }
@@ -6612,8 +6674,39 @@ impl App {
         Ok(())
     }
 
+    /// The shown Note's text as typed: of a Note of a kind its name and
+    /// its description joined (#188).
+    fn typed_text(&self) -> String {
+        if self.text_kinded {
+            note_kinds::join(&self.name, &self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+
+    /// Puts the text `whole` into the field of the shown Note, of a Note
+    /// of a kind split into its name and its description (#188).
+    fn put_typed(&mut self, whole: String) {
+        if self.text_kinded {
+            self.name = note_kinds::name(&whole).to_string();
+            self.text = note_kinds::description(&whole).to_string();
+        } else {
+            self.name.clear();
+            self.text = whole;
+        }
+    }
+
+    /// Whether the name and the description typed are those of `stored`
+    /// (#188): leaving them writes nothing, the text as stored kept.
+    fn kinded_unchanged(&self, stored: &str) -> bool {
+        self.text_kinded
+            && self.name == note_kinds::name(stored)
+            && self.text == note_kinds::description(stored)
+    }
+
     /// Keeps the edited text of the shown Note when it changed; an
-    /// emptied text goes back to what it was.
+    /// emptied text goes back to what it was, and so does an emptied
+    /// name of a Note of a kind (#188).
     fn save_note_text(&mut self) -> oldbrainfix_core::Result<()> {
         let Some((placed, _)) = &self.view.detail else {
             return Ok(());
@@ -6623,21 +6716,28 @@ impl App {
         if self.text_of.as_deref() != Some(note.id.as_str())
             || note.is_trashed()
             || !note.text_editable
+            || self.kinded_unchanged(&note.text)
         {
             return Ok(());
         }
-        let text = self.text.trim();
+        if self.text_kinded && self.name.trim().is_empty() {
+            self.name = note_kinds::name(&note.text).to_string();
+        }
+        let typed = self.typed_text();
+        let text = typed.trim();
         if text.is_empty() {
-            self.text = note.text.clone();
+            let stored = note.text.clone();
+            self.put_typed(stored);
         } else if text != note.text {
             let notes = Notes::new(&self.store);
             notes.edit(&note.id, text)?;
             // As stored: its new boxes with their ids (ADR 0035), or the
             // next save gives them new ones and their ticks are lost.
-            self.text = match notes.by_id(&note.id)? {
+            let stored = match notes.by_id(&note.id)? {
                 Some(now) => now.text,
                 None => text.to_string(),
             };
+            self.put_typed(stored);
         }
         Ok(())
     }
@@ -6656,7 +6756,11 @@ impl App {
         {
             return Ok(());
         }
-        let text = self.text.trim();
+        if self.text_kinded && self.name.trim().is_empty() {
+            self.name = note_kinds::name(&note.text).to_string();
+        }
+        let typed = self.typed_text();
+        let text = typed.trim();
         if text.is_empty() {
             return Ok(());
         }
@@ -6668,10 +6772,10 @@ impl App {
             if let Some(now) = notes.by_id(&note.id)?
                 && now.text != text
             {
-                let typed = self.text.clone();
                 let before = &typed[..typed.len() - typed.trim_start().len()];
                 let after = &typed[typed.trim_end().len()..];
-                self.text = format!("{before}{}{after}", now.text);
+                let kept = format!("{before}{}{after}", now.text);
+                self.put_typed(kept);
             }
         }
         Ok(())
@@ -8100,24 +8204,20 @@ impl App {
                 None => true,
             },
             NoteBadge::Kind => {
-                let kind = note_kind(&t, &self.view);
-                let (icon, name) = kind.map_or((icons::NOTE, ""), |(icon, name, _)| (icon, name));
-                let list = self.view.checklist.is_some();
-                let plainable = kind.is_some_and(|(_, _, plain)| plain);
+                let shown_kind = KindShown::of(&self.view);
+                let current = shown_kind.kind;
+                let (icon, _) = kind_look(&t, current);
                 badge_dialog(ctx, shown, (icon, None), t.badge_kind(), |ui| {
-                    let text = ui.visuals().text_color();
-                    ui.label(RichText::new(name).color(text));
-                    if plainable
-                        && ui
-                            .button(RichText::new(t.checklist_to_plain()).color(text))
-                            .clicked()
-                    {
-                        let id = note.id.clone();
-                        actions.push(if list {
-                            Action::Checklist(ChecklistAction::ToPlain(id))
-                        } else {
-                            Action::Shopping(ShoppingAction::ToPlain(id))
-                        });
+                    // The kinds as radio buttons, the current one picked;
+                    // a pick changes it at once and closes (#188).
+                    let mut picked = current;
+                    let options = std::iter::once(current)
+                        .chain(shown_kind.choices.iter().copied())
+                        .map(|kind| (kind, kind_look(&t, kind).1.to_string()));
+                    if radio_column(ui, &mut picked, options) {
+                        if picked != current {
+                            actions.push(kind_action(&note.id, current, picked));
+                        }
                         actions.push(Action::Badge(None));
                     }
                 })
@@ -8683,6 +8783,7 @@ impl App {
                     sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
+                    tally: self.view.tallies.contains(id),
                     menu: self.card_menu.as_ref(),
                     changes: self.view.card_changes.contains(id),
                     boxes: CardBoxes {
@@ -8906,15 +9007,16 @@ impl App {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
-        let kind = note_kind(&self.t, &self.view);
+        let kind = KindShown::of(&self.view);
+        // A Checklist, a Shopping List or a Tally shows its text as its
+        // name and its description, its content under them (#188).
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         let linked = &self.view.routines;
         let newer_routines = self.view.newer_routines;
         let tally = self.view.tally.as_ref();
         let tally_count = self.tally_look.count;
         let checklist = self.view.checklist.as_ref();
-        let makes_checklist = self.view.makes_checklist;
         let shopping = self.view.shopping.as_ref();
-        let makes_shopping = self.view.makes_shopping;
         let typed = &mut self.lines;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
@@ -8924,6 +9026,7 @@ impl App {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let edited = &mut self.text;
+        let name = &mut self.name;
         let editing = &mut self.text_editing;
         let focus = &mut self.text_focus;
         let select = &mut self.text_select;
@@ -8971,7 +9074,19 @@ impl App {
                         ui.label(RichText::new(t.text_newer_format()).color(weak));
                     }
                     let formatted = note.text_format == text_format::MARKDOWN;
-                    if trashed || !may.changes || !note.text_editable {
+                    let writes = !trashed && may.changes && note.text_editable;
+                    if kinded {
+                        let shown = KindedText {
+                            note,
+                            writes,
+                            boxes,
+                            ticks: (ticks, &ticked),
+                        };
+                        let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
+                        kinded_text(ui, (t, tones), shown, (&mut *name, state), actions);
+                        return;
+                    }
+                    if !writes {
                         // Its marks show, to read (#125), and a formatted
                         // text reads as it is formatted (#127); it selects
                         // to be copied (#183).
@@ -9017,26 +9132,15 @@ impl App {
                         boxes,
                         ticks: (ticks, &ticked),
                         name: t.note_text_field_name(),
+                        look: (18.0, text),
+                        hint: None,
                     };
                     let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
                     edited_text(ui, (t, tones), field, state, actions);
                 });
-                // Each setting as its badge, in one wrapping row under the
-                // text (#160).
-                let shown = BadgesShown {
-                    placed,
-                    routines: linked,
-                    newer: newer_routines,
-                    kind,
-                    on_agenda: checklist.and_then(|c| c.on_agenda),
-                    shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
-                    ticks: has_boxes.then_some(show_ticks),
-                    may,
-                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
-                };
-                note_badges(ui, (&t, tones), &shown, actions);
-                // Under the text field, as the Lines are under the text on
-                // a card; nothing while the Note is no Checklist.
+                // The kind's content under its name and description (#188),
+                // as the Lines are under them on a card; nothing while the
+                // Note is no Checklist.
                 if let Some(shown) = checklist {
                     let mut asked = Vec::new();
                     checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
@@ -9048,6 +9152,26 @@ impl App {
                     shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Shopping));
                 }
+                // Nothing while the Note is no Tally.
+                if let Some(tally) = tally {
+                    let mut asked = Vec::new();
+                    tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Tally));
+                }
+                // Each setting as its badge, in one wrapping row under the
+                // text and the kind's content (#160).
+                let shown = BadgesShown {
+                    placed,
+                    routines: linked,
+                    newer: newer_routines,
+                    kind: &kind,
+                    on_agenda: checklist.and_then(|c| c.on_agenda),
+                    shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
+                    ticks: has_boxes.then_some(show_ticks),
+                    may,
+                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
+                };
+                note_badges(ui, (&t, tones), &shown, actions);
                 let media = [
                     &note.photos,
                     &note.recordings,
@@ -9076,12 +9200,6 @@ impl App {
                         );
                     });
                 }
-                // Nothing while the Note is no Tally.
-                if let Some(tally) = tally {
-                    let mut asked = Vec::new();
-                    tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Tally));
-                }
                 for (at, section) in sections.iter().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
                         if !section.text_editable {
@@ -9102,6 +9220,8 @@ impl App {
                                 boxes: look,
                                 ticks: (section_ticks, &section_ticked),
                                 name: t.section_text_field_name(),
+                                look: (18.0, text),
+                                hint: None,
                             };
                             let state = (
                                 &mut field.text,
@@ -9264,22 +9384,6 @@ impl App {
                         );
                         if add.clicked() {
                             actions.push(Action::Amend);
-                        }
-                        // A plain Note becomes a Checklist of its text.
-                        if makes_checklist
-                            && ui
-                                .button(RichText::new(t.make_checklist()).color(text))
-                                .clicked()
-                        {
-                            actions.push(Action::Checklist(ChecklistAction::Make(note.id.clone())));
-                        }
-                        // Or a Shopping List of it.
-                        if makes_shopping
-                            && ui
-                                .button(RichText::new(t.make_shopping_list()).color(text))
-                                .clicked()
-                        {
-                            actions.push(Action::Shopping(ShoppingAction::Make(note.id.clone())));
                         }
                     });
                 });
@@ -13219,7 +13323,7 @@ struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
     newer: usize,
-    kind: Option<(char, &'static str, bool)>,
+    kind: &'a KindShown,
     on_agenda: Option<bool>,
     shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
@@ -13227,19 +13331,79 @@ struct BadgesShown<'a> {
     frog_open: bool,
 }
 
-/// The kind of the Note open, its icon and name, and whether this Device
-/// may turn it back into a plain Note: a Checklist's or Shopping List's
-/// "Back to a plain Note" (#160); `None` for a plain Note.
-fn note_kind(t: &L10n, view: &View) -> Option<(char, &'static str, bool)> {
-    if let Some(list) = &view.checklist {
-        return Some((icons::CHECKLIST, t.checklist_heading(), list.plain));
+/// The kind of the Note open (#188), and the kinds this Device may make
+/// it from its kind badge, in the order offered: a plain Note a
+/// Checklist, a Shopping List or a Tally, as it may make it one; a list
+/// a plain Note again or the other list; a Tally none.
+#[derive(Debug, Clone, PartialEq)]
+struct KindShown {
+    kind: NoteKind,
+    choices: Vec<NoteKind>,
+}
+
+impl KindShown {
+    fn of(view: &View) -> KindShown {
+        let kind = view.kind.unwrap_or(NoteKind::Plain);
+        let Some((placed, _)) = &view.detail else {
+            return KindShown {
+                kind,
+                choices: Vec::new(),
+            };
+        };
+        let note = &placed.note;
+        let may = view.may;
+        let mut choices = Vec::new();
+        if !note.is_trashed() {
+            let plain = |list_plain: bool| list_plain.then_some(NoteKind::Plain);
+            let switch = |to: NoteKind| view.switches_list.then_some(to);
+            match kind {
+                NoteKind::Plain => {
+                    // As the Note menu offers them (#145).
+                    let tally = may.amends && may.changes && !note.is_merged();
+                    choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
+                    choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));
+                    choices.extend(tally.then_some(NoteKind::Tally));
+                }
+                NoteKind::Checklist => {
+                    choices.extend(plain(view.checklist.as_ref().is_some_and(|l| l.plain)));
+                    choices.extend(switch(NoteKind::ShoppingList));
+                }
+                NoteKind::ShoppingList => {
+                    choices.extend(plain(view.shopping.as_ref().is_some_and(|l| l.plain)));
+                    choices.extend(switch(NoteKind::Checklist));
+                }
+                // No way out of a Tally.
+                NoteKind::Tally => {}
+            }
+        }
+        KindShown { kind, choices }
     }
-    if let Some(list) = &view.shopping {
-        return Some((icons::SHOPPING_CART, t.shopping_heading(), list.plain));
+}
+
+/// What making the Note `id` of the kind `from` one of the kind `to`
+/// asks (#188): the existing ways a Note becomes a list, a Tally or a
+/// plain Note again, a list the other list.
+fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
+    let id = id.to_string();
+    match to {
+        NoteKind::Plain if from == NoteKind::ShoppingList => {
+            Action::Shopping(ShoppingAction::ToPlain(id))
+        }
+        NoteKind::Plain => Action::Checklist(ChecklistAction::ToPlain(id)),
+        NoteKind::Checklist => Action::Checklist(ChecklistAction::Make(id)),
+        NoteKind::ShoppingList => Action::Shopping(ShoppingAction::Make(id)),
+        NoteKind::Tally => Action::Tally(TallyAction::Make(id)),
     }
-    view.tally
-        .as_ref()
-        .map(|_| (icons::TALLY, t.tally_heading(), false))
+}
+
+/// The icon and the name of the kind `kind` (#188).
+fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
+    match kind {
+        NoteKind::Plain => (icons::NOTE, t.kind_plain()),
+        NoteKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
+        NoteKind::ShoppingList => (icons::SHOPPING_CART, t.shopping_heading()),
+        NoteKind::Tally => (icons::TALLY, t.tally_heading()),
+    }
 }
 
 /// The row of badges under the Note's text (#160), in the phone's order:
@@ -13310,9 +13474,11 @@ fn note_badges(
             let newer = t.newer_version_needed();
             badge(ui, look, icon, t.routine(), Some(newer), false);
         }
-        if let Some((icon, name, plain)) = shown.kind
-            && badge(ui, look, (icon, None), t.badge_kind(), Some(name), plain).clicked()
-        {
+        // Every Note has its kind, a plain Note too (#188); it opens
+        // where there is another to make it.
+        let (icon, name) = kind_look(t, shown.kind.kind);
+        let choosing = !shown.kind.choices.is_empty();
+        if badge(ui, look, (icon, None), t.badge_kind(), Some(name), choosing).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
         // A Shopping List's three ways, where a Checklist's switch sits.
@@ -13522,6 +13688,9 @@ struct CardLook<'a> {
     sections: &'a [Section],
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
+    /// Whether the Note is a Tally, whose full card shows its name and
+    /// description as a list's does (#188).
+    tally: bool,
     menu: Option<&'a CardMenu>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
@@ -13668,6 +13837,11 @@ struct EditedText<'a> {
     ticks: (bool, &'a dyn Fn(&str) -> bool),
     /// What a screen reader calls the field.
     name: &'a str,
+    /// The size and colour of its text: a description's smaller and
+    /// weaker (#188).
+    look: (f32, Color32),
+    /// What it says while empty.
+    hint: Option<&'a str>,
 }
 
 /// The field of a text of the Note dialog, `edit`, its format bar above
@@ -13688,6 +13862,7 @@ fn edited_text(
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
+    let (size, written) = edit.look;
     let (formatted, boxes) = (edit.formatted, edit.boxes);
     // Kept as a formatted text at once: the Note's, or the Section's.
     let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
@@ -13723,7 +13898,7 @@ fn edited_text(
                 ui,
                 (edited, text_format::MARKDOWN, boxes),
                 all,
-                (Some(18.0), text),
+                (Some(size), written),
                 false,
             )
         });
@@ -13767,11 +13942,11 @@ fn edited_text(
         let small = FontId::proportional(13.0);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
-            let font = FontId::proportional(18.0);
+            let font = FontId::proportional(size);
             let job = if formatted {
-                text_marks_view::source_job(typed, font, (text, accent, weak))
+                text_marks_view::source_job(typed, font, (written, accent, weak))
             } else {
-                text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
+                text_marks_view::tag_job(typed, (0, typed.len()), font, (written, accent))
             };
             let gap = |after: &str| {
                 let said = after.to_string();
@@ -13810,14 +13985,17 @@ fn edited_text(
         // A box goes whole, its id with it, and the cursor
         // stays where it was as a save gives boxes ids.
         let cut = text_marks_view::guard_field(ui, id, edited, !placed);
-        let output = TextEdit::multiline(edited)
+        let mut field = TextEdit::multiline(edited)
             .id(id)
-            .font(FontId::proportional(18.0))
+            .font(FontId::proportional(size))
             .layouter(&mut layouter)
             .desired_rows(1)
             .desired_width(f32::INFINITY)
-            .frame(Frame::NONE)
-            .show(ui);
+            .frame(Frame::NONE);
+        if let Some(hint) = edit.hint {
+            field = field.hint_text(RichText::new(hint).size(size).color(weak));
+        }
+        let output = field.show(ui);
         text_marks_view::guard_cursor(ui, id, edited);
         if cut {
             ui.ctx().request_repaint();
@@ -13923,6 +14101,275 @@ fn edited_text(
             actions.push(Action::SaveText);
         }
     });
+}
+
+/// The size of the name of a Note of a kind (#188), a heading, and of
+/// its description, smaller than a text.
+const NAME_SIZE: f32 = 22.0;
+const DESCRIPTION_SIZE: f32 = 14.0;
+
+/// The text of a Note of a kind in the Note dialog (#188): the Note,
+/// whether this Device may change its text here, how its boxes show,
+/// whether it may tick them and which were ticked (ADR 0035).
+struct KindedText<'a> {
+    note: &'a Note,
+    writes: bool,
+    boxes: &'a BoxLook,
+    ticks: (bool, &'a dyn Fn(&str) -> bool),
+}
+
+/// What is typed into the text of a Note of a kind: its name, and its
+/// description as [`edited_text`] edits it.
+type KindedState<'a> = (
+    &'a mut String,
+    (
+        &'a mut String,
+        &'a mut bool,
+        &'a mut bool,
+        &'a mut Option<(usize, usize)>,
+    ),
+);
+
+/// The text of a Note of a kind as its name, a heading on one line, and
+/// its description under it (#188), small and weak, folded to its first
+/// line while it is not edited: a click unfolds it, into its field where
+/// this Device may change it, which an empty one always shows. Read only,
+/// both select to be copied (#183) and a click folds the description
+/// again.
+fn kinded_text(
+    ui: &mut Ui,
+    (t, tones): (L10n, Tones),
+    shown: KindedText<'_>,
+    (name, (edited, editing, focus, select)): KindedState<'_>,
+    actions: &mut Vec<Action>,
+) {
+    let note = shown.note;
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let formatted = note.text_format == text_format::MARKDOWN;
+    if !shown.writes {
+        ui.style_mut().interaction.selectable_labels = true;
+        let whole = note.text.as_str();
+        let look = (whole, note.text_format.as_str(), shown.boxes);
+        // In the offsets of the whole text, as its boxes, tables, tags
+        // and links are found.
+        let named = note_kinds::name(whole).len();
+        let mut spots = Spots::default();
+        if named > 0 {
+            let heading = (Some(NAME_SIZE), text);
+            let label = text_marks_view::formatted_label(ui, look, (0, named), heading, false);
+            spots.extend(label);
+        }
+        let description = note_kinds::description(whole);
+        let start = whole.len() - description.len();
+        if let Some((from, to)) = first_line(description) {
+            let id = Id::new(("description open", &note.id));
+            let open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+            let range = if open {
+                (start, whole.len())
+            } else {
+                (start + from, start + to)
+            };
+            let small = (Some(DESCRIPTION_SIZE), weak);
+            let drawn = folded_row(ui, open, |ui| {
+                text_marks_view::formatted_label(ui, look, range, small, !open)
+            });
+            if description_fold(ui, &t, (drawn.response.rect, id), open) {
+                ui.data_mut(|d| d.insert_temp(id, !open));
+            }
+            spots.extend(drawn.inner);
+        }
+        let of = Id::new(("text", &note.id));
+        // Its tables open to read (#128).
+        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
+            actions.push(Action::OpenTable(Opening {
+                note: None,
+                text: note.text.clone(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(note.id.clone()),
+            }));
+        }
+        // A Member ticks the boxes of a Note not theirs.
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, of, &spots.boxes, shown.ticks) {
+            actions.push(box_action(note.id.clone(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, of, &spots.links);
+        return;
+    }
+    // Enter in the name goes on at the start of the description.
+    if name_edit(ui, &t, (name, formatted, shown.boxes), actions) {
+        *editing = true;
+        *focus = true;
+        *select = Some((0, 0));
+    }
+    let id = Id::new("note text");
+    let open = *editing || ui.memory(|m| m.has_focus(id));
+    if open {
+        let field = EditedText {
+            id,
+            of: &note.id,
+            section: false,
+            stored: note_kinds::description(&note.text),
+            formatted,
+            boxes: shown.boxes,
+            ticks: shown.ticks,
+            name: t.note_description(),
+            look: (DESCRIPTION_SIZE, weak),
+            hint: Some(t.note_description()),
+        };
+        edited_text(
+            ui,
+            (t, tones),
+            field,
+            (edited, editing, focus, select),
+            actions,
+        );
+    } else if edited.trim().is_empty() {
+        // Empty, its field with its hint; typed into, it is edited.
+        let hint = RichText::new(t.note_description())
+            .size(DESCRIPTION_SIZE)
+            .color(weak);
+        let field = ui.add(
+            TextEdit::multiline(edited)
+                .id(id)
+                .font(FontId::proportional(DESCRIPTION_SIZE))
+                .text_color(weak)
+                .hint_text(hint)
+                .desired_rows(1)
+                .desired_width(f32::INFINITY)
+                .frame(Frame::NONE),
+        );
+        name_field(ui, &field, t.note_description());
+        if field.has_focus() {
+            *editing = true;
+        }
+    } else {
+        // Folded to its first line with words, as typed.
+        let range = first_line(edited).unwrap_or((0, 0));
+        let look = (edited.as_str(), note.text_format.as_str(), shown.boxes);
+        let small = (Some(DESCRIPTION_SIZE), weak);
+        let drawn = folded_row(ui, false, |ui| {
+            text_marks_view::formatted_label(ui, look, range, small, true)
+        });
+        let fold = Id::new(("description open", &note.id));
+        if description_fold(ui, &t, (drawn.response.rect, fold), false) {
+            *editing = true;
+            *focus = true;
+        }
+        // Its boxes tick and its tags and links open, folded too.
+        let spots = drawn.inner;
+        let marked = Id::new(("field", &note.id));
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, shown.ticks)
+        {
+            actions.push(box_action(note.id.clone(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, marked, &spots.links);
+    }
+}
+
+/// The name of a Note of a kind being edited (#188): one line, as a
+/// heading, its tags marked and its boxes as they show (ADR 0035), a
+/// formatted text's marks dimmed. Leaving it keeps it; Enter goes on in
+/// the description, which `true` says. A line break pasted becomes a
+/// space, as in any one-line field.
+fn name_edit(
+    ui: &mut Ui,
+    t: &L10n,
+    (name, formatted, boxes): (&mut String, bool, &BoxLook),
+    actions: &mut Vec<Action>,
+) -> bool {
+    let id = Id::new("note name");
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let accent = ui.visuals().hyperlink_color;
+    let mut moved = false;
+    if ui.memory(|m| m.has_focus(id)) {
+        ui.input_mut(|i| {
+            if i.consume_key(Modifiers::COMMAND, Key::Enter) {
+                actions.push(Action::SaveText);
+            } else if i.consume_key(Modifiers::NONE, Key::Enter) {
+                moved = true;
+            }
+        });
+    }
+    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+        let typed = typed.as_str();
+        let font = FontId::proportional(NAME_SIZE);
+        let job = if formatted {
+            text_marks_view::source_job(typed, font, (text, accent, weak))
+        } else {
+            text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
+        };
+        let mut job = text_marks_view::field_job(job, boxes, &|_: &str| 0.0);
+        job.wrap.max_width = width;
+        ui.fonts_mut(|f| f.layout_job(job))
+    };
+    let cut = text_marks_view::guard_field(ui, id, name, true);
+    let output = TextEdit::singleline(name)
+        .id(id)
+        .font(FontId::proportional(NAME_SIZE))
+        .layouter(&mut layouter)
+        .hint_text(RichText::new(t.note_name()).size(NAME_SIZE).color(weak))
+        .desired_width(f32::INFINITY)
+        .return_key(None)
+        .frame(Frame::NONE)
+        .show(ui);
+    text_marks_view::guard_cursor(ui, id, name);
+    if cut {
+        ui.ctx().request_repaint();
+    }
+    text_marks_view::remember_text(ui, id, name);
+    let field = &output.response.response;
+    name_field(ui, field, t.note_name());
+    if moved {
+        ui.memory_mut(|m| m.surrender_focus(id));
+    } else if field.lost_focus() {
+        actions.push(Action::SaveText);
+    }
+    moved
+}
+
+/// A description of a Note of a kind as `add` draws it, folded or
+/// `open`, after the sign of which it is (#188).
+fn folded_row<R>(
+    ui: &mut Ui,
+    open: bool,
+    add: impl FnOnce(&mut Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal_top(|ui| {
+        let icon = if open {
+            icons::EXPAND_LESS
+        } else {
+            icons::EXPAND_MORE
+        };
+        icons::show(ui, icon, 16.0, weak);
+        ui.vertical(add).inner
+    })
+}
+
+/// Whether the description drawn at `rect` was clicked to unfold it, or
+/// to fold it while `open` (#188); a screen reader reads what the click
+/// does.
+fn description_fold(ui: &mut Ui, t: &L10n, (rect, id): (egui::Rect, Id), open: bool) -> bool {
+    let said = if open {
+        t.note_description_fold()
+    } else {
+        t.note_description_unfold()
+    };
+    let fold = ui.interact(rect, id.with("fold"), Sense::click());
+    fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+    fold.on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(said)
+        .clicked()
 }
 
 /// What a click on a box of the text `entity` asked, as an action.
@@ -14032,6 +14479,42 @@ fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &
     }
 }
 
+/// The text `text` of a Note of a kind in `format` on its full card
+/// (#188): its name as the card's title, its description under it,
+/// small, folded to its first line with words unless `unfolded`; where
+/// its boxes, tags and links lie added to `marks`, and where the
+/// description shows.
+fn card_kinded_text(
+    ui: &mut Ui,
+    (text, format, look): (&str, &str, &BoxLook),
+    unfolded: bool,
+    marks: &mut Spots,
+) -> Option<egui::Rect> {
+    let colour = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let named = note_kinds::name(text).len();
+    if named > 0 {
+        let heading = (Some(20.0), colour);
+        let label =
+            text_marks_view::formatted_label(ui, (text, format, look), (0, named), heading, false);
+        marks.extend(label);
+    }
+    let description = note_kinds::description(text);
+    let start = text.len() - description.len();
+    let (from, to) = first_line(description)?;
+    let range = if unfolded {
+        (start, text.len())
+    } else {
+        (start + from, start + to)
+    };
+    let small = (Some(13.0), weak);
+    let drawn = folded_row(ui, unfolded, |ui| {
+        text_marks_view::formatted_label(ui, (text, format, look), range, small, !unfolded)
+    });
+    marks.extend(drawn.inner);
+    Some(drawn.response.rect)
+}
+
 /// The photo cache, the store the photos are read from and the
 /// recording being transcribed, for [`whole`].
 type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
@@ -14040,7 +14523,8 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 /// (but in the trash) and Edit, and where it is filed, its Area's colour
 /// down the left edge and icon before the place; then, as `look` says,
 /// the whole Note under its Capture Context, a Checklist's or a Shopping
-/// List's Lines under its text, checkable, with every Section oldest
+/// List's Lines under its name and description (#188), checkable, with
+/// every Section oldest
 /// first, each under its own, its photos opening full screen on a click;
 /// or, compact, where it was captured, its first line, how many of its
 /// Lines are checked or open and its media. ⋮ and a right-click open
@@ -14071,6 +14555,11 @@ fn note_card(
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
+    // Where the description of a Note of a kind shows on a full card, and
+    // whether it is unfolded (#188).
+    let fold_id = Id::new(("card description", &note.id));
+    let unfolded = ui.data(|d| d.get_temp::<bool>(fold_id)).unwrap_or(false);
+    let mut description_rect = None;
     // The photos shown in full, where they lie, the checkboxes of its
     // Lines and the status marks and tags of its text and of its
     // Sections'.
@@ -14171,11 +14660,14 @@ fn note_card(
                         (None, Some((list, _))) => Some(shopping_view::shown_lines(t, list)),
                         (None, None) => None,
                     };
-                    if let Some(lines) = lines {
-                        // Its Lines right under its text.
+                    if lines.is_some() || look.tally {
+                        // Its name as its title, its description folded
+                        // under it (#188), its Lines right under them.
                         let text = (part.text, part.format, look.boxes.look(part.id));
-                        card_text(ui, text, &mut marks);
-                        boxes = checklist_view::card_lines(ui, tones, &lines);
+                        description_rect = card_kinded_text(ui, text, unfolded, &mut marks);
+                        if let Some(lines) = &lines {
+                            boxes = checklist_view::card_lines(ui, tones, lines);
+                        }
                         shown.extend(media_view::whole_media(
                             ui,
                             t,
@@ -14290,6 +14782,13 @@ fn note_card(
         });
     let edit = ui.interact(edit_rect, Id::new(("edit", &note.id)), Sense::click());
     edit.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
+    // Over the card too: a click on the description folds or unfolds it,
+    // not the card's own (#188).
+    if let Some(rect) = description_rect
+        && description_fold(ui, t, (rect, fold_id), unfolded)
+    {
+        ui.data_mut(|d| d.insert_temp(fold_id, !unfolded));
+    }
     if ui.is_rect_visible(edit_rect) {
         let dim = |c: Color32| {
             if unimportant {

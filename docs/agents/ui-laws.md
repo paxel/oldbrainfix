@@ -307,26 +307,40 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   same people (the Section's author, in a Shared Area also the
   Managers); others read it. Under its meta line it says, small and
   grey, when it was last edited and by whom, once it was.
+- **A Note is its kind** (#188): a Plain Note, a Checklist, a Shopping
+  List or a Tally. A Plain Note shows as its text. Every other kind's
+  page, in the Note editor and on the full card, starts with its
+  **name**, the text's first line, as a heading, its **description**,
+  the rest of the text, small right under it and folded to one line
+  until a tap unfolds it, then **the kind's content** (the Lines, the
+  Tally), then the badges, the photos and recordings, and the Amends
+  below as the dated diary part. In the editor the name is a one-line
+  field and the description its own field; nothing is rewritten for the
+  display, and leaving both unchanged writes nothing.
 - **The Note editor shows each setting of the Note as a badge** (#160),
-  in one wrapping row under the text: the setting's icon and its value,
+  in one wrapping row under the text, or under the kind's content for a
+  Note of a kind (#188): the setting's icon and its value,
   like a shield. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
-  its schedule; the kind (Checklist, Shopping List, Tally) while it has
-  one; Show on the Agenda for a Checklist without a Routine and for a
+  its schedule; the kind, Plain Note included (#188); Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same icon and the setting's
   name, which changes it at once: Importance as radio buttons (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the
   Agenda as radio buttons (here and in the card's ⋮), the switches,
-  Back to a plain Note;
+  the kind as radio buttons of the kinds it may become: from a Plain
+  Note a Checklist, a Shopping List or a Tally, from a list the other
+  list, keeping its Lines, or a Plain Note; a Tally's only shows it;
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value". The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
   there only for who may set them up. The text, the Lines, the photos and
-  recordings and the Sections stay the page's content. On the desktop
-  the badges sit under the text in the Note dialog, their small editors
+  recordings and the Sections stay the page's content; the editor has no
+  "Make it a Checklist" or "Make it a Shopping List" button of its own,
+  the kind badge does it. On the desktop the badges sit in the same place
+  in the Note dialog, their small editors
   are dialogs over it, and the menu of "+" opens under it.
 - Another person's Note shows their Profile picture, or its
   placeholder, on its card; one's own Notes show none. Tapping another

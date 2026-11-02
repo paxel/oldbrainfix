@@ -497,6 +497,79 @@ class ShoppingLists {
       '${line.struck ? ChecklistKeys.checkMark : ''}${line.text}',
   ].join('\n');
 
+  /// Whether this Device may switch the list the Note [noteId] is, a
+  /// Checklist to a Shopping List or the other way ([switchList]): a
+  /// Note in the lists that is one of the two, which it may change.
+  bool maySwitch(String noteId) {
+    final note = Notes(store).byId(noteId);
+    return note != null &&
+        !note.isTrashed &&
+        !note.isMerged &&
+        (making(noteId) != null || Checklists(store).isChecklist(noteId)) &&
+        store.mayChange(noteId);
+  }
+
+  /// Switches the list the Note [noteId] is (#188): a Checklist becomes a
+  /// Shopping List and a Shopping List a Checklist, in a new making. The
+  /// Lines that show carry over, as Lines of the new making, in the order
+  /// they show, at one moment: a checked Line checked, a struck one
+  /// checked, each at the top with the reappear time a new Line gets on a
+  /// Shopping List. A Checklist's Lines show their own checks here, not
+  /// those of an Occurrence. The text is not touched; the Lines of the
+  /// old making stay in the log.
+  void switchList(String noteId, WallClock wallClock) {
+    if (!maySwitch(noteId)) {
+      throw StateError('the list of $noteId may not be switched here');
+    }
+    final shopping = byNote(noteId, wallClock);
+    final List<({String text, bool checked})> carried;
+    if (shopping != null) {
+      carried = [
+        for (final l in shopping.lines) (text: l.text, checked: l.struck),
+      ];
+    } else {
+      carried = [
+        for (final l in Checklists(store).byNote(noteId)!.lines)
+          (text: l.text, checked: l.checked),
+      ];
+    }
+    final making = Store.newId();
+    store.batch(() {
+      store.append(
+        noteId,
+        ChecklistKeys.kind,
+        shopping != null
+            ? ChecklistKeys.kindOf(making)
+            : ShoppingKeys.kindOf(making),
+      );
+      final now = store.clock().toUtc();
+      var key = '';
+      for (final line in carried) {
+        key = LineOrder.after(key);
+        if (shopping != null) {
+          writeLine(
+            store,
+            noteId,
+            making,
+            text: line.text,
+            order: key,
+            checked: line.checked,
+            date: now,
+          );
+        } else {
+          _writeLine(
+            noteId,
+            making,
+            line.text,
+            key,
+            checked: line.checked,
+            date: now,
+          );
+        }
+      }
+    });
+  }
+
   /// Whether this Device may add Lines to the Shopping List of [noteId]
   /// and check them: anywhere it holds a role.
   bool mayCheck(String noteId) => store.mayWriteIn(noteId);
