@@ -172,7 +172,7 @@ pub struct SentItem {
 
 /// Builds a JSON object in key order, the same with or without
 /// serde_json's `preserve_order`.
-fn object(pairs: Vec<(&str, Value)>) -> Value {
+pub(crate) fn object(pairs: Vec<(&str, Value)>) -> Value {
     let mut map = Map::new();
     for (key, value) in pairs {
         map.insert(key.to_string(), value);
@@ -401,7 +401,7 @@ fn sent_lines(json: &Value, shopping: bool) -> Option<Vec<SentLine>> {
 /// its current state, its id kept, so the receiver starts from the
 /// sender's states and the same boxes take the later ones (ADR 0035); a
 /// text that is not `editable` here as it is.
-fn baked(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
+pub(crate) fn baked(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
     if !editable {
         return text.to_string();
     }
@@ -435,7 +435,7 @@ fn stored(item: &SentItem) -> String {
     StoredText::of(&item.text_format, &item.text, item.text_version).encode()
 }
 
-fn times(schedule: &Schedule) -> String {
+pub(crate) fn times(schedule: &Schedule) -> String {
     schedule
         .times
         .iter()

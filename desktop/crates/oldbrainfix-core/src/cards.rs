@@ -227,6 +227,28 @@ fn card_parts(text: &str) -> Option<(String, String)> {
     }
 }
 
+/// A Profile card whose signatures held, as the Dart core's
+/// `CheckedProfileCard`: the person's signed Profile, the key record of
+/// the Device that made it, bound to that Profile, and the Profile's id.
+/// A Pack (#164) carries one to say who it is from.
+#[derive(Debug, Clone)]
+pub struct CheckedCard {
+    pub profile: SignedProfile,
+    pub key: KeyRecord,
+    pub id: String,
+}
+
+/// The card `text` holds, a link or the card alone, checked as opening
+/// one checks it, as the Dart core's `checkProfileCard`; none when it is
+/// none or its signatures do not hold. Nothing is kept.
+pub fn check_profile_card(text: &str) -> Option<CheckedCard> {
+    read_card(text).map(|card| CheckedCard {
+        profile: card.profile,
+        key: card.key,
+        id: card.id,
+    })
+}
+
 /// The card `text` holds ([`card_parts`]), checked ([`check_card`]).
 fn read_card(text: &str) -> Option<Card> {
     let (payload, sig) = card_parts(text)?;
@@ -302,6 +324,14 @@ impl Store {
             map.insert("type".into(), FILE_TYPE.into());
             Value::Object(map).to_string().into_bytes()
         }))
+    }
+
+    /// The own card alone, `<payload>.<signature>`, as
+    /// [`Store::profile_card_file`] holds it, picture and all, as the Dart
+    /// core's `profileCardText`: what a Pack carries with "Add my
+    /// Profile" (#164). None when [`Store::profile_card`] is.
+    pub fn profile_card_text(&self) -> Result<Option<String>> {
+        self.own_card(false, true)
     }
 
     /// The own card, `<payload>.<signature>`, with the record as kept

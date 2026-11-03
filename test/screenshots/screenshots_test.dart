@@ -44,6 +44,7 @@ import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
+import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
@@ -131,6 +132,11 @@ typedef _Texts = ({
   String sent,
   String boilerHere,
   String boilerThere,
+  String packArea,
+  String packTopic,
+  String packTally,
+  String packList,
+  String packStretch,
 });
 
 const _en = (
@@ -215,6 +221,11 @@ const _en = (
   sent: 'Lena\'s birthday on Saturday: bring the cake at 3',
   boilerHere: 'Boiler knocks in the mornings, plumber on Thursday',
   boilerThere: 'Boiler knocks in the mornings and evenings',
+  packArea: 'Fitness',
+  packTopic: 'Running',
+  packTally: 'Laps',
+  packList: 'Race day\nShoes\nStart number\nWater',
+  packStretch: 'Stretch after running',
 );
 
 const _de = (
@@ -299,6 +310,11 @@ const _de = (
   sent: 'Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen',
   boilerHere: 'Therme klopft morgens, Installateur am Donnerstag',
   boilerThere: 'Therme klopft morgens und abends',
+  packArea: 'Fitness',
+  packTopic: 'Laufen',
+  packTally: 'Runden',
+  packList: 'Lauftag\nSchuhe\nStartnummer\nWasser',
+  packStretch: 'Nach dem Laufen dehnen',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -310,7 +326,10 @@ class _Seeded {
   /// The Sent Item Lena sent, with [sends].
   final Uint8List? sent;
 
-  _Seeded._(this.store, this.snack, [this.sent]);
+  /// The Pack Lena made with her Profile, with [packs] (#164).
+  final Uint8List? pack;
+
+  _Seeded._(this.store, this.snack, [this.sent, this.pack]);
 
   /// With [lists], the Household also holds a Checklist, a Shopping List
   /// and a Tally with its entries, for the guide's frames of them.
@@ -320,7 +339,8 @@ class _Seeded {
   /// what the history Missed stays unseen, in the Missed Summary; with
   /// [dueReminder], the boiler's Note has a Reminder due at 09:30.
   /// With [sends], Lena sent a Note with a Reminder, not encrypted
-  /// ([sent]). With [conflict], the Laptop is paired and it and this
+  /// ([sent]). With [packs], Lena made a Pack of her Fitness with her
+  /// Profile ([pack]). With [conflict], the Laptop is paired and it and this
   /// Device changed the boiler's text before they synced.
   factory _Seeded(
     _Texts x, {
@@ -331,13 +351,14 @@ class _Seeded {
     bool missed = false,
     bool dueReminder = false,
     bool sends = false,
+    bool packs = false,
     bool conflict = false,
   }) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
     // With People, the own key from a fixed seed: the same short code
     // on the Profile page on every run.
-    final withPeople = people || shared || sends;
+    final withPeople = people || shared || sends || packs;
     final store =
         Store.inMemory(
             clock: () => clock,
@@ -353,8 +374,15 @@ class _Seeded {
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);
     Uint8List? sent;
+    Uint8List? pack;
     if (withPeople) {
-      sent = _seedPeople(store, x, shared: shared, sends: sends);
+      (sent, pack) = _seedPeople(
+        store,
+        x,
+        shared: shared,
+        sends: sends,
+        packs: packs,
+      );
     }
     clock = _now;
     if (conflict) _seedConflict(store, x);
@@ -363,7 +391,7 @@ class _Seeded {
     // The screens show Tallies, Sessions, Frogs, Topics, the format bar
     // and roles: Advanced, chosen (#197).
     store.advanced = true;
-    return _Seeded._(store, snack, sent);
+    return _Seeded._(store, snack, sent, pack);
   }
 
   static Routine _seed(
@@ -668,12 +696,15 @@ const _receiptText =
 /// card, sent through a messenger, so not verified. With [shared], Work
 /// is shared with her from afar as a Member, its changes travelling by
 /// bundles. With [sends], she sends a Note with a Reminder, not
-/// encrypted: its file.
-Uint8List? _seedPeople(
+/// encrypted: its file. With [packs], she makes a Pack of her Fitness,
+/// a Tally, a Checklist and a Note with a Routine,
+/// with her Profile (#164): its file.
+(Uint8List?, Uint8List?) _seedPeople(
   Store store,
   _Texts x, {
   required bool shared,
   bool sends = false,
+  bool packs = false,
 }) {
   store
     ..applyProfileDefaults(name: 'Sam')
@@ -699,9 +730,30 @@ Uint8List? _seedPeople(
     );
     sent = sendNote(lena, party.id);
   }
+  Uint8List? pack;
+  if (packs) {
+    final fitness = Places(lena).addArea(x.packArea);
+    final running = Places(lena).addTopic(fitness.id, x.packTopic);
+    final notes = Notes(lena);
+    final laps = notes.capture(x.packTally, place: running.id);
+    Tallies(lena).addField(laps.id, name: x.packTally, target: 10);
+    final list = notes.capture(x.packList, place: running.id);
+    Checklists(lena).make(list.id);
+    final stretch = notes.capture(x.packStretch, place: fitness.id);
+    Routines(lena).spawn(
+      stretch.id,
+      Schedule(
+        start: Day(2026, 10, 1),
+        times: [ClockTime(19, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,WE,FR'),
+      ),
+    );
+    final whole = lena.packOf(fitness.id);
+    pack = lena.writePack(whole, whole.allKeys(), addProfile: true);
+  }
   lena.close();
   store.openProfileCard(card);
-  if (!shared) return sent;
+  if (!shared) return (sent, pack);
   final work = Places(store).areas().firstWhere((a) => a.starter == 'work');
   shareAreaWith(
     store,
@@ -710,7 +762,7 @@ Uint8List? _seedPeople(
     role: AreaRole.member,
     transport: Transport.bundle,
   );
-  return sent;
+  return (sent, pack);
 }
 
 /// The Laptop, a Device of the user's own, paired, and a Conflict: it and
@@ -1835,10 +1887,11 @@ void main() {
             WidgetTester tester,
             _Seeded seeded, {
             List<int>? waiting,
+            String waitingName = 'lena.oldbrain',
           }) {
             final bundles = FakeBundles(Directory('build'));
             if (waiting != null) {
-              final file = File('build/guide-sent/lena.oldbrain')
+              final file = File('build/guide-sent/$waitingName')
                 ..parent.createSync(recursive: true)
                 ..writeAsBytesSync(waiting);
               bundles.waiting.add(file.path);
@@ -2007,6 +2060,33 @@ void main() {
             final seeded = _Seeded(texts, sends: true);
             await sharingApp(tester, seeded, waiting: seeded.sent);
             expect(find.byType(SentItemScreen), findsOneWidget);
+          });
+
+          // Packs (#164): the Household's tree, and Lena's Pack opened.
+          boxFrame(sharing176, 'send-pack', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household');
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(
+              tester,
+              find.byKey(ValueKey('area-menu-${household.id}')),
+            );
+            await _tap(tester, find.text(t.exportAsPack));
+            expect(find.byType(PackExportScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'open-pack', (tester) async {
+            final seeded = _Seeded(texts, packs: true);
+            await sharingApp(
+              tester,
+              seeded,
+              waiting: seeded.pack,
+              waitingName: 'lena.obfpack',
+            );
+            expect(find.byType(PackImportScreen), findsOneWidget);
           });
 
           boxFrame(sharing176, 'pairing', (tester) async {

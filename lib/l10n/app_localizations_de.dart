@@ -5292,4 +5292,139 @@ class AppLocalizationsDe extends AppLocalizations {
   String helpWhatsNewTitle(String version) {
     return 'Neu in $version';
   }
+
+  @override
+  String get exportAsPack => 'Als Paket exportieren…';
+
+  @override
+  String get packExportTitle => 'Als Paket exportieren';
+
+  @override
+  String get packTickAll => 'Alle auswählen';
+
+  @override
+  String get packUntickAll => 'Alle abwählen';
+
+  @override
+  String packSize(String size) {
+    return 'Größe: $size';
+  }
+
+  @override
+  String get packAddProfile => 'Mein Profil beifügen';
+
+  @override
+  String get packAddProfileHint =>
+      'Die Person sieht deinen Namen und dein Bild und kann erkennen, dass niemand das Paket verändert hat.';
+
+  @override
+  String get packShare => 'Teilen…';
+
+  @override
+  String get packNothingTicked => 'Wähle mindestens eine Notiz aus.';
+
+  @override
+  String packPhoto(String size) {
+    return 'Foto · $size';
+  }
+
+  @override
+  String packRecording(String size) {
+    return 'Aufnahme · $size';
+  }
+
+  @override
+  String packPhotoText(String text) {
+    return 'Fototext: $text';
+  }
+
+  @override
+  String packTranscript(String text) {
+    return 'Transkript: $text';
+  }
+
+  @override
+  String packRoutine(String when) {
+    return 'Routine: $when';
+  }
+
+  @override
+  String packReminder(String when) {
+    return 'Erinnerung: $when';
+  }
+
+  @override
+  String get packFrog => 'Frosch';
+
+  @override
+  String get packTitle => 'Paket';
+
+  @override
+  String packFrom(String name) {
+    return 'Von $name';
+  }
+
+  @override
+  String packAddPerson(String name) {
+    return '$name zu Menschen hinzufügen';
+  }
+
+  @override
+  String get packClaim => 'Als meine übernehmen';
+
+  @override
+  String get packClaimHint =>
+      'Ohne Haken zeigt jede Notiz, von wem sie kam, bis du es entfernst.';
+
+  @override
+  String get packAdd => 'Hinzufügen';
+
+  @override
+  String packAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen hinzugefügt',
+      one: '1 Notiz hinzugefügt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get packSuffix => 'Paket';
+
+  @override
+  String get packNoArea => 'Aus einem Paket';
+
+  @override
+  String get packNotSent => 'Das Paket wurde nicht geteilt.';
+
+  @override
+  String get packNotSentTitle => 'Paket nicht geteilt';
+
+  @override
+  String get packNotWrittenCause =>
+      'Die Datei für das Paket konnte nicht geschrieben werden.';
+
+  @override
+  String get packNotOpened => 'Das Paket wurde nicht geöffnet.';
+
+  @override
+  String get packNotOpenedTitle => 'Paket nicht geöffnet';
+
+  @override
+  String get packUnreadable =>
+      'Diese Datei ist kein Paket, oder sie wurde verändert, nachdem sie gemacht wurde.';
+
+  @override
+  String get packFromBlocked =>
+      'Dieses Paket ist von einer Person, die du blockiert hast.';
+
+  @override
+  String get packAskAgainFix => 'Bitte die Person, es noch einmal zu senden.';
+
+  @override
+  String removePackFrom(String name) {
+    return '„Von $name“ entfernen';
+  }
 }

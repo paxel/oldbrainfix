@@ -9,8 +9,9 @@ import org.junit.Test
 import org.w3c.dom.Element
 
 /**
- * The manifest's "open with" filters: a Profile card file (#144) comes
- * in as a bundle or a Sent Item does, and no card link opens the app.
+ * The manifest's "open with" filters: a Profile card file (#144) and a
+ * Pack (#164) come in as a bundle or a Sent Item does, and no card link
+ * opens the app.
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -39,6 +40,12 @@ class ManifestTest {
         assertTrue(types.contains("application/vnd.oldbrainfix.sync"))
         // Messengers often hand a file over without its own type.
         assertTrue(types.contains("application/octet-stream"))
+    }
+
+    @Test
+    fun aPackOpensWithTheAppAsACardFileDoes() {
+        val types = dataOf(activity(".BundleActivity"), "mimeType")
+        assertTrue(types.contains("application/vnd.oldbrainfix.pack"))
     }
 
     @Test

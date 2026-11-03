@@ -1234,6 +1234,14 @@ fn guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame(CALENDAR_APPS, "family-calendar-on-agenda"),
             )?);
+            // Packs (#164): the desktop makes and opens none yet (#165),
+            // so their boxes show its Agenda.
+            for name in ["send-pack", "open-pack"] {
+                problems.extend(match_frame(
+                    &mut harness,
+                    &box_frame("sharing-and-sync", name),
+                )?);
+            }
             harness.state_mut().select(Selection::AllRoutines);
             harness.run();
             problems.extend(match_frame(

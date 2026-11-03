@@ -6267,6 +6267,190 @@ fn profile_card_files_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
     Ok(())
 }
 
+// ---------------------------------------------------------------- Packs
+
+/// A Pack's tree item in the shape of the generator's `item`.
+fn pack_item_json(item: &oldbrainfix_core::PackItem) -> Value {
+    json!({
+        "key": item.key,
+        "kind": item.kind.name(),
+        "note": item.note,
+        "index": item.index,
+        "size": item.size,
+        "children": item.children.iter().map(pack_item_json).collect::<Vec<_>>(),
+    })
+}
+
+/// The tree of `pack`, the keys ticked at the start, all and after
+/// unticking the pool of its Session, with their sizes, as the
+/// generator's `treeOf`.
+fn pack_tree_json(pack: &oldbrainfix_core::Pack) -> Result<Value, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::packs::item_keys;
+    let start = pack.export_ticks();
+    let mut off = pack.all_keys();
+    let session = pack
+        .notes
+        .iter()
+        .find_map(|n| n.session.as_ref())
+        .ok_or("a Session")?;
+    for t in &session.pool {
+        off = pack.tick(&off, &item_keys::note(*t), false);
+    }
+    let all = pack.all_keys();
+    Ok(json!({
+        "items": pack.tree().iter().map(pack_item_json).collect::<Vec<_>>(),
+        "start": start,
+        "startSize": pack.size(&start),
+        "all": all,
+        "allSize": pack.size(&all),
+        "untickedPool": off,
+        "untickedPoolSize": pack.size(&off),
+    }))
+}
+
+#[test]
+fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
+    use oldbrainfix_core::packs::{EXTENSION, item_keys};
+    let dir = fixtures().join("pack");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let times = &expected["times"];
+    let clock = held_clock(times["made"].as_str().ok_or("made")?)?;
+
+    // Ada's Health, with its photo and recording, and her Profile.
+    let held = clock.clone();
+    let ada = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    ada.set_local_setting("author", "Ada")?;
+    insert_lines(&ada, &dir.join("sender.jsonl"))?;
+    for (kind, sub) in [("photo", "photos"), ("audio", "audio")] {
+        for (hash, bytes) in files(&dir.join(sub))? {
+            assert!(ada.put_blob(kind, &hash, &bytes)?, "{hash}");
+        }
+    }
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings.as_array().ok_or("settings")? {
+        ada.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    // Ben, who has a Health of his own.
+    let held = clock.clone();
+    let mut ben = Store::in_memory(Box::new(move || *held.lock()), || Ok(joiner_key()))?;
+    ben.set_local_setting("author", "Ben")?;
+    insert_lines(&ben, &dir.join("receiver.jsonl"))?;
+
+    // The tree of her Health and the files of it, byte for byte.
+    let health = Places::new(&ada)
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == "Health")
+        .ok_or("Health")?;
+    let pack = ada.pack_of(&health.id, &std::collections::HashSet::new())?;
+    assert_eq!(pack_tree_json(&pack)?, expected["tree"]);
+    let route = pack
+        .notes
+        .iter()
+        .position(|n| n.text == "Route")
+        .ok_or("Route")?;
+    let mut first = pack.export_ticks();
+    first.insert(item_keys::photo(route, 0));
+    first.insert(item_keys::recording(route, 0));
+    let plain = ada.write_pack(&pack, &first, false)?;
+    let signed = ada.write_pack(&pack, &pack.all_keys(), true)?;
+    assert!(plain == std::fs::read(dir.join(format!("pack.{EXTENSION}")))?);
+    assert!(signed == std::fs::read(dir.join(format!("signed.{EXTENSION}")))?);
+
+    // Ben opens each and adds it, claimed and not, the same entries.
+    *clock.lock() = parse_time(times["added"].as_str().ok_or("added")?)?;
+    counted_ids(&mut ben, 0x1100);
+    let wall = |at: DateTime<Utc>| at.naive_utc();
+    let opened_plain = ben.open_pack(&plain)?.map_err(|e| e.name())?;
+    let mark = ben.current_seq()?;
+    let all = opened_plain.pack.all_keys();
+    let added_plain = ben.add_pack(&opened_plain, &all, true, &wall, "Pack", "From a Pack")?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("added.jsonl"))?
+    );
+    counted_ids(&mut ben, 0x1200);
+    let opened_signed = ben.open_pack(&signed)?.map_err(|e| e.name())?;
+    let mark = ben.current_seq()?;
+    let all = opened_signed.pack.all_keys();
+    let added_signed = ben.add_pack(&opened_signed, &all, false, &wall, "Pack", "From a Pack")?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("badged.jsonl"))?
+    );
+    let mut badges = serde_json::Map::new();
+    for n in Notes::new(&ben).all()? {
+        if let Some(from) = ben.pack_from(&n.id)? {
+            badges.insert(n.id, json!({"id": from.id, "name": from.name}));
+        }
+    }
+    assert_eq!(pack_tree_json(&opened_plain.pack)?, expected["openedTree"]);
+    assert_eq!(
+        pack_tree_json(&opened_signed.pack)?,
+        expected["openedSignedTree"]
+    );
+    let from = opened_signed.from.as_ref();
+    assert_eq!(
+        json!({
+            "id": from.map(|f| f.id.clone()),
+            "name": from.map(|f| f.name.clone()),
+            "kept": opened_signed.from_kept,
+        }),
+        expected["from"]
+    );
+    let added = |a: &oldbrainfix_core::PackAdded| json!({"areas": a.areas, "notes": a.notes});
+    assert_eq!(added(&added_plain), expected["addedPlain"]);
+    assert_eq!(added(&added_signed), expected["addedSigned"]);
+    assert_eq!(Value::Object(badges), expected["badges"]);
+
+    // Refused: the signed one changed, a format to come, and hers once
+    // he blocked her.
+    let changed = String::from_utf8(signed.clone())?.replacen("Shoes", "Boots", 1);
+    assert_eq!(
+        changed.as_bytes(),
+        std::fs::read(dir.join(format!("changed.{EXTENSION}")))?
+    );
+    let later = std::fs::read(dir.join(format!("later.{EXTENSION}")))?;
+    let mut json: serde_json::Map<String, Value> = serde_json::from_slice(&plain)?;
+    let mut ordered = serde_json::Map::new();
+    ordered.insert("format".into(), json!(2));
+    ordered.append(&mut json);
+    assert!(Value::Object(ordered).to_string().into_bytes() == later);
+    let refusal = |bytes: &[u8]| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(match ben.open_pack(bytes)? {
+            Ok(_) => "opened".to_string(),
+            Err(e) => e.name().to_string(),
+        })
+    };
+    let refused_changed = refusal(changed.as_bytes())?;
+    let refused_later = refusal(&later)?;
+    ben.open_profile_card(&ada.profile_card(false)?.ok_or("her card")?, false)?;
+    let ada_id = oldbrainfix_core::OwnProfile::new(&ada)
+        .get()?
+        .ok_or("her Profile")?
+        .id;
+    ben.block_person(&ada_id, false)?;
+    let refused_blocked = refusal(&signed)?;
+    assert_eq!(
+        json!({
+            "changed": refused_changed,
+            "later": refused_later,
+            "blocked": refused_blocked,
+        }),
+        expected["refused"]
+    );
+    let names: serde_json::Map<String, Value> = Places::new(&ben)
+        .areas()?
+        .into_iter()
+        .map(|a| (a.id, json!(a.name)))
+        .collect();
+    assert_eq!(Value::Object(names), expected["areaNames"]);
+    Ok(())
+}
+
 #[test]
 fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
     use oldbrainfix_core::signing::{ImportReport, KeyRecord};

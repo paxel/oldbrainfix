@@ -6567,6 +6567,221 @@ void _cardsFixture(Directory root) {
   }
 }
 
+/// Packs (#164, ADR 0043): Ada makes a Pack of her Health as the tree
+/// starts and with everything and her Profile; Ben, who has a Health of
+/// his own, opens and adds each, claimed and not, and refuses a changed
+/// one, one of a later format and hers after he blocked her.
+void _packFixture(Directory root) {
+  final out = Directory('${root.path}/pack')..createSync(recursive: true);
+  final ada = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ben');
+  DateTime wall(DateTime utc) => utc;
+  try {
+    final places = Places(ada);
+    final notes = Notes(ada);
+    final health = places.addArea('Health');
+    final running = places.addTopic(health.id, 'Running');
+    final garden = places.addArea('Garden');
+    final water = notes.capture(
+      '# Water\nDrink **two** ☐ glasses ☐',
+      format: TextFormats.markdown,
+      place: health.id,
+    );
+    notes.amend(water.id, 'And one more in the evening');
+    final boxes = notes.byId(water.id)!.boxes;
+    Boxes(ada).tick(water.id, boxes.first.id, BoxState.done);
+    Routines(ada).spawn(
+      water.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY;COUNT=3'),
+      ),
+    );
+    Routines(ada).spawn(
+      water.id,
+      Schedule(start: Day(2026, 1, 20), times: [ClockTime(9, 30)]),
+    );
+    Routines(ada).spawn(
+      water.id,
+      Schedule(start: Day(2025, 12, 24), times: [ClockTime(18, 0)]),
+    );
+    final bag = notes.capture('Bag\nShoes\nBottle', place: running.id);
+    Checklists(ada).make(bag.id);
+    Checklists(ada).check(Checklists(ada).byNote(bag.id)!.lines.first.id);
+    final shop = notes.capture('Shop\nGel\nSocks', place: running.id);
+    ShoppingLists(ada).make(shop.id);
+    final gel = ShoppingLists(ada).byNote(shop.id, wall)!.lines.first;
+    ShoppingLists(ada)
+        .setReappear(gel.id, Reappear.after(2, ReappearUnit.week));
+    ShoppingLists(ada).check(gel.id, wall);
+    final laps = notes.capture('Laps\nAround the park', place: running.id);
+    final tallies = Tallies(ada);
+    final count = tallies.addField(laps.id, name: 'Laps', target: 10);
+    final rounds = tallies.addField(laps.id, name: 'Rounds');
+    tallies.setMultiplies(laps.id, rounds, count);
+    tallies.add(laps.id, values: {count: 4, rounds: 2}, line: 'Windy');
+    final digging = notes.capture('Digging', place: garden.id);
+    tallies.addField(digging.id, name: 'Minutes', unit: 'min');
+    tallies.add(digging.id, values: {}, line: 'Beds');
+    final training = notes.capture('Training', place: running.id);
+    Sessions(ada).spawn(
+      training.id,
+      Schedule(
+        start: Day(2025, 12, 1),
+        times: [ClockTime(7, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,WE'),
+      ),
+      pool: [laps.id, digging.id],
+      count: 1,
+      rule: SessionRule.least,
+    );
+    Sessions(ada).setCountOn(training.id, 3, 2);
+    final route = notes.capture(
+      'Route',
+      place: running.id,
+      photos: [_photo(41)],
+      recordings: [_recording(42)],
+    );
+    final media = notes.byId(route.id)!;
+    notes.setPhotoText(route.id, media.photos.single, 'Park map');
+    notes.setTranscript(route.id, media.recordings.single, 'Turn left');
+    final frog = notes.capture('Fix the bike', place: health.id);
+    Frogs(ada).spawn(frog.id);
+    final eaten = notes.capture('Buy shoes', place: health.id);
+    Frogs(ada).markDone(Frogs(ada).spawn(eaten.id).id);
+    _write(File('${out.path}/sender.jsonl'), _log(ada));
+    _writeBlobs(ada, out);
+    ada.applyProfileDefaults(name: 'Ada');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert([
+        for (final (key, value) in ada.localSettingsWithPrefix('profile')) [key, value],
+      ])}\n',
+    );
+    Places(ben).addArea('Health');
+    _write(File('${out.path}/receiver.jsonl'), _log(ben));
+
+    final made = DateTime.utc(2026, 1, 10, 12);
+    _held = made;
+    final pack = ada.packOf(health.id);
+    Object? item(PackItem i) => {
+      'key': i.key,
+      'kind': i.kind.name,
+      'note': i.note,
+      'index': i.index,
+      'size': i.size,
+      'children': [for (final c in i.children) item(c)],
+    };
+    List<String> sorted(Set<String> keys) => keys.toList()..sort();
+    Map<String, Object?> treeOf(Pack p) {
+      final start = p.exportTicks();
+      var off = p.allKeys();
+      final session = p.notes.indexWhere((n) => n.session != null);
+      for (final t in p.notes[session].session!.pool) {
+        off = p.tick(off, PackItemKeys.note(t), false);
+      }
+      return {
+        'items': [for (final i in p.tree()) item(i)],
+        'start': sorted(start),
+        'startSize': p.size(start),
+        'all': sorted(p.allKeys()),
+        'allSize': p.size(p.allKeys()),
+        'untickedPool': sorted(off),
+        'untickedPoolSize': p.size(off),
+      };
+    }
+
+    final route0 = pack.notes.indexWhere((n) => n.text == 'Route');
+    final first = {
+      ...pack.exportTicks(),
+      PackItemKeys.photo(route0, 0),
+      PackItemKeys.recording(route0, 0),
+    };
+    final plain = ada.writePack(pack, first);
+    final signed = ada.writePack(pack, pack.allKeys(), addProfile: true);
+    File('${out.path}/pack.$packExtension').writeAsBytesSync(plain);
+    File('${out.path}/signed.$packExtension').writeAsBytesSync(signed);
+
+    final added = DateTime.utc(2026, 1, 11, 18);
+    _held = added;
+    var ids = 0x1100;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final openedPlain = ben.openPack(plain);
+    var mark = ben.currentSeq();
+    final addedPlain = ben.addPack(
+      openedPlain,
+      openedPlain.pack.allKeys(),
+      claim: true,
+      wallClock: wall,
+      suffix: 'Pack',
+      noArea: 'From a Pack',
+    );
+    _writeAfter(ben, mark, File('${out.path}/added.jsonl'));
+    ids = 0x1200;
+    final openedSigned = ben.openPack(signed);
+    mark = ben.currentSeq();
+    final addedSigned = ben.addPack(
+      openedSigned,
+      openedSigned.pack.allKeys(),
+      claim: false,
+      wallClock: wall,
+      suffix: 'Pack',
+      noArea: 'From a Pack',
+    );
+    _writeAfter(ben, mark, File('${out.path}/badged.jsonl'));
+    final badges = <String, Object?>{
+      for (final n in Notes(ben).all())
+        if (ben.packFrom(n.id) case final from?)
+          n.id: {'id': from.id, 'name': from.name},
+    };
+
+    final changed = utf8.encode(
+      utf8.decode(signed).replaceFirst('Shoes', 'Boots'),
+    );
+    File('${out.path}/changed.$packExtension').writeAsBytesSync(changed);
+    final json = jsonDecode(utf8.decode(plain)) as Map<String, Object?>;
+    final later = utf8.encode(jsonEncode({'format': 2, ...json}));
+    File('${out.path}/later.$packExtension').writeAsBytesSync(later);
+    String refusal(List<int> bytes) {
+      try {
+        ben.openPack(bytes);
+        return 'opened';
+      } on Exception catch (e) {
+        return '$e';
+      }
+    }
+
+    final refusedChanged = refusal(changed);
+    final refusedLater = refusal(later);
+    ben.openProfileCard(ada.profileCard()!);
+    ben.blockPerson(ada.ownProfile!.id);
+    final refusedBlocked = refusal(signed);
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'times': {'made': made.toIso8601String(), 'added': added.toIso8601String()},
+        'tree': treeOf(pack),
+        'openedTree': treeOf(openedPlain.pack),
+        'openedSignedTree': treeOf(openedSigned.pack),
+        'from': {'id': openedSigned.from?.id, 'name': openedSigned.from?.name, 'kept': openedSigned.fromKept},
+        'addedPlain': {'areas': addedPlain.areas, 'notes': addedPlain.notes},
+        'addedSigned': {'areas': addedSigned.areas, 'notes': addedSigned.notes},
+        'areaNames': {for (final a in Places(ben).areas()) a.id: a.name},
+        'badges': badges,
+        'refused': {'changed': refusedChanged, 'later': refusedLater, 'blocked': refusedBlocked},
+      })}\n',
+    );
+  } finally {
+    _held = null;
+    ada.close();
+    ben.close();
+  }
+}
+
 /// Profile card files (#144): Ada (the writer's key) with a picture
 /// makes her card file and the one answering another, Ben (the joiner's
 /// key) his answering hers; the file names of a few names; then Ben opens
@@ -8670,6 +8885,26 @@ Future<void> main(List<String> args) async {
     'by Ada for his answer, her QR\'s card after hers and his block, each '
     'with what came of it, the `person:` settings and the keys pinned '
     '(`card-files.json`).\n'
+    '- `pack/`: Packs (#164, ADR 0043): Ada\'s log with its blobs '
+    '(`sender.jsonl`) and her Profile settings (`settings.json`): her '
+    'Health with a formatted Note of the Area with an Amend and a Box '
+    'ticked, a Routine ending after three times, a Reminder to come and '
+    'one past; in its Topic Running a Checklist with a Line checked, a '
+    'Shopping List with a Line struck, a Tally with entries and a field '
+    'multiplying another, a Session picking it and a Tally of her '
+    'Garden, a Note with a photo, a recording and their texts, an open '
+    'Frog and an eaten one. At a held clock (`times`) the tree of the '
+    'Pack from Health with its keys, kinds and sizes, the keys ticked '
+    'at the start and the size then, ticked all and after unticking both '
+    'Tallies of the Session (`tree`); the Pack of what is ticked at the '
+    'start with the photo and the recording (`pack.obfpack`), and of '
+    'everything with her Profile, signed (`signed.obfpack`); Ben, who '
+    'has a Health (`receiver.jsonl`), opening each, its tree, and adding '
+    'the first with "Claim as mine" (`added.jsonl`, ids counted from '
+    '0x1101) and the second without (`badged.jsonl`, from 0x1201), with '
+    'the Areas made and the badges; then refused: the signed one changed '
+    '(`changed.obfpack`), a format to come (`later.obfpack`), and the '
+    'signed one after he blocked her (`expected.json`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
     'joins the School Carol manages; Carol writes a Note with a photo and '
     'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '
@@ -8773,6 +9008,7 @@ Future<void> main(List<String> args) async {
   _blockFixture(root);
   _pendingFixture(root);
   await _offerFixture(root);
+  _packFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

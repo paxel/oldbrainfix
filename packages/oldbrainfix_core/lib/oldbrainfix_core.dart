@@ -32,6 +32,7 @@ export 'src/named_places.dart';
 export 'src/note_history.dart';
 export 'src/note_kinds.dart';
 export 'src/note_share.dart';
+export 'src/packs.dart';
 export 'src/notes.dart';
 export 'src/nudges.dart';
 export 'src/pair_code.dart';

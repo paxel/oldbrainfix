@@ -1,0 +1,733 @@
+{
+  "times": {
+    "made": "2026-01-10T12:00:00.000Z",
+    "added": "2026-01-11T18:00:00.000Z"
+  },
+  "tree": {
+    "items": [
+      {
+        "key": "a0",
+        "kind": "area",
+        "note": null,
+        "index": null,
+        "size": 0,
+        "children": [
+          {
+            "key": "n0",
+            "kind": "note",
+            "note": 0,
+            "index": null,
+            "size": 46,
+            "children": []
+          },
+          {
+            "key": "n1",
+            "kind": "note",
+            "note": 1,
+            "index": null,
+            "size": 49,
+            "children": [
+              {
+                "key": "n1.f",
+                "kind": "frog",
+                "note": 1,
+                "index": null,
+                "size": 4,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "n2",
+            "kind": "note",
+            "note": 2,
+            "index": null,
+            "size": 187,
+            "children": [
+              {
+                "key": "n2.r0",
+                "kind": "routine",
+                "note": 2,
+                "index": 0,
+                "size": 66,
+                "children": []
+              },
+              {
+                "key": "n2.r1",
+                "kind": "reminder",
+                "note": 2,
+                "index": 1,
+                "size": 38,
+                "children": []
+              },
+              {
+                "key": "n2.r2",
+                "kind": "reminder",
+                "note": 2,
+                "index": 2,
+                "size": 38,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "a0.t0",
+            "kind": "topic",
+            "note": null,
+            "index": null,
+            "size": 0,
+            "children": [
+              {
+                "key": "n3",
+                "kind": "note",
+                "note": 3,
+                "index": null,
+                "size": 52,
+                "children": [
+                  {
+                    "key": "n3.p0",
+                    "kind": "photo",
+                    "note": 3,
+                    "index": 0,
+                    "size": 40,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.pt0",
+                    "kind": "photoText",
+                    "note": 3,
+                    "index": 0,
+                    "size": 8,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.a0",
+                    "kind": "recording",
+                    "note": 3,
+                    "index": 0,
+                    "size": 28,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.at0",
+                    "kind": "transcript",
+                    "note": 3,
+                    "index": 0,
+                    "size": 9,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n4",
+                "kind": "note",
+                "note": 4,
+                "index": null,
+                "size": 122,
+                "children": [
+                  {
+                    "key": "n4.r0",
+                    "kind": "routine",
+                    "note": 4,
+                    "index": 0,
+                    "size": 71,
+                    "children": []
+                  },
+                  {
+                    "key": "n8",
+                    "kind": "note",
+                    "note": 8,
+                    "index": null,
+                    "size": 100,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n5",
+                "kind": "note",
+                "note": 5,
+                "index": null,
+                "size": 188,
+                "children": []
+              },
+              {
+                "key": "n6",
+                "kind": "note",
+                "note": 6,
+                "index": null,
+                "size": 145,
+                "children": []
+              },
+              {
+                "key": "n7",
+                "kind": "note",
+                "note": 7,
+                "index": null,
+                "size": 114,
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "start": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n3",
+      "n3.at0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "startSize": 1161,
+    "all": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n2.r1",
+      "n2.r2",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "allSize": 1305,
+    "untickedPool": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n2.r1",
+      "n2.r2",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4.r0",
+      "n6",
+      "n7"
+    ],
+    "untickedPoolSize": 824
+  },
+  "openedTree": {
+    "items": [
+      {
+        "key": "a0",
+        "kind": "area",
+        "note": null,
+        "index": null,
+        "size": 0,
+        "children": [
+          {
+            "key": "n0",
+            "kind": "note",
+            "note": 0,
+            "index": null,
+            "size": 46,
+            "children": []
+          },
+          {
+            "key": "n1",
+            "kind": "note",
+            "note": 1,
+            "index": null,
+            "size": 49,
+            "children": [
+              {
+                "key": "n1.f",
+                "kind": "frog",
+                "note": 1,
+                "index": null,
+                "size": 4,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "n2",
+            "kind": "note",
+            "note": 2,
+            "index": null,
+            "size": 187,
+            "children": [
+              {
+                "key": "n2.r0",
+                "kind": "routine",
+                "note": 2,
+                "index": 0,
+                "size": 66,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "a0.t0",
+            "kind": "topic",
+            "note": null,
+            "index": null,
+            "size": 0,
+            "children": [
+              {
+                "key": "n3",
+                "kind": "note",
+                "note": 3,
+                "index": null,
+                "size": 52,
+                "children": [
+                  {
+                    "key": "n3.p0",
+                    "kind": "photo",
+                    "note": 3,
+                    "index": 0,
+                    "size": 40,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.pt0",
+                    "kind": "photoText",
+                    "note": 3,
+                    "index": 0,
+                    "size": 8,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.a0",
+                    "kind": "recording",
+                    "note": 3,
+                    "index": 0,
+                    "size": 28,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.at0",
+                    "kind": "transcript",
+                    "note": 3,
+                    "index": 0,
+                    "size": 9,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n4",
+                "kind": "note",
+                "note": 4,
+                "index": null,
+                "size": 122,
+                "children": [
+                  {
+                    "key": "n4.r0",
+                    "kind": "routine",
+                    "note": 4,
+                    "index": 0,
+                    "size": 71,
+                    "children": []
+                  },
+                  {
+                    "key": "n8",
+                    "kind": "note",
+                    "note": 8,
+                    "index": null,
+                    "size": 100,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n5",
+                "kind": "note",
+                "note": 5,
+                "index": null,
+                "size": 188,
+                "children": []
+              },
+              {
+                "key": "n6",
+                "kind": "note",
+                "note": 6,
+                "index": null,
+                "size": 145,
+                "children": []
+              },
+              {
+                "key": "n7",
+                "kind": "note",
+                "note": 7,
+                "index": null,
+                "size": 114,
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "start": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n3",
+      "n3.at0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "startSize": 1161,
+    "all": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "allSize": 1229,
+    "untickedPool": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4.r0",
+      "n6",
+      "n7"
+    ],
+    "untickedPoolSize": 748
+  },
+  "openedSignedTree": {
+    "items": [
+      {
+        "key": "a0",
+        "kind": "area",
+        "note": null,
+        "index": null,
+        "size": 0,
+        "children": [
+          {
+            "key": "n0",
+            "kind": "note",
+            "note": 0,
+            "index": null,
+            "size": 46,
+            "children": []
+          },
+          {
+            "key": "n1",
+            "kind": "note",
+            "note": 1,
+            "index": null,
+            "size": 49,
+            "children": [
+              {
+                "key": "n1.f",
+                "kind": "frog",
+                "note": 1,
+                "index": null,
+                "size": 4,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "n2",
+            "kind": "note",
+            "note": 2,
+            "index": null,
+            "size": 187,
+            "children": [
+              {
+                "key": "n2.r0",
+                "kind": "routine",
+                "note": 2,
+                "index": 0,
+                "size": 66,
+                "children": []
+              },
+              {
+                "key": "n2.r1",
+                "kind": "reminder",
+                "note": 2,
+                "index": 1,
+                "size": 38,
+                "children": []
+              },
+              {
+                "key": "n2.r2",
+                "kind": "reminder",
+                "note": 2,
+                "index": 2,
+                "size": 38,
+                "children": []
+              }
+            ]
+          },
+          {
+            "key": "a0.t0",
+            "kind": "topic",
+            "note": null,
+            "index": null,
+            "size": 0,
+            "children": [
+              {
+                "key": "n3",
+                "kind": "note",
+                "note": 3,
+                "index": null,
+                "size": 52,
+                "children": [
+                  {
+                    "key": "n3.p0",
+                    "kind": "photo",
+                    "note": 3,
+                    "index": 0,
+                    "size": 40,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.pt0",
+                    "kind": "photoText",
+                    "note": 3,
+                    "index": 0,
+                    "size": 8,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.a0",
+                    "kind": "recording",
+                    "note": 3,
+                    "index": 0,
+                    "size": 28,
+                    "children": []
+                  },
+                  {
+                    "key": "n3.at0",
+                    "kind": "transcript",
+                    "note": 3,
+                    "index": 0,
+                    "size": 9,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n4",
+                "kind": "note",
+                "note": 4,
+                "index": null,
+                "size": 122,
+                "children": [
+                  {
+                    "key": "n4.r0",
+                    "kind": "routine",
+                    "note": 4,
+                    "index": 0,
+                    "size": 71,
+                    "children": []
+                  },
+                  {
+                    "key": "n8",
+                    "kind": "note",
+                    "note": 8,
+                    "index": null,
+                    "size": 100,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "key": "n5",
+                "kind": "note",
+                "note": 5,
+                "index": null,
+                "size": 188,
+                "children": []
+              },
+              {
+                "key": "n6",
+                "kind": "note",
+                "note": 6,
+                "index": null,
+                "size": 145,
+                "children": []
+              },
+              {
+                "key": "n7",
+                "kind": "note",
+                "note": 7,
+                "index": null,
+                "size": 114,
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "start": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n3",
+      "n3.at0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "startSize": 1161,
+    "all": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n2.r1",
+      "n2.r2",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4",
+      "n4.r0",
+      "n5",
+      "n6",
+      "n7",
+      "n8"
+    ],
+    "allSize": 1305,
+    "untickedPool": [
+      "n0",
+      "n1",
+      "n1.f",
+      "n2",
+      "n2.r0",
+      "n2.r1",
+      "n2.r2",
+      "n3",
+      "n3.a0",
+      "n3.at0",
+      "n3.p0",
+      "n3.pt0",
+      "n4.r0",
+      "n6",
+      "n7"
+    ],
+    "untickedPoolSize": 824
+  },
+  "from": {
+    "id": "00000000000000000000000000000021",
+    "name": "Ada",
+    "kept": false
+  },
+  "addedPlain": {
+    "areas": [
+      "area:00000000000000000000000000001101",
+      "area:00000000000000000000000000001102"
+    ],
+    "notes": 9
+  },
+  "addedSigned": {
+    "areas": [
+      "area:00000000000000000000000000001201",
+      "area:00000000000000000000000000001202"
+    ],
+    "notes": 9
+  },
+  "areaNames": {
+    "area:00000000000000000000000000001102": "Garden",
+    "area:00000000000000000000000000001202": "Garden (Pack)",
+    "area:00000000000000000000000000000022": "Health",
+    "area:00000000000000000000000000001201": "Health (Pack 2)",
+    "area:00000000000000000000000000001101": "Health (Pack)"
+  },
+  "badges": {
+    "note:00000000000000000000000000001204": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:00000000000000000000000000001205": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:00000000000000000000000000001207": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:0000000000000000000000000000120b": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:0000000000000000000000000000120c": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:0000000000000000000000000000120e": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:00000000000000000000000000001211": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:00000000000000000000000000001215": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    },
+    "note:00000000000000000000000000001219": {
+      "id": "00000000000000000000000000000021",
+      "name": "Ada"
+    }
+  },
+  "refused": {
+    "changed": "NotAPack",
+    "later": "PackNeedsUpdate",
+    "blocked": "PackFromBlocked"
+  }
+}

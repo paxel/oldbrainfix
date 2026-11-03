@@ -11,6 +11,7 @@ import 'checklist_view.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'person_screen.dart';
 import 'profile.dart';
@@ -159,8 +160,9 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
   }
 }
 
-/// Opens a file another app handed over, or the user picked: a Profile
-/// card file (#144) shows the person's Profile or why nobody was added,
+/// Opens a file another app handed over, or the user picked: a Pack
+/// (#164) shows its tree or why it did not open, a Profile card file
+/// (#144) shows the person's Profile or why nobody was added,
 /// a Sent Item shows its preview, anything else is imported as a bundle.
 /// A card file is JSON as a Sent Item is, so it is asked for first. The
 /// copy is removed either way. Returns how many Conflicts a bundle
@@ -173,6 +175,17 @@ Future<int> openReceivedFile(
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context);
+  // A Pack is JSON as a card file is, and of any size (#164): asked
+  // for first, and read whole.
+  if (packFileBytes(path) case final pack?) {
+    try {
+      File(path).deleteSync();
+    } on FileSystemException {
+      // Gone already.
+    }
+    await openPackBytes(context, store, pack);
+    return 0;
+  }
   final bytes = _small(path);
   final card = looksLikeProfileCard(bytes);
   if (!card && !looksLikeSentItem(bytes)) {
@@ -239,6 +252,9 @@ List<int> _small(String path) {
 
 /// Whether the file at [path] is a Sent Item rather than a bundle.
 bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
+
+/// Whether the file at [path] is a Pack (#164).
+bool isPackFile(String path) => packFileBytes(path) != null;
 
 /// Whether the file at [path] is a Profile card file (#144).
 bool isProfileCardFile(String path) => looksLikeProfileCard(_small(path));

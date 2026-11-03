@@ -125,6 +125,13 @@ class NoteActions {
   /// (#183).
   final VoidCallback? onCopy;
 
+  /// Opens the tree of a Pack exported from the Note (#164).
+  final VoidCallback? onExportPack;
+
+  /// Removes the Note's "From …" badge (#164), naming [packFrom].
+  final VoidCallback? onRemovePackFrom;
+  final String? packFrom;
+
   /// The calendar choices, read as the menu opens; only shown with a
   /// calendar.
   final NoteCalendar Function()? calendar;
@@ -174,6 +181,9 @@ class NoteActions {
     this.onImportance,
     this.onSend,
     this.onShare,
+    this.onExportPack,
+    this.onRemovePackFrom,
+    this.packFrom,
     this.onCopy,
     this.calendar,
     this.onAmend,
@@ -219,7 +229,8 @@ List<(ListOnAgenda, String)> listOnAgendaOptions(AppLocalizations t) => [
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
-/// own, ADR 0017); with [showPlace] where it is filed; a separator under
+/// own, ADR 0017); "From …" when a Pack brought it unclaimed (#164);
+/// with [showPlace] where it is filed; a separator under
 /// them; then the Note in its compact or its detailed view ([full], #189).
 /// Its Area's colour runs down the left edge and its icon leads the place
 /// line. An important Note gets an accent marker and a stronger emboss, an
@@ -467,6 +478,20 @@ class NoteCard extends StatelessWidget {
           _AuthorLine(noteId: note.id, author: author),
           const SizedBox(height: 4),
         ],
+        // Who a Pack it came from is from, until removed (#164).
+        if (actions?.packFrom case final from?)
+          Row(
+            key: ValueKey('pack-from-${note.id}'),
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Flexible(child: Text(t.packFrom(from), style: text.labelMedium)),
+            ],
+          ),
         if (place != null) ...[
           const SizedBox(height: 4),
           Row(
@@ -483,7 +508,7 @@ class NoteCard extends StatelessWidget {
     );
     // Its time and place show under the text of the detailed view (#170):
     // with no Profile or place over the text it has no header.
-    final headed = author != null || place != null;
+    final headed = author != null || place != null || actions?.packFrom != null;
     final marker = important
         ? Icon(
             Icons.label_important,
@@ -716,7 +741,7 @@ class NoteActionRow extends StatelessWidget {
 /// The ⋮ of a card's action row, or of a compact card's top right: a menu
 /// at the button with words. It leads with Edit, then on a compact card
 /// File into… and Merge into… (#189), then, for a Note being captured, its Importance as radio
-/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, the calendar, adding to the Note, "Add entry" of
+/// buttons, the one it has marked, then Show ticks while it has boxes, then sending, sharing, copying its text, exporting it as a Pack and removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
 /// switch, a Shopping List's three choices as radio buttons) and "Uncheck
@@ -820,6 +845,18 @@ class _MoreButton extends StatelessWidget {
             item('note-share', Icons.share_outlined, t.shareToApp, share),
           if (actions.onCopy case final copy?)
             item('note-copy', Icons.copy_outlined, t.copyText, copy),
+          if (actions.onExportPack case final pack?)
+            item('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+          if ((actions.onRemovePackFrom, actions.packFrom) case (
+            final remove?,
+            final name?,
+          ))
+            item(
+              'note-remove-pack-from',
+              Icons.inventory_2_outlined,
+              t.removePackFrom(name),
+              remove,
+            ),
           if (calendar != null && calendar.add.isNotEmpty)
             item(
               'note-calendar',

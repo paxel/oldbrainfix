@@ -6,7 +6,7 @@
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
-//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files and of a Google Keep export. The Dart core
+//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the Packs of copied Notes one hands another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files and of a Google Keep export. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
@@ -44,6 +44,7 @@ pub mod notes;
 pub mod nudges;
 pub mod offers;
 pub mod overrides;
+pub mod packs;
 pub mod pairing;
 pub mod pending;
 pub mod people;
@@ -94,6 +95,9 @@ pub use notes::{
 };
 pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
+pub use packs::{
+    OpenedPack, Pack, PackAdded, PackError, PackFrom, PackItem, PackItemKind, PackNote, PackTicks,
+};
 pub use pairing::PairedDevice;
 pub use pending::{
     AcceptedChanges, KeptEdit, PendingChange, PendingDraft, PendingEntry, PendingSet,

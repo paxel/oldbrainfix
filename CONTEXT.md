@@ -247,11 +247,15 @@ _Avoid_: guest, viewer
 
 **Sent Item**:
 A single Note with its Routines or Reminders, sent as a file to another Old Brain Fix user outside any Shared Area. It is sent with "Send to a person". The receiver previews and accepts it; the sender may later send an update or a cancellation for it.
-_Avoid_: invite, share (Share to an app hands a Note to another app), bundle (a bundle is a sync transport)
+_Avoid_: invite, share (Share to an app hands a Note to another app), Pack (a Pack hands copies with nothing linking back), bundle (a bundle is a sync transport)
 
 **Share to an app**:
 Handing a copy of a Note to another app, such as a messenger or mail: its text and its Sections, each under its date, with HTML beside the Markdown of a Formatted text, and its photos and recordings as files. On the phone it gives them to the share sheet; on the desktop "Copy as text" and "Save as Markdown…" put the same on the clipboard or into a file. Nothing comes back from the other app and nothing of it syncs. German: Mit einer App teilen.
-_Avoid_: Sent Item and "Send to a person" (they send a Note to another Old Brain Fix user), Shared Area, export
+_Avoid_: Sent Item and "Send to a person" (they send a Note to another Old Brain Fix user), Pack (a Pack hands copies to another Old Brain Fix user), Shared Area, export
+
+**Pack**:
+A file of copies of Notes picked from an Area, a Topic or a Note with "Export as Pack…", handed over through any messenger, which the receiver opens with the app and keeps as their own (#164, ADR 0043). Both see the same tree of what it holds and tick what goes: each Note with what it is (its text, Sections, kind, Routines and Reminders, an open Frog), never its Tally entries, ticks, check-offs, Capture Context or history; its photos, recordings, Photo Texts and Transcripts each on its own; and under a Session the Tallies it picks from elsewhere. "Add my Profile" signs it with the sender's Profile; "Claim as mine" unticked leaves each Note a badge saying who it came from, such as "From Ann", until removed. The copies land in new Areas and Topics, never in one there already; nothing links them back, updates or cancels them. German: Paket.
+_Avoid_: Sent Item (one Note, encrypted, owned by the sender), Share to an app, Import, bundle (a bundle is a sync transport), export (in the UI the action is "Export as Pack…")
 
 **Profile**:
 A person as the app shows them: a name and a picture, under an id of their own. Each person has one Profile for all of their Devices. German: Profil.

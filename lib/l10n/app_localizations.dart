@@ -8527,6 +8527,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What\'s new in {version}'**
   String helpWhatsNewTitle(String version);
+
+  /// The entry in the menu of an Area, a Topic and a Note that opens the Pack's tree (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Pack…'**
+  String get exportAsPack;
+
+  /// Title of the page where the user ticks what goes into a Pack (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Pack'**
+  String get packExportTitle;
+
+  /// Ticks every item of a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick all'**
+  String get packTickAll;
+
+  /// Unticks every item of a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Untick all'**
+  String get packUntickAll;
+
+  /// The Pack's size with what is ticked now, shown live.
+  ///
+  /// In en, this message translates to:
+  /// **'Size: {size}'**
+  String packSize(String size);
+
+  /// Tick on the export page: the Pack carries the sender's Profile card and is signed with it (Q462).
+  ///
+  /// In en, this message translates to:
+  /// **'Add my Profile'**
+  String get packAddProfile;
+
+  /// Under 'Add my Profile'.
+  ///
+  /// In en, this message translates to:
+  /// **'The receiver sees your name and picture, and can tell nobody changed the Pack.'**
+  String get packAddProfileHint;
+
+  /// The button on the export page that writes the Pack and opens the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get packShare;
+
+  /// Under the export and import pages' button while no Note is ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick at least one Note.'**
+  String get packNothingTicked;
+
+  /// A photo in a Pack's tree, with its size.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo · {size}'**
+  String packPhoto(String size);
+
+  /// A voice recording in a Pack's tree, with its size.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording · {size}'**
+  String packRecording(String size);
+
+  /// A Photo Text in a Pack's tree, with the start of its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Text: {text}'**
+  String packPhotoText(String text);
+
+  /// A Transcript in a Pack's tree, with the start of its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript: {text}'**
+  String packTranscript(String text);
+
+  /// A Routine in a Pack's tree, with its schedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine: {when}'**
+  String packRoutine(String when);
+
+  /// A Reminder in a Pack's tree, with its day and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: {when}'**
+  String packReminder(String when);
+
+  /// A Note's open Frog in a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog'**
+  String get packFrog;
+
+  /// Title of the page showing a Pack that was opened (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Pack'**
+  String get packTitle;
+
+  /// Who a Pack is from, and the badge of a Note added from it without 'Claim as mine' (Q463).
+  ///
+  /// In en, this message translates to:
+  /// **'From {name}'**
+  String packFrom(String name);
+
+  /// On an opened Pack with a Profile: keeps the person as a Profile card would.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} to People'**
+  String packAddPerson(String name);
+
+  /// Tick beside 'Add' on a Pack with a Profile (Q463), on by default.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim as mine'**
+  String get packClaim;
+
+  /// Under 'Claim as mine'.
+  ///
+  /// In en, this message translates to:
+  /// **'Unticked, each Note shows who it came from until you remove it.'**
+  String get packClaimHint;
+
+  /// The button that adds the ticked Notes of a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get packAdd;
+
+  /// Announced after 'Add' on a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note added} other{{count} Notes added}}'**
+  String packAdded(int count);
+
+  /// Put after the name of a new Area from a Pack when an Area has that name: 'Health (Pack)'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack'**
+  String get packSuffix;
+
+  /// The name of the new Area for the Notes of a Pack that were in no Area.
+  ///
+  /// In en, this message translates to:
+  /// **'From a Pack'**
+  String get packNoArea;
+
+  /// Announced when a Pack could not be written or no app took it.
+  ///
+  /// In en, this message translates to:
+  /// **'The Pack was not shared.'**
+  String get packNotSent;
+
+  /// Title of the dialog behind 'packNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack not shared'**
+  String get packNotSentTitle;
+
+  /// Why a Pack was not shared: its file could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for the Pack could not be written.'**
+  String get packNotWrittenCause;
+
+  /// Announced when a Pack is refused; the tap shows why.
+  ///
+  /// In en, this message translates to:
+  /// **'The Pack was not opened.'**
+  String get packNotOpened;
+
+  /// Title of the dialog behind 'packNotOpened'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack not opened'**
+  String get packNotOpenedTitle;
+
+  /// Why a Pack was not opened: it is damaged, or its signature does not hold.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no Pack, or it was changed after it was made.'**
+  String get packUnreadable;
+
+  /// Why a Pack was not opened (Q471).
+  ///
+  /// In en, this message translates to:
+  /// **'This Pack is from a person you blocked.'**
+  String get packFromBlocked;
+
+  /// The fix when a Pack could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the person to send it again.'**
+  String get packAskAgainFix;
+
+  /// In a Note's menu: removes the badge saying who the Note came from in a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “From {name}”'**
+  String removePackFrom(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -5223,4 +5223,138 @@ class AppLocalizationsEn extends AppLocalizations {
   String helpWhatsNewTitle(String version) {
     return 'What\'s new in $version';
   }
+
+  @override
+  String get exportAsPack => 'Export as Pack…';
+
+  @override
+  String get packExportTitle => 'Export as Pack';
+
+  @override
+  String get packTickAll => 'Tick all';
+
+  @override
+  String get packUntickAll => 'Untick all';
+
+  @override
+  String packSize(String size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String get packAddProfile => 'Add my Profile';
+
+  @override
+  String get packAddProfileHint =>
+      'The receiver sees your name and picture, and can tell nobody changed the Pack.';
+
+  @override
+  String get packShare => 'Share…';
+
+  @override
+  String get packNothingTicked => 'Tick at least one Note.';
+
+  @override
+  String packPhoto(String size) {
+    return 'Photo · $size';
+  }
+
+  @override
+  String packRecording(String size) {
+    return 'Recording · $size';
+  }
+
+  @override
+  String packPhotoText(String text) {
+    return 'Photo Text: $text';
+  }
+
+  @override
+  String packTranscript(String text) {
+    return 'Transcript: $text';
+  }
+
+  @override
+  String packRoutine(String when) {
+    return 'Routine: $when';
+  }
+
+  @override
+  String packReminder(String when) {
+    return 'Reminder: $when';
+  }
+
+  @override
+  String get packFrog => 'Frog';
+
+  @override
+  String get packTitle => 'Pack';
+
+  @override
+  String packFrom(String name) {
+    return 'From $name';
+  }
+
+  @override
+  String packAddPerson(String name) {
+    return 'Add $name to People';
+  }
+
+  @override
+  String get packClaim => 'Claim as mine';
+
+  @override
+  String get packClaimHint =>
+      'Unticked, each Note shows who it came from until you remove it.';
+
+  @override
+  String get packAdd => 'Add';
+
+  @override
+  String packAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes added',
+      one: '1 Note added',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get packSuffix => 'Pack';
+
+  @override
+  String get packNoArea => 'From a Pack';
+
+  @override
+  String get packNotSent => 'The Pack was not shared.';
+
+  @override
+  String get packNotSentTitle => 'Pack not shared';
+
+  @override
+  String get packNotWrittenCause =>
+      'The file for the Pack could not be written.';
+
+  @override
+  String get packNotOpened => 'The Pack was not opened.';
+
+  @override
+  String get packNotOpenedTitle => 'Pack not opened';
+
+  @override
+  String get packUnreadable =>
+      'This file is no Pack, or it was changed after it was made.';
+
+  @override
+  String get packFromBlocked => 'This Pack is from a person you blocked.';
+
+  @override
+  String get packAskAgainFix => 'Ask the person to send it again.';
+
+  @override
+  String removePackFrom(String name) {
+    return 'Remove “From $name”';
+  }
 }

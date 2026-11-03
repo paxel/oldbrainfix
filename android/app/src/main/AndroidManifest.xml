@@ -129,14 +129,15 @@
                 <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>
-        <!-- Sync bundles (ADR 0003), Sent Items (ADR 0009) and Profile
-             card files (#144) opened with the app or shared to it from a
-             messenger or a file manager.
+        <!-- Sync bundles (ADR 0003), Sent Items (ADR 0009), Profile card
+             files (#144) and Packs (#164) opened with the app or shared to
+             it from a messenger or a file manager.
              Messengers rarely keep their own types, so files and zips are
              taken too; the app tells them apart by what is in them, and
              one that is none of them is announced as such. It only copies
              the file and hands over to MainActivity, which imports a
-             bundle, shows a Sent Item's preview and opens a card. -->
+             bundle, shows a Sent Item's preview, opens a card and shows a
+             Pack's tree. -->
         <activity
             android:name=".BundleActivity"
             android:exported="true"
@@ -151,6 +152,7 @@
                 <data android:mimeType="application/vnd.oldbrainfix.sync" />
                 <data android:mimeType="application/vnd.oldbrainfix.item" />
                 <data android:mimeType="application/vnd.oldbrainfix.card" />
+                <data android:mimeType="application/vnd.oldbrainfix.pack" />
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="application/zip" />
                 <data android:mimeType="application/x-zip-compressed" />

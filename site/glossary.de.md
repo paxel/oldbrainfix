@@ -245,11 +245,15 @@ _Avoid_: Gast, Betrachter
 
 **Gesendete Notiz** [Sent Item]:
 Eine einzelne Notiz mit ihren Routinen oder Erinnerungen, als Datei an einen anderen Menschen mit Old Brain Fix geschickt, außerhalb jedes geteilten Bereichs, mit „An eine Person senden“. Wer sie bekommt, sieht sie vorher an und nimmt sie an; wer sie geschickt hat, kann später eine Aktualisierung oder eine Absage nachschicken.
-_Avoid_: Einladung, Teilen (Mit einer App teilen gibt eine Notiz an eine andere App), Bündel (ein Bündel ist ein Weg zum Abgleichen)
+_Avoid_: Einladung, Teilen (Mit einer App teilen gibt eine Notiz an eine andere App), Paket (ein Paket gibt Kopien, und nichts verbindet sie zurück), Bündel (ein Bündel ist ein Weg zum Abgleichen)
 
 **Mit einer App teilen** [Share to an app]:
 Eine Kopie einer Notiz an eine andere App geben, etwa einen Messenger oder die Mail: ihren Text und ihre Abschnitte, jeden unter seinem Datum, mit HTML neben dem Markdown eines formatierten Texts, und ihre Fotos und Aufnahmen als Dateien. Auf dem Handy bekommt sie das Teilen-Menü; am Computer legen „Als Text kopieren“ und „Als Markdown speichern …“ dasselbe in die Zwischenablage oder in eine Datei. Von der anderen App kommt nichts zurück, und nichts davon wird abgeglichen.
-_Avoid_: Gesendete Notiz und „An eine Person senden“ (damit geht eine Notiz an einen anderen Menschen mit Old Brain Fix), Geteilter Bereich, Exportieren
+_Avoid_: Gesendete Notiz und „An eine Person senden“ (damit geht eine Notiz an einen anderen Menschen mit Old Brain Fix), Paket (ein Paket gibt einem anderen Menschen mit Old Brain Fix Kopien), Geteilter Bereich, Exportieren
+
+**Paket** [Pack]:
+Eine Datei mit Kopien von Notizen aus einem Bereich, einem Thema oder einer Notiz, gemacht mit „Als Paket exportieren…“ und über einen beliebigen Messenger weitergegeben; wer sie bekommt, öffnet sie mit der App und behält die Kopien als eigene. Beide sehen denselben Baum dessen, was darin ist, und wählen aus, was mitgeht: jede Notiz mit dem, was sie ist (ihr Text, ihre Abschnitte, ihre Art, ihre Routinen und Erinnerungen, ein offener Frosch), nie die Einträge ihrer Strichliste, Haken, Erledigt-Haken, ihr Erfassungskontext oder ihr Verlauf; ihre Fotos, Aufnahmen, Fototexte und Transkripte jedes für sich; und unter einer Einheit die Strichlisten, aus denen sie anderswo wählt. „Mein Profil beifügen“ signiert es mit dem Profil der Person, die es schickt; ohne Haken bei „Als meine übernehmen“ behält jede Notiz eine Plakette, von wem sie kam, etwa „Von Ann“, bis du sie entfernst. Die Kopien landen in neuen Bereichen und Themen, nie in einem, den es schon gibt; nichts verbindet sie zurück, aktualisiert oder sagt sie ab.
+_Avoid_: Gesendete Notiz (eine Notiz, verschlüsselt, gehört der Person, die sie schickt), Mit einer App teilen, Import, Bündel (ein Bündel ist ein Weg zum Abgleichen), Exportieren (in der App heißt die Aktion „Als Paket exportieren…“)
 
 **Profil** [Profile]:
 Ein Mensch, wie die App ihn zeigt: ein Name und ein Bild, unter einer eigenen Kennung. Jeder Mensch hat ein Profil für alle seine Geräte.

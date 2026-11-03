@@ -170,7 +170,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -1246,6 +1246,11 @@ impl Store {
                     all.insert("boxes".into(), json!(boxes_json(&note.boxes)));
                     all.insert("captureContext".into(), Value::Object(context));
                     all.insert("frogs".into(), json!(frogs));
+                    // The "From <name>" badge of a Note a Pack brought,
+                    // only while it has one (#164).
+                    if let Some(from) = self.pack_from(id)? {
+                        all.insert("from".into(), json!(from.name));
+                    }
                     all.insert("lines".into(), lines);
                     all.insert("mayChange".into(), json!(self.may_change(id)?));
                     all.insert(
@@ -3069,6 +3074,35 @@ mod tests {
         assert_eq!(line()?, json!({"kind": "once"}));
         assert!(!set(json!({"id": milk, "reappear": "none"}))?.is_error);
         assert_eq!(line()?, json!({"kind": "none"}));
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_from_a_pack_names_its_sender_while_it_keeps_the_badge() -> TestResult {
+        use crate::{OwnProfile, SigningKey};
+        let person = |seed: u8, name: &str| -> Made<Store> {
+            let key = move || Ok(SigningKey::from_seed([seed; 32]));
+            let store = Store::in_memory(crate::store::tests::ticking(), key)?;
+            OwnProfile::new(&store).apply_defaults(name, None)?;
+            Ok(store)
+        };
+        let ann = person(1, "Ann")?;
+        let ben = person(2, "Ben")?;
+        let note = Notes::new(&ann).capture("Drink water", None, None)?;
+        let pack = ann.pack_of(&note.id, &std::collections::HashSet::new())?;
+        let file = ann.write_pack(&pack, &pack.all_keys(), true)?;
+        let opened = ben.open_pack(&file)?.map_err(|e| e.name())?;
+        let wall = |t: DateTime<Utc>| t.naive_utc();
+        let ticks = opened.pack.all_keys();
+        ben.add_pack(&opened, &ticks, false, &wall, "Pack", "From a Pack")?;
+        let badged = Notes::new(&ben).all()?.remove(0).id;
+        ben.add_pack(&opened, &ticks, true, &wall, "Pack", "From a Pack")?;
+        let claimed = Notes::new(&ben).all()?.remove(0).id;
+        assert_ne!(badged, claimed);
+        let task = ben.open_ai_task()?;
+        let read = |id: &str| json_of(&call(&ben, &task, "read_note", &json!({"id": id}))?);
+        assert_eq!(read(&badged)?.get("from"), Some(&json!("Ann")));
+        assert_eq!(read(&claimed)?.get("from"), None);
         Ok(())
     }
 

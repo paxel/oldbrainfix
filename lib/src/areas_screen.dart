@@ -14,6 +14,7 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'notes_screen.dart';
+import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -268,6 +269,9 @@ class _AreasScreenState extends State<AreasScreen>
           ),
         );
         if (!mounted) return;
+      case _AreaAction.pack:
+        await exportPack(context, widget.places.store, area.id);
+        if (!mounted) return;
       case _AreaAction.people:
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -305,7 +309,8 @@ class _AreasScreenState extends State<AreasScreen>
   }
 
   /// What may be done to [area] here: everything by its owner or a
-  /// Manager, only seeing who is in by anyone else.
+  /// Manager; by anyone else exporting it as a Pack (#164) and seeing who
+  /// is in.
   Widget _areaMenu(AppLocalizations t, Area area) {
     final access = _access[area.id] ?? AreaAccess.owner;
     final manages = access == AreaAccess.owner || access == AreaAccess.manager;
@@ -319,6 +324,12 @@ class _AreasScreenState extends State<AreasScreen>
           PopupMenuItem(value: _AreaAction.look, child: Text(t.areaLook)),
           PopupMenuItem(value: _AreaAction.share, child: Text(t.shareArea)),
         ],
+        // Copies of what anyone may read (#164).
+        PopupMenuItem(
+          key: ValueKey('area-pack-${area.id}'),
+          value: _AreaAction.pack,
+          child: Text(t.exportAsPack),
+        ),
         if (shared)
           PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
         if (manages)
@@ -420,9 +431,9 @@ class _AreasScreenState extends State<AreasScreen>
   }
 }
 
-enum _AreaAction { rename, look, share, people, delete }
+enum _AreaAction { rename, look, share, pack, people, delete }
 
-enum _TopicAction { rename, delete }
+enum _TopicAction { rename, pack, delete }
 
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
@@ -624,6 +635,9 @@ class _AreaScreenState extends State<AreaScreen>
         final name = await askName(context, title: t.rename, initial: shown);
         if (!mounted || name == null || name == shown) return;
         widget.places.rename(topic.id, name);
+      case _TopicAction.pack:
+        await exportPack(context, widget.places.store, topic.id);
+        if (!mounted) return;
       case _TopicAction.delete:
         final go = await confirmDeleteTopic(
           context,
@@ -649,21 +663,29 @@ class _AreaScreenState extends State<AreaScreen>
           title: topicName(t, topic),
           highlighted: topic.id == last,
           onTap: () => _open(topic),
-          menu: !_manages
-              ? null
-              : PopupMenuButton<_TopicAction>(
-                  onSelected: (action) => _act(area, topic, action),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: _TopicAction.rename,
-                      child: Text(t.rename),
-                    ),
-                    PopupMenuItem(
-                      value: _TopicAction.delete,
-                      child: Text(t.delete),
-                    ),
-                  ],
+          // Anyone may export copies (#164); renaming and deleting are a
+          // Manager's.
+          menu: PopupMenuButton<_TopicAction>(
+            key: ValueKey('topic-menu-${topic.id}'),
+            onSelected: (action) => _act(area, topic, action),
+            itemBuilder: (_) => [
+              if (_manages)
+                PopupMenuItem(
+                  value: _TopicAction.rename,
+                  child: Text(t.rename),
                 ),
+              PopupMenuItem(
+                key: ValueKey('topic-pack-${topic.id}'),
+                value: _TopicAction.pack,
+                child: Text(t.exportAsPack),
+              ),
+              if (_manages)
+                PopupMenuItem(
+                  value: _TopicAction.delete,
+                  child: Text(t.delete),
+                ),
+            ],
+          ),
         ),
       ...diaryCards(
         context,

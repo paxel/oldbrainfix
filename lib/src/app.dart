@@ -729,7 +729,8 @@ class _HomeState extends State<_Home> {
   /// what each brought; Conflicts as an automatic sync's, not past the
   /// App Lock. A Sent Item among them opens its preview, behind the App
   /// Lock once it is unlocked. A Profile card file (#144) opens the
-  /// person's Profile, which is browsing, so it waits for the unlock as
+  /// person's Profile, and a Pack (#164) its tree, which is browsing, so
+  /// each waits for the unlock as
   /// well; nor before the first start made the own Profile, so nothing is
   /// kept before the user chose to restore or add a Device of theirs.
   Future<void> _importOpened() async {
@@ -739,8 +740,10 @@ class _HomeState extends State<_Home> {
     var conflicts = 0;
     for (final path in paths) {
       if (!mounted) return;
-      final card = isProfileCardFile(path);
-      // A Sent Item or a card shows what is in it: not past the App Lock.
+      // A Pack names its sender as a card does (#164).
+      final card = isProfileCardFile(path) || isPackFile(path);
+      // A Sent Item, a card or a Pack shows what is in it: not past the
+      // App Lock.
       if ((widget.lock.locked && (card || isSentItemFile(path))) ||
           (card && widget.profile.profile == null)) {
         _openedWaiting.add(path);

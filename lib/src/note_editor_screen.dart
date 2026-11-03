@@ -24,9 +24,11 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_history_screen.dart';
 import 'ocr_platform.dart';
+import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
+import 'profile.dart' show profileDisplayName;
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
@@ -279,6 +281,7 @@ NoteActions noteActions(
   VoidCallback? onEdit,
 }) {
   final id = placed.note.id;
+  final from = notes.store.packFrom(id);
   void then(Future<Object?> step) => unawaited(
     step.then((_) {
       if (context.mounted) changed();
@@ -289,6 +292,14 @@ NoteActions noteActions(
     onEdit: onEdit,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
+    onExportPack: () => unawaited(exportPack(context, notes.store, id)),
+    packFrom: from == null ? null : profileDisplayName(context.t, from.name),
+    onRemovePackFrom: from == null || !placed.changes
+        ? null
+        : () {
+            notes.store.removePackFrom(id);
+            changed();
+          },
     // Copied says nothing: the text is on the screen (UI laws).
     onCopy: () => unawaited(
       Clipboard.setData(ClipboardData(text: noteCopyText(notes, id))),
@@ -1557,6 +1568,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
+  /// Asks to remove the Note's "From …" badge (#164), and removes it.
+  Future<void> _removePackFrom(String name) async {
+    final t = context.t;
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(t.removePackFrom(name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('remove-pack-from'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.remove),
+          ),
+        ],
+      ),
+    );
+    if (remove != true || !mounted) return;
+    widget.notes.store.removePackFrom(widget.noteId);
+    setState(() {});
+  }
+
   /// The row of badges under the text (#160): each setting of the Note
   /// as its icon and its value, an icon for a fixed set of values, short
   /// text otherwise (#192), a tap opening its small editor; a setting
@@ -1605,6 +1641,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           value: when.format(note.context.captured.toLocal()),
           onTap: (_) => _showCaptured(when),
         ),
+        // Who the Pack it came from is from, until removed (#164).
+        if (widget.notes.store.packFrom(note.id) case final from?)
+          SettingBadge(
+            key: const ValueKey('badge-pack-from'),
+            setting: t.packTitle,
+            icon: Icons.inventory_2_outlined,
+            value: t.packFrom(profileDisplayName(t, from.name)),
+            onTap: changes
+                ? (_) => _removePackFrom(profileDisplayName(t, from.name))
+                : null,
+          ),
         for (final routine in _routines)
           SettingBadge(
             key: ValueKey('badge-routine-${routine.id}'),
@@ -2189,6 +2236,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
               },
               icon: Icons.share_outlined,
+            ),
+            BarAction(
+              key: const ValueKey('pack-note'),
+              label: t.exportAsPack,
+              onPressed: () {
+                _saveText();
+                unawaited(
+                  exportPack(context, widget.notes.store, widget.noteId),
+                );
+              },
+              icon: Icons.inventory_2_outlined,
             ),
             CalendarButton(choices: _calendarChoices),
             BarAction(

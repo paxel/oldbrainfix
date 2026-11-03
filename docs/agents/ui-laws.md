@@ -320,7 +320,9 @@ replace a law of Both apps where they say so. A desktop law marked
   its schedule; the kind, Plain Note included (#188); the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
-  Shopping List (#186); Show ticks while it has a box. A Tally's setup
+  Shopping List (#186); Show ticks while it has a box; "From Ann" while
+  a Pack brought the Note unclaimed (#164), `inventory_2` with the
+  name, its tap asking to remove it. A Tally's setup
   is its fields (#190), each its name with its rule, unit and target as
   badges, as on the Tally page, what it multiplies (#200) while it does
   or may ("Multiplies: Reps", "Nothing"), a multiplier without its rule
@@ -357,6 +359,21 @@ replace a law of Both apps where they say so. A desktop law marked
 - Another person's Note shows their Profile picture, or its
   placeholder, on its card; one's own Notes show none. Tapping another
   person's picture, anywhere it shows, opens their Profile.
+- **A Note a Pack brought unclaimed says who it came from** (#164):
+  "From Ann" on a weak line with `inventory_2` at the top of its card,
+  in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
+  in the Note editor takes it away.
+- **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
+  for anyone who may read them, in a Note card's ⋮ after Copy text and
+  on the Note editor's bar after Share to an app (`inventory_2`). It
+  opens the Pack's tree: Areas and Topics as headings, each Note with
+  its kind's icon and its first line, under it its files with their
+  sizes, their texts, its Routines, Reminders and Frog, under a Session
+  the Tallies it brings from elsewhere, each a box at the start; an item
+  under a Note not ticked cannot be ticked. "Tick all" and "Untick all"
+  sit on the bar, the size over the tree. A Pack opened shows the same
+  tree, all ticked, under who it is from; its ticks ("Add my Profile",
+  "Claim as mine") go below their text.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.
