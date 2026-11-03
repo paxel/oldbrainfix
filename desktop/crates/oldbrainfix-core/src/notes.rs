@@ -1567,8 +1567,9 @@ impl<'a> Notes<'a> {
                 break;
             }
             if let Some(start) = chain.iter().position(|c| *c == next) {
-                let kept = chain[start..]
+                let kept = chain
                     .iter()
+                    .skip(start)
                     .min_by(|a, b| crate::store::utf16_cmp(a, b))
                     .cloned();
                 return Ok(kept.filter(|k| k != id));

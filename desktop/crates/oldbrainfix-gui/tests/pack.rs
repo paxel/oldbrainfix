@@ -9,6 +9,14 @@
 //! as a badge in the Note dialog until removed, and a changed Pack, one
 //! of a later format and one from a blocked person do not open.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};

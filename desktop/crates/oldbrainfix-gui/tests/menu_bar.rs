@@ -4,6 +4,14 @@
 //! closed by their button, Esc and back, and back to the one they were
 //! opened from; and the sidebar marking the place the list shows.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::Toggled;

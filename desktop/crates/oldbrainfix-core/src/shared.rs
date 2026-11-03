@@ -730,7 +730,11 @@ impl Store {
             let b_mine = Some(&b.id) == mine.as_ref();
             b_mine
                 .cmp(&a_mine)
-                .then_with(|| crate::store::utf16_cmp(&names[&a.id], &names[&b.id]))
+                // Every person's name was put in above.
+                .then_with(|| {
+                    let name = |id: &String| names.get(id).map_or("", String::as_str);
+                    crate::store::utf16_cmp(name(&a.id), name(&b.id))
+                })
                 .then_with(|| a.id.cmp(&b.id))
         });
         Ok(people)

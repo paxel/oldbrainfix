@@ -2,6 +2,14 @@
 //! Settings, driven headless by egui_kittest over the Dart core's
 //! `routines` fixture log, on a European wall clock.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::PathBuf;
 use std::sync::Arc;
 

@@ -7,6 +7,14 @@
 //! of each Section as one weak line under its text (#170), and a click
 //! on a photo showing it full screen to zoom.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 

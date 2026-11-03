@@ -3,6 +3,14 @@
 //! typed to fill the chips and times, with suggestions and the words not
 //! understood marked, read-only on an Advanced schedule.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDateTime, Utc};

@@ -3,6 +3,14 @@
 //! egui_kittest with a fake microphone, speakers, clipboard and engines.
 //! The real microphone, speakers, clipboard and Whisper are device-only.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;

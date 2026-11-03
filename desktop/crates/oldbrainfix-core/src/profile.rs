@@ -260,7 +260,8 @@ fn trim(runes: &[u32]) -> &[u32] {
         .iter()
         .rposition(|&c| !is_whitespace(c))
         .map_or(start, |e| e + 1);
-    &runes[start..end]
+    // `end` is past `start` whenever a rune was kept, else equal to it.
+    runes.get(start..end).unwrap_or(&[])
 }
 
 /// The placeholder's initials for `name`: the first character of its
@@ -287,7 +288,12 @@ pub fn initials(name: &str) -> String {
 /// The placeholder's colour for the Profile `id`, ARGB, from [`COLORS`].
 pub fn color(id: &str) -> u32 {
     let hash = Sha256::digest(format!("oldbrainfix:profile-colour:{id}").as_bytes());
-    COLORS[usize::from(hash[0]) % COLORS.len()]
+    let [first, ..] = <[u8; 32]>::from(hash);
+    // Modulo the length of a non-empty table: always one of its colours.
+    COLORS
+        .get(usize::from(first) % COLORS.len())
+        .copied()
+        .unwrap_or(COLORS[0])
 }
 
 const CODE_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -300,15 +306,16 @@ pub fn short_code(id: &str, first_key: &[u8]) -> String {
     hasher.update(format!("oldbrainfix:profile-code:{id}:").as_bytes());
     hasher.update(first_key);
     let hash = hasher.finalize();
-    let bits = hash[..5].iter().fold(0u64, |a, b| (a << 8) | u64::from(*b));
+    let bits = hash
+        .iter()
+        .take(5)
+        .fold(0u64, |a, b| (a << 8) | u64::from(*b));
     let mut out = String::new();
     for i in 0..8 {
         if i == 4 {
             out.push('-');
         }
-        out.push(char::from(
-            CODE_ALPHABET[((bits >> (35 - 5 * i)) & 31) as usize],
-        ));
+        out.push(crate::base32_symbol(CODE_ALPHABET, bits >> (35 - 5 * i)));
     }
     out
 }

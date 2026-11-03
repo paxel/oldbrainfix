@@ -100,14 +100,22 @@ pub fn parse_list_kind(value: Option<&str>) -> Option<(&str, &str)> {
 /// The keys that place Lines, as the Dart core's `LineOrder`: digits of
 /// base 62 in ASCII order, compared as text, never ending in `0`.
 pub mod order {
-    pub const DIGITS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    pub const DIGITS: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    /// The middle digit of [`DIGITS`] (a test checks it).
+    const MID: u8 = b'V';
 
     fn digit(c: u8) -> Option<usize> {
         DIGITS.iter().position(|d| *d == c)
     }
 
+    /// The digit of value `d`, none past the last.
+    fn symbol(d: usize) -> Option<char> {
+        DIGITS.get(d).map(|c| char::from(*c))
+    }
+
     fn mid() -> char {
-        char::from(DIGITS[DIGITS.len() / 2])
+        char::from(MID)
     }
 
     /// Whether `key` is one this order reads: any other sorts after them.
@@ -127,8 +135,8 @@ pub mod order {
             let Some(d) = digit(c) else {
                 break;
             };
-            if d < DIGITS.len() - 1 {
-                return format!("{}{}", &a[..i], char::from(DIGITS[d + 1]));
+            if let Some(next) = symbol(d + 1) {
+                return format!("{}{next}", &a[..i]);
             }
         }
         format!("{a}{}", mid())
@@ -142,7 +150,10 @@ pub mod order {
         }
         let (ab, bb) = (a.as_bytes(), b.as_bytes());
         let mut n = 0;
-        while n < bb.len() && ab.get(n).copied().unwrap_or(b'0') == bb[n] {
+        while bb
+            .get(n)
+            .is_some_and(|c| ab.get(n).copied().unwrap_or(b'0') == *c)
+        {
             n += 1;
         }
         if n >= bb.len() {
@@ -153,20 +164,28 @@ pub mod order {
             Some(c) => digit(*c),
             None => Some(0),
         };
-        let (Some(da), Some(db)) = (da, digit(bb[n])) else {
+        let (Some(da), Some(db)) = (da, bb.get(n).and_then(|c| digit(*c))) else {
             return after(a);
         };
         if db <= da {
             return after(a);
         }
+        // `da` and `db` are digits, so their middle and `da` are too;
+        // were they not, the key after `a` still sorts right.
         if db - da > 1 {
-            return format!("{prefix}{}", char::from(DIGITS[(da + db) / 2]));
+            let Some(middle) = symbol((da + db) / 2) else {
+                return after(a);
+            };
+            return format!("{prefix}{middle}");
         }
         if bb.len() > n + 1 {
             return b[..n + 1].to_string();
         }
         let rest = if n < ab.len() { &a[n + 1..] } else { "" };
-        format!("{prefix}{}{}", char::from(DIGITS[da]), after(rest))
+        let Some(da) = symbol(da) else {
+            return after(a);
+        };
+        format!("{prefix}{da}{}", after(rest))
     }
 
     /// The key for a place after `a` and before `b`, either `None` for
@@ -177,6 +196,16 @@ pub mod order {
             (None, Some(b)) => between("", b),
             (Some(a), None) => after(a),
             (Some(a), Some(b)) => between(a, b),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn the_middle_digit_is_the_middle_of_the_digits() {
+            assert_eq!(DIGITS[DIGITS.len() / 2], MID);
         }
     }
 }
@@ -1122,11 +1151,11 @@ impl<'a> Checklists<'a> {
         }
         let grouped = block.len() > 1;
         if grouped {
-            while pos < rest.len() && rest[pos].in_group() {
+            while rest.get(pos).is_some_and(Line::in_group) {
                 pos += 1;
             }
         }
-        let indent = !grouped && pos < rest.len() && rest[pos].in_group();
+        let indent = !grouped && rest.get(pos).is_some_and(Line::in_group);
         let (mut a, b) = neighbours(&rest, pos);
         let ids: Vec<String> = block.iter().map(|l| l.id.clone()).collect();
         let indented = self.indented(line_id)?;
@@ -1502,12 +1531,14 @@ fn last_day(schedule: &Schedule, today: Day) -> Option<Day> {
 /// The valid keys around the place `pos` of `lines`: the last one before
 /// it, and the first one after it past that one.
 fn neighbours(lines: &[Line], pos: usize) -> (Option<String>, Option<String>) {
-    let a = lines[..pos]
+    // A place past the end is the end.
+    let (before, after) = lines.split_at_checked(pos).unwrap_or((lines, &[]));
+    let a = before
         .iter()
         .rev()
         .find(|l| order::is_valid(l.order.as_deref()))
         .and_then(|l| l.order.clone());
-    let b = lines[pos..]
+    let b = after
         .iter()
         .filter_map(|l| l.order.as_deref())
         .find(|key| {

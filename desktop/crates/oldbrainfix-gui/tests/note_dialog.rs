@@ -14,6 +14,14 @@
 //! goes with its Remove after one question while the time stays, and
 //! where this Device may change the Note only (#162).
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 

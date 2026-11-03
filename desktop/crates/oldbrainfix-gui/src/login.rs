@@ -2,6 +2,10 @@
 //! full name and account picture of the computer login, else the
 //! computer's name and the initials. Nothing is asked.
 
+// The user database and Windows calls are FFI (#229): unsafe code is
+// allowed in this module only, with a `// SAFETY:` reason on each block.
+#![allow(unsafe_code)]
+
 use oldbrainfix_core::profile::{self, OwnProfile, Profile};
 use oldbrainfix_core::{Result, Store};
 

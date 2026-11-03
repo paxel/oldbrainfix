@@ -63,12 +63,11 @@ pub fn looks_like_code(text: &str) -> bool {
     let (mut lines, mut code) = (0, 0);
     for line in text.split("\r\n").flat_map(|l| l.split(['\r', '\n'])) {
         let bytes = line.as_bytes();
-        let Some(start) = bytes.iter().position(|c| !blank(c)) else {
+        let Some(&first) = bytes.iter().find(|c| !blank(c)) else {
             continue;
         };
-        let end = bytes.iter().rposition(|c| !blank(c)).unwrap_or(start);
+        let last = bytes.iter().rfind(|c| !blank(c)).copied().unwrap_or(first);
         lines += 1;
-        let (first, last) = (bytes[start], bytes[end]);
         let indented = (line.starts_with('\t') || line.starts_with("    "))
             && !matches!(first, b'-' | b'*' | b'+');
         if matches!(last, b';' | b'{' | b'}') || first == b'}' || indented {

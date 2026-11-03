@@ -233,18 +233,19 @@ impl Store {
         if devices.len() < 2 {
             return Ok(None);
         }
-        let mut heads: Vec<usize> = (0..written.len())
-            .filter(|&h| {
+        let mut heads: Vec<(usize, &Entry)> = written
+            .iter()
+            .enumerate()
+            .filter(|&(h, head)| {
                 !written
                     .iter()
                     .enumerate()
-                    .any(|(x, e)| x != h && saw(e, &written[h]))
+                    .any(|(x, e)| x != h && saw(e, head))
             })
             .collect();
-        heads.sort_by(|&a, &b| Store::latest_wins(&written[b], &written[a]));
+        heads.sort_by(|(_, a), (_, b)| Store::latest_wins(b, a));
         let mut versions: Vec<ConflictVersion> = Vec::new();
-        for h in heads {
-            let head = &written[h];
+        for (h, head) in heads {
             let values: Vec<(String, Option<String>)> = fields
                 .iter()
                 .filter_map(|field| {

@@ -470,7 +470,11 @@ const PHOTO_KINDS: [&str; 5] = ["jpg", "jpeg", "png", "webp", "gif"];
 /// of ASCII letters.
 fn in_keep_folder(path: &str) -> bool {
     let folders: Vec<&str> = path.split(['/', '\\']).collect();
-    folders.len() > 1 && folders[folders.len() - 2].eq_ignore_ascii_case("keep")
+    folders
+        .iter()
+        .rev()
+        .nth(1)
+        .is_some_and(|folder| folder.eq_ignore_ascii_case("keep"))
 }
 
 /// The extension of the file `base` in lower case ASCII letters, empty
@@ -604,7 +608,12 @@ fn decode(bytes: &[u8]) -> Option<String> {
         Err(_) => bytes
             .iter()
             .map(|&b| match b {
-                0x80..=0x9f => CP1252[usize::from(b - 0x80)],
+                // The table holds all 32 of them; were one missing, the
+                // byte would read as Latin-1, as the rest do.
+                0x80..=0x9f => CP1252
+                    .get(usize::from(b - 0x80))
+                    .copied()
+                    .unwrap_or(char::from(b)),
                 _ => char::from(b),
             })
             .collect(),

@@ -152,7 +152,7 @@ pub fn generate(arbs: &[Arb], template: &str) -> Result<String, String> {
         .iter()
         .find(|a| a.locale == template)
         .ok_or_else(|| format!("no ARB for the template locale {template}"))?;
-    let keys: Vec<&String> = tpl.messages.keys().collect();
+    let keys: Vec<(&String, &String)> = tpl.messages.iter().collect();
     let mut out = String::new();
     let _ = writeln!(
         out,
@@ -170,8 +170,8 @@ pub fn generate(arbs: &[Arb], template: &str) -> Result<String, String> {
     let _ = writeln!(out, "static MESSAGES: [[&str; KEYS]; {}] = [", arbs.len());
     for a in &ordered {
         let _ = write!(out, "    [");
-        for key in &keys {
-            let text = a.messages.get(*key).unwrap_or(&tpl.messages[*key]);
+        for (key, template_text) in &keys {
+            let text = a.messages.get(*key).unwrap_or(template_text);
             let _ = write!(out, "{text:?}, ");
         }
         let _ = writeln!(out, "],");
@@ -193,29 +193,40 @@ impl L10n {{
         L10n {{ index }}
     }}
 
+    // `index` is only made by `new`, from a position in LOCALES, which
+    // is as long as MESSAGES; the template (index 0, which a fixed-size
+    // array of at least one locale holds) is the honest fallback.
     pub fn locale(&self) -> &'static str {{
-        LOCALES[self.index]
+        match LOCALES.get(self.index) {{
+            Some(locale) => locale,
+            None => LOCALES[0],
+        }}
     }}
 
-    fn raw(&self, key: usize) -> &'static str {{
-        MESSAGES[self.index][key]
+    /// The locale's messages, one per key; each accessor below takes
+    /// its own at a constant index the compiler checks against KEYS.
+    fn messages(&self) -> &'static [&'static str; KEYS] {{
+        match MESSAGES.get(self.index) {{
+            Some(messages) => messages,
+            None => &MESSAGES[0],
+        }}
     }}
 
     /// The raw ICU message of a key by name, for tools; none for an
     /// unknown key.
     pub fn raw_by_name(&self, name: &str) -> Option<&'static str> {{
-        KEY_NAMES.iter().position(|k| *k == name).map(|i| self.raw(i))
+        let i = KEY_NAMES.iter().position(|k| *k == name)?;
+        self.messages().get(i).copied()
     }}
 "#
     );
-    for (i, key) in keys.iter().enumerate() {
-        let message = &tpl.messages[*key];
+    for (i, (key, message)) in keys.iter().enumerate() {
         let params = params(tpl, key, message);
         let name = snake(key);
         if params.is_empty() {
             let _ = writeln!(
                 out,
-                "    pub fn {name}(&self) -> &'static str {{ self.raw({i}) }}"
+                "    pub fn {name}(&self) -> &'static str {{ self.messages()[{i}] }}"
             );
         } else {
             let sig: Vec<String> = params
@@ -234,7 +245,7 @@ impl L10n {{
                 .collect();
             let _ = writeln!(
                 out,
-                "    pub fn {name}(&self, {}) -> String {{ oldbrainfix_l10n::icu::format(self.locale(), self.raw({i}), &[{}]) }}",
+                "    pub fn {name}(&self, {}) -> String {{ oldbrainfix_l10n::icu::format(self.locale(), self.messages()[{i}], &[{}]) }}",
                 sig.join(", "),
                 args.join(", ")
             );
@@ -242,7 +253,7 @@ impl L10n {{
     }
     let _ = writeln!(out, "}}");
     let _ = write!(out, "static KEY_NAMES: [&str; KEYS] = [");
-    for key in &keys {
+    for (key, _) in &keys {
         let _ = write!(out, "{key:?}, ");
     }
     let _ = writeln!(out, "];");
@@ -326,7 +337,7 @@ mod tests {
         let arbs = vec![parse_arb(DE).unwrap(), parse_arb(EN).unwrap()];
         let src = generate(&arbs, "en").unwrap();
         assert!(src.contains(r#"pub const LOCALES: [&str; 2] = ["en", "de", ];"#));
-        assert!(src.contains("pub fn app_title(&self) -> &'static str { self.raw(0) }"));
+        assert!(src.contains("pub fn app_title(&self) -> &'static str { self.messages()[0] }"));
         assert!(src.contains("pub fn csv_saved_to(&self, path: &str) -> String"));
         assert!(src.contains("pub fn changes_count(&self, n: i64) -> String"));
         assert!(src.contains("pub fn greet(&self, name: &str, count: &str) -> String"));

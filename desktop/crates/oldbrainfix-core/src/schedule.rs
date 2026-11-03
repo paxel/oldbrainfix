@@ -65,10 +65,9 @@ impl Day {
 
     /// Parses `YYYY-MM-DD`; `None` when it is not a valid day.
     pub fn parse(text: &str) -> Option<Day> {
-        let b = text.as_bytes();
-        if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
+        let [_, _, _, _, b'-', _, _, b'-', _, _] = text.as_bytes() else {
             return None;
-        }
+        };
         let y = digits(&text[0..4])?;
         let m = digits(&text[5..7])?;
         let d = digits(&text[8..10])?;
@@ -155,10 +154,9 @@ impl ClockTime {
 
     /// Parses `HH:MM`; `None` when it is not a time of day.
     pub fn parse(text: &str) -> Option<ClockTime> {
-        let b = text.as_bytes();
-        if b.len() != 5 || b[2] != b':' {
+        let [_, _, b':', _, _] = text.as_bytes() else {
             return None;
-        }
+        };
         let hour = digits(&text[0..2])?;
         let minute = digits(&text[3..5])?;
         ClockTime::new(u32::try_from(hour).ok()?, u32::try_from(minute).ok()?)
@@ -239,6 +237,21 @@ impl Frequency {
 
 const WEEKDAY_CODES: [&str; 7] = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
 
+/// The RRULE code of `weekday`, 1 for Monday to 7 for Sunday. A number
+/// outside that breaks the contract of the fields that hold it; it is
+/// written as the nearest weekday, not as a rule no Device reads.
+fn weekday_code(weekday: u32) -> &'static str {
+    match weekday {
+        0 | 1 => "MO",
+        2 => "TU",
+        3 => "WE",
+        4 => "TH",
+        5 => "FR",
+        6 => "SA",
+        _ => "SU",
+    }
+}
+
 /// One BYDAY item: a weekday, with an ordinal for "the first Monday"
 /// (1MO) or "the last Friday" (-1FR).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -253,7 +266,7 @@ impl fmt::Display for WeekdayRule {
         if let Some(ordinal) = self.ordinal {
             write!(f, "{ordinal}")?;
         }
-        f.write_str(WEEKDAY_CODES[(self.weekday - 1) as usize])
+        f.write_str(weekday_code(self.weekday))
     }
 }
 
@@ -467,10 +480,7 @@ impl Recurrence {
             parts.push(format!("BYMINUTE={}", join(&self.by_minute)));
         }
         if self.week_start != 1 {
-            parts.push(format!(
-                "WKST={}",
-                WEEKDAY_CODES[(self.week_start - 1) as usize]
-            ));
+            parts.push(format!("WKST={}", weekday_code(self.week_start)));
         }
         parts.join(";")
     }
@@ -1181,6 +1191,19 @@ mod tests {
 
     fn at(h: u32, m: u32) -> ClockTime {
         ClockTime { hour: h, minute: m }
+    }
+
+    #[test]
+    fn a_weekday_is_written_by_its_code_and_one_out_of_range_as_the_nearest() {
+        for (i, code) in WEEKDAY_CODES.iter().enumerate() {
+            assert_eq!(weekday_code(i as u32 + 1), *code);
+        }
+        let rule = |weekday| WeekdayRule {
+            weekday,
+            ordinal: Some(1),
+        };
+        assert_eq!(rule(0).to_string(), "1MO");
+        assert_eq!(rule(8).to_string(), "1SU");
     }
 
     #[test]

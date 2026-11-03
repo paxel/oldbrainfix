@@ -363,24 +363,27 @@ impl Pack {
     /// its Area and Topic say; one brought from outside only under the
     /// Sessions that pick it.
     pub fn tree(&self) -> Vec<PackItem> {
-        let shown: Vec<usize> = (0..self.notes.len())
-            .filter(|i| !self.notes[*i].outside)
+        let shown: Vec<(usize, &PackNote)> = self
+            .notes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| !n.outside)
             .collect();
         let mut out = Vec::new();
         for (a, area) in self.areas.iter().enumerate() {
-            if !shown.iter().any(|i| self.notes[*i].area == Some(a)) {
+            if !shown.iter().any(|(_, n)| n.area == Some(a)) {
                 continue;
             }
             let mut children: Vec<PackItem> = shown
                 .iter()
-                .filter(|i| self.notes[**i].area == Some(a) && self.notes[**i].topic.is_none())
-                .map(|i| self.note_item(*i, &HashSet::new()))
+                .filter(|(_, n)| n.area == Some(a) && n.topic.is_none())
+                .map(|&(i, n)| self.note_item(i, n, &HashSet::new()))
                 .collect();
             for t in 0..area.topics.len() {
                 let of_topic: Vec<PackItem> = shown
                     .iter()
-                    .filter(|i| self.notes[**i].area == Some(a) && self.notes[**i].topic == Some(t))
-                    .map(|i| self.note_item(*i, &HashSet::new()))
+                    .filter(|(_, n)| n.area == Some(a) && n.topic == Some(t))
+                    .map(|&(i, n)| self.note_item(i, n, &HashSet::new()))
                     .collect();
                 if !of_topic.is_empty() {
                     children.push(PackItem::group(
@@ -396,18 +399,17 @@ impl Pack {
                 children,
             ));
         }
-        for i in shown {
-            if self.notes[i].area.is_none() {
-                out.push(self.note_item(i, &HashSet::new()));
+        for (i, n) in shown {
+            if n.area.is_none() {
+                out.push(self.note_item(i, n, &HashSet::new()));
             }
         }
         out
     }
 
-    /// The item of the Note `i`, with the items under it; a Tally its
-    /// Session brought from outside under it unless `seen` holds it.
-    fn note_item(&self, i: usize, seen: &HashSet<usize>) -> PackItem {
-        let note = &self.notes[i];
+    /// The item of the Note `i`, `note`, with the items under it; a Tally
+    /// its Session brought from outside under it unless `seen` holds it.
+    fn note_item(&self, i: usize, note: &PackNote, seen: &HashSet<usize>) -> PackItem {
         let mut children = Vec::new();
         for (j, p) in note.photos.iter().enumerate() {
             if p.has_file {
@@ -469,10 +471,13 @@ impl Pack {
         }
         if let Some(session) = &note.session {
             for t in &session.pool {
-                if self.notes.get(*t).is_some_and(|n| n.outside) && !seen.contains(t) {
+                if let Some(tally) = self.notes.get(*t)
+                    && tally.outside
+                    && !seen.contains(t)
+                {
                     let mut further = seen.clone();
                     further.insert(i);
-                    children.push(self.note_item(*t, &further));
+                    children.push(self.note_item(*t, tally, &further));
                 }
             }
         }
@@ -554,7 +559,10 @@ impl Pack {
         let i = self.note_of(key);
         if on {
             out.insert(key.to_string());
-            if let Some(session) = i.and_then(|i| self.notes[i].session.as_ref()) {
+            if let Some(session) = i
+                .and_then(|i| self.notes.get(i))
+                .and_then(|n| n.session.as_ref())
+            {
                 for t in &session.pool {
                     out.insert(item_keys::note(*t));
                 }
@@ -640,42 +648,48 @@ impl Pack {
     pub fn picked(&self, ticks: &PackTicks) -> Pack {
         let ticked = |i: usize| ticks.contains(&item_keys::note(i));
         // A Session with none of its pool ticked goes neither.
-        let kept: Vec<usize> = (0..self.notes.len())
-            .filter(|i| ticked(*i))
-            .filter(|i| {
-                self.notes[*i]
-                    .session
+        let kept: Vec<(usize, &PackNote)> = self
+            .notes
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| ticked(*i))
+            .filter(|(_, n)| {
+                n.session
                     .as_ref()
                     .is_none_or(|s| s.pool.iter().any(|t| ticked(*t)))
             })
             .collect();
         let new_index: HashMap<usize, usize> =
-            kept.iter().enumerate().map(|(n, i)| (*i, n)).collect();
+            kept.iter().enumerate().map(|(n, (i, _))| (*i, n)).collect();
         let mut area_index: HashMap<usize, usize> = HashMap::new();
         let mut topic_index: HashMap<(usize, usize), usize> = HashMap::new();
         let mut areas: Vec<PackArea> = Vec::new();
-        for i in &kept {
-            let note = &self.notes[*i];
-            let Some(a) = note.area else {
+        for (_, note) in &kept {
+            // Opening a Pack refuses a Note filed into an Area or Topic it
+            // does not hold; were one here, it would go filed nowhere.
+            let Some((a, area)) = note.area.and_then(|a| Some((a, self.areas.get(a)?))) else {
                 continue;
             };
             let at = *area_index.entry(a).or_insert_with(|| {
                 areas.push(PackArea {
-                    name: self.areas[a].name.clone(),
+                    name: area.name.clone(),
                     topics: Vec::new(),
                 });
                 areas.len() - 1
             });
-            if let Some(t) = note.topic {
+            if let Some(t) = note.topic
+                && let Some(topic) = area.topics.get(t)
+                && let Some(kept_area) = areas.get_mut(at)
+            {
                 topic_index.entry((a, t)).or_insert_with(|| {
-                    areas[at].topics.push(self.areas[a].topics[t].clone());
-                    areas[at].topics.len() - 1
+                    kept_area.topics.push(topic.clone());
+                    kept_area.topics.len() - 1
                 });
             }
         }
         let pooled: HashSet<usize> = kept
             .iter()
-            .filter_map(|i| self.notes[*i].session.as_ref())
+            .filter_map(|(_, n)| n.session.as_ref())
             .flat_map(|s| s.pool.iter().copied())
             .filter(|t| new_index.contains_key(t))
             .collect();
@@ -692,65 +706,62 @@ impl Pack {
         };
         let notes = kept
             .iter()
-            .map(|&i| {
-                let n = &self.notes[i];
-                PackNote {
-                    area: n.area.and_then(|a| area_index.get(&a).copied()),
-                    topic: match (n.area, n.topic) {
-                        (Some(a), Some(t)) => topic_index.get(&(a, t)).copied(),
-                        _ => None,
-                    },
-                    outside: n.outside && pooled.contains(&i),
-                    text: n.text.clone(),
-                    format: n.format.clone(),
-                    version: n.version,
-                    sections: n.sections.clone(),
-                    lines: n.lines.clone(),
-                    shopping: n.shopping,
-                    fields: n.fields.clone(),
-                    session: n.session.as_ref().map(|s| PackSession {
-                        pool: s
-                            .pool
-                            .iter()
-                            .filter_map(|t| new_index.get(t).copied())
-                            .collect(),
-                        count: s.count,
-                        counts: s.counts.clone(),
-                        rule: s.rule,
-                    }),
-                    routines: n
-                        .routines
+            .map(|&(i, n)| PackNote {
+                area: n.area.and_then(|a| area_index.get(&a).copied()),
+                topic: match (n.area, n.topic) {
+                    (Some(a), Some(t)) => topic_index.get(&(a, t)).copied(),
+                    _ => None,
+                },
+                outside: n.outside && pooled.contains(&i),
+                text: n.text.clone(),
+                format: n.format.clone(),
+                version: n.version,
+                sections: n.sections.clone(),
+                lines: n.lines.clone(),
+                shopping: n.shopping,
+                fields: n.fields.clone(),
+                session: n.session.as_ref().map(|s| PackSession {
+                    pool: s
+                        .pool
                         .iter()
-                        .enumerate()
-                        .filter(|(j, _)| ticks.contains(&item_keys::routine(i, *j)))
-                        .map(|(_, r)| r.clone())
+                        .filter_map(|t| new_index.get(t).copied())
                         .collect(),
-                    frog: n.frog && ticks.contains(&item_keys::frog(i)),
-                    photos: n
-                        .photos
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(j, p)| {
-                            file(
-                                p,
-                                ticks.contains(&item_keys::photo(i, j)),
-                                ticks.contains(&item_keys::photo_text(i, j)),
-                            )
-                        })
-                        .collect(),
-                    recordings: n
-                        .recordings
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(j, a)| {
-                            file(
-                                a,
-                                ticks.contains(&item_keys::recording(i, j)),
-                                ticks.contains(&item_keys::transcript(i, j)),
-                            )
-                        })
-                        .collect(),
-                }
+                    count: s.count,
+                    counts: s.counts.clone(),
+                    rule: s.rule,
+                }),
+                routines: n
+                    .routines
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| ticks.contains(&item_keys::routine(i, *j)))
+                    .map(|(_, r)| r.clone())
+                    .collect(),
+                frog: n.frog && ticks.contains(&item_keys::frog(i)),
+                photos: n
+                    .photos
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, p)| {
+                        file(
+                            p,
+                            ticks.contains(&item_keys::photo(i, j)),
+                            ticks.contains(&item_keys::photo_text(i, j)),
+                        )
+                    })
+                    .collect(),
+                recordings: n
+                    .recordings
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, a)| {
+                        file(
+                            a,
+                            ticks.contains(&item_keys::recording(i, j)),
+                            ticks.contains(&item_keys::transcript(i, j)),
+                        )
+                    })
+                    .collect(),
             })
             .collect();
         Pack {
@@ -1404,8 +1415,8 @@ impl Store {
         let sessions = Sessions::new(self);
         // The Tallies the Sessions pick from that are not among them.
         let mut k = 0;
-        while k < order.len() {
-            if let Some(setup) = sessions.setup_of(&order[k])? {
+        while let Some(id) = order.get(k).cloned() {
+            if let Some(setup) = sessions.setup_of(&id)? {
                 for t in sessions.pool(&setup)? {
                     if order.contains(&t) {
                         continue;
@@ -1454,10 +1465,12 @@ impl Store {
                         area_names.len() - 1
                     });
                     area = Some(a);
-                    if let Some(t) = in_topic {
+                    if let Some(t) = in_topic
+                        && let Some(named) = area_names.get_mut(a)
+                    {
                         topic = Some(*topics.entry(t.id).or_insert_with(|| {
-                            area_names[a].topics.push(t.name.clone());
-                            area_names[a].topics.len() - 1
+                            named.topics.push(t.name.clone());
+                            named.topics.len() - 1
                         }));
                     }
                 }
@@ -1819,12 +1832,12 @@ impl Store {
                 area_ids.push(id);
             }
             let mut topic_ids: Vec<Vec<String>> = Vec::new();
-            for (a, pa) in pack.areas.iter().enumerate() {
+            for (pa, area_id) in pack.areas.iter().zip(&area_ids) {
                 let mut ids = Vec::new();
                 for t in &pa.topics {
                     let id = format!("topic:{}", self.new_id()?);
                     self.append(&id, place_keys::TYPE, Some(place_keys::TYPE_TOPIC), None)?;
-                    self.append(&id, place_keys::AREA, Some(&area_ids[a]), None)?;
+                    self.append(&id, place_keys::AREA, Some(area_id), None)?;
                     self.append(&id, place_keys::NAME, Some(dart_trim(t)), None)?;
                     ids.push(id);
                 }
@@ -1990,14 +2003,14 @@ impl Store {
                 self.append(id, &key(tally_keys::HIDDEN), Some("true"), None)?;
             }
         }
-        for (j, f) in n.fields.iter().enumerate() {
+        for (j, (f, own)) in n.fields.iter().zip(&field_ids).enumerate() {
             let Some(m) = f.multiplies.filter(|m| *m != j) else {
                 continue;
             };
             let Some(other) = field_ids.get(m) else {
                 continue;
             };
-            let key = tally_keys::field(&field_ids[j], tally_keys::MULTIPLIES);
+            let key = tally_keys::field(own, tally_keys::MULTIPLIES);
             self.append(id, &key, Some(other), None)?;
         }
         Ok(())

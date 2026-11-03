@@ -1827,7 +1827,8 @@ fn pack_file_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
     let read = std::fs::File::open(path)
         .and_then(|mut file| file.read(&mut head))
         .ok()?;
-    let first = head[..read]
+    let first = head
+        .get(..read)?
         .iter()
         .find(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))?;
     if *first != b'{' {
@@ -10302,10 +10303,10 @@ impl App {
                         );
                         // Its details, each removable on its own, in the
                         // same dialog as the Note's Captured badge (#170).
-                        let before = match at {
-                            0 => note.captured,
-                            _ => sections[at - 1].captured,
-                        };
+                        let before = at
+                            .checked_sub(1)
+                            .and_then(|above| sections.get(above))
+                            .map_or(note.captured, |above| above.captured);
                         let line =
                             capture_line(&t, (section.captured, &section.context), Some(before));
                         let edited = section_edited(&t, section);

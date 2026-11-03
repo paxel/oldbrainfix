@@ -248,8 +248,8 @@ fn settle(notes: &Notes, asked: &Asked, skipped: &HashSet<String>, changed: &dyn
     {
         let mut waiters = asked.waiters.lock();
         let mut i = 0;
-        while i < waiters.len() {
-            match read_all(notes, &waiters[i].0, skipped) {
+        while let Some((then, _)) = waiters.get(i) {
+            match read_all(notes, then, skipped) {
                 Some(read) => ready.push((waiters.remove(i).1, read)),
                 None => i += 1,
             }

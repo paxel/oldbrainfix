@@ -124,8 +124,11 @@ impl SessionDraft {
 
     /// Gives the weekday at `index` (0 for Monday) its own count,
     /// starting from every day's, or takes it away when `own` is false.
+    /// An index past Sunday is no weekday and has none.
     pub fn set_own(&mut self, index: usize, own: bool) {
-        self.counts[index] = own.then_some(self.count);
+        if let Some(slot) = self.counts.get_mut(index) {
+            *slot = own.then_some(self.count);
+        }
     }
 
     /// How many weekdays have their own count.
@@ -502,17 +505,19 @@ impl SessionDraft {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let day = weekday_long(t, index as u32 + 1);
-        let mut own = self.counts[index].is_some();
+        let Some(mut own) = self.counts.get(index).map(Option::is_some) else {
+            return;
+        };
         if theme::checkbox(ui, &mut own, RichText::new(day).color(text)).changed() {
             self.set_own(index, own);
         }
-        match &mut self.counts[index] {
-            Some(count) => {
+        match self.counts.get_mut(index) {
+            Some(Some(count)) => {
                 ui.indent(("session weekday", index), |ui| {
                     stepper(ui, t, count, (1, Some(MAX_COUNT)), None);
                 });
             }
-            None => {
+            Some(None) | None => {
                 ui.indent(("session weekday", index), |ui| {
                     ui.label(
                         RichText::new(t.session_weekday_count_hint())
@@ -531,4 +536,24 @@ fn tags_of(text: Option<&str>) -> BTreeSet<String> {
         .into_iter()
         .map(|found| found.tag)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oldbrainfix_core::SigningKey;
+
+    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    #[test]
+    fn a_weekday_past_sunday_has_no_own_count() -> TestResult {
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || {
+            Ok(SigningKey::from_seed([3; 32]))
+        })?;
+        let mut draft = SessionDraft::of(&store, &L10n::new("en"), "note:a", None)?;
+        draft.set_own(0, true);
+        draft.set_own(7, true);
+        assert_eq!(draft.counts, [Some(1), None, None, None, None, None, None]);
+        Ok(())
+    }
 }

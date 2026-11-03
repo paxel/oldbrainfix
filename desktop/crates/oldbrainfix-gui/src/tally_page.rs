@@ -160,8 +160,12 @@ impl TallyPage {
         let name = self.name.trim().to_string();
         let system = self.system;
         self.name_missing = name.is_empty();
-        let kept: Vec<usize> = (0..self.fields.len())
-            .filter(|i| !self.fields[*i].name.trim().is_empty())
+        let kept: Vec<usize> = self
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| !f.name.trim().is_empty())
+            .map(|(i, _)| i)
             .collect();
         self.fields_missing = kept.is_empty();
         for (i, field) in self.fields.iter_mut().enumerate() {
@@ -181,7 +185,11 @@ impl TallyPage {
             self.focus = Some(field_id(field.key));
             return Ok(None);
         }
-        let fields: Vec<&FieldDraft> = kept.iter().map(|i| &self.fields[*i]).collect();
+        let fields: Vec<&FieldDraft> = self
+            .fields
+            .iter()
+            .filter(|f| !f.name.trim().is_empty())
+            .collect();
         let place = self.place.as_deref();
         let id = store.batch(|| {
             let note = Notes::new(store).capture(&name, place, None)?;

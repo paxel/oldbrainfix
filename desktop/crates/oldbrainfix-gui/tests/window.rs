@@ -2,6 +2,14 @@
 //! fixture logs: Areas and Topics on the left, Notes in the middle, the
 //! selected Note on the right, and everything the user changes there.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

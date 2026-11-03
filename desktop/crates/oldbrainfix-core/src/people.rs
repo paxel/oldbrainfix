@@ -513,17 +513,19 @@ impl Store {
         let Some(id) = Profile::parse(&sent.record).map(|p| p.id) else {
             return Ok(());
         };
-        let mut value = json!({"profile": sent.to_json(), "seen": seen});
+        let mut value = serde_json::Map::new();
+        value.insert("profile".into(), sent.to_json());
+        value.insert("seen".into(), json!(seen));
         if let Some(shown) = shown {
-            value["shown"] = json!(BASE64.encode(shown));
+            value.insert("shown".into(), json!(BASE64.encode(shown)));
         }
         if stripped {
-            value["stripped"] = json!(true);
+            value.insert("stripped".into(), json!(true));
         }
         if verified {
-            value["verified"] = json!(true);
+            value.insert("verified".into(), json!(true));
         }
-        self.set_local_setting(&format!("{PREFIX}{id}"), &value.to_string())?;
+        self.set_local_setting(&format!("{PREFIX}{id}"), &Value::Object(value).to_string())?;
         *self.people.lock() = None;
         Ok(())
     }

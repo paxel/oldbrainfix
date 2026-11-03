@@ -100,3 +100,6 @@ serde_json = "1.0"
 # Profile cards forged by hand in the tests, as the core writes them.
 base64 = "0.22"
 tempfile = "3.10"
+
+[lints]
+workspace = true

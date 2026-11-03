@@ -344,7 +344,10 @@ pub fn section(
                 return false;
             };
             let at = fields.iter().position(|k| *k == key);
-            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let above = at
+                .and_then(|at| at.checked_sub(1))
+                .and_then(|at| fields.get(at))
+                .copied();
             let below = at.and_then(|at| fields.get(at + 1)).copied();
             line_editing::field(
                 ui,

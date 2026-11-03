@@ -434,7 +434,7 @@ impl<'a> Routines<'a> {
             return Ok(None);
         }
         let linked = self.of_note(&note.id)?;
-        if linked.len() != 1 || linked[0].id != routine.id {
+        if !matches!(linked.as_slice(), [only] if only.id == routine.id) {
             return Ok(None);
         }
         Ok(Some(note))

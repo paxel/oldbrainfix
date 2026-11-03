@@ -114,7 +114,10 @@ pub fn pictures(t: &L10n) -> Vec<&'static [u8]> {
     let german = t.locale() == "de";
     GROUPS
         .iter()
-        .map(|g| g.pictures[usize::from(german)])
+        .map(|g| {
+            let [english, in_german] = g.pictures;
+            if german { in_german } else { english }
+        })
         .collect()
 }
 

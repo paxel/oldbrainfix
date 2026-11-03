@@ -21,6 +21,14 @@
 //! cargo test -p oldbrainfix-gui --test screenshots -- --ignored guide_frames
 //! ```
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;

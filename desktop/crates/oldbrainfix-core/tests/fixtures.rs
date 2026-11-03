@@ -9,6 +9,14 @@
 //! same European wall clock, Europe/Berlin here; the calendar files of
 //! Routines and Reminders must be the same bytes.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::{Path, PathBuf};
 
 use base64::Engine;

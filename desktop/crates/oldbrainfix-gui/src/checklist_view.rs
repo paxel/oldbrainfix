@@ -255,7 +255,10 @@ fn neighbours(list: &Checklist, line: &Line) -> (Option<String>, bool) {
     let Some(at) = level.iter().position(|l| l.id == line.id) else {
         return (None, false);
     };
-    let before = at.checked_sub(1).map(|i| level[i].id.clone());
+    let before = at
+        .checked_sub(1)
+        .and_then(|i| level.get(i))
+        .map(|l| l.id.clone());
     (before, at + 1 < level.len())
 }
 
@@ -293,16 +296,17 @@ pub fn new_line_steps(rows: &[TypedLine], at: usize) -> Vec<LineStep> {
     let Some(me) = lines.iter().position(|(it, _)| *it) else {
         return Vec::new();
     };
-    let in_group = lines[me].1 && me > 0;
+    let grouped = |i: usize| lines.get(i).is_some_and(|(_, g)| *g);
+    let in_group = grouped(me) && me > 0;
     // Its level: the Lines of its group, or those at the top.
     let level: Vec<usize> = if in_group {
-        let head = lines[..me].iter().rposition(|(_, g)| !g).unwrap_or(0);
+        let head = lines.iter().take(me).rposition(|(_, g)| !g).unwrap_or(0);
         (head + 1..lines.len())
-            .take_while(|&i| lines[i].1)
+            .take_while(|&i| grouped(i))
             .collect()
     } else {
         (0..lines.len())
-            .filter(|&i| i == me || !lines[i].1)
+            .filter(|&i| i == me || !grouped(i))
             .collect()
     };
     let Some(on) = level.iter().position(|&i| i == me) else {
@@ -341,8 +345,8 @@ pub fn move_down(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_co
     let Some(at) = level.iter().position(|l| l.id == line.id) else {
         return Ok(());
     };
-    if at + 2 < level.len() {
-        return lists.move_line(&line.id, Some(&level[at + 2].id));
+    if let Some(past) = level.get(at + 2) {
+        return lists.move_line(&line.id, Some(&past.id));
     }
     if !line.in_group() {
         return lists.move_line(&line.id, None);
@@ -415,12 +419,12 @@ fn group_frame(ui: &Ui, gap: f32) -> Frame {
 /// one frame with its group indented under it, every Line by `row`.
 fn grouped(ui: &mut Ui, lines: &[ShownLine], gap: f32, row: &mut dyn FnMut(&mut Ui, &ShownLine)) {
     ui.spacing_mut().item_spacing.y = gap;
-    let mut at = 0;
-    while at < lines.len() {
-        let head = &lines[at];
-        let end = at + 1 + lines[at + 1..].iter().take_while(|l| l.in_group).count();
-        let group = &lines[at + 1..end];
-        at = end;
+    let mut rest = lines;
+    while let Some((head, after)) = rest.split_first() {
+        let size = after.iter().take_while(|l| l.in_group).count();
+        // `size` counts Lines of `after`, so never more than it holds.
+        let (group, next) = after.split_at_checked(size).unwrap_or((after, &[]));
+        rest = next;
         if group.is_empty() {
             row(ui, head);
             continue;
@@ -779,7 +783,10 @@ pub fn section(
                 return false;
             };
             let at = fields.iter().position(|k| *k == key);
-            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let above = at
+                .and_then(|at| at.checked_sub(1))
+                .and_then(|at| fields.get(at))
+                .copied();
             let below = at.and_then(|at| fields.get(at + 1)).copied();
             line_editing::field(
                 ui,

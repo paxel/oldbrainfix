@@ -478,8 +478,9 @@ fn key_at(list: &ShoppingList, at: Option<usize>) -> String {
             return order::place(last, None);
         }
     };
-    let a = open[..at]
+    let a = open
         .iter()
+        .take(at)
         .rev()
         .find(|l| order::is_valid(l.order.as_deref()))
         .and_then(|l| l.order.as_deref());

@@ -647,7 +647,9 @@ fn chart(
     }
     let width = ui.available_width().max(SLOT);
     let fit = ((width / SLOT).floor() as usize).max(1);
-    let shown = &buckets[buckets.len().saturating_sub(fit)..];
+    let shown = buckets
+        .get(buckets.len().saturating_sub(fit)..)
+        .unwrap_or(buckets);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, CHART_HEIGHT), Sense::hover());
     let label = t.tally_chart_label(&field.name, shown.len() as i64);
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, &label));
@@ -1157,7 +1159,9 @@ impl FieldForm {
                                     .map(|(i, (_, name))| (Some(i), name.clone())),
                             );
                         if radio_column(ui, &mut picked, options) {
-                            self.multiplies = picked.map(|i| self.multipliable[i].0.clone());
+                            self.multiplies = picked
+                                .and_then(|i| self.multipliable.get(i))
+                                .map(|(id, _)| id.clone());
                         }
                         ui.label(
                             RichText::new(t.tally_multiplies_detail())

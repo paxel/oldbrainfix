@@ -4,6 +4,14 @@
 //! switch changes again; a click still only selects (#148). A compact
 //! card shows no Capture Context; Edit and ⋮ stay top right.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};

@@ -363,8 +363,8 @@ impl SessionMarks {
                     Some(there) => self.entries_for(store, key, there)?.is_empty(),
                     None => false,
                 };
-                match place {
-                    Some(i) if free => pick[i] = note_id.clone(),
+                match place.and_then(|i| pick.get_mut(i)) {
+                    Some(there) if free => *there = note_id.clone(),
                     _ => pick.push(note_id.clone()),
                 }
                 healed = true;
@@ -444,7 +444,7 @@ fn count_of(value: Option<&str>) -> Option<i64> {
     let value = value?;
     let b = value.as_bytes();
     let digits = matches!(b.len(), 1 | 2)
-        && (b'1'..=b'9').contains(&b[0])
+        && b.first().is_some_and(|c| (b'1'..=b'9').contains(c))
         && b.iter().all(u8::is_ascii_digit);
     if !digits {
         return None;
@@ -1029,7 +1029,10 @@ impl<'a> Sessions<'a> {
         let mut i = wanted.len();
         while i > 0 && wanted.len() > count {
             i -= 1;
-            if !recorded(&wanted[i])? {
+            let Some(id) = wanted.get(i) else {
+                break;
+            };
+            if !recorded(id)? {
                 wanted.remove(i);
             }
         }

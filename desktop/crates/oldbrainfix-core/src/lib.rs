@@ -74,6 +74,16 @@ pub mod text_format;
 pub mod text_tags;
 pub mod transcript_prompts;
 
+/// The symbol of `alphabet` for the low five bits of `value`, as the
+/// pair codes, the Recovery Sheet and the Profile codes write base32.
+pub(crate) fn base32_symbol(alphabet: &[u8; 32], value: u64) -> char {
+    // Proof: the mask keeps the index in 0..=31, and the alphabet's type
+    // holds exactly 32 symbols, so the index is always in bounds.
+    #[allow(clippy::indexing_slicing)]
+    let symbol = alphabet[(value & 31) as usize];
+    char::from(symbol)
+}
+
 pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm};
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};

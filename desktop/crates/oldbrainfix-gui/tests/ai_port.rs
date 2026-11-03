@@ -15,6 +15,14 @@
 //! Shopping List (#186) or a Checklist (#219) shows on the Agenda in the
 //! words of its choice.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};

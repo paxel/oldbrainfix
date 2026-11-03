@@ -436,7 +436,7 @@ pub fn html(text: &str) -> String {
                 // One level in only inside an item.
                 let level = block.level.min(html.lists.len());
                 html.close_lists(level + 1);
-                if html.lists.len() == level + 1 && html.lists[level] == block.kind {
+                if html.lists.len() == level + 1 && html.lists.get(level) == Some(&block.kind) {
                     html.out.push_str("</li><li>");
                 } else {
                     html.close_lists(level);
@@ -705,7 +705,9 @@ fn addresses(text: &str, (from, to): (usize, usize), found: &mut Vec<(usize, usi
             None
         };
         let starts = after.filter(|&after| {
-            !(i > 0 && bytes[i - 1].is_ascii_alphanumeric())
+            !i.checked_sub(1)
+                .and_then(|before| bytes.get(before))
+                .is_some_and(u8::is_ascii_alphanumeric)
                 && text
                     .get(after..to)
                     .and_then(|r| r.chars().next())
@@ -724,7 +726,7 @@ fn addresses(text: &str, (from, to): (usize, usize), found: &mut Vec<(usize, usi
             .find(|&(_, c)| c == '<' || c == '>' || c.is_whitespace())
             .map_or(to, |(k, _)| after + k);
         loop {
-            let link = &bytes[i..end];
+            let link = bytes.get(i..end).unwrap_or_default();
             let count = |c: u8| link.iter().filter(|&&b| b == c).count();
             match link.last() {
                 Some(b'.' | b',' | b':' | b';' | b'!' | b'?') => end -= 1,
@@ -1017,8 +1019,10 @@ pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Cha
             BlockKind::Quote => "> ".into(),
             BlockKind::Bullet => format!("{lead}- "),
             BlockKind::Numbered => {
-                let n = next[level.min(1)];
-                next[level.min(1)] += 1;
+                let [top, inner] = &mut next;
+                let counter = if level == 0 { top } else { inner };
+                let n = *counter;
+                *counter += 1;
                 format!("{lead}{n}. ")
             }
         };
@@ -1255,7 +1259,10 @@ pub fn line_at(text: &str, offset: usize) -> usize {
     let mut line = 0;
     let mut i = 0;
     while i < stop {
-        match bytes[i] {
+        let Some(&byte) = bytes.get(i) else {
+            break;
+        };
+        match byte {
             b'\r' if bytes.get(i + 1) == Some(&b'\n') => {
                 if i + 1 < stop {
                     line += 1;
@@ -1276,8 +1283,7 @@ fn lines(text: &str) -> Vec<(usize, usize)> {
     let bytes = text.as_bytes();
     let mut lines = Vec::new();
     let (mut start, mut i) = (0, 0);
-    while i < bytes.len() {
-        let c = bytes[i];
+    while let Some(&c) = bytes.get(i) {
         if c != b'\n' && c != b'\r' {
             i += 1;
             continue;
@@ -1982,29 +1988,31 @@ impl Inline<'_> {
 fn emphasis(text: &str, items: &mut Vec<Item>) {
     let mut c = 0;
     while c < items.len() {
-        let (char, closer_count, closer_length, closer_open) = match &items[c] {
-            Item::Delim(d) if d.close && d.count() > 0 => (d.char, d.count(), d.length, d.open),
+        let (char, closer_count, closer_length, closer_open) = match items.get(c) {
+            Some(Item::Delim(d)) if d.close && d.count() > 0 => {
+                (d.char, d.count(), d.length, d.open)
+            }
             _ => {
                 c += 1;
                 continue;
             }
         };
-        let opener = (0..c).rev().find(|&o| match &items[o] {
-            Item::Delim(d) => {
+        let opener = (0..c).rev().find(|&o| match items.get(o) {
+            Some(Item::Delim(d)) => {
                 d.char == char
                     && d.open
                     && d.count() > 0
                     && !third(d.char, d.length, d.close, closer_length, closer_open)
             }
-            Item::Span(_) => false,
+            Some(Item::Span(_)) | None => false,
         });
         let Some(o) = opener else {
             c += 1;
             continue;
         };
-        let opener_count = match &items[o] {
-            Item::Delim(d) => d.count(),
-            Item::Span(_) => 0,
+        let opener_count = match items.get(o) {
+            Some(Item::Delim(d)) => d.count(),
+            Some(Item::Span(_)) | None => 0,
         };
         let used = if char == b'~' || (opener_count >= 2 && closer_count >= 2) {
             2
@@ -2021,13 +2029,13 @@ fn emphasis(text: &str, items: &mut Vec<Item>) {
             .map(|item| span_of(text, item))
             .collect();
         let (mut start, mut content_start) = (0, 0);
-        if let Item::Delim(d) = &mut items[o] {
+        if let Some(Item::Delim(d)) = items.get_mut(o) {
             content_start = d.end;
             d.end -= used;
             start = d.end;
         }
         let (mut end, mut content_end) = (0, 0);
-        if let Item::Delim(d) = &mut items[o + 1] {
+        if let Some(Item::Delim(d)) = items.get_mut(o + 1) {
             content_end = d.start;
             d.start += used;
             end = d.start;
@@ -2044,11 +2052,11 @@ fn emphasis(text: &str, items: &mut Vec<Item>) {
         };
         items.insert(o + 1, Item::Span(span));
         c = o + 2;
-        if matches!(&items[o], Item::Delim(d) if d.count() == 0) {
+        if matches!(items.get(o), Some(Item::Delim(d)) if d.count() == 0) {
             items.remove(o);
             c -= 1;
         }
-        if matches!(&items[c], Item::Delim(d) if d.count() == 0) {
+        if matches!(items.get(c), Some(Item::Delim(d)) if d.count() == 0) {
             items.remove(c);
         }
     }

@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::markdown;
 use crate::text_format;
 
@@ -369,11 +369,16 @@ pub fn convert(
 fn drawn(new_id: &mut impl FnMut() -> Result<String>) -> Result<String> {
     let digest = Sha256::digest(new_id()?.as_bytes());
     let alphabet = ID_ALPHABET.as_bytes();
-    Ok(digest
+    digest
         .iter()
         .take(ID_LENGTH)
-        .map(|b| char::from(alphabet[usize::from(*b) % alphabet.len()]))
-        .collect())
+        .map(|b| {
+            alphabet
+                .get(usize::from(*b) % alphabet.len())
+                .map(|c| char::from(*c))
+                .ok_or_else(|| Error::Invalid("an empty id alphabet".into()))
+        })
+        .collect()
 }
 
 #[cfg(test)]

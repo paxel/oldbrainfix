@@ -6,6 +6,14 @@
 //! nothing ticked, and "Save the Pack…" saves the Notes ticked to be
 //! attached. Nothing leaves without a click.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 

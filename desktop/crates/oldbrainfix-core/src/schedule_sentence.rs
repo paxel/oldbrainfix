@@ -83,7 +83,7 @@ pub fn sentence(schedule: &SimpleSchedule, locale: &str, today: Day) -> String {
                 let names: Vec<&str> = repeat
                     .weekdays
                     .iter()
-                    .map(|&d| w.weekdays()[(d - 1) as usize])
+                    .map(|&d| weekday_word(w.weekdays(), d))
                     .collect();
                 head.push(' ');
                 head.push_str(&names.join(", "));
@@ -165,13 +165,11 @@ pub fn suggest(text: &str, cursor: usize, locale: &str) -> Vec<Suggestion> {
     }
     // "8:3" is typed for "08:30".
     let bytes = typed.as_bytes();
-    let padded =
-        if !bytes.is_empty() && bytes[0].is_ascii_digit() && (bytes.len() == 1 || bytes[1] == b':')
-        {
-            format!("0{typed}")
-        } else {
-            typed.to_string()
-        };
+    let padded = if matches!(bytes, [first] | [first, b':', ..] if first.is_ascii_digit()) {
+        format!("0{typed}")
+    } else {
+        typed.to_string()
+    };
     let prefix = padded.to_lowercase();
     let mut seen = BTreeSet::new();
     parser
@@ -364,7 +362,7 @@ impl Words {
         self.pick("and", "und")
     }
 
-    fn weekdays(self) -> &'static [&'static str] {
+    fn weekdays(self) -> &'static [&'static str; 7] {
         if self.german {
             &WEEKDAYS_DE
         } else {
@@ -372,7 +370,7 @@ impl Words {
         }
     }
 
-    fn weekdays_long(self) -> &'static [&'static str] {
+    fn weekdays_long(self) -> &'static [&'static str; 7] {
         if self.german {
             &WEEKDAYS_LONG_DE
         } else {
@@ -381,7 +379,7 @@ impl Words {
     }
 
     /// The ordinals 1 to 4 and the last, in that order.
-    fn ordinals(self) -> &'static [&'static str] {
+    fn ordinals(self) -> &'static [&'static str; 5] {
         if self.german {
             &["ersten", "zweiten", "dritten", "vierten", "letzten"]
         } else {
@@ -390,7 +388,7 @@ impl Words {
     }
 
     /// Each unit's word for one.
-    fn units(self) -> &'static [&'static str] {
+    fn units(self) -> &'static [&'static str; 4] {
         if self.german {
             &["Tag", "Woche", "Monat", "Jahr"]
         } else {
@@ -399,7 +397,7 @@ impl Words {
     }
 
     /// Each unit's word for more.
-    fn units_many(self) -> &'static [&'static str] {
+    fn units_many(self) -> &'static [&'static str; 4] {
         if self.german {
             &["Tage", "Wochen", "Monate", "Jahre"]
         } else {
@@ -433,19 +431,18 @@ impl Words {
     }
 
     fn every(self, n: i64, unit: RepeatUnit) -> String {
-        let i = unit_index(unit);
         if !self.german {
             return if n == 1 {
-                format!("Every {}", self.units()[i])
+                format!("Every {}", unit_word(self.units(), unit))
             } else {
-                format!("Every {n} {}", self.units_many()[i])
+                format!("Every {n} {}", unit_word(self.units_many(), unit))
             };
         }
         if n != 1 {
-            return format!("Alle {n} {}", self.units_many()[i]);
+            return format!("Alle {n} {}", unit_word(self.units_many(), unit));
         }
-        let article = ["Jeden", "Jede", "Jeden", "Jedes"][i];
-        format!("{article} {}", self.units()[i])
+        let article = unit_word(&["Jeden", "Jede", "Jeden", "Jedes"], unit);
+        format!("{article} {}", unit_word(self.units(), unit))
     }
 
     fn month_day(self, day: i64) -> String {
@@ -457,12 +454,15 @@ impl Words {
     }
 
     fn nth(self, rule: WeekdayRule) -> String {
-        let index = match rule.ordinal {
-            Some(o) if (1..=4).contains(&o) => (o - 1) as usize,
-            _ => 4,
+        let [first, second, third, fourth, last] = *self.ordinals();
+        let ordinal = match rule.ordinal {
+            Some(1) => first,
+            Some(2) => second,
+            Some(3) => third,
+            Some(4) => fourth,
+            _ => last,
         };
-        let ordinal = self.ordinals()[index];
-        let weekday = self.weekdays_long()[(rule.weekday - 1) as usize];
+        let weekday = weekday_word(self.weekdays_long(), rule.weekday);
         if self.german {
             format!("am {ordinal} {weekday}")
         } else {
@@ -499,14 +499,14 @@ impl Words {
     /// The unit `word` names, for one or more.
     fn unit(self, word: &str) -> Option<RepeatUnit> {
         let i = Words::find(word, self.units()).or_else(|| Words::find(word, self.units_many()))?;
-        Some(
-            [
-                RepeatUnit::Days,
-                RepeatUnit::Weeks,
-                RepeatUnit::Months,
-                RepeatUnit::Years,
-            ][i],
-        )
+        [
+            RepeatUnit::Days,
+            RepeatUnit::Weeks,
+            RepeatUnit::Months,
+            RepeatUnit::Years,
+        ]
+        .get(i)
+        .copied()
     }
 
     /// 1 for Monday to 7 for Sunday, for a short or long name.
@@ -532,12 +532,31 @@ fn plain(word: &str) -> String {
     }
 }
 
-fn unit_index(unit: RepeatUnit) -> usize {
+/// The word of `words`, one per unit in the order days, weeks, months,
+/// years, for `unit`.
+fn unit_word(words: &[&'static str; 4], unit: RepeatUnit) -> &'static str {
+    let [days, weeks, months, years] = *words;
     match unit {
-        RepeatUnit::Days => 0,
-        RepeatUnit::Weeks => 1,
-        RepeatUnit::Months => 2,
-        RepeatUnit::Years => 3,
+        RepeatUnit::Days => days,
+        RepeatUnit::Weeks => weeks,
+        RepeatUnit::Months => months,
+        RepeatUnit::Years => years,
+    }
+}
+
+/// The word of `words`, Monday to Sunday, for `weekday`, 1 for Monday to
+/// 7 for Sunday. A number outside that breaks the contract of the fields
+/// that hold it; it reads as the nearest weekday, as the rule writes it.
+fn weekday_word(words: &[&'static str; 7], weekday: u32) -> &'static str {
+    let [mon, tue, wed, thu, fri, sat, sun] = *words;
+    match weekday {
+        0 | 1 => mon,
+        2 => tue,
+        3 => wed,
+        4 => thu,
+        5 => fri,
+        6 => sat,
+        _ => sun,
     }
 }
 
@@ -727,12 +746,15 @@ impl Parser {
             &t.text
         };
         let parts: Vec<&str> = body.split(if dots { '.' } else { '/' }).collect();
-        if parts[0].len() > 2 || parts[1].len() > 2 {
+        let [first, second, rest @ ..] = parts.as_slice() else {
+            return None;
+        };
+        if first.len() > 2 || second.len() > 2 {
             return None;
         }
-        let a: i64 = parts[0].parse().ok()?;
-        let b: i64 = parts[1].parse().ok()?;
-        let year = match parts.get(2) {
+        let a: i64 = first.parse().ok()?;
+        let b: i64 = second.parse().ok()?;
+        let year = match rest.first() {
             None => self.today.year,
             Some(y) if y.len() == 2 => 2000 + y.parse::<i64>().ok()?,
             Some(y) if y.len() == 4 => y.parse().ok()?,
@@ -1026,13 +1048,13 @@ impl Parser {
         }
         let picked: Vec<&str> = (1..=7u32)
             .filter(|d| !self.weekdays.contains(d))
-            .map(|d| w.weekdays()[(d - 1) as usize])
+            .map(|d| weekday_word(w.weekdays(), d))
             .collect();
         let words: Vec<String> = match self.state {
             State::Start => return strings(&w.heads()),
             State::Once => return strings(&[w.on(), w.at()]),
             State::OnceOn | State::FromDate | State::UntilDate | State::MonthOnDay => Vec::new(),
-            State::Every => [w.units(), w.weekdays()]
+            State::Every => [w.units().as_slice(), w.weekdays().as_slice()]
                 .concat()
                 .iter()
                 .map(ToString::to_string)
@@ -1140,6 +1162,16 @@ mod tests {
             .into_iter()
             .map(|s| s.text)
             .collect()
+    }
+
+    #[test]
+    fn a_weekday_out_of_range_reads_as_the_nearest() {
+        let schedule =
+            SimpleSchedule::new(SimpleRepeat::weekdays([0, 9].into()), TODAY, &[at(8, 0)]);
+        assert_eq!(
+            sentence(&schedule, "en", TODAY),
+            "Weekdays Mon, Sun at 08:00"
+        );
     }
 
     #[test]
