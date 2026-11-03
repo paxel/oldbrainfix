@@ -6,6 +6,10 @@
 # matches its screen. Run this after a screen changes and commit the
 # frames with the change.
 #
+# A guide box's frame (#171) lies in the folder of its page,
+# <device>/<lang>/<theme>/<page>/<box>.png, where the site's box finds it:
+# a scene named with boxFrame (phone) or box_frame (desktop) writes it.
+#
 #   tool/guide-frames.sh           write every frame
 #   tool/guide-frames.sh --check   compare only, as CI does
 #

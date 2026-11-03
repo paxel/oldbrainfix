@@ -7,7 +7,8 @@
 //
 // The user guide's phone frames (#134) come from the same seeded data:
 // each screen in English and German, light and dark, 648 × 1152, under
-// site/assets/frames/phone/<language>/<theme>/. They are committed; a run
+// site/assets/frames/phone/<language>/<theme>/, a guide box's frame in
+// the folder of its page as <page>/<box>.png (#171). They are committed; a run
 // compares each frame with the committed one and fails when they differ,
 // and UPDATE_FRAMES=1 writes them instead (tool/guide-frames.sh):
 //
@@ -35,8 +36,11 @@ import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
+import 'package:oldbrainfix/src/settings_screen.dart';
+import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
+import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -957,21 +961,88 @@ void main() {
             });
           }
 
+          /// The frame of the box [box] on the guide page [page] (#171),
+          /// as the site's box names it: <page>/<box>.png. A page's
+          /// ticket only adds its scenes here.
+          void boxFrame(
+            String page,
+            String box,
+            Future<void> Function(WidgetTester) body,
+          ) => frame('$page/$box', body);
+
           frame('agenda', (tester) async {
             await start(tester, seed());
             expect(find.byType(AgendaScreen), findsOneWidget);
           });
 
-          frame('first-start', (tester) async {
+          // Getting started: the first start's choices, the Import rows
+          // and the alarm setup.
+          boxFrame('getting-started', 'start-new', (tester) async {
+            await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-new')));
+            expect(find.byType(StarterSetScreen), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'add-device', (tester) async {
+            await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-device')));
+            expect(find.byType(SyncScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'restore', (tester) async {
             await firstStart(tester);
             expect(find.byType(FirstStartScreen), findsOneWidget);
             expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
           });
 
-          frame('starter-set', (tester) async {
-            await firstStart(tester);
+          /// The phone's Settings scrolled to its Import rows, a folder
+          /// pickable.
+          Future<void> importRows(WidgetTester tester) async {
+            final dir = Directory('build/guide-import')
+              ..createSync(recursive: true);
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              folders: DirFolders(dir.path),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            final keep = find.byKey(const ValueKey('importKeep'));
+            await tester.scrollUntilVisible(
+              keep,
+              300,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(SettingsScreen),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame('getting-started', 'import-folder', (tester) async {
+            await importRows(tester);
+            expect(find.byKey(const ValueKey('importFolder')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'import-keep', (tester) async {
+            await importRows(tester);
+            await _tap(tester, find.byKey(const ValueKey('importKeep')));
+            expect(find.byKey(const ValueKey('importKeepZip')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'set-up', (tester) async {
+            final t = await firstStart(tester);
             await _tap(tester, find.byKey(const ValueKey('first-new')));
-            expect(find.byType(StarterSetScreen), findsOneWidget);
+            await _tap(tester, find.text(t.starterSetDone));
+            expect(find.byType(SetupScreen), findsOneWidget);
           });
 
           frame('capture-fan', (tester) async {

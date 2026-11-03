@@ -217,6 +217,72 @@
     });
   }
 
+  // ---------- guide boxes: the Phone and Desktop tabs (#171) ----------
+  // The ARIA tablist pattern: one tab in the Tab order, the arrow keys,
+  // Home and End move between them and show their panel. A choice shows
+  // that device in every box of the page and is remembered; without
+  // storage it lasts for this page, without script both panels show.
+
+  const DEVICE_KEY = "oldbrainfix-device";
+  const boxes = Array.prototype.slice.call(document.querySelectorAll(".box"));
+
+  function showDevice(device) {
+    boxes.forEach(function (box) {
+      box.querySelectorAll("[role='tab']").forEach(function (tab) {
+        const on = tab.getAttribute("data-device") === device;
+        tab.setAttribute("aria-selected", String(on));
+        tab.tabIndex = on ? 0 : -1;
+      });
+      box.querySelectorAll("[role='tabpanel']").forEach(function (panel) {
+        panel.hidden = panel.getAttribute("data-device") !== device;
+      });
+    });
+  }
+
+  function chooseDevice(device) {
+    showDevice(device);
+    try {
+      window.localStorage.setItem(DEVICE_KEY, device);
+    } catch {
+      // Storage unavailable: the choice lasts for this page only.
+    }
+  }
+
+  if (boxes.length) {
+    let device = "phone";
+    try {
+      const kept = window.localStorage.getItem(DEVICE_KEY);
+      if (kept === "phone" || kept === "desktop") device = kept;
+    } catch {
+      // Storage unavailable: Phone, as the page starts.
+    }
+    boxes.forEach(function (box) {
+      const list = box.querySelector("[role='tablist']");
+      if (!list) return;
+      const tabs = Array.prototype.slice.call(list.querySelectorAll("[role='tab']"));
+      list.hidden = false;
+      box.classList.add("has-tabs");
+      list.addEventListener("click", function (event) {
+        const tab = event.target.closest && event.target.closest("[role='tab']");
+        if (tab) chooseDevice(tab.getAttribute("data-device"));
+      });
+      list.addEventListener("keydown", function (event) {
+        const at = tabs.indexOf(document.activeElement);
+        if (at < 0) return;
+        let next = -1;
+        if (event.key === "ArrowRight") next = (at + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") next = (at - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = tabs.length - 1;
+        if (next < 0) return;
+        event.preventDefault();
+        chooseDevice(tabs[next].getAttribute("data-device"));
+        tabs[next].focus();
+      });
+    });
+    showDevice(device);
+  }
+
   // ---------- search ----------
 
   const input = document.getElementById("search");

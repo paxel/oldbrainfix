@@ -11,7 +11,8 @@
 //!
 //! The user guide's desktop frames (#134) come from the same demo store:
 //! each screen in English and German, light and dark, under
-//! `site/assets/frames/desktop/<language>/<theme>/`. They are committed; a
+//! `site/assets/frames/desktop/<language>/<theme>/`, a guide box's frame
+//! in the folder of its page as `<page>/<box>.png` (#171). They are committed; a
 //! run compares each frame with the committed one and fails when they
 //! differ, and `UPDATE_FRAMES=1` writes them instead
 //! (`tool/guide-frames.sh`):
@@ -75,6 +76,13 @@ struct Texts {
     fixed: &'static str,
     /// The menu bar's Note menu.
     note_menu: &'static str,
+    /// The first start's "New to Old Brain Fix".
+    new_here: &'static str,
+    /// The menu bar's File menu, its Import…, and Google Keep… in the
+    /// Import dialog.
+    file_menu: &'static str,
+    import: &'static str,
+    keep: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -101,6 +109,10 @@ const EN: Texts = Texts {
     typo: "Pick up the parcel for Dana at the post office tomorow",
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
     note_menu: "Note",
+    new_here: "New to Old Brain Fix",
+    file_menu: "File",
+    import: "Import…",
+    keep: "Google Keep…",
 };
 
 const DE: Texts = Texts {
@@ -127,6 +139,10 @@ const DE: Texts = Texts {
     typo: "Packet für Dana morgen bei der Post abhohlen",
     fixed: "Paket für Dana morgen bei der Post abholen",
     note_menu: "Notiz",
+    new_here: "Neu bei Old Brain Fix",
+    file_menu: "Datei",
+    import: "Importieren …",
+    keep: "Google Keep …",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -376,6 +392,41 @@ fn window_with(
     Ok(harness)
 }
 
+/// The window of a computer on its first start, in `locale` and `theme`:
+/// nothing written yet, so the first start's three choices show.
+fn first_start(
+    locale: &str,
+    theme: egui::Theme,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    let now = parse_time("2026-10-26T08:30:00.000Z")?;
+    let store = Store::in_memory(Box::new(move || now), || {
+        Ok(SigningKey::from_seed([46; 32]))
+    })?;
+    let mut app = App::new(store, locale);
+    app.set_wall_clock(Arc::new(utc));
+    app.set_profile_defaults(Box::new(|store| {
+        oldbrainfix_core::OwnProfile::new(store).apply_defaults("Sam", None)
+    }));
+    app.offer_restore();
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(
+            (SIZE.0 + 2 * MARGIN) as f32,
+            (SIZE.1 + 2 * MARGIN) as f32,
+        ))
+        .with_theme(theme)
+        .wgpu()
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.input_mut().system_theme = Some(theme);
+    harness.run_steps(4);
+    Ok(harness)
+}
+
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
@@ -384,8 +435,46 @@ fn guide_frames() -> TestResult {
         for (theme, name) in [(egui::Theme::Light, "light"), (egui::Theme::Dark, "dark")] {
             let frame =
                 |screen: &str| format!("site/assets/frames/desktop/{language}/{name}/{screen}.png");
+            // The frame of the box `name` on the guide page `page` (#171),
+            // as the site's box names it: a page's ticket only adds its
+            // scenes here.
+            let box_frame = |page: &str, name: &str| frame(&format!("{page}/{name}"));
             let mut harness = window(texts, language, theme)?;
             problems.extend(match_frame(&mut harness, &frame("agenda"))?);
+            // Getting started: the first start's three choices, for adding
+            // a Device and for a restore, whose own pages show a code and
+            // a file of this run; the Starter Set; the Import dialog and
+            // its question about a Keep export; the Settings.
+            let mut harness = first_start(language, theme)?;
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "add-device"),
+            )?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "restore"),
+            )?);
+            harness.get_by_label(texts.new_here).click_accesskit();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "start-new"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            harness.get_by_label(texts.file_menu).click();
+            harness.run();
+            harness.get_by_label(texts.import).click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "import-folder"),
+            )?);
+            harness.get_by_label(texts.keep).click_accesskit();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "import-keep"),
+            )?);
             // A thought typed into the quick note, opened over the Agenda
             // as File ▸ New Note opens it (#146): the action row and the
             // Nudge times show.
@@ -460,6 +549,10 @@ fn guide_frames() -> TestResult {
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().open(Page::Settings);
             problems.extend(match_frame(&mut harness, &frame("settings"))?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("getting-started", "set-up"),
+            )?);
         }
     }
     assert!(

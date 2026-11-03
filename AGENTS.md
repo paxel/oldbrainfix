@@ -14,6 +14,10 @@ Default five-role vocabulary, label string equals role name. See `docs/agents/tr
 
 Navigation, capture, Agenda, cards, look and notifications. See `docs/agents/ui-laws.md`. Check every screen change against it.
 
+### Guide writing
+
+The user guide's short boxes with Phone and Desktop tabs. See `docs/agents/guide-writing.md`. Check every guide change against it.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
