@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+# tool/coverage.sh (#232)
+/packages/oldbrainfix_core/coverage/
+/desktop/coverage/
 
 # Symbolication related
 app.*.symbols

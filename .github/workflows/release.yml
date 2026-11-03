@@ -10,11 +10,12 @@
 #                    tests, no untranslated string, the guide's phone
 #                    frames, the cross-core fixtures current, the site
 #                    tests, the Python tools' tests, the Flatpak's
-#                    cargo sources current and its files linted
+#                    cargo sources current and its files linted, the
+#                    Dart core's and the app's coverage floors
 #   gate-desktop   — the Rust half: licence lists current, the OCR
 #                    library's and the desktop's format, clippy with the
 #                    workspace lints and all tests, the guide's desktop
-#                    frames
+#                    frames, the Rust core's and GUI's coverage floors
 #   geiger         — cargo geiger, report-only: unsafe counts in the log,
 #                    never blocks
 #   build-android  — signed per-ABI + universal APKs and the Play bundle,
@@ -195,9 +196,9 @@ jobs:
           node-version: 22
       - name: Site — unit tests
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound and OSV gate tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate and coverage floor tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
@@ -220,10 +221,12 @@ jobs:
             appstreamcli validate --no-net --explain io.github.paxel.oldbrainfix.metainfo.xml
             desktop-file-validate io.github.paxel.oldbrainfix.desktop
             flatpak-builder-lint manifest io.github.paxel.oldbrainfix.yml'
-      # ------------------------------------------------------------------
-      # PLACEHOLDER — coverage floors (#232): the four floors (Rust core,
-      # Rust GUI, Dart core, Flutter app) go here as a blocking step.
-      # ------------------------------------------------------------------
+      # Coverage floors (#232): the Dart core and the Flutter app below
+      # their floor in tool/coverage-floors.txt stop the release. A floor
+      # that rose is raised there on the runner only; raise it with a
+      # local run of tool/coverage.sh and commit it.
+      - name: Coverage floors — Dart core and Flutter app
+        run: tool/coverage.sh dart-core flutter-app
 
   gate-desktop:
     name: Gate (desktop and OCR, Rust)
@@ -244,7 +247,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ mesa-vulkan-drivers libvulkan1
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop
@@ -277,6 +280,12 @@ jobs:
       - name: The guide's desktop frames match their screens
         working-directory: desktop
         run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored guide_frames
+      # Coverage floors (#232), the Rust half: the core and the GUI below
+      # their floor in tool/coverage-floors.txt stop the release.
+      - name: Coverage floors — Rust core and Rust GUI
+        run: |
+          cargo install cargo-llvm-cov --locked --version 0.9.1
+          tool/coverage.sh rust-core rust-gui
 
   # Report-only (#231): the unsafe counts of the desktop and the OCR
   # library and their dependencies, for the log. cargo geiger is known to

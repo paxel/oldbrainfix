@@ -9,6 +9,10 @@
   <a href="https://github.com/paxel/oldbrainfix/actions/workflows/security.yml"><img src="https://github.com/paxel/oldbrainfix/actions/workflows/security.yml/badge.svg?branch=summer" alt="Security"/></a>
   <a href="https://github.com/paxel/oldbrainfix/actions/workflows/codeql.yml"><img src="https://github.com/paxel/oldbrainfix/actions/workflows/codeql.yml/badge.svg?branch=summer" alt="CodeQL"/></a>
   <a href="https://sonarcloud.io/summary/new_code?id=paxel_oldbrainfix"><img src="https://sonarcloud.io/api/project_badges/measure?project=paxel_oldbrainfix&metric=alert_status" alt="Quality gate"/></a>
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/paxel/oldbrainfix/summer/.github/badges/coverage-rust-core.json" alt="Coverage Rust core"/>
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/paxel/oldbrainfix/summer/.github/badges/coverage-rust-gui.json" alt="Coverage Rust GUI"/>
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/paxel/oldbrainfix/summer/.github/badges/coverage-dart-core.json" alt="Coverage Dart core"/>
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/paxel/oldbrainfix/summer/.github/badges/coverage-flutter-app.json" alt="Coverage Flutter app"/>
   <a href="https://github.com/paxel/oldbrainfix/releases/latest"><img src="https://img.shields.io/github/v/release/paxel/oldbrainfix" alt="Release"/></a>
   <a href="https://paxel.github.io/fdroid/"><img src="https://img.shields.io/badge/F--Droid-paxel.github.io-1976D2?logo=f-droid" alt="F-Droid repository"/></a>
   <a href="https://paxel.github.io/oldbrainfix/"><img src="https://img.shields.io/badge/docs-paxel.github.io-informational" alt="Documentation"/></a>
@@ -16,7 +20,7 @@
   <img src="https://img.shields.io/github/languages/top/paxel/oldbrainfix" alt="Top language"/>
   <img src="https://img.shields.io/github/languages/code-size/paxel/oldbrainfix" alt="Code size"/>
   <img src="https://img.shields.io/github/repo-size/paxel/oldbrainfix" alt="Repository size"/>
-  <img src="https://tokei.rs/b1/github/paxel/oldbrainfix?category=code" alt="Lines of code"/>
+  <a href="https://sonarcloud.io/summary/overall?id=paxel_oldbrainfix"><img src="https://sonarcloud.io/api/project_badges/measure?project=paxel_oldbrainfix&metric=ncloc" alt="Lines of code"/></a>
   <img src="https://img.shields.io/github/commit-activity/m/paxel/oldbrainfix" alt="Commit activity"/>
   <img src="https://img.shields.io/github/last-commit/paxel/oldbrainfix/summer" alt="Last commit"/>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue" alt="License"/></a>

@@ -145,9 +145,9 @@ jobs:
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo, What's-new, alarm sound and OSV gate tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate and coverage floor tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor
       - name: Render the files as Flathub gets them
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
