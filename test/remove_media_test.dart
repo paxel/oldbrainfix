@@ -139,6 +139,8 @@ void main() {
       expect(inCard(find.byType(NotePhoto)), findsOneWidget);
       expect(inCard(find.text('Room 12')), findsOneWidget);
 
+      // The card got shorter: its first line may sit above the screen.
+      await reveal(tester, inCard(find.text('doctor')));
       await tester.longPress(inCard(find.text('doctor')));
       await tester.pumpAndSettle();
       expect(inEditor(find.byType(NotePhoto)), findsOneWidget);
