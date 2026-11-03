@@ -40,6 +40,8 @@ With a Profile the page says "From <name>" with the picture, the user's Override
 
 **"Claim as mine"** (Q463), ticked at the start beside "Add", is only asked with a Profile. Ticked, the Notes are simply the receiver's. Unticked, each Note gets the field `packFrom` = `{"id":<Profile id>,"name":<name>}`: the "From <name>" line of its card and a badge in the Note editor, removed from the card's ⋮ or the badge, which writes the field null. It is a field of the Note, so it syncs and travels with it like any other; it shows the name the Profile has here when the person is kept, else the name the Pack carried.
 
+Amended (Q554 (a)): `packFrom` counts only when one of the person's own Devices wrote it, read as the person's settings are (ADR 0040): the newest value their own Devices wrote (`currentByOwn`, `own_current`). What another person's Device in a Shared Area writes there is ignored, as if absent, so it can neither set, change nor hide the line. Removing it works as before, writing the field null when the own read holds one. The `pack` fixture holds such a write (`foreign.jsonl`).
+
 ## Where it lands
 
 "Add" (Q460, Q461) writes everything in one batch, by this Device, captured now: each Area of the Pack a new private Area of its name, not locked, not shared, with default settings, its Topics new Topics in it. A name an Area has already gets a suffix the app hands in, "Health (Pack)", then "Health (Pack 2)", "(Pack 3)" and on; the Areas made in the same Add count as taken. Notes of no Area land in a new Area the app names ("From a Pack"), by the same rule. Nothing lands in an existing or a Shared Area, so nothing is Unsorted and no Nudge comes.
@@ -51,7 +53,7 @@ With a Profile the page says "From <name>" with the picture, the user's Override
 
 ## The AI port
 
-A Pack has no AI port tool to make or open one (ADR 0026): like an Import (ADR 0036) it is a person's own act with the system's share sheet and a file they opened, not something to set up, and the Notes it makes are read and changed through the tools Notes already have. The one new field, `packFrom`, is read there with the Note it is on and is never set or removed by the AI port.
+A Pack has no AI port tool to make or open one (ADR 0026): like an Import (ADR 0036) it is a person's own act with the system's share sheet and a file they opened, not something to set up, and the Notes it makes are read and changed through the tools Notes already have. The one new field, `packFrom`, is read there with the Note it is on and is never set or removed by the AI port. `read_note` shows it as `from` through the same read as the app (`pack_from`), so a line another person's Device wrote does not show there either.
 
 ## The desktop
 

@@ -6397,12 +6397,20 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
         lines_after(&ben, mark)?,
         lines_of(&dir.join("badged.jsonl"))?
     );
-    let mut badges = serde_json::Map::new();
-    for n in Notes::new(&ben).all()? {
-        if let Some(from) = ben.pack_from(&n.id)? {
-            badges.insert(n.id, json!({"id": from.id, "name": from.name}));
+    let badges_of = |ben: &Store| -> Result<Value, Box<dyn std::error::Error>> {
+        let mut badges = serde_json::Map::new();
+        for n in Notes::new(ben).all()? {
+            if let Some(from) = ben.pack_from(&n.id)? {
+                badges.insert(n.id, json!({"id": from.id, "name": from.name}));
+            }
         }
-    }
+        Ok(Value::Object(badges))
+    };
+    let badges = badges_of(&ben)?;
+    // Another person's Device writes `packFrom` on a badged Note and on
+    // one without a badge, later (Q554 (a)): neither counts.
+    insert_lines(&ben, &dir.join("foreign.jsonl"))?;
+    let foreign_badges = badges_of(&ben)?;
     assert_eq!(pack_tree_json(&opened_plain.pack)?, expected["openedTree"]);
     assert_eq!(
         pack_tree_json(&opened_signed.pack)?,
@@ -6420,7 +6428,8 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
     let added = |a: &oldbrainfix_core::PackAdded| json!({"areas": a.areas, "notes": a.notes});
     assert_eq!(added(&added_plain), expected["addedPlain"]);
     assert_eq!(added(&added_signed), expected["addedSigned"]);
-    assert_eq!(Value::Object(badges), expected["badges"]);
+    assert_eq!(badges, expected["badges"]);
+    assert_eq!(foreign_badges, expected["foreignBadges"]);
 
     // Refused: the signed one changed, a format to come, and hers once
     // he blocked her.

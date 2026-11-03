@@ -2030,9 +2030,11 @@ impl Store {
     /// core's `packFrom`: the sender's Profile id and the name it shows
     /// with, the user's Override or the name kept here when their Profile
     /// is kept, else the name the Pack carried; none when it has none, or
-    /// it was removed.
+    /// it was removed. Only what the user's own Devices wrote counts
+    /// (`own_current`, Q554 (a)): another person's Device in a Shared
+    /// Area can neither set nor change it.
     pub fn pack_from(&self, note_id: &str) -> Result<Option<PackFrom>> {
-        let Some(raw) = self.current(note_id, keys::FROM)? else {
+        let Some(raw) = self.own_current(note_id, keys::FROM, &mut HashMap::new())? else {
             return Ok(None);
         };
         let Ok(Value::Object(json)) = serde_json::from_str::<Value>(&raw) else {
@@ -2064,7 +2066,10 @@ impl Store {
 
     /// Removes the "From `<name>`" badge of the Note `note_id`.
     pub fn remove_pack_from(&self, note_id: &str) -> Result<()> {
-        if self.current(note_id, keys::FROM)?.is_none() {
+        if self
+            .own_current(note_id, keys::FROM, &mut HashMap::new())?
+            .is_none()
+        {
             return Ok(());
         }
         if !self.may_change(note_id)? {
@@ -2664,6 +2669,39 @@ mod tests {
         for n in texts(&ben)? {
             assert_eq!(ben.pack_from(&n.id)?, None);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn what_another_persons_device_wrote_neither_sets_changes_nor_hides_the_badge() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let h = health(&ann)?;
+        let pack = ann.pack_of(&h.plain, &HashSet::new())?;
+        let open = opened(&ben, &ann.write_pack(&pack, &pack.all_keys(), true)?)?;
+        add(&ben, &open, false)?;
+        let badged = texts(&ben)?.into_iter().next().ok_or("the Note")?.id;
+        let own = Notes::new(&ben).capture("Milk", None, None)?.id;
+        let badge = PackFrom {
+            id: own_id(&ann)?,
+            name: "Ann".into(),
+        };
+        // As a modified app in a Shared Area would: Cy's Device writes the
+        // field of Ben's Notes, later than anything Ben wrote.
+        let cy = device(3, "Cy")?;
+        let from = json!({"id": "cy", "name": "Cy"}).to_string();
+        let later = |days: i64| Some(ben.now() + chrono::Duration::days(days));
+        for note in [&badged, &own] {
+            ben.insert(&cy.append(note, keys::FROM, Some(&from), later(1))?.wire())?;
+        }
+        assert_eq!(ben.pack_from(&badged)?, Some(badge.clone()));
+        assert_eq!(ben.pack_from(&own)?, None);
+        ben.insert(&cy.append(&badged, keys::FROM, None, later(2))?.wire())?;
+        assert_eq!(ben.pack_from(&badged)?, Some(badge));
+        ben.remove_pack_from(&badged)?;
+        assert_eq!(ben.pack_from(&badged)?, None);
+        ben.remove_pack_from(&own)?;
+        assert_eq!(ben.current(&own, keys::FROM)?, Some(from));
         Ok(())
     }
 

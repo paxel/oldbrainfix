@@ -382,6 +382,48 @@ fn unclaimed_notes_say_from_ada_on_the_card_and_in_the_dialog_until_removed() ->
 }
 
 #[test]
+fn a_from_line_another_persons_device_wrote_does_not_show() -> TestResult {
+    let ben = store(5, "Ben")?;
+    let signed = std::fs::read(fixture("signed"))?;
+    let opened = ben.open_pack(&signed)?.map_err(|e| e.name())?;
+    let wall = |at: chrono::DateTime<chrono::Utc>| at.naive_utc();
+    ben.add_pack(
+        &opened,
+        &opened.pack.all_keys(),
+        false,
+        &wall,
+        "Pack",
+        "From a Pack",
+    )?;
+    let notes = Notes::new(&ben);
+    let shoes = notes
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Buy shoes")
+        .ok_or("Buy shoes")?
+        .id;
+    let milk = notes.capture("Milk", None, None)?.id;
+    // As a modified app in a Shared Area would (Q554 (a)): Cy's Device
+    // writes the line on a badged Note and on Ben's own, later.
+    let cy = store(6, "Cy")?;
+    let from = r#"{"id":"cy","name":"Cy"}"#;
+    let later = Some(chrono::Utc::now() + chrono::Duration::days(1));
+    for note in [&shoes, &milk] {
+        ben.insert(
+            &cy.append(note, packs::keys::FROM, Some(from), later)?
+                .wire(),
+        )?;
+    }
+    let mut app = App::new(ben, "en");
+    app.select(Selection::All);
+    let harness = window(app);
+    assert!(shows(&harness, "Milk"));
+    assert!(shows(&harness, "From Ada"));
+    assert!(!shows(&harness, "From Cy"));
+    Ok(())
+}
+
+#[test]
 fn add_ada_to_people_keeps_her_and_the_pack_open() -> TestResult {
     let mut harness = window(App::new(store(5, "Ben")?, "en"));
     drop_file(&mut harness, &fixture("signed"));

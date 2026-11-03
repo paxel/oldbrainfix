@@ -513,6 +513,42 @@ void main() {
       expect(Notes(ben).all().map((n) => ben.packFrom(n.id)), [null, null]);
     });
 
+    test("what another person's Device wrote counts for nothing (Q554 (a)): "
+        'it neither sets, changes nor hides the badge, and it can still be '
+        'removed', () {
+      final h = health();
+      final pack = ann.packOf(h.plain);
+      final opened = ben.openPack(
+        ann.writePack(pack, pack.allKeys(), addProfile: true),
+      );
+      ben.addPack(
+        opened,
+        opened.pack.allKeys(),
+        claim: false,
+        wallClock: _wall,
+        suffix: 'Pack',
+        noArea: 'From a Pack',
+      );
+      final badged = Notes(ben).all().single.id;
+      final own = Notes(ben).capture('Milk').id;
+      final badge = (id: ann.ownProfile!.id, name: 'Ann');
+      // As a modified app in a Shared Area would: Cy's Device writes the
+      // field of Ben's Notes.
+      final cy = device(clock, 'Cy');
+      String from(String name) => jsonEncode({'id': 'cy', 'name': name});
+      ben
+        ..insert(cy.append(badged, PackKeys.from, from('Cy')))
+        ..insert(cy.append(own, PackKeys.from, from('Cy')));
+      expect(ben.packFrom(badged), badge);
+      expect(ben.packFrom(own), isNull);
+      ben.insert(cy.append(badged, PackKeys.from, null));
+      expect(ben.packFrom(badged), badge);
+      ben.removePackFrom(badged);
+      expect(ben.packFrom(badged), isNull);
+      ben.removePackFrom(own);
+      expect(ben.current(own, PackKeys.from), from('Cy'));
+    });
+
     test('a help Note arrives under a new id', () {
       final note = Notes(ann).capture('Quick start');
       final pack = ann.packOf(note.id);

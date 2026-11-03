@@ -1577,10 +1577,12 @@ extension PackImport on Store {
   /// The "From …" badge of the Note [noteId] (Q463): the sender's
   /// Profile id and the name it shows with, the user's Override or the
   /// name kept here when their Profile is kept, else the name the Pack
-  /// carried; null when it has none, or it was removed.
+  /// carried; null when it has none, or it was removed. Only what the
+  /// user's own Devices wrote counts ([currentByOwn], Q554 (a)): another
+  /// person's Device in a Shared Area can neither set nor change it.
   ({String id, String name})? packFrom(String noteId) {
     try {
-      if (jsonDecode(current(noteId, PackKeys.from) ?? '') case {
+      if (jsonDecode(currentByOwn(noteId, PackKeys.from) ?? '') case {
         'id': final String id,
         'name': final String name,
       }) {
@@ -1595,7 +1597,7 @@ extension PackImport on Store {
 
   /// Removes the "From …" badge of the Note [noteId].
   void removePackFrom(String noteId) {
-    if (current(noteId, PackKeys.from) == null) return;
+    if (currentByOwn(noteId, PackKeys.from) == null) return;
     if (!mayChange(noteId)) throw StateError('may not change $noteId');
     append(noteId, PackKeys.from, null);
   }

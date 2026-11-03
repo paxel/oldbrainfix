@@ -6736,11 +6736,39 @@ void _packFixture(Directory root) {
       noArea: 'From a Pack',
     );
     _writeAfter(ben, mark, File('${out.path}/badged.jsonl'));
-    final badges = <String, Object?>{
+    Map<String, Object?> badgesOf() => {
       for (final n in Notes(ben).all())
         if (ben.packFrom(n.id) case final from?)
           n.id: {'id': from.id, 'name': from.name},
     };
+    final badges = badgesOf();
+    // As a modified app in a Shared Area would (Q554 (a)): another
+    // person's Device writes `packFrom` on a badged Note and on one
+    // without a badge, an hour later; neither counts.
+    final cy = Store.inMemory(
+      clock: _clock,
+      newKey: () => SigningKey.fromSeed(_restoredSeed),
+    )..setLocalSetting('author', 'Cy');
+    final forged = jsonEncode({'id': 'cy', 'name': 'Cy'});
+    final foreignMark = cy.currentSeq();
+    final noteIds = Notes(ben).all().map((n) => n.id);
+    for (final note in [
+      badges.keys.first,
+      noteIds.firstWhere((id) => !badges.containsKey(id)),
+    ]) {
+      cy.append(
+        note,
+        PackKeys.from,
+        forged,
+        date: added.add(const Duration(hours: 1)),
+      );
+    }
+    _writeAfter(cy, foreignMark, File('${out.path}/foreign.jsonl'));
+    for (final e in cy.entriesAfter(foreignMark)) {
+      ben.insert(e);
+    }
+    cy.close();
+    final foreignBadges = badgesOf();
 
     final changed = utf8.encode(
       utf8.decode(signed).replaceFirst('Shoes', 'Boots'),
@@ -6780,6 +6808,7 @@ void _packFixture(Directory root) {
         'addedSigned': {'areas': addedSigned.areas, 'notes': addedSigned.notes},
         'areaNames': {for (final a in Places(ben).areas()) a.id: a.name},
         'badges': badges,
+        'foreignBadges': foreignBadges,
         'refused': {'changed': refusedChanged, 'later': refusedLater, 'blocked': refusedBlocked},
       })}\n',
     );
@@ -9151,7 +9180,10 @@ Future<void> main(List<String> args) async {
     'has a Health (`receiver.jsonl`), opening each, its tree, and adding '
     'the first with "Claim as mine" (`added.jsonl`, ids counted from '
     '0x1101) and the second without (`badged.jsonl`, from 0x1201), with '
-    'the Areas made and the badges; then refused: the signed one changed '
+    'the Areas made and the badges, and the same badges once another '
+    "person's Device wrote `packFrom` on a badged Note and on one without "
+    'a badge an hour later (`foreign.jsonl`, `foreignBadges`, Q554 (a)); '
+    'then refused: the signed one changed '
     '(`changed.obfpack`), a format to come (`later.obfpack`), and the '
     'signed one after he blocked her (`expected.json`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
