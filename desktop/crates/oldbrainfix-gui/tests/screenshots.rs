@@ -30,6 +30,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use oldbrainfix_core::backup;
 use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
     AreaRole, BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, ImportReport,
@@ -811,6 +812,9 @@ fn first_start(
     Ok(harness)
 }
 
+/// The guide page "Backups, locks and privacy" (#177).
+const PRIVACY: &str = "backups-locks-and-privacy";
+
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
@@ -825,6 +829,9 @@ fn guide_frames() -> TestResult {
             let box_frame = |page: &str, name: &str| frame(&format!("{page}/{name}"));
             let mut harness = window(texts, language, theme)?;
             problems.extend(match_frame(&mut harness, &frame("agenda"))?);
+            // Backups, locks and privacy (#177): the Agenda, open to
+            // anyone at the computer, as the desktop has no App Lock.
+            problems.extend(match_frame(&mut harness, &box_frame(PRIVACY, "app-lock"))?);
             // Getting started: the first start's three choices, for adding
             // a Device and for a restore, whose own pages show a code and
             // a file of this run; the Starter Set; the Import dialog and
@@ -1190,11 +1197,16 @@ fn guide_frames() -> TestResult {
             problems.extend(sharing_frames(texts, language, theme, |name| {
                 box_frame("sharing-and-sync", name)
             })?);
+            // Backups, locks and privacy (#177).
+            problems.extend(privacy_frames(texts, language, theme, |name| {
+                box_frame(PRIVACY, name)
+            })?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().open(Page::Settings);
             problems.extend(match_frame(&mut harness, &frame("settings"))?);
+            problems.extend(match_frame(&mut harness, &box_frame(PRIVACY, "privacy"))?);
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("getting-started", "set-up"),
@@ -1713,6 +1725,64 @@ fn sharing_frames(
         if let Some((dir, _)) = people.sent {
             dir.close()?;
         }
+    }
+    Ok(problems)
+}
+
+/// The cheapest passphrase key: the frames need Backups set up, not safe.
+const CHEAP: backup::Kdf = backup::Kdf {
+    memory: 64,
+    iterations: 1,
+    parallelism: 1,
+};
+
+/// A scene of the page "Backups, locks and privacy", given its window
+/// and the words.
+type PrivacyScene = fn(&mut PeopleWindow, &Texts) -> TestResult;
+
+/// The frames of the page "Backups, locks and privacy" (#177), in
+/// `texts`' words, `language` and `theme`, but the Agenda and the
+/// Settings, which [`guide_frames`] draws: the Backups dialog before and
+/// after setting up, with a folder chosen and a Backup written, the
+/// Household's Notes in full, and the question before blocking Lena.
+fn privacy_frames(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    box_frame: impl Fn(&str) -> String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let scenes: [(&str, PrivacyScene); 4] = [
+        ("set-up", |harness, _| {
+            harness.state_mut().open(Page::Backups);
+            harness.run();
+            Ok(())
+        }),
+        ("folder", |harness, _| {
+            let store = harness.state().store();
+            backup::set_up(store, "correct horse", CHEAP, &mut backup::system_random)?;
+            // A path of its own on no disk: the dialog names it, and
+            // nothing writes there.
+            store.set_backup_folder(Some("/home/sam/Backups"))?;
+            store.set_local_setting("backup:last", "2026-10-25T19:30:00.000Z")?;
+            harness.state_mut().open(Page::Backups);
+            harness.run();
+            Ok(())
+        }),
+        ("area-locks", |harness, texts| {
+            show_household(harness, texts)
+        }),
+        ("block", |harness, _| {
+            lena_profile(harness)?;
+            let block = harness.state().t().person_block().to_string();
+            click_first(harness, &block)
+        }),
+    ];
+    let mut problems = Vec::new();
+    for (name, scene) in scenes {
+        let (harness, _) = window_with_people(texts, language, theme, PeopleSeed::default())?;
+        let mut harness = Box::new(harness);
+        scene(&mut harness, texts)?;
+        problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
     Ok(problems)
 }

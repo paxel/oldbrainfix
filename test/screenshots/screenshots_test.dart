@@ -2015,7 +2015,56 @@ void main() {
             await openSync(tester, t, find.text('Laptop'));
           });
 
-          frame('backups', (tester) async {
+          // Backups, locks and privacy (#177): Backups before and after
+          // setting up, the App Lock and the Area Locks in Settings, the
+          // question before blocking Lena, and the top of Settings.
+          const privacy177 = 'backups-locks-and-privacy';
+
+          /// The Backups page opened from the Profile page.
+          Future<void> openBackups(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            await _tap(tester, find.byKey(const ValueKey('backups')));
+            expect(find.byType(BackupScreen), findsOneWidget);
+          }
+
+          /// Settings opened from the Profile page.
+          Future<void> openSettings(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            expect(find.byType(SettingsScreen), findsOneWidget);
+          }
+
+          /// Settings scrolled to Privacy, its heading on top.
+          Future<void> toPrivacy(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            final heading = find.text(t.settingsPrivacy);
+            await tester.scrollUntilVisible(
+              heading,
+              300,
+              scrollable: notesList.last,
+            );
+            await tester.pumpAndSettle();
+            await Scrollable.ensureVisible(tester.element(heading));
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame(privacy177, 'set-up', (tester) async {
+            final t = await start(tester, seed());
+            await openBackups(tester, t);
+            expect(find.byKey(const ValueKey('set-up')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'folder', (tester) async {
             final seeded = seed();
             await setUpBackups(seeded.store, 'correct horse', derive: quickKey);
             final dir = Directory('build/guide-backups')
@@ -2034,13 +2083,23 @@ void main() {
               _guideDpr,
               folders: DirFolders(dir.path),
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            await _tap(tester, find.byKey(const ValueKey('backups')));
-            expect(find.byType(BackupScreen), findsOneWidget);
+            await openBackups(tester, t);
             expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
           });
 
-          frame('area-locks', (tester) async {
+          boxFrame(privacy177, 'app-lock', (tester) async {
+            final seeded = seed();
+            final t = await start(tester, seeded);
+            // Switched on once the app shows, so it starts unlocked.
+            seeded.store
+              ..setPin('2468', iterations: 1)
+              ..appLockOn = true;
+            await openSettings(tester, t);
+            await toPrivacy(tester, t);
+            expect(find.byKey(const ValueKey('changePin')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'area-locks', (tester) async {
             final seeded = seed();
             final places = Places(seeded.store);
             String area(String slug) =>
@@ -2051,18 +2110,23 @@ void main() {
               ..setAreaLocked(area('work'), true)
               ..setAreaMasked(area('work'), false);
             final t = await start(tester, seeded);
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final settings = find.byKey(const ValueKey('deviceSettings'));
-            await tester.ensureVisible(settings);
-            await _tap(tester, settings);
-            final locks = find.byKey(const ValueKey('areaLocks'));
-            await tester.scrollUntilVisible(
-              locks,
-              300,
-              scrollable: notesList.last,
-            );
-            await _tap(tester, locks);
+            await openSettings(tester, t);
+            await toPrivacy(tester, t);
+            await _tap(tester, find.byKey(const ValueKey('areaLocks')));
             expect(find.byType(AreaLocksScreen), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'block', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.text('Lena'));
+            await _tap(tester, find.byKey(const ValueKey('block-person')));
+            expect(find.byKey(const ValueKey('block-confirm')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'privacy', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            expect(find.text(t.settingsIntro), findsOneWidget);
           });
         }
       }
