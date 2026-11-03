@@ -24,7 +24,7 @@ Spaces count one and a tab four; an item indented by two or more is one level in
 
 Within a line, never across lines: `\` before ASCII punctuation shows that character; a run of backticks up to the next run of as many is code, shown as it is, one space at both ends dropped when there is one at both; `[label](destination)` is a link, its destination without spaces and with any parentheses balanced, and no link inside a link; `*` and `_` are emphasis by CommonMark's delimiter rules, one for italic and two for bold, with ASCII punctuation as punctuation and the line's start and end as space; a run of exactly two `~` is strike-through. A `[` right after a `!` is no link, so an image shows as written.
 
-Shown as written: `###` and deeper headings, indented code blocks, images, raw HTML, character references, autolinks, reference links, link titles, Setext headings, a rule written as `---`, lists numbered with `)`, and a line that only CommonMark's continuation would put into the item or paragraph above. Items deeper than one level show one level in. The fixture `markdown.json` compares the lines and parts both cores read, offsets counted in code points.
+Shown as written: `###` and deeper headings, indented code blocks, images, raw HTML, character references, `<…>` autolinks (the web address inside one is a link, as below), reference links, link titles, Setext headings, a rule written as `---`, lists numbered with `)`, and a line that only CommonMark's continuation would put into the item or paragraph above. Items deeper than one level show one level in. The fixture `markdown.json` compares the lines and parts both cores read, offsets counted in code points.
 
 ## Tables
 
@@ -56,11 +56,13 @@ Formats, line formats, a link and indenting leave a block's lines as they are; a
 
 The visible text is the text without its marks, its line breaks as they are (`Markdown.plain`, `TextFormats.visible`); a code block's fences go with a line break, as a table's delimiter row does, and its lines are as written. Search looks in it for a formatted text, so "bold" finds "**bold**" and "**" finds no marks; a plain text is searched as written. Alarms and other previews the cores make show it too.
 
-Tags (ADR 0032) and Boxes (ADR 0035, which replaced the status marks of ADR 0031) are found in the source as before, so "- ☐ milk" counts. In a formatted text, a `#word` inside code, inside a code block, its info string included, or inside a link's destination is no tag (`Markdown.tags`), and a glyph there gets no id when the text is saved (`Markdown.literalRanges`, ADR 0035).
+Tags (ADR 0032) and Boxes (ADR 0035, which replaced the status marks of ADR 0031) are found in the source as before, so "- ☐ milk" counts. In a formatted text, a `#word` inside code, inside a code block, its info string included, or inside a link's destination is no tag (`Markdown.tags`), and a glyph there gets no id when the text is saved (`Markdown.literalRanges`, ADR 0035). In any text, plain or formatted, a `#word` or a glyph inside a bare web address (below) is neither (`Markdown.plainTags`, `TextBoxes.convert`).
 
 ## Links
 
 A link's destination is written by whoever wrote the text, who may be another person in a Shared Area or behind a Sent Item. The apps open a link only when `Markdown.mayOpen` says so: `http://`, `https://` and `mailto:`, in any case of ASCII letters; anything else, a file, a script or another app's address, stays text.
+
+A bare web address is a link too (#222, amended): in every text a Note shows, plain or formatted, its text, its Sections and Amends, on cards and in the read views, it is drawn as a link and opens through `Markdown.mayOpen` like one. Nothing is stored or rewritten for it; it is how the text is drawn. It starts with `http://` or `https://`, in any case of ASCII letters, not right after an ASCII letter or digit, and an ASCII letter or digit or a character beyond ASCII follows; `www.` alone, `mailto:` and other schemes stay text. It runs up to a space of any kind (Unicode's White_Space), a `<`, a `>` or the end of the text, then, as GitHub's autolinks end, loses its last character while that is one of `.,:;!?`, or a `)` with more `)` than `(` in it. In a formatted text it is found only in what a part shows as written (`Markdown.autolinks`): none in code, a code block, a Code text (#213) or a link, its label included, and an escape or a mark ends it, so `**https://x.org**` links `https://x.org`. A plain text's are `Markdown.plainAutolinks`. Both cores find the same characters; `markdown.json` holds them for every text, formatted and as a plain text, with the plain text's tags.
 
 ## Transcripts and Photo Texts
 

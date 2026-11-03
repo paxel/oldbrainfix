@@ -572,20 +572,154 @@ abstract final class Markdown {
   }
 
   /// The tags of [text] as [TextTags.find] finds them, but those in code,
-  /// in a code block or in a link's destination.
-  static List<FoundTag> tags(String text) {
-    final hidden = literalRanges(text);
-    return [
-      for (final tag in TextTags.find(text))
-        if (!hidden.any((h) => tag.start < h.$2 && h.$1 < tag.end)) tag,
-    ];
+  /// in a code block, in a link's destination or in a web address
+  /// ([autolinks]).
+  static List<FoundTag> tags(String text) =>
+      _outside(literalRanges(text), text);
+
+  /// The tags of the plain text [text] as [TextTags.find] finds them, but
+  /// those in a web address ([plainAutolinks]).
+  static List<FoundTag> plainTags(String text) =>
+      _outside(plainAutolinks(text), text);
+
+  static List<FoundTag> _outside(List<(int, int)> hidden, String text) => [
+    for (final tag in TextTags.find(text))
+      if (!hidden.any((h) => tag.start < h.$2 && h.$1 < tag.end)) tag,
+  ];
+
+  /// The bare web addresses of the plain text [text], each drawn as a
+  /// link and opened as one (#222), as (start, end) in UTF-16 code
+  /// units; nothing about them is stored. One starts with `http://` or
+  /// `https://`, in any case of ASCII letters, not right after an ASCII
+  /// letter or digit, and an ASCII letter or digit or a character beyond
+  /// ASCII must follow. It runs up to a space of any kind (Unicode's
+  /// White_Space), a `<`, a `>` or the end, then, as GitHub's autolinks
+  /// do, loses its last character while that is one of `.,:;!?`, or a
+  /// `)` with more `)` than `(` in it.
+  static List<(int, int)> plainAutolinks(String text) {
+    final found = <(int, int)>[];
+    _addresses(text, 0, text.length, found);
+    return found;
   }
 
+  /// The bare web addresses of the formatted [text] as [plainAutolinks]
+  /// finds them, each within the characters a part shows as written:
+  /// none in code, in a code block or in a link, its label included.
+  static List<(int, int)> autolinks(String text) {
+    final found = <(int, int)>[];
+    void walk(List<MarkdownSpan> spans) {
+      for (final s in spans) {
+        switch (s.kind) {
+          // An escaped character starts none.
+          case MarkdownSpanKind.text:
+            _addresses(text, s.start, s.end, found);
+          case MarkdownSpanKind.bold ||
+              MarkdownSpanKind.italic ||
+              MarkdownSpanKind.strike:
+            walk(s.children);
+          case MarkdownSpanKind.code || MarkdownSpanKind.link:
+            break;
+        }
+      }
+    }
+
+    for (final block in parse(text)) {
+      if (block.code == null) walk(block.spans);
+    }
+    return found;
+  }
+
+  /// Adds the web addresses between [from] and [to] of [text] to [found].
+  static void _addresses(
+    String text,
+    int from,
+    int to,
+    List<(int, int)> found,
+  ) {
+    var i = from;
+    while (i < to) {
+      final after = _scheme(text, i, to);
+      if (after == null ||
+          (i > 0 && _asciiWord(text.codeUnitAt(i - 1))) ||
+          after >= to ||
+          !_hostStart(text.codeUnitAt(after))) {
+        i++;
+        continue;
+      }
+      var end = after;
+      while (end < to && !_endsAddress(text.codeUnitAt(end))) {
+        end++;
+      }
+      while (true) {
+        final last = text.codeUnitAt(end - 1);
+        if ('.,:;!?'.codeUnits.contains(last)) {
+          end--;
+        } else if (last == 0x29 &&
+            _count(text, i, end, 0x29) > _count(text, i, end, 0x28)) {
+          end--;
+        } else {
+          break;
+        }
+      }
+      found.add((i, end));
+      i = end;
+    }
+  }
+
+  /// Where the address after `http://` or `https://` at [at] of [text]
+  /// starts, or null when none starts there.
+  static int? _scheme(String text, int at, int to) {
+    for (final scheme in const ['https://', 'http://']) {
+      if (at + scheme.length > to) continue;
+      var k = 0;
+      while (k < scheme.length) {
+        final c = text.codeUnitAt(at + k);
+        final lower = c >= 0x41 && c <= 0x5A ? c | 0x20 : c;
+        if (lower != scheme.codeUnitAt(k)) break;
+        k++;
+      }
+      if (k == scheme.length) return at + k;
+    }
+    return null;
+  }
+
+  static int _count(String text, int from, int to, int c) {
+    var n = 0;
+    for (var i = from; i < to; i++) {
+      if (text.codeUnitAt(i) == c) n++;
+    }
+    return n;
+  }
+
+  static bool _asciiWord(int c) =>
+      (c >= 0x30 && c <= 0x39) || ((c | 0x20) >= 0x61 && (c | 0x20) <= 0x7A);
+
+  static bool _hostStart(int c) =>
+      _asciiWord(c) || (c > 0x7F && !_whiteSpace(c));
+
+  static bool _endsAddress(int c) => c == 0x3C || c == 0x3E || _whiteSpace(c);
+
+  /// Whether [c] is a space of Unicode's White_Space property, as Rust's
+  /// `char::is_whitespace` takes it.
+  static bool _whiteSpace(int c) =>
+      (c >= 0x09 && c <= 0x0D) ||
+      c == 0x20 ||
+      c == 0x85 ||
+      c == 0xA0 ||
+      c == 0x1680 ||
+      (c >= 0x2000 && c <= 0x200A) ||
+      c == 0x2028 ||
+      c == 0x2029 ||
+      c == 0x202F ||
+      c == 0x205F ||
+      c == 0x3000;
+
   /// Where [text] holds characters taken as written, so no tag and no
-  /// box: code, a code block, its fences included, and a link's
-  /// destination, as (start, end) in UTF-16 code units.
+  /// box: code, a code block, its fences included, a link's destination
+  /// and a web address ([autolinks]), as (start, end) in UTF-16 code
+  /// units.
   static List<(int, int)> literalRanges(String text) {
-    final hidden = <(int, int)>[];
+    final hidden = <(int, int)>[...autolinks(text)];
     void hide(List<MarkdownSpan> spans) {
       for (final s in spans) {
         if (s.kind == MarkdownSpanKind.code) hidden.add((s.start, s.end));

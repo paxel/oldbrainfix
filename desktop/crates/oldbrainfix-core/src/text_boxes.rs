@@ -318,7 +318,7 @@ pub fn baked(text: &str, ticks: &BTreeMap<String, BoxTick>) -> String {
 /// part of another emoji, becomes a box with a new id, and a box whose
 /// id came up before in the text gets a new one. In a formatted text a
 /// glyph in inline code, in a code block or in a link's address stays as
-/// it is. Each id is drawn from `new_id`, the store's maker of entity
+/// it is, and in any text one in a web address (#222). Each id is drawn from `new_id`, the store's maker of entity
 /// ids, again while it is in the text already.
 pub fn convert(
     text: &str,
@@ -340,7 +340,7 @@ pub fn convert(
     let skipped = if format == text_format::MARKDOWN {
         markdown::literal_ranges(text)
     } else {
-        Vec::new()
+        markdown::plain_autolinks(text)
     };
     let mut out = String::with_capacity(text.len());
     let mut from = 0;
@@ -460,10 +460,21 @@ mod tests {
         let saved = convert(text, text_format::MARKDOWN, counted())?;
         assert_eq!(find(&saved).len(), 3);
         assert_eq!(strip(&saved), text);
+        // As plain text only the glyph in the web address stays bare.
         assert_eq!(
             find(&convert(text, text_format::PLAIN, counted())?).len(),
-            5
+            4
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_glyph_inside_a_web_address_gets_no_id() -> Result<()> {
+        for format in [text_format::PLAIN, text_format::MARKDOWN] {
+            let saved = convert("https://x.org/☐ ☐", format, counted())?;
+            assert!(saved.starts_with("https://x.org/☐ ☐"), "{saved:?}");
+            assert_eq!(find(&saved).len(), 1);
+        }
         Ok(())
     }
 

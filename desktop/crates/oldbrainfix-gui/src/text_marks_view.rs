@@ -28,6 +28,11 @@
 //! system's browser or mail program on a click, and any other stays
 //! text.
 //!
+//! A bare web address, `http://` or `https://` (#222), in a plain or a
+//! formatted text is drawn and opens as such a link does, but none in
+//! code, a code block or a link ([`markdown::autolinks`]); a tag or a box
+//! inside one is none. Nothing about it is stored.
+//!
 //! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
 //! scaled down to the width there is: its header row bold on grey, its
 //! first column bold while it holds headings, each cell one line of the
@@ -46,7 +51,7 @@ use egui::{
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
 use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
-use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format, text_tags};
+use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
 use crate::schedule_text;
@@ -145,7 +150,7 @@ pub fn tag_job(
     let plain = TextFormat::simple(font.clone(), colour);
     let tagged = TextFormat::simple(font, accent);
     let mut at = from;
-    for tag in text_tags::find(text) {
+    for tag in markdown::plain_tags(text) {
         if tag.start < from || tag.end > to {
             continue;
         }
@@ -235,7 +240,8 @@ pub fn marked_label(
         .iter()
         .any(|b| b.0.start >= from && b.0.end <= to);
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
-    if !marked && !tagged {
+    let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
+    if !marked && !tagged && !linked {
         let mut rich = RichText::new(part).color(look.1);
         if let Some(size) = look.0 {
             rich = rich.size(size);
@@ -444,31 +450,40 @@ pub(crate) fn line_at(text: &str, at: usize) -> usize {
         .count()
 }
 
-/// The boxes and the tags of a text, in its source, a table's cells'
-/// among them: each box with the state it shows and what it says after
-/// it.
+/// The boxes, the tags and the web addresses (#222) of a text, in its
+/// source, a table's cells' among them: each box with the state it shows
+/// and what it says after it. A box or a tag inside a web address is
+/// none.
 pub(crate) struct Found {
     boxes: Vec<(FoundBox, BoxState, Option<String>)>,
     tags: Vec<FoundTag>,
+    links: Vec<(usize, usize)>,
 }
 
 impl Found {
     /// Those of the source `text` in `format`, its boxes as `look` says.
     pub(crate) fn of(text: &str, format: &str, look: &BoxLook) -> Found {
+        let markdown = format == text_format::MARKDOWN;
+        let links = if markdown {
+            markdown::autolinks(text)
+        } else {
+            markdown::plain_autolinks(text)
+        };
         let boxes = text_boxes::find(text)
             .into_iter()
+            .filter(|b| !links.iter().any(|&(s, e)| b.start < e && s < b.end))
             .map(|b| {
                 let state = look.state(&b);
                 let after = look.after.get(&b.id).cloned();
                 (b, state, after)
             })
             .collect();
-        let tags = if format == text_format::MARKDOWN {
+        let tags = if markdown {
             markdown::tags(text)
         } else {
-            text_tags::find(text)
+            markdown::plain_tags(text)
         };
-        Found { boxes, tags }
+        Found { boxes, tags, links }
     }
 }
 
@@ -606,16 +621,18 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
 }
 
 /// What a run of characters shown as written holds: a box, by its place
-/// among those found, or a tag.
+/// among those found, a tag or a web address.
 enum Cut {
     Box(usize),
     Tag,
+    Link,
 }
 
 /// Adds the bytes `start..end` of `text`, shown as written, to `line`,
-/// its boxes and tags cut out of it: a box as the glyph of the state it
-/// shows, its id left out, and with Show ticks what it says after it,
-/// small and dim; a tag in a link's words is part of the link.
+/// its boxes, tags and web addresses cut out of it: a box as the glyph of
+/// the state it shows, its id left out, and with Show ticks what it says
+/// after it, small and dim; a web address as a link that opens (#222); a
+/// tag in a link's words is part of the link.
 fn add_written(
     line: &mut Line,
     text: &str,
@@ -638,6 +655,13 @@ fn add_written(
                 .iter()
                 .filter(|t| t.start >= start && t.end <= end)
                 .map(|t| (t.start, t.end, Cut::Tag)),
+        );
+        cuts.extend(
+            found
+                .links
+                .iter()
+                .filter(|&&(s, e)| s >= start && e <= end)
+                .map(|&(s, e)| (s, e, Cut::Link)),
         );
     }
     cuts.sort_by_key(|c| c.0);
@@ -666,6 +690,18 @@ fn add_written(
                 tagged.color = look.accent;
                 let chars = line.push(piece, tagged, style.bold);
                 line.tags.push((a, piece.to_string(), chars));
+            }
+            Cut::Link => {
+                // Never an id drawn, of a glyph copied in.
+                let url = text_boxes::strip(piece);
+                let linked = Style {
+                    link: true,
+                    ..style
+                };
+                let chars = line.push(&url, part_format(look, linked, false), style.bold);
+                if markdown::may_open(&url) {
+                    line.links.push((a, url, chars));
+                }
             }
         }
         at = b;
@@ -1271,7 +1307,7 @@ pub fn tag_spots(
     text: &str,
     (from, to): (usize, usize),
 ) -> Vec<TagSpot> {
-    text_tags::find(text)
+    markdown::plain_tags(text)
         .into_iter()
         .filter(|tag| tag.start >= from && tag.end <= to)
         .filter_map(|tag| {

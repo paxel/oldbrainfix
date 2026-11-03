@@ -213,6 +213,64 @@ fn a_link_opens_only_to_a_web_or_mail_address() -> TestResult {
     Ok(())
 }
 
+/// The addresses the last frame of `harness` opened.
+fn opened(harness: &Harness<'_, App>) -> Vec<String> {
+    harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .filter_map(|c| match c {
+            OutputCommand::OpenUrl(open) => Some(open.url.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_bare_web_address_opens_in_a_formatted_text_but_in_code_or_a_link() -> TestResult {
+    let (store, note) = with_note(
+        "`https://a.org` [l](https://b.org) **https://c.org**, x\n```\nhttps://d.org\n```\n\
+         | https://e.org | f |\n|---|---|",
+        MARKDOWN,
+    )?;
+    let mut harness = editor(&store, &note);
+    assert_eq!(links(&harness, "https://c.org"), 1);
+    assert_eq!(links(&harness, "https://e.org"), 1);
+    assert_eq!(links(&harness, "l"), 1);
+    for none in ["https://a.org", "https://b.org", "https://d.org"] {
+        assert_eq!(links(&harness, none), 0, "{none}");
+    }
+    harness
+        .query_all_by_role_and_label(Role::Link, "https://c.org")
+        .next()
+        .ok_or("the address")?
+        .click_accesskit();
+    harness.step();
+    assert_eq!(opened(&harness), ["https://c.org"]);
+    Ok(())
+}
+
+#[test]
+fn a_bare_web_address_opens_from_a_plain_card() -> TestResult {
+    let store = Arc::new(device()?);
+    Notes::new(&store).capture_as("see https://x.org/a?#b. #tag ☐", "plain", None, None)?;
+    Notes::new(&store).capture_as("only https://y.org", "plain", None, None)?;
+    let mut harness = window(&store, Selection::Unsorted, None);
+    assert_eq!(links(&harness, "https://y.org"), 1);
+    // A tag inside it is none.
+    assert_eq!(links(&harness, "Search for #b"), 0);
+    assert_eq!(links(&harness, "Search for #tag"), 1);
+    harness
+        .query_all_by_role_and_label(Role::Link, "https://x.org/a?#b")
+        .next()
+        .ok_or("the address on the card")?
+        .click_accesskit();
+    harness.step();
+    assert_eq!(opened(&harness), ["https://x.org/a?#b"]);
+    Ok(())
+}
+
 #[test]
 fn a_click_on_a_formatted_text_edits_its_markdown() -> TestResult {
     let (store, note) = with_note("Buy **milk**", MARKDOWN)?;

@@ -288,10 +288,10 @@
     },
     {
       "text": "`☐` [☐ b](https://x.org/☐) **✅** ~~❌~~",
-      "plain": "`☐󠀸󠁯󠁩󠀶󠁿` [☐󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐󠁰󠀰󠁶󠁫󠁿) **✅󠁩󠀲󠀰󠁪󠁿** ~~❌󠀹󠁦󠀵󠁦󠁿~~",
+      "plain": "`☐󠀸󠁯󠁩󠀶󠁿` [☐󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐) **✅󠁰󠀰󠁶󠁫󠁿** ~~❌󠁩󠀲󠀰󠁪󠁿~~",
       "markdown": "`☐` [☐󠀸󠁯󠁩󠀶󠁿 b](https://x.org/☐) **✅󠁵󠁸󠁰󠀰󠁿** ~~❌󠁰󠀰󠁶󠁫󠁿~~",
       "found": [],
-      "shown": "`☐` [✅ b](https://x.org/☐) **❌** ~~❌~~",
+      "shown": "`☐` [✅ b](https://x.org/☐) **✅** ~~☐~~",
       "boxes": [
         {
           "id": "8oi6",
@@ -315,36 +315,26 @@
         },
         {
           "id": "p0vk",
-          "state": "open",
+          "state": "done",
           "starting": null,
-          "start": 24,
-          "end": 25,
-          "sourceStart": 34,
-          "idStart": 35,
-          "sourceEnd": 40
+          "start": 29,
+          "end": 30,
+          "sourceStart": 39,
+          "idStart": 40,
+          "sourceEnd": 45
         },
         {
           "id": "i20j",
-          "state": "failed",
-          "starting": "done",
-          "start": 29,
-          "end": 30,
-          "sourceStart": 44,
-          "idStart": 45,
-          "sourceEnd": 50
-        },
-        {
-          "id": "9f5f",
-          "state": "failed",
-          "starting": null,
+          "state": "open",
+          "starting": "failed",
           "start": 35,
           "end": 36,
-          "sourceStart": 55,
-          "idStart": 56,
-          "sourceEnd": 61
+          "sourceStart": 50,
+          "idStart": 51,
+          "sourceEnd": 56
         }
       ],
-      "baked": "`☐󠀸󠁯󠁩󠀶󠁿` [✅󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐󠁰󠀰󠁶󠁫󠁿) **❌󠁩󠀲󠀰󠁪󠁿** ~~❌󠀹󠁦󠀵󠁦󠁿~~",
+      "baked": "`☐󠀸󠁯󠁩󠀶󠁿` [✅󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐) **✅󠁰󠀰󠁶󠁫󠁿** ~~☐󠁩󠀲󠀰󠁪󠁿~~",
       "strip": "`☐` [☐ b](https://x.org/☐) **✅** ~~❌~~",
       "visible": "☐ ☐ b ✅ ❌"
     },
@@ -493,6 +483,38 @@
       "baked": "Ünïcode ☐󠀸󠁯󠁩󠀶󠁿 Straße ❌󠁵󠁸󠁰󠀰󠁿 👩‍👧 ❌󠁰󠀰󠁶󠁫󠁿",
       "strip": "Ünïcode ☐ Straße ✅ 👩‍👧 ❌",
       "visible": "Ünïcode ☐ Straße ✅ 👩‍👧 ❌"
+    },
+    {
+      "text": "https://x.org/☐ ☐ (https://x.org/✅) ❌",
+      "plain": "https://x.org/☐ ☐󠀸󠁯󠁩󠀶󠁿 (https://x.org/✅) ❌󠁵󠁸󠁰󠀰󠁿",
+      "markdown": "https://x.org/☐ ☐󠀸󠁯󠁩󠀶󠁿 (https://x.org/✅) ❌󠁵󠁸󠁰󠀰󠁿",
+      "found": [],
+      "shown": "https://x.org/☐ ☐ (https://x.org/✅) ☐",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 16,
+          "end": 17,
+          "sourceStart": 16,
+          "idStart": 17,
+          "sourceEnd": 22
+        },
+        {
+          "id": "uxp0",
+          "state": "open",
+          "starting": "failed",
+          "start": 36,
+          "end": 37,
+          "sourceStart": 41,
+          "idStart": 42,
+          "sourceEnd": 47
+        }
+      ],
+      "baked": "https://x.org/☐ ☐󠀸󠁯󠁩󠀶󠁿 (https://x.org/✅) ☐󠁵󠁸󠁰󠀰󠁿",
+      "strip": "https://x.org/☐ ☐ (https://x.org/✅) ❌",
+      "visible": "https://x.org/☐ ☐ (https://x.org/✅) ❌"
     }
   ]
 }

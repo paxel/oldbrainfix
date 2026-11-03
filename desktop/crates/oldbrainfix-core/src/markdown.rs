@@ -627,18 +627,119 @@ pub fn escape(text: &str) -> String {
 }
 
 /// The tags of `text` as [`text_tags::find`] finds them, but those in
-/// code, in a code block or in a link's destination.
+/// code, in a code block, in a link's destination or in a web address
+/// ([`autolinks`]).
 pub fn tags(text: &str) -> Vec<FoundTag> {
-    let hidden = literal_ranges(text);
+    outside(&literal_ranges(text), text)
+}
+
+/// The tags of the plain text `text` as [`text_tags::find`] finds them,
+/// but those in a web address ([`plain_autolinks`]).
+pub fn plain_tags(text: &str) -> Vec<FoundTag> {
+    outside(&plain_autolinks(text), text)
+}
+
+fn outside(hidden: &[(usize, usize)], text: &str) -> Vec<FoundTag> {
     text_tags::find(text)
         .into_iter()
         .filter(|t| !hidden.iter().any(|&(a, b)| t.start < b && a < t.end))
         .collect()
 }
 
+/// The bare web addresses of the plain text `text`, each drawn as a link
+/// and opened as one (#222), as (start, end) in bytes; nothing about
+/// them is stored. One starts with `http://` or `https://`, in any case
+/// of ASCII letters, not right after an ASCII letter or digit, and an
+/// ASCII letter or digit or a character beyond ASCII must follow. It
+/// runs up to a space of any kind (Unicode's White_Space), a `<`, a `>`
+/// or the end, then, as GitHub's autolinks do, loses its last character
+/// while that is one of `.,:;!?`, or a `)` with more `)` than `(` in it.
+/// The same as the Dart core's `Markdown.plainAutolinks`.
+pub fn plain_autolinks(text: &str) -> Vec<(usize, usize)> {
+    let mut found = Vec::new();
+    addresses(text, (0, text.len()), &mut found);
+    found
+}
+
+/// The bare web addresses of the formatted `text` as
+/// [`plain_autolinks`] finds them, each within the characters a part
+/// shows as written: none in code, in a code block or in a link, its
+/// label included.
+pub fn autolinks(text: &str) -> Vec<(usize, usize)> {
+    fn walk(text: &str, spans: &[Span], found: &mut Vec<(usize, usize)>) {
+        for s in spans {
+            match s.kind {
+                // An escaped character starts none.
+                SpanKind::Text => addresses(text, (s.start, s.end), found),
+                SpanKind::Bold | SpanKind::Italic | SpanKind::Strike => {
+                    walk(text, &s.children, found);
+                }
+                SpanKind::Code | SpanKind::Link => {}
+            }
+        }
+    }
+    let mut found = Vec::new();
+    for block in parse(text) {
+        if block.code.is_none() {
+            walk(text, &block.spans, &mut found);
+        }
+    }
+    found
+}
+
+/// Adds the web addresses in the bytes `from..to` of `text` to `found`.
+fn addresses(text: &str, (from, to): (usize, usize), found: &mut Vec<(usize, usize)>) {
+    let bytes = text.as_bytes();
+    let mut i = from;
+    while i < to {
+        let rest = text.get(i..to).unwrap_or_default();
+        let lower = |scheme: &str| {
+            rest.get(..scheme.len())
+                .is_some_and(|s| s.eq_ignore_ascii_case(scheme))
+        };
+        let after = if lower("https://") {
+            Some(i + 8)
+        } else if lower("http://") {
+            Some(i + 7)
+        } else {
+            None
+        };
+        let starts = after.filter(|&after| {
+            !(i > 0 && bytes[i - 1].is_ascii_alphanumeric())
+                && text
+                    .get(after..to)
+                    .and_then(|r| r.chars().next())
+                    .is_some_and(|c| {
+                        c.is_ascii_alphanumeric() || (!c.is_ascii() && !c.is_whitespace())
+                    })
+        });
+        let Some(after) = starts else {
+            i += rest.chars().next().map_or(1, char::len_utf8);
+            continue;
+        };
+        let mut end = text
+            .get(after..to)
+            .unwrap_or_default()
+            .char_indices()
+            .find(|&(_, c)| c == '<' || c == '>' || c.is_whitespace())
+            .map_or(to, |(k, _)| after + k);
+        loop {
+            let link = &bytes[i..end];
+            let count = |c: u8| link.iter().filter(|&&b| b == c).count();
+            match link.last() {
+                Some(b'.' | b',' | b':' | b';' | b'!' | b'?') => end -= 1,
+                Some(b')') if count(b')') > count(b'(') => end -= 1,
+                _ => break,
+            }
+        }
+        found.push((i, end));
+        i = end;
+    }
+}
+
 /// Where `text` holds characters taken as written, so no tag and no box:
-/// code, a code block, its fences included, and a link's destination, as
-/// (start, end) in bytes.
+/// code, a code block, its fences included, a link's destination and a
+/// web address ([`autolinks`]), as (start, end) in bytes.
 pub fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
     fn hide(spans: &[Span], hidden: &mut Vec<(usize, usize)>) {
         for s in spans {
@@ -651,7 +752,7 @@ pub fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
             hide(&s.children, hidden);
         }
     }
-    let mut hidden = Vec::new();
+    let mut hidden = autolinks(text);
     for block in parse(text) {
         if let Some(code) = &block.code {
             if block.line == code.first_line {
@@ -2080,6 +2181,76 @@ mod tests {
         assert_eq!(found, ["#a", "#c", "#e", "#f"]);
         // As plain text all count.
         assert_eq!(text_tags::find(text).len(), 5);
+    }
+
+    #[test]
+    fn a_tag_inside_a_web_address_is_no_tag() {
+        let text = "see https://x.org/?#frag and #a";
+        let tags_of =
+            |found: Vec<FoundTag>| -> Vec<String> { found.into_iter().map(|t| t.tag).collect() };
+        assert_eq!(tags_of(text_tags::find(text)), ["#frag", "#a"]);
+        assert_eq!(tags_of(plain_tags(text)), ["#a"]);
+        assert_eq!(tags_of(tags(text)), ["#a"]);
+    }
+
+    fn plain_links(text: &str) -> Vec<&str> {
+        plain_autolinks(text)
+            .into_iter()
+            .map(|(s, e)| &text[s..e])
+            .collect()
+    }
+
+    #[test]
+    fn a_bare_http_or_https_address_is_one_in_any_case() {
+        assert_eq!(
+            plain_links("see https://x.org/a?b=1 and HTTP://y.de now"),
+            ["https://x.org/a?b=1", "HTTP://y.de"]
+        );
+        assert!(plain_links("www.x.org ftp://x.org mailto:a@x.org https:// x").is_empty());
+        assert!(plain_links("xhttps://x.org 1https://x.org").is_empty());
+        assert_eq!(plain_links("(https://x.org)"), ["https://x.org"]);
+    }
+
+    #[test]
+    fn a_web_address_ends_as_githubs_autolinks_end() {
+        assert_eq!(
+            plain_links("https://x.org. https://x.org/a, https://x.org/b:;!?"),
+            ["https://x.org", "https://x.org/a", "https://x.org/b"]
+        );
+        assert_eq!(
+            plain_links("(see https://x.org/a_(b)) and https://x.org/c)."),
+            ["https://x.org/a_(b)", "https://x.org/c"]
+        );
+        assert_eq!(
+            plain_links("<https://x.org>\nhttps://y.org\u{a0}z https://z.org\u{3000}"),
+            ["https://x.org", "https://y.org", "https://z.org"]
+        );
+        assert_eq!(plain_links("https://x.org/a.b.c"), ["https://x.org/a.b.c"]);
+        assert_eq!(
+            plain_links("https://x.org\u{202f}https://y.org\u{2028}"),
+            ["https://x.org", "https://y.org"]
+        );
+    }
+
+    #[test]
+    fn a_formatted_text_has_no_web_address_in_code_a_code_block_or_a_link() {
+        let text = "`https://a.org` [https://b.org](https://c.org) **https://d.org** \
+                    *https://e.org*, https://f.org\\_x\n```\nhttps://g.org\n```\n\
+                    | https://h.org | b |\n|---|---|";
+        let found: Vec<&str> = autolinks(text)
+            .into_iter()
+            .map(|(s, e)| &text[s..e])
+            .collect();
+        assert_eq!(
+            found,
+            [
+                "https://d.org",
+                "https://e.org",
+                "https://f.org",
+                "https://h.org"
+            ]
+        );
+        assert_eq!(plain_links(text).len(), 7);
     }
 
     #[test]

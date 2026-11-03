@@ -86,8 +86,9 @@ void main() {
       expect(TextBoxes.strip(saved), text);
       expect(saved, contains('`☐`'));
       expect(saved, contains('https://x.org/☐)'));
+      // As plain text only the glyph in the web address stays bare.
       final plain = TextBoxes.convert(text, newId: counted());
-      expect(TextBoxes.find(plain), hasLength(5));
+      expect(TextBoxes.find(plain), hasLength(4));
     });
   });
 

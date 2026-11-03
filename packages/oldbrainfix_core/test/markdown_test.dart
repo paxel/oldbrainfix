@@ -203,9 +203,85 @@ void main() {
       expect(TextTags.find(text), hasLength(5));
     });
 
+    test('a tag inside a web address is no tag', () {
+      const text = 'see https://x.org/?#frag and #a';
+      expect([for (final t in TextTags.find(text)) t.tag], ['#frag', '#a']);
+      expect([for (final t in Markdown.plainTags(text)) t.tag], ['#a']);
+      expect([for (final t in Markdown.tags(text)) t.tag], ['#a']);
+    });
+
     test('a box at the start of an item reads as its glyph', () {
       const text = '- ☐ milk\n* ✅ **eggs**';
       expect(Markdown.plain(text), '☐ milk\n✅ eggs');
+    });
+  });
+
+  group('web addresses', () {
+    List<String> plain(String text) => [
+      for (final (s, e) in Markdown.plainAutolinks(text)) text.substring(s, e),
+    ];
+    List<String> formatted(String text) => [
+      for (final (s, e) in Markdown.autolinks(text)) text.substring(s, e),
+    ];
+
+    test('a bare http or https address is one, in any case', () {
+      expect(plain('see https://x.org/a?b=1 and HTTP://y.de now'), [
+        'https://x.org/a?b=1',
+        'HTTP://y.de',
+      ]);
+      expect(plain('www.x.org ftp://x.org mailto:a@x.org https:// x'), []);
+      expect(plain('xhttps://x.org 1https://x.org'), []);
+      expect(plain('(https://x.org)'), ['https://x.org']);
+    });
+
+    test('it ends as GitHub\'s autolinks end', () {
+      expect(plain('https://x.org. https://x.org/a, https://x.org/b:;!?'), [
+        'https://x.org',
+        'https://x.org/a',
+        'https://x.org/b',
+      ]);
+      expect(plain('(see https://x.org/a_(b)) and https://x.org/c).'), [
+        'https://x.org/a_(b)',
+        'https://x.org/c',
+      ]);
+      expect(plain('<https://x.org>\nhttps://y.org z https://z.org　'), [
+        'https://x.org',
+        'https://y.org',
+        'https://z.org',
+      ]);
+      expect(plain('https://x.org/a.b.c'), ['https://x.org/a.b.c']);
+      expect(plain('https://x.org\u202fhttps://y.org\u2028'), [
+        'https://x.org',
+        'https://y.org',
+      ]);
+    });
+
+    test('a formatted text has none in code, a code block or a link', () {
+      const text =
+          '`https://a.org` [https://b.org](https://c.org) **https://d.org** '
+          r'*https://e.org*, https://f.org\_x'
+          '\n```\nhttps://g.org\n```\n| https://h.org | b |\n|---|---|';
+      expect(formatted(text), [
+        'https://d.org',
+        'https://e.org',
+        'https://f.org',
+        'https://h.org',
+      ]);
+      expect(plain(text), hasLength(7));
+    });
+
+    test('a glyph inside one gets no id', () {
+      var n = 0;
+      String counted() => '${++n}'.padLeft(32, '0');
+      for (final format in [TextFormats.plain, TextFormats.markdown]) {
+        final saved = TextBoxes.convert(
+          'https://x.org/☐ ☐',
+          format: format,
+          newId: counted,
+        );
+        expect(saved, startsWith('https://x.org/☐ ☐'));
+        expect(TextBoxes.find(saved), hasLength(1));
+      }
     });
   });
 

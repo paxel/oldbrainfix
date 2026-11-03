@@ -167,6 +167,7 @@ class _TableScreenState extends State<TableScreen> {
   MarkdownTable? _table;
   List<DrawnBox> _boxes = const [];
   List<FoundTag> _tags = const [];
+  List<(int, int)> _links = const [];
 
   /// The ticks of the boxes, read again after each tick here.
   late BoxTicking? _ticking = _watched(widget.ticking);
@@ -220,6 +221,7 @@ class _TableScreenState extends State<TableScreen> {
     _table = MarkdownTables.at(_text, _at);
     _boxes = storedBoxes(_text, _ticking);
     _tags = Markdown.tags(_text);
+    _links = Markdown.autolinks(_text);
   }
 
   /// [ticking] telling this screen of each tick too.
@@ -713,6 +715,7 @@ class _TableScreenState extends State<TableScreen> {
         table.rows[r].cells[c],
         boxes: _boxes,
         tags: _tags,
+        links: _links,
         style: style,
         textAlign: cellAlign(table.aligns[c]),
         ticking: _ticking,

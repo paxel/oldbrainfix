@@ -207,7 +207,8 @@ abstract final class TextBoxes {
   /// part of another emoji, becomes a box with a new id, and a box whose
   /// id came up before in the text gets a new one. In a formatted text
   /// a glyph in inline code, in a code block or in a link's address stays
-  /// as it is; a code text (#213) has no boxes and stays as it is. Each
+  /// as it is, and in any text one in a web address (#222); a code text
+  /// (#213) has no boxes and stays as it is. Each
   /// id is drawn from [newId], the store's maker of entity
   /// ids, again while it is in the text already.
   static String convert(
@@ -224,7 +225,7 @@ abstract final class TextBoxes {
     };
     final skipped = format == TextFormats.markdown
         ? _literalRanges(text)
-        : const <(int, int)>[];
+        : Markdown.plainAutolinks(text);
     final out = StringBuffer();
     var from = 0;
     for (final b in found) {
@@ -337,7 +338,7 @@ abstract final class TextBoxes {
   }
 
   /// Where a glyph of the formatted text [text] is no box: inline code,
-  /// a code block and links' addresses, as (start, end).
+  /// a code block, links' addresses and web addresses, as (start, end).
   static List<(int, int)> _literalRanges(String text) =>
       Markdown.literalRanges(text);
 }

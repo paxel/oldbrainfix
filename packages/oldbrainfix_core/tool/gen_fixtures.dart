@@ -7132,6 +7132,7 @@ Map<String, Object?> _textBoxes() {
     '| ☐ c | d |\n| --- | --- |\n| ✅ | `❌` |\n\n> ☐ quoted',
     '😀☐🧠✅\r\n❌\r☐',
     'Ünïcode ☐ Straße ✅ 👩‍👧 ❌',
+    'https://x.org/☐ ☐ (https://x.org/✅) ❌',
   ];
   return {
     'cases': [for (final text in texts) _textBoxesOf(text)],
@@ -7382,6 +7383,15 @@ Map<String, Object?> _markdown() {
     '``` a`b\n    ```\n\t~~~\n   ~~~ 🧠 x\nopen #t ☐\r\n\r\n',
     '```',
     'x\n~~~\n``` no close\n~~~ x\n~~~~',
+    // Web addresses (#222).
+    'see https://x.org/a?b=1#top, HTTP://Y.de/(a)) and https://z.org/x_(y). '
+        'www.x.org ftp://x.org https:// xhttps://x.org 1http://x.org '
+        'https://x.org/?#frag #after\r\nhttps://ü.de/日記\u00a0x '
+        'https://x.org\u202fy https://x.org/🧠\u3000z <https://x.org>!?;: https://x.org/s;',
+    '`https://a.org` [https://b.org](https://c.org/#d) **https://e.org** '
+        r'*https://f.org*, https://g.org/\_x (https://h.org).'
+        '\n```\nhttps://i.org #no\n```\n| https://j.org/#k | b |\n|---|---|\n'
+        '> https://k.org/☐ ☐ #q\n# https://l.org',
   ];
   int cp(String text, int offset) => text.substring(0, offset).runes.length;
   int u16(String text, int point) =>
@@ -7721,6 +7731,24 @@ Map<String, Object?> _markdown() {
               },
           ],
           'tables': [for (final t in MarkdownTables.all(text)) table(text, t)],
+          // Web addresses (#222), in it formatted and as a plain text, and
+          // its tags as a plain text.
+          'autolinks': [
+            for (final (s, e) in Markdown.autolinks(text))
+              [cp(text, s), cp(text, e)],
+          ],
+          'plainAutolinks': [
+            for (final (s, e) in Markdown.plainAutolinks(text))
+              [cp(text, s), cp(text, e)],
+          ],
+          'plainTags': [
+            for (final t in Markdown.plainTags(text))
+              {
+                'end': cp(text, t.end),
+                'start': cp(text, t.start),
+                'tag': t.tag,
+              },
+          ],
           'text': text,
           'uses': Markdown.uses(text),
           'words': [
@@ -8430,7 +8458,7 @@ Future<void> main(List<String> args) async {
     'ticked on, without ids, and as it reads, offsets counted in code '
     'points; glyphs mid-word, with variation selectors, joined into '
     'another emoji, other boxes and ticks, ids twice, ids of another '
-    'shape and alone, in inline code, a link and a table, and astral '
+    'shape and alone, in inline code, a link, a table and a web address, and astral '
     'characters and line breaks of every kind.\n'
     '- `text_tags.json`: tags in texts: for each text the tags found, each '
     'as written, as searched and where it lies, counted in code points; in '
@@ -8441,9 +8469,11 @@ Future<void> main(List<String> args) async {
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
     'marks, whether it uses a format, the text escaped, as HTML, its '
-    'tables with their rows and cells, its tags but those in code and link '
-    'destinations, the offsets where a typed shortcut ends, and the line '
-    'and the word at every offset; '
+    'tables with their rows and cells, its tags but those in code, link '
+    'destinations and web addresses, its web addresses (#222) and those '
+    'it holds as a plain text with the tags outside them, the offsets '
+    'where a typed shortcut ends, and the line and the word at every '
+    'offset; '
     'bold, italic, strike-through, code, links, headings, quotes, bulleted '
     'and numbered items one level in, tables with ragged rows, escaped '
     'pipes, alignment and the line marking the first column as headings, '

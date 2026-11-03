@@ -541,7 +541,10 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Tap is the primary action.** On a list row it opens the thing; on a
   checkbox it checks. **A tap on a Note card switches that card** between
   its compact and its detailed view, in place (#189); in "merge into…" it
-  picks the Note. A tap on a row or card never opens a menu.
+  picks the Note. A tap on a link in its text, a formatted text's or a
+  bare `http://` or `https://` address (#222), opens that link instead; a
+  long press on it is still the card's. A tap on a row or card never
+  opens a menu.
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A

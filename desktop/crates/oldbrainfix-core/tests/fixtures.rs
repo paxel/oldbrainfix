@@ -6508,7 +6508,22 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                 json!([points(s), points(e)])
             })
             .collect();
+        // Web addresses (#222), formatted and as a plain text, and the
+        // tags of a plain text outside them.
+        let ranges = |found: Vec<(usize, usize)>| -> Vec<Value> {
+            found
+                .into_iter()
+                .map(|(s, e)| json!([points(s), points(e)]))
+                .collect()
+        };
+        let plain_tags: Vec<Value> = markdown::plain_tags(text)
+            .iter()
+            .map(|t| json!({"end": points(t.end), "start": points(t.start), "tag": t.tag}))
+            .collect();
         let ours = json!({
+            "autolinks": ranges(markdown::autolinks(text)),
+            "plainAutolinks": ranges(markdown::plain_autolinks(text)),
+            "plainTags": plain_tags,
             "blocks": blocks,
             "codeBlocks": code_blocks,
             "escaped": markdown::escape(text),
