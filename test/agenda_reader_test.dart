@@ -12,8 +12,11 @@ import 'package:oldbrainfix/src/agenda_reader.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/agenda_widget.dart';
 import 'package:oldbrainfix/src/alarm_sync.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/l10n.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/schedule_text.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
@@ -425,6 +428,130 @@ void main() {
         'tea',
         'water',
       });
+    });
+  });
+
+  group('the alarms\' plan (#228)', () {
+    late Store store;
+    final now = DateTime(2026, 10, 24, 9);
+
+    setUp(() {
+      store = Store.inMemory(clock: () => now)..setPin('1234', iterations: 10);
+    });
+    tearDown(() => store.close());
+
+    Schedule daily(List<int> hours) => Schedule(
+      start: Day(2026, 10, 1),
+      times: [for (final h in hours) ClockTime(h, 0)],
+      rule: Recurrence.parse('FREQ=DAILY'),
+    );
+
+    /// A locked Masked Area with a Routine and a Reminder, an open one,
+    /// a Note merged into another, a snooze, a check-off yesterday.
+    void seed() {
+      final notes = Notes(store);
+      final places = Places(store);
+      final routines = Routines(store);
+      final doctor = places.addArea('Doctor');
+      final home = places.addArea('Home');
+      final pills = routines.spawn(
+        notes.capture('Pills\nwith water', place: doctor.id).id,
+        daily([8, 12, 20]),
+      );
+      routines.spawn(
+        notes.capture('Call the clinic', place: doctor.id).id,
+        Schedule(start: Day(2026, 10, 26), times: [ClockTime(10, 0)]),
+      );
+      store
+        ..setAreaLocked(doctor.id, true)
+        ..setAreaMasked(doctor.id, true);
+      routines.spawn(
+        notes.capture('Water plants', place: home.id).id,
+        daily([7, 19]),
+      );
+      final tea = routines.create('Tea', daily([7]));
+      final old = notes.capture('Old walk');
+      routines.spawn(old.id, daily([17]));
+      notes.merge(old.id, notes.capture('Walk\nin the park').id);
+      routines.markDone(tea.id, Occurrence(Day(2026, 10, 23), ClockTime(7, 0)));
+      Alarms(store).applySnooze(
+        pills.id,
+        '2026-10-24T12:00',
+        DateTime(2026, 10, 24, 12, 10),
+      );
+    }
+
+    test('arms the alarms and texts a read of each Routine per alarm '
+        'gave, in English and German', () {
+      seed();
+      for (final (t, locale) in [
+        (AppLocalizationsEn(), 'en'),
+        (AppLocalizationsDe(), 'de'),
+      ]) {
+        // As the plan read before #228: each alarm's Routine on its own.
+        String title(PlannedAlarm alarm) {
+          final routine = Routines(store).byId(alarm.routineId);
+          if (routine != null && AreaLocks(store).masks(routine)) {
+            return maskedText(t, locale, routine, alarm.occurrence);
+          }
+          final line = alarm.text?.trim().split('\n').first.trim();
+          if (line != null && line.isNotEmpty) return line;
+          return alarm.text == null
+              ? t.noteGone
+              : wordlessTitle(t, alarm.wordless);
+        }
+
+        final before = [
+          for (final a in Alarms(store).plan(deviceWallClock))
+            '$a|${title(a)}|${occurrenceTime(t, locale, a.occurrence)}',
+        ];
+        final plan = planAlarms(store, deviceWallClock, t, locale);
+        expect([
+          for (final a in plan.armed) '${a.alarm}|${a.title}|${a.body}',
+        ], before);
+        expect(plan.done, Alarms(store).recentlyDone(deviceWallClock));
+        expect(plan.done, isNotEmpty);
+        expect(
+          plan.escalating,
+          Routines(store).all().any((r) => r.escalation != null),
+        );
+        final titles = {for (final a in plan.armed) a.title};
+        expect(
+          titles,
+          containsAll([
+            t.maskedRoutineAt(
+              occurrenceTime(
+                t,
+                locale,
+                Occurrence(Day(2026, 10, 24), ClockTime(12, 0)),
+              ),
+            ),
+            t.maskedReminder,
+            'Water plants',
+            'Tea',
+            'Walk',
+          ]),
+        );
+        expect(titles, isNot(contains('Pills')));
+        expect(
+          plan.armed.where((a) => a.alarm.kind == AlarmKind.snooze),
+          isNotEmpty,
+        );
+      }
+    });
+
+    test('reads each Routine once per plan, not once per alarm', () {
+      seed();
+      final reads = store.historyReads;
+      final plan = planAlarms(
+        store,
+        deviceWallClock,
+        AppLocalizationsEn(),
+        'en',
+      );
+      final read = store.historyReads - reads;
+      expect(plan.armed.length, greaterThan(150));
+      expect(read, lessThan(plan.armed.length ~/ 2), reason: '$read reads');
     });
   });
 }

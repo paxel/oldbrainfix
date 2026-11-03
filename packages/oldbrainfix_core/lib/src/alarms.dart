@@ -474,11 +474,12 @@ class Alarms {
     }
   }
 
-  /// The alarm plan at the store's now, on [wallClock].
-  List<PlannedAlarm> plan(WallClock wallClock) {
-    final routines = Routines(store);
+  /// The alarm plan at the store's now, on [wallClock], over [routines]
+  /// when the caller has read [Routines.all] already (#228).
+  List<PlannedAlarm> plan(WallClock wallClock, {List<Routine>? routines}) {
+    final read = Routines(store);
     return alarmPlan(
-      routines: [for (final r in routines.all()) (r, routines.note(r))],
+      routines: [for (final r in routines ?? read.all()) (r, read.note(r))],
       snoozes: snoozes,
       now: store.clock(),
       wallClock: wallClock,
@@ -558,11 +559,15 @@ class Alarms {
   void markSeen() => store.missedSeen = store.clock();
 
   /// The Occurrences Done from yesterday to tomorrow on [wallClock], by
-  /// Routine id: their notifications, if still showing, can go.
-  List<(String, Occurrence)> recentlyDone(WallClock wallClock) {
+  /// Routine id: their notifications, if still showing, can go. Over
+  /// [routines] when the caller has read [Routines.all] already (#228).
+  List<(String, Occurrence)> recentlyDone(
+    WallClock wallClock, {
+    List<Routine>? routines,
+  }) {
     final today = Day.today(store.clock(), wallClock);
     return [
-      for (final routine in Routines(store).all())
+      for (final routine in routines ?? Routines(store).all())
         for (final occurrence in routine.schedule.between(
           today.addDays(-1),
           today.addDays(1),

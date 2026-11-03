@@ -372,6 +372,33 @@ void main() {
       );
     });
 
+    test('plans and names Done over the Routines handed in, read already '
+        '(#228)', () {
+      final pills = routines.spawn(notes.capture('pills').id, daily([at(8)]));
+      final tea = routines.spawn(notes.capture('tea').id, daily([at(9)]));
+      for (final (routine, hour) in [(pills, 8), (tea, 9)]) {
+        routines.markDone(routine.id, Occurrence(Day(2026, 10, 23), at(hour)));
+      }
+      final all = routines.all();
+      expect(
+        alarms.plan(europe, routines: all).map((a) => a.id),
+        alarms.plan(europe).map((a) => a.id),
+      );
+      expect(
+        alarms.recentlyDone(europe, routines: all),
+        alarms.recentlyDone(europe),
+      );
+      final only = [routines.byId(tea.id)!];
+      expect(
+        {for (final a in alarms.plan(europe, routines: only)) a.routineId},
+        {tea.id},
+      );
+      expect(
+        {for (final (id, _) in alarms.recentlyDone(europe, routines: only)) id},
+        {tea.id},
+      );
+    });
+
     test('a Done from a notification is applied as of when it was tapped', () {
       final id = routines.spawn(notes.capture('pills').id, daily([at(8)])).id;
       final tapped = DateTime.utc(2026, 10, 24, 6, 5);

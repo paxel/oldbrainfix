@@ -247,13 +247,18 @@ AlarmPlanRead planAlarms(
   String locale,
 ) {
   final seq = store.currentSeq();
-  final routines = Routines(store);
+  // Read once for the plan, its titles and its Done (#228), where each
+  // alarm read its Routine again.
+  final routines = Routines(store).all();
+  final byId = {for (final routine in routines) routine.id: routine};
   final locks = AreaLocks(store);
+  final masked = <String, bool>{};
   final alarms = Alarms(store);
   String title(PlannedAlarm alarm) {
-    final routine = routines.byId(alarm.routineId);
+    final routine = byId[alarm.routineId];
     // From a locked Area set to Masked, on the lock screen too.
-    if (routine != null && locks.masks(routine)) {
+    if (routine != null &&
+        masked.putIfAbsent(routine.id, () => locks.masks(routine))) {
       return maskedText(t, locale, routine, alarm.occurrence);
     }
     // A photo or voice Note without words is still there.
@@ -264,16 +269,16 @@ AlarmPlanRead planAlarms(
   final planned = alarms.nudge(wallClock);
   final changes = alarms.changesNudge(wallClock);
   return AlarmPlanRead(
-    escalating: routines.all().any((routine) => routine.escalation != null),
+    escalating: routines.any((routine) => routine.escalation != null),
     armed: [
-      for (final alarm in alarms.plan(wallClock))
+      for (final alarm in alarms.plan(wallClock, routines: routines))
         ArmedAlarm(
           alarm: alarm,
           title: title(alarm),
           body: occurrenceTime(t, locale, alarm.occurrence),
         ),
     ],
-    done: alarms.recentlyDone(wallClock),
+    done: alarms.recentlyDone(wallClock, routines: routines),
     nudge: planned == null
         ? null
         : ArmedNudge(
