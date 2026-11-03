@@ -822,6 +822,9 @@ const PRIVACY: &str = "backups-locks-and-privacy";
 /// The guide page "The desktop app" (#178).
 const DESKTOP: &str = "desktop-app";
 
+/// The guide page "Sync with family and friends" (#198).
+const FAMILY: &str = "sync-with-family-and-friends";
+
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
@@ -1215,6 +1218,10 @@ fn guide_frames() -> TestResult {
             // The desktop app (#178).
             problems.extend(desktop_frames(texts, language, theme, |name| {
                 box_frame(DESKTOP, name)
+            })?);
+            // Sync with family and friends (#198).
+            problems.extend(family_frames(texts, language, theme, |name| {
+                box_frame(FAMILY, name)
             })?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda: the tray's box, as the
@@ -1741,6 +1748,63 @@ fn sharing_frames(
         if let Some((dir, _)) = people.sent {
             dir.close()?;
         }
+    }
+    Ok(problems)
+}
+
+/// The frames of the page "Sync with family and friends" (#198), in
+/// `texts`' words, `language` and `theme`: the Sync dialog at its shared
+/// folder, chosen, where Syncthing's or Autosync's folder goes, and
+/// "How do changes travel with Lena?" with the shared folder picked.
+fn family_frames(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    box_frame: impl Fn(&str) -> String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let folder = PeopleSeed {
+        devices: true,
+        folder: true,
+        ..PeopleSeed::default()
+    };
+    let shared_folder: PeopleScene = |harness, _, _| {
+        let stay = harness.state().t().sync_settings_stay().to_string();
+        sync_to(harness, &stay)
+    };
+    let scenes: [(&str, PeopleSeed, PeopleScene); 4] = [
+        ("syncthing-own", folder, shared_folder),
+        (
+            "syncthing-family",
+            PeopleSeed::default(),
+            |harness, _, texts| {
+                let (share, afar, by_folder) = {
+                    let t = harness.state().t();
+                    (
+                        t.share_area().to_string(),
+                        t.share_afar_pick().to_string(),
+                        t.transport_folder().to_string(),
+                    )
+                };
+                area_menu(harness, texts.household, &share)?;
+                click_first(harness, &afar)?;
+                harness
+                    .query_all_by_label("Lena")
+                    .last()
+                    .ok_or("Lena's card")?
+                    .click();
+                harness.run();
+                click_first(harness, &by_folder)
+            },
+        ),
+        ("autosync", folder, shared_folder),
+        ("cloud-apps", folder, shared_folder),
+    ];
+    let mut problems = Vec::new();
+    for (name, seed, scene) in scenes {
+        let (harness, people) = window_with_people(texts, language, theme, seed)?;
+        let mut harness = Box::new(harness);
+        scene(&mut harness, &people, texts)?;
+        problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
     Ok(problems)
 }

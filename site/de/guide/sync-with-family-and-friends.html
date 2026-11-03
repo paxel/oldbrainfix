@@ -1,0 +1,150 @@
+<!-- page: title="Mit Familie und Freunden abgleichen" track="guide" order=7 summary="Deine Geräte und geteilten Bereiche über einen geteilten Ordner abgleichen, wenn sie weit auseinander sind: Syncthing ohne Cloud, Autosync mit einer Cloud, die ihr schon nutzt, und warum die Handy-Apps von Google Drive, Dropbox und Nextcloud nicht reichen." -->
+<p class="lede">
+  Old Brain Fix hat keinen eigenen Abgleich über das Internet. Geräte, die weit auseinander sind,
+  gleichen über einen geteilten Ordner ab, den eine andere App zwischen ihnen trägt: Syncthing von
+  Gerät zu Gerät oder Autosync über eine Cloud wie Google Drive, Dropbox oder OneDrive. Alles, was Old
+  Brain Fix in den Ordner schreibt, ist verschlüsselt. Jeder Kasten unten zeigt die Schritte auf dem
+  Handy und auf dem Desktop.
+</p>
+
+<guide-box name="syncthing-own">
+<h2>Deine eigenen Geräte mit Syncthing abgleichen</h2>
+<p>Halte dein Handy und deinen Computer abgeglichen, wo immer sie sind, ohne Cloud.</p>
+<box-tab device="phone" alt="Synchronisieren, gescrollt zu Geteilter Ordner mit Ordner wählen, darunter Bündel">
+<li>Installiere Syncthing-Fork aus F-Droid oder Google Play.</li>
+<li>Lege in Syncthing-Fork einen Ordner an und teile ihn mit deinem Computer.</li>
+<li>Tippe auf dein Profilbild, dann <strong>Mit einem anderen Gerät synchronisieren</strong>.</li>
+<li>Tippe <strong>Ordner wählen</strong> und wähle den Syncthing-Ordner.</li>
+</box-tab>
+<box-tab device="desktop" alt="Der Dialog Synchronisieren mit gewähltem geteiltem Ordner, Jetzt synchronisieren, Ordner wählen und Vergessen, den Bündeln und fünf gekoppelten Geräten">
+<li>Installiere Syncthing und nimm den Ordner an, den das Handy teilt.</li>
+<li>Klicke <strong>Synchronisieren ▸ Jetzt synchronisieren</strong>.</li>
+<li>Klicke <strong>Ordner wählen</strong> und wähle den Syncthing-Ordner.</li>
+</box-tab>
+<box-more>
+<p>
+  Syncthing ist quelloffen und hat keinen zentralen Server: Es gleicht den Ordner zwischen deinen
+  Geräten ab, ohne Cloud-Konto.
+</p>
+<p>
+  Für Android wurde die offizielle Syncthing-App im Dezember 2024 eingestellt. Syncthing-Fork führt sie
+  fort und wird weiter gepflegt; es gibt sie in F-Droid und in Google Play. Für den Computer nennt
+  syncthing.net Syncthing für Linux, Windows und macOS: Linux-Distributionen bringen es als Paket mit,
+  und für Windows und macOS nennt die Seite Installationsprogramme wie Syncthing Windows Setup,
+  SyncTrayzor und syncthing-macos.
+</p>
+<p>
+  Kopple deine Geräte zuerst einmal vor Ort (siehe
+  <a href="sharing-and-sync.html#koppeln">Mit einem anderen deiner Geräte abgleichen</a>): Dateien von
+  einem Gerät, das nicht mit diesem gekoppelt ist, werden gezählt und nicht gelesen. Old Brain Fix legt
+  seine Dateien in einen Ordner namens <code>oldbrainfix-sync</code> in dem Ordner, den du wählst. Jedes
+  Gerät wählt einen geteilten Ordner; er trägt deine eigenen Geräte und jeden geteilten Bereich, der
+  über einen Ordner geht.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="syncthing-family">
+<h2>Einen Bereich über Syncthing mit deiner Familie teilen</h2>
+<p>Teile einen Bereich mit einem Menschen in der Ferne über einen Syncthing-Ordner, den ihr beide habt.</p>
+<box-tab device="phone" alt="Wie kommen Änderungen zu Lena? Ein gemeinsamer Ordner, den ihr beide erreicht, ist gewählt, über der Seite Haushalt teilen">
+<li>Teile deinen Syncthing-Ordner mit ihrem Syncthing.</li>
+<li>Tippe ⋮ neben dem Bereich, dann <strong>Teilen …</strong>.</li>
+<li>Tippe <strong>Teilen mit…</strong> und wähle die Person.</li>
+<li>Tippe <strong>Ein gemeinsamer Ordner, den ihr beide erreicht</strong>, dann <strong>Teilen</strong>.</li>
+<li>Schick das Angebot; sie nimmt es an und wählt denselben Ordner.</li>
+</box-tab>
+<box-tab device="desktop" alt="Wie kommen Änderungen zu Lena? als Dialog über der Agenda, Ein gemeinsamer Ordner, den ihr beide erreicht, gewählt">
+<li>Teile deinen Syncthing-Ordner mit ihrem Syncthing.</li>
+<li>Klicke mit rechts auf den Bereich links, dann <strong>Teilen …</strong>.</li>
+<li>Klicke <strong>Teilen mit…</strong> und klicke die Person.</li>
+<li>Wähle <strong>Ein gemeinsamer Ordner, den ihr beide erreicht</strong>, dann <strong>Teilen</strong>.</li>
+<li>Schick die Angebotsdatei; sie nimmt an und wählt denselben Ordner.</li>
+</box-tab>
+<box-more>
+<p>
+  Die Person braucht Old Brain Fix und Syncthing und muss unter deinen Menschen sein (siehe
+  <a href="sharing-and-sync.html#eine-person-hinzufuegen">Eine Person hinzufügen</a>). Füge in
+  Syncthing ihr Gerät hinzu und teile deinen Ordner damit; sie nimmt ihn auf ihrer Seite an. Das
+  Angebot selbst geht als Datei über einen beliebigen Messenger, wie unter
+  <a href="sharing-and-sync.html#einen-bereich-mit-jemandem-in-der-ferne-teilen">Einen Bereich mit
+  jemandem in der Ferne teilen</a>. Nimmt sie es an und hat noch keinen geteilten Ordner, fragt die
+  App „Den gemeinsamen Ordner wählen?“, und sie wählt den Syncthing-Ordner.
+</p>
+<p>
+  Der Ordner ist derselbe, über den deine eigenen Geräte abgleichen, und er hält, was sie alle
+  schreiben, jeden Bereich mit einem eigenen Schlüssel versiegelt. Die App des anderen Menschen liest
+  nur die Dateien der Bereiche, die mit ihm geteilt sind; alles andere bleibt versiegelt. Wer den
+  Ordner hat, sieht darin, welche Geräte abgleichen und wie viel, nicht was geschrieben wurde.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="autosync">
+<h2>Eine Cloud, die ihr schon teilt, mit Autosync nutzen</h2>
+<p>Leg den geteilten Ordner in eine Cloud, die deine Familie schon nutzt, etwa Google Drive oder Dropbox.</p>
+<box-tab device="phone" alt="Synchronisieren, gescrollt zu Geteilter Ordner mit Ordner wählen, darunter Bündel">
+<li>Installiere Autosync aus Google Play.</li>
+<li>Verbinde einen Ordner auf dem Handy mit einem Ordner in der Cloud.</li>
+<li>Tippe auf dein Profilbild, dann <strong>Mit einem anderen Gerät synchronisieren</strong>.</li>
+<li>Tippe <strong>Ordner wählen</strong> und wähle den Handy-Ordner, den Autosync abgleicht.</li>
+</box-tab>
+<box-tab device="desktop" alt="Der Dialog Synchronisieren mit gewähltem geteiltem Ordner, Jetzt synchronisieren, Ordner wählen und Vergessen, den Bündeln und fünf gekoppelten Geräten">
+<li>Installiere die Desktop-App der Cloud, etwa Dropbox oder Nextcloud.</li>
+<li>Klicke <strong>Synchronisieren ▸ Jetzt synchronisieren</strong>.</li>
+<li>Klicke <strong>Ordner wählen</strong> und wähle einen Ordner, den die Cloud-App abgleicht.</li>
+</box-tab>
+<box-more>
+<p>
+  Autosync von MetaCtrl hält einen Ordner auf dem Handy und einen Ordner in der Cloud in beiden
+  Richtungen gleich: Neue Dateien in der Cloud kommen herunter, neue Dateien auf dem Handy gehen hinauf,
+  und eine auf einer Seite gelöschte Datei wird auf der anderen gelöscht.
+</p>
+<ul>
+  <li><strong>Autosync - File Sync &amp; Backup</strong> deckt Google Drive, OneDrive, SharePoint Online, Dropbox, Box, MEGA, Nextcloud, ownCloud, pCloud, Yandex Disk, WebDAV, FTP, SFTP und Netzlaufwerke ab. Die App beginnt als Testversion und verlangt danach einen Kauf.</li>
+  <li><strong>Autosync for Google Drive</strong>, <strong>Dropsync</strong> (Dropbox), <strong>OneSync</strong> (OneDrive), <strong>MegaSync</strong> und <strong>BoxSync</strong> decken je eine Cloud ab. Sie sind kostenlos mit Werbung, für ein Ordnerpaar und Uploads bis 10 MB; die Premium-Version, ein In-App-Kauf, bringt mehr Paare, größere Dateien und keine Werbung.</li>
+</ul>
+<p>
+  Eine Aufnahme oder ein Foto über 10 MB braucht die Premium-Version einer App für eine Cloud. Für
+  einen geteilten Bereich gleicht jeder Mensch denselben Ordner der Cloud ab, etwa einen, der in der
+  Cloud mit den anderen geteilt ist, und wählt ihn in Old Brain Fix wie unter
+  <a href="#einen-bereich-ueber-syncthing-mit-deiner-familie-teilen">Einen Bereich über Syncthing mit
+  deiner Familie teilen</a>.
+</p>
+<p>
+  Am Computer gleichen die eigenen Desktop-Apps der Clouds einen echten Ordner ab: die Desktop-App von
+  Nextcloud unter Linux, Windows und macOS, der Dropbox-Ordner im Explorer oder Finder und unter Linux,
+  und Google Drive für den Desktop, das „Meine Ablage“ unter Windows und macOS in einen Ordner spiegelt.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="cloud-apps">
+<h2>Warum die Google-Drive-App nicht reicht</h2>
+<p>Die Handy-Apps von Google Drive, Dropbox und Nextcloud halten keinen Ordner in beiden Richtungen abgeglichen.</p>
+<box-tab device="phone" alt="Synchronisieren, gescrollt zu Geteilter Ordner mit Ordner wählen, darunter Bündel">
+<li>Nutze Autosync oder Syncthing-Fork statt der eigenen App der Cloud.</li>
+<li>Tippe <strong>Ordner wählen</strong> und wähle den Ordner, den diese App abgleicht.</li>
+</box-tab>
+<box-tab device="desktop" alt="Der Dialog Synchronisieren mit gewähltem geteiltem Ordner, Jetzt synchronisieren, Ordner wählen und Vergessen, den Bündeln und fünf gekoppelten Geräten">
+<li>Installiere die Desktop-App der Cloud.</li>
+<li>Klicke <strong>Synchronisieren ▸ Jetzt synchronisieren</strong>.</li>
+<li>Klicke <strong>Ordner wählen</strong> und wähle einen Ordner in ihrem abgeglichenen Ordner.</li>
+</box-tab>
+<box-more>
+<p>
+  Der geteilte Ordner funktioniert nur, wenn Dateien, die die anderen Geräte schreiben, von selbst
+  darin erscheinen, und Dateien, die Old Brain Fix schreibt, ihn von selbst verlassen. Die Cloud-Apps
+  auf dem Handy tun das nicht:
+</p>
+<ul>
+  <li><strong>Google Drive</strong>: Die Android-App macht einzelne Dateien offline verfügbar; ihre Hilfe beschreibt keinen Ordner auf dem Handy, der abgeglichen bleibt.</li>
+  <li><strong>Dropbox</strong>: Die Android-App macht einen ganzen Ordner nur in bezahlten Tarifen offline verfügbar, und Offline-Dateien werden über mobile Daten standardmäßig nicht aktuell gehalten.</li>
+  <li><strong>Nextcloud</strong>: Laut ihrem Benutzerhandbuch ist der Abgleich in beiden Richtungen im Android-Client noch nicht vollständig umgesetzt.</li>
+</ul>
+<p>
+  Am Computer ist das anders: Die Desktop-Apps von Nextcloud, Dropbox und Google Drive halten einen
+  echten Ordner abgeglichen, und Old Brain Fix auf dem Desktop kann einen Ordner darin nutzen.
+</p>
+</box-more>
+</guide-box>

@@ -2225,6 +2225,44 @@ void main() {
           });
 
           boxFrame(desktop178, 'missing', agenda);
+
+          // Sync with family and friends (#198): Sync at its shared
+          // folder, where Syncthing's or Autosync's folder is chosen, and
+          // the question how changes travel with Lena, the folder picked.
+          const family198 = 'sync-with-family-and-friends';
+
+          Future<void> sharedFolder(WidgetTester tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('pick-folder')),
+            );
+          }
+
+          boxFrame(family198, 'syncthing-own', sharedFolder);
+
+          boxFrame(family198, 'syncthing-family', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
+            final afar = find.byKey(const ValueKey('share-afar'));
+            await tester.scrollUntilVisible(
+              afar,
+              100,
+              scrollable: notesList.last,
+            );
+            await tester.drag(notesList.last, const Offset(0, -200));
+            await tester.pumpAndSettle();
+            await _tap(tester, afar);
+            await _tap(tester, find.text('Lena'));
+            expect(find.byType(TransportDialog), findsOneWidget);
+            await _tap(tester, find.byKey(const ValueKey('transport-folder')));
+          });
+
+          boxFrame(family198, 'autosync', sharedFolder);
+
+          boxFrame(family198, 'cloud-apps', sharedFolder);
         }
       }
     },
