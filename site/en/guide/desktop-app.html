@@ -1,13 +1,31 @@
-<!-- page: title="The desktop app" track="guide" order=8 summary="Old Brain Fix on Linux, Windows and macOS: the window, its menu bar, dialogs and keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, sync with the phone and the AI Task." -->
+<!-- page: title="The desktop app" track="guide" order=8 summary="Old Brain Fix on Linux, Windows and macOS: installing it, the window and its cards, the Note dialog, the menu bar, dialogs and keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, Transcripts, sync with the phone, the AI port, the theme and the size, and what only the phone has." -->
 <p class="lede">
   The desktop app runs on Linux, Windows and macOS and holds the same Notes, Areas and Routines as
   the phone once the two are paired. It is a window with a menu bar, the places on the left and the
   list beside them, a Note opening as a dialog over them, worked with the mouse and the keyboard, with
-  a capture popup and a command line for capturing from anywhere. Settings belong to this computer and
-  are never synced.
+  a capture popup and a command line for capturing from anywhere. Each box below shows the steps on
+  the desktop and, where the phone has the same, on the phone.
+</p>
+<p>
+  Most settings belong to this computer and are not synced. Simple or Advanced and "Move a Note to the
+  Trash when its one-time Reminder is done" are settings of you as a person: they sync to your own
+  Devices.
 </p>
 
-<h2>Install and first start</h2>
+<guide-box name="install">
+<h2>Install the desktop app</h2>
+<p>Put Old Brain Fix on a computer and start it for the first time.</p>
+<box-tab device="phone" alt="The first start on the phone: New to Old Brain Fix, Add a Device of mine and Restore from a Backup">
+<li>Install Old Brain Fix as the <a href="../reference/install.html">Install</a> page says.</li>
+<li>Open it.</li>
+<li>Pick one of the three choices on the first start.</li>
+</box-tab>
+<box-tab device="desktop" alt="The first start in the desktop app: New to Old Brain Fix, Add a Device of mine and Restore from a Backup">
+<li>Install the app as the <a href="../reference/install.html">Install</a> page says.</li>
+<li>Start Old Brain Fix.</li>
+<li>Pick one of the three choices on the first start.</li>
+</box-tab>
+<box-more>
 <p>
   The app is installed with Homebrew, Scoop, a .deb, a Flatpak file, an AppImage, a disk image or a
   zip file; see <a href="../reference/install.html">Install</a>. On Linux, outside the Flatpak,
@@ -15,50 +33,105 @@
 </p>
 <p>
   The first start offers the same three choices as the phone: <strong>New to Old Brain
-  Fix</strong> with the Starter Set, <strong>Add a Device of mine</strong> and <strong>Restore from
-  a Backup</strong> (see <a href="getting-started.html#on-the-desktop">Getting started</a>). The
-  Profile takes the name and picture of your login on the computer, or else the computer's name. The desktop asks neither for the
-  speech model nor for alarm access.
+  Fix</strong> with the Starter Set, where Simple or Advanced is picked, <strong>Add a Device of
+  mine</strong> and <strong>Restore from a Backup</strong> (see
+  <a href="getting-started.html#on-the-desktop">Getting started</a>). The Profile takes the name and
+  picture of your login on the computer, or else the computer's name. The desktop asks neither for
+  the speech model nor for alarm access.
 </p>
+</box-more>
+</guide-box>
 
-<h2>The window</h2>
+<guide-box name="window">
+<h2>Find your way in the window</h2>
+<p>Show a place's Notes and add something there.</p>
+<box-tab device="phone" alt="The Household's Notes on the phone with the fan of its + open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic">
+<li>Tap the folder on the Agenda.</li>
+<li>Tap an Area, then a Topic.</li>
+<li>Swipe right to go back one level.</li>
+<li>Tap <strong>+</strong> to add something here.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Household's Notes with the menu of the + at the end of the heading open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic, each with its icon">
+<li>Click a place in the sidebar on the left.</li>
+<li>Click a level of the path above the list.</li>
+<li>Click the back arrow for the place shown before.</li>
+<li>Right-click an Area or a Topic for its menu.</li>
+<li>Click <strong>+</strong> at the end of the list's heading.</li>
+</box-tab>
+<box-more>
 <p>
   The window has the menu bar on top and two columns below it; the border between them can be
   dragged.
 </p>
 <ul>
-  <li><strong>Left</strong>, the sidebar: Agenda, Unsorted, All Notes and Frogs, then "Areas" with a "+" for a new Area, each Area with its Topics below it, and the Trash. The place the list shows is marked. A right-click on an Area opens New Topic, Rename, Colour and icon, Share…, People when it is shared, and Delete, as far as you manage the Area; a right-click on a Topic opens Rename and Delete. These menus close once an entry is picked, with the mouse, the keyboard or a screen reader.</li>
-  <li><strong>Middle</strong>, the list: on top the back and forward arrows and the path to the place shown, such as "Areas › Household › Repairs", where a click on a level shows it; "Areas" leads to All Notes. Below them what is selected on the left. All Notes, an Area and a Topic have a search field; every list of Notes except the Trash has a switch between the compact and the detailed view of its cards and a filter by person. The heading ends with a "+" (see below).</li>
+  <li><strong>Left</strong>, the sidebar: Agenda, Unsorted, All Notes and Frogs, then "Areas" with a "+" for a new Area, each Area with its Topics below it, and the Trash. The place the list shows is marked. A right-click on an Area opens New Topic, in Advanced, Rename, Colour and icon, Share…, People when it is shared, and Delete, as far as you manage the Area; a right-click on a Topic opens Rename and Delete, as far as you manage its Area. These menus close once an entry is picked, with the mouse, the keyboard or a screen reader.</li>
+  <li><strong>Middle</strong>, the list: on top the back and forward arrows and the path to the place shown, such as "Areas › Household › Repairs", where a click on a level shows it; "Areas" leads to All Notes. Below them what is selected on the left. All Notes, an Area and a Topic have a search field; every list of Notes except the Trash has a switch between the compact and the detailed view of its cards and a filter by person. The heading ends with a "+".</li>
 </ul>
 <p>
   The "+" of All Notes, an Area and a Topic opens a menu: <strong>Note</strong> opens the quick note,
   <strong>Checklist</strong>, <strong>Shopping List</strong> and <strong>Frog</strong> ask for a name,
   <strong>Tally</strong> and <strong>Session</strong> open their page, and in an Area
-  <strong>Topic</strong> adds a Topic. What it makes is filed into the Area or Topic shown, from All
-  Notes into none; Session, Frog and Topic are there for who may set them up. A new Checklist or
-  Shopping List opens in the Note dialog, the cursor in its first Line or its field at the top (see
+  <strong>Topic</strong> adds a Topic. Tally, Session, Frog and Topic are there in Advanced only;
+  Session and Frog for who may set them up there, Topic for who manages the Area. What it makes is
+  filed into the Area or Topic shown, from All Notes into none. A new Checklist or Shopping List opens
+  in the Note dialog, the cursor in its first Line or its field at the top (see
   <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>).
-  The "+" of the Agenda and of Unsorted opens the quick note at once. Nothing is made while the list
-  shows another person's Notes only. Every list ends with room after its last card, so that card
-  scrolls fully into view.
+  The "+" of the Agenda, beside its heading, and of Unsorted opens the quick note at once. Nothing is
+  made while the list shows another person's Notes only. Every list ends with room after its last
+  card, so that card scrolls fully into view.
 </p>
-
-<figure class="frame">
-  <img class="shot-light" src="../../assets/frames/desktop/en/light/add-menu.png" alt="The Household's Notes with the menu of the "+" at the end of the heading open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic, each with its icon" width="1280" height="800" loading="lazy">
-  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/add-menu.png" alt="The Household's Notes with the menu of the "+" at the end of the heading open: Note, Checklist, Shopping List, Tally, Session, Frog and Topic, each with its icon" width="1280" height="800" loading="lazy">
-  <figcaption>What "+" makes in an Area.</figcaption>
-</figure>
 <p>
-  In a list of Notes, a click selects a card; its view button, at its top right beside ⋮ and the
-  pencil, switches it between its compact and its detailed view (see "A Note's kind" in
+  The Agenda's bar holds All Routines and Reminders and New Routine or Reminder; the desktop's Agenda
+  has no Calendar and no Profile picture, the menu bar leads to the rest.
+</p>
+<p>
+  Buttons are rounded rectangles with a fill and an outline, darker in light and lighter in dark under
+  the pointer, and with a ring while they hold the keyboard focus. The main action of a dialog, such
+  as Save, Create or Done, is on the teal accent; Delete, Remove and Move to Trash are on the error
+  colour. Links stay links, entries of a menu stay flat, and icon-only buttons such as ⋮, the pencil
+  and the view button get a rounded background under the pointer and name themselves in a tooltip.
+  Nothing opens or changes on hover alone.
+</p>
+<p>
+  While a sync of this computer runs, a thin line in the accent moves back and forth under the menu
+  bar, taking no room; the app stays usable meanwhile. A screen reader finds it as a progress
+  indicator named "Syncing…".
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="cards">
+<h2>Select, file and open Notes with the mouse</h2>
+<p>Pick one or several cards in a list, file them, or open one.</p>
+<box-tab device="phone" alt="The Household's Notes on the phone: a Checklist, a Shopping List and a Tally among the cards">
+<li>Tap a card to switch its view.</li>
+<li>Tap ⋮ ▸ <strong>File into…</strong> on a card.</li>
+<li>Long-press a card to open it.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Household's Notes with two cards selected, each with a check mark and a thicker outline">
+<li>Click a card to select it.</li>
+<li>Ctrl-click more cards, or Shift-click the last of a run.</li>
+<li>Drag the selected cards onto an Area or Topic.</li>
+<li>Click a card's chevron to switch its view.</li>
+<li>Double-click a card to open it.</li>
+</box-tab>
+<box-more>
+<p>
+  In a list of Notes, a click selects a card; its view button, the chevron at its top right beside ⋮
+  and the pencil, switches it between its compact and its detailed view, in every list but the Trash (see
   <a href="lists-tallies-sessions-frogs.html">Lists, Tallies, Sessions and Frogs</a>), kept on this
   computer until the list's switch is used again; a double-click or the pencil opens the Note in the
-  Note dialog. A right-click on a card or its ⋮ opens <strong>Edit</strong>,
-  <strong>File into…</strong>, the Checklist and Shopping List entries
-  with <strong>Show on the Agenda</strong> and its three choices (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>),
-  <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Save as Markdown…</strong>. A card
-  dragged onto an Area or Topic in the sidebar is filed there, an Unsorted one leaving Unsorted;
-  Notes in the Trash are not dragged.
+  Note dialog. A web address in a card's text, starting with "http://" or "https://", is a link: a
+  click on it opens it in the browser, a click beside it selects the card.
+</p>
+<p>
+  A right-click on a card or its ⋮ opens <strong>Edit</strong>, <strong>File into…</strong>, the
+  Checklist and Shopping List entries with <strong>Show on the Agenda</strong> and its three choices
+  (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and
+  Frogs</a>), <strong>Send to a person</strong>, <strong>Copy as text</strong>, <strong>Save as
+  Markdown…</strong> and, where the Note has boxes, <strong>Show ticks</strong>. A card dragged onto
+  an Area or Topic in the sidebar is filed there, an Unsorted one leaving Unsorted; Notes in the Trash
+  are not dragged.
 </p>
 <p>
   Ctrl-click (Cmd-click on macOS) adds a card to the selection or takes it away again, and
@@ -70,6 +143,60 @@
   people wrote, which only a Manager moves: they stay where they are, and a line at the top says
   that not every Note was filed; its click shows how many moved and how many stayed.
 </p>
+</box-more>
+</guide-box>
+
+<guide-box name="note-dialog">
+<h2>Work in the Note dialog</h2>
+<p>Read and change one Note in a dialog over the list.</p>
+<box-tab device="phone" alt="The boiler's Note in the Note editor on the phone, with its badges under the text">
+<li>Long-press a card to open it.</li>
+<li>Type into the text.</li>
+<li>Tap a badge to change that setting.</li>
+<li>Tap the back arrow to close it.</li>
+</box-tab>
+<box-tab device="desktop" alt="The desktop window with the kitchen tap Note from Repairs open in the Note dialog over the Household's Notes: its text, the badges Important, Household / Repairs, its capture time, the kind, the text format and +, a Section and Add to Note">
+<li>Double-click a card, or click its pencil.</li>
+<li>Type into the text.</li>
+<li>Click a badge to change that setting.</li>
+<li>Click the cross, or press Esc.</li>
+</box-tab>
+<box-more>
+<p>
+  A Note opens as a dialog over the list and the sidebar, one at a time; the menu bar stays at hand
+  above it. It holds the text with the format bar, in Advanced, under it the Note's settings as
+  badges, then its Lines, photos and recordings, its Tally's setup and its Sections, Add to Note and
+  the rest of what can be done to it. Its cross, Esc, Alt+Left, the mouse's back button and a click
+  beside it close it, and what was typed is kept, a Section typed into Add to Note too.
+</p>
+<p>
+  Each badge shows a setting's icon and its value, as an icon or as short text, as on the phone (see
+  <a href="capture-and-sort.html#the-note-editor">Capture and sort</a>): the Importance, Area and
+  Topic, Captured, each Routine and Reminder, the kind, on every Note, which also changes it (see
+  <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>),
+  the Text format of a Plain Note (Plain text, Formatted text or Code; see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted
+  text</a>), Show on the Agenda for a Checklist without a Routine and for a Shopping List, Show ticks
+  while there is a box, and "+" with Routine, Reminder, Frog and Session for who may set them up,
+  Frog and Session in Advanced only. A click opens its small editor as a dialog over the Note; Area
+  and Topic opens File into…, a Routine or Reminder its editor. The Routine editor, a Tally's pages,
+  the New Tally page and the New Session page open as dialogs over what they were opened from.
+  Captured's dialog shows Remove beside each captured detail but the time, and a click on the small
+  grey line under a Section's text, such as "12:40 · Home · Dentist", opens the same dialog for that
+  Section; Remove asks once, and the dialog stays open with what is left. In the detailed view of a
+  card the Note and each Section show that line under their text, a Section's with its time alone
+  when it was captured the same day as the part before it.
+</p>
+<p>
+  The text of a Section, an Amend or a Note merged in, is edited in place in a field of its own with
+  the same format bar as the Note's text, by its author and in a Shared Area also by the Area's
+  Managers, and saved as the dialog closes or the field is left; it keeps its place and its capture
+  time, and once edited says under its capture line when and by whom, such as "Edited 3/2/2026 11:00 by
+  Ann". A text that is only read, such as another person's Section or a Note's in the Trash, is
+  selected with the mouse and copied with Ctrl+C (Cmd+C on macOS); a link in it opens in the browser
+  with a click. <strong>Copy as text</strong> copies the Note and all its Sections, as they show.
+  <strong>Note ▸ History</strong> lists every change of the Note, the newest first (see
+  <a href="capture-and-sort.html">Capture and sort</a>).
+</p>
 <p>
   A click on a photo in the Note dialog shows it full screen. A right-click on a photo in the Note
   dialog or full screen opens <strong>Save image as…</strong>, which saves its file where you say,
@@ -78,85 +205,84 @@
   say nothing; when one of them fails, a line at the top of the window says so, and a click on it
   shows why and what to do.
 </p>
-<p>
-  The Agenda's bar holds All Routines and Reminders and New Routine or Reminder.
-</p>
+</box-more>
+</guide-box>
 
-<h2>The Note dialog</h2>
-<p>
-  A Note opens as a dialog over the list and the sidebar, one at a time; the menu bar stays at hand
-  above it. It holds the text with the format bar, under it the Note's settings as badges, then its
-  Lines, photos and recordings, its Tally's setup and its Sections, Add to Note and the rest of what can be
-  done to it. Its cross, Esc, Alt+Left, the mouse's back button and a click beside it close it, and
-  what was typed is kept, a Section typed into Add to Note too.
-</p>
-<p>
-  Each badge shows a setting's icon and its value, as an icon or as short text, as on the phone (see
-  <a href="capture-and-sort.html#the-note-editor">Capture and sort</a>): the Importance, Area and
-  Topic, Captured, each Routine and Reminder, the kind of a Checklist, Shopping List or Tally, Show on
-  the Agenda for a Checklist without a Routine and for a Shopping List, Show ticks while there is a box, and "+" with
-  Routine, Reminder, Frog and Session for who may set them up. A click opens its small editor as a
-  dialog over the Note; Area and Topic opens File into…, a Routine or Reminder its editor. The
-  Routine editor, a Tally's pages, the New Tally page and the New Session page open as dialogs over
-  what they were opened from. Captured's dialog shows Remove beside each captured detail but the
-  time, and a click on the small grey line under a Section's text, such as "12:40 · Home · Dentist",
-  opens the same dialog for that Section; Remove asks once, and the dialog stays open with what is
-  left. In the detailed view of a card the Note and each Section show that line under their text, a Section's with
-  its time alone when it was captured the same day as the part before it.
-</p>
-<p>
-  The text of a Section, an Amend or a Note merged in, is edited in place in a field of its own with
-  the same format bar as the Note's text, by its author and in a Shared Area also by the Area's
-  Managers, and saved as the dialog closes or the field is left; it keeps its place and its capture
-  time, and once edited says under its capture line when and by whom, such as "Edited 3/2/2026 11:00 by
-  Ann". A text that is only read, such as another person's Section or a Note's in the Trash, is
-  selected with the mouse and copied with Ctrl+C (Cmd+C on macOS). <strong>Copy as text</strong>
-  copies the Note and all its Sections, as they show.
-</p>
-
-<figure class="frame">
-  <img class="shot-light" src="../../assets/frames/desktop/en/light/window.png" alt="The desktop window with the kitchen tap Note from Repairs open in the Note dialog over the Household's Notes: its text, the badges Important, Household / Repairs, its capture time, the kind, the text format and +, a Section and Add to Note" width="1280" height="800" loading="lazy">
-  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/window.png" alt="The desktop window with the kitchen tap Note from Repairs open in the Note dialog over the Household's Notes: its text, the badges Important, Household / Repairs, its capture time, the kind, the text format and +, a Section and Add to Note" width="1280" height="800" loading="lazy">
-  <figcaption>A Note in the Note dialog, its settings as badges.</figcaption>
-</figure>
-
-<h2>The menu bar</h2>
+<guide-box name="menu-bar">
+<h2>Use the menu bar</h2>
+<p>Reach Settings, Sync, Backups and everything a Note can do.</p>
+<box-tab device="phone" alt="The Profile page on the phone: Send my Profile, Show my QR, Back up this Device and Sync with another Device">
+<li>Tap your Profile picture on the Agenda.</li>
+<li>Tap <strong>Back up this Device</strong>, <strong>Sync with another Device</strong> or <strong>Settings</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Note menu open over the window: File into… with Ctrl+M, Routine…, Reminder…, Frog, Session, Make it a Checklist, Make it a Shopping List, Make it a Tally, Send to a person, Copy as text, History and Delete">
+<li>Click <strong>Edit ▸ Settings…</strong> for this computer's Settings.</li>
+<li>Click <strong>Sync</strong> for Sync, pairing, People, Profile and Backups.</li>
+<li>Click <strong>Note</strong> for the Note open in its dialog.</li>
+<li>Click <strong>Help ▸ User guide</strong> for this guide.</li>
+</box-tab>
+<box-more>
 <ul>
-  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong> and <strong>Google Keep…</strong> (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
-  <li><strong>Edit</strong>: <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field, All Notes' where the list has none. <strong>Settings…</strong> (Ctrl+,) opens this computer's Settings.</li>
-  <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> with <strong>System</strong>, which shows the window light or dark as the computer is set and changes with it, <strong>Light</strong> and <strong>Dark</strong>; the choice is kept on this computer.</li>
-  <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic and, while no Note is open, files the cards selected in the list, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong>, <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong>, <strong>History</strong> and <strong>Delete</strong>. They are greyed while no Note is open, but File into… while cards are selected, and each one where the Note dialog does not offer it either.</li>
-  <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see below).</li>
+  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field, filed into the Area or Topic the list shows (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown or text files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Save as Markdown…</strong> saves the Note in the Note dialog. <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
+  <li><strong>Edit</strong>: <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Find</strong> (Ctrl+F) puts the cursor into the search field, All Notes' where the list has none. <strong>Settings…</strong> (Ctrl+,) opens the Settings.</li>
+  <li><strong>View</strong>: Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Theme</strong> (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
+  <li><strong>Note</strong>, for the Note in the Note dialog: <strong>File into…</strong> (Ctrl+M), which asks for the Area or Topic and, while no Note is open, files the cards selected in the list, <strong>Routine…</strong>, <strong>Reminder…</strong>, <strong>Frog</strong> and <strong>Session</strong>, <strong>Make it a Checklist</strong>, <strong>Make it a Shopping List</strong>, <strong>Make it a Tally</strong>, <strong>Send to a person</strong>, <strong>Copy as text</strong>, <strong>History</strong> and <strong>Delete</strong>. Frog, Session and Make it a Tally show in Advanced only. They are greyed while no Note is open, but File into… while cards are selected, and each one where the Note dialog does not offer it either.</li>
+  <li><strong>Sync</strong>: <strong>Sync now</strong>, <strong>Pair a Device</strong>, <strong>People</strong>, <strong>Profile</strong> and <strong>Backups…</strong>, each a dialog (see <a href="#close-a-dialog-or-go-back-in-it">Close a dialog or go back in it</a>).</li>
   <li><strong>Help</strong>: <strong>User guide</strong> opens this page in the browser; <strong>About Old Brain Fix</strong> shows the version, the documentation and privacy policy, the source code and every third-party component with its licence.</li>
 </ul>
 <p>
   A menu closes once an entry is picked, with the mouse, the keyboard or a screen reader. On macOS
   the menu bar is part of the window, as on Linux and Windows, and Settings… stays in its Edit menu.
+  The menu bar takes the place of the phone's Profile picture: no button on the main window leads to
+  the Settings, Backups or Sync.
 </p>
+</box-more>
+</guide-box>
 
-<figure class="frame">
-  <img class="shot-light" src="../../assets/frames/desktop/en/light/menu.png" alt="The Note menu open over the window: File into… with Ctrl+M, Routine…, Reminder…, Frog, Session, Make it a Checklist, Make it a Shopping List, Make it a Tally, Send to a person, Copy as text, History and Delete" width="1280" height="800" loading="lazy">
-  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/menu.png" alt="The Note menu open over the window: File into… with Ctrl+M, Routine…, Reminder…, Frog, Session, Make it a Checklist, Make it a Shopping List, Make it a Tally, Send to a person, Copy as text, History and Delete" width="1280" height="800" loading="lazy">
-  <figcaption>The Note menu for the Note in the Note dialog.</figcaption>
-</figure>
-
-<h2>Dialogs</h2>
+<guide-box name="dialogs">
+<h2>Close a dialog or go back in it</h2>
+<p>Leave the Settings, About or a Sync dialog, or go back one step.</p>
+<box-tab device="phone" alt="Backups on the phone, opened from the Profile page, with the back arrow at the top left">
+<li>Tap the back arrow at the top left.</li>
+</box-tab>
+<box-tab device="desktop" alt="About Old Brain Fix opened from the Settings, with the arrow back at the top left and the cross at the top right">
+<li>Click the arrow at the top left to go back.</li>
+<li>Click the cross at the top right, or press Esc.</li>
+<li>Click beside the dialog to close it.</li>
+</box-tab>
+<box-more>
 <p>
-  The Settings, About and everything under Sync open as dialogs over the window; the list stays where
-  it was beneath them. The cross at the top right, Esc or a click beside the dialog closes it. A
-  dialog opened from another, such as About from the Settings and the licences from About, has an
-  arrow at the top left that leads back to that one. While a dialog is open, a line that announces
-  something shows at its top.
+  The Settings, About and everything under Sync open as dialogs over the window, where the phone
+  shows a page of its own; the list stays where it was beneath them. The cross at the top right, Esc
+  or a click beside the dialog closes it. A dialog opened from another, such as About from the
+  Settings and the licences from About, has an arrow at the top left that leads back to that one.
+  While a dialog is open, a line that announces something shows at its top.
 </p>
 <ul>
-  <li><strong>Sync now</strong> opens Sync: this computer's code while it is open, the Conflicts, the shared folder, which it syncs at once when one is chosen, the bundles and the paired Devices (see <a href="#sync-with-the-phone">Sync with the phone</a>).</li>
+  <li><strong>Sync now</strong> opens Sync: this computer's code while it is open, the Conflicts, the shared folder, which it syncs at once when one is chosen, the bundles and the paired Devices (see <a href="#pair-the-computer-with-the-phone">Pair the computer with the phone</a>). It says that Simple or Advanced and the Trash setting sync to your own Devices and the other settings stay on each Device.</li>
   <li><strong>Pair a Device</strong>: the question about a Device asking to sync, this computer's code, and the field for the code another Device shows.</li>
   <li><strong>People</strong>: every Profile kept here, the blocked ones in a fold of their own, and <strong>Add a person from a link</strong>. A click on a person opens their Profile over it.</li>
   <li><strong>Profile</strong>: your picture, name and short code, with <strong>Send my Profile</strong> and <strong>Show my QR</strong>.</li>
   <li><strong>Backups…</strong>: the Backups and the Recovery Sheet (see <a href="backups-locks-and-privacy.html#on-the-desktop">Backups, locks and privacy</a>).</li>
 </ul>
+</box-more>
+</guide-box>
 
-<h2>Keys instead of swipes</h2>
+<guide-box name="keys">
+<h2>Use keys instead of swipes</h2>
+<p>Go back and forward, and reach what you need, from the keyboard.</p>
+<box-tab device="phone" alt="The Areas list on the phone, one level above an Area">
+<li>Swipe right to go back one level.</li>
+<li>Swipe left on the Agenda for the Areas list.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Repairs Topic below its path Areas › Household › Repairs, the back arrow at the top left of the list">
+<li>Press Alt+Left or the mouse's back button to go back.</li>
+<li>Press Ctrl+N for a new Note.</li>
+<li>Press Ctrl+F to search.</li>
+<li>Press Ctrl+Enter to save what you typed.</li>
+<li>Press Esc to close what lies on top.</li>
+</box-tab>
+<box-more>
 <p>
   Where the phone goes back with a swipe, the desktop uses keys and the mouse's side buttons. Alt+Left
   and Alt+Right rest while the cursor is in a text field; the mouse buttons always work.
@@ -170,10 +296,25 @@
   <li><strong>Ctrl+B and Ctrl+I</strong> (Cmd on macOS): bold and italic while the Note's text is edited.</li>
   <li><strong>Ctrl+V</strong> (Cmd+V on macOS) in the quick note's empty field: takes the clipboard's text into the field and its picture into the Note as its photo.</li>
   <li><strong>Enter</strong> in a one-line field of a dialog, such as a name or a link's address, takes it.</li>
-  <li><strong>Esc</strong> closes a dialog, as does a click beside it, and closes a photo or table shown full screen. In a table cell, Tab and Shift+Tab move to the next and the previous cell (see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted text</a>). The Note dialog and the quick note keep what was typed when they close.</li>
+  <li><strong>Esc</strong> closes a menu, a dialog, as does a click beside it, and a photo or table shown full screen; over the list without a dialog it drops the cards selected. In a table cell, Tab and Shift+Tab move to the next and the previous cell (see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted text</a>). The Note dialog and the quick note keep what was typed when they close.</li>
 </ul>
+</box-more>
+</guide-box>
 
-<h2>The tray and starting at login</h2>
+<guide-box name="tray">
+<h2 id="the-tray-and-starting-at-login">Keep the app running in the tray</h2>
+<p>Keep alarms, the hotkey and sync working with the window closed.</p>
+<box-tab device="phone" alt="The Agenda on the phone, which has no tray">
+<li>Use the desktop app for this; the phone has no tray.</li>
+</box-tab>
+<box-tab device="desktop" alt="The desktop Settings as a dialog over the Agenda: under This computer Notifications on this computer, Start at login and Bigger text and icons, then the AI port with Who may connect, About Old Brain Fix and Quick capture with the hotkey Ctrl+Alt+N">
+<li>Close the window.</li>
+<li>Click the tray icon to open it again.</li>
+<li>Right-click the tray icon for its menu.</li>
+<li>Click <strong>Quit</strong> there to end the app.</li>
+<li>Leave <strong>Start at login</strong> ticked in Settings.</li>
+</box-tab>
+<box-more>
 <p>
   The app shows an icon in the tray: in the notification area on Windows, in the menu bar on macOS,
   and on Linux where the desktop has a tray: KDE, Xfce, Cinnamon, and GNOME with the AppIndicator
@@ -197,21 +338,34 @@
   The app runs once per user. A second start, from the menu or a command, hands its wish to the
   running app: its window opens, or its capture popup.
 </p>
+</box-more>
+</guide-box>
 
-<figure class="frame">
-  <img class="shot-light" src="../../assets/frames/desktop/en/light/settings.png" alt="The desktop Settings as a dialog over the Agenda: Notifications on this computer and Start at login, the AI port with Who may connect, About Old Brain Fix, Quick capture with the hotkey Ctrl+Alt+N, and Quick note with its switches" width="1280" height="800" loading="lazy">
-  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/settings.png" alt="The desktop Settings as a dialog over the Agenda: Notifications on this computer and Start at login, the AI port with Who may connect, About Old Brain Fix, Quick capture with the hotkey Ctrl+Alt+N, and Quick note with its switches" width="1280" height="800" loading="lazy">
-  <figcaption>The Settings of this computer, opened with Edit, Settings….</figcaption>
-</figure>
-
-<h2>The capture popup and its hotkey</h2>
+<guide-box name="hotkey">
+<h2>Capture with the hotkey</h2>
+<p>Keep a thought from anywhere on the computer, without the window.</p>
+<box-tab device="phone" alt="Text capture on the phone with a typed text">
+<li>Long-press the Old Brain Fix icon.</li>
+<li>Tap <strong>Text</strong>.</li>
+<li>Type what's on your mind.</li>
+<li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="The capture popup with a typed text, To full editor, the alarm clock and the Nudge buttons">
+<li>Press Ctrl+Alt+N anywhere.</li>
+<li>Type what's on your mind.</li>
+<li>Press Enter.</li>
+<li>Change the key in Settings under "Quick capture".</li>
+</box-tab>
+<box-more>
 <p>
   The hotkey, Ctrl+Alt+N unless changed, opens the popup "Capture a Note" over all other windows,
-  also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong> and the command
-  <code>oldbrainfix capture</code> open it too. It takes text, a voice recording and the clipboard,
-  offers <strong>To full editor</strong> and what Settings under "Quick note" switched on, as the
-  quick note in the window does, and never asks anything: Enter saves the Note
-  with a Nudge in 1 h, and Esc keeps what is typed the same way (see
+  also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong>,
+  <strong>File ▸ Quick note</strong> and the command <code>oldbrainfix capture</code> open it too. It
+  takes text, a voice recording and the clipboard: it holds a one-line field, <strong>Record
+  voice</strong>, <strong>Paste</strong>, <strong>To full editor</strong>, the alarm clock, whose
+  menu offers Routine and Reminder, what Settings under "Quick note" switched on, as the quick note
+  in the window does, and the Nudge buttons. It never asks anything: Enter saves the Note with a
+  Nudge in 1 h, or without one once the Note is sorted, and Esc keeps what is typed the same way (see
   <a href="capture-and-sort.html#the-hotkey-and-the-popup">Capture and sort</a>).
 </p>
 <ul>
@@ -220,8 +374,21 @@
   <li>The key works while the app runs, also from the tray.</li>
   <li>On Wayland the desktop decides whether the popup stays above other windows and where the keyboard goes once it closes.</li>
 </ul>
+</box-more>
+</guide-box>
 
-<h2>The command line</h2>
+<guide-box name="command-line">
+<h2>Capture from the command line</h2>
+<p>Keep a Note from a terminal, a launcher or a macro pad.</p>
+<box-tab device="phone" alt="The Agenda on the phone, which has no command line">
+<li>Use the desktop app for this; the phone has no command line.</li>
+</box-tab>
+<box-tab device="desktop" alt="Unsorted with the Note buy milk, kept from the command line">
+<li>Open a terminal.</li>
+<li>Type <code>oldbrainfix capture buy milk</code> and press Enter.</li>
+<li>Find "buy milk" in Unsorted.</li>
+</box-tab>
+<box-more>
 <ul>
   <li><code>oldbrainfix</code> opens the window.</li>
   <li><code>oldbrainfix capture</code> opens the capture popup.</li>
@@ -238,15 +405,45 @@
   bundle imported, and 2 for wrong arguments or nothing to capture. Launchers, key-binding tools and
   macro pads can run these commands, also where the desktop offers no hotkey.
 </p>
+</box-more>
+</guide-box>
 
-<h2>Drag and drop</h2>
+<guide-box name="drop">
+<h2>Drop files onto the window</h2>
+<p>Make a Note of a picture or a sound file, or open a file the app sent.</p>
+<box-tab device="phone" alt="The Agenda on the phone with the fan of its + open: Text, Voice, Photo, Gallery and Paste">
+<li>Share a picture or sound file to Old Brain Fix.</li>
+<li>Tap <strong>+</strong> ▸ <strong>Gallery</strong> on the Agenda instead.</li>
+<li>Type what goes with it.</li>
+<li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="The quick note with a dropped photo waiting in it as a Photo line, the receipt's text typed above it">
+<li>Drag a picture or sound file onto the window.</li>
+<li>Type what goes with it.</li>
+<li>Press Ctrl+Enter.</li>
+</box-tab>
+<box-more>
 <ul>
-  <li>Pictures and sound files dropped onto the window open the quick note and wait in it, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
+  <li>Pictures and sound files dropped onto the window open the quick note and wait in it, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Pictures are JPEG, PNG and WebP; sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
   <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline; a Profile card file (<code>.obfcard</code>) adds the person and opens their Profile.</li>
   <li>A Note's card dragged onto an Area or Topic in the sidebar is filed there, with the other cards selected when it is one of them.</li>
 </ul>
+</box-more>
+</guide-box>
 
-<h2>Notifications</h2>
+<guide-box name="notifications">
+<h2>Get alarms as notifications</h2>
+<p>Let Routines, Reminders and Nudges come up on the computer.</p>
+<box-tab device="phone" alt="Set up alarms on the phone, one access at a time">
+<li>Tap <strong>Allow</strong> for each access the alarms need.</li>
+<li>Tap <strong>Done</strong> or a snooze time on the alarm.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Agenda in the desktop app with today's Routines and Reminders">
+<li>Keep Old Brain Fix running, in the tray too.</li>
+<li>Leave <strong>Notifications on this computer</strong> ticked in Settings.</li>
+<li>Click <strong>Done</strong>, <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong> on an alarm.</li>
+</box-tab>
+<box-more>
 <p>
   The alarms of Routines and Reminders, the Nudge, the Changes Nudge and "Missed while Old Brain
   Fix was not running" come as the system's notifications, for as long as the app runs. The switch
@@ -254,17 +451,31 @@
   window: on Unsorted for the Nudge; for the Changes Nudge, a save dialog for each person waiting.
 </p>
 <ul>
-  <li><strong>Linux</strong>: an alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix"; the Nudge offers 10 min, 30 min, 1 h and "Open Old Brain Fix"; the Changes Nudge offers Send. A notification shown again replaces the one before, and an alarm's notification closes once its Occurrence is Done, also on another Device.</li>
+  <li><strong>Linux</strong>: an alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix"; the Nudge offers 10 min, 30 min, 1 h and "Open Old Brain Fix"; "Missed while Old Brain Fix was not running" offers "Open Old Brain Fix"; the Changes Nudge offers Send. A notification shown again replaces the one before, and an alarm's notification closes once its Occurrence is Done, also on another Device.</li>
   <li><strong>Windows</strong>: the same buttons. Each notification is shown anew, and the app does not close it once its Occurrence is Done.</li>
   <li><strong>macOS</strong>: no buttons; a click on the notification opens the window.</li>
 </ul>
 <p>
-  The app plays the alarm sound itself, and an escalated alarm turns the notification urgent; there
-  is no full-screen alarm (see <a href="routines-and-agenda.html#on-the-desktop">Routines,
-  Reminders and the Agenda</a>).
+  The app plays its own alarm sound; once an alarm escalates, its notification turns urgent and the
+  system's alarm sound rings instead. There is no full-screen alarm (see
+  <a href="routines-and-agenda.html#on-the-desktop">Routines, Reminders and the Agenda</a>).
 </p>
+</box-more>
+</guide-box>
 
-<h2>The speech model and Photo Texts</h2>
+<guide-box name="speech">
+<h2>Get Transcripts and Photo Texts on the computer</h2>
+<p>Let the computer write down what recordings say and what photos show.</p>
+<box-tab device="phone" alt="The Speech model page with the base model in use and the choice of Base, 148 MB and Small, 488 MB">
+<li>Tap your Profile picture, then <strong>Settings</strong>.</li>
+<li>Tap <strong>Speech model</strong>.</li>
+<li>Tap <strong>Base, 148 MB</strong>.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Settings dialog at the speech model's card: no speech model yet, the choice of Base, 148 MB and Small, 488 MB, and Use a file of my own">
+<li>Click <strong>Edit ▸ Settings…</strong>.</li>
+<li>Click <strong>Base, 148 MB</strong> under "Speech model".</li>
+</box-tab>
+<box-more>
 <p>
   Transcripts need the speech model, chosen and downloaded under Settings, <strong>Speech
   model</strong>, or taken from a file of your own, as on the phone. Recordings without a Transcript,
@@ -274,8 +485,23 @@
   <a href="formatted-text-transcripts-photo-texts.html">Formatted text, Transcripts and Photo
   Texts</a>).
 </p>
+</box-more>
+</guide-box>
 
-<h2>Sync with the phone</h2>
+<guide-box name="sync">
+<h2>Pair the computer with the phone</h2>
+<p>Give the computer and the phone the same Notes.</p>
+<box-tab device="phone" alt="Sync on the phone: Scan the code, the Pair code field with Sync now, and Show this Device's code">
+<li>Tap your Profile picture on the Agenda.</li>
+<li>Tap <strong>Sync with another Device</strong>.</li>
+<li>Tap <strong>Scan the code</strong> and scan the computer's code.</li>
+</box-tab>
+<box-tab device="desktop" alt="The desktop Agenda with the Sync menu open: Sync now, Pair a Device, People, Profile and Backups…">
+<li>Click <strong>Sync ▸ Pair a Device</strong>.</li>
+<li>Scan the code shown with the phone's Sync page.</li>
+<li>Click <strong>Trust</strong> when the computer asks about the phone.</li>
+</box-tab>
+<box-more>
 <p>
   <strong>Sync now</strong> in the Sync menu opens Sync. It shows this computer's code, as a QR code
   and as text with its PIN, for the phone to scan, for as long as it is open; a phone that is not
@@ -284,26 +510,97 @@
   same code and the field <strong>Pair code</strong>, where a code the phone shows is typed or pasted
   and joined with <strong>Sync with this code</strong>. Paired Devices on the same network then sync
   on their own for as long as the app runs, also in the tray; the shared folder syncs every half
-  minute. See <a href="sharing-and-sync.html#pairing">Sharing and sync</a> for pairing, the shared
-  folder, bundles and Conflicts.
+  minute. While a sync runs, the thin line moves under the menu bar. See
+  <a href="sharing-and-sync.html#pairing">Sharing and sync</a> for pairing, the shared folder,
+  bundles and Conflicts.
 </p>
-<p>
-  <strong>Import…</strong> in the File menu opens the Import dialog: <strong>A folder…</strong> makes
-  Notes of a folder of Markdown or text files, and <strong>Google Keep…</strong> of a Google Takeout
-  export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from
-  another app</a>).
-</p>
+</box-more>
+</guide-box>
 
-<h2>The AI Task</h2>
+<guide-box name="ai-port">
+<h2>Open the AI port</h2>
+<p>Let an AI model of your choice do one task on your Notes, then review it.</p>
+<box-tab device="phone" alt="The phone's Sync with the Laptop among its paired Devices, the shared folder and the bundles">
+<li>Pair the phone with the computer.</li>
+<li>Run the AI Task in the desktop app.</li>
+<li>Sync the phone once the review is done.</li>
+</box-tab>
+<box-tab device="desktop" alt="Review the AI Task: a typo fixed, with before and after, Accept all and Reject all, and the line AI Task waits for review, sync paused">
+<li>Click <strong>Open the AI port</strong> in Settings.</li>
+<li>Click <strong>Copy client config</strong> and paste it into the AI client.</li>
+<li>Give the AI its task.</li>
+<li>Click <strong>Done, review</strong>.</li>
+<li>Click <strong>Accept all</strong>, or <strong>Reject all</strong>.</li>
+</box-tab>
+<box-more>
 <p>
   Only the desktop has the AI port. Settings, <strong>Open the AI port</strong> lets an AI model of
-  your choice work on your Notes for one task, reachable only from this computer with its token.
-  Sync waits while the port is open and until the review. <strong>Done, review</strong> closes the
-  port and lists every change with its before and after, to accept or reject as a whole (see
-  <a href="sharing-and-sync.html#the-ai-task">The AI Task</a>).
+  your choice work on your Notes for one task, reachable only with its token, from this computer or,
+  as chosen under <strong>Who may connect</strong>, from Docker containers on it. Sync waits while
+  the port is open and until the review. <strong>Done, review</strong> closes the port and lists
+  every change with its before and after, to accept or reject as a whole (see
+  <a href="sharing-and-sync.html#the-ai-task">Let an AI work on your Notes</a>).
 </p>
+<p>
+  Besides the Notes, their kinds and parts, the Areas, Topics, Routines and Reminders, the AI reads
+  a Note's History, the format of a Note's text and this computer's settings, Simple or Advanced and
+  the Trash setting among them. It sets a Note's text format, sets up Tallies, Sessions, Checklists,
+  Shopping Lists and Frogs, and turns a Checklist into a Shopping List and back, each as a change that
+  waits for the review. What you recorded it only reads.
+</p>
+</box-more>
+</guide-box>
 
-<h2>What the desktop does not have</h2>
+<guide-box name="look">
+<h2>Change the theme and the size</h2>
+<p>Show the app light or dark, and its text and icons bigger.</p>
+<box-tab device="phone" alt="Settings on the phone under Look: System, Light and Dark, and Fat fingers">
+<li>Tap your Profile picture, then <strong>Settings</strong>.</li>
+<li>Pick <strong>System</strong>, <strong>Light</strong> or <strong>Dark</strong> under Look.</li>
+<li>Switch on <strong>Fat fingers</strong> for bigger text and icons.</li>
+</box-tab>
+<box-tab device="desktop" alt="The View menu open over the Agenda: the places, Detailed views, Compact views and Theme">
+<li>Click <strong>View ▸ Theme</strong>.</li>
+<li>Click <strong>System</strong>, <strong>Light</strong> or <strong>Dark</strong>.</li>
+<li>Tick <strong>Bigger text and icons</strong> in <strong>Edit ▸ Settings…</strong>.</li>
+</box-tab>
+<box-more>
+<p>
+  <strong>View ▸ Theme</strong> offers <strong>System</strong>, which shows the window light or dark
+  as the computer is set and changes with it, <strong>Light</strong> and <strong>Dark</strong>; the
+  choice is kept on this computer. The question marks in the background move in parallax as on the
+  phone; the desktop reads no "remove animations" setting, so they never stop.
+</p>
+<p>
+  Settings, "This computer", <strong>Bigger text and icons</strong>, off by default: "Text, icons and
+  buttons show 1.3 times their size on this computer." It zooms the whole window and is kept on this
+  computer only. The phone's switch is "Fat fingers" in Settings ▸ Look.
+</p>
+<p>
+  The Settings end with "What Old Brain Fix offers": <strong>Simple</strong> or
+  <strong>Advanced</strong>, a setting of you as a person, the same on all of your own Devices (see
+  <a href="getting-started.html">Getting started</a>). In Simple the desktop leaves out Tally,
+  Session, Frog and Topic in "+", Frog, Session and Make it a Tally in the Note menu, New Topic in an
+  Area's menu, the format bar and the choice of a role when sharing an Area; what was made before
+  stays visible and usable.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="missing">
+<h2>Know what only the phone has</h2>
+<p>See what the desktop leaves to the phone.</p>
+<box-tab device="phone" alt="The Agenda on the phone">
+<li>Lock the app or an Area with a PIN.</li>
+<li>Show your calendar's appointments on the Agenda.</li>
+<li>Take photos with the camera.</li>
+</box-tab>
+<box-tab device="desktop" alt="The quick note in the desktop app: no camera, From file… for pictures and sound files">
+<li>Add photos from a file, the clipboard or a drop.</li>
+<li>Use the phone for locks, the Calendar and the camera.</li>
+</box-tab>
+<box-more>
+<p>The desktop does not have:</p>
 <ul>
   <li>The App Lock and Area Locks.</li>
   <li>The Calendar page and appointments from the calendar on the Agenda.</li>
@@ -312,3 +609,5 @@
   <li>Photos from a camera: photos come from a file, the clipboard or a drop.</li>
   <li>A full Capture Context: a Note captured on the desktop keeps only its time, without the place, the source app, the calendar event or the Bluetooth device, and there are no Named Places to manage. The Capture Context of a Note from the phone shows in full.</li>
 </ul>
+</box-more>
+</guide-box>

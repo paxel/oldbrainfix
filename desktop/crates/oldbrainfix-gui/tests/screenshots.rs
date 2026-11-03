@@ -128,6 +128,8 @@ struct Texts {
     sent: &'static str,
     lock_here: &'static str,
     lock_there: &'static str,
+    /// The desktop app (#178): a text kept from the command line.
+    typed: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -185,6 +187,7 @@ const EN: Texts = Texts {
     sent: "Lena's birthday on Saturday: bring the cake at 3",
     lock_here: "Bike lock code changed to 4-7-1-9, the blue lock",
     lock_there: "Bike lock code changed to 4-7-2-9",
+    typed: "buy milk",
 };
 
 const DE: Texts = Texts {
@@ -242,6 +245,7 @@ const DE: Texts = Texts {
     sent: "Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen",
     lock_here: "Code vom Fahrradschloss geändert auf 4-7-1-9, das blaue Schloss",
     lock_there: "Code vom Fahrradschloss geändert auf 4-7-2-9",
+    typed: "Milch kaufen",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -815,6 +819,9 @@ fn first_start(
 /// The guide page "Backups, locks and privacy" (#177).
 const PRIVACY: &str = "backups-locks-and-privacy";
 
+/// The guide page "The desktop app" (#178).
+const DESKTOP: &str = "desktop-app";
+
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
@@ -960,7 +967,10 @@ fn guide_frames() -> TestResult {
                 .ok_or("the Household Area")?;
             harness.state_mut().select(Selection::Place(household.id));
             harness.state_mut().select_note(&tap);
-            problems.extend(match_frame(&mut harness, &frame("window"))?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame(DESKTOP, "note-dialog"),
+            )?);
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("capture-and-sort", "edit"),
@@ -972,7 +982,7 @@ fn guide_frames() -> TestResult {
                 .ok_or("the Note menu")?
                 .click();
             harness.run();
-            problems.extend(match_frame(&mut harness, &frame("menu"))?);
+            problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "menu-bar"))?);
             // Note ▸ History of that Note.
             harness
                 .get_all_by_label(texts.history)
@@ -1101,7 +1111,8 @@ fn guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("routines-and-agenda", "calendar"),
             )?);
-            // What "+" at the top of the Household's list makes (#161).
+            // What "+" at the top of the Household's list makes (#161),
+            // the window's box of the desktop app.
             let mut harness = window(texts, language, theme)?;
             let household = Places::new(harness.state().store())
                 .areas()?
@@ -1112,7 +1123,7 @@ fn guide_frames() -> TestResult {
             harness.run();
             harness.get_by_label(texts.add_here).click();
             harness.run();
-            problems.extend(match_frame(&mut harness, &frame("add-menu"))?);
+            problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "window"))?);
             // Lists, Tallies, Sessions and Frogs (#174): the same "+", the
             // Household's cards compact, a plain Note's kinds, the packing
             // Checklist in the Note dialog, the Shopping List's Agenda
@@ -1201,11 +1212,16 @@ fn guide_frames() -> TestResult {
             problems.extend(privacy_frames(texts, language, theme, |name| {
                 box_frame(PRIVACY, name)
             })?);
+            // The desktop app (#178).
+            problems.extend(desktop_frames(texts, language, theme, |name| {
+                box_frame(DESKTOP, name)
+            })?);
             // The Settings dialog with this computer's switches, the AI
-            // port and the hotkey, over the Agenda.
+            // port and the hotkey, over the Agenda: the tray's box, as the
+            // tray itself is drawn by the system.
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().open(Page::Settings);
-            problems.extend(match_frame(&mut harness, &frame("settings"))?);
+            problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "tray"))?);
             problems.extend(match_frame(&mut harness, &box_frame(PRIVACY, "privacy"))?);
             problems.extend(match_frame(
                 &mut harness,
@@ -1784,5 +1800,140 @@ fn privacy_frames(
         scene(&mut harness, texts)?;
         problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
+    Ok(problems)
+}
+
+/// A scene of the page "The desktop app", given its window and the words.
+type DesktopScene = fn(&mut AppWindow, &Texts) -> TestResult;
+
+/// The window of a scene, held on the heap.
+type AppWindow = Box<Harness<'static, App>>;
+
+/// The frames of the page "The desktop app" (#178), in `texts`' words,
+/// `language` and `theme`, but the window's "+", the Note dialog, the Note
+/// menu and the Settings, which [`guide_frames`] draws: the first start,
+/// two cards selected, About opened from the Settings with its way back,
+/// Repairs shown below its path, the capture popup, a text kept from the
+/// command line in Unsorted, a dropped photo waiting in the quick note,
+/// the Agenda, the speech model, the Sync menu, an AI Task's review, the
+/// View menu and the quick note's ways to a photo.
+fn desktop_frames(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    box_frame: impl Fn(&str) -> String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut problems = Vec::new();
+    let mut harness = Box::new(first_start(language, theme)?);
+    problems.extend(match_frame(&mut harness, &box_frame("install"))?);
+    drop(harness);
+    let scenes: [(&str, DesktopScene); 7] = [
+        ("cards", |harness, texts| {
+            show_household(harness, texts)?;
+            // Ctrl-clicked, each after a pause, so no click counts double.
+            for text in [texts.filed[1], texts.bins] {
+                harness.run_steps(50);
+                harness
+                    .get_by_role_and_label(Role::Button, text)
+                    .click_modifiers(egui::Modifiers::COMMAND);
+                harness.run();
+            }
+            Ok(())
+        }),
+        ("dialogs", |harness, _| {
+            harness.state_mut().open(Page::Settings);
+            harness.run();
+            let about = harness.state().t().about_title().to_string();
+            click_first(harness, &about)
+        }),
+        ("keys", |harness, texts| {
+            let places = Places::new(harness.state().store());
+            let household = places
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.household)
+                .ok_or("the Household Area")?;
+            let repairs = places
+                .topics(&household.id)?
+                .into_iter()
+                .find(|t| t.name == texts.repairs)
+                .ok_or("the Repairs Topic")?;
+            harness.state_mut().select(Selection::Place(household.id));
+            harness.run();
+            harness.state_mut().select(Selection::Place(repairs.id));
+            harness.run();
+            Ok(())
+        }),
+        ("drop", |harness, texts| {
+            harness.input_mut().dropped_files = vec![egui::DroppedFile {
+                bytes: Some(Arc::from(RECEIPT)),
+                ..Default::default()
+            }];
+            harness.run();
+            harness
+                .get_by(|n| n.placeholder() == Some(texts.hint))
+                .click();
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.receipt);
+            harness.run();
+            Ok(())
+        }),
+        ("notifications", |_, _| Ok(())),
+        ("sync", |harness, _| {
+            let sync = harness.state().t().menu_sync().to_string();
+            harness
+                .query_all_by_label(&sync)
+                .next()
+                .ok_or("the Sync menu")?
+                .click();
+            harness.run();
+            Ok(())
+        }),
+        ("look", |harness, _| {
+            let view = harness.state().t().menu_view().to_string();
+            click_last(harness, &view)
+        }),
+    ];
+    for (name, scene) in scenes {
+        let mut harness = Box::new(window(texts, language, theme)?);
+        scene(&mut harness, texts)?;
+        problems.extend(match_frame(&mut harness, &box_frame(name))?);
+    }
+    // The quick note's Paste and From file…, the desktop's ways to a
+    // photo without a camera.
+    let mut harness = Box::new(window(texts, language, theme)?);
+    harness.state_mut().new_note();
+    harness.run();
+    problems.extend(match_frame(&mut harness, &box_frame("missing"))?);
+    drop(harness);
+    let mut harness = Box::new(popup(texts, language, theme)?);
+    harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+    harness.run();
+    problems.extend(match_frame(&mut harness, &box_frame("hotkey"))?);
+    drop(harness);
+    // "oldbrainfix capture buy milk" kept the text as an Unsorted Note.
+    let mut harness = Box::new(window_with(texts, language, theme, |store, _| {
+        Notes::new(store)
+            .capture(texts.typed, None, None)
+            .map(|_| ())
+    })?);
+    harness.state_mut().select(Selection::Unsorted);
+    harness.run();
+    problems.extend(match_frame(&mut harness, &box_frame("command-line"))?);
+    drop(harness);
+    problems.extend(speech_model_frame(
+        texts,
+        language,
+        theme,
+        &box_frame("speech"),
+    )?);
+    // An AI Task that fixed a typo waits for its review.
+    let mut harness = Box::new(window_with(texts, language, theme, |store, _| {
+        let notes = Notes::new(store);
+        let parcel = notes.capture(texts.typo, None, None)?;
+        let task = store.open_ai_task()?;
+        store.drafting(&task, || notes.edit(&parcel.id, texts.fixed))
+    })?);
+    problems.extend(match_frame(&mut harness, &box_frame("ai-port"))?);
     Ok(problems)
 }

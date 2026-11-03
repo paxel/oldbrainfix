@@ -1722,7 +1722,8 @@ void main() {
             await search(tester, texts.search);
           });
 
-          boxFrame(texts175, 'transcript', (tester) async {
+          /// The Speech model page, opened from Settings.
+          Future<void> speechModel(WidgetTester tester) async {
             final t = await _start(
               tester,
               boundary,
@@ -1749,7 +1750,9 @@ void main() {
             await tester.pumpAndSettle();
             await _tap(tester, model);
             expect(find.byType(SpeechModelScreen), findsOneWidget);
-          });
+          }
+
+          boxFrame(texts175, 'transcript', speechModel);
 
           boxFrame(texts175, 'photo-text', (tester) async {
             await formattedNotes(tester);
@@ -2128,6 +2131,100 @@ void main() {
             await openSettings(tester, t);
             expect(find.text(t.settingsIntro), findsOneWidget);
           });
+
+          // The desktop app (#178): the phone's own way where it has one,
+          // else the Agenda, as the box is the desktop's alone.
+          const desktop178 = 'desktop-app';
+
+          Future<void> agenda(WidgetTester tester) async {
+            await start(tester, seed());
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          }
+
+          boxFrame(desktop178, 'install', (tester) async {
+            await firstStart(tester);
+            expect(find.byType(FirstStartScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'window', (tester) async {
+            await addFan(tester);
+            expect(find.byKey(const ValueKey('addFan-tally')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'cards', household);
+
+          boxFrame(desktop178, 'note-dialog', (tester) async {
+            await boilerEditor(tester);
+            expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'menu-bar', (tester) async {
+            // A Profile of fixed keys: its short code is the same on
+            // every run.
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            expect(
+              find.byKey(const ValueKey('deviceSettings')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame(desktop178, 'dialogs', (tester) async {
+            final t = await start(tester, seed());
+            await openBackups(tester, t);
+          });
+
+          boxFrame(desktop178, 'keys', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            expect(find.text(t.starterHousehold), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'tray', agenda);
+
+          boxFrame(desktop178, 'hotkey', (tester) async {
+            await start(tester, seed());
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.pumpAndSettle();
+            expect(find.byType(CaptureScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'command-line', agenda);
+
+          boxFrame(desktop178, 'drop', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byIcon(Icons.add));
+            expect(fanEntry('gallery'), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'notifications', (tester) async {
+            final t = await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-new')));
+            await _tap(tester, find.text(t.starterSetDone));
+            expect(find.byType(SetupScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'speech', speechModel);
+
+          boxFrame(desktop178, 'sync', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'ai-port', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t, find.text('Laptop'));
+          });
+
+          boxFrame(desktop178, 'look', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            expect(find.byKey(const ValueKey('fatFingers')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'missing', agenda);
         }
       }
     },
