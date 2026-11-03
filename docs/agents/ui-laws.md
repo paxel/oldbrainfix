@@ -4,40 +4,19 @@ Rules every screen follows. Check a change against them before it lands;
 a screen that breaks one is a bug, not a style choice. Terms are those of
 `CONTEXT.md`. #n refers to issue n on https://github.com/paxel/oldbrainfix/issues.
 
-## Navigation
+The laws come in three parts (#196): **Both apps** binds the phone and the
+desktop alike; **Phone** and **Desktop** hold what only one app does, and
+replace a law of Both apps where they say so. A desktop law marked
+"(draft, #196)" waits for the user's review.
 
-- **Never a bottom bar**, on any screen. The bottom edge belongs to the
-  system's navigation buttons and gestures; app navigation there only
-  causes wrong taps.
-- **The end of every page clears the system navigation bar** (#61), on
-  gesture and button navigation alike: the last row scrolls fully above
-  it, and controls anchored at the bottom sit above it. **The end of a
-  page also clears its floating buttons** (#158): the last row scrolls
-  fully above them, their margin and a gap included. On the desktop
-  nothing floats over a list; every list ends with the same room after
-  its last card, so that card scrolls fully into view.
-- The Agenda carries one floating button: **"+"** captures a Note.
-  Nothing else floats, except the ways "+" fans out while it is open (see
-  Capture). **The folder**, first in the Agenda's top bar, opens the
-  Areas list (#221); search by text and by #tag stays inside the
-  browser.
-- Settings, Backups and Sync are reached only through the **Profile
-  picture in the Agenda's top corner**. It
-  opens the Profile page: picture, name and short code; Backups and
-  recovery; Your Devices; People; Settings of this Device, with About
-  inside. No hamburger menu, no ⋮ menu for them. On the desktop the
-  menu bar leads to them instead (see Desktop).
-- The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
-  level above the Areas list**. **Swipe left on the Agenda opens the
-  Areas list**, as the folder does. In the notes browser, **swipe
-  right goes back** one level (Topic, Area, Areas list, Agenda) and
-  **swipe left goes forward** into the last selected Area or Topic, if
-  there is one. The last selected Area and Topic are highlighted.
+## Both apps
+
+### Navigation
+
 - Every browser level (Areas, Topics, Notes) has a "+" that adds the
   thing shown on that level. On the Areas list it adds an Area. **In an
-  Area, a Topic and All Notes "+" fans out Note, Checklist, Shopping
-  List, Tally, Session and Frog** (#161), and in an Area Topic, each an
-  icon with its words, upward from the button as the Agenda's fan does;
+  Area, a Topic and All Notes "+" offers Note, Checklist, Shopping
+  List, Tally, Session and Frog** (#161), and in an Area Topic;
   Session, Frog and Topic only for who may set them up, and Tally,
   Session, Frog and Topic only in Advanced (#197). What it makes is
   filed into the Area or Topic shown, from All Notes into none: Note
@@ -59,13 +38,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   starts its name with the tags picked, and Rolling's order moves only
   unfiltered. The filter is a view, kept while the page is open, never
   stored. Leaving a name dialog or one of
-  the pages without Create or Save makes nothing. **On the desktop "+"
-  sits at the end of the list's heading** (#146, #161) and opens a menu
-  of the same kinds, Note first, each with its icon and words; the
-  Agenda's and Unsorted's "+" open the quick note at once. The pages
-  open as dialogs over the window; the desktop's Session page is the
-  Routine editor's, its name first, the count, rule and schedule as its
-  panels.
+  the pages without Create or Save makes nothing.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.
@@ -78,26 +51,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   it a Tally", the format bar, and roles when sharing and in People.
   What exists shows and works as in Advanced. Never chosen is Advanced.
 
-## Gestures
+### Clicks and taps
 
-- **Tap is the primary action.** On a list row it opens the thing; on a
-  checkbox it checks. **A tap on a Note card switches that card** between
-  its compact and its detailed view, in place (#189); in "merge into…" it
-  picks the Note. A tap on a row or card never opens a menu.
-- **Long-press is the secondary action**: a menu, or the editor when
-  there is only one thing to do. A long-press on a Note card opens its
-  editor, as Edit in its ⋮ does; nothing else opens it from a card. A
-  long-press never changes data by itself.
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
-- **A horizontal swipe only navigates** (see Navigation); it never
-  changes data or swipes a row or card away. The exceptions are the
-  full-screen table, where a one-finger drag on its cells moves it
-  sideways, as its bar does, and a Code text in the Note editor (#213),
-  which a one-finger drag moves sideways; on a card a Code text is cut
-  off at the edge instead.
 
-## Announcements
+### Announcements
 
 - Everything the app has to say goes to the top of the screen, under
   the status bar: one announcement at a time, the page pushed down
@@ -115,25 +74,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - An answer to a form field (name taken, not a code) is that field's
   own error text, red, under the field.
 
-## Capture
+### Capture
 
 - **Capture never asks anything and never needs unlocking.** The App
   Lock and Area Locks guard browsing, not Capture.
-- **The Agenda's "+" fans out Text, Voice, Photo, Gallery and Paste**,
-  and so does the lock screen's, each an icon with
-  its words, upward from the button; it is not a bottom sheet. While
-  the fan is open, "+" reads as close; a second tap on it, a tap
-  outside or Back closes the fan. Text opens text capture, Voice starts
-  recording at once, Photo opens the camera, Gallery opens the system's
-  picture picker and continues as a photo Note, Paste opens text capture
-  filled from the clipboard: its text in the field, its picture as the
-  Note's photo, both when it holds both, and a line on the screen, no
-  announcement, when it holds neither. The clipboard is read only on
-  that tap, never on opening or in the background. The text capture
-  screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
-  quick entry point (widget, tile, shortcut, also when the phone's key
-  or gesture settings or a button-mapper app start it; no code reads a
-  key) opens its capture screen directly, with no fan and no screen in between.
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
@@ -145,43 +89,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   with that Nudge time, so the radio-button law does not apply to them.
   Where the Device switched the Nudge buttons off (Settings ▸ Quick
   note), one Save takes their place, and it nudges in 1 h as leaving does.
-- **The quick note is uncluttered** (#142): by default it shows the
-  text field, Photo, Voice, Gallery and Paste, the Nudge buttons and
-  **To full editor**, nothing that sorts and no chips. To full editor
-  saves the Note at once, Unsorted with the default Nudge, and opens the
-  Note editor on it in place of the capture screen; leaving the editor
-  returns to where Capture was opened from. It waits while there is
-  nothing to save and is not offered behind the App Lock or while a
-  Shopping List is picked.
-- **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
-  all off by default, for File into…, Routine, Reminder, Frog, Session
-  or Tally, Add to a Shopping List, the Importance and the format bar
-  (only in Advanced, #197),
-  and the switch Nudge buttons, on by default. What is switched on shows
-  in the Note card's action row beside To full editor, on every capture
-  path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts): File into… and the
-  alarm clock, and ⋮ with the Importance, Make it a Tally (with the
-  Routine switch) and Add to a Shopping List. Each opens its usual
-  page and comes back to the capture screen with the choice shown at the
-  top ("→ Household"), not saved yet; the user can keep typing or add
-  more. All of it is optional. With the format bar on, it rides on the
-  keyboard; where the room is small the buttons under the text scroll
-  and the text keeps two lines.
-- **On the desktop** the capture popup and the window's quick note
-  dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
-  quick note and follow the same switches (desktop Settings ▸ Quick
-  note, beside Quick capture): by default the text, Record voice, Paste
-  (the dialog also From file…), the Nudge buttons and To full editor;
-  switched on, File into…, Routine, Reminder, Frog and Session, and
-  More with the Importance, Make it a Tally and Add to a Shopping List,
-  and the format bar over the field, without ☐, link and table. Files
-  dropped onto the window open the dialog and wait in it. Leaving the
-  dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
-  beside it keeps what is typed, nudged in 1 h. To full editor in the
-  window opens the Note in the Note dialog in its place; in the popup it
-  closes the popup and opens the Note there in the window, brought back
-  from the tray.
 - **Add to a Shopping List** makes each line of the capture a Line of
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
@@ -196,15 +103,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, or
   a Routine, Reminder, Frog, Session or Tally is set up, the three
   Nudge buttons become one Save and no Nudge is set; leaving saves too.
-- Behind the App Lock, the row offers neither File into… nor the
-  Session, which would show the Areas and the Tallies. File into… lists
-  a closed locked Area without its Topics.
-- After saving, the new Note's card shows with the same options, for
-  whatever was not done while capturing (merging into another Note
-  among them): in its detailed view, a tap switching it to compact. Enriching is never required; a Note left without an
-  Area or Topic stays Unsorted.
 
-## Agenda
+### Agenda
 
 - Order: the Missed Summary card, then the "x Unsorted" banner, then
   the "x Sent Items waiting" line while a stranger's Sent Item waits for
@@ -224,17 +124,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   says how to capture instead ("Nothing due today. Tap + to capture a
   thought."). The later days'
   Occurrences can be checked off today.
-- **The Agenda's bar**, in this order: All Routines and Reminders,
-  Calendar, new Routine, then the Profile picture in the corner. All
-  Routines and Reminders lists every one alphabetically by name, also
-  those beyond the week, and a tap opens its editor; its bar's New
-  Session opens the editor of a new Session whose Note is the text typed
-  there, and its Export writes one calendar file of all of them. Calendar opens the Calendar
-  page: "Read from your calendar" (the appointment running at Capture,
-  and the switch that shows the calendar's appointments on the Agenda,
-  whose calendars are picked on a page of checkboxes, none at first) and
-  "Write to your calendar" (the calendar mirror); Settings has a row
-  leading to the same page. Nothing on the Agenda selects rows to share.
 - **Every group on the Agenda is a heading with its entries under it**
   (#208): a Shopping List, a Checklist, a Checklist Routine's Occurrence
   and a Session's Occurrence alike. The heading leads with its box, or
@@ -247,27 +136,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   form), a box checks its entry. One card holds a group. Which Lines a
   Checklist's group shows is decided in one place (`agendaLines`, on the
   desktop `agenda_lines`).
-- **The Agenda's rows are tight, their targets are not** (#208): on the
-  phone every box and ⋮ is 40 by 40 dp, a heading at least 40 high with
-  2 above and below it in its card, an entry 40 high, 6 between two
-  cards, entries indented 48; an Occurrence's card is 48 high and the
-  next starts 54 below it, where 0.3.1 had 56 and 68. On the desktop a
-  row's card has 6 above and below its content, 6 between cards and 2
-  between a heading's time and words, so the next row starts 52 below,
-  where 0.3.1 had 84; the box stays 28. The "Eat a frog" rows and the
-  appointments' rows are as tight. Not as tight as the widget, whose
-  rows lie 4 apart.
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
   press: History for a Routine, and Share, which hands the Routine as
   its whole series with its end, or the Reminder, to another app as a
   calendar file. A Masked row asks for its Area to open first.
-- **A calendar appointment's row is read only**: no checkbox, the
-  calendar's colour down its side, the calendar icon and the calendar's
-  name. A tap unfolds its place and description and folds them again;
-  ⋮ or a long press opens "Copy into a Note", which makes a new Unsorted
-  Note of its title, time, place and description and shows its card on
-  top. The calendar mirror's own entries never show as appointments.
-  Nothing of an appointment is kept or synced.
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines (#143, #208): its name as the heading, without a
   box, and its open Lines under it, each with its box, which checks it;
@@ -316,37 +188,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   unchecks it, and a tap on it does nothing, on every day. Tomorrow and
   later days show only the title and how many it picks: the picks are
   made on the day.
-- **The home-screen Agenda widget shows exactly what the Agenda shows**
-  (#153, #194), in the Agenda's order: the Missed Summary with its
-  Missed Occurrences, the "x Unsorted" row, which opens the Unsorted
-  list, then under "Today" the rows of today and the "Eat a frog"
-  section, then the Agenda's coming days, "Tomorrow" and the five days
-  after it under their weekday and date, each with its rows and
-  appointments, dimmed, an empty one with "Nothing planned". It moves on
-  at midnight without the app, showing the days its snapshot still
-  holds. It is one list that scrolls when it is taller than the
-  widget. **Its groups are the Agenda's** (#209): a Shopping List's and
-  a Checklist's name as the heading, without a box, its words where a
-  boxed heading's begin, with their open Lines under it; a Checklist
-  Routine's Occurrence with its Lines; a Session's Occurrence with its
-  picks; each entry with its box, indented alike in every group so its
-  box stands where the heading's words begin, a Line under another
-  Line one step further. A Shopping List shown as its count, or Masked,
-  and a Masked Checklist are the heading alone, as on the Agenda. A box
-  there checks what the same box on the Agenda checks, with the same
-  result: an Occurrence, a Line for its Occurrence, a Checklist's Line,
-  a Frog, a Missed Occurrence, a Shopping List's Line; unchecking is
-  done in the app. **Only today's rows and the Missed Occurrences tick
-  there** (#194): a coming day's box, unlike the Agenda's, checks
-  nothing and opens the app. **A Session's box only shows Done**, and a tap on it
-  does nothing; a pick's box shows whether it has an entry, and a tap
-  on the pick, box or words, opens the app at its entry form, its
-  locked Area first, once the App Lock is open. Appointments, the lists'
-  headings and the other headings have no box; every other tap opens
-  the app. Masked rows show as on the Agenda and the lock screen.
-  Nothing of an appointment is kept for the widget either.
 
-## Cards
+### Cards
 
 - A Note is drawn as a card with a soft embossed look, visibly above the
   background.
@@ -362,14 +205,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   its height capped, and is decoded no larger than it shows, so an
   extreme picture (12 × 34,000 px) cannot break the card; a tap opens it
   full screen with zoom.
-- **A photo gets out of the Note** (#149): full screen its ⋮ offers
-  Save, Copy and Share on the phone, Save putting it into the phone's
-  Pictures in the album "Old Brain Fix" (Android 10 and later; before
-  it, Save is announced as failed with Share as the fix), and only while
-  its file is on the phone; on the desktop a right-click on a photo in
-  the Note editor or full screen offers "Save image as…", "Copy image"
-  and "Open in another program". Saved and copied say nothing, nor does
-  a share sheet left without an app; a failure is announced.
 - **A part's meta is one weak line under its text** (#170): under the
   Note's text in the detailed view, and under each Section's there and
   in the Note editor, its time, place (the Named Place, else the coordinates),
@@ -414,8 +249,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   and offering "Another one" as on the Agenda, then "done N / skipped
   M" for each of the last four weeks, this week first; a Session
   without a Routine shows its pool alone.
-- The editor opens only through a long press on the card or Edit in its
-  ⋮.
 - **A card ticks today's Occurrences of its Note** (#215): in either
   view, under where it is filed and over its text, a box with the time
   for each of its Routines and Reminders with an Occurrence today, its
@@ -436,9 +269,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   accent and "Done and move to trash" on the error colour.
 - **Copy text** in a card's ⋮ puts the text of the Note and of each
   Section on the clipboard as they show, oldest first, a blank line
-  between them, and says nothing (#183). In the Note editor a text that
-  is only read, the Note's or a Section's, selects with a long press,
-  with Copy in the system's menu.
+  between them, and says nothing (#183).
 - **A Section's text is edited in place in the Note editor** (#183), in
   the same field and with the same format bar as the Note's text, by the
   same people (the Section's author, in a Shared Area also the
@@ -530,19 +361,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.
 
-## Dialogs and pages
+### Dialogs and pages
 
 - A dialog has one question and at most two actions plus Cancel. More
   than that is a page. A list to choose from (Areas, Topics, People) is
   a menu at the finger or a page, never a sheet.
-- Text and buttons must be readable at the phone's default font size:
-  buttons stacked full width or in one row of two, never a cramped row
-  of four. A row of three is allowed when every label is a few
-  characters long, like "10 min", "30 min", "1 h". The content scrolls if it does not fit; nothing shrinks to
-  fit.
-- **The control goes below its text.** In every row that holds text and
-  a control (switch, button, dropdown), the control sits on its own line
-  below the text, always, also when the text is short.
 - **Every single choice is radio buttons.** A choice of one value is a
   column of radio buttons, one option per line, two options included:
   never segmented buttons or a row of choice chips, which cramp and grow
@@ -556,37 +379,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error
   colour.
-- An editor with several fields is a full-screen page with Save in the
-  top bar; secondary state changes are rows at the bottom of the page.
-  The Note editor's settings are its badges (see Cards).
 
-## Text editor
+### Text editor
 
-- **The Note editor and Amend type in two rows** on the phone and the
-  tablet, unless Settings of this Device switch it off, which gives the
-  system's text field back. The desktop keeps its own field.
-- The top row is the whole text in the system's text field, so the
-  keyboard's suggestions, autocorrect, swipe typing and voice input
-  work. A tap puts the cursor at the nearest word boundary; there is no
-  magnifier and no dragging the cursor. A long press selects as usual,
-  with Copy, Cut and Delete in the system's menu.
-- The bottom row shows the cursor's line as a text field does: from
-  its start, the cursor right after the text before it; a line wider
-  than the row scrolls sideways only as far as keeps the cursor in
-  view, so ◀ and ▶ move the cursor, not the letters. It sits directly
-  above the keyboard, only while the keyboard is open; it is a bar of
-  the field, not a sheet, and never takes the keyboard's focus. It
-  rides on the keyboard and never sits on the screen's bottom edge, so
-  it is no bottom bar. **◀ and ▶ move the cursor one character** (an
-  emoji is one); held, they repeat, faster the longer they are held.
-- **A long press on the bottom row starts selecting** where the cursor
-  is and never moves it. While selecting, ◀ and ▶ show in inverted
-  colours and move only the selection's moving end; the system's menu
-  offers Copy, Cut and Delete; typing replaces the selection and ends
-  selecting; another long press ends it with the cursor at the moving
-  end.
-- A screen reader reads both rows and the buttons by name, and the
-  character the cursor passes.
 - **The format bar goes with the field**: ☐, bold, italic,
   strike-through, two headings, bullets, numbers, quote, link, code,
   code block (on the lines touched, or taking a block's fences off), in
@@ -606,15 +401,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   moves sideways. **A paste that looks like code** into a Plain Note's
   text in the Note editor formats nothing and puts "Keep as code" under
   the text, with a cross that lets the paste be; Capture never asks.
-- **On the phone a table in the field is its grid**, the same as on the
-  card, never its Markdown; a tap opens it full screen. It is one block:
-  the cursor and a selection never end inside it, the bottom row shows
-  it as a table's sign, what is typed right before or after it goes on
-  a line of its own, and deleting any of it deletes all of it, asking
-  first while its cells hold words. The desktop's field shows its
-  Markdown.
 
-## Boxes
+### Boxes
 
 - **A tap on a box opens its menu at the finger**: Check, Fail and
   Open, the state it shows left out, and History once it has been
@@ -639,7 +427,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **History** opens a dialog listing every change of the box, the oldest
   first: the state, who and when.
 
-## Checklist and Shopping List Lines
+### Checklist and Shopping List Lines
 
 - **A Checklist and a Shopping List are edited the same way**, as one
   block of text with boxes (#184): in the Note editor every Line is a
@@ -654,11 +442,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Line, which keeps its box and state, and the Line goes, its checks
   staying in the log; an empty Line simply goes. **No Add Line button
   and no Add field**: Return makes new Lines.
-- **In and out** sit on the bar above the keyboard, as the format bar
-  does, and put the Line with the cursor under the Line above or back
-  at the top. On the desktop **Tab and Shift+Tab** do it, in place of
-  the buttons, and Up and Down move the cursor to the Line above and
-  below.
 - **The frame around a group holds the group's own Line** and the Lines
   under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when
@@ -678,23 +461,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   once, then Close. Where this Device may not change the Line, the badge
   only shows it; a new Line's badge stores it first.
 
-## The bar
-
-- **One bar on every phone page.** On a phone the buttons sit on their
-  own row and the title on the line under them; on a wide screen the
-  title sits beside them.
-- **An action goes into ⋮ only when the bar is full.** A page lists its
-  actions in a fixed order; the bar shows as many as fit at the width it
-  has, the rest overflow into ⋮, and ⋮ exists only when it holds
-  something. ⋮ is last. Nothing adapts to use. Settings, Backups and
-  Sync never go into ⋮; they stay behind the Profile picture.
-- A destructive action has no special place: last in the order, on the
-  bar when there is room; its confirm dialog is the guard.
-- An action in ⋮ shows its icon and its words, as it does on the bar.
-- Labelled buttons (Save) and buttons that open a menu of their own
-  never overflow.
-
-## Lists
+### Lists
 
 - A part of a page that is rarely needed folds; the fold is remembered
   per Device in a setting of that Device, closed by default when there
@@ -711,13 +478,13 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
 
-## Wording
+### Wording
 
 - The UI speaks in the terms of `CONTEXT.md`: Notes, Areas, Topics,
   Routines, Reminders, People; never of entries, entities or hashes.
 - Errors name the cause and the fix in one sentence each.
 
-## Look
+### Look
 
 - Light mode: a light teal background. Dark mode: anthracite. The
   accent is teal in both. The theme follows the system, with a manual
@@ -729,13 +496,254 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Cards and controls must always stand out clearly from the question
   marks.
 
-## Alarms and notifications
+### Alarms and notifications
 
 - An Occurrence's notification offers **Done** and **Snooze** (10 min,
   30 min, 1 h) without opening the app. Done is also at the top of its
   Note's editor and on its card (#215); Snooze stays in the
   notification. Done moves a Plain Note with its only Reminder to the
   trash where the person chose so (#211, "Agenda").
+
+## Phone
+
+### Navigation
+
+- **Never a bottom bar**, on any screen. The bottom edge belongs to the
+  system's navigation buttons and gestures; app navigation there only
+  causes wrong taps.
+- **The end of every page clears the system navigation bar** (#61), on
+  gesture and button navigation alike: the last row scrolls fully above
+  it, and controls anchored at the bottom sit above it. **The end of a
+  page also clears its floating buttons** (#158): the last row scrolls
+  fully above them, their margin and a gap included.
+- The Agenda carries one floating button: **"+"** captures a Note.
+  Nothing else floats, except the ways "+" fans out while it is open (see
+  Capture). **The folder**, first in the Agenda's top bar, opens the
+  Areas list (#221); search by text and by #tag stays inside the
+  browser.
+- Settings, Backups and Sync are reached only through the **Profile
+  picture in the Agenda's top corner**. It
+  opens the Profile page: picture, name and short code; Backups and
+  recovery; Your Devices; People; Settings of this Device, with About
+  inside. No hamburger menu, no ⋮ menu for them.
+- The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
+  level above the Areas list**. **Swipe left on the Agenda opens the
+  Areas list**, as the folder does. In the notes browser, **swipe
+  right goes back** one level (Topic, Area, Areas list, Agenda) and
+  **swipe left goes forward** into the last selected Area or Topic, if
+  there is one. The last selected Area and Topic are highlighted.
+- **In an Area, a Topic and All Notes "+" fans out** its kinds (#161),
+  each an icon with its words, upward from the button as the Agenda's
+  fan does.
+
+### Gestures
+
+- **Tap is the primary action.** On a list row it opens the thing; on a
+  checkbox it checks. **A tap on a Note card switches that card** between
+  its compact and its detailed view, in place (#189); in "merge into…" it
+  picks the Note. A tap on a row or card never opens a menu.
+- **Long-press is the secondary action**: a menu, or the editor when
+  there is only one thing to do. A long-press on a Note card opens its
+  editor, as Edit in its ⋮ does; nothing else opens it from a card. A
+  long-press never changes data by itself.
+- **A horizontal swipe only navigates** (see Navigation); it never
+  changes data or swipes a row or card away. The exceptions are the
+  full-screen table, where a one-finger drag on its cells moves it
+  sideways, as its bar does, and a Code text in the Note editor (#213),
+  which a one-finger drag moves sideways; on a card a Code text is cut
+  off at the edge instead.
+
+### Capture
+
+- **The Agenda's "+" fans out Text, Voice, Photo, Gallery and Paste**,
+  and so does the lock screen's, each an icon with
+  its words, upward from the button; it is not a bottom sheet. While
+  the fan is open, "+" reads as close; a second tap on it, a tap
+  outside or Back closes the fan. Text opens text capture, Voice starts
+  recording at once, Photo opens the camera, Gallery opens the system's
+  picture picker and continues as a photo Note, Paste opens text capture
+  filled from the clipboard: its text in the field, its picture as the
+  Note's photo, both when it holds both, and a line on the screen, no
+  announcement, when it holds neither. The clipboard is read only on
+  that tap, never on opening or in the background. The text capture
+  screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
+  quick entry point (widget, tile, shortcut, also when the phone's key
+  or gesture settings or a button-mapper app start it; no code reads a
+  key) opens its capture screen directly, with no fan and no screen in between.
+- **The quick note is uncluttered** (#142): by default it shows the
+  text field, Photo, Voice, Gallery and Paste, the Nudge buttons and
+  **To full editor**, nothing that sorts and no chips. To full editor
+  saves the Note at once, Unsorted with the default Nudge, and opens the
+  Note editor on it in place of the capture screen; leaving the editor
+  returns to where Capture was opened from. It waits while there is
+  nothing to save and is not offered behind the App Lock or while a
+  Shopping List is picked.
+- **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
+  all off by default, for File into…, Routine, Reminder, Frog, Session
+  or Tally, Add to a Shopping List, the Importance and the format bar
+  (only in Advanced, #197),
+  and the switch Nudge buttons, on by default. What is switched on shows
+  in the Note card's action row beside To full editor, on every capture
+  path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
+  shortcut, also one a phone key or gesture starts): File into… and the
+  alarm clock, and ⋮ with the Importance, Make it a Tally (with the
+  Routine switch) and Add to a Shopping List. Each opens its usual
+  page and comes back to the capture screen with the choice shown at the
+  top ("→ Household"), not saved yet; the user can keep typing or add
+  more. All of it is optional. With the format bar on, it rides on the
+  keyboard; where the room is small the buttons under the text scroll
+  and the text keeps two lines.
+- Behind the App Lock, the row offers neither File into… nor the
+  Session, which would show the Areas and the Tallies. File into… lists
+  a closed locked Area without its Topics.
+- After saving, the new Note's card shows with the same options, for
+  whatever was not done while capturing (merging into another Note
+  among them): in its detailed view, a tap switching it to compact. Enriching is never required; a Note left without an
+  Area or Topic stays Unsorted.
+
+### Agenda
+
+- **The Agenda's bar**, in this order: All Routines and Reminders,
+  Calendar, new Routine, then the Profile picture in the corner. All
+  Routines and Reminders lists every one alphabetically by name, also
+  those beyond the week, and a tap opens its editor; its bar's New
+  Session opens the editor of a new Session whose Note is the text typed
+  there, and its Export writes one calendar file of all of them. Calendar opens the Calendar
+  page: "Read from your calendar" (the appointment running at Capture,
+  and the switch that shows the calendar's appointments on the Agenda,
+  whose calendars are picked on a page of checkboxes, none at first) and
+  "Write to your calendar" (the calendar mirror); Settings has a row
+  leading to the same page. Nothing on the Agenda selects rows to share.
+- **The Agenda's rows are tight, their targets are not** (#208): on the
+  phone every box and ⋮ is 40 by 40 dp, a heading at least 40 high with
+  2 above and below it in its card, an entry 40 high, 6 between two
+  cards, entries indented 48; an Occurrence's card is 48 high and the
+  next starts 54 below it, where 0.3.1 had 56 and 68. The "Eat a frog"
+  rows and the appointments' rows are as tight. Not as tight as the
+  widget, whose rows lie 4 apart.
+- **A calendar appointment's row is read only**: no checkbox, the
+  calendar's colour down its side, the calendar icon and the calendar's
+  name. A tap unfolds its place and description and folds them again;
+  ⋮ or a long press opens "Copy into a Note", which makes a new Unsorted
+  Note of its title, time, place and description and shows its card on
+  top. The calendar mirror's own entries never show as appointments.
+  Nothing of an appointment is kept or synced.
+- **The home-screen Agenda widget shows exactly what the Agenda shows**
+  (#153, #194), in the Agenda's order: the Missed Summary with its
+  Missed Occurrences, the "x Unsorted" row, which opens the Unsorted
+  list, then under "Today" the rows of today and the "Eat a frog"
+  section, then the Agenda's coming days, "Tomorrow" and the five days
+  after it under their weekday and date, each with its rows and
+  appointments, dimmed, an empty one with "Nothing planned". It moves on
+  at midnight without the app, showing the days its snapshot still
+  holds. It is one list that scrolls when it is taller than the
+  widget. **Its groups are the Agenda's** (#209): a Shopping List's and
+  a Checklist's name as the heading, without a box, its words where a
+  boxed heading's begin, with their open Lines under it; a Checklist
+  Routine's Occurrence with its Lines; a Session's Occurrence with its
+  picks; each entry with its box, indented alike in every group so its
+  box stands where the heading's words begin, a Line under another
+  Line one step further. A Shopping List shown as its count, or Masked,
+  and a Masked Checklist are the heading alone, as on the Agenda. A box
+  there checks what the same box on the Agenda checks, with the same
+  result: an Occurrence, a Line for its Occurrence, a Checklist's Line,
+  a Frog, a Missed Occurrence, a Shopping List's Line; unchecking is
+  done in the app. **Only today's rows and the Missed Occurrences tick
+  there** (#194): a coming day's box, unlike the Agenda's, checks
+  nothing and opens the app. **A Session's box only shows Done**, and a tap on it
+  does nothing; a pick's box shows whether it has an entry, and a tap
+  on the pick, box or words, opens the app at its entry form, its
+  locked Area first, once the App Lock is open. Appointments, the lists'
+  headings and the other headings have no box; every other tap opens
+  the app. Masked rows show as on the Agenda and the lock screen.
+  Nothing of an appointment is kept for the widget either.
+
+### Cards
+
+- **A photo gets out of the Note** (#149): full screen its ⋮ offers
+  Save, Copy and Share on the phone, Save putting it into the phone's
+  Pictures in the album "Old Brain Fix" (Android 10 and later; before
+  it, Save is announced as failed with Share as the fix), and only while
+  its file is on the phone. Saved and copied say nothing, nor does
+  a share sheet left without an app; a failure is announced.
+- The editor opens only through a long press on the card or Edit in its
+  ⋮.
+- In the Note editor a text that is only read, the Note's or a
+  Section's, selects with a long press, with Copy in the system's menu
+  (#183).
+
+### Dialogs and pages
+
+- Text and buttons must be readable at the phone's default font size:
+  buttons stacked full width or in one row of two, never a cramped row
+  of four. A row of three is allowed when every label is a few
+  characters long, like "10 min", "30 min", "1 h". The content scrolls if it does not fit; nothing shrinks to
+  fit.
+- **The control goes below its text.** In every row that holds text and
+  a control (switch, button, dropdown), the control sits on its own line
+  below the text, always, also when the text is short.
+- An editor with several fields is a full-screen page with Save in the
+  top bar; secondary state changes are rows at the bottom of the page.
+  The Note editor's settings are its badges (see Cards).
+
+### Text editor
+
+- **The Note editor and Amend type in two rows** on the phone and the
+  tablet, unless Settings of this Device switch it off, which gives the
+  system's text field back.
+- The top row is the whole text in the system's text field, so the
+  keyboard's suggestions, autocorrect, swipe typing and voice input
+  work. A tap puts the cursor at the nearest word boundary; there is no
+  magnifier and no dragging the cursor. A long press selects as usual,
+  with Copy, Cut and Delete in the system's menu.
+- The bottom row shows the cursor's line as a text field does: from
+  its start, the cursor right after the text before it; a line wider
+  than the row scrolls sideways only as far as keeps the cursor in
+  view, so ◀ and ▶ move the cursor, not the letters. It sits directly
+  above the keyboard, only while the keyboard is open; it is a bar of
+  the field, not a sheet, and never takes the keyboard's focus. It
+  rides on the keyboard and never sits on the screen's bottom edge, so
+  it is no bottom bar. **◀ and ▶ move the cursor one character** (an
+  emoji is one); held, they repeat, faster the longer they are held.
+- **A long press on the bottom row starts selecting** where the cursor
+  is and never moves it. While selecting, ◀ and ▶ show in inverted
+  colours and move only the selection's moving end; the system's menu
+  offers Copy, Cut and Delete; typing replaces the selection and ends
+  selecting; another long press ends it with the cursor at the moving
+  end.
+- A screen reader reads both rows and the buttons by name, and the
+  character the cursor passes.
+- **On the phone a table in the field is its grid**, the same as on the
+  card, never its Markdown; a tap opens it full screen. It is one block:
+  the cursor and a selection never end inside it, the bottom row shows
+  it as a table's sign, what is typed right before or after it goes on
+  a line of its own, and deleting any of it deletes all of it, asking
+  first while its cells hold words.
+
+### Checklist and Shopping List Lines
+
+- **In and out** sit on the bar above the keyboard, as the format bar
+  does, and put the Line with the cursor under the Line above or back
+  at the top.
+
+### The bar
+
+- **One bar on every phone page.** On a phone the buttons sit on their
+  own row and the title on the line under them; on a wide screen the
+  title sits beside them.
+- **An action goes into ⋮ only when the bar is full.** A page lists its
+  actions in a fixed order; the bar shows as many as fit at the width it
+  has, the rest overflow into ⋮, and ⋮ exists only when it holds
+  something. ⋮ is last. Nothing adapts to use. Settings, Backups and
+  Sync never go into ⋮; they stay behind the Profile picture.
+- A destructive action has no special place: last in the order, on the
+  bar when there is room; its confirm dialog is the guard.
+- An action in ⋮ shows its icon and its words, as it does on the bar.
+- Labelled buttons (Save) and buttons that open a menu of their own
+  never overflow.
+
+### Alarms and notifications
+
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
@@ -744,6 +752,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   checkable.
 
 ## Desktop
+
+### The window
 
 - The desktop window is a classic desktop window (#145): **the menu
   bar** on top (File, Edit, View, Note, Sync, Help); **the sidebar** on
@@ -755,6 +765,31 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Alt+Left, the mouse's back button and a click beside it. The Routine
   editor, a Tally's pages and the New Tally page open as dialogs over
   the dialog or the list they were opened from.
+- **On the desktop nothing floats over a list** (#158); every list ends
+  with the same room after its last card, so that card scrolls fully
+  into view.
+- **On the desktop "+" sits at the end of the list's heading** (#146, #161)
+  and opens a menu of the same kinds, Note first, each with its icon and
+  words; the Agenda's and Unsorted's "+" open the quick note at once. The
+  pages open as dialogs over the window; the desktop's Session page is
+  the Routine editor's, its name first, the count, rule and schedule as
+  its panels.
+- **Back and forward go through the places the list showed**, as a
+  browser does: the arrows at the top of the list, Alt+Left and
+  Alt+Right, and the mouse's back and forward buttons; the keys rest
+  while text is being typed. Showing a new place forgets what lay
+  ahead. Over a dialog, back leads to the dialog it was opened from, or
+  closes it; over a photo or table full screen, it closes that. They
+  take the place of the phone's swipes.
+- **The path beside the arrows leads up the levels**, such as "Areas ›
+  Household › Repairs"; a click on a level shows it, "Areas" leading to
+  All Notes.
+- **The Agenda's bar on the desktop holds All Routines and Reminders and
+  New Routine or Reminder** (draft, #196): no Calendar and no Profile
+  picture; the menu bar leads to the rest.
+
+### Menu bar and keys
+
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader; the Note menu acts on the
   Note in the Note dialog and is greyed while none is open, each entry
@@ -762,22 +797,59 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   selected in the list while no Note is open (#148). Its keys (Ctrl+N,
   Ctrl+F, Ctrl+M, Ctrl+,; Cmd on macOS) stand beside the entries and
   work while typing, over the Note dialog too, not while another dialog
-  is open.
+  is open. On the desktop the menu bar leads to Settings, Backups and
+  Sync in place of the Profile picture.
+- **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
+  macOS) saves the quick note's Note and the text being edited in the
+  Note dialog, while Enter alone starts a new line; Enter in a one-line
+  field of a dialog takes it; Ctrl+B and Ctrl+I make bold and italic
+  while the Note's text is edited.
+- **Esc closes what lies on top** (draft, #196): a menu, a photo or
+  table full screen, the top dialog, the quick note keeping what was
+  typed, and over the list without a dialog the cards selected.
+- **The keyboard stays in the dialog on top** (draft, #196): while the
+  Note dialog is open, Tab never walks onto the list or the sidebar
+  beneath it, as the pointer does not.
+
+### Mouse
+
+- **A click is the primary action** (draft, #196): on a sidebar row, an
+  Agenda row, a Frog or a Tally entry it opens the thing, on a box it
+  opens the box's menu, and it never opens any other menu; there is no
+  long press. On a Note card it selects (see Cards and selection).
+- **A right-click is the desktop's long press** (draft, #196): it opens
+  the same menu as ⋮ where there is one, on a Note card, an Occurrence
+  row and a Checklist Line's words, and the thing's menu on an Area, a
+  Topic, a Frog, a Tally entry, a table and a photo. Like the long
+  press, it never changes data by itself.
+- **Hover only shows** (draft, #196): what a click opens turns the
+  pointer into a hand, an icon-only button gets its rounded background
+  under the pointer and names itself in a tooltip; nothing opens and
+  nothing changes on hover alone.
+
+### Dialogs
+
 - **The Settings, About and everything under Sync (Sync, Pair a Device,
   People, Profile, Backups) open as dialogs over the window**, never as
   views replacing the list, and no button on the main window leads to
   them. A dialog opened from another has a way back to it; the cross,
   Esc and a click beside it close it. While a dialog is open,
   announcements show at its top.
-- **Back and forward go through the places the list showed**, as a
-  browser does: the arrows at the top of the list, Alt+Left and
-  Alt+Right, and the mouse's back and forward buttons; the keys rest
-  while text is being typed. Showing a new place forgets what lay
-  ahead. Over a dialog, back leads to the dialog it was opened from, or
-  closes it; over a photo or table full screen, it closes that.
-- **The path beside the arrows leads up the levels**, such as "Areas ›
-  Household › Repairs"; a click on a level shows it, "Areas" leading to
-  All Notes.
+- **The phone's pages are dialogs on the desktop** (draft, #196): an
+  editor with several fields, the Settings and Sync's pages open as
+  dialogs over the window, with no top bar and no Save in one, in place
+  of the phone's full-screen page with Save in its top bar; the phone's
+  bar and its ⋮ overflow (see Phone, The bar) do not apply.
+- **The control may stand beside its text** (draft, #196): unlike the
+  phone, an on-or-off setting is a square checkbox (`theme::checkbox`)
+  with its words beside the box, its detail in a small weak line under
+  it, in place of the phone's switch on its own line. A single choice
+  is still a column of radio buttons; the Sync dialog's "Bundle for",
+  a dropdown beside its words (`sync_view.rs`), does not follow that
+  yet.
+
+### Cards and selection
+
 - In the Note lists a click selects the card; **the view button beside
   ⋮ and Edit at the card's top right switches the card** between its
   compact and its detailed view, as a tap does on the phone (#189), and
@@ -801,6 +873,49 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
   details how many moved and how many stayed.
+- **A photo gets out of the Note** (#149): on the desktop a right-click
+  on a photo in the Note editor or full screen offers "Save image as…",
+  "Copy image" and "Open in another program". Saved and copied say
+  nothing; a failure is announced.
+- **The Agenda's rows are tight** (#208): on the desktop a row's card
+  has 6 above and below its content, 6 between cards and 2 between a
+  heading's time and words, so the next row starts 52 below, where
+  0.3.1 had 84; the box stays 28. The "Eat a frog" rows are as tight.
+
+### Capture
+
+- **On the desktop** the capture popup and the window's quick note
+  dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
+  quick note and follow the same switches (desktop Settings ▸ Quick
+  note, beside Quick capture): by default the text, Record voice, Paste
+  (the dialog also From file…), the Nudge buttons and To full editor;
+  switched on, File into…, Routine, Reminder, Frog and Session, and
+  More with the Importance, Make it a Tally and Add to a Shopping List,
+  and the format bar over the field, without ☐, link and table. Files
+  dropped onto the window open the dialog and wait in it. Leaving the
+  dialog by its cross, Esc, Alt+Left, the mouse's back button or a click
+  beside it keeps what is typed, nudged in 1 h. To full editor in the
+  window opens the Note in the Note dialog in its place; in the popup it
+  closes the popup and opens the Note there in the window, brought back
+  from the tray.
+
+### Text editor and Lines
+
+- The desktop keeps its own field, not the phone's two rows. The
+  desktop's field shows a table's Markdown.
+- On the desktop **Tab and Shift+Tab** put a Line under the Line above
+  or back at the top, in place of the in and out buttons, and Up and
+  Down move the cursor to the Line above and below.
+
+### Settings
+
+- **The Settings dialog is a column of cards** (draft, #196): each card
+  embossed as a Note's, its heading strong on top (This computer,
+  Alarms, Nudges, Units, Agenda, History, Features, …), its settings
+  under it, each with its small weak detail line.
+
+### Buttons and look
+
 - **Buttons look like buttons** (#218): a rounded rectangle (radius
   8 px) with a tonal fill and a 1 px outline in light and dark, darker
   in light and lighter in dark under the pointer, and pressed or holding
@@ -816,3 +931,24 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   `theme::destructive` for the two emphasised kinds, and
   `theme::checkbox` (or `theme::square_boxes`) for a checkbox, whose
   box stays square, not round as a radio button.
+- **The theme is picked in View ▸ Theme** (draft, #196): System, Light
+  or Dark, kept on this computer. The question marks move in parallax
+  as on the phone, but the desktop reads no "remove animations"
+  setting yet, so its parallax never stops.
+
+### Notifications
+
+- **The desktop's notifications are the system's** (draft, #196), for
+  as long as the app runs, in the tray too: on Linux and Windows an
+  alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix", on
+  macOS no buttons; there is no full-screen alarm. A click on the Nudge
+  opens the window on Unsorted, in place of the phone's Nudge screen.
+
+### What the desktop does not have
+
+- **No App Lock, no Area Locks, no Calendar** (draft, #196): the
+  desktop has no App Lock and no Area Locks, so nothing on it is Masked;
+  no Calendar page and no appointments on the Agenda; no camera, photos
+  coming from a file, the clipboard or a drop. The laws of Both apps
+  about these hold where they arise and ask nothing of the desktop
+  otherwise.
