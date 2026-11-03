@@ -414,6 +414,17 @@ replace a law of Both apps where they say so. A desktop law marked
   the schedule again. On an Advanced schedule it is read-only, the
   schedule's summary with "Switch to Simple to type". The sentence is
   never stored.
+- **Send feedback shows what it sends** (#214): Settings ▸ "Send
+  feedback" is a page with a field for the words, ticks for what goes
+  along (version, system and device, install method ticked at first;
+  the phone's last crash report and Notes as a Pack not) and the
+  preview, the exact text sent, always above its buttons, which wait
+  for words: Mail, a mail link to the developer while the text fits one,
+  and on the phone Share…, the text and the Pack to the app picked, on
+  the desktop "Save as file…" and, while Notes go along, "Save the
+  Pack…" to attach it. Notes are picked in the Pack's tree of every
+  open Area, nothing ticked at first. Nothing leaves without the
+  preview and a tap.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error

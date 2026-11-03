@@ -15,6 +15,7 @@ import 'capture_context_screen.dart';
 import 'context_platform.dart';
 import 'failure_dialog.dart';
 import 'features_choice.dart';
+import 'feedback_screen.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
 import 'keep_import.dart';
@@ -44,7 +45,7 @@ enum _Importing { folder, keep }
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; and About. Each is a local setting, never synced,
+/// Google Keep export; Send feedback (#214); and About. Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -765,6 +766,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
             SettingsSection(
               children: [
+                ListTile(
+                  key: const ValueKey('sendFeedback'),
+                  leading: const Icon(Icons.feedback_outlined),
+                  title: Text(t.feedbackTitle),
+                  subtitle: Text(t.feedbackSettingsDetail),
+                  onTap: () => _push(FeedbackScreen(store: widget.store)),
+                ),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: Text(t.aboutTitle),

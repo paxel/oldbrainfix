@@ -149,6 +149,18 @@ void main() {
       // Taken now: the same crash is not offered again.
       expect(lastCrashText(), isNull);
       expect(mailed, isEmpty, reason: 'nothing goes without a tap');
+      // Kept for Send feedback (#214), which can still send it along.
+      expect(keptCrashReport()?.text, contains('boom'));
+      expect(keptCrashReport()?.text, startsWith('Old Brain Fix '));
+    });
+
+    test('Send feedback reads a crash not offered yet, else the one '
+        'offered last (#214)', () async {
+      expect(keptCrashReport(), isNull);
+      File('${dir.path}/last_crash_seen.txt').writeAsStringSync('older');
+      expect(keptCrashReport()?.text, 'older');
+      File('${dir.path}/last_crash.txt').writeAsStringSync('newer');
+      expect(keptCrashReport()?.text, 'newer');
     });
   });
 

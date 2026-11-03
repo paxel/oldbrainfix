@@ -142,7 +142,7 @@ fn heading(ui: &mut Ui, title: &str) {
 }
 
 /// "Tick all" and "Untick all", in place of the phone's bar.
-fn tick_buttons(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
+pub(crate) fn tick_buttons(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
     let text = ui.visuals().text_color();
     ui.horizontal(|ui| {
         if ui
@@ -172,7 +172,7 @@ fn tick_with_hint(ui: &mut Ui, on: &mut bool, label: &str, hint: &str) {
     });
 }
 
-fn nothing_ticked(ui: &mut Ui, t: &L10n, picked: bool) {
+pub(crate) fn nothing_ticked(ui: &mut Ui, t: &L10n, picked: bool) {
     if !picked {
         let weak = ui.visuals().weak_text_color();
         ui.label(RichText::new(t.pack_nothing_ticked()).color(weak));
@@ -183,7 +183,7 @@ fn nothing_ticked(ui: &mut Ui, t: &L10n, picked: bool) {
 /// as headings, each other item a box with its words and its icon at the
 /// end, as the phone's; a box changes the ticks by the Session rule
 /// (Q458).
-fn tree(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
+pub(crate) fn tree(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
     let high = (ui.ctx().content_rect().height() - 360.0).max(200.0);
     // Up to `high`, not held to the room left under it: the dialog finds
     // its place over the window from its size, and a tree held to that

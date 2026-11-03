@@ -6347,6 +6347,22 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
         .ok_or("Health")?;
     let pack = ada.pack_of(&health.id, &std::collections::HashSet::new())?;
     assert_eq!(pack_tree_json(&pack)?, expected["tree"]);
+    // The Pack of everything Feedback offers (#214), and without Garden.
+    let texts =
+        |p: &oldbrainfix_core::Pack| p.notes.iter().map(|n| n.text.clone()).collect::<Vec<_>>();
+    let everything = ada.pack_of_all(&std::collections::HashSet::new())?;
+    assert_eq!(pack_tree_json(&everything)?, expected["everything"]);
+    assert_eq!(json!(texts(&everything)), expected["everythingTexts"]);
+    let names: Vec<_> = everything.areas.iter().map(|a| a.name.clone()).collect();
+    assert_eq!(json!(names), expected["everythingAreas"]);
+    let garden = Places::new(&ada)
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == "Garden")
+        .ok_or("Garden")?;
+    let without = ada.pack_of_all(&std::collections::HashSet::from([garden.id]))?;
+    assert_eq!(pack_tree_json(&without)?, expected["withoutGarden"]);
+    assert_eq!(json!(texts(&without)), expected["withoutGardenTexts"]);
     let route = pack
         .notes
         .iter()

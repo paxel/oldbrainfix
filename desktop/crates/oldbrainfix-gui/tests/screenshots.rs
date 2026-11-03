@@ -37,6 +37,7 @@ use oldbrainfix_core::{
     Importance, Notes, OwnProfile, PairedDevice, PersonSettings, Places, QuickNoteControl,
     Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
 };
+use oldbrainfix_gui::feedback_view::FeedbackFacts;
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Page, Selection};
@@ -1922,7 +1923,7 @@ fn privacy_frames(
     theme: egui::Theme,
     box_frame: impl Fn(&str) -> String,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let scenes: [(&str, PrivacyScene); 4] = [
+    let scenes: [(&str, PrivacyScene); 5] = [
         ("set-up", |harness, _| {
             harness.state_mut().open(Page::Backups);
             harness.run();
@@ -1946,6 +1947,30 @@ fn privacy_frames(
             lena_profile(harness)?;
             let block = harness.state().t().person_block().to_string();
             click_first(harness, &block)
+        }),
+        // Send feedback (#214), opened from the Settings, with words and
+        // this computer's facts held.
+        ("feedback", |harness, _| {
+            harness.state_mut().set_feedback_facts(FeedbackFacts {
+                version: "0.4.0".into(),
+                system: "Debian GNU/Linux 13 (trixie), x86_64".into(),
+                install: "Flatpak".into(),
+            });
+            harness.state_mut().open(Page::Settings);
+            harness.run();
+            let t = harness.state().t();
+            let (open, field) = (t.feedback_title(), t.feedback_text_label());
+            let words = if t.locale() == "de" {
+                "Die Agenda zeigt die Routine von gestern als verpasst."
+            } else {
+                "The Agenda shows yesterday's Routine as Missed."
+            };
+            click_first(harness, open)?;
+            harness.get_by_label(field).click();
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(words);
+            harness.run();
+            Ok(())
         }),
     ];
     let mut problems = Vec::new();

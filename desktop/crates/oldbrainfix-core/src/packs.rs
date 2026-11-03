@@ -1362,6 +1362,44 @@ impl Store {
                 .ok_or_else(|| Error::Invalid(format!("not an Area, Topic or Note: {from}")))?;
             vec![note]
         };
+        self.pack_of_notes(&picked, closed)
+    }
+
+    /// The Pack of everything the tree may offer for feedback (#214), as
+    /// the Dart core's `packOfAll`: each Area by name, but those of
+    /// `closed`, with its own Notes and then its Topics' Notes as
+    /// [`Store::pack_of`] lists them, then the Notes filed into no Area,
+    /// newest capture first; nothing in the trash or merged.
+    pub fn pack_of_all(&self, closed: &HashSet<String>) -> Result<Pack> {
+        let places = Places::new(self);
+        let all = Notes::new(self).all()?;
+        let mut ids = Vec::new();
+        for area in places.areas()? {
+            if closed.contains(&area.id) {
+                continue;
+            }
+            let topics = places.topics(&area.id)?;
+            ids.push(area.id);
+            ids.extend(topics.into_iter().map(|t| t.id));
+        }
+        let mut picked: Vec<Note> = ids
+            .iter()
+            .flat_map(|id| {
+                all.iter()
+                    .filter(move |n| n.place.as_deref() == Some(id.as_str()))
+            })
+            .cloned()
+            .collect();
+        picked.extend(all.iter().filter(|n| n.place.is_none()).cloned());
+        self.pack_of_notes(&picked, closed)
+    }
+
+    /// The Pack of `picked`, in their order, and the Tallies their
+    /// Sessions pick from that are not among them after them, but for
+    /// those filed into an Area of `closed`.
+    fn pack_of_notes(&self, picked: &[Note], closed: &HashSet<String>) -> Result<Pack> {
+        let notes = Notes::new(self);
+        let places = Places::new(self);
         let mut order: Vec<String> = picked.iter().map(|n| n.id.clone()).collect();
         let sessions = Sessions::new(self);
         // The Tallies the Sessions pick from that are not among them.
@@ -2240,6 +2278,55 @@ mod tests {
         let all: Vec<_> = of_note.notes.iter().map(|n| n.text.as_str()).collect();
         assert_eq!(all, ["Training", "Laps", "Digging"]);
         assert!(of_note.notes[1..].iter().all(|n| n.outside));
+        Ok(())
+    }
+
+    #[test]
+    fn the_pack_of_everything_holds_every_open_area_by_name_then_the_notes_without_one()
+    -> TestResult {
+        let ann = device(1, "Ann")?;
+        let h = health(&ann)?;
+        let notes = Notes::new(&ann);
+        notes.capture("Loose thought", None, None)?;
+        // Filed by another Device into a place deleted here meanwhile.
+        let stray = notes.capture("Stray", None, None)?;
+        ann.append(&stray.id, note_keys::PLACE, Some("gone"), None)?;
+        let trashed = notes.capture("Gone", Some(&h.area), None)?;
+        notes.trash(&trashed.id)?;
+        let pack = ann.pack_of_all(&HashSet::new())?;
+        let areas: Vec<_> = pack.areas.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(areas, ["Garden", "Health"]);
+        let tree = pack.tree();
+        let kinds: Vec<_> = tree.iter().map(|i| i.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                PackItemKind::Area,
+                PackItemKind::Area,
+                PackItemKind::Note,
+                PackItemKind::Note
+            ]
+        );
+        let text = |i: &PackItem| i.note.map(|n| pack.notes[n].text.clone());
+        let loose: Vec<_> = tree[2..].iter().filter_map(text).collect();
+        assert_eq!(loose, ["Stray", "Loose thought"]);
+        assert!(!pack.notes.iter().any(|n| n.text == "Gone"));
+        assert!(!pack.notes.iter().any(|n| n.outside));
+        assert_eq!(pack.notes[0].text, "Digging");
+        assert_eq!(pack.notes.len(), 8);
+
+        let garden = Places::new(&ann)
+            .areas()?
+            .into_iter()
+            .find(|a| a.name == "Garden")
+            .ok_or("Garden")?;
+        let closed = ann.pack_of_all(&HashSet::from([garden.id]))?;
+        let areas: Vec<_> = closed.areas.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(areas, ["Health"]);
+        assert!(!closed.notes.iter().any(|n| n.text == "Digging"));
+        let session = &closed.notes[index_of(&closed, "Training")?];
+        let pool = session.session.as_ref().map(|s| s.pool.clone());
+        assert_eq!(pool, Some(vec![index_of(&closed, "Laps")?]));
         Ok(())
     }
 

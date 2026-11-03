@@ -117,7 +117,7 @@ class _PackExportScreenState extends State<PackExportScreen> {
       appBar: pageBar(
         context,
         title: t.packExportTitle,
-        actions: _tickActions(
+        actions: packTickActions(
           t,
           onAll: () => setState(() => _ticks = widget.pack.allKeys()),
           onNone: () => setState(() => _ticks = {}),
@@ -195,7 +195,9 @@ class _TickBelow extends StatelessWidget {
   );
 }
 
-List<BarAction> _tickActions(
+/// "Tick all" and "Untick all" on the bar of a Pack's tree, also the one
+/// Send feedback opens (#214).
+List<BarAction> packTickActions(
   AppLocalizations t, {
   required VoidCallback onAll,
   required VoidCallback onNone,
@@ -330,7 +332,7 @@ class _PackImportScreenState extends State<PackImportScreen> {
       appBar: pageBar(
         context,
         title: t.packTitle,
-        actions: _tickActions(
+        actions: packTickActions(
           t,
           onAll: () => setState(() => _ticks = _pack.allKeys()),
           onNone: () => setState(() => _ticks = {}),

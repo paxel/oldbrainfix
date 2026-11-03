@@ -8755,6 +8755,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove “From {name}”'**
   String removePackFrom(String name);
+
+  /// The page in Settings that sends feedback or a bug report to the developer (#214), and its entry there.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get feedbackTitle;
+
+  /// Under 'Send feedback' in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell the developer what happened or what could be better. You see everything before it is sent.'**
+  String get feedbackSettingsDetail;
+
+  /// The text field on the Send feedback page.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened / what could be better'**
+  String get feedbackTextLabel;
+
+  /// Heading over the ticks of what the feedback carries besides the text.
+  ///
+  /// In en, this message translates to:
+  /// **'What goes along'**
+  String get feedbackGoesAlong;
+
+  /// Tick: the app's version goes along, its value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get feedbackVersion;
+
+  /// Tick: the operating system and the device go along, their value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'OS and device'**
+  String get feedbackSystem;
+
+  /// Tick: where the app was installed from goes along (Play, F-Droid, APK, Flatpak, Homebrew, Scoop…), its value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Install method'**
+  String get feedbackInstall;
+
+  /// Tick, off at first: the report of the app's last unexpected stop goes along.
+  ///
+  /// In en, this message translates to:
+  /// **'The last crash report'**
+  String get feedbackCrash;
+
+  /// Under 'The last crash report' when there is none; the tick is greyed.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone keeps none.'**
+  String get feedbackCrashNone;
+
+  /// Under 'The last crash report': when it was written.
+  ///
+  /// In en, this message translates to:
+  /// **'From {date}'**
+  String feedbackCrashFrom(String date);
+
+  /// Tick, off at first: copies of Notes picked in the Pack's tree go along as a Pack file.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes as a Pack'**
+  String get feedbackNotes;
+
+  /// Under 'Notes as a Pack' while no Note is picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick them in the Pack\'s tree.'**
+  String get feedbackNotesHint;
+
+  /// Under 'Notes as a Pack': how many Notes are picked and the Pack's size.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note} other{{count} Notes}}, {size}'**
+  String feedbackNotesPicked(int count, String size);
+
+  /// Button under 'Notes as a Pack' that opens the Pack's tree again.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the Notes…'**
+  String get feedbackPickNotes;
+
+  /// Title of the Pack's tree opened from Send feedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes for the feedback'**
+  String get feedbackNotesTitle;
+
+  /// Heading over the text the feedback sends, as it is sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview: exactly this is sent'**
+  String get feedbackPreview;
+
+  /// Under the preview while Notes go along.
+  ///
+  /// In en, this message translates to:
+  /// **'With it, as a file: a Pack of {notes}'**
+  String feedbackPackAlong(String notes);
+
+  /// Button on the Send feedback page: opens the mail app with the text to the developer.
+  ///
+  /// In en, this message translates to:
+  /// **'Mail'**
+  String get feedbackMail;
+
+  /// Button on the Send feedback page: hands the text and the Pack to the app picked in the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get feedbackShare;
+
+  /// Under the buttons of Send feedback while the text field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what happened first.'**
+  String get feedbackTextFirst;
+
+  /// Under the buttons of Send feedback on the phone when the text is longer than a mail link carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long for a mail link. Share sends all of it.'**
+  String get feedbackTooLongForMail;
+
+  /// Under the buttons of Send feedback on the phone while Notes go along.
+  ///
+  /// In en, this message translates to:
+  /// **'A mail link cannot carry the Pack. Share sends it along: pick your mail app there.'**
+  String get feedbackPackNotInMail;
+
+  /// Announced when the feedback's Pack could not be written or no app took it.
+  ///
+  /// In en, this message translates to:
+  /// **'The feedback was not shared.'**
+  String get feedbackNotSent;
+
+  /// Title of the dialog behind 'feedbackNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback not shared'**
+  String get feedbackNotSentTitle;
 }
 
 class _AppLocalizationsDelegate

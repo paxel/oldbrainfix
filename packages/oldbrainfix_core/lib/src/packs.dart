@@ -1071,6 +1071,38 @@ extension PackExport on Store {
       }
       picked = [note];
     }
+    return _packOfNotes(picked, closed);
+  }
+
+  /// The Pack of everything the tree may offer for feedback (#214): each
+  /// Area by name, but those of [closed], with its own Notes and then its
+  /// Topics' Notes as [packOf] lists them, then the Notes filed into no
+  /// Area, newest capture first; nothing in the trash or merged.
+  Pack packOfAll({Set<String> closed = const {}}) {
+    final places = Places(this);
+    final all = Notes(this).all();
+    final ids = [
+      for (final area in places.areas())
+        if (!closed.contains(area.id)) ...[
+          area.id,
+          for (final t in places.topics(area.id)) t.id,
+        ],
+    ];
+    return _packOfNotes([
+      for (final id in ids)
+        for (final n in all)
+          if (n.place == id) n,
+      for (final n in all)
+        if (n.place == null) n,
+    ], closed);
+  }
+
+  /// The Pack of [picked], in their order, and the Tallies their Sessions
+  /// pick from that are not among them after them, but for those filed
+  /// into an Area of [closed].
+  Pack _packOfNotes(List<Note> picked, Set<String> closed) {
+    final notes = Notes(this);
+    final places = Places(this);
     final order = [for (final n in picked) n.id];
     final sessions = Sessions(this);
     // The Tallies the Sessions pick from that are not among them.

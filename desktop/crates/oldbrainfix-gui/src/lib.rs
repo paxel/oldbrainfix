@@ -30,6 +30,7 @@ pub mod card_selection;
 pub mod checklist_view;
 pub mod cli;
 pub mod enrich;
+pub mod feedback_view;
 pub mod folder_import;
 pub mod folder_sync;
 pub mod format_bar;

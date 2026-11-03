@@ -22,6 +22,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon und dem Desktop beginnt der Plan im Routinen-Editor mit einer Zeile „Wann“, die ihn als Satz in der Sprache der App zeigt, etwa „Wochentags Mo, Do um 08:00, 15:00, bis 31.12.“. Was du in sie tippst, stellt die Wiederholung, die Uhrzeiten, den Beginn und das Ende schon beim Tippen ein, und darunter werden das nächste Wort, Wochentage und Uhrzeiten angeboten; Wörter, die sie nicht versteht, werden markiert und ändern nichts. Sie kann alles, was der einfache Plan kann; bei einem erweiterten Plan zeigt sie eine Zusammenfassung und „Wechsle zu Einfach, um zu tippen.“. Gespeichert wird nur der Plan, nicht der Satz.
 - Die Anleitung hat eine Seite zum Abgleich über Syncthing oder Autosync.
 - Die Anleitung hat eine Seite zu Kalender-Apps wie FamilyWall: ihre Termine in der Agenda des Handys über den Kalender des Handys, und Routinen und Erinnerungen, als Kalenderdatei in sie exportiert.
+- Auf dem Handy und am Desktop schreiben Einstellungen ▸ Feedback senden an den Entwickler: ein Feld für das, was passiert ist oder besser sein könnte, Haken für die Version, das System und das Gerät und die Installationsart, zuerst angehakt, und für den letzten Absturzbericht (Handy) und Notizen als Paket, im Baum des Pakets gewählt, nicht angehakt. Eine Vorschau zeigt genau, was gesendet wird; Mail öffnet die Mail-App damit, und Teilen gibt es mit dem Paket auf dem Handy an jede App, während der Desktop es als Datei speichert und das Paket zum Anhängen.
 
 ### Geändert
 

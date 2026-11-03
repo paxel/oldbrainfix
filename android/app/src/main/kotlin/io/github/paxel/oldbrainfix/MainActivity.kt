@@ -375,6 +375,8 @@ class MainActivity : FlutterActivity() {
                             args["html"] as? String,
                             (args["paths"] as? List<*>).orEmpty().map { it as? String ?: "" },
                             (args["types"] as? List<*>).orEmpty().map { it as? String ?: "" },
+                            args["mailTo"] as? String,
+                            args["subject"] as? String,
                         ),
                     )
                     "pick" -> pickBundle(result)
@@ -463,6 +465,11 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, EXIT_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "lastExit") result.success(lastExit()) else result.notImplemented()
+            }
+        // What Send feedback says of this phone (#214).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "facts") result.success(deviceFacts()) else result.notImplemented()
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCK_CHANNEL)
             .setMethodCallHandler { call, result ->
@@ -982,6 +989,35 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * The system, the device and the app that installed this one, for
+     * Send feedback (#214): the installer's package name, null when none
+     * is recorded, as for an APK installed by hand; `installerKnown` is
+     * false when the system would not say.
+     */
+    private fun deviceFacts(): Map<String, Any?> {
+        var known = true
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                packageManager.getInstallSourceInfo(packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstallerPackageName(packageName)
+            }
+        } catch (_: Exception) {
+            known = false
+            null
+        }
+        return mapOf(
+            "installer" to installer,
+            "installerKnown" to known,
+            "release" to Build.VERSION.RELEASE,
+            "sdk" to Build.VERSION.SDK_INT,
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+        )
+    }
+
+    /**
      * The pick a tap on the Agenda widget opens the entry form of (#209),
      * as the app reads it; null for any other intent, or one brought
      * back from the recent apps.
@@ -1010,6 +1046,7 @@ class MainActivity : FlutterActivity() {
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"
+        private const val DEVICE_CHANNEL = "io.github.paxel.oldbrainfix/device"
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
         private const val BUNDLE_CHANNEL = "io.github.paxel.oldbrainfix/bundle"

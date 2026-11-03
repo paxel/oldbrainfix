@@ -580,5 +580,21 @@
   "packNotSavedTitle": "Pack not saved",
   "@packNotSavedTitle": {"description": "Title of the dialog behind 'packNotSaved'."},
   "packPersonAdded": "{name} was added to People.",
-  "@packPersonAdded": {"description": "Announced in the desktop's Pack dialog after 'Add {name} to People' (#165).", "placeholders": {"name": {"type": "String"}}}
+  "@packPersonAdded": {"description": "Announced in the desktop's Pack dialog after 'Add {name} to People' (#165).", "placeholders": {"name": {"type": "String"}}},
+  "feedbackSaveFile": "Save as file…",
+  "@feedbackSaveFile": {"description": "Button on the desktop's Send feedback page (#214): saves the text of the preview as a file."},
+  "feedbackSaveTitle": "Save the feedback",
+  "@feedbackSaveTitle": {"description": "Title of the file dialog that saves the feedback's text."},
+  "feedbackSavePack": "Save the Pack…",
+  "@feedbackSavePack": {"description": "Button on the desktop's Send feedback page while Notes go along: saves the Pack to attach to the mail."},
+  "feedbackPackAttach": "A mail link cannot carry the Pack: save it and attach it to the mail.",
+  "@feedbackPackAttach": {"description": "Under the buttons of the desktop's Send feedback page while Notes go along."},
+  "feedbackTooLongDesktop": "Too long for a mail link. Save it as a file and attach it to a mail.",
+  "@feedbackTooLongDesktop": {"description": "Under the buttons of the desktop's Send feedback page when the text is longer than a mail link carries."},
+  "feedbackFileCause": "The file could not be written.",
+  "@feedbackFileCause": {"description": "The cause when the feedback's file or Pack could not be saved."},
+  "feedbackNotSaved": "The feedback was not saved.",
+  "@feedbackNotSaved": {"description": "Announced when the feedback's file or Pack could not be saved."},
+  "feedbackNotSavedTitle": "Feedback not saved",
+  "@feedbackNotSavedTitle": {"description": "Title of the dialog behind 'feedbackNotSaved'."}
 }

@@ -5370,4 +5370,91 @@ class AppLocalizationsEn extends AppLocalizations {
   String removePackFrom(String name) {
     return 'Remove “From $name”';
   }
+
+  @override
+  String get feedbackTitle => 'Send feedback';
+
+  @override
+  String get feedbackSettingsDetail =>
+      'Tell the developer what happened or what could be better. You see everything before it is sent.';
+
+  @override
+  String get feedbackTextLabel => 'What happened / what could be better';
+
+  @override
+  String get feedbackGoesAlong => 'What goes along';
+
+  @override
+  String get feedbackVersion => 'Version';
+
+  @override
+  String get feedbackSystem => 'OS and device';
+
+  @override
+  String get feedbackInstall => 'Install method';
+
+  @override
+  String get feedbackCrash => 'The last crash report';
+
+  @override
+  String get feedbackCrashNone => 'This phone keeps none.';
+
+  @override
+  String feedbackCrashFrom(String date) {
+    return 'From $date';
+  }
+
+  @override
+  String get feedbackNotes => 'Notes as a Pack';
+
+  @override
+  String get feedbackNotesHint => 'Pick them in the Pack\'s tree.';
+
+  @override
+  String feedbackNotesPicked(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return '$_temp0, $size';
+  }
+
+  @override
+  String get feedbackPickNotes => 'Pick the Notes…';
+
+  @override
+  String get feedbackNotesTitle => 'Notes for the feedback';
+
+  @override
+  String get feedbackPreview => 'Preview: exactly this is sent';
+
+  @override
+  String feedbackPackAlong(String notes) {
+    return 'With it, as a file: a Pack of $notes';
+  }
+
+  @override
+  String get feedbackMail => 'Mail';
+
+  @override
+  String get feedbackShare => 'Share…';
+
+  @override
+  String get feedbackTextFirst => 'Write what happened first.';
+
+  @override
+  String get feedbackTooLongForMail =>
+      'Too long for a mail link. Share sends all of it.';
+
+  @override
+  String get feedbackPackNotInMail =>
+      'A mail link cannot carry the Pack. Share sends it along: pick your mail app there.';
+
+  @override
+  String get feedbackNotSent => 'The feedback was not shared.';
+
+  @override
+  String get feedbackNotSentTitle => 'Feedback not shared';
 }

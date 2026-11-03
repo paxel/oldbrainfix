@@ -55,13 +55,19 @@ class FakeBundles implements BundlePlatform {
   final texts = <({String text, String? html, List<SharedFile> files})>[];
   final fileBytes = <String, List<int>>{};
 
+  /// The address and subject a mail app picked fills in (#214).
+  final mails = <({String? to, String? subject})>[];
+
   @override
   Future<ShareOutcome> shareText(
     String text, {
     String? html,
     List<SharedFile> files = const [],
+    String? mailTo,
+    String? subject,
   }) async {
     texts.add((text: text, html: html, files: files));
+    mails.add((to: mailTo, subject: subject));
     for (final f in files) {
       fileBytes[f.path] = File(f.path).readAsBytesSync();
     }

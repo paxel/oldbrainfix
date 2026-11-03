@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the schedule in the Routine editor starts with a line, "When", that shows it as a sentence in the app's language, such as "Weekdays Mon, Thu at 08:00, 15:00, until 12/31". Typing in it sets the repeat, the times, the start and the end as you type, with the next word, weekday names and times offered under it; words it does not understand are marked and change nothing. It covers everything the Simple schedule can do; on an Advanced schedule it shows a summary and "Switch to Simple to type". Only the schedule is saved, not the sentence.
 - The guide has a page on syncing through Syncthing or Autosync.
 - The guide has a page on calendar apps such as FamilyWall: their appointments on the phone's Agenda through the phone's calendar, and Routines and Reminders exported into them as a calendar file.
+- On the phone and the desktop, Settings ▸ Send feedback writes to the developer: a field for what happened or what could be better, ticks for the version, the system and the device and the install method, ticked at first, and for the last crash report (phone) and Notes as a Pack picked in the Pack's tree, not ticked. A preview shows exactly what is sent; Mail opens the mail app with it, and Share hands it with the Pack to any app on the phone, while the desktop saves it as a file and the Pack to attach.
 
 ### Changed
 

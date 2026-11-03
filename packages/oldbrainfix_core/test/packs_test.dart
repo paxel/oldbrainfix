@@ -141,6 +141,42 @@ void main() {
       expect(pack.areas.map((a) => a.name), ['Health']);
     });
 
+    test('of everything (#214): every open Area by name with its Topics, '
+        'then the Notes without one; nothing of a closed Area', () {
+      final h = health();
+      final loose = Notes(ann).capture('Loose thought');
+      // Filed by another Device into a place deleted here meanwhile.
+      final stray = Notes(ann).capture('Stray');
+      ann.append(stray.id, NoteKeys.place, 'gone');
+      final trashed = Notes(ann).capture('Gone', place: h.area);
+      Notes(ann).trash(trashed.id);
+      final pack = ann.packOfAll();
+      expect(pack.areas.map((a) => a.name), ['Garden', 'Health']);
+      final tree = pack.tree();
+      expect(tree.map((i) => i.kind), [
+        PackItemKind.area,
+        PackItemKind.area,
+        PackItemKind.note,
+        PackItemKind.note,
+      ]);
+      expect(
+        [for (final i in tree.skip(2)) pack.notes[i.note!].text],
+        ['Stray', 'Loose thought'],
+      );
+      expect(pack.notes.map((n) => n.text), isNot(contains('Gone')));
+      expect(pack.notes.where((n) => n.outside), isEmpty);
+      expect(pack.notes.first.text, 'Digging');
+      expect(pack.notes.length, 8);
+      expect(loose.id, isNotEmpty);
+
+      final garden = Places(ann).areas().firstWhere((a) => a.name == 'Garden');
+      final closed = ann.packOfAll(closed: {garden.id});
+      expect(closed.areas.map((a) => a.name), ['Health']);
+      expect(closed.notes.map((n) => n.text), isNot(contains('Digging')));
+      final session = closed.notes[indexOf(closed, 'Training')];
+      expect(session.session!.pool, [indexOf(closed, 'Laps')]);
+    });
+
     test('everything is ticked but Reminders and files; the size follows '
         'the ticks', () {
       final h = health();

@@ -5440,4 +5440,91 @@ class AppLocalizationsDe extends AppLocalizations {
   String removePackFrom(String name) {
     return '„Von $name“ entfernen';
   }
+
+  @override
+  String get feedbackTitle => 'Feedback senden';
+
+  @override
+  String get feedbackSettingsDetail =>
+      'Sag dem Entwickler, was passiert ist oder was besser sein könnte. Du siehst alles, bevor es gesendet wird.';
+
+  @override
+  String get feedbackTextLabel => 'Was ist passiert / was könnte besser sein';
+
+  @override
+  String get feedbackGoesAlong => 'Was mitgeht';
+
+  @override
+  String get feedbackVersion => 'Version';
+
+  @override
+  String get feedbackSystem => 'System und Gerät';
+
+  @override
+  String get feedbackInstall => 'Installiert über';
+
+  @override
+  String get feedbackCrash => 'Der letzte Absturzbericht';
+
+  @override
+  String get feedbackCrashNone => 'Dieses Handy hat keinen.';
+
+  @override
+  String feedbackCrashFrom(String date) {
+    return 'Vom $date';
+  }
+
+  @override
+  String get feedbackNotes => 'Notizen als Paket';
+
+  @override
+  String get feedbackNotesHint => 'Wähle sie im Baum des Pakets.';
+
+  @override
+  String feedbackNotesPicked(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen',
+      one: '1 Notiz',
+    );
+    return '$_temp0, $size';
+  }
+
+  @override
+  String get feedbackPickNotes => 'Notizen wählen …';
+
+  @override
+  String get feedbackNotesTitle => 'Notizen für das Feedback';
+
+  @override
+  String get feedbackPreview => 'Vorschau: genau das wird gesendet';
+
+  @override
+  String feedbackPackAlong(String notes) {
+    return 'Dazu als Datei: ein Paket mit $notes';
+  }
+
+  @override
+  String get feedbackMail => 'Mail';
+
+  @override
+  String get feedbackShare => 'Teilen …';
+
+  @override
+  String get feedbackTextFirst => 'Schreib zuerst, was passiert ist.';
+
+  @override
+  String get feedbackTooLongForMail =>
+      'Zu lang für einen Mail-Link. Teilen sendet alles.';
+
+  @override
+  String get feedbackPackNotInMail =>
+      'Ein Mail-Link kann das Paket nicht mitnehmen. Teilen sendet es mit: Wähle dort deine Mail-App.';
+
+  @override
+  String get feedbackNotSent => 'Das Feedback wurde nicht geteilt.';
+
+  @override
+  String get feedbackNotSentTitle => 'Feedback nicht geteilt';
 }

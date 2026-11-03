@@ -51,11 +51,14 @@ abstract interface class BundlePlatform {
 
   /// Offers [text], with [html] beside it when there is one, and the
   /// [files], each written where [exportPath] said, to the app the user
-  /// picks (#129); answers as [share] does.
+  /// picks (#129); answers as [share] does. A mail app picked fills in
+  /// [mailTo] and [subject] where they are given (#214).
   Future<ShareOutcome> shareText(
     String text, {
     String? html,
     List<SharedFile> files = const [],
+    String? mailTo,
+    String? subject,
   });
 
   /// Opens the system's file picker; the copy of the file picked, or
@@ -95,6 +98,8 @@ class NoBundles implements BundlePlatform {
     String text, {
     String? html,
     List<SharedFile> files = const [],
+    String? mailTo,
+    String? subject,
   }) async => ShareOutcome.noApp;
 
   @override
@@ -146,11 +151,15 @@ class AndroidBundles implements BundlePlatform {
     String text, {
     String? html,
     List<SharedFile> files = const [],
+    String? mailTo,
+    String? subject,
   }) async => switch (await _ask<String>('shareText', {
     'text': text,
     'html': html,
     'paths': [for (final f in files) f.path],
     'types': [for (final f in files) f.type],
+    'mailTo': mailTo,
+    'subject': subject,
   })) {
     'taken' => ShareOutcome.taken,
     'dismissed' => ShareOutcome.dismissed,

@@ -118,6 +118,7 @@ use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
 use crate::enrich::Enricher;
+use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
@@ -216,6 +217,9 @@ pub enum Page {
     About,
     /// Every third-party component and its licence, reached from About.
     Licences,
+    /// Send feedback (#214): the text, what goes along and its preview,
+    /// reached from the Settings.
+    Feedback,
     /// The user's own Profile: its picture, name and short code, and its
     /// card; Sync ▸ Profile.
     Profile,
@@ -1269,6 +1273,8 @@ enum Action {
     ExportPack(String),
     /// Save…, Add, "Add … to People" or Cancel in a Pack's dialog.
     Pack(PackAsk),
+    /// Mail, a save or the Notes tick on the Send feedback page (#214).
+    Feedback(FeedbackAsk),
     /// File ▸ Open Pack…: asks for the file and opens it (#165).
     OpenPack,
     /// Asks whether the "From …" badge of the Note goes (#165).
@@ -1663,6 +1669,12 @@ pub struct App {
     card_saver: FileSaver,
     /// Asks where to save a Pack and which one to open (#165).
     pack_saver: FileSaver,
+    /// Asks where to save the text of Send feedback (#214).
+    feedback_saver: FileSaver,
+    /// What Send feedback says of this computer, and its page's state
+    /// while it shows (#214).
+    feedback_facts: FeedbackFacts,
+    feedback: FeedbackForm,
     pack_opener: FolderPicker,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
@@ -2023,6 +2035,15 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
+            feedback_saver: Box::new(|title, name| {
+                rfd::FileDialog::new()
+                    .set_title(title)
+                    .add_filter("Text", &["txt"])
+                    .set_file_name(name)
+                    .save_file()
+            }),
+            feedback_facts: FeedbackFacts::of_this_computer(),
+            feedback: FeedbackForm::default(),
             pack_opener: Box::new(|title| pack_dialog(title).pick_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
@@ -2429,6 +2450,18 @@ impl App {
     /// Hands in the dialog asking where to save a Pack (#165).
     pub fn set_pack_saver(&mut self, saver: FileSaver) {
         self.pack_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save the text of Send feedback
+    /// (#214).
+    pub fn set_feedback_saver(&mut self, saver: FileSaver) {
+        self.feedback_saver = saver;
+    }
+
+    /// Hands in what Send feedback says of this computer (#214), for
+    /// tests and the guide's frames.
+    pub fn set_feedback_facts(&mut self, facts: FeedbackFacts) {
+        self.feedback_facts = facts;
     }
 
     /// Hands in the dialog asking which Pack to open (#165).
@@ -2980,6 +3013,62 @@ impl App {
             PackAsk::Save => self.save_pack(),
             PackAsk::Add => self.add_pack()?,
             PackAsk::AddPerson => self.add_pack_person()?,
+        }
+        Ok(())
+    }
+
+    /// What was asked on the Send feedback page (#214): Mail opens the
+    /// mail link with the preview's text; the saves write it, or the
+    /// Notes ticked as a Pack, where the user says and say nothing, a
+    /// failure is announced; the first tick of Notes makes the Pack of
+    /// everything, nothing ticked. The desktop has no Area Locks.
+    fn feedback_action(&mut self, asked: FeedbackAsk) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let body = self.feedback.body(&self.feedback_facts);
+        let day = Day::today(self.store.now(), &*self.wall);
+        let written = match asked {
+            FeedbackAsk::Notes(on) => {
+                if on && self.feedback.pack.is_none() {
+                    self.feedback.pack = Some(self.store.pack_of_all(&HashSet::new())?);
+                }
+                self.feedback.notes = on;
+                return Ok(());
+            }
+            FeedbackAsk::Mail => {
+                self.open_url = Some(feedback_view::mail_url(&body));
+                return Ok(());
+            }
+            FeedbackAsk::SaveFile => {
+                let name = feedback_view::file_name(&day.to_string());
+                let Some(path) = (self.feedback_saver)(t.feedback_save_title(), &name) else {
+                    return Ok(());
+                };
+                std::fs::write(&path, body).map_err(|e| e.to_string())
+            }
+            FeedbackAsk::SavePack => {
+                let Some(pack) = self.feedback.picked() else {
+                    return Ok(());
+                };
+                let name = packs::file_name(day);
+                let Some(mut path) = (self.pack_saver)(t.pack_save_title(), &name) else {
+                    return Ok(());
+                };
+                if path.extension().is_none_or(|e| e != packs::EXTENSION) {
+                    path.set_extension(packs::EXTENSION);
+                }
+                match self.store.write_pack(pack, &self.feedback.ticks, false) {
+                    Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+        };
+        if let Err(e) = written {
+            self.announce_failure(
+                t.feedback_not_saved(),
+                t.feedback_not_saved_title(),
+                (t.feedback_file_cause(), t.nothing_lost_fix()),
+                format!("feedback: {e}"),
+            );
         }
         Ok(())
     }
@@ -5144,7 +5233,12 @@ impl App {
                 self.save_text()?;
                 self.pages = vec![page];
             }
-            Action::PageInto(page) => self.pages.push(page),
+            Action::PageInto(page) => {
+                if page == Page::Feedback {
+                    self.feedback = FeedbackForm::default();
+                }
+                self.pages.push(page);
+            }
             Action::PageBack => {
                 self.pages.pop();
             }
@@ -6002,6 +6096,7 @@ impl App {
                 self.export_pack(&from)?;
             }
             Action::Pack(asked) => self.pack_action(asked)?,
+            Action::Feedback(asked) => self.feedback_action(asked)?,
             Action::OpenPack => {
                 if let Some(path) = (self.pack_opener)(self.t.pack_open_title()) {
                     self.open_file(&path);
@@ -8867,6 +8962,13 @@ impl App {
                         }
                     }
                     Page::Licences => about_view::licences_page(ui, &t),
+                    Page::Feedback => {
+                        let facts = &self.feedback_facts;
+                        if let Some(asked) = feedback_view::form(ui, &t, facts, &mut self.feedback)
+                        {
+                            actions.push(Action::Feedback(asked));
+                        }
+                    }
                     Page::Profile | Page::People | Page::Backups => {
                         self.profile_pane(ui, tones, actions, page);
                     }
@@ -11891,6 +11993,19 @@ impl App {
                 }
                 embossed(ui, tones, false, None, |ui| {
                     if ui
+                        .button(RichText::new(t.feedback_title()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::PageInto(Page::Feedback));
+                    }
+                    ui.label(
+                        RichText::new(t.feedback_settings_detail())
+                            .small()
+                            .color(weak),
+                    );
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    if ui
                         .button(RichText::new(t.about_title()).color(text))
                         .clicked()
                     {
@@ -12267,6 +12382,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::Settings => t.settings_title(),
         Page::About => t.about_title(),
         Page::Licences => t.open_source_licenses(),
+        Page::Feedback => t.feedback_title(),
         Page::Profile => t.profile_title(),
         Page::People => t.people_title(),
         Page::Backups => t.profile_backups(),
@@ -12354,7 +12470,7 @@ fn focused_field(
 
 /// Where Report sends a problem's details: the developer's mail, as on
 /// the phone (crash_guard.dart).
-const REPORT_MAIL: &str = "taum@tuta.io";
+pub(crate) const REPORT_MAIL: &str = "taum@tuta.io";
 
 /// What a failure announced at the top was (UI laws, "Announcements"):
 /// `heading`, the cause and the fix in one sentence each, the full
@@ -12438,7 +12554,7 @@ fn report_url(details: &str) -> String {
 
 /// `text` with everything but unreserved characters percent-encoded,
 /// as a URL's query takes it.
-fn percent_encoded(text: &str) -> String {
+pub(crate) fn percent_encoded(text: &str) -> String {
     text.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {

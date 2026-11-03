@@ -14,6 +14,7 @@
 //
 //   flutter test test/screenshots --run-skipped --concurrency=1 \
 //     --plain-name 'guide frames'
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -32,6 +33,7 @@ import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
+import 'package:oldbrainfix/src/feedback_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -2250,6 +2252,55 @@ void main() {
             final t = await start(tester, seed());
             await openSettings(tester, t);
             expect(find.text(t.settingsIntro), findsOneWidget);
+          });
+
+          // Send feedback (#214), with words and the phone's facts held:
+          // the page as Settings opens it.
+          boxFrame(privacy177, 'feedback', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            final settings = tester.state<NavigatorState>(
+              find.byType(Navigator).first,
+            );
+            unawaited(
+              settings.push(
+                MaterialPageRoute<void>(
+                  builder: (_) => FeedbackScreen(
+                    store: tester
+                        .widget<SettingsScreen>(find.byType(SettingsScreen))
+                        .store,
+                    facts: () async => const FeedbackFacts(
+                      version: '0.4.0+57',
+                      system: 'Android 15 (SDK 35), Google Pixel 8',
+                      install: 'F-Droid',
+                    ),
+                    crash: () => null,
+                    mail: (_) async {},
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('feedback-text')),
+              language == 'de'
+                  ? 'Die Agenda zeigt die Routine von gestern als verpasst.'
+                  : "The Agenda shows yesterday's Routine as Missed.",
+            );
+            await tester.pumpAndSettle();
+            // The ticks' end and the preview with its buttons in view.
+            final preview = find.text(t.feedbackPreview);
+            await tester.scrollUntilVisible(
+              preview,
+              200,
+              scrollable: find.byType(Scrollable).last,
+            );
+            await tester.drag(
+              find.byType(Scrollable).last,
+              const Offset(0, -300),
+            );
+            await tester.pumpAndSettle();
+            expect(find.byType(FeedbackScreen), findsOneWidget);
           });
 
           // The desktop app (#178): the phone's own way where it has one,

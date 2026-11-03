@@ -42,6 +42,7 @@ File? _file(String name) {
 File? get _crashFile => _file('last_crash.txt');
 File? get _marker => _file('running.marker');
 File? get _exitSeen => _file('exit_seen.txt');
+File? get _crashSeen => _file('last_crash_seen.txt');
 
 Future<void> initCrashGuard(
   Directory supportDir, {
@@ -209,6 +210,20 @@ String? lastCrashText() {
   return file != null && file.existsSync() ? file.readAsStringSync() : null;
 }
 
+/// The crash report Send feedback can send along (#214): the last one
+/// recorded and not offered yet, else the one offered last, with when it
+/// was written; null when this phone keeps none.
+({String text, DateTime at})? keptCrashReport() {
+  for (final file in [_crashFile, _crashSeen]) {
+    try {
+      if (file != null && file.existsSync()) {
+        return (text: file.readAsStringSync(), at: file.lastModifiedSync());
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 void clearLastCrash() {
   try {
     final file = _crashFile;
@@ -249,18 +264,24 @@ String mailBody(String body, {int limit = mailBodyLimit}) {
 Future<void> mailCrashReport(
   String body, {
   String subject = 'Old Brain Fix crash report',
-}) async {
-  final uri = Uri(
-    scheme: 'mailto',
-    path: crashMail,
-    query:
-        'subject=${Uri.encodeComponent(subject)}'
-        '&body=${Uri.encodeComponent(mailBody(body))}',
-  );
+}) => mailDeveloper(subject, mailBody(body));
+
+/// Opens the mail app with a mail to [crashMail] titled [subject] that
+/// carries [body] as it is; the user still sends or discards it.
+Future<void> mailDeveloper(String subject, String body) async {
   try {
-    await launchUrl(uri);
+    await launchUrl(mailUri(subject, body));
   } catch (_) {}
 }
+
+/// The `mailto:` link of a mail to [crashMail] with [subject] and [body].
+Uri mailUri(String subject, String body) => Uri(
+  scheme: 'mailto',
+  path: crashMail,
+  query:
+      'subject=${Uri.encodeComponent(subject)}'
+      '&body=${Uri.encodeComponent(body)}',
+);
 
 /// Offers the report of the run that died at the top of the screen (UI
 /// laws, "Announcements"): tapping it opens what happened in the
@@ -280,6 +301,10 @@ void offerCrashReport(
       '${crashReportHeader()}\n\n'
           'Old Brain Fix was killed without a crash log '
           '(most likely out of memory).';
+  // Kept for Send feedback (#214); offered here only once.
+  try {
+    _crashSeen?.writeAsStringSync(body);
+  } catch (_) {}
   clearLastCrash();
   announcements.announce(
     t.crashLastRunBody,

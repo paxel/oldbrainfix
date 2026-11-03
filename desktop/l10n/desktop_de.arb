@@ -313,5 +313,13 @@
   "packSaveTitle": "Das Paket zum Senden speichern",
   "packNotSaved": "Das Paket wurde nicht gespeichert.",
   "packNotSavedTitle": "Paket nicht gespeichert",
-  "packPersonAdded": "{name} wurde zu Menschen hinzugefügt."
+  "packPersonAdded": "{name} wurde zu Menschen hinzugefügt.",
+  "feedbackSaveFile": "Als Datei speichern …",
+  "feedbackSaveTitle": "Feedback speichern",
+  "feedbackSavePack": "Paket speichern …",
+  "feedbackPackAttach": "Ein Mail-Link kann das Paket nicht mitnehmen: Speichere es und hänge es an die Mail an.",
+  "feedbackTooLongDesktop": "Zu lang für einen Mail-Link. Speichere es als Datei und hänge sie an eine Mail an.",
+  "feedbackFileCause": "Die Datei konnte nicht geschrieben werden.",
+  "feedbackNotSaved": "Das Feedback wurde nicht gespeichert.",
+  "feedbackNotSavedTitle": "Feedback nicht gespeichert"
 }

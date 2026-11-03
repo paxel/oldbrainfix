@@ -6695,6 +6695,9 @@ void _packFixture(Directory root) {
       };
     }
 
+    // The Pack of everything Feedback offers (#214), and without Garden.
+    final everything = ada.packOfAll();
+    final withoutGarden = ada.packOfAll(closed: {garden.id});
     final route0 = pack.notes.indexWhere((n) => n.text == 'Route');
     final first = {
       ...pack.exportTicks(),
@@ -6765,6 +6768,11 @@ void _packFixture(Directory root) {
       '${_json.convert({
         'times': {'made': made.toIso8601String(), 'added': added.toIso8601String()},
         'tree': treeOf(pack),
+        'everything': treeOf(everything),
+        'everythingTexts': [for (final n in everything.notes) n.text],
+        'everythingAreas': [for (final a in everything.areas) a.name],
+        'withoutGarden': treeOf(withoutGarden),
+        'withoutGardenTexts': [for (final n in withoutGarden.notes) n.text],
         'openedTree': treeOf(openedPlain.pack),
         'openedSignedTree': treeOf(openedSigned.pack),
         'from': {'id': openedSigned.from?.id, 'name': openedSigned.from?.name, 'kept': openedSigned.fromKept},
@@ -9134,7 +9142,10 @@ Future<void> main(List<String> args) async {
     'Frog and an eaten one. At a held clock (`times`) the tree of the '
     'Pack from Health with its keys, kinds and sizes, the keys ticked '
     'at the start and the size then, ticked all and after unticking both '
-    'Tallies of the Session (`tree`); the Pack of what is ticked at the '
+    'Tallies of the Session (`tree`); the same of the Pack of everything '
+    'Feedback offers (#214), her Areas by name, with the texts of its '
+    'Notes in order, and without her Garden as a closed Area '
+    '(`everything`, `withoutGarden`); the Pack of what is ticked at the '
     'start with the photo and the recording (`pack.obfpack`), and of '
     'everything with her Profile, signed (`signed.obfpack`); Ben, who '
     'has a Health (`receiver.jsonl`), opening each, its tree, and adding '
