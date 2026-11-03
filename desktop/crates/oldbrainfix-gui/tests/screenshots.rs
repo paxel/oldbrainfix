@@ -21,16 +21,17 @@
 //! cargo test -p oldbrainfix-gui --test screenshots -- --ignored guide_frames
 //! ```
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Importance, Notes, PersonSettings, Places, QuickNoteControl,
-    Routines, Schedule, SigningKey, Store, parse_time,
+    Checklists, ClockTime, Day, DeviceSettings, Frogs, Importance, Notes, PersonSettings, Places,
+    QuickNoteControl, Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time,
 };
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Page, Selection};
@@ -94,6 +95,16 @@ struct Texts {
     escalate: &'static str,
     /// The start of an Agenda row's ⋮, "More for {title}".
     more_for: &'static str,
+    /// The Household's lists (#174): a packing Checklist, its first line
+    /// its name, a group under one of its Lines; the weekly Shopping
+    /// List; a Tally of the pages read in the evenings, with its field
+    /// and unit; and the Frogs put off for a while.
+    packing: &'static str,
+    groceries: &'static str,
+    reading: &'static str,
+    pages_read: &'static str,
+    pages: &'static str,
+    frogs: [&'static str; 3],
 }
 
 const EN: Texts = Texts {
@@ -130,6 +141,16 @@ const EN: Texts = Texts {
     weekdays: "Weekdays",
     escalate: "Escalate to an urgent alarm with sound",
     more_for: "More for",
+    packing: "Packing for the weekend at the lake\n✓ Toothbrush\nPhone charger\nHiking gear\n  ✓ Boots\n  Rain jacket",
+    groceries: "Weekly shopping\nMilk\nBread\nCoffee\nApples\nWashing-up liquid",
+    reading: "Reading before bed",
+    pages_read: "Pages read",
+    pages: "pages",
+    frogs: [
+        "Sort the receipts for the tax return",
+        "Clear out the shelf in the cellar",
+        "Cancel the old gym membership",
+    ],
 };
 
 const DE: Texts = Texts {
@@ -166,6 +187,16 @@ const DE: Texts = Texts {
     weekdays: "Wochentage",
     escalate: "Zum dringenden Alarm mit Ton eskalieren",
     more_for: "Mehr zu",
+    packing: "Packen fürs Wochenende am See\n✓ Zahnbürste\nLadekabel fürs Handy\nWandersachen\n  ✓ Wanderschuhe\n  Regenjacke",
+    groceries: "Wocheneinkauf\nMilch\nBrot\nKaffee\nÄpfel\nSpülmittel",
+    reading: "Lesen vor dem Schlafen",
+    pages_read: "Gelesene Seiten",
+    pages: "Seiten",
+    frogs: [
+        "Belege für die Steuererklärung sortieren",
+        "Das Regal im Keller ausmisten",
+        "Den alten Fitnessstudio-Vertrag kündigen",
+    ],
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -258,6 +289,122 @@ fn demo_with_clock(x: &Texts) -> Result<(Store, Vec<String>, Clock), Box<dyn std
 
 fn utc(at: DateTime<Utc>) -> chrono::NaiveDateTime {
     at.naive_utc()
+}
+
+/// The Notes of the Household's lists (#174), as [`seed_lists`] made them.
+#[derive(Default)]
+struct Lists {
+    packing: String,
+    groceries: String,
+}
+
+/// Adds the Household's lists in `x`'s words to the demo store, each at
+/// its own moment on `now`, which is set back after: a Tally of the pages
+/// read most evenings since 13 October, 30 a day the target; the packing
+/// Checklist, a Line and a grouped one checked; the weekly Shopping List,
+/// two Lines bought on Saturday; and three Frogs, one of them at Work.
+fn seed_lists(store: &Store, x: &Texts, now: &Clock) -> oldbrainfix_core::Result<Lists> {
+    let back = *now.lock();
+    let at = |day: u32, h: u32, m: u32| {
+        *now.lock() = Utc
+            .with_ymd_and_hms(2026, 10, day, h, m, 0)
+            .single()
+            .unwrap_or(back);
+    };
+    let places = Places::new(store);
+    let area = |name: &str| -> oldbrainfix_core::Result<Option<String>> {
+        Ok(places
+            .areas()?
+            .into_iter()
+            .find(|a| a.name == name)
+            .map(|a| a.id))
+    };
+    let household = area(x.household)?;
+    let work = area(x.work)?;
+    let notes = Notes::new(store);
+
+    at(13, 22, 5);
+    let reading = notes.capture(x.reading, household.as_deref(), None)?;
+    let tallies = Tallies::new(store);
+    let pages = tallies.add_field(&reading.id, x.pages_read, x.pages, Some(30.0), None)?;
+    let read = [24, 31, 0, 18, 40, 35, 12, 0, 30, 27, 22, 45, 33];
+    for (day, count) in (13..).zip(read) {
+        if count == 0 {
+            continue;
+        }
+        at(day, 22, 15);
+        let values = BTreeMap::from([(pages.clone(), f64::from(count))]);
+        tallies.add(&reading.id, &values, "", None)?;
+    }
+
+    at(24, 9, 30);
+    let groceries = notes.capture(x.groceries, household.as_deref(), None)?;
+    let shopping = ShoppingLists::new(store);
+    shopping.make(&groceries.id)?;
+    at(24, 11, 5);
+    if let Some(list) = shopping.by_note(&groceries.id, &utc)? {
+        for line in [&list.lines[1], &list.lines[3]] {
+            shopping.check(&line.id, &utc)?;
+        }
+    }
+
+    at(25, 19, 40);
+    let packing = notes.capture(x.packing, household.as_deref(), None)?;
+    Checklists::new(store).make(&packing.id)?;
+
+    let frogs = Frogs::new(store);
+    for (day, (text, place)) in (8..).step_by(3).zip([
+        (x.frogs[0], &work),
+        (x.frogs[1], &household),
+        (x.frogs[2], &household),
+    ]) {
+        at(day, 20, 10);
+        let note = notes.capture(text, place.as_deref(), None)?;
+        frogs.spawn(&note.id)?;
+    }
+    *now.lock() = back;
+    Ok(Lists {
+        packing: packing.id,
+        groceries: groceries.id,
+    })
+}
+
+/// The window over the demo store with the Household's lists, in `x`'s
+/// words, `locale` and `theme`, on the Agenda; with the lists' Notes.
+fn window_with_lists(
+    x: &Texts,
+    locale: &str,
+    theme: egui::Theme,
+) -> Result<(Harness<'static, App>, Lists), Box<dyn std::error::Error>> {
+    let mut lists = Lists::default();
+    let harness = window_with_clock(x, locale, theme, |store, _, now| {
+        lists = seed_lists(store, x, now)?;
+        Ok(())
+    })?;
+    Ok((harness, lists))
+}
+
+/// Shows the Household's Notes in the window.
+fn show_household(harness: &mut Harness<'static, App>, x: &Texts) -> TestResult {
+    let household = Places::new(harness.state().store())
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == x.household)
+        .ok_or("the Household Area")?;
+    harness.state_mut().select(Selection::Place(household.id));
+    harness.run();
+    Ok(())
+}
+
+/// Clicks the last widget labelled `label`.
+fn click_last(harness: &mut Harness<'static, App>, label: &str) -> TestResult {
+    harness
+        .get_all_by_label(label)
+        .last()
+        .ok_or_else(|| format!("{label:?}"))?
+        .click();
+    harness.run();
+    Ok(())
 }
 
 /// The window's size in the screenshots.
@@ -824,6 +971,82 @@ fn guide_frames() -> TestResult {
             harness.get_by_label(texts.add_here).click();
             harness.run();
             problems.extend(match_frame(&mut harness, &frame("add-menu"))?);
+            // Lists, Tallies, Sessions and Frogs (#174): the same "+", the
+            // Household's cards compact, a plain Note's kinds, the packing
+            // Checklist in the Note dialog, the Shopping List's Agenda
+            // choices and its card, the New Tally page, a Tally's card,
+            // the New Session page and the Frog view.
+            const LISTS: &str = "lists-tallies-sessions-frogs";
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "make"))?);
+            let (mut harness, _) = window_with_lists(texts, language, theme)?;
+            show_household(&mut harness, texts)?;
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame(LISTS, "shopping-list"),
+            )?);
+            let add_entry = harness.state().t().add_tally_entry().to_string();
+            harness
+                .get_all_by_label(&add_entry)
+                .next()
+                .ok_or("the Tally's Add entry")?
+                .scroll_to_me();
+            harness.run();
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "tally-entry"))?);
+            let (mut harness, _) = window_with_lists(texts, language, theme)?;
+            show_household(&mut harness, texts)?;
+            let view = harness.state().t().menu_view().to_string();
+            let compact = harness.state().t().menu_compact_views().to_string();
+            click_last(&mut harness, &view)?;
+            click_last(&mut harness, &compact)?;
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "views"))?);
+            let (mut harness, lists) = window_with_lists(texts, language, theme)?;
+            harness.state_mut().select_note(&lists.packing);
+            harness.run();
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "checklist"))?);
+            let (mut harness, lists) = window_with_lists(texts, language, theme)?;
+            harness.state_mut().select_note(&lists.groceries);
+            harness.run();
+            let agenda = harness.state().t().checklist_show_on_agenda().to_string();
+            harness
+                .query_all_by_label_contains(&format!("{agenda}: "))
+                .next()
+                .ok_or("the Show on the Agenda badge")?
+                .click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame(LISTS, "list-on-agenda"),
+            )?);
+            // The bike lock's plain Note in the Note dialog, its kind
+            // badge open.
+            let mut lock = String::new();
+            let mut harness = window_with(texts, language, theme, |_, ids| {
+                lock = ids[1].clone();
+                Ok(())
+            })?;
+            harness.state_mut().select_note(&lock);
+            harness.run();
+            let kind = {
+                let t = harness.state().t();
+                format!("{}: {}", t.badge_kind(), t.kind_plain())
+            };
+            click_last(&mut harness, &kind)?;
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "kind"))?);
+            for (page, label) in [
+                ("tally", harness.state().t().tally_heading().to_string()),
+                ("session", harness.state().t().session().to_string()),
+            ] {
+                let (mut harness, _) = window_with_lists(texts, language, theme)?;
+                show_household(&mut harness, texts)?;
+                harness.get_by_label(texts.add_here).click();
+                harness.run();
+                click_last(&mut harness, &label)?;
+                problems.extend(match_frame(&mut harness, &box_frame(LISTS, page))?);
+            }
+            let (mut harness, _) = window_with_lists(texts, language, theme)?;
+            harness.state_mut().select(Selection::Frogs);
+            harness.run();
+            problems.extend(match_frame(&mut harness, &box_frame(LISTS, "frog"))?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;

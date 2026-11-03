@@ -34,8 +34,10 @@ import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
+import 'package:oldbrainfix/src/frogs_screen.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
+import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
@@ -1237,6 +1239,11 @@ void main() {
             expect(find.byType(CalendarScreen), findsOneWidget);
           });
 
+          // Lists, Tallies, Sessions and Frogs (#174): the fan of the
+          // Household's "+", its cards compact, a plain Note's kinds, the
+          // packing Checklist in the editor, the Shopping List's Agenda
+          // choices and its card, a new Tally, a Tally's card, a new
+          // Session and the Frog view.
           /// The Household with its Checklist, Shopping List and Tally.
           Future<void> household(WidgetTester tester) async {
             final t = await start(
@@ -1254,12 +1261,12 @@ void main() {
             await _tap(tester, find.byTooltip(t.addHere));
           }
 
-          frame('add-fan', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'make', (tester) async {
             await addFan(tester);
             expect(find.byKey(const ValueKey('addFan-tally')), findsOneWidget);
           });
 
-          frame('new-tally', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'tally', (tester) async {
             await addFan(tester);
             await _tap(tester, find.byKey(const ValueKey('addFan-tally')));
             Finder key(String k) => find.byKey(ValueKey(k));
@@ -1281,7 +1288,7 @@ void main() {
             expect(find.text(texts.squats), findsOneWidget);
           });
 
-          frame('new-session', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'session', (tester) async {
             await addFan(tester);
             await _tap(tester, find.byKey(const ValueKey('addFan-session')));
             await tester.enterText(
@@ -1302,7 +1309,9 @@ void main() {
             (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
           );
 
-          frame('lists', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'shopping-list', (
+            tester,
+          ) async {
             await household(tester);
             // The lower part of the Checklist above the Shopping List,
             // its struck Lines at the end.
@@ -1317,7 +1326,7 @@ void main() {
             expect(groceries, findsOneWidget);
           });
 
-          frame('list-editor', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'checklist', (tester) async {
             await household(tester);
             // The packing Checklist in the editor (#184): one block of
             // text with boxes, the group in a frame with its own Line.
@@ -1337,7 +1346,9 @@ void main() {
             expect(lines, findsOneWidget);
           });
 
-          frame('tally', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'tally-entry', (
+            tester,
+          ) async {
             await household(tester);
             final reading = find.text(texts.reading);
             await tester.scrollUntilVisible(
@@ -1354,6 +1365,52 @@ void main() {
             );
             Scrollable.ensureVisible(tester.element(reading));
             await tester.pumpAndSettle();
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'views', (tester) async {
+            await household(tester);
+            // Every card of the Household in its compact view (#189).
+            await _tap(tester, find.byKey(const ValueKey('compactNotes')));
+            expect(find.byType(NoteCard), findsWidgets);
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'kind', (tester) async {
+            await boilerEditor(tester);
+            // The kind badge's choices for a plain Note (#188).
+            final kind = find.byKey(const ValueKey('badge-kind'));
+            await reveal(tester, kind);
+            await _tap(tester, kind);
+            expect(
+              find.byKey(const ValueKey('kind-checklist')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'list-on-agenda', (
+            tester,
+          ) async {
+            await household(tester);
+            // The weekly Shopping List's "Show on the Agenda" (#186).
+            final groceries = find.text(texts.groceries.split('\n').first);
+            await tester.scrollUntilVisible(
+              groceries,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            await tester.longPress(groceries);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final agenda = find.byKey(const ValueKey('badge-agenda'));
+            await reveal(tester, agenda);
+            await _tap(tester, agenda);
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'frog', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byTooltip(t.frogsTitle));
+            expect(find.byType(FrogsScreen), findsOneWidget);
           });
 
           /// The Household with its formatted Notes, the newest on top.
