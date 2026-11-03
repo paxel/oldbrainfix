@@ -10,13 +10,15 @@ import 'tally_units.dart';
 enum ThemeChoice { system, light, dark }
 
 /// What the quick note (the text capture screen) shows beyond its text
-/// field, its Photo, Voice, Gallery and Paste, its Nudge buttons and "To
-/// full editor", each once this Device switched it on (#142).
+/// field, its Photo, Voice, Gallery and Paste, its Nudge buttons, "To
+/// full editor" and the alarm clock for a Routine or Reminder (#223), each
+/// once this Device switched it on (#142).
 enum QuickNoteControl {
   /// "File into…".
   fileInto('quickNoteFileInto'),
 
-  /// The Routine, Reminder, Frog or Session menu.
+  /// Frog and Session in the alarm clock's menu, and "Make it a Tally"
+  /// (Q481); the clock offers a Routine or Reminder without it (#223).
   schedule('quickNoteSchedule'),
 
   /// "Add to a Shopping List".
@@ -48,12 +50,15 @@ extension DeviceSettings on Store {
   static const _missedSeen = 'missedSeen';
   static const _quietHours = 'quietHours';
   static const _quietHoursOff = 'quietHoursOff';
+  static const _allDayFrom = 'allDayFrom';
   static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
   static const _calendarContext = 'calendarContext';
   static const _bluetoothContext = 'bluetoothContext';
   static const _agendaCalendar = 'agendaCalendar';
   static const _agendaCalendars = 'agendaCalendars';
   static const _streaksOff = 'streaksOff';
+  static const _agendaHideChecked = 'agendaHideChecked';
+  static const _fatFingers = 'fatFingers';
   static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
@@ -73,6 +78,10 @@ extension DeviceSettings on Store {
     ClockTime(22, 0),
     ClockTime(8, 0),
   );
+
+  /// When all-day Occurrences start to ring when nothing else is set
+  /// (#201).
+  static final defaultAllDayFrom = ClockTime(15, 0);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -157,6 +166,13 @@ extension DeviceSettings on Store {
 
   set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
 
+  /// From when on this Device an all-day Occurrence rings, on the wall
+  /// clock; before that it only shows on the Agenda (#201).
+  ClockTime get allDayFrom =>
+      ClockTime.tryParse(localSetting(_allDayFrom) ?? '') ?? defaultAllDayFrom;
+
+  set allDayFrom(ClockTime time) => setLocalSetting(_allDayFrom, '$time');
+
   /// How long an ignored Nudge waits before it comes again.
   Duration get nudgeRepeat {
     final minutes = int.tryParse(localSetting(_nudgeRepeatMinutes) ?? '');
@@ -213,6 +229,21 @@ extension DeviceSettings on Store {
   bool get streaksOn => localSetting(_streaksOff) != 'true';
 
   set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
+
+  /// Whether this Device's Agenda, and its widget, hide what is checked
+  /// instead of striking it through (#217): a Done Occurrence, a checked
+  /// Line, a pick with its entry, and a group with nothing left; off
+  /// until switched on.
+  bool get agendaHidesChecked => localSetting(_agendaHideChecked) == 'true';
+
+  set agendaHidesChecked(bool on) => setLocalSetting(_agendaHideChecked, '$on');
+
+  /// Whether this Device shows text, icons and tap targets 1.3 times
+  /// their size, "Fat fingers" on the phone and "Bigger text and icons"
+  /// on the desktop (#224); off until switched on.
+  bool get fatFingers => localSetting(_fatFingers) == 'true';
+
+  set fatFingers(bool on) => setLocalSetting(_fatFingers, '$on');
 
   /// Whether the Note editor and Amend on this Device type in two rows,
   /// the bottom one above the keyboard; on unless switched off, which

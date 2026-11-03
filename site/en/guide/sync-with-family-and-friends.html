@@ -1,0 +1,145 @@
+<!-- page: title="Sync with family and friends" track="guide" order=7 summary="Syncing your Devices and Shared Areas far apart through a shared folder: Syncthing without a cloud, Autosync with a cloud you already use, and why the phone apps of Google Drive, Dropbox and Nextcloud are not enough." -->
+<p class="lede">
+  Old Brain Fix has no sync over the internet of its own. Devices far apart sync through a shared
+  folder that another app carries between them: Syncthing from device to device, or Autosync through
+  a cloud such as Google Drive, Dropbox or OneDrive. Everything Old Brain Fix writes into the folder
+  is encrypted. Each box below shows the steps on the phone and on the desktop.
+</p>
+
+<guide-box name="syncthing-own">
+<h2>Sync your own Devices with Syncthing</h2>
+<p>Keep your phone and your computer in sync wherever they are, without a cloud.</p>
+<box-tab device="phone" alt="Sync scrolled to Shared folder with Choose folder, and Sync bundle below">
+<li>Install Syncthing-Fork from F-Droid or Google Play.</li>
+<li>Add a folder in Syncthing-Fork and share it with your computer.</li>
+<li>Tap your Profile picture, then <strong>Sync with another Device</strong>.</li>
+<li>Tap <strong>Choose folder</strong> and pick the Syncthing folder.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Sync dialog with the shared folder chosen, Sync now, Choose folder and Forget, the bundles and five paired Devices">
+<li>Install Syncthing and accept the folder the phone shares.</li>
+<li>Click <strong>Sync ▸ Sync now</strong>.</li>
+<li>Click <strong>Choose folder</strong> and pick the Syncthing folder.</li>
+</box-tab>
+<box-more>
+<p>
+  Syncthing is open source and has no central server: it syncs the folder between your devices,
+  without a cloud account.
+</p>
+<p>
+  On Android, the official Syncthing app was discontinued in December 2024. Syncthing-Fork carries on
+  from it and is updated; it is on F-Droid and on Google Play. On the computer, syncthing.net lists
+  Syncthing for Linux, Windows and macOS: Linux distributions package it, and for Windows and macOS it
+  names installers such as Syncthing Windows Setup, SyncTrayzor and syncthing-macos.
+</p>
+<p>
+  Pair your Devices once in person first (see
+  <a href="sharing-and-sync.html#pairing">Sync with another Device of yours</a>): files from a Device
+  this one is not paired with are counted and left unread. Old Brain Fix keeps its files in a folder
+  named <code>oldbrainfix-sync</code> inside the one you choose. Each Device chooses one shared folder;
+  it carries your own Devices and every Shared Area that travels through a folder.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="syncthing-family">
+<h2>Share an Area with your family through Syncthing</h2>
+<p>Share one Area with a person far away through a Syncthing folder you both have.</p>
+<box-tab device="phone" alt="How do changes travel with Lena? A shared folder you both reach is picked, over the Share Household page">
+<li>Share your Syncthing folder with their Syncthing.</li>
+<li>Tap ⋮ next to the Area, then <strong>Share…</strong>.</li>
+<li>Tap <strong>Share with…</strong> and pick the person.</li>
+<li>Tap <strong>A shared folder you both reach</strong>, then <strong>Share</strong>.</li>
+<li>Send the offer; they accept and choose the same folder.</li>
+</box-tab>
+<box-tab device="desktop" alt="How do changes travel with Lena? as a dialog over the Agenda, A shared folder you both reach picked">
+<li>Share your Syncthing folder with their Syncthing.</li>
+<li>Right-click the Area in the left pane, then click <strong>Share…</strong>.</li>
+<li>Click <strong>Share with…</strong> and click the person.</li>
+<li>Pick <strong>A shared folder you both reach</strong>, then click <strong>Share</strong>.</li>
+<li>Send the offer file; they accept and choose the same folder.</li>
+</box-tab>
+<box-more>
+<p>
+  The person needs Old Brain Fix and Syncthing, and must be among your People (see
+  <a href="sharing-and-sync.html#add-a-person">Add a person</a>). In Syncthing, add their device and
+  share your folder with it; they accept it on their side. The offer itself goes as a file through
+  any messenger, as in <a href="sharing-and-sync.html#share-an-area-with-someone-far-away">Share an
+  Area with someone far away</a>. When they accept it and have no shared folder yet, the app asks
+  "Choose the shared folder?", and they pick the Syncthing folder.
+</p>
+<p>
+  The folder is the same one your own Devices sync through, and it holds what all of them write, each
+  Area sealed with a key of its own. The other person's app reads only the files of the Areas shared
+  with them; everything else stays sealed. What the folder shows to anyone who has it is which
+  Devices sync and how much, not what was written.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="autosync">
+<h2>Use a cloud you already share, with Autosync</h2>
+<p>Keep the shared folder in a cloud your family already uses, such as Google Drive or Dropbox.</p>
+<box-tab device="phone" alt="Sync scrolled to Shared folder with Choose folder, and Sync bundle below">
+<li>Install Autosync from Google Play.</li>
+<li>Pair a folder on the phone with a folder in the cloud.</li>
+<li>Tap your Profile picture, then <strong>Sync with another Device</strong>.</li>
+<li>Tap <strong>Choose folder</strong> and pick the phone folder Autosync syncs.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Sync dialog with the shared folder chosen, Sync now, Choose folder and Forget, the bundles and five paired Devices">
+<li>Install the cloud's desktop app, such as Dropbox or Nextcloud.</li>
+<li>Click <strong>Sync ▸ Sync now</strong>.</li>
+<li>Click <strong>Choose folder</strong> and pick a folder the cloud app syncs.</li>
+</box-tab>
+<box-more>
+<p>
+  Autosync, by MetaCtrl, keeps a folder on the phone and a folder in the cloud the same in both
+  directions: new files in the cloud come down, new files on the phone go up, and a file deleted on
+  one side is deleted on the other.
+</p>
+<ul>
+  <li><strong>Autosync - File Sync &amp; Backup</strong> covers Google Drive, OneDrive, SharePoint Online, Dropbox, Box, MEGA, Nextcloud, ownCloud, pCloud, Yandex Disk, WebDAV, FTP, SFTP and network drives. It starts as a trial and then asks for a purchase.</li>
+  <li><strong>Autosync for Google Drive</strong>, <strong>Dropsync</strong> (Dropbox), <strong>OneSync</strong> (OneDrive), <strong>MegaSync</strong> and <strong>BoxSync</strong> each cover one cloud. They are free with ads, for one pair of folders and uploads up to 10 MB; the premium version, an in-app purchase, adds more pairs, larger files and no ads.</li>
+</ul>
+<p>
+  A recording or photo larger than 10 MB needs the premium version of a single-cloud app. For a
+  Shared Area, each person syncs the same folder of the cloud, for example one shared with the others
+  inside the cloud, and chooses it in Old Brain Fix as in
+  <a href="#share-an-area-with-your-family-through-syncthing">Share an Area with your family through
+  Syncthing</a>.
+</p>
+<p>
+  On the computer, the clouds' own desktop apps sync a real folder: the Nextcloud desktop app on
+  Linux, Windows and macOS, the Dropbox folder in File Explorer or Finder and on Linux, and Google
+  Drive for desktop, which mirrors My Drive into a folder on Windows and macOS.
+</p>
+</box-more>
+</guide-box>
+
+<guide-box name="cloud-apps">
+<h2>Why the Google Drive app is not enough</h2>
+<p>The phone apps of Google Drive, Dropbox and Nextcloud keep no folder in two-way sync.</p>
+<box-tab device="phone" alt="Sync scrolled to Shared folder with Choose folder, and Sync bundle below">
+<li>Use Autosync or Syncthing-Fork instead of the cloud's own app.</li>
+<li>Tap <strong>Choose folder</strong> and pick the folder that app syncs.</li>
+</box-tab>
+<box-tab device="desktop" alt="The Sync dialog with the shared folder chosen, Sync now, Choose folder and Forget, the bundles and five paired Devices">
+<li>Install the cloud's desktop app.</li>
+<li>Click <strong>Sync ▸ Sync now</strong>.</li>
+<li>Click <strong>Choose folder</strong> and pick a folder inside its synced folder.</li>
+</box-tab>
+<box-more>
+<p>
+  The shared folder works only when files the other Devices write appear in it on their own, and
+  files Old Brain Fix writes leave it on their own. The cloud apps on the phone do not do that:
+</p>
+<ul>
+  <li><strong>Google Drive</strong>: the Android app makes single files available offline with "Make available offline"; its help describes no folder on the phone kept in sync.</li>
+  <li><strong>Dropbox</strong>: the Android app makes a whole folder available offline only on paid plans, and by default offline files are not kept up to date over mobile data.</li>
+  <li><strong>Nextcloud</strong>: its user manual says that two-way sync has not yet been fully implemented in the Android client.</li>
+</ul>
+<p>
+  On the computer this is different: the desktop apps of Nextcloud, Dropbox and Google Drive keep a
+  real folder in sync, and Old Brain Fix on the desktop can use a folder inside it.
+</p>
+</box-more>
+</guide-box>

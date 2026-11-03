@@ -1,5 +1,7 @@
 import 'checklists.dart';
+import 'note_kinds.dart';
 import 'notes.dart';
+import 'person_settings.dart';
 import 'schedule.dart';
 import 'sessions.dart';
 import 'shared_areas.dart';
@@ -223,7 +225,8 @@ class Routines {
       }
       within?.call(id);
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Creates a Routine without a Note at hand: its Note, holding [text],
@@ -364,6 +367,36 @@ class Routines {
     );
   }
 
+  /// Checks off [occurrence] of the Routine [id] as [markDone] does, the
+  /// way the user's Done does it everywhere (#211): with "Move a Note to
+  /// the Trash when its one-time Reminder is done" on
+  /// ([PersonSettings.trashesDoneReminder]), a Reminder that is the only
+  /// Routine or Reminder of a plain Note this Device may change moves the
+  /// Note to the trash with it, as "Done and move to trash" does (#215).
+  /// Returns whether it did. Unchecking it later leaves the Note there;
+  /// it comes back from the trash.
+  bool checkOff(String id, Occurrence occurrence, {DateTime? at}) =>
+      store.batch(() {
+        markDone(id, occurrence, at: at);
+        final note = _trashedWhenDone(_require(id));
+        if (note == null) return false;
+        trashNote(note.id, withRoutines: true);
+        return true;
+      });
+
+  /// The Note Done on [routine] moves to the trash ([checkOff]); null
+  /// when none does.
+  Note? _trashedWhenDone(Routine routine) {
+    if (!store.trashesDoneReminder || !routine.isReminder) return null;
+    final note = this.note(routine);
+    if (note == null || note.isTrashed || note.isMerged) return null;
+    if (NoteKinds(store).of(note.id) != NoteKind.plain) return null;
+    if (!store.mayChange(note.id)) return null;
+    final linked = ofNote(note.id);
+    if (linked.length != 1 || linked.single.id != routine.id) return null;
+    return note;
+  }
+
   /// Unchecks [occurrence] of the Routine [id] again.
   void unmarkDone(String id, Occurrence occurrence) {
     _require(id);
@@ -402,10 +435,12 @@ class Routines {
       trashed: trashed == null ? null : DateTime.parse(trashed),
       trashedWith: trashed == null ? null : fields[RoutineKeys.trashedWith],
       done: {
-        // A Session's Occurrence is Done too once every pick has an
-        // entry (ADR 0029); a check-off, written below, keeps its moment.
-        if (fields[SessionKeys.pool] != null)
-          ...SessionMarks.read(store, id, history).doneFromEntries(store),
+        // An Occurrence of a Routine that ran a Session is Done too once
+        // every pick has an entry (ADR 0029), whether the Note is still a
+        // Session or not (ADR 0039); a check-off, written below, keeps
+        // its moment.
+        if (fields.keys.any((k) => k.startsWith(SessionKeys.pickPrefix)))
+          ...SessionMarks.of(store, id).doneFromEntries(store),
         // Spawned from a Checklist, once every Line is checked for it
         // (ADR 0030).
         if (fields.keys.any((k) => k.startsWith(ChecklistKeys.checkPrefix)))
@@ -546,6 +581,24 @@ class Routines {
       tomorrowRows: rowsOn(today.addDays(1)),
       laterRows: [for (var i = 2; i < days; i++) rowsOn(today.addDays(i))],
     );
+  }
+
+  /// What the cards tick today (#215), by the id of the Note each
+  /// Routine and Reminder shows under, with days as [wallClock] shows
+  /// them: of each with an Occurrence today, in the order of today's
+  /// Agenda, its first one today not Done, else its last one today, Done.
+  /// Read once for all the cards of a list.
+  Map<String, List<AgendaRow>> todayByNote(WallClock wallClock) {
+    final byRoutine = <String, AgendaRow>{};
+    for (final row in agenda(wallClock).todayRows) {
+      final held = byRoutine[row.routine.id];
+      if (held == null || held.done != null) byRoutine[row.routine.id] = row;
+    }
+    final byNote = <String, List<AgendaRow>>{};
+    for (final row in byRoutine.values) {
+      if (row.note case final note?) (byNote[note.id] ??= []).add(row);
+    }
+    return byNote;
   }
 
   /// Writes the fields of [schedule] that differ from what is there.

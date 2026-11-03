@@ -362,8 +362,16 @@ pub fn copy_hashing(
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
-        digest.update(&buffer[..read]);
-        output.write_all(&buffer[..read])?;
+        // A reader answers at most the buffer's length; one that claims
+        // more is an error, not a crash.
+        let chunk = buffer.get(..read).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "read more than the buffer holds",
+            )
+        })?;
+        digest.update(chunk);
+        output.write_all(chunk)?;
         total += read as u64;
         if total - told >= 1 << 20 {
             told = total;
@@ -419,6 +427,24 @@ mod tests {
         let stopped = copy_hashing(&b"abc"[..], io::sink(), &AtomicBool::new(true), |_| {})?;
         assert_eq!(stopped, None);
         Ok(())
+    }
+
+    /// A reader that claims to have read more than the buffer holds.
+    struct Overclaiming;
+
+    impl Read for Overclaiming {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            Ok(buf.len() + 1)
+        }
+    }
+
+    #[test]
+    fn a_reader_claiming_more_than_the_buffer_is_an_error() {
+        let copied = copy_hashing(Overclaiming, io::sink(), &AtomicBool::new(false), |_| {});
+        assert_eq!(
+            copied.map_err(|e| e.kind()),
+            Err(io::ErrorKind::InvalidData)
+        );
     }
 
     #[test]

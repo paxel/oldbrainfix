@@ -22,6 +22,12 @@ every release.
 - Release notes record: `docs/release-notes-<version>.md`. The tag pipeline
   takes What's new for Google Play and F-Droid from its `play_notes_en` and
   `play_notes_de` blocks, word for word, and refuses a tag without them.
+  The same blocks are the in-app "What's new in X.Y.Z" Note (#180, ADR
+  0042), which both apps bundle from `assets/help/whats_new.json`: once the
+  record is written, run `python3 tool/whats_new.py --bundle` and commit the
+  file with it. The tag pipeline refuses a tag whose version the bundle
+  lacks, and CI one whose bundle is not current. Write the notes as a Note
+  reads them too: an update's user sees them in the app, not only in Play.
 - Privacy policy: https://paxel.github.io/oldbrainfix/en/reference/privacy-policy.html
   and https://paxel.github.io/oldbrainfix/de/reference/privacy-policy.html.
 

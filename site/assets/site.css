@@ -1272,3 +1272,180 @@ h2 small {
   font-weight: 400;
   margin-left: 0.5rem;
 }
+
+/* ---------- the guide's boxes (#171) ---------- */
+
+/* A section starts with a short box: the heading, what it is for, the
+   Phone and Desktop tabs with their steps and frame, the details folded. */
+.box {
+  container-type: inline-size;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.25rem 1.25rem 1rem;
+  margin: 0 0 2rem;
+}
+
+.box > h2 {
+  margin-top: 0.75rem;
+}
+
+.box-purpose {
+  font-size: 1.05rem;
+}
+
+.box-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+  margin: 0 0 1rem;
+}
+
+.box-tabs[hidden] {
+  display: none;
+}
+
+.box-tabs [role="tab"] {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: -1px;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+.box-tabs [role="tab"]:hover {
+  color: var(--ink);
+}
+
+.box-tabs [role="tab"][aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.box-tabs [role="tab"]:focus-visible,
+.box-panel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The panel: the steps, the frame beside them where the box is wide
+   enough for a phone frame, under them otherwise. A desktop frame lies
+   under the steps, as wide as the box, unless the box is very wide. */
+.box-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem 1.5rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.box-panel[hidden] {
+  display: none;
+}
+
+@container (min-width: 34rem) {
+  .box-panel[data-device="phone"] {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@container (min-width: 60rem) {
+  .box-panel[data-device="desktop"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  }
+}
+
+/* Without script both panels show, each under its device's name. */
+.box-device {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.box.has-tabs .box-device {
+  display: none;
+}
+
+.box-steps {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.box-steps li {
+  margin-bottom: 0.45rem;
+}
+
+.box-panel .frame {
+  margin: 0;
+}
+
+.box-panel .frame img {
+  max-width: 100%;
+  height: auto;
+}
+
+.box-panel .frame.phone img {
+  max-height: 28rem;
+  width: auto;
+}
+
+.box-more {
+  border-top: 1px solid var(--rule);
+  padding-top: 0.75rem;
+}
+
+.box-more > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.box-more > summary::marker {
+  content: "";
+}
+
+.box-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.box-more > summary::before {
+  content: "▸";
+  transition: transform var(--ease);
+}
+
+.box-more[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.box-more > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The guide's start page: every box as a question, under its page. */
+.questions-page {
+  font-weight: 600;
+  margin: 1.25rem 0 0.4rem;
+}
+
+.questions ul {
+  margin-top: 0;
+}
+
+.questions li {
+  margin-bottom: 0.35rem;
+}

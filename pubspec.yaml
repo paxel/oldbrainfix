@@ -3,7 +3,7 @@ description: "Old Brain Fix — capture a thought in one tap, get nagged until i
 publish_to: 'none'
 
 # App version. Keep in sync with CHANGELOG.md.
-version: 0.3.1+6
+version: 0.4.0+7
 
 environment:
   sdk: ^3.13.4
@@ -42,3 +42,7 @@ flutter:
     # (play-developer/feature-graphic.svg), rendered 28 dp high at 1x to
     # 4x; the project's own art, under the project's licence.
     - assets/brain.png
+    # The help Notes' parts (#180): the What's new of each release, written
+    # by tool/whats_new.py --bundle, and the icon pictures, written by the
+    # screenshots generator's 'help pictures'.
+    - assets/help/

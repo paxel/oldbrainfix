@@ -197,6 +197,9 @@ fn dimension(value: jint) -> Option<u32> {
 /// `OcrNative.open(detection, recognition, characters)`: a handle to a
 /// [Reader] with the two models and the characters of `dict.txt`, or 0
 /// when they could not be loaded. A panic never crosses into Java.
+// SAFETY: the one exported symbol of this name, with the signature
+// OcrNative's `external fun open` declares.
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_open<'local>(
     env: JNIEnv<'local>,
@@ -219,6 +222,8 @@ pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_open<'local>(
 
 /// `OcrNative.read(reader, rgba, width, height)`: the text in the
 /// picture, empty when there is none, or null when it could not be read.
+// SAFETY: the export as in `open`, and the handle's use as said below.
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_read<'local>(
     env: JNIEnv<'local>,
@@ -251,6 +256,8 @@ pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_read<'local>(
 }
 
 /// `OcrNative.close(reader)`: frees the [Reader] and its models.
+// SAFETY: the export as in `open`, and the handle's use as said below.
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_close<'local>(
     _env: JNIEnv<'local>,

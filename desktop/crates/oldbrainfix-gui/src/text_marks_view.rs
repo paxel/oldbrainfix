@@ -28,6 +28,11 @@
 //! system's browser or mail program on a click, and any other stays
 //! text.
 //!
+//! A bare web address, `http://` or `https://` (#222), in a plain or a
+//! formatted text is drawn and opens as such a link does, but none in
+//! code, a code block or a link ([`markdown::autolinks`]); a tag or a box
+//! inside one is none. Nothing about it is stored.
+//!
 //! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
 //! scaled down to the width there is: its header row bold on grey, its
 //! first column bold while it holds headings, each cell one line of the
@@ -44,9 +49,9 @@ use egui::{
     TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
-use oldbrainfix_core::markdown::{self, Block, BlockKind, Span, SpanKind};
+use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
-use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format, text_tags};
+use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
 use crate::schedule_text;
@@ -145,7 +150,7 @@ pub fn tag_job(
     let plain = TextFormat::simple(font.clone(), colour);
     let tagged = TextFormat::simple(font, accent);
     let mut at = from;
-    for tag in text_tags::find(text) {
+    for tag in markdown::plain_tags(text) {
         if tag.start < from || tag.end > to {
             continue;
         }
@@ -235,7 +240,8 @@ pub fn marked_label(
         .iter()
         .any(|b| b.0.start >= from && b.0.end <= to);
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
-    if !marked && !tagged {
+    let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
+    if !marked && !tagged && !linked {
         let mut rich = RichText::new(part).color(look.1);
         if let Some(size) = look.0 {
             rich = rich.size(size);
@@ -265,8 +271,10 @@ pub fn marked_label(
 /// Draws the bytes `shown` of the source `text`, in `format`, its boxes
 /// as `boxes` says, as [`marked_label`] draws them: a formatted text as
 /// it reads, line by line, a table as a grid (a row's cells one after
-/// another while cut off), a plain one as it is written. Gives where its
-/// boxes, tags, links and tables lie.
+/// another while cut off), a code block as its lines in the fixed-width
+/// font on the background of code (its lines without the fences while
+/// cut off), a plain one as it is written. Gives where its boxes, tags,
+/// links and tables lie.
 pub fn formatted_label(
     ui: &mut Ui,
     (text, format, boxes): (&str, &str, &BoxLook),
@@ -274,6 +282,10 @@ pub fn formatted_label(
     look: (Option<f32>, Color32),
     truncate: bool,
 ) -> Spots {
+    if format == text_format::CODE {
+        code_text_label(ui, text, shown, look, (truncate, false));
+        return Spots::default();
+    }
     if format != text_format::MARKDOWN {
         return marked_label(ui, (text, boxes), shown, look, truncate);
     }
@@ -289,6 +301,16 @@ pub fn formatted_label(
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         for block in blocks.get(first..=last).unwrap_or_default() {
+            if let Some(code) = &block.code {
+                if !truncate {
+                    if block.line == code.first_line.max(first) {
+                        code_label(ui, text, (&blocks, code), (first, last), &look);
+                    }
+                } else if !code.is_fence(block.line) {
+                    spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+                }
+                continue;
+            }
             match &block.table {
                 // A table is drawn once, at its first line shown; cut
                 // off, each line as its row reads.
@@ -302,6 +324,83 @@ pub fn formatted_label(
         }
     });
     spots
+}
+
+/// Draws the bytes `shown` of a Code text (#213) as written in the
+/// fixed-width font, unwrapped, nothing in it a format, a tag or a box:
+/// on the background of code, cut off at the edge, or moved sideways
+/// with `sideways`; one line cut off without the background with
+/// `truncate`, as a compact card shows it.
+pub fn code_text_label(
+    ui: &mut Ui,
+    text: &str,
+    (from, to): (usize, usize),
+    look: (Option<f32>, Color32),
+    (truncate, sideways): (bool, bool),
+) {
+    let Some(part) = text.get(from..to) else {
+        return;
+    };
+    let look = Look::of(ui, look);
+    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let job = LayoutJob::single_section(text_boxes::strip(part), format);
+    if truncate {
+        ui.add(egui::Label::new(job).truncate());
+        return;
+    }
+    egui::Frame::NONE
+        .fill(look.code)
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(8, 6))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            if sideways {
+                egui::ScrollArea::horizontal()
+                    .id_salt(("code text", from))
+                    .show(ui, |ui| ui.add(egui::Label::new(job).extend()));
+                return;
+            }
+            // Cut off at the edge, every line kept.
+            let galley = ui.fonts_mut(|f| f.layout_job(job));
+            let size = Vec2::new(ui.available_width(), galley.size().y);
+            let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+            let said = galley.text().to_string();
+            response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, &said));
+            ui.painter()
+                .with_clip_rect(rect.intersect(ui.clip_rect()))
+                .galley(rect.min, galley, look.colour);
+        });
+}
+
+/// Draws the lines of `code`, among `blocks` of `text`, from the line
+/// `first` to `last` as written, in the fixed-width font on the
+/// background of code: nothing in them is a format, a tag or a box.
+fn code_label(
+    ui: &mut Ui,
+    text: &str,
+    (blocks, code): (&[Block], &CodeBlock),
+    (first, last): (usize, usize),
+    look: &Look,
+) {
+    let lines: Vec<String> = (code.first_line.max(first)..=code.last_line.min(last))
+        .filter(|&l| !code.is_fence(l))
+        .filter_map(|l| blocks.get(l))
+        .map(|b| text_boxes::strip(text.get(b.start..b.end).unwrap_or_default()))
+        .collect();
+    // Only its closing fence shown: nothing to draw.
+    if lines.is_empty() && code.first_line < first {
+        return;
+    }
+    let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
+    let job = LayoutJob::single_section(lines.join("\n"), format);
+    egui::Frame::NONE
+        .fill(look.code)
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::symmetric(8, 6))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(egui::Label::new(job).wrap());
+        });
 }
 
 /// How a formatted text is drawn: its font, its colour, the accent for
@@ -351,31 +450,40 @@ pub(crate) fn line_at(text: &str, at: usize) -> usize {
         .count()
 }
 
-/// The boxes and the tags of a text, in its source, a table's cells'
-/// among them: each box with the state it shows and what it says after
-/// it.
+/// The boxes, the tags and the web addresses (#222) of a text, in its
+/// source, a table's cells' among them: each box with the state it shows
+/// and what it says after it. A box or a tag inside a web address is
+/// none.
 pub(crate) struct Found {
     boxes: Vec<(FoundBox, BoxState, Option<String>)>,
     tags: Vec<FoundTag>,
+    links: Vec<(usize, usize)>,
 }
 
 impl Found {
     /// Those of the source `text` in `format`, its boxes as `look` says.
     pub(crate) fn of(text: &str, format: &str, look: &BoxLook) -> Found {
+        let markdown = format == text_format::MARKDOWN;
+        let links = if markdown {
+            markdown::autolinks(text)
+        } else {
+            markdown::plain_autolinks(text)
+        };
         let boxes = text_boxes::find(text)
             .into_iter()
+            .filter(|b| !links.iter().any(|&(s, e)| b.start < e && s < b.end))
             .map(|b| {
                 let state = look.state(&b);
                 let after = look.after.get(&b.id).cloned();
                 (b, state, after)
             })
             .collect();
-        let tags = if format == text_format::MARKDOWN {
+        let tags = if markdown {
             markdown::tags(text)
         } else {
-            text_tags::find(text)
+            markdown::plain_tags(text)
         };
-        Found { boxes, tags }
+        Found { boxes, tags, links }
     }
 }
 
@@ -513,16 +621,18 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
 }
 
 /// What a run of characters shown as written holds: a box, by its place
-/// among those found, or a tag.
+/// among those found, a tag or a web address.
 enum Cut {
     Box(usize),
     Tag,
+    Link,
 }
 
 /// Adds the bytes `start..end` of `text`, shown as written, to `line`,
-/// its boxes and tags cut out of it: a box as the glyph of the state it
-/// shows, its id left out, and with Show ticks what it says after it,
-/// small and dim; a tag in a link's words is part of the link.
+/// its boxes, tags and web addresses cut out of it: a box as the glyph of
+/// the state it shows, its id left out, and with Show ticks what it says
+/// after it, small and dim; a web address as a link that opens (#222); a
+/// tag in a link's words is part of the link.
 fn add_written(
     line: &mut Line,
     text: &str,
@@ -545,6 +655,13 @@ fn add_written(
                 .iter()
                 .filter(|t| t.start >= start && t.end <= end)
                 .map(|t| (t.start, t.end, Cut::Tag)),
+        );
+        cuts.extend(
+            found
+                .links
+                .iter()
+                .filter(|&&(s, e)| s >= start && e <= end)
+                .map(|&(s, e)| (s, e, Cut::Link)),
         );
     }
     cuts.sort_by_key(|c| c.0);
@@ -573,6 +690,18 @@ fn add_written(
                 tagged.color = look.accent;
                 let chars = line.push(piece, tagged, style.bold);
                 line.tags.push((a, piece.to_string(), chars));
+            }
+            Cut::Link => {
+                // Never an id drawn, of a glyph copied in.
+                let url = text_boxes::strip(piece);
+                let linked = Style {
+                    link: true,
+                    ..style
+                };
+                let chars = line.push(&url, part_format(look, linked, false), style.bold);
+                if markdown::may_open(&url) {
+                    line.links.push((a, url, chars));
+                }
             }
         }
         at = b;
@@ -650,6 +779,11 @@ fn block_label(
                     add_spans(&mut line, text, &cell.spans, style, (found, &look));
                 }
             }
+        }
+        // A line of a code block as written, in the fixed-width font.
+        None if block.kind == BlockKind::Code => {
+            let shown = text_boxes::strip(text.get(block.start..block.end).unwrap_or_default());
+            line.push(&shown, part_format(&look, style, true), false);
         }
         None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
     }
@@ -1031,13 +1165,15 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
 /// The source `text` of a formatted text laid out for its edit field in
 /// `font` and `colour`: every character where it is, its marks in `dim`
 /// and its tags in `accent`, unwrapped. A table's pipes, its delimiter
-/// row and the line marking its first column as headings are marks.
+/// row and the line marking its first column as headings are marks; so
+/// are a code block's fences, its lines in the fixed-width font on the
+/// background `code`.
 pub fn source_job(
     text: &str,
     font: FontId,
-    (colour, accent, dim): (Color32, Color32, Color32),
+    (colour, accent, dim, code): (Color32, Color32, Color32, Color32),
 ) -> LayoutJob {
-    // What each byte is: 0 words, 1 a mark, 2 a tag.
+    // What each byte is: 0 words, 1 a mark, 2 a tag, 3 code.
     let mut kind = vec![0u8; text.len()];
     let mut mark = |a: usize, b: usize, k: u8| {
         for slot in kind.get_mut(a..b).unwrap_or_default() {
@@ -1063,7 +1199,16 @@ pub fn source_job(
     // A line's mark, or a table's line whole; then its cells' words
     // again; then the marks of its words.
     let (mut lines, mut cells, mut inline) = (Vec::new(), Vec::new(), Vec::new());
+    let mut code_lines = Vec::new();
     for block in markdown::parse(text) {
+        if let Some(c) = &block.code {
+            if c.is_fence(block.line) {
+                lines.push((block.start, block.end));
+            } else {
+                code_lines.push((block.start, block.end));
+            }
+            continue;
+        }
         match (&block.table, block.row) {
             (Some(table), row) => {
                 lines.push((block.start, block.end));
@@ -1086,16 +1231,21 @@ pub fn source_job(
     for (a, b) in inline {
         mark(a, b, 1);
     }
+    for (a, b) in code_lines {
+        mark(a, b, 3);
+    }
     for tag in markdown::tags(text) {
         mark(tag.start, tag.end, 2);
     }
-    let format = |k: u8| {
-        let c = match k {
-            1 => dim,
-            2 => accent,
-            _ => colour,
-        };
-        TextFormat::simple(font.clone(), c)
+    let format = |k: u8| match k {
+        1 => TextFormat::simple(font.clone(), dim),
+        2 => TextFormat::simple(font.clone(), accent),
+        3 => {
+            let mut format = TextFormat::simple(FontId::monospace(font.size * 0.9), colour);
+            format.background = code;
+            format
+        }
+        _ => TextFormat::simple(font.clone(), colour),
     };
     let mut job = LayoutJob::default();
     let mut run = 0;
@@ -1157,7 +1307,7 @@ pub fn tag_spots(
     text: &str,
     (from, to): (usize, usize),
 ) -> Vec<TagSpot> {
-    text_tags::find(text)
+    markdown::plain_tags(text)
         .into_iter()
         .filter(|tag| tag.start >= from && tag.end <= to)
         .filter_map(|tag| {

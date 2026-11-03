@@ -4,6 +4,14 @@
 //! Dart core's `lanSync` does, and the desktop joins a phone by the code
 //! typed in.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -354,7 +362,12 @@ fn the_paired_host_runs_only_while_a_paired_device_syncs_on_its_own() -> TestRes
             .map_err(|e| e.to_string())?;
         Ok((challenge.status().as_u16(), vector.status().as_u16()))
     });
-    let sessions = hosting.step(&desk, "Desk", std::time::Duration::from_millis(50));
+    let sessions = hosting.step(
+        &desk,
+        "Desk",
+        std::time::Duration::from_millis(50),
+        &oldbrainfix_gui::auto_sync::Syncing::default(),
+    );
     assert!(sessions.is_empty());
     assert_eq!(asked.join().map_err(|_| "asker")??, (200, 403));
 
@@ -563,7 +576,8 @@ fn the_folder_thread_syncs_at_once_and_on_its_own() -> TestResult {
         let (desk, stop, wanted, rounds) =
             (desk.clone(), stop.clone(), wanted.clone(), rounds.clone());
         std::thread::spawn(move || {
-            oldbrainfix_gui::folder_sync::run(&desk, &stop, &wanted, |_| {
+            let syncing = oldbrainfix_gui::auto_sync::Syncing::default();
+            oldbrainfix_gui::folder_sync::run(&desk, &stop, &wanted, &syncing, |_| {
                 rounds.fetch_add(1, Ordering::SeqCst);
             });
         })
@@ -588,6 +602,98 @@ fn the_folder_thread_syncs_at_once_and_on_its_own() -> TestResult {
     assert!(wait(2), "asked for, another comes before the half minute");
     stop.store(true, Ordering::SeqCst);
     thread.join().map_err(|_| "the thread")?;
+    Ok(())
+}
+
+#[test]
+fn a_folder_round_on_its_own_connection_shows_the_line_then_what_came() -> TestResult {
+    use oldbrainfix_gui::auto_sync::Syncing;
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+    let db = tempfile::tempdir()?;
+    let dir = tempfile::tempdir()?;
+    let path = db.path().join("oldbrainfix.db");
+    let open = || {
+        Store::open(&path, Box::new(chrono::Utc::now), || {
+            Ok(SigningKey::from_seed([1; 32]))
+        })
+    };
+    // The window's connection, and the folder thread's own (#225).
+    let shown = Arc::new(open()?);
+    let own = Arc::new(open()?);
+    phone_folder(&own, dir.path(), "Through the folder", true)?;
+    own.choose_sync_folder(&dir.path().to_string_lossy())?;
+    let syncing = Syncing::default();
+    let changes = Arc::new(AtomicU64::new(0));
+    let mut app = App::new(shown.clone(), "en");
+    app.watch_changes(changes.clone());
+    app.set_syncing(syncing.clone());
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.step();
+    assert!(harness.query_by_label("Syncing…").is_none());
+    assert!(!shows(&harness, "Through the folder"));
+    // While a sync runs, the line lies along the menu bar's bottom edge,
+    // across the window, and the window keeps drawing.
+    syncing.during(|| -> TestResult {
+        harness.step();
+        let line = harness.get_by_label("Syncing…").rect();
+        let file = harness.get_by_label("File").rect();
+        assert!(line.top() >= file.bottom());
+        assert!((line.height() - oldbrainfix_gui::sync_line::HEIGHT).abs() < 0.01);
+        // The bar's width, inside the window's margin of 8.
+        assert!((line.width() - (1280.0 - 16.0)).abs() < 0.01);
+        harness.step();
+        assert!(harness.query_by_label("Syncing…").is_some());
+        Ok(())
+    })?;
+    harness.step();
+    assert!(harness.query_by_label("Syncing…").is_none(), "gone with it");
+    // A real round on the thread's own connection; the window's hears of
+    // it and reads the log again.
+    let (stop, wanted, rounds) = (
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicUsize::new(0)),
+    );
+    let thread = {
+        let (own, shown, changes) = (own.clone(), shown.clone(), changes.clone());
+        let (stop, wanted, rounds, syncing) = (
+            stop.clone(),
+            wanted.clone(),
+            rounds.clone(),
+            syncing.clone(),
+        );
+        std::thread::spawn(move || {
+            oldbrainfix_gui::folder_sync::run(&own, &stop, &wanted, &syncing, |result| {
+                if !result.applied.is_empty() {
+                    shown.changed_elsewhere();
+                    changes.fetch_add(1, Ordering::SeqCst);
+                }
+                rounds.fetch_add(1, Ordering::SeqCst);
+            });
+        })
+    };
+    for _ in 0..400 {
+        if rounds.load(Ordering::SeqCst) >= 1 {
+            break;
+        }
+        harness.step();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    stop.store(true, Ordering::SeqCst);
+    thread.join().map_err(|_| "the thread")?;
+    assert_eq!(rounds.load(Ordering::SeqCst), 1);
+    harness.step();
+    assert!(shows(&harness, "Through the folder"));
+    assert!(harness.query_by_label("Syncing…").is_none());
     Ok(())
 }
 

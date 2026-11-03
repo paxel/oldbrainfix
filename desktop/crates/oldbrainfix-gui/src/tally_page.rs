@@ -13,13 +13,13 @@ use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::tally_units;
 use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 
-use crate::app::{embossed, radio_column};
+use crate::app::{chip_row, embossed};
 use crate::icons;
 use crate::l10n::L10n;
-use crate::setting_badges::{badge, badge_dialog, badge_row};
+use crate::setting_badges::{BadgeValue, badge, badge_dialog, badge_row};
 use crate::tally_unit_match::{self, UnitNames};
-use crate::tally_view::kind_name;
-use crate::theme::Tones;
+use crate::tally_view::{self, kind_name};
+use crate::theme::{self, Tones};
 
 /// What was asked of the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,6 +140,13 @@ impl TallyPage {
         }
     }
 
+    /// The page with its name starting as `name`, such as the tags a
+    /// Session's pool is filtered by (#220).
+    pub fn with_name(mut self, name: String) -> TallyPage {
+        self.name = name;
+        self
+    }
+
     /// The name as typed, without the blanks around it.
     pub fn name(&self) -> &str {
         self.name.trim()
@@ -153,8 +160,12 @@ impl TallyPage {
         let name = self.name.trim().to_string();
         let system = self.system;
         self.name_missing = name.is_empty();
-        let kept: Vec<usize> = (0..self.fields.len())
-            .filter(|i| !self.fields[*i].name.trim().is_empty())
+        let kept: Vec<usize> = self
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| !f.name.trim().is_empty())
+            .map(|(i, _)| i)
             .collect();
         self.fields_missing = kept.is_empty();
         for (i, field) in self.fields.iter_mut().enumerate() {
@@ -174,7 +185,11 @@ impl TallyPage {
             self.focus = Some(field_id(field.key));
             return Ok(None);
         }
-        let fields: Vec<&FieldDraft> = kept.iter().map(|i| &self.fields[*i]).collect();
+        let fields: Vec<&FieldDraft> = self
+            .fields
+            .iter()
+            .filter(|f| !f.name.trim().is_empty())
+            .collect();
         let place = self.place.as_deref();
         let id = store.batch(|| {
             let note = Notes::new(store).capture(&name, place, None)?;
@@ -213,7 +228,7 @@ impl TallyPage {
                 ui.add_space(4.0);
                 ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
                 ui.horizontal_wrapped(|ui| {
-                    if ui.button(RichText::new(t.save()).color(text)).clicked() {
+                    if theme::primary(ui, true, t.save()).clicked() {
                         intent = Some(PageIntent::Save);
                     }
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
@@ -263,10 +278,7 @@ impl TallyPage {
                         }
                         let unit = tally_units::shown_unit(&field.unit(system), system);
                         let target = field.target.trim();
-                        let rule = match field.rule {
-                            TallyRule::Sum => t.tally_rule_sum_short(),
-                            TallyRule::Max => t.tally_rule_max_short(),
-                        };
+                        let rule = tally_view::rule_value(t, field.rule);
                         let unit_value = if unit.is_empty() {
                             t.tally_no_unit().to_string()
                         } else {
@@ -281,22 +293,22 @@ impl TallyPage {
                         let mut opened = None;
                         badge_row(ui, |ui| {
                             let badges = [
+                                (icons::TALLY_RULE, t.tally_rule(), rule, Editing::Rule),
                                 (
-                                    icons::TALLY_RULE,
-                                    t.tally_rule(),
-                                    rule.to_string(),
-                                    Editing::Rule,
+                                    icons::TALLY_UNIT,
+                                    t.tally_unit(),
+                                    BadgeValue::Text(&unit_value),
+                                    Editing::Unit,
                                 ),
-                                (icons::TALLY_UNIT, t.tally_unit(), unit_value, Editing::Unit),
                                 (
                                     icons::TALLY_TARGET,
                                     t.tally_target_badge(),
-                                    target_value,
+                                    BadgeValue::Text(&target_value),
                                     Editing::Target,
                                 ),
                             ];
                             for (icon, setting, value, editing) in badges {
-                                if badge(ui, shown, (icon, None), setting, Some(&value), true)
+                                if badge(ui, shown, (icon, None), setting, Some(value), true)
                                     .clicked()
                                 {
                                     opened = Some(editing);
@@ -357,7 +369,7 @@ impl TallyPage {
                         (TallyRule::Sum, t.tally_rule_sum().to_string()),
                         (TallyRule::Max, t.tally_rule_max().to_string()),
                     ];
-                    if radio_column(ui, &mut field.rule, options) {
+                    if chip_row(ui, &mut field.rule, options) {
                         field.rule_picked = true;
                         done = true;
                     }

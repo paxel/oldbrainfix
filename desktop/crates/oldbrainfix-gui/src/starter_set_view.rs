@@ -11,6 +11,7 @@ use oldbrainfix_core::places::STARTER_SET;
 use crate::backup_view::WelcomeAction;
 use crate::l10n::L10n;
 use crate::names::offered_area_name;
+use crate::theme;
 
 /// Every slug of the Starter Set: what shows ticked at first.
 pub fn all() -> BTreeSet<String> {
@@ -53,20 +54,20 @@ pub fn tick_topic(picked: &mut BTreeSet<String>, area: &str, topic: &str, on: bo
 pub fn starter_set(
     ui: &mut Ui,
     t: &L10n,
-    picked: &mut BTreeSet<String>,
+    (picked, advanced): (&mut BTreeSet<String>, &mut bool),
     actions: &mut Vec<WelcomeAction>,
 ) {
     let text = ui.visuals().text_color();
     ui.heading(RichText::new(t.starter_set_title()).color(text));
+    ui.label(RichText::new(t.features()).strong().color(text));
+    features_choice(ui, t, advanced);
+    ui.add_space(8.0);
     ui.label(RichText::new(t.starter_set_intro()).color(text));
     for (area, topics) in STARTER_SET {
         ui.add_space(8.0);
         let mut on = picked.contains(area.slug);
         let name = offered_area_name(t, Some(area.slug), area.name);
-        if ui
-            .checkbox(&mut on, RichText::new(name).strong().color(text))
-            .changed()
-        {
+        if theme::checkbox(ui, &mut on, RichText::new(name).strong().color(text)).changed() {
             tick_area(picked, area.slug, on);
         }
         for topic in topics {
@@ -74,10 +75,7 @@ pub fn starter_set(
                 ui.add_space(24.0);
                 let mut on = picked.contains(topic.slug);
                 let name = offered_area_name(t, Some(topic.slug), topic.name);
-                if ui
-                    .checkbox(&mut on, RichText::new(name).color(text))
-                    .changed()
-                {
+                if theme::checkbox(ui, &mut on, RichText::new(name).color(text)).changed() {
                     tick_topic(picked, area.slug, topic.slug, on);
                 }
             });
@@ -85,16 +83,34 @@ pub fn starter_set(
     }
     ui.add_space(12.0);
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.starter_set_done()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.starter_set_done()).clicked() {
             actions.push(WelcomeAction::Plant);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             actions.push(WelcomeAction::Back);
         }
     });
+}
+
+/// Simple or Advanced (#197) as two radio buttons, each with what it
+/// means under it, under what the choice keeps: on the Starter Set and in
+/// Settings. True when a click picked the other one.
+pub fn features_choice(ui: &mut Ui, t: &L10n, advanced: &mut bool) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.features_detail()).small().color(weak));
+    let was = *advanced;
+    for (value, label, detail) in [
+        (false, t.features_simple(), t.features_simple_detail()),
+        (true, t.features_advanced(), t.features_advanced_detail()),
+    ] {
+        ui.radio_value(advanced, value, RichText::new(label).color(text));
+        ui.horizontal(|ui| {
+            ui.add_space(24.0);
+            ui.label(RichText::new(detail).small().color(weak));
+        });
+    }
+    *advanced != was
 }
 
 #[cfg(test)]

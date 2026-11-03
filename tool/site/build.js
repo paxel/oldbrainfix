@@ -59,6 +59,10 @@ export const UI = {
     result: "result",
     linkCopied: "Link copied",
     copyFailed: "Could not copy automatically; the heading is selected",
+    device: "Device",
+    phone: "Phone",
+    desktop: "Desktop",
+    moreDetails: "More details",
   },
   de: {
     overview: "Übersicht",
@@ -87,6 +91,10 @@ export const UI = {
     result: "Treffer",
     linkCopied: "Link kopiert",
     copyFailed: "Konnte nicht automatisch kopieren; die Überschrift ist markiert",
+    device: "Gerät",
+    phone: "Handy",
+    desktop: "Desktop",
+    moreDetails: "Mehr Details",
   },
 };
 
@@ -192,6 +200,221 @@ export function processHeadings(body, ui = UI.en) {
   html += body.slice(cursor);
   const intro = stripTags(body.slice(0, matches.length ? matches[0].start : body.length));
   return { html, headings, intro, sections };
+}
+
+// ---------------------------------------------------------------------------
+// The guide's boxes (#171, docs/agents/guide-writing.md). A section of a guide
+// page starts with a short box, authored as
+//
+//   <guide-box name="start-new">
+//   <h2>Start new</h2>
+//   <p>What it is for, in one line.</p>
+//   <box-tab device="phone" alt="…"><li>Tap <strong>New</strong>.</li>…</box-tab>
+//   <box-tab device="desktop" alt="…"><li>…</li></box-tab>
+//   <box-more>Reasons, exceptions and the rest, folded.</box-more>
+//   </guide-box>
+//
+// and built into a section with Phone and Desktop tabs, each tab with its
+// steps and its frame, light and dark, under
+// assets/frames/<device>/<lang>/<theme>/<page>/<name>.png. The rules hold
+// only on pages with a box; the others are left as they are.
+
+export const BOX_DEVICES = ["phone", "desktop"];
+export const BOX_MAX_STEPS = 5;
+export const BOX_MAX_WORDS = 12;
+
+const BOX = /<guide-box\b([^>]*)>([\s\S]*?)<\/guide-box>/g;
+
+function attr(attrs, name) {
+  const m = new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`).exec(attrs);
+  return m ? m[1] : undefined;
+}
+
+/** Words of a step: the tokens with a letter or a digit, so "+" and "▸" are none. */
+export function countWords(html) {
+  return stripTags(html)
+    .split(/\s+/)
+    .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+/** Width and height from a PNG's header. */
+function pngSize(file) {
+  const head = Buffer.alloc(24);
+  const fd = fs.openSync(file, "r");
+  try {
+    fs.readSync(fd, head, 0, 24, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
+}
+
+/** The boxes of a page in the authored form, checked against the rules; [] for a page without one. */
+export function parseBoxes(page, srcDir) {
+  const where = page.url;
+  const pageName = path.posix.basename(page.path, ".html");
+  const boxes = [];
+  for (const m of page.body.matchAll(BOX)) {
+    const name = attr(m[1], "name");
+    if (!name || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
+      throw new Error(`${where}: a box needs a name of lower-case words joined by "-", got "${name ?? ""}"`);
+    }
+    const fail = (why) => new Error(`${where}: box "${name}": ${why}`);
+    if (boxes.some((b) => b.name === name)) throw new Error(`${where}: two boxes named "${name}"`);
+    let rest = m[2];
+    const heading = /<h2\b([^>]*)>([\s\S]*?)<\/h2>/.exec(rest);
+    if (!heading) throw fail("no <h2> heading");
+    rest = rest.replace(heading[0], "");
+    const tabs = [];
+    rest = rest.replace(/<box-tab\b([^>]*)>([\s\S]*?)<\/box-tab>/g, (_, attrs, inner) => {
+      tabs.push({ device: attr(attrs, "device"), alt: attr(attrs, "alt"), inner });
+      return "";
+    });
+    const more = [];
+    rest = rest.replace(/<box-more>([\s\S]*?)<\/box-more>/g, (_, inner) => {
+      more.push(inner.trim());
+      return "";
+    });
+    if (more.length > 1) throw fail("more than one <box-more>");
+    rest = rest.trim();
+    const purpose = /^<p>([\s\S]*?)<\/p>/.exec(rest);
+    if (!purpose) {
+      if (!rest) throw fail("no purpose, the one line <p> under the heading");
+      throw fail(`unexpected content "${rest.slice(0, 60)}"`);
+    }
+    const left = rest.slice(purpose[0].length).trim();
+    if (left) throw fail(`unexpected content "${left.slice(0, 60)}"`);
+    for (const tab of tabs) {
+      if (!BOX_DEVICES.includes(tab.device)) throw fail(`a tab for "${tab.device}", not phone or desktop`);
+    }
+    const panels = BOX_DEVICES.map((device) => {
+      const found = tabs.filter((t) => t.device === device);
+      if (found.length === 0) throw fail(`no ${device} tab`);
+      if (found.length > 1) throw fail(`two ${device} tabs`);
+      const tab = found[0];
+      if (!tab.alt) throw fail(`the ${device} tab has no alt text for its frame`);
+      const items = [...tab.inner.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((s) => s[1].trim());
+      const loose = tab.inner.replace(/<li>[\s\S]*?<\/li>/g, "").trim();
+      if (loose) throw fail(`the ${device} tab holds more than its steps: "${loose.slice(0, 60)}"`);
+      if (items.length === 0) throw fail(`the ${device} tab has no steps`);
+      if (items.length > BOX_MAX_STEPS) {
+        throw fail(`the ${device} tab has ${items.length} steps, more than ${BOX_MAX_STEPS}`);
+      }
+      for (const item of items) {
+        const words = countWords(item);
+        if (words > BOX_MAX_WORDS) {
+          throw fail(`a ${device} step has ${words} words, more than ${BOX_MAX_WORDS}: "${stripTags(item)}"`);
+        }
+      }
+      let size = null;
+      for (const lang of LANGS.map((l) => l.id)) {
+        for (const theme of ["light", "dark"]) {
+          const rel = `assets/frames/${device}/${lang}/${theme}/${pageName}/${name}.png`;
+          const file = path.join(srcDir, ...rel.split("/"));
+          if (!fs.existsSync(file)) throw fail(`the ${device} tab has no frame ${rel}`);
+          if (lang === page.lang && theme === "light") size = pngSize(file);
+        }
+      }
+      return { device, alt: tab.alt, items, size };
+    });
+    const authored = /\sid\s*=\s*"([^"]*)"/.exec(heading[1]);
+    boxes.push({
+      name,
+      id: authored ? authored[1] : slugify(heading[2]),
+      heading: heading[2].trim(),
+      purpose: purpose[1].trim(),
+      panels,
+      more: more[0] ?? "",
+      whole: m[0],
+    });
+  }
+  if (boxes.length) {
+    const outside = page.body.replace(BOX, "");
+    const loose = /<h2\b[^>]*>([\s\S]*?)<\/h2>/.exec(outside);
+    if (loose) throw new Error(`${where}: the section "${stripTags(loose[1])}" is not a box; on a page of boxes every section starts with one`);
+  }
+  return boxes;
+}
+
+/** The built form of a box: its section with the tabs, the panels and the details. */
+export function renderBox(box, page) {
+  const ui = UI[page.lang];
+  const rel = relPrefix(page.url);
+  const pageName = path.posix.basename(page.path, ".html");
+  const id = box.id;
+  const tabs = box.panels
+    .map(
+      (p, i) =>
+        `<button type="button" role="tab" id="${id}-${p.device}-tab" aria-controls="${id}-${p.device}" ` +
+        `aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-device="${p.device}">${escapeHtml(ui[p.device])}</button>`,
+    )
+    .join("\n");
+  const panels = box.panels
+    .map((p) => {
+      const shot = (theme) =>
+        `<img class="shot-${theme}" src="${rel}assets/frames/${p.device}/${page.lang}/${theme}/${pageName}/${box.name}.png" ` +
+        `alt="${escapeHtml(p.alt)}" width="${p.size.width}" height="${p.size.height}" loading="lazy">`;
+      return (
+        `<div class="box-panel" role="tabpanel" id="${id}-${p.device}" aria-labelledby="${id}-${p.device}-tab" data-device="${p.device}" tabindex="0">\n` +
+        `<p class="box-device">${escapeHtml(ui[p.device])}</p>\n` +
+        `<ol class="box-steps">\n${p.items.map((i) => `<li>${i}</li>`).join("\n")}\n</ol>\n` +
+        `<figure class="frame${p.device === "phone" ? " phone" : ""}">\n${shot("light")}\n${shot("dark")}\n</figure>\n` +
+        `</div>`
+      );
+    })
+    .join("\n");
+  const more = box.more
+    ? `\n<details class="box-more">\n<summary>${escapeHtml(ui.moreDetails)}</summary>\n${box.more}\n</details>`
+    : "";
+  return (
+    `<section class="box" aria-labelledby="${id}">\n<h2 id="${id}">${box.heading}</h2>\n` +
+    `<p class="box-purpose">${box.purpose}</p>\n` +
+    `<div class="box-tabs" role="tablist" aria-label="${escapeHtml(ui.device)}" hidden>\n${tabs}\n</div>\n` +
+    `${panels}${more}\n</section>`
+  );
+}
+
+/**
+ * Checks and builds the boxes of every page, twins holding the same boxes in
+ * the same order, and fills each guide start page's <guide-questions> with
+ * every box of its language as a link: none can be missed.
+ */
+export function expandGuide(pages, srcDir) {
+  const boxesOf = new Map();
+  for (const page of pages) boxesOf.set(page, parseBoxes(page, srcDir));
+  const [first, ...others] = LANGS.map((l) => l.id);
+  for (const page of pages.filter((p) => others.includes(p.lang))) {
+    const twin = pages.find((p) => p.lang === first && p.path === page.path);
+    const mine = boxesOf.get(page).map((b) => b.name);
+    const theirs = twin ? boxesOf.get(twin).map((b) => b.name) : mine;
+    if (mine.join() !== theirs.join()) {
+      throw new Error(`${page.url}: boxes ${mine.join(", ")} differ from ${twin.url}: ${theirs.join(", ")}`);
+    }
+  }
+  for (const [page, boxes] of boxesOf) {
+    for (const box of boxes) page.body = page.body.replace(box.whole, () => renderBox(box, page));
+  }
+  const QUESTIONS = /<guide-questions><\/guide-questions>/;
+  for (const lang of LANGS.map((l) => l.id)) {
+    const withBoxes = pages.filter((p) => p.lang === lang && p.track === "guide" && boxesOf.get(p).length);
+    const index = pages.find((p) => p.url === `${lang}/guide/index.html`);
+    if (!index || !QUESTIONS.test(index.body)) {
+      if (withBoxes.length) throw new Error(`${lang}/guide/index.html: no <guide-questions> for the boxes of the guide`);
+      continue;
+    }
+    const groups = withBoxes
+      .map((p) => {
+        const href = path.posix.relative(path.posix.dirname(index.path), p.path);
+        const items = boxesOf
+          .get(p)
+          .map((b) => `<li><a href="${href}#${b.id}">${escapeHtml(stripTags(b.heading))}</a></li>`)
+          .join("\n");
+        return `<p class="questions-page">${escapeHtml(p.title)}</p>\n<ul>\n${items}\n</ul>`;
+      })
+      .join("\n");
+    index.body = index.body.replace(QUESTIONS, () => `<div class="questions">\n${groups}\n</div>`);
+  }
+  return pages;
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +796,7 @@ export function collectPages({ srcDir = path.join(REPO_ROOT, "site"), generated 
   }
   checkSiblings(pages);
   for (const page of pages) rejectRootRelativeLinks(page);
+  expandGuide(pages, srcDir);
   return pages;
 }
 

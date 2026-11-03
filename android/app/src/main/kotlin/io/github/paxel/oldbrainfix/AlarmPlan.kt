@@ -34,8 +34,8 @@ data class Action(
     /** Counts up; the app acknowledges everything up to one it applied. */
     val seq: Long,
     /**
-     * "done" or "snooze"; from the Agenda widget also "line", "frog" or
-     * "shopping" ([EventQueue.KINDS]).
+     * "done" or "snooze"; from the Agenda widget also "line", "frog",
+     * "shopping" or "checklist" ([EventQueue.KINDS]).
      */
     val kind: String,
     /** The Routine, or the Frog of a "frog". */
@@ -47,7 +47,7 @@ data class Action(
     val until: Long,
     val title: String,
     val body: String,
-    /** The Line a "line" or a "shopping" checks; empty for the others. */
+    /** The Line a "line", a "shopping" or a "checklist" checks; empty for the others. */
     val line: String = "",
 )
 

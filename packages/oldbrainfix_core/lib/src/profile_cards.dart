@@ -162,6 +162,23 @@ typedef _Card = ({SignedProfile profile, KeyRecord key, bool back, String id});
   return (parts[0], parts[1]);
 }
 
+/// A Profile card whose signatures held: the person's signed Profile,
+/// the key record of the Device that made it, bound to that Profile, and
+/// the Profile's id. A Pack (#164) carries one to say who it is from.
+typedef CheckedProfileCard = ({
+  SignedProfile profile,
+  KeyRecord key,
+  String id,
+});
+
+/// The card [text] holds, a link or the card alone, checked as opening
+/// one checks it; null when it is none or its signatures do not hold.
+/// Nothing is kept.
+CheckedProfileCard? checkProfileCard(String text) => switch (_readCard(text)) {
+  final card? => (profile: card.profile, key: card.key, id: card.id),
+  null => null,
+};
+
 /// The card [text] holds ([_cardParts]), checked ([_checkCard]).
 _Card? _readCard(String text) {
   final parts = _cardParts(text);
@@ -239,6 +256,11 @@ extension ProfileCards on Store {
         ? null
         : utf8.encode(jsonEncode({'card': card, 'type': _cardFileType}));
   }
+
+  /// The own card alone, `<payload>.<signature>`, as [profileCardFile]
+  /// holds it, picture and all: what a Pack carries with "Add my
+  /// Profile" (#164). Null when [profileCard] is.
+  String? profileCardText() => _card(back: false, picture: true);
 
   /// The own card, `<payload>.<signature>`, with the record as kept when
   /// [picture], else without its picture.

@@ -1,7 +1,9 @@
 //! The badges of a Note's settings (#160), as the phone's
 //! `setting_badges.dart` draws them: like a shield, the setting's icon on
-//! a tinted part, then its current value. A screen reader reads one as
-//! "setting: value". A click opens its small editor, a dialog with the
+//! a tinted part, the same for every value, then its current value
+//! (#192), an icon where the setting has a fixed set of values, short text
+//! otherwise, never both. A screen reader reads one as "setting: value"
+//! in words. A click opens its small editor, a dialog with the
 //! same icon and the setting's name as its title, the editor itself and
 //! Close; a badge this Device may not change only shows its value. The
 //! New Tally and New Session pages (#161) draw their settings the same
@@ -15,6 +17,40 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::theme::{self, Tones};
 
+/// The value a badge shows (#192).
+#[derive(Clone, Copy)]
+pub enum BadgeValue<'a> {
+    /// Short text, for a setting without a fixed set of values.
+    Text(&'a str),
+    /// Short text that is no words, such as "4w", and the value in words
+    /// for the screen reader, "4 weeks" (#195).
+    Short(&'a str, &'a str),
+    /// An icon, for a setting with a fixed set of values, and the value
+    /// in words for the screen reader.
+    Icon(char, &'a str),
+}
+
+impl<'a> BadgeValue<'a> {
+    /// The value in words.
+    pub fn words(self) -> &'a str {
+        match self {
+            BadgeValue::Text(words) | BadgeValue::Short(_, words) | BadgeValue::Icon(_, words) => {
+                words
+            }
+        }
+    }
+}
+
+/// The value icon of an on-or-off setting's badge, `toggle_on` or
+/// `toggle_off` as on the phone.
+pub fn switch_icon(on: bool) -> char {
+    if on {
+        icons::TOGGLE_ON
+    } else {
+        icons::TOGGLE_OFF
+    }
+}
+
 /// The badge of `setting` with its `value`, `None` for one that only
 /// adds, such as "+": `icon` on its tinted part, in `colour` or the
 /// accent. It answers clicks while `active`.
@@ -23,19 +59,29 @@ pub fn badge(
     (t, tones): (&L10n, Tones),
     (icon, colour): (char, Option<Color32>),
     setting: &str,
-    value: Option<&str>,
+    value: Option<BadgeValue>,
     active: bool,
 ) -> egui::Response {
     let text = ui.visuals().text_color();
     let font = FontId::proportional(14.0);
-    let galley = value.map(|v| {
-        ui.painter()
-            .layout_no_wrap(v.to_string(), font.clone(), text)
-    });
+    let galley = match value {
+        Some(BadgeValue::Text(v) | BadgeValue::Short(v, _)) => Some(ui.painter().layout_no_wrap(
+            v.to_string(),
+            font.clone(),
+            text,
+        )),
+        _ => None,
+    };
     let height = 32.0;
     let icon_part = 38.0;
     let pad = 10.0;
-    let width = icon_part + galley.as_ref().map_or(0.0, |g| g.size().x + 2.0 * pad);
+    let value_icon = 18.0;
+    let value_width = match (&galley, value) {
+        (Some(g), _) => g.size().x + 2.0 * pad,
+        (None, Some(BadgeValue::Icon(..))) => value_icon + 2.0 * pad,
+        (None, _) => 0.0,
+    };
+    let width = icon_part + value_width;
     let sense = if active {
         Sense::click()
     } else {
@@ -43,7 +89,7 @@ pub fn badge(
     };
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), sense);
     let label = match value {
-        Some(value) => t.setting_badge_label(setting, value),
+        Some(value) => t.setting_badge_label(setting, value.words()),
         None => setting.to_string(),
     };
     resp.widget_info(|| {
@@ -66,8 +112,8 @@ pub fn badge(
         let rounding = egui::CornerRadius {
             nw: radius as u8,
             sw: radius as u8,
-            ne: if galley.is_some() { 0 } else { radius as u8 },
-            se: if galley.is_some() { 0 } else { radius as u8 },
+            ne: if value.is_some() { 0 } else { radius as u8 },
+            se: if value.is_some() { 0 } else { radius as u8 },
         };
         painter.rect_filled(left, rounding, tones.accent.gamma_multiply(0.22));
         let square = egui::Rect::from_center_size(left.center(), egui::vec2(18.0, 18.0));
@@ -75,6 +121,10 @@ pub fn badge(
         if let Some(galley) = galley {
             let at = egui::pos2(left.right() + pad, rect.center().y - galley.size().y / 2.0);
             painter.galley(at, galley, text);
+        } else if let Some(BadgeValue::Icon(value, _)) = value {
+            let at = egui::pos2(left.right() + pad + value_icon / 2.0, rect.center().y);
+            let square = egui::Rect::from_center_size(at, egui::vec2(value_icon, value_icon));
+            icons::paint(painter, square, value, text);
         }
         painter.rect_stroke(
             rect,
@@ -134,8 +184,7 @@ pub fn badge_switch(ui: &mut Ui, t: &L10n, setting: &str, on: &mut bool) -> bool
     let text = ui.visuals().text_color();
     let value = if *on { t.setting_on() } else { t.setting_off() };
     ui.label(RichText::new(value).color(text));
-    ui.checkbox(on, RichText::new(setting).color(text))
-        .changed()
+    theme::checkbox(ui, on, RichText::new(setting).color(text)).changed()
 }
 
 /// Lays `badges` out in one wrapping row, 8 points apart.

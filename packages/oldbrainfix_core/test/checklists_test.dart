@@ -535,7 +535,10 @@ void main() {
     test('a Checklist goes out in format 2 and arrives as one', () {
       final note = checklist(ann, 'Trip\nBath\n  Soap\n✓ Tent');
       final file = sendNote(ann, note);
-      expect(jsonDecode(utf8.decode(file))['format'], sentItemListFormat);
+      expect(
+        (jsonDecode(utf8.decode(file)) as Map<String, Object?>)['format'],
+        sentItemListFormat,
+      );
       final opened = openSentItem(ben, file);
       expect(
         [for (final l in opened.item.lines!) l.text],
@@ -550,7 +553,10 @@ void main() {
         note,
         to: Recipient(id: 'ben', name: 'Ben', keys: [ben.ownKeyRecord.boxKey!]),
       );
-      expect(jsonDecode(utf8.decode(sealed))['format'], sentItemListFormat);
+      expect(
+        (jsonDecode(utf8.decode(sealed)) as Map<String, Object?>)['format'],
+        sentItemListFormat,
+      );
       final read = openSentItem(ben, sealed);
       expect(read.encrypted, isTrue);
       expect(read.item.lines!.map((l) => l.checked), [false, false, true]);

@@ -99,6 +99,7 @@ class MainActivity : FlutterActivity() {
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
+        if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -106,8 +107,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge, the Changes Nudge or the Agenda
-     * widget's Unsorted count opened the running app: the app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge, the Agenda
+     * widget's Unsorted count or a pick on it opened the running app: the
+     * app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -122,6 +124,10 @@ class MainActivity : FlutterActivity() {
         }
         if (opensUnsorted(intent)) {
             unsortedOpened = true
+            actionsArrived()
+        }
+        pickOf(intent)?.let {
+            pickOpened = it
             actionsArrived()
         }
         // Something was shared in while the app runs: it takes it now.
@@ -369,6 +375,8 @@ class MainActivity : FlutterActivity() {
                             args["html"] as? String,
                             (args["paths"] as? List<*>).orEmpty().map { it as? String ?: "" },
                             (args["types"] as? List<*>).orEmpty().map { it as? String ?: "" },
+                            args["mailTo"] as? String,
+                            args["subject"] as? String,
                         ),
                     )
                     "pick" -> pickBundle(result)
@@ -458,6 +466,11 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 if (call.method == "lastExit") result.success(lastExit()) else result.notImplemented()
             }
+        // What Send feedback says of this phone (#214).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "facts") result.success(deviceFacts()) else result.notImplemented()
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCK_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -494,6 +507,10 @@ class MainActivity : FlutterActivity() {
                     "unsortedOpened" -> {
                         result.success(unsortedOpened)
                         unsortedOpened = false
+                    }
+                    "pickOpened" -> {
+                        result.success(pickOpened)
+                        pickOpened = null
                     }
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
@@ -971,6 +988,48 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * The system, the device and the app that installed this one, for
+     * Send feedback (#214): the installer's package name, null when none
+     * is recorded, as for an APK installed by hand; `installerKnown` is
+     * false when the system would not say.
+     */
+    private fun deviceFacts(): Map<String, Any?> {
+        var known = true
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                packageManager.getInstallSourceInfo(packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstallerPackageName(packageName)
+            }
+        } catch (_: Exception) {
+            known = false
+            null
+        }
+        return mapOf(
+            "installer" to installer,
+            "installerKnown" to known,
+            "release" to Build.VERSION.RELEASE,
+            "sdk" to Build.VERSION.SDK_INT,
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+        )
+    }
+
+    /**
+     * The pick a tap on the Agenda widget opens the entry form of (#209),
+     * as the app reads it; null for any other intent, or one brought
+     * back from the recent apps.
+     */
+    private fun pickOf(intent: Intent?): Map<String, String>? {
+        if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
+        val session = intent.getStringExtra(EXTRA_PICK_SESSION) ?: return null
+        val occurrence = intent.getStringExtra(EXTRA_PICK_OCCURRENCE) ?: return null
+        val note = intent.getStringExtra(EXTRA_PICK_NOTE) ?: return null
+        return mapOf("session" to session, "occurrence" to occurrence, "note" to note)
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -987,6 +1046,7 @@ class MainActivity : FlutterActivity() {
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"
+        private const val DEVICE_CHANNEL = "io.github.paxel.oldbrainfix/device"
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
         private const val BUNDLE_CHANNEL = "io.github.paxel.oldbrainfix/bundle"
@@ -1022,6 +1082,11 @@ class MainActivity : FlutterActivity() {
         /** Marks the launch from the Agenda widget's Unsorted count. */
         const val EXTRA_UNSORTED = "oldbrainfix.unsorted"
 
+        /** The Session, Occurrence and Tally of a pick tapped on the Agenda widget (#209). */
+        const val EXTRA_PICK_SESSION = "oldbrainfix.pick.session"
+        const val EXTRA_PICK_OCCURRENCE = "oldbrainfix.pick.occurrence"
+        const val EXTRA_PICK_NOTE = "oldbrainfix.pick.note"
+
         /** Marks the launch by a share from another app ([ShareActivity]). */
         const val EXTRA_SHARED = "oldbrainfix.shared"
 
@@ -1036,6 +1101,9 @@ class MainActivity : FlutterActivity() {
 
         /** The Agenda widget's Unsorted count was tapped and the app has not shown the list yet. */
         private var unsortedOpened = false
+
+        /** The pick tapped on the Agenda widget whose entry form the app has not opened yet. */
+        private var pickOpened: Map<String, String>? = null
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null

@@ -5,9 +5,12 @@
 //! Nth or last weekday, each but once ending never, on a day or after a
 //! number of times) or as an RRULE in the advanced mode, its start day
 //! and times of day, the next Occurrences, its own Re-nag
-//! interval or this Device's default, and Escalation. A Session (#104)
-//! has its pool, count, weekdays' counts and rule on top of the schedule
-//! ([`SessionDraft`]); Save says under each field what to fix. Save
+//! interval or this Device's default, and Escalation. A new Session
+//! (#104) has its pool, count, weekdays' counts and rule on top of the
+//! schedule ([`SessionDraft`]); Save says under each field what to fix.
+//! A Routine of a Session Note only says when it runs it: the setup lies
+//! on the Note, on its page (#191), and making a plain Note a Session
+//! shows the setup alone ([`RoutineEditor::make_session`]). Save
 //! writes it; leaving without saving drops the edit. Opened from a
 //! capture for the Note not written yet (#113), Save hands back what was
 //! set up instead ([`RoutineEditor::choice`]), as the phone's
@@ -20,18 +23,21 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
 use oldbrainfix_core::schedule::WeekdayRule;
+use oldbrainfix_core::schedule_sentence::{self, SimpleSchedule};
 use oldbrainfix_core::{
     ClockTime, Day, Note, Notes, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit,
-    Routine, Routines, Schedule, Session, SimpleRepeat, Store,
+    Routine, Routines, Schedule, SimpleRepeat, Store,
 };
 
-use crate::app::{embossed, icon_button, pill, radio_column};
+use crate::app::{chip_row, embossed, icon_button, pill};
 use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_long, weekday_text};
+use crate::schedule_text::{
+    clock_text, day_text, occurrence_time, schedule_text, weekday_long, weekday_text,
+};
 use crate::session_editor::{SessionDraft, SessionIntent};
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
 pub const RENAG_CHOICES: [i64; 5] = [5, 10, 15, 30, 60];
@@ -116,9 +122,20 @@ pub struct RoutineEditor {
     schedule: Option<Schedule>,
     rule_error: Option<String>,
     next: Vec<Occurrence>,
-    /// A Session's part, with the Session as it was opened; `None` for a
-    /// new one.
-    session: Option<(SessionDraft, Option<Session>)>,
+    /// The schedule as a sentence, as typed or as written (#227).
+    pub sentence: String,
+    /// The byte ranges of `sentence` not understood.
+    sentence_unknown: Vec<std::ops::Range<usize>>,
+    /// The schedule `sentence` is of; `None` on an Advanced schedule.
+    sentence_shown: Option<SimpleSchedule>,
+    /// Whether the sentence is being typed: its line has the keyboard,
+    /// or had it when a click began, which may be on a suggestion.
+    sentence_typing: bool,
+    /// A new Session's part.
+    session: Option<SessionDraft>,
+    /// Whether it makes its plain Note a Session, its setup alone,
+    /// without a schedule (#191).
+    makes: bool,
     /// Whether it has a History to open: a Routine saved, not a
     /// Reminder, as it was opened.
     history: bool,
@@ -190,7 +207,12 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            sentence: String::new(),
+            sentence_unknown: Vec::new(),
+            sentence_shown: None,
+            sentence_typing: false,
             session: None,
+            makes: false,
             history: false,
             place: None,
             named: false,
@@ -216,15 +238,42 @@ impl RoutineEditor {
         editor.named = true;
         let mut draft = draft;
         draft.new_tally = true;
-        editor.session = Some((draft, None));
+        editor.session = Some(draft);
         editor.update();
         editor
+    }
+
+    /// The setup's page of a Session made of the plain Note `note` from
+    /// its kind badge (#191): the Note, then its pool of `draft` with
+    /// "New Tally" at its end, filed where the Note is, its count, its
+    /// weekdays' counts and its rule; no schedule, its Routines being
+    /// that. Save makes the Note a Session.
+    pub fn make_session(
+        note: Note,
+        draft: SessionDraft,
+        now: DateTime<Utc>,
+        wall: &dyn Fn(DateTime<Utc>) -> NaiveDateTime,
+        device_renag: Duration,
+    ) -> RoutineEditor {
+        let place = note.place.clone();
+        let mut editor = RoutineEditor::new(Some(note), false, now, wall, device_renag);
+        editor.place = place;
+        editor.makes = true;
+        let mut draft = draft;
+        draft.new_tally = true;
+        editor.session = Some(draft);
+        editor
+    }
+
+    /// Whether it makes its plain Note a Session (#191).
+    pub fn makes_session(&self) -> bool {
+        self.makes
     }
 
     /// Puts the Tally `id`, shown as `name`, made from the New Session
     /// page, first in its pool, ticked.
     pub fn add_made_tally(&mut self, id: &str, name: &str) {
-        if let Some((draft, _)) = &mut self.session {
+        if let Some(draft) = &mut self.session {
             draft.add_made(id, name);
         }
     }
@@ -250,16 +299,15 @@ impl RoutineEditor {
         self.capture.is_some()
     }
 
-    /// Makes it a Session: `draft` for its part, `session` as it was
-    /// opened, `None` for a new one.
-    pub fn with_session(mut self, draft: SessionDraft, session: Option<Session>) -> RoutineEditor {
-        self.session = Some((draft, session));
+    /// Makes it a new Session, `draft` for its part.
+    pub fn with_session(mut self, draft: SessionDraft) -> RoutineEditor {
+        self.session = Some(draft);
         self
     }
 
     /// The Session's part, when it is one.
     pub fn session(&self) -> Option<&SessionDraft> {
-        self.session.as_ref().map(|(draft, _)| draft)
+        self.session.as_ref()
     }
 
     /// The editor of `routine`, which links back to `note`.
@@ -306,7 +354,12 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            sentence: String::new(),
+            sentence_unknown: Vec::new(),
+            sentence_shown: None,
+            sentence_typing: false,
             session: None,
+            makes: false,
             history: !routine.is_reminder(),
             place: None,
             named: false,
@@ -369,12 +422,12 @@ impl RoutineEditor {
         })
     }
 
-    /// The rule the simple editor shows.
-    fn simple_rule(&self) -> Option<Recurrence> {
+    /// The repeat the simple editor shows.
+    fn simple_repeat(&self) -> SimpleRepeat {
         let count = (self.end == RepeatEnd::Count).then_some(self.count);
         let until = (self.end == RepeatEnd::Until).then(|| self.until_day());
         let simple = match self.kind {
-            RepeatKind::Once => return None,
+            RepeatKind::Once => return SimpleRepeat::once(),
             RepeatKind::Every => SimpleRepeat::every(self.every, self.unit),
             RepeatKind::Weekdays => SimpleRepeat::weekdays(self.weekdays.clone()),
             RepeatKind::MonthDay => SimpleRepeat::month_day(
@@ -389,7 +442,56 @@ impl RoutineEditor {
                 self.months,
             ),
         };
-        simple.ending(count, until).to_rule()
+        simple.ending(count, until)
+    }
+
+    /// The rule the simple editor shows.
+    fn simple_rule(&self) -> Option<Recurrence> {
+        self.simple_repeat().to_rule()
+    }
+
+    /// The schedule as the simple editor holds it; `None` in the advanced
+    /// mode.
+    pub fn simple_schedule(&self) -> Option<SimpleSchedule> {
+        (!self.advanced).then(|| SimpleSchedule::new(self.simple_repeat(), self.start, &self.times))
+    }
+
+    /// Reads `text` typed into the schedule's sentence in the language
+    /// of `t`: a schedule it reads fills the chips and times, the parts
+    /// not understood are marked and change nothing (#227).
+    pub fn type_sentence(&mut self, t: &L10n, text: &str) {
+        self.sentence = text.to_string();
+        let read = schedule_sentence::read(text, t.locale(), self.today);
+        self.sentence_unknown = read.unknown;
+        if let Some(schedule) = read.schedule {
+            self.start = schedule.start;
+            self.start_text = schedule.start.to_string();
+            self.times.clone_from(&schedule.times);
+            self.take_simple(&schedule.repeat);
+            self.sentence_shown = Some(schedule);
+            self.update();
+        }
+    }
+
+    /// The parts of the sentence not understood, as byte ranges.
+    pub fn sentence_unknown(&self) -> &[std::ops::Range<usize>] {
+        &self.sentence_unknown
+    }
+
+    /// Writes the sentence of the schedule, unless the one being typed
+    /// (`typing`) is of it; on an Advanced schedule its summary.
+    fn show_sentence(&mut self, t: &L10n, typing: bool) {
+        let simple = self.simple_schedule();
+        if typing && simple.is_some() && simple == self.sentence_shown {
+            return;
+        }
+        self.sentence = match (&simple, &self.schedule) {
+            (Some(simple), _) => schedule_sentence::sentence(simple, t.locale(), self.today),
+            (None, Some(schedule)) => schedule_text(t, schedule),
+            (None, None) => String::new(),
+        };
+        self.sentence_unknown.clear();
+        self.sentence_shown = simple;
     }
 
     /// Whether what is edited happens once.
@@ -470,7 +572,7 @@ impl RoutineEditor {
     /// Whether a Session's part needs fixing, which then says so under
     /// its fields.
     fn session_to_fix(&mut self) -> bool {
-        let Some((draft, _)) = &mut self.session else {
+        let Some(draft) = &mut self.session else {
             return false;
         };
         if draft.valid() {
@@ -492,7 +594,7 @@ impl RoutineEditor {
             schedule,
             renag: self.renag.map(Duration::minutes),
             escalation: self.escalation,
-            session: self.session.as_ref().map(|(draft, _)| draft.choice()),
+            session: self.session.as_ref().map(SessionDraft::choice),
         })
     }
 
@@ -504,23 +606,28 @@ impl RoutineEditor {
         if self.session_to_fix() || self.name_missing {
             return Ok(None);
         }
+        if self.makes {
+            let (Some(note), Some(draft)) = (&self.note, &self.session) else {
+                return Err(oldbrainfix_core::Error::Invalid("no Note".into()));
+            };
+            draft.choice().make(store, &note.id)?;
+            return Ok(Some(note.id.clone()));
+        }
         let routines = Routines::new(store);
         let Some(schedule) = &self.schedule else {
             return Err(oldbrainfix_core::Error::Invalid("no schedule".into()));
         };
         let id = match (&self.routine, &self.note, &self.session) {
-            (Some(id), _, session) => {
+            // Of a Session Note too: it only says when it runs it.
+            (Some(id), _, _) => {
                 routines.reschedule(id, schedule)?;
-                if let Some((draft, Some(session))) = session {
-                    draft.save(store, session)?;
-                }
                 id.clone()
             }
-            (None, Some(note), Some((draft, _))) => draft.spawn(store, &note.id, schedule)?,
+            (None, Some(note), Some(draft)) => draft.spawn(store, &note.id, schedule)?,
             (None, Some(note), None) => routines.spawn(&note.id, schedule)?.id,
             // A new Session without a Note: its Note is made from the text,
             // as a new Routine's is.
-            (None, None, Some((draft, _))) => {
+            (None, None, Some(draft)) => {
                 let text = self.text.trim();
                 if text.is_empty() {
                     return Err(oldbrainfix_core::Error::Invalid(
@@ -555,8 +662,8 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         let once = self.once();
         let heading = match (&self.routine, once) {
-            _ if self.session.is_some() && self.routine.is_none() => t.new_session(),
-            _ if self.session.is_some() => t.session(),
+            _ if self.makes => t.session(),
+            _ if self.session.is_some() => t.new_session(),
             (None, true) => t.new_reminder(),
             (None, false) => t.new_routine(),
             (Some(_), true) => t.reminder(),
@@ -649,62 +756,24 @@ impl RoutineEditor {
                         }
                     }
                 });
-                if let Some((draft, _)) = &mut self.session
+                if let Some(draft) = &mut self.session
                     && let Some(asked) = draft.show(ui, t, tones)
                 {
                     intent = Some(Intent::Session(asked));
                 }
-                embossed(ui, tones, false, None, |ui| {
-                    ui.horizontal(|ui| {
-                        for (advanced, label) in
-                            [(false, t.schedule_simple()), (true, t.schedule_advanced())]
-                        {
-                            if pill(ui, tones, self.advanced == advanced, label).clicked()
-                                && self.advanced != advanced
-                            {
-                                self.switch_mode(advanced);
-                                changed = true;
-                            }
-                        }
-                    });
-                    if self.advanced {
-                        changed |= self.advanced_editor(ui, t);
-                    } else {
-                        changed |= self.simple_editor(ui, t, tones);
-                    }
-                    changed |= self.start_editor(ui, t, once);
-                    if !self.advanced && self.kind != RepeatKind::Once {
-                        changed |= self.end_editor(ui, t);
-                    }
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    changed |= self.times_editor(ui, t, tones, once, shown_now);
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.next_occurrences()).strong().color(text));
-                    if self.schedule.is_some() && self.next.is_empty() {
-                        ui.label(RichText::new(t.never_due()).color(text));
-                    }
-                    for o in &self.next {
-                        let line = format!("{}  {}", day_text(t, o.day), occurrence_time(t, o));
-                        ui.label(RichText::new(line).color(text));
-                    }
-                });
-                embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
-                embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+                // Making a Note a Session sets it up alone (#191).
+                if !self.makes {
+                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now));
+                }
                 ui.horizontal(|ui| {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
                         intent = Some(Intent::Close);
                     }
-                    if self.routine.is_some()
-                        && ui
-                            .button(RichText::new(t.delete()).color(ui.visuals().error_fg_color))
-                            .clicked()
+                    if self.routine.is_some() && theme::destructive(ui, true, t.delete()).clicked()
                     {
                         intent = Some(Intent::Delete);
                     }
-                    let save = egui::Button::new(RichText::new(t.save()).color(text));
-                    if ui.add_enabled(self.can_save(), save).clicked() {
+                    if theme::primary(ui, self.can_save(), t.save()).clicked() {
                         intent = Some(Intent::Save);
                     }
                 });
@@ -713,6 +782,181 @@ impl RoutineEditor {
             self.update();
         }
         intent
+    }
+
+    /// The schedule's panels: the repeat with its start and end, the
+    /// times of day, the next Occurrences, Re-nag and Escalation; whether
+    /// the schedule changed.
+    fn schedule_panels(
+        &mut self,
+        ui: &mut Ui,
+        t: &L10n,
+        tones: Tones,
+        (once, shown_now): (bool, NaiveDateTime),
+    ) -> bool {
+        let text = ui.visuals().text_color();
+        let mut changed = false;
+        embossed(ui, tones, false, None, |ui| {
+            changed |= self.sentence_line(ui, t);
+            let mut advanced = self.advanced;
+            let modes = [
+                (false, t.schedule_simple().to_string()),
+                (true, t.schedule_advanced().to_string()),
+            ];
+            if chip_row(ui, &mut advanced, modes) && advanced != self.advanced {
+                self.switch_mode(advanced);
+                changed = true;
+            }
+            if self.advanced {
+                changed |= self.advanced_editor(ui, t);
+            } else {
+                changed |= self.simple_editor(ui, t, tones);
+            }
+            changed |= self.start_editor(ui, t, once);
+            if !self.advanced && self.kind != RepeatKind::Once {
+                changed |= self.end_editor(ui, t);
+            }
+        });
+        embossed(ui, tones, false, None, |ui| {
+            changed |= self.times_editor(ui, t, tones, once, shown_now);
+        });
+        embossed(ui, tones, false, None, |ui| {
+            ui.label(RichText::new(t.next_occurrences()).strong().color(text));
+            if self.schedule.is_some() && self.next.is_empty() {
+                ui.label(RichText::new(t.never_due()).color(text));
+            }
+            for o in &self.next {
+                let line = format!("{}  {}", day_text(t, o.day), occurrence_time(t, o));
+                ui.label(RichText::new(line).color(text));
+            }
+        });
+        embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
+        embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+        changed
+    }
+
+    /// The line at the top of the schedule (#227): the schedule as a
+    /// sentence, typed to fill the chips and times, with the next words
+    /// as suggestions under it and the words not understood marked; on
+    /// an Advanced schedule a summary, read-only. Whether it changed the
+    /// schedule.
+    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let error = ui.visuals().error_fg_color;
+        let id = Id::new("schedule sentence");
+        // A click takes the keyboard from the line as it begins; one on a
+        // suggestion ends a frame later.
+        let clicking = ui.input(|i| i.pointer.any_down() || i.pointer.any_released());
+        let typing = ui.memory(|m| m.has_focus(id)) || (self.sentence_typing && clicking);
+        self.sentence_typing = typing;
+        self.show_sentence(t, typing);
+        let simple = !self.advanced;
+        let label = ui.label(
+            RichText::new(t.schedule_sentence_label())
+                .strong()
+                .color(text),
+        );
+        let unknown = self.sentence_unknown.clone();
+        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, wrap: f32| {
+            let typed = typed.as_str();
+            let plain = egui::TextFormat {
+                font_id: egui::FontId::proportional(14.0),
+                color: text,
+                ..Default::default()
+            };
+            let wrong = egui::TextFormat {
+                color: error,
+                underline: egui::Stroke::new(1.0, error),
+                ..plain.clone()
+            };
+            let mut job = egui::text::LayoutJob::default();
+            let mut at = 0;
+            for range in unknown.iter().filter(|r| r.end <= typed.len()) {
+                if range.start > at {
+                    job.append(&typed[at..range.start], 0.0, plain.clone());
+                }
+                job.append(&typed[range.clone()], 0.0, wrong.clone());
+                at = range.end;
+            }
+            job.append(&typed[at..], 0.0, plain);
+            job.wrap.max_width = wrap;
+            ui.fonts_mut(|f| f.layout_job(job))
+        };
+        let mut typed = self.sentence.clone();
+        let field = ui
+            .add(
+                TextEdit::multiline(&mut typed)
+                    .id(id)
+                    .hint_text(t.schedule_sentence_hint())
+                    .interactive(simple)
+                    .return_key(None)
+                    .desired_rows(1)
+                    .desired_width(f32::INFINITY)
+                    .layouter(&mut layouter),
+            )
+            .labelled_by(label.id);
+        let mut changed = false;
+        if simple && field.changed() {
+            self.type_sentence(t, &typed);
+            changed = true;
+        }
+        if !simple {
+            ui.label(
+                RichText::new(t.schedule_sentence_advanced())
+                    .small()
+                    .color(weak),
+            );
+            return changed;
+        }
+        if !self.sentence_unknown.is_empty() {
+            ui.label(
+                RichText::new(t.schedule_sentence_unknown())
+                    .small()
+                    .color(error),
+            );
+        }
+        self.sentence_typing |= field.has_focus();
+        if self.sentence_typing {
+            let (cursor, end) = crate::format_bar::selection(ui, id, &self.sentence);
+            let suggestions = if cursor == end {
+                schedule_sentence::suggest(&self.sentence, cursor, t.locale())
+            } else {
+                Vec::new()
+            };
+            let mut picked = None;
+            if !suggestions.is_empty() {
+                // Suggestions that fill in the line, not a choice of
+                // their own.
+                ui.horizontal_wrapped(|ui| {
+                    for suggestion in &suggestions {
+                        if ui
+                            .small_button(RichText::new(&suggestion.text).color(text))
+                            .clicked()
+                        {
+                            picked = Some(suggestion.clone());
+                        }
+                    }
+                });
+            }
+            if let Some(suggestion) = picked {
+                let mut typed = self.sentence.clone();
+                let space = if typed[suggestion.range.end..].starts_with(' ') {
+                    ""
+                } else {
+                    " "
+                };
+                typed.replace_range(
+                    suggestion.range.clone(),
+                    &format!("{}{space}", suggestion.text),
+                );
+                let at = suggestion.range.start + suggestion.text.len() + 1;
+                self.type_sentence(t, &typed);
+                crate::format_bar::select(ui, id, &self.sentence, (at, at));
+                changed = true;
+            }
+        }
+        changed
     }
 
     fn switch_mode(&mut self, advanced: bool) {
@@ -744,7 +988,7 @@ impl RoutineEditor {
             (RepeatKind::MonthDay, t.repeat_month_day()),
             (RepeatKind::MonthWeekday, t.repeat_month_weekday()),
         ];
-        radio_column(
+        chip_row(
             ui,
             &mut kind,
             kinds.map(|(k, label)| (k, label.to_string())),
@@ -782,7 +1026,7 @@ impl RoutineEditor {
                 RepeatUnit::Months,
                 RepeatUnit::Years,
             ];
-            radio_column(ui, &mut unit, units.map(|u| (u, unit_text(u))));
+            chip_row(ui, &mut unit, units.map(|u| (u, unit_text(u))));
             if unit != self.unit {
                 self.unit = unit;
                 changed = true;
@@ -832,14 +1076,14 @@ impl RoutineEditor {
         let mut ordinal = self.ordinal.unwrap_or(Self::ordinal_of(self.start));
         ui.label(RichText::new(t.which_in_month_label()).color(text));
         let ordinals = [1, 2, 3, 4, -1].map(|n| (n, t.nth_option(&n.to_string())));
-        if radio_column(ui, &mut ordinal, ordinals) {
+        if chip_row(ui, &mut ordinal, ordinals) {
             self.ordinal = Some(ordinal);
             changed = true;
         }
         let mut weekday = self.nth_weekday.unwrap_or(self.start.weekday());
         ui.label(RichText::new(t.weekday_label()).color(text));
         let weekdays = (1..=7).map(|day| (day, weekday_long(t, day).to_string()));
-        if radio_column(ui, &mut weekday, weekdays) {
+        if chip_row(ui, &mut weekday, weekdays) {
             self.nth_weekday = Some(weekday);
             changed = true;
         }
@@ -857,7 +1101,7 @@ impl RoutineEditor {
             (RepeatEnd::Until, t.end_on_day()),
             (RepeatEnd::Count, t.end_after_count()),
         ];
-        radio_column(ui, &mut end, ends.map(|(e, label)| (e, label.to_string())));
+        chip_row(ui, &mut end, ends.map(|(e, label)| (e, label.to_string())));
         let mut changed = end != self.end;
         if changed {
             self.end = end;
@@ -1015,7 +1259,7 @@ impl RoutineEditor {
         let options = std::iter::once(None)
             .chain(choices.into_iter().map(Some))
             .map(|m| (m, label(m)));
-        radio_column(ui, &mut picked, options);
+        chip_row(ui, &mut picked, options);
         self.renag = picked;
     }
 
@@ -1030,9 +1274,12 @@ impl RoutineEditor {
         ui.label(RichText::new(summary).color(text));
         ui.label(RichText::new(t.escalation_explain()).small().color(weak));
         let mut on = self.escalation.is_some();
-        if ui
-            .checkbox(&mut on, RichText::new(t.escalation_switch()).color(text))
-            .changed()
+        if theme::checkbox(
+            ui,
+            &mut on,
+            RichText::new(t.escalation_switch()).color(text),
+        )
+        .changed()
         {
             self.escalation = on.then_some(DEFAULT_ESCALATION);
         }
@@ -1041,7 +1288,7 @@ impl RoutineEditor {
             let mut choices: BTreeSet<i64> = ESCALATION_CHOICES.into_iter().collect();
             choices.insert(after);
             let mut picked = after;
-            radio_column(
+            chip_row(
                 ui,
                 &mut picked,
                 choices.into_iter().map(|n| (n, n.to_string())),

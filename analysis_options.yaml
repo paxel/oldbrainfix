@@ -13,6 +13,22 @@ analyzer:
   exclude:
     - build/**
     - android/**
+  # Strict typing (#230, Q556 (a)): no implicit downcasts from dynamic, no
+  # raw generic types, no inference that falls back to dynamic.
+  language:
+    strict-casts: true
+    strict-raw-types: true
+    strict-inference: true
+  # The Dart counterpart of the Rust panic rules (#230, Q560 (a)): a dynamic
+  # call, a future nobody awaits or handles, a subscription or sink left
+  # open, and a BuildContext used after a gap fail the analysis.
+  errors:
+    avoid_dynamic_calls: error
+    unawaited_futures: error
+    discarded_futures: error
+    cancel_subscriptions: error
+    close_sinks: error
+    use_build_context_synchronously: error
 
 linter:
   # The lint rules applied to this project can be customized in the
@@ -26,8 +42,12 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    - avoid_dynamic_calls
+    - unawaited_futures
+    - discarded_futures
+    - cancel_subscriptions
+    - close_sinks
+    - use_build_context_synchronously
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

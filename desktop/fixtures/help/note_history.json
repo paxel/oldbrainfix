@@ -1,0 +1,209 @@
+{
+  "notes": [
+    {
+      "id": "note:help-00000000000000000000000000000001-icons",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:48.000Z",
+          "entity": "note:help-00000000000000000000000000000001-icons",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:25.000Z",
+          "entity": "note:help-00000000000000000000000000000001-icons",
+          "kind": "photoAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:25.000Z",
+          "entity": "note:help-00000000000000000000000000000001-icons",
+          "kind": "filed",
+          "before": null,
+          "after": "area:help-00000000000000000000000000000001",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:25.000Z",
+          "entity": "note:help-00000000000000000000000000000001-icons",
+          "kind": "captured",
+          "before": null,
+          "after": "What the icons mean\n\nKind: what the Note is",
+          "format": "plain",
+          "by": "Ada",
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-quick-start",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:32.000Z",
+          "entity": "note:help-00000000000000000000000000000001-quick-start",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:07.000Z",
+          "entity": "note:help-00000000000000000000000000000001-quick-start",
+          "kind": "filed",
+          "before": null,
+          "after": "area:help-00000000000000000000000000000001",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:07.000Z",
+          "entity": "note:help-00000000000000000000000000000001-quick-start",
+          "kind": "captured",
+          "before": null,
+          "after": "Quick start",
+          "format": "plain",
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "line:help-00000000000000000000000000000001-quick-start-1",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "File it into an Area",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "line:help-00000000000000000000000000000001-quick-start-0",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Capture a thought with +",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "note:help-00000000000000000000000000000001-quick-start",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:44.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:38.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+          "kind": "filed",
+          "before": null,
+          "after": "area:help-00000000000000000000000000000001",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:38.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+          "kind": "captured",
+          "before": null,
+          "after": "What's new in 0.4.0\n\nAdded\n• Help Notes.",
+          "format": "plain",
+          "by": "Ada",
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:46.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+          "kind": "filed",
+          "before": null,
+          "after": "area:help-00000000000000000000000000000001",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+          "kind": "captured",
+          "before": null,
+          "after": "Neu in 0.4.1\n\nBehoben\n• Eine Sache.",
+          "format": "plain",
+          "by": "Ada",
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.5.0",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:52.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.5.0",
+          "kind": "filed",
+          "before": null,
+          "after": "area:help-00000000000000000000000000000001",
+          "format": null,
+          "by": "Ada",
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:52.000Z",
+          "entity": "note:help-00000000000000000000000000000001-whats-new-0.5.0",
+          "kind": "captured",
+          "before": null,
+          "after": "What's new in 0.5.0\n\nAdded\n• More.",
+          "format": "plain",
+          "by": "Ada",
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

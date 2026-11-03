@@ -11,6 +11,7 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'routine_history_screen.dart';
+import 'schedule_sentence_field.dart';
 import 'schedule_text.dart';
 import 'session_editor.dart';
 import 'system_bars.dart';
@@ -39,7 +40,11 @@ Future<bool> spawnFromNote(
       places: places,
       noteId: note.id,
       reminder: spawn == Spawn.reminder,
-      session: spawn == Spawn.session,
+      // Only a plain Note becomes a Session (ADR 0039): a Session Note's
+      // new Routine runs it as it is, and one of another kind runs plain.
+      session:
+          spawn == Spawn.session &&
+          NoteKinds(notes.store).of(note.id) == NoteKind.plain,
     ),
   );
 }
@@ -110,9 +115,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
 ///
-/// A Session (#104) has its pool, count, weekdays' counts and rule on top
-/// of the schedule ([SessionFields]); Save says under each field what to
-/// fix there.
+/// A new Session (#104) has its pool, count, weekdays' counts and rule on
+/// top of the schedule ([SessionFields]); Save says under each field what
+/// to fix there. A Routine of a Session Note only says when it runs it:
+/// the setup lies on the Note, on its page (#191).
 class RoutineEditorScreen extends StatefulWidget {
   /// The Re-nag intervals offered, in minutes.
   static const renagChoices = [5, 10, 15, 30, 60];
@@ -176,8 +182,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   Routine? _routine;
   Note? _note;
 
-  /// The Session edited, when it is one.
-  Session? _session;
+  /// The setup of a new Session.
   SessionDraft? _draft;
 
   bool _advanced = false;
@@ -234,10 +239,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         : _routines.byId(widget.routineId ?? '');
     _routine = routine;
     if (routine != null) {
-      final session = _session = Sessions(widget.notes.store).byId(routine.id);
-      if (session != null) {
-        _draft = SessionDraft.of(widget.notes.store, routine.id, session);
-      }
       _note = _routines.note(routine);
       _renag = routine.renag;
       _escalation = routine.escalation;
@@ -326,29 +327,29 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// An end day not chosen yet: a month after the start.
   Day get _untilDay => _until ?? Day(_start.year, _start.month + 1, _start.day);
 
-  /// The rule the simple editor shows.
-  Recurrence? _simpleRule() {
+  /// The repeat the simple editor shows.
+  SimpleRepeat _simpleRepeat() {
     final count = _end == RepeatEnd.count ? _count : null;
     final until = _end == RepeatEnd.until ? _untilDay : null;
     return switch (_kind) {
-      RepeatKind.once => null,
+      RepeatKind.once => const SimpleRepeat.once(),
       RepeatKind.every => SimpleRepeat.every(
         _every,
         _unit,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.weekdays => SimpleRepeat.weekdays(
         _weekdays,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.monthDay => SimpleRepeat.monthDay(
         _monthDay ?? _start.day,
         every: _months,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.monthWeekday => SimpleRepeat.monthWeekday(
         WeekdayRule(
           _nthWeekday ?? _start.weekday,
@@ -357,9 +358,19 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         every: _months,
         count: count,
         until: until,
-      ).toRule(),
+      ),
     };
   }
+
+  /// The rule the simple editor shows.
+  Recurrence? _simpleRule() => _simpleRepeat().toRule();
+
+  /// Takes what the schedule's sentence read (#227).
+  void _takeSentence(SimpleSchedule read) => _change(() {
+    _start = read.start;
+    _times = [...read.times];
+    _takeSimple(read.repeat);
+  });
 
   /// Reads the edit into [_schedule] and its coming Occurrences.
   void _update() {
@@ -472,11 +483,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     }
     final routine = _routine;
     final note = _note;
-    final session = _session;
     final String id;
     if (routine != null) {
       _routines.reschedule(routine.id, schedule);
-      if (draft != null && session != null) draft.save(session);
       id = routine.id;
     } else if (note != null) {
       id = draft == null
@@ -571,7 +580,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     final title =
         widget.title ??
         (_draft != null
-            ? (routine == null ? t.newSession : t.session)
+            ? t.newSession
             : routine == null
             ? (once ? t.newReminder : t.newRoutine)
             : (once ? t.reminder : t.routine));
@@ -700,7 +709,19 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RadioColumn<bool>(
+              ScheduleSentenceField(
+                schedule: _advanced
+                    ? null
+                    : SimpleSchedule(_simpleRepeat(), _start, _times),
+                summary: switch (_schedule) {
+                  final schedule? => scheduleText(t, locale, schedule),
+                  null => '',
+                },
+                today: _today,
+                onRead: _takeSentence,
+              ),
+              const SizedBox(height: 16),
+              ChoiceChips<bool>(
                 value: _advanced,
                 options: [
                   RadioOption(value: false, title: Text(t.scheduleSimple)),
@@ -797,7 +818,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             padding: EdgeInsets.zero,
             title: Text(t.renagThis),
             // 0 stands for the Device default: no Re-nag lasts 0 min.
-            control: RadioColumn<int>(
+            control: ChoiceChips<int>(
               key: const ValueKey('renagThis'),
               value: own ?? 0,
               onChanged: (minutes) => setState(
@@ -847,7 +868,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ControlBelow(
               padding: EdgeInsets.zero,
               title: Text(t.escalationAfter),
-              control: RadioColumn<int>(
+              control: ChoiceChips<int>(
                 key: const ValueKey('escalationAfter'),
                 value: after,
                 onChanged: (count) => setState(() => _escalation = count),
@@ -869,7 +890,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   List<Widget> _simpleEditor(AppLocalizations t) {
     final locale = Localizations.localeOf(context).toString();
     return [
-      RadioColumn<RepeatKind>(
+      ChoiceChips<RepeatKind>(
         value: _kind,
         options: [
           RadioOption(value: RepeatKind.once, title: Text(t.repeatOnce)),
@@ -908,7 +929,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _stepper(_every, onChanged: (n) => _every = n),
-              RadioColumn<RepeatUnit>(
+              ChoiceChips<RepeatUnit>(
                 key: const ValueKey('everyUnit'),
                 value: _unit,
                 onChanged: (unit) => _change(() => _unit = unit),
@@ -977,7 +998,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   ) => ControlBelow(
     padding: const EdgeInsets.only(top: 8),
     title: Text(title),
-    control: RadioColumn<T>(
+    control: ChoiceChips<T>(
       value: value,
       options: options,
       onChanged: onChanged,

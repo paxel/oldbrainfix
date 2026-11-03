@@ -48,60 +48,132 @@ pub mod keys {
     pub const AGENDA: &str = "shopping";
 }
 
+/// The unit of a [`Reappear`] time (#195), the letter its code ends in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReappearUnit {
+    Day,
+    Week,
+    Month,
+    Year,
+}
+
+impl ReappearUnit {
+    pub const ALL: [ReappearUnit; 4] = [
+        ReappearUnit::Day,
+        ReappearUnit::Week,
+        ReappearUnit::Month,
+        ReappearUnit::Year,
+    ];
+
+    /// How its code ends.
+    pub fn letter(self) -> char {
+        match self {
+            ReappearUnit::Day => 'd',
+            ReappearUnit::Week => 'w',
+            ReappearUnit::Month => 'm',
+            ReappearUnit::Year => 'y',
+        }
+    }
+}
+
 /// How long a checked Line of a Shopping List stays struck through before
-/// it comes back (CONTEXT.md).
+/// it comes back (CONTEXT.md): none, so it stays struck until a time is
+/// set; Once, gone once checked; or a number of days, weeks, months or
+/// years (#195), from 1 to [`Reappear::MAX_COUNT`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Reappear {
+    /// None: a checked Line stays struck until a time is set. What a new
+    /// Line gets.
+    Unset,
     /// Gone once checked.
     Once,
-    Week1,
-    Week2,
-    Week3,
-    Week4,
+    /// This many of the unit.
+    After(u32, ReappearUnit),
 }
 
 impl Reappear {
-    pub const ALL: [Reappear; 5] = [
-        Reappear::Once,
-        Reappear::Week1,
-        Reappear::Week2,
-        Reappear::Week3,
-        Reappear::Week4,
-    ];
+    /// What a Line without a reappear time, or with one not known here,
+    /// reads as: one week, as every version before #195 read it.
+    pub const FALLBACK: Reappear = Reappear::After(1, ReappearUnit::Week);
 
-    /// What a new Line gets.
-    pub const STANDARD: Reappear = Reappear::Week1;
+    /// The largest number a time holds, so its code stays short.
+    pub const MAX_COUNT: u32 = 99;
 
-    /// How it is stored on the Line.
-    pub fn code(self) -> &'static str {
+    /// `count` `unit`s, or `None` for a count not from 1 to
+    /// [`Reappear::MAX_COUNT`].
+    pub fn after(count: u32, unit: ReappearUnit) -> Option<Reappear> {
+        (1..=Reappear::MAX_COUNT)
+            .contains(&count)
+            .then_some(Reappear::After(count, unit))
+    }
+
+    /// How it is stored on the Line: `none`, `once`, or the number and the
+    /// unit's letter, such as `4w` or `3m`.
+    pub fn code(self) -> String {
         match self {
-            Reappear::Once => "once",
-            Reappear::Week1 => "1w",
-            Reappear::Week2 => "2w",
-            Reappear::Week3 => "3w",
-            Reappear::Week4 => "4w",
+            Reappear::Unset => "none".to_string(),
+            Reappear::Once => "once".to_string(),
+            Reappear::After(count, unit) => format!("{count}{}", unit.letter()),
         }
     }
 
-    /// The weeks it stays struck; none for [`Reappear::Once`].
-    pub fn weeks(self) -> i64 {
-        match self {
-            Reappear::Once => 0,
-            Reappear::Week1 => 1,
-            Reappear::Week2 => 2,
-            Reappear::Week3 => 3,
-            Reappear::Week4 => 4,
-        }
-    }
-
-    /// The reappear time `code` names; [`Reappear::STANDARD`] for none,
-    /// or a code not known here.
+    /// The reappear time `code` names; [`Reappear::FALLBACK`] for none, or
+    /// a code not known here: anything but `none`, `once` and a number
+    /// from 1 to 99 without a leading zero followed by `d`, `w`, `m` or
+    /// `y`.
     pub fn read(code: Option<&str>) -> Reappear {
-        Reappear::ALL
+        match code {
+            Some("none") => return Reappear::Unset,
+            Some("once") => return Reappear::Once,
+            _ => {}
+        }
+        let Some(code) = code.filter(|c| c.is_ascii() && (2..=3).contains(&c.len())) else {
+            return Reappear::FALLBACK;
+        };
+        let (digits, letter) = code.split_at(code.len() - 1);
+        let unit = ReappearUnit::ALL
             .into_iter()
-            .find(|r| Some(r.code()) == code)
-            .unwrap_or(Reappear::STANDARD)
+            .find(|u| letter.starts_with(u.letter()));
+        let count = digits
+            .bytes()
+            .all(|b| b.is_ascii_digit())
+            .then(|| digits.parse::<u32>().ok())
+            .flatten()
+            .filter(|_| !digits.starts_with('0'));
+        match (count, unit) {
+            (Some(count), Some(unit)) => Reappear::After(count, unit),
+            _ => Reappear::FALLBACK,
+        }
     }
+
+    /// The day a Line checked on `checked` comes back on: as many days or
+    /// weeks on, or the same day of the month as many months or years on,
+    /// the month's last day where it has no such day. `None` for none and
+    /// Once, which never come back by themselves.
+    pub fn back_from(self, checked: Day) -> Option<Day> {
+        let Reappear::After(count, unit) = self else {
+            return None;
+        };
+        let count = i64::from(count);
+        Some(match unit {
+            ReappearUnit::Day => checked.add_days(count),
+            ReappearUnit::Week => checked.add_days(7 * count),
+            ReappearUnit::Month => months_on(checked, count),
+            ReappearUnit::Year => months_on(checked, 12 * count),
+        })
+    }
+}
+
+/// The same day of the month `months` on, the month's last day where it
+/// has no such day.
+fn months_on(day: Day, months: i64) -> Day {
+    let first = Day::new(day.year, i64::from(day.month) + months, 1);
+    let last = Day::new(first.year, i64::from(first.month) + 1, 0).day;
+    Day::new(
+        first.year,
+        i64::from(first.month),
+        i64::from(day.day.min(last)),
+    )
 }
 
 /// How the Agenda of a Device showed Shopping Lists (#123), a setting of
@@ -151,49 +223,51 @@ impl ShoppingAgenda {
     }
 }
 
-/// How a Shopping List shows on today's Agenda (#186), each person's own
-/// choice for each list, kept as an Override is (ADR 0030).
+/// How a Shopping List shows on today's Agenda (#186), the name its code
+/// knows the shared [`ListOnAgenda`] by.
+pub type ShoppingOnAgenda = ListOnAgenda;
+
+/// How a Shopping List (#186) or a Checklist (#219) shows on today's
+/// Agenda, each person's own choice for each list, kept as an Override is
+/// (ADR 0030).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ShoppingOnAgenda {
+pub enum ListOnAgenda {
     /// Never.
     Off,
     /// One row with the number of its open Lines, such as "Groceries: 4
-    /// open".
+    /// open" or "Before the trip: 3 of 7 open".
     Count,
     /// Each open Line on a row of its own, checkable there.
     Lines,
 }
 
-impl ShoppingOnAgenda {
-    pub const ALL: [ShoppingOnAgenda; 3] = [
-        ShoppingOnAgenda::Off,
-        ShoppingOnAgenda::Count,
-        ShoppingOnAgenda::Lines,
-    ];
+impl ListOnAgenda {
+    pub const ALL: [ListOnAgenda; 3] =
+        [ListOnAgenda::Off, ListOnAgenda::Count, ListOnAgenda::Lines];
 
     /// How it is stored, as the Dart core's enum names it.
     pub fn code(self) -> &'static str {
         match self {
-            ShoppingOnAgenda::Off => "off",
-            ShoppingOnAgenda::Count => "count",
-            ShoppingOnAgenda::Lines => "lines",
+            ListOnAgenda::Off => "off",
+            ListOnAgenda::Count => "count",
+            ListOnAgenda::Lines => "lines",
         }
     }
 
     /// The choice `code` names; `None` for none known here.
-    pub fn parse(code: &str) -> Option<ShoppingOnAgenda> {
-        ShoppingOnAgenda::ALL.into_iter().find(|s| s.code() == code)
+    pub fn parse(code: &str) -> Option<ListOnAgenda> {
+        ListOnAgenda::ALL.into_iter().find(|s| s.code() == code)
     }
 
     /// What a list nobody chose for shows as on a Device whose Agenda
     /// showed Shopping Lists the way `old` before: off for "Not at all",
     /// each open Line for "Each Line that came back today", else one row
     /// with the count.
-    pub fn from_device(old: ShoppingAgenda) -> ShoppingOnAgenda {
+    pub fn from_device(old: ShoppingAgenda) -> ListOnAgenda {
         match old {
-            ShoppingAgenda::Off => ShoppingOnAgenda::Off,
-            ShoppingAgenda::Lines => ShoppingOnAgenda::Lines,
-            ShoppingAgenda::Back | ShoppingAgenda::Open => ShoppingOnAgenda::Count,
+            ShoppingAgenda::Off => ListOnAgenda::Off,
+            ShoppingAgenda::Lines => ListOnAgenda::Lines,
+            ShoppingAgenda::Back | ShoppingAgenda::Open => ListOnAgenda::Count,
         }
     }
 }
@@ -224,7 +298,7 @@ pub struct ShoppingLine {
     /// never checked or was brought back since.
     pub checked_at: Option<DateTime<Utc>>,
     /// The day it comes back, at its start, while it is struck; `None`
-    /// while it is open.
+    /// while it is open, and while it is struck without a reappear time.
     pub back_on: Option<Day>,
     /// The day it came back by itself, at its start, while it is open
     /// since then: on that day it "came back today". `None` while it is
@@ -323,16 +397,17 @@ impl Read {
         match (check, value) {
             (Some(check), Some(_)) => {
                 gone = reappear == Reappear::Once;
-                let day = Day::of(wall(check.date_at)).add_days(7 * reappear.weeks());
-                struck = !gone && today < day;
+                let day = reappear.back_from(Day::of(wall(check.date_at)));
+                // Without a time it stays struck until one is set.
+                struck = !gone && day.is_none_or(|day| today < day);
                 if struck {
-                    back = Some(day);
+                    back = day;
                 }
                 if !gone && !struck {
-                    came_back = Some(day);
+                    came_back = day;
                 }
                 checked = check.date_at;
-                came = day_start(day);
+                came = day.map_or_else(|| wall(check.date_at), day_start);
             }
             _ => {
                 let at = check
@@ -403,8 +478,9 @@ fn key_at(list: &ShoppingList, at: Option<usize>) -> String {
             return order::place(last, None);
         }
     };
-    let a = open[..at]
+    let a = open
         .iter()
+        .take(at)
         .rev()
         .find(|l| order::is_valid(l.order.as_deref()))
         .and_then(|l| l.order.as_deref());
@@ -671,8 +747,8 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// Whether this Device may make the Note `note_id` a Shopping List: a
-    /// Note in the lists, of a text known here, neither a Tally nor a list
-    /// already, which it may change.
+    /// Note in the lists, of a text known here and not code, neither a Tally
+    /// nor a list already, which it may change.
     pub fn may_make(&self, note_id: &str) -> Result<bool> {
         let Some(note) = Notes::new(self.store).by_id(note_id)? else {
             return Ok(false);
@@ -680,6 +756,7 @@ impl<'a> ShoppingLists<'a> {
         Ok(!note.is_trashed()
             && !note.is_merged()
             && note.text_editable
+            && note.text_format != crate::text_format::CODE
             && parse_list_kind(
                 self.store
                     .current(note_id, checklist_keys::KIND)?
@@ -687,6 +764,7 @@ impl<'a> ShoppingLists<'a> {
             )
             .is_none()
             && !Tallies::new(self.store).is_tally(note_id)?
+            && !crate::sessions::Sessions::new(self.store).is_session_note(note_id)?
             && self.store.may_change(note_id)?)
     }
 
@@ -728,6 +806,86 @@ impl<'a> ShoppingLists<'a> {
             for line in &parsed {
                 key = order::after(&key);
                 self.write_line(note_id, &making, &line.text, &key, line.checked, Some(now))?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Whether this Device may switch the list the Note `note_id` is, a
+    /// Checklist to a Shopping List or the other way ([`Self::switch_list`]):
+    /// a Note in the lists that is one of the two, which it may change.
+    pub fn may_switch(&self, note_id: &str) -> Result<bool> {
+        let Some(note) = Notes::new(self.store).by_id(note_id)? else {
+            return Ok(false);
+        };
+        Ok(!note.is_trashed()
+            && !note.is_merged()
+            && (self.making(note_id)?.is_some()
+                || Checklists::new(self.store).is_checklist(note_id)?)
+            && self.store.may_change(note_id)?)
+    }
+
+    /// Switches the list the Note `note_id` is (#188): a Checklist becomes
+    /// a Shopping List and a Shopping List a Checklist, in a new making.
+    /// The Lines that show carry over, as Lines of the new making, in the
+    /// order they show, at one moment: a checked Line checked, a struck one
+    /// checked, each at the top with the reappear time a new Line gets on
+    /// a Shopping List. A Checklist's Lines show their own checks here, not
+    /// those of an Occurrence. The text is not touched; the Lines of the
+    /// old making stay in the log.
+    pub fn switch_list(&self, note_id: &str, wall: &WallClock) -> Result<()> {
+        if !self.may_switch(note_id)? {
+            return Err(Error::Invalid(format!(
+                "the list of {note_id} may not be switched here"
+            )));
+        }
+        let shopping = self.by_note(note_id, wall)?;
+        let carried: Vec<(String, bool)> = match &shopping {
+            Some(list) => list
+                .lines
+                .iter()
+                .map(|l| (l.text.clone(), l.struck))
+                .collect(),
+            None => Checklists::new(self.store)
+                .by_note(note_id)?
+                .map(|list| list.lines)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|l| (l.text, l.checked))
+                .collect(),
+        };
+        let making = self.store.new_id()?;
+        self.store.batch(|| {
+            let s = self.store;
+            let kind = match shopping {
+                Some(_) => checklist_keys::kind_of(&making),
+                None => keys::kind_of(&making),
+            };
+            s.append(note_id, checklist_keys::KIND, Some(&kind), None)?;
+            let now = s.now();
+            let mut key = String::new();
+            for (text, checked) in &carried {
+                key = order::after(&key);
+                match shopping {
+                    Some(_) => {
+                        write_line(
+                            s,
+                            note_id,
+                            &making,
+                            &NewLine {
+                                text,
+                                order: &key,
+                                indent: false,
+                                checked: *checked,
+                                received: None,
+                                at: Some(now),
+                            },
+                        )?;
+                    }
+                    None => {
+                        self.write_line(note_id, &making, text, &key, *checked, Some(now))?;
+                    }
+                }
             }
             Ok(())
         })
@@ -905,7 +1063,7 @@ impl<'a> ShoppingLists<'a> {
             return Ok(());
         }
         self.store
-            .append(line_id, keys::REAPPEAR, Some(reappear.code()), None)
+            .append(line_id, keys::REAPPEAR, Some(&reappear.code()), None)
             .map(drop)
     }
 
@@ -941,9 +1099,9 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// Checks the Line `line_id`: it is struck through and goes to the end
-    /// until the start of the same weekday as many weeks on as its
-    /// reappear time says, by `wall`; a Line Once is gone. A struck one
-    /// stays as it is.
+    /// until the start of the day its reappear time brings it back on
+    /// ([`Reappear::back_from`]), by `wall`, or until a time is set for one
+    /// without; a Line Once is gone. A struck one stays as it is.
     pub fn check(&self, line_id: &str, wall: &WallClock) -> Result<()> {
         let (list, line) = self.require_shown(line_id, wall)?;
         if !self.may_check(&list.note_id)? {
@@ -1007,7 +1165,7 @@ impl<'a> ShoppingLists<'a> {
         self.store.append(
             &id,
             keys::REAPPEAR,
-            Some(Reappear::STANDARD.code()),
+            Some(&Reappear::Unset.code()),
             Some(now),
         )?;
         Ok(id)
@@ -1149,6 +1307,15 @@ mod tests {
 
     /// The Lines of the Shopping List of `note` as they show: `~text` for
     /// a struck one.
+    /// Gives each Line of the Shopping List of `note` a week.
+    fn weekly(store: &Store, note: &str) -> Made<()> {
+        let lists = ShoppingLists::new(store);
+        for line in lists.by_note(note, &wall)?.ok_or("a Shopping List")?.lines {
+            lists.set_reappear(&line.id, Reappear::FALLBACK)?;
+        }
+        Ok(())
+    }
+
     fn shown(store: &Store, note: &str) -> Made<Vec<String>> {
         let list = ShoppingLists::new(store).by_note(note, &wall)?;
         Ok(list
@@ -1172,6 +1339,95 @@ mod tests {
 
     fn id_of(store: &Store, note: &str, text: &str) -> Made<String> {
         Ok(line_of(store, note, text)?.id)
+    }
+
+    /// How many entries the log holds for `field` of `entity`.
+    fn writes(store: &Store, entity: &str, field: &str) -> Made<usize> {
+        Ok(store
+            .history(entity)?
+            .iter()
+            .filter(|e| e.field == field)
+            .count())
+    }
+
+    #[test]
+    fn a_checklist_switches_to_a_shopping_list_of_its_lines_the_text_untouched() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = Notes::new(&ann)
+            .capture("Trip\nPassport\n Socks\nTickets", None, None)?
+            .id;
+        let lists = Checklists::new(&ann);
+        lists.make(&note)?;
+        let third = lists.by_note(&note)?.ok_or("a Checklist")?.lines[2]
+            .id
+            .clone();
+        lists.check(&third)?;
+        let texts = writes(&ann, &note, note_keys::TEXT)?;
+        let shops = ShoppingLists::new(&ann);
+        assert!(shops.may_switch(&note)?);
+        shops.switch_list(&note, &wall)?;
+        assert!(lists.by_note(&note)?.is_none());
+        assert_eq!(shown(&ann, &note)?, ["Passport", "Socks", "~Tickets"]);
+        assert_eq!(line_of(&ann, &note, "Socks")?.reappear, Reappear::Unset);
+        assert_eq!(writes(&ann, &note, note_keys::TEXT)?, texts, "no text");
+        let made = Notes::new(&ann).by_id(&note)?.ok_or("the Note")?;
+        assert_eq!(made.text, "Trip");
+        Ok(())
+    }
+
+    #[test]
+    fn a_shopping_list_switches_to_a_checklist_of_the_lines_that_show() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nBread\nEggs", None)?;
+        let shops = ShoppingLists::new(&ann);
+        shops.set_reappear(&id_of(&ann, &note, "Bread")?, Reappear::Once)?;
+        shops.check(&id_of(&ann, &note, "Bread")?, &wall)?;
+        shops.check(&id_of(&ann, &note, "Milk")?, &wall)?;
+        shops.switch_list(&note, &wall)?;
+        assert!(!shops.is_shopping_list(&note)?);
+        let list = Checklists::new(&ann).by_note(&note)?.ok_or("a Checklist")?;
+        let lines: Vec<String> = list
+            .lines
+            .iter()
+            .map(|l| format!("{}{}", if l.checked { "~" } else { "" }, l.text))
+            .collect();
+        assert_eq!(lines, ["Eggs", "~Milk"]);
+        assert!(list.lines.iter().all(|l| !l.in_group()));
+        Ok(())
+    }
+
+    #[test]
+    fn switching_back_and_forth_starts_a_new_making_each_time() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk", None)?;
+        let shops = ShoppingLists::new(&ann);
+        let first = shops.making(&note)?.ok_or("a making")?;
+        shops.switch_list(&note, &wall)?;
+        shops.switch_list(&note, &wall)?;
+        assert_ne!(shops.making(&note)?.ok_or("a making")?, first);
+        assert_eq!(shown(&ann, &note)?, ["Milk"]);
+        assert_eq!(
+            ann.entities_with_prefix(checklist_keys::LINE_PREFIX)?.len(),
+            3
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn neither_a_plain_note_nor_a_tally_switches() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let shops = ShoppingLists::new(&ann);
+        let plain = Notes::new(&ann).capture("Shop\nMilk", None, None)?.id;
+        assert!(!shops.may_switch(&plain)?);
+        assert!(shops.switch_list(&plain, &wall).is_err());
+        let tally = Notes::new(&ann).capture("Gym", None, None)?.id;
+        Tallies::new(&ann).add_field(&tally, "Reps", "reps", None, None)?;
+        assert!(!shops.may_switch(&tally)?);
+        Ok(())
     }
 
     #[test]
@@ -1199,8 +1455,8 @@ mod tests {
             (5, 4, 1)
         );
         for l in &list.lines {
-            assert_eq!(l.reappear, Reappear::Week1);
-            assert_eq!(ann.current(&l.id, keys::REAPPEAR)?.as_deref(), Some("1w"));
+            assert_eq!(l.reappear, Reappear::Unset);
+            assert_eq!(ann.current(&l.id, keys::REAPPEAR)?.as_deref(), Some("none"));
             assert_eq!(ann.current(&l.id, checklist_keys::INDENT)?, None);
         }
         assert!(lists.is_shopping_list(&note.id)?);
@@ -1241,6 +1497,7 @@ mod tests {
         let ann = clock.device(1, "Ann")?;
         let lists = ShoppingLists::new(&ann);
         let week = shopping(&ann, "Groceries\nMilk\nEggs\nTea\nRice", None)?;
+        weekly(&ann, &week)?;
         let hardware = shopping(&ann, "Hardware\nNails\nGlue", None)?;
         let gone = shopping(&ann, "Gone\nSalt", None)?;
         for text in ["Milk", "Eggs", "Tea"] {
@@ -1248,7 +1505,10 @@ mod tests {
         }
         lists.uncheck(&id_of(&ann, &week, "Eggs")?, &wall)?;
         lists.add(&week, "tea", &wall)?;
-        lists.set_reappear(&id_of(&ann, &hardware, "Nails")?, Reappear::Week2)?;
+        lists.set_reappear(
+            &id_of(&ann, &hardware, "Nails")?,
+            Reappear::After(2, ReappearUnit::Week),
+        )?;
         lists.check(&id_of(&ann, &hardware, "Nails")?, &wall)?;
         lists.check(&id_of(&ann, &gone, "Salt")?, &wall)?;
         Notes::new(&ann).trash(&gone)?;
@@ -1347,12 +1607,197 @@ mod tests {
             ann.append(&one, keys::REAPPEAR, code, None)?;
             assert_eq!(
                 line_of(&ann, &note, "One")?.reappear,
-                Reappear::Week1,
+                Reappear::After(1, ReappearUnit::Week),
                 "{code:?}"
             );
         }
         assert_eq!(Reappear::read(Some("once")), Reappear::Once);
-        assert_eq!(Reappear::read(Some("4w")), Reappear::Week4);
+        assert_eq!(
+            Reappear::read(Some("4w")),
+            Reappear::After(4, ReappearUnit::Week)
+        );
+        Ok(())
+    }
+
+    fn at(year: i32, month: u32, day: u32, hour: u32) -> Made<DateTime<Utc>> {
+        Ok(Utc
+            .with_ymd_and_hms(year, month, day, hour, 0, 0)
+            .single()
+            .ok_or("a moment")?)
+    }
+
+    fn after(count: u32, unit: ReappearUnit) -> Made<Reappear> {
+        Ok(Reappear::after(count, unit).ok_or("a count")?)
+    }
+
+    #[test]
+    fn a_new_line_stays_struck_until_a_time_is_set_which_counts_from_its_check() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let milk = id_of(&ann, &note, "Milk")?;
+        assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Unset);
+        lists.check(&milk, &wall)?;
+        assert!(line_of(&ann, &note, "Milk")?.struck);
+        assert_eq!(line_of(&ann, &note, "Milk")?.back_on, None);
+        // A year on, still struck.
+        clock.set(at(2027, 3, 5, 10)?);
+        assert_eq!(shown(&ann, &note)?, ["Eggs", "~Milk"]);
+        // Ten days after the check, a week makes it back since the 12th.
+        clock.set(at(2026, 3, 15, 10)?);
+        lists.set_reappear(&milk, after(1, ReappearUnit::Week)?)?;
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs"]);
+        assert_eq!(
+            line_of(&ann, &note, "Milk")?.came_back_on,
+            Some(Day::new(2026, 3, 12))
+        );
+        // A month instead: struck again until the 5th of April.
+        lists.set_reappear(&milk, after(1, ReappearUnit::Month)?)?;
+        assert_eq!(shown(&ann, &note)?, ["Eggs", "~Milk"]);
+        assert_eq!(
+            line_of(&ann, &note, "Milk")?.back_on,
+            Some(Day::new(2026, 4, 5))
+        );
+        lists.set_reappear(&milk, Reappear::Unset)?;
+        assert_eq!(ann.current(&milk, keys::REAPPEAR)?.as_deref(), Some("none"));
+        assert_eq!(line_of(&ann, &note, "Milk")?.back_on, None);
+        Ok(())
+    }
+
+    #[test]
+    fn days_and_weeks_count_on_and_months_and_years_go_by_the_calendar() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        // Saturday the 31st of January on the wall.
+        clock.set(at(2026, 1, 31, 10)?);
+        let note = shopping(&ann, "Shop\nA\nB\nC\nD\nE\nF", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let times = [
+            ("A", after(1, ReappearUnit::Day)?, Day::new(2026, 2, 1)),
+            ("B", after(6, ReappearUnit::Week)?, Day::new(2026, 3, 14)),
+            ("C", after(1, ReappearUnit::Month)?, Day::new(2026, 2, 28)),
+            ("D", after(13, ReappearUnit::Month)?, Day::new(2027, 2, 28)),
+            ("E", after(1, ReappearUnit::Year)?, Day::new(2027, 1, 31)),
+            ("F", after(99, ReappearUnit::Day)?, Day::new(2026, 5, 10)),
+        ];
+        for (text, time, _) in times {
+            lists.set_reappear(&id_of(&ann, &note, text)?, time)?;
+            lists.check(&id_of(&ann, &note, text)?, &wall)?;
+        }
+        for (text, _, back) in times {
+            assert_eq!(line_of(&ann, &note, text)?.back_on, Some(back), "{text}");
+        }
+        // At the start of the 28th of February on the wall, C is back.
+        clock.set(at(2026, 2, 27, 23)?);
+        assert!(!line_of(&ann, &note, "C")?.struck);
+        assert_eq!(
+            line_of(&ann, &note, "C")?.came_back_on,
+            Some(Day::new(2026, 2, 28))
+        );
+        assert!(line_of(&ann, &note, "B")?.struck);
+        // A leap day a year on is the 28th, four years on the 29th.
+        let leap = Day::new(2028, 2, 29);
+        let back =
+            |count, unit, day| -> Made<Option<Day>> { Ok(after(count, unit)?.back_from(day)) };
+        assert_eq!(
+            back(1, ReappearUnit::Year, leap)?,
+            Some(Day::new(2029, 2, 28))
+        );
+        assert_eq!(
+            back(4, ReappearUnit::Year, leap)?,
+            Some(Day::new(2032, 2, 29))
+        );
+        assert_eq!(
+            back(1, ReappearUnit::Month, leap)?,
+            Some(Day::new(2028, 3, 29))
+        );
+        assert_eq!(
+            back(11, ReappearUnit::Month, Day::new(2026, 3, 31))?,
+            Some(Day::new(2027, 2, 28))
+        );
+        assert_eq!(Reappear::Unset.back_from(leap), None);
+        assert_eq!(Reappear::Once.back_from(leap), None);
+        Ok(())
+    }
+
+    #[test]
+    fn the_week_values_of_before_are_kept_and_reading_writes_nothing() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nTea", None)?;
+        let lists = ShoppingLists::new(&ann);
+        // As a version before #195 wrote them.
+        for (text, code) in [("Milk", Some("1w")), ("Eggs", Some("4w")), ("Tea", None)] {
+            ann.append(&id_of(&ann, &note, text)?, keys::REAPPEAR, code, None)?;
+        }
+        for text in ["Milk", "Eggs", "Tea"] {
+            lists.check(&id_of(&ann, &note, text)?, &wall)?;
+        }
+        let before = ann.all_entries()?.len();
+        assert_eq!(
+            line_of(&ann, &note, "Milk")?.reappear,
+            after(1, ReappearUnit::Week)?
+        );
+        assert_eq!(
+            line_of(&ann, &note, "Eggs")?.reappear,
+            after(4, ReappearUnit::Week)?
+        );
+        assert_eq!(line_of(&ann, &note, "Tea")?.reappear, Reappear::FALLBACK);
+        assert_eq!(
+            line_of(&ann, &note, "Milk")?.back_on,
+            Some(Day::new(2026, 3, 12))
+        );
+        assert_eq!(
+            line_of(&ann, &note, "Eggs")?.back_on,
+            Some(Day::new(2026, 4, 2))
+        );
+        assert_eq!(
+            line_of(&ann, &note, "Tea")?.back_on,
+            Some(Day::new(2026, 3, 12))
+        );
+        assert_eq!(ann.all_entries()?.len(), before);
+        let eggs = id_of(&ann, &note, "Eggs")?;
+        assert_eq!(ann.current(&eggs, keys::REAPPEAR)?.as_deref(), Some("4w"));
+        Ok(())
+    }
+
+    #[test]
+    fn reappear_codes_as_stored_and_those_no_app_writes_read_as_a_week() -> TestResult {
+        let codes = [
+            ("none", Reappear::Unset),
+            ("once", Reappear::Once),
+            ("1d", after(1, ReappearUnit::Day)?),
+            ("20w", after(20, ReappearUnit::Week)?),
+            ("3m", after(3, ReappearUnit::Month)?),
+            ("99y", after(99, ReappearUnit::Year)?),
+        ];
+        for (code, time) in codes {
+            assert_eq!(Reappear::read(Some(code)), time, "{code}");
+            assert_eq!(time.code(), code);
+        }
+        let odd = [
+            None,
+            Some(""),
+            Some("0w"),
+            Some("01w"),
+            Some("100d"),
+            Some("1W"),
+            Some(" 1w"),
+            Some("1w "),
+            Some("w1"),
+            Some("1 w"),
+            Some("5"),
+            Some("1x"),
+            Some("٣w"),
+            Some("None"),
+        ];
+        for code in odd {
+            assert_eq!(Reappear::read(code), Reappear::FALLBACK, "{code:?}");
+        }
+        assert_eq!(Reappear::FALLBACK, after(1, ReappearUnit::Week)?);
+        assert_eq!(Reappear::after(0, ReappearUnit::Day), None);
+        assert_eq!(Reappear::after(100, ReappearUnit::Day), None);
         Ok(())
     }
 
@@ -1361,6 +1806,7 @@ mod tests {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nEggs\nTea", None)?;
+        weekly(&ann, &note)?;
         let lists = ShoppingLists::new(&ann);
         lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
         assert_eq!(shown(&ann, &note)?, ["Eggs", "Tea", "~Milk"]);
@@ -1377,6 +1823,7 @@ mod tests {
         // 22:30 UTC on Wednesday is 00:30 on Thursday two hours ahead.
         let two_ahead = |utc: DateTime<Utc>| (utc + Duration::hours(2)).naive_utc();
         let late = shopping(&ann, "Late\nSalt", None)?;
+        weekly(&ann, &late)?;
         clock.set(utc(18, 22, 30, 0)?);
         lists.check(&id_of(&ann, &late, "Salt")?, &two_ahead)?;
         let back = |wall: &WallClock| -> Made<Option<Day>> {
@@ -1397,12 +1844,22 @@ mod tests {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nOnce\nOne\nTwo\nThree\nFour", None)?;
+        weekly(&ann, &note)?;
         let lists = ShoppingLists::new(&ann);
         let once = id_of(&ann, &note, "Once")?;
         lists.set_reappear(&once, Reappear::Once)?;
-        lists.set_reappear(&id_of(&ann, &note, "Two")?, Reappear::Week2)?;
-        lists.set_reappear(&id_of(&ann, &note, "Three")?, Reappear::Week3)?;
-        lists.set_reappear(&id_of(&ann, &note, "Four")?, Reappear::Week4)?;
+        lists.set_reappear(
+            &id_of(&ann, &note, "Two")?,
+            Reappear::After(2, ReappearUnit::Week),
+        )?;
+        lists.set_reappear(
+            &id_of(&ann, &note, "Three")?,
+            Reappear::After(3, ReappearUnit::Week),
+        )?;
+        lists.set_reappear(
+            &id_of(&ann, &note, "Four")?,
+            Reappear::After(4, ReappearUnit::Week),
+        )?;
         for text in ["Once", "One", "Two", "Three", "Four"] {
             lists.check(&id_of(&ann, &note, text)?, &wall)?;
         }
@@ -1423,6 +1880,7 @@ mod tests {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nEggs\nTea\nRice", None)?;
+        weekly(&ann, &note)?;
         let lists = ShoppingLists::new(&ann);
         lists.check(&id_of(&ann, &note, "Eggs")?, &wall)?;
         lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
@@ -1482,6 +1940,7 @@ mod tests {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
         let note = shopping(&ann, "Shop\nMilk\nEggs\nHam\nJam\nTea", None)?;
+        weekly(&ann, &note)?;
         let lists = ShoppingLists::new(&ann);
         for text in ["Eggs", "Ham", "Jam"] {
             lists.check(&id_of(&ann, &note, text)?, &wall)?;
@@ -1603,7 +2062,7 @@ mod tests {
         lists.rename(&milk, "Oat milk")?;
         let before = ann.all_entries()?.len();
         lists.rename(&milk, " Oat milk ")?;
-        lists.set_reappear(&milk, Reappear::Week1)?;
+        lists.set_reappear(&milk, Reappear::Unset)?;
         assert_eq!(ann.all_entries()?.len(), before);
         lists.delete(&milk)?;
         assert_eq!(shown(&ann, &note)?, ["Eggs", "Tea"]);
@@ -1666,7 +2125,7 @@ mod tests {
         exchange(&ben, &ann)?;
         let held: Vec<String> = ann.all_entries()?.iter().map(Entry::id).collect();
         assert!(forged.iter().all(|e| held.contains(&e.id())));
-        assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Week1);
+        assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Unset);
         assert_eq!(shown(&ann, &note)?, ["Milk", "Bread", "~Eggs"]);
         let grants = ann.grants_of(&area)?.ok_or("the grants")?;
         let person = grants
@@ -1675,9 +2134,12 @@ mod tests {
             .to_string();
         ann.set_role(&area, &person, AreaRole::Manager)?;
         exchange(&ben, &ann)?;
-        lists.set_reappear(&milk, Reappear::Week2)?;
+        lists.set_reappear(&milk, Reappear::After(2, ReappearUnit::Week))?;
         exchange(&ben, &ann)?;
-        assert_eq!(line_of(&ann, &note, "Milk")?.reappear, Reappear::Week2);
+        assert_eq!(
+            line_of(&ann, &note, "Milk")?.reappear,
+            Reappear::After(2, ReappearUnit::Week)
+        );
         Ok(())
     }
 
@@ -1786,7 +2248,10 @@ mod tests {
         let ben = clock.device(2, "Ben")?;
         let note = shopping(&ann, "Shop\nMilk\nBread\nEggs", None)?;
         let lists = ShoppingLists::new(&ann);
-        lists.set_reappear(&id_of(&ann, &note, "Eggs")?, Reappear::Week2)?;
+        lists.set_reappear(
+            &id_of(&ann, &note, "Eggs")?,
+            Reappear::After(2, ReappearUnit::Week),
+        )?;
         lists.set_reappear(&id_of(&ann, &note, "Bread")?, Reappear::Once)?;
         lists.check(&id_of(&ann, &note, "Bread")?, &wall)?;
         lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
@@ -1797,14 +2262,23 @@ mod tests {
             .lines
             .iter()
             .flatten()
-            .map(|l| format!("{} {}", l.text, l.reappear.map_or("", Reappear::code)))
+            .map(|l| {
+                format!(
+                    "{} {}",
+                    l.text,
+                    l.reappear.map(Reappear::code).unwrap_or_default()
+                )
+            })
             .collect();
-        assert_eq!(carried, ["Eggs 2w", "Milk 1w"]);
+        assert_eq!(carried, ["Eggs 2w", "Milk none"]);
         let got = ben
             .accept_sent_item(&opened.item, false)?
             .ok_or("accepted")?;
         assert_eq!(shown(&ben, &got)?, ["Eggs", "Milk"]);
-        assert_eq!(line_of(&ben, &got, "Eggs")?.reappear, Reappear::Week2);
+        assert_eq!(
+            line_of(&ben, &got, "Eggs")?.reappear,
+            Reappear::After(2, ReappearUnit::Week)
+        );
         assert!(Checklists::new(&ben).by_note(&got)?.is_none());
         assert!(Notes::new(&ben).by_id(&got)?.ok_or("note")?.is_unsorted());
         Ok(())
@@ -2002,6 +2476,8 @@ mod tests {
         let lists = ShoppingLists::new(&ann);
         let week = shopping(&ann, "Groceries\nMilk\nEggs", None)?;
         let hardware = shopping(&ann, "Hardware\nNails", None)?;
+        weekly(&ann, &week)?;
+        weekly(&ann, &hardware)?;
         shopping(&ann, "Title only", None)?;
         lists.set_on_agenda(&week, ShoppingOnAgenda::Lines)?;
         lists.set_reappear(&id_of(&ann, &week, "Eggs")?, Reappear::Once)?;
@@ -2076,7 +2552,7 @@ mod tests {
         let note = Notes::new(&ann).capture("Groceries\nMilk", None, None)?.id;
         let checklists = Checklists::new(&ann);
         checklists.make(&note)?;
-        checklists.set_show_on_agenda(&note, false)?;
+        checklists.set_on_agenda(&note, ListOnAgenda::Off)?;
         checklists.to_plain(&note)?;
         let lists = ShoppingLists::new(&ann);
         lists.make(&note)?;
@@ -2085,8 +2561,8 @@ mod tests {
         lists.set_on_agenda(&note, ShoppingOnAgenda::Off)?;
         lists.to_plain(&note, &wall)?;
         checklists.make(&note)?;
-        checklists.set_show_on_agenda(&note, true)?;
-        assert_eq!(checklists.agenda()?.len(), 1);
+        checklists.set_on_agenda(&note, ListOnAgenda::Lines)?;
+        assert_eq!(checklists.agenda_rows()?.len(), 1);
         Ok(())
     }
 

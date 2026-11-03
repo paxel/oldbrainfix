@@ -67,17 +67,30 @@ void main() {
   }
 
   Future<void> openEditor(WidgetTester tester, String text) async {
-    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.byKey(const ValueKey('browse')));
     await tap(tester, find.byTooltip('All Notes'));
     await tester.longPress(find.text(text));
     await tester.pumpAndSettle();
   }
 
-  final moreIcon = find.byIcon(Icons.more_horiz);
+  // The one line under the text of the detailed card, as the Agenda's
+  // just-captured card starts (#170, #189).
+  String captured(WidgetTester tester) => tester
+      .widget<Text>(
+        find
+            .descendant(
+              of: find.byKey(
+                ValueKey('captured-line:${notes.all().single.id}'),
+              ),
+              matching: find.byType(Text),
+            )
+            .first,
+      )
+      .data!;
 
   group('Capture', () {
     testWidgets('records the running event and the connected device once '
-        'they arrive; the card gets its Capture Context icon', (tester) async {
+        'they arrive; the line on the card gets them', (tester) async {
       store
         ..calendarContextOn = true
         ..bluetoothContextOn = true;
@@ -86,7 +99,7 @@ void main() {
 
       expect(find.text('nees mor sauce'), findsOneWidget, reason: 'at once');
       expect(notes.all().single.context.hasMore, isFalse);
-      expect(moreIcon, findsNothing);
+      expect(captured(tester), isNot(contains(' · ')));
 
       await arrive(
         tester,
@@ -99,7 +112,7 @@ void main() {
       final context = notes.all().single.context;
       expect(context.calendarEvents, ['Dentist']);
       expect(context.bluetoothDevices, ['My Car']);
-      expect(moreIcon, findsOneWidget);
+      expect(captured(tester), endsWith(' · Dentist · My Car'));
       expect(source.asked, isEmpty, reason: 'Capture never asks');
 
       await openEditor(tester, 'nees mor sauce');
@@ -126,12 +139,12 @@ void main() {
 
       location.fix.complete(home);
       await tester.pumpAndSettle();
-      expect(find.text('Home'), findsOneWidget);
-      expect(moreIcon, findsNothing);
+      expect(find.textContaining(' · Home'), findsOneWidget);
+      expect(captured(tester), endsWith(' · Home'));
 
       source.devices.complete(['My Car']);
       await tester.pumpAndSettle();
-      expect(moreIcon, findsOneWidget);
+      expect(captured(tester), endsWith(' · Home · My Car'));
     });
 
     testWidgets('looks nothing up while switched off', (tester) async {
@@ -139,7 +152,7 @@ void main() {
       await capture(tester, 'nees mor sauce');
       expect(source.eventLookups, 0);
       expect(source.deviceLookups, 0);
-      expect(moreIcon, findsNothing);
+      expect(captured(tester), isNot(contains(' · ')));
       expect(notes.all().single.context.hasMore, isFalse);
     });
 
@@ -167,7 +180,7 @@ void main() {
       await capture(tester, 'nees mor sauce');
       await arrive(tester, events: const [], devices: null);
       expect(notes.all().single.context.hasMore, isFalse);
-      expect(moreIcon, findsNothing);
+      expect(captured(tester), isNot(contains(' · ')));
     });
 
     testWidgets('an Amend records its own', (tester) async {
@@ -176,7 +189,7 @@ void main() {
       final note = notes.capture('nees mor sauce');
       await start(tester);
       await openEditor(tester, 'nees mor sauce');
-      expect(find.text('Connected: Headphones'), findsNothing);
+      expect(find.textContaining('Headphones'), findsNothing);
 
       await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));
@@ -188,7 +201,8 @@ void main() {
         'sauce bought',
       );
       await tap(tester, find.text('Add'));
-      expect(find.text('Connected: Headphones'), findsOneWidget);
+      // In the Section's one line under its text (#170).
+      expect(find.textContaining(' · Headphones'), findsOneWidget);
       expect(notes.sections(note.id).single.context.bluetoothDevices, [
         'Headphones',
       ]);
@@ -210,7 +224,7 @@ void main() {
       final note = notes.all().single;
       expect(note.context.sourceApp?.name, 'WhatsApp');
       expect(note.context.sourceApp?.package, 'com.whatsapp');
-      expect(moreIcon, findsOneWidget);
+      expect(captured(tester), endsWith(' · WhatsApp'));
 
       await openEditor(tester, 'https://example.org/sauce');
       await tester.tap(find.byKey(const ValueKey('badge-captured')));
@@ -223,7 +237,7 @@ void main() {
       await start(tester);
       await tap(tester, find.text('Save'));
       expect(notes.all().single.context.sourceApp, isNull);
-      expect(moreIcon, findsNothing);
+      expect(captured(tester), isNot(contains(' · ')));
     });
   });
 
@@ -336,17 +350,20 @@ void main() {
 
     testWidgets('the Agenda bar keeps its order', (tester) async {
       await start(tester);
+      // New Session after New Routine, in Advanced (#246).
       final xs = [
-        for (final key in ['allRoutines', 'calendarPage', 'profile'])
+        for (final key in [
+          'browse',
+          'allRoutines',
+          'calendarPage',
+          'newRoutine',
+          'newSession',
+          'profile',
+        ])
           tester.getTopLeft(find.byKey(ValueKey(key))).dx,
       ];
-      final newRoutine = tester.getTopLeft(find.byIcon(Icons.add_alarm)).dx;
-      expect(
-        [xs[0], xs[1], newRoutine, xs[2]],
-        [
-          ...[xs[0], xs[1], newRoutine, xs[2]]..sort(),
-        ],
-      );
+      expect(xs, [...xs]..sort());
+      expect(xs.toSet(), hasLength(xs.length));
     });
 
     testWidgets('are not offered without a source', (tester) async {

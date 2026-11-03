@@ -161,7 +161,7 @@ fn the_popup_adds_the_line_to_the_list_and_keeps_no_note() -> TestResult {
     // Only the list shows; the rest waits unshown.
     assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
     assert!(!shows(&harness, "Into: Household"));
-    for label in ["File into…", "Routine", "Frog", "10 min"] {
+    for label in ["File into…", "Routine, Reminder, Frog or Session", "10 min"] {
         assert!(!shows(&harness, label), "{label}");
     }
     assert!(shows(&harness, "Save"));

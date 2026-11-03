@@ -5,12 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_reader.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
-import 'app_lock.dart';
-import 'l10n.dart';
-import 'profile.dart';
-import 'schedule_text.dart';
+import 'tally_view.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
 /// start, on every change to the log, and whenever the app comes back;
@@ -35,6 +33,10 @@ class AlarmSync extends ChangeNotifier {
   final AlarmPlatform platform;
   final WallClock wallClock;
 
+  /// Where the plan and the Agenda's reads run: the app hands in an
+  /// isolate of their own (#207), tests read on [store].
+  final AgendaReader reader;
+
   AppLocalizations? _t;
   String _locale = '';
   Map<AlarmPermission, bool> _granted = const {};
@@ -49,19 +51,38 @@ class AlarmSync extends ChangeNotifier {
   /// The Agenda widget's snapshot handed over last, likewise.
   String? _lastShown;
 
+  /// The Agenda's read handed over last ([agendaRead]), with the log's
+  /// mark it was read at; null once the log changed since.
+  ({AgendaRead read, int seq})? _agendaRead;
+
+  /// Set while the snapshot waits for the Agenda's next read, or for
+  /// [showDelay] without one; whether it is handed over even unchanged.
+  bool? _showWaiting;
+  Timer? _showTimer;
+
+  /// How long the snapshot waits for the Agenda's read before it reads
+  /// the log itself, as when the Agenda is not up.
+  static const showDelay = Duration(milliseconds: 500);
+
+  /// Whether the next arming is handed over even unchanged: one asked
+  /// for it, and its plan was read before a newer change (#207).
+  var _forceNext = false;
+
   /// Whether any Routine escalates, as of the last arming.
   var _escalating = false;
   Ringing? _ringing;
   var _nudgeOpened = false;
   var _changesOpened = false;
   var _unsortedOpened = false;
+  WidgetPick? _pickOpened;
 
   AlarmSync({
     required this.store,
     required this.platform,
     required this.wallClock,
+    this.reader = const InlineAgendaReader(),
   }) {
-    store.addListener(_changed);
+    store.addListener(_logChanged);
     store.addProfileListener(_changed);
     _arrivals = platform.actionsArrived.listen((_) => refresh());
   }
@@ -129,6 +150,14 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// The Session's pick tapped on the Agenda widget whose entry form is
+  /// still to open, or null; taking it clears it (#209).
+  WidgetPick? takePickOpened() {
+    final opened = _pickOpened;
+    _pickOpened = null;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -156,6 +185,8 @@ class AlarmSync extends ChangeNotifier {
           _applyFrog(frogId, at);
         case ShoppingTapped(:final lineId):
           _applyShopping(lineId);
+        case ChecklistTapped(:final lineId):
+          _applyChecklist(lineId);
       }
     }
     final granted = await platform.permissions();
@@ -163,10 +194,12 @@ class AlarmSync extends ChangeNotifier {
     final nudgeOpened = await platform.nudgeOpened();
     final changesOpened = await platform.changesOpened();
     final unsortedOpened = await platform.unsortedOpened();
+    final pickOpened = await platform.pickOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
+    if (pickOpened != null) _pickOpened = pickOpened;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -185,7 +218,8 @@ class AlarmSync extends ChangeNotifier {
             ringingChanged ||
             nudgeOpened ||
             changesOpened ||
-            unsortedOpened)) {
+            unsortedOpened ||
+            pickOpened != null)) {
       notifyListeners();
     }
   });
@@ -232,11 +266,43 @@ class AlarmSync extends ChangeNotifier {
     }
   }
 
+  /// Checks the Line [lineId] of a Checklist without a Routine, as the
+  /// Agenda's box does (#209); one gone or no longer allowed changes
+  /// nothing.
+  void _applyChecklist(String lineId) {
+    try {
+      Checklists(store).check(lineId);
+    } on ArgumentError {
+      return;
+    } on StateError {
+      return;
+    }
+  }
+
   /// Asks for [permission]; the answer arrives with the next [refresh]
   /// when the app comes back.
   Future<void> request(AlarmPermission permission) async {
     await platform.request(permission);
     await refresh();
+  }
+
+  /// The Agenda read [read] as it loaded (#204), at the log's mark
+  /// [seq], else now: the widget's snapshot takes it while the log has
+  /// not changed since, rather than reading the log a second time.
+  void agendaRead(AgendaRead read, {int? seq}) {
+    if (_disposed) return;
+    _agendaRead = (read: read, seq: seq ?? store.currentSeq());
+    final force = _showWaiting;
+    if (force == null) return;
+    _showWaiting = null;
+    _showTimer?.cancel();
+    unawaited(_serial(() => _showNow(force: force)));
+  }
+
+  /// The log changed: the Agenda's read is not current any more.
+  void _logChanged() {
+    _agendaRead = null;
+    _changed();
   }
 
   void _changed() {
@@ -251,57 +317,21 @@ class AlarmSync extends ChangeNotifier {
   Future<void> _arm({bool force = false}) async {
     final t = _t;
     if (t == null || _disposed) return;
-    final escalating = Routines(store)
-        .all()
-        .any((routine) => routine.escalation != null);
-    if (escalating != _escalating) {
-      _escalating = escalating;
+    final locale = _locale;
+    final plan = await reader.plan(store, wallClock, t, locale);
+    if (_disposed) return;
+    // Read before a newer change, whose arming comes next (#207).
+    if (plan.seq != store.currentSeq()) {
+      _forceNext = _forceNext || force;
+      return;
+    }
+    force = force || _forceNext;
+    _forceNext = false;
+    if (plan.escalating != _escalating) {
+      _escalating = plan.escalating;
       notifyListeners();
     }
-    final routines = Routines(store);
-    final locks = AreaLocks(store);
-    String title(PlannedAlarm alarm) {
-      final routine = routines.byId(alarm.routineId);
-      // From a locked Area set to Masked, on the lock screen too.
-      if (routine != null && locks.masks(routine)) {
-        return maskedText(t, _locale, routine, alarm.occurrence);
-      }
-      // A photo or voice Note without words is still there.
-      return _title(alarm.text) ??
-          (alarm.text == null ? t.noteGone : wordlessTitle(t, alarm.wordless));
-    }
-
-    final armed = [
-      for (final alarm in Alarms(store).plan(wallClock))
-        ArmedAlarm(
-          alarm: alarm,
-          title: title(alarm),
-          body: occurrenceTime(t, _locale, alarm.occurrence),
-        ),
-    ];
-    final done = Alarms(store).recentlyDone(wallClock);
-    final planned = Alarms(store).nudge(wallClock);
-    final nudge = planned == null
-        ? null
-        : ArmedNudge(
-            nudge: planned,
-            title: t.nudgeTitle(planned.count),
-            body: t.nudgeBody,
-          );
-    final plannedChanges = Alarms(store).changesNudge(wallClock);
-    final changes = plannedChanges == null
-        ? null
-        : ArmedChangesNudge(
-            nudge: plannedChanges,
-            title: t.changesNudgeTitle(
-              namesText(t, [
-                for (final person in plannedChanges.people)
-                  profileDisplayName(t, store.personShown(person).name),
-              ]),
-            ),
-            body: t.changesNudgeBody,
-            public: t.changesNudgePublic,
-          );
+    final AlarmPlanRead(:armed, :done, :nudge, :changes) = plan;
     final sound = store.alarmSound;
     final signature = [
       'sound $sound',
@@ -311,7 +341,7 @@ class AlarmSync extends ChangeNotifier {
       if (changes != null)
         '${changes.nudge}|${changes.title}|${changes.body}|${changes.public}',
     ].join('\n');
-    await _show(t, force: force);
+    await _show(force: force);
     if (!force && signature == _lastArmed) return;
     _lastArmed = signature;
     await platform.arm(
@@ -341,19 +371,63 @@ class AlarmSync extends ChangeNotifier {
 
   /// Hands the Agenda widget its snapshot when it changed: the
   /// Unsorted count, a Note's text or a Done change it without changing
-  /// the alarms.
-  Future<void> _show(AppLocalizations t, {required bool force}) async {
-    final snapshot = AgendaSnapshot.of(store, wallClock, t, _locale);
+  /// the alarms. Made of the Agenda's read while that is current (#204);
+  /// else it waits for the Agenda's next read, or reads the log itself
+  /// after [showDelay], once however many changes came meanwhile.
+  Future<void> _show({required bool force}) async {
+    if (_current() == null) {
+      _wait(force: force);
+      return;
+    }
+    await _showNow(force: force);
+  }
+
+  /// Waits for the Agenda's next read, or [showDelay] without one.
+  void _wait({required bool force}) {
+    _showWaiting = (_showWaiting ?? false) || force;
+    _showTimer?.cancel();
+    _showTimer = Timer(showDelay, () {
+      final force = _showWaiting;
+      _showWaiting = null;
+      if (force != null && !_disposed) {
+        unawaited(_serial(() => _showNow(force: force)));
+      }
+    });
+  }
+
+  /// The Agenda's read while the log has not changed since and it shows
+  /// today, on this wall clock; else null.
+  AgendaRead? _current() {
+    final held = _agendaRead;
+    if (held == null ||
+        held.read.wallClock != wallClock ||
+        held.seq != store.currentSeq() ||
+        held.read.days.today != Day.today(store.clock(), wallClock)) {
+      return null;
+    }
+    return held.read;
+  }
+
+  Future<void> _showNow({required bool force}) async {
+    final t = _t;
+    if (t == null || _disposed) return;
+    var read = _current();
+    if (read == null) {
+      // Read off the UI thread where the app reads so (#207).
+      final load = await reader.read(store, wallClock, deviceUnitSystem(store));
+      if (_disposed) return;
+      // Read before a newer change, which shows anew.
+      if (load.seq != store.currentSeq()) {
+        _wait(force: force);
+        return;
+      }
+      read = AgendaRead.of(load, wallClock);
+    }
+    final snapshot = AgendaSnapshot.from(store, read, t, _locale);
     final signature = jsonEncode(snapshot.toMap());
     if (!force && signature == _lastShown) return;
     _lastShown = signature;
     await platform.showAgenda(snapshot);
-  }
-
-  /// The first line of a Note's text, or null when there is none.
-  static String? _title(String? text) {
-    final line = text?.trim().split('\n').first.trim();
-    return line == null || line.isEmpty ? null : line;
   }
 
   /// Runs [job] after the jobs before it, one at a time.
@@ -363,10 +437,22 @@ class AlarmSync extends ChangeNotifier {
     return next;
   }
 
+  /// Hands the Agenda widget the snapshot still waiting for the Agenda's
+  /// read, now: a background run has no Agenda and may end before
+  /// [showDelay] is over.
+  Future<void> settle() {
+    final force = _showWaiting;
+    _showTimer?.cancel();
+    _showWaiting = null;
+    if (force == null || _disposed) return _serial(() async {});
+    return _serial(() => _showNow(force: force));
+  }
+
   @override
   void dispose() {
     _disposed = true;
-    store.removeListener(_changed);
+    _showTimer?.cancel();
+    store.removeListener(_logChanged);
     store.removeProfileListener(_changed);
     unawaited(_arrivals?.cancel());
     super.dispose();

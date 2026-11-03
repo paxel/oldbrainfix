@@ -149,9 +149,9 @@ class PendingSet {
     try {
       final json = jsonDecode(text);
       if (json case {
-        'changes': final List changes,
+        'changes': final List<Object?> changes,
         'id': final String id,
-        'keys': final List keys,
+        'keys': final List<Object?> keys,
         'kind': final String kind,
         'made': final String made,
         'shown': final bool shown,

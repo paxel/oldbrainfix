@@ -9,9 +9,12 @@
 //! one block of text as a Checklist's are (#141, #184, `line_editing`):
 //! each where this Device may change it, new ones by anyone with a role
 //! in its Area, every one staying in its row while the editor is open; a
-//! new list starts with one empty Line. For a Line this Device may
-//! change, ⋮ and a right-click on its box's row with its reappear time as
-//! radio buttons and "Delete for good". "Back to a plain Note" is a badge
+//! new list starts with one empty Line. Each Line ends in the badge of
+//! its reappear time (#195), "—", "Once", "4w", whose click opens its
+//! dialog where this Device may change the Line: None, Once or After,
+//! After with its number and Day, Week, Month or Year, each written at
+//! once. For such a Line, ⋮ and a right-click on its box's row hold
+//! "Delete for good". "Back to a plain Note" is a badge
 //! of the Note dialog (#160), as is "Show on the Agenda" (#186), whose
 //! three ways the card's ⋮ offers as radio buttons too.
 //! Nothing is written when a struck Line comes back: the window
@@ -22,7 +25,7 @@ use std::collections::HashSet;
 
 use egui::{RichText, Ui};
 use oldbrainfix_core::{
-    Note, Reappear, ShoppingList, ShoppingLists, ShoppingOnAgenda, Store, WallClock,
+    Note, Reappear, ReappearUnit, ShoppingList, ShoppingLists, ShoppingOnAgenda, Store, WallClock,
 };
 
 use crate::app::embossed;
@@ -30,11 +33,16 @@ use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
-use crate::theme::Tones;
+use crate::setting_badges::{BadgeValue, badge};
+use crate::theme::{self, Tones};
+use crate::{icons, routine_editor};
 
-/// What the menu of a Shopping List's Line does.
+/// What a Shopping List's Line is asked from its badge, its reappear time
+/// dialog and its menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShopStep {
+    /// Opens its reappear time dialog (#195).
+    PickReappear,
     Reappear(Reappear),
     Delete,
 }
@@ -113,12 +121,22 @@ pub fn on_agenda(
     Ok(Some(lists.on_agenda(note)?))
 }
 
-/// The words of a way a Shopping List shows on the Agenda.
+/// The words of a way a Shopping List or a Checklist shows on the Agenda.
 pub fn on_agenda_label(t: &L10n, shows: ShoppingOnAgenda) -> &'static str {
     match shows {
         ShoppingOnAgenda::Off => t.setting_off(),
         ShoppingOnAgenda::Count => t.shopping_on_agenda_count(),
         ShoppingOnAgenda::Lines => t.shopping_on_agenda_lines(),
+    }
+}
+
+/// The way `shows` as the value icon of its badge (#192), the phone's
+/// `shoppingOnAgendaIcon`.
+pub fn on_agenda_icon(shows: ShoppingOnAgenda) -> char {
+    match shows {
+        ShoppingOnAgenda::Off => crate::setting_badges::switch_icon(false),
+        ShoppingOnAgenda::Count => crate::icons::COUNT,
+        ShoppingOnAgenda::Lines => crate::icons::FORMAT_BULLETS,
     }
 }
 
@@ -141,38 +159,124 @@ pub fn shown_lines(t: &L10n, list: &ShoppingList) -> Vec<ShownLine> {
         .collect()
 }
 
-/// The words of a reappear time: "Once" or "2 weeks".
+/// The words of a reappear time: "None", "Once", "2 weeks", "3 months".
 pub fn reappear_label(t: &L10n, reappear: Reappear) -> String {
     match reappear {
+        Reappear::Unset => t.shopping_reappear_none().to_string(),
         Reappear::Once => t.shopping_once().to_string(),
-        weeks => t.shopping_weeks(weeks.weeks()),
+        Reappear::After(count, unit) => {
+            let count = i64::from(count);
+            match unit {
+                ReappearUnit::Day => t.shopping_days(count),
+                ReappearUnit::Week => t.shopping_weeks(count),
+                ReappearUnit::Month => t.shopping_months(count),
+                ReappearUnit::Year => t.shopping_years(count),
+            }
+        }
     }
 }
 
-/// The menu of a Line whose reappear time is `current`, from its ⋮ and a
-/// right-click on it: the reappear times as radio buttons under their
-/// heading and "Delete for good"; the step clicked. A click on the
-/// time it has already changes nothing.
-fn line_menu(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<ShopStep> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    let mut picked = None;
-    ui.label(RichText::new(t.shopping_reappear()).small().color(weak));
-    for reappear in Reappear::ALL {
-        let on = reappear == current;
-        let label = reappear_label(t, reappear);
-        if ui.radio(on, RichText::new(label).color(text)).clicked() && !on {
-            picked = Some(ShopStep::Reappear(reappear));
+/// A reappear time as its badge shows it, short text (#192, #195): "—"
+/// for none, "Once", "4w", "3m".
+pub fn reappear_short(t: &L10n, reappear: Reappear) -> String {
+    match reappear {
+        Reappear::Unset => "—".to_string(),
+        Reappear::Once => t.shopping_once().to_string(),
+        Reappear::After(count, unit) => {
+            let count = i64::from(count);
+            match unit {
+                ReappearUnit::Day => t.shopping_short_days(count),
+                ReappearUnit::Week => t.shopping_short_weeks(count),
+                ReappearUnit::Month => t.shopping_short_months(count),
+                ReappearUnit::Year => t.shopping_short_years(count),
+            }
         }
     }
-    ui.separator();
-    if ui
-        .button(RichText::new(t.shopping_delete_for_good()).color(text))
-        .clicked()
-    {
-        picked = Some(ShopStep::Delete);
+}
+
+/// The badge of a Line's reappear time at its end (#195), read as
+/// "Reappear time: 4 weeks"; clicked while `active`, it asks for its
+/// dialog.
+fn reappear_badge(
+    ui: &mut Ui,
+    shown: (&L10n, Tones),
+    reappear: Reappear,
+    active: bool,
+) -> Option<ShopStep> {
+    let t = shown.0;
+    let short = reappear_short(t, reappear);
+    let words = reappear_label(t, reappear);
+    let value = BadgeValue::Short(&short, &words);
+    let clicked = badge(
+        ui,
+        shown,
+        (icons::REAPPEAR, None),
+        t.shopping_reappear(),
+        Some(value),
+        active,
+    )
+    .clicked();
+    (active && clicked).then_some(ShopStep::PickReappear)
+}
+
+/// What a Line's reappear time dialog shows of `current` (#195): None,
+/// Once or After as choice chips, After with its number from 1 to 99 and
+/// Day, Week, Month or Year under it; the time picked, written at once by
+/// the caller. After starts at a week.
+pub fn reappear_editor(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<Reappear> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Kind {
+        None,
+        Once,
+        After,
     }
-    picked
+    let mut kind = match current {
+        Reappear::Unset => Kind::None,
+        Reappear::Once => Kind::Once,
+        Reappear::After(..) => Kind::After,
+    };
+    let options = [
+        (Kind::None, t.shopping_reappear_none().to_string()),
+        (Kind::Once, t.shopping_once().to_string()),
+        (Kind::After, t.shopping_reappear_after().to_string()),
+    ];
+    if crate::app::chip_row(ui, &mut kind, options) {
+        return Some(match kind {
+            Kind::None => Reappear::Unset,
+            Kind::Once => Reappear::Once,
+            Kind::After => Reappear::FALLBACK,
+        });
+    }
+    let Reappear::After(count, unit) = current else {
+        return None;
+    };
+    let mut number = i64::from(count);
+    let most = Some(i64::from(Reappear::MAX_COUNT));
+    if routine_editor::stepper(ui, t, &mut number, (1, most), None) {
+        return u32::try_from(number)
+            .ok()
+            .and_then(|n| Reappear::after(n, unit));
+    }
+    let mut picked = unit;
+    let units = ReappearUnit::ALL.map(|u| {
+        let words = match u {
+            ReappearUnit::Day => t.unit_days(number),
+            ReappearUnit::Week => t.unit_weeks(number),
+            ReappearUnit::Month => t.unit_months(number),
+            ReappearUnit::Year => t.unit_years(number),
+        };
+        (u, words)
+    });
+    (crate::app::chip_row(ui, &mut picked, units) && picked != unit)
+        .then_some(Reappear::After(count, picked))
+}
+
+/// The menu of a Line, from its ⋮ and a right-click on it: "Delete for
+/// good"; the step clicked.
+fn line_menu(ui: &mut Ui, t: &L10n) -> Option<ShopStep> {
+    theme::destructive(ui, true, t.shopping_delete_for_good())
+        .clicked()
+        .then_some(ShopStep::Delete)
 }
 
 /// How many Lines of `list` are open, on a compact card.
@@ -196,14 +300,9 @@ pub fn section(
     let list = &shown.list;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.shopping_heading()).strong().color(text));
-        let menu = |ui: &mut Ui, id: &str| {
-            let current = list.line(id).map_or(Reappear::STANDARD, |l| l.reappear);
-            line_menu(ui, t, current)
-        };
-        let menus = (
-            &shown.editable,
-            &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>,
-        );
+        let menu = |ui: &mut Ui, _: &str| line_menu(ui, t);
+        let menued = typed.with_menus(&shown.editable);
+        let menus = (&menued, &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>);
         let lines = shown_lines(t, list);
         let rows: Vec<ShownLine> = typed
             .rows
@@ -245,7 +344,10 @@ pub fn section(
                 return false;
             };
             let at = fields.iter().position(|k| *k == key);
-            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let above = at
+                .and_then(|at| at.checked_sub(1))
+                .and_then(|at| fields.get(at))
+                .copied();
             let below = at.and_then(|at| fields.get(at + 1)).copied();
             line_editing::field(
                 ui,
@@ -257,12 +359,20 @@ pub fn section(
             );
             true
         };
+        // A new Line has none yet; a click stores it first.
+        let trailing = |ui: &mut Ui, line: &ShownLine| {
+            let (reappear, active) = match list.line(&line.id) {
+                Some(stored) => (stored.reappear, shown.editable.contains(&line.id)),
+                None => (Reappear::Unset, shown.checks && menued.contains(&line.id)),
+            };
+            reappear_badge(ui, (t, tones), reappear, active)
+        };
         let asked = checklist_view::line_rows(
             ui,
             (t, tones),
             &rows,
             shown.checks,
-            (Some(menus), Some(&mut field)),
+            (Some(menus), Some(&mut field), Some(&trailing)),
         );
         for asked in asked {
             actions.push(match asked {
@@ -281,6 +391,13 @@ pub fn section(
 /// click on the way it has already changes nothing.
 pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ShoppingAction> {
     let current = menu.shopping_on_agenda?;
+    agenda_radios(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
+}
+
+/// "Show on the Agenda" of a Shopping List or a Checklist (#219) in a
+/// card's menu: its three ways as radio buttons under their heading,
+/// `current` marked; the other way clicked.
+pub fn agenda_radios(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut picked = None;
@@ -294,7 +411,7 @@ pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Shopping
         let on = shows == current;
         let label = RichText::new(on_agenda_label(t, shows)).color(text);
         if ui.radio(on, label).clicked() && !on {
-            picked = Some(ShoppingAction::OnAgenda(menu.note.clone(), shows));
+            picked = Some(shows);
         }
     }
     ui.separator();

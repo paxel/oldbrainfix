@@ -16,6 +16,7 @@ const RENAG_MINUTES: &str = "renagMinutes";
 const MISSED_SEEN: &str = "missedSeen";
 const QUIET_HOURS: &str = "quietHours";
 const QUIET_HOURS_OFF: &str = "quietHoursOff";
+const ALL_DAY_FROM: &str = "allDayFrom";
 const NUDGE_REPEAT_MINUTES: &str = "nudgeRepeatMinutes";
 const ALERTS_OFF: &str = "alertsOff";
 const AUTOSTART_OFF: &str = "autostartOff";
@@ -26,6 +27,8 @@ const ALARM_SOUND: &str = "alarmSound";
 const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
+const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
+const FAT_FINGERS: &str = "fatFingers";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const THEME: &str = "theme";
 
@@ -63,13 +66,15 @@ impl ThemeChoice {
 
 /// What the quick note (the capture field and popup on the desktop)
 /// shows beyond its text, its buttons that add a recording, a picture or
-/// a file, its Nudge buttons and "To full editor", each once this Device
-/// switched it on (#142), as the Dart core's `QuickNoteControl`.
+/// a file, its Nudge buttons, "To full editor" and the alarm clock for a
+/// Routine or Reminder (#223), each once this Device switched it on
+/// (#142), as the Dart core's `QuickNoteControl`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuickNoteControl {
     /// "File into…".
     FileInto,
-    /// Routine, Reminder, Frog, Session and "Make it a Tally" (Q481).
+    /// Frog and Session in the alarm clock's menu, and "Make it a Tally"
+    /// (Q481); the clock offers a Routine or Reminder without it (#223).
     Schedule,
     /// "Add to a Shopping List".
     Shopping,
@@ -138,6 +143,13 @@ pub const DEFAULT_QUIET_HOURS: QuietHours = QuietHours {
         minute: 0,
     },
     end: ClockTime { hour: 8, minute: 0 },
+};
+
+/// When all-day Occurrences start to ring when nothing else is set
+/// (#201).
+pub const DEFAULT_ALL_DAY_FROM: ClockTime = ClockTime {
+    hour: 15,
+    minute: 0,
 };
 
 /// This Device's settings in the store's local settings.
@@ -216,6 +228,18 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(QUIET_HOURS_OFF, &(!on).to_string())
     }
 
+    /// From when on this Device an all-day Occurrence rings, on the
+    /// wall clock; before that it only shows on the Agenda (#201).
+    pub fn all_day_from(&self) -> Result<ClockTime> {
+        let text = self.store.local_setting(ALL_DAY_FROM)?.unwrap_or_default();
+        Ok(ClockTime::parse(&text).unwrap_or(DEFAULT_ALL_DAY_FROM))
+    }
+
+    pub fn set_all_day_from(&self, time: ClockTime) -> Result<()> {
+        self.store
+            .set_local_setting(ALL_DAY_FROM, &time.to_string())
+    }
+
     /// How long an ignored Nudge waits before it comes again.
     pub fn nudge_repeat(&self) -> Result<Duration> {
         self.minutes(NUDGE_REPEAT_MINUTES, default_nudge_repeat())
@@ -256,6 +280,30 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_streaks_on(&self, on: bool) -> Result<()> {
         self.store
             .set_local_setting(STREAKS_OFF, &(!on).to_string())
+    }
+
+    /// Whether this Device's Agenda hides what is checked instead of
+    /// striking it through (#217): a Done Occurrence, a checked Line, a
+    /// pick with its entry, and a group with nothing left; off until
+    /// switched on.
+    pub fn agenda_hides_checked(&self) -> Result<bool> {
+        Ok(self.store.local_setting(AGENDA_HIDE_CHECKED)?.as_deref() == Some("true"))
+    }
+
+    pub fn set_agenda_hides_checked(&self, on: bool) -> Result<()> {
+        self.store
+            .set_local_setting(AGENDA_HIDE_CHECKED, &on.to_string())
+    }
+
+    /// Whether this Device shows text, icons and tap targets 1.3 times
+    /// their size (#224): "Bigger text and icons" on the desktop, egui's
+    /// zoom, as "Fat fingers" on the phone; off until switched on.
+    pub fn fat_fingers(&self) -> Result<bool> {
+        Ok(self.store.local_setting(FAT_FINGERS)?.as_deref() == Some("true"))
+    }
+
+    pub fn set_fat_fingers(&self, on: bool) -> Result<()> {
+        self.store.set_local_setting(FAT_FINGERS, &on.to_string())
     }
 
     /// Whether the quick note on this Device shows `control`; off until
@@ -416,9 +464,12 @@ mod tests {
         assert_eq!(settings.nudge_repeat()?, Duration::hours(1));
         assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
         assert!(settings.quiet_hours_on()?);
+        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
         assert!(settings.streaks_on()?);
+        assert!(!settings.agenda_hides_checked()?);
+        assert!(!settings.fat_fingers()?);
         for control in QuickNoteControl::ALL {
             assert!(!settings.quick_note_shows(control)?, "{control:?}");
         }
@@ -432,6 +483,8 @@ mod tests {
         assert_eq!(settings.renag_interval()?, Duration::minutes(10));
         store.set_local_setting(QUIET_HOURS, "23:00")?;
         assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
+        store.set_local_setting(ALL_DAY_FROM, "noon")?;
+        assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
         Ok(())
     }
 
@@ -450,6 +503,13 @@ mod tests {
         };
         settings.set_quiet_hours(quiet)?;
         settings.set_quiet_hours_on(false)?;
+        let half_past_eleven = ClockTime {
+            hour: 11,
+            minute: 30,
+        };
+        settings.set_all_day_from(half_past_eleven)?;
+        assert_eq!(settings.all_day_from()?, half_past_eleven);
+        assert_eq!(store.local_setting(ALL_DAY_FROM)?.as_deref(), Some("11:30"));
         settings.set_alerts_on(false)?;
         settings.set_autostart_on(false)?;
         settings.set_streaks_on(false)?;
@@ -467,6 +527,27 @@ mod tests {
         assert_eq!(store.local_setting(STREAKS_OFF)?.as_deref(), Some("true"));
         settings.set_streaks_on(true)?;
         assert!(settings.streaks_on()?);
+        // The Agenda strikes through what is checked until this Device
+        // hides it (#217), under the Dart core's key.
+        settings.set_agenda_hides_checked(true)?;
+        assert!(settings.agenda_hides_checked()?);
+        assert_eq!(
+            store.local_setting(AGENDA_HIDE_CHECKED)?.as_deref(),
+            Some("true")
+        );
+        settings.set_agenda_hides_checked(false)?;
+        assert!(!settings.agenda_hides_checked()?);
+        store.set_local_setting(AGENDA_HIDE_CHECKED, "garbled")?;
+        assert!(!settings.agenda_hides_checked()?);
+        // Text and icons keep their size until this Device makes them
+        // bigger (#224), under the Dart core's key.
+        settings.set_fat_fingers(true)?;
+        assert!(settings.fat_fingers()?);
+        assert_eq!(store.local_setting(FAT_FINGERS)?.as_deref(), Some("true"));
+        settings.set_fat_fingers(false)?;
+        assert!(!settings.fat_fingers()?);
+        store.set_local_setting(FAT_FINGERS, "garbled")?;
+        assert!(!settings.fat_fingers()?);
         for control in QuickNoteControl::ALL {
             settings.set_quick_note_shows(control, true)?;
             assert!(settings.quick_note_shows(control)?, "{control:?}");

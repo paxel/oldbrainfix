@@ -24,6 +24,11 @@ import 'tally_form_screen.dart';
 /// into [place], Unsorted for none, and spawns the Session; it pops the
 /// Session's id. Leaving without Save makes nothing but the Tallies made
 /// on the way.
+///
+/// For the kind badge of a plain Note ([noteId], #191) it sets that Note
+/// up instead: no name and no schedule, the Note's text being its name
+/// and its Routines its schedule; Save makes it a Session and pops its
+/// id.
 class SessionFormScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -31,11 +36,15 @@ class SessionFormScreen extends StatefulWidget {
   /// The Area or Topic it goes into; null for none.
   final String? place;
 
+  /// The plain Note made a Session; null for a new one.
+  final String? noteId;
+
   const SessionFormScreen({
     super.key,
     required this.notes,
     required this.places,
     this.place,
+    this.noteId,
   });
 
   @override
@@ -44,7 +53,16 @@ class SessionFormScreen extends StatefulWidget {
 
 class _SessionFormScreenState extends State<SessionFormScreen> {
   /// The Tallies of where it goes; while Unsorted, any of the user's.
-  late final _draft = SessionDraft.of(widget.notes.store, widget.place ?? '');
+  late final _draft = SessionDraft.of(
+    widget.notes.store,
+    widget.noteId ?? widget.place ?? '',
+  );
+
+  /// Where a Tally made here goes: where the Session goes.
+  late final String? _place = switch (widget.noteId) {
+    final id? => widget.notes.byId(id)?.place,
+    null => widget.place,
+  };
   final _name = TextEditingController();
   final _nameFocus = FocusNode();
 
@@ -71,8 +89,11 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   Future<void> _newTally() async {
     final made = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) =>
-            TallyFormScreen(notes: widget.notes, place: widget.place),
+        builder: (_) => TallyFormScreen(
+          notes: widget.notes,
+          place: _place,
+          text: _draft.newTallyText,
+        ),
       ),
     );
     if (!mounted || made == null) return;
@@ -103,40 +124,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   );
 
   Future<void> _editRule() async {
-    final t = context.t;
-    final picked = await showDialog<SessionRule>(
-      context: context,
-      builder: (context) => BadgeDialog(
-        setting: t.sessionRule,
-        icon: Icons.shuffle,
-        content: RadioColumn<SessionRule>(
-          key: const ValueKey('session-rule'),
-          value: _draft.rule,
-          onChanged: (rule) => Navigator.of(context).pop(rule),
-          options: [
-            for (final (rule, title, detail) in [
-              (
-                SessionRule.random,
-                t.sessionRuleRandom,
-                t.sessionRuleRandomDetail,
-              ),
-              (
-                SessionRule.rolling,
-                t.sessionRuleRolling,
-                t.sessionRuleRollingDetail,
-              ),
-              (SessionRule.least, t.sessionRuleLeast, t.sessionRuleLeastDetail),
-            ])
-              RadioOption(
-                key: ValueKey('session-rule-${rule.name}'),
-                value: rule,
-                title: Text(title),
-                subtitle: Text(detail),
-              ),
-          ],
-        ),
-      ),
-    );
+    final picked = await pickSessionRule(context, _draft.rule);
     if (!mounted || picked == null) return;
     setState(() => _draft.rule = picked);
   }
@@ -166,6 +154,15 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   }
 
   void _save() {
+    if (widget.noteId case final noteId?) {
+      setState(() => _draft.checked = true);
+      if (!_draft.valid) return;
+      Sessions(
+        widget.notes.store,
+      ).make(noteId, pool: _draft.pool, count: _draft.count, rule: _draft.rule);
+      Navigator.of(context).pop(noteId);
+      return;
+    }
     final name = _name.text.trim();
     setState(() {
       _nameMissing = name.isEmpty;
@@ -199,11 +196,12 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(t.sessionPoolExplain),
+          SessionPoolTags(draft: _draft, onChanged: () => setState(() {})),
           Material(
             type: MaterialType.transparency,
             child: Column(
               children: [
-                for (final id in _draft.order)
+                for (final id in _draft.shown)
                   CheckboxListTile(
                     key: ValueKey('session-pool-$id'),
                     contentPadding: EdgeInsets.zero,
@@ -230,6 +228,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               ],
             ),
           ),
+          SessionPoolHidden(draft: _draft),
           if (_draft.checked && _draft.pool.isEmpty)
             Text(
               t.sessionPoolMissing,
@@ -245,15 +244,11 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
-    final rule = switch (_draft.rule) {
-      SessionRule.random => t.sessionRuleRandom,
-      SessionRule.rolling => t.sessionRuleRolling,
-      SessionRule.least => t.sessionRuleLeast,
-    };
+    final rule = sessionRuleName(t, _draft.rule);
     return Scaffold(
       appBar: pageBar(
         context,
-        title: t.newSession,
+        title: widget.noteId == null ? t.newSession : t.session,
         actions: [
           TextButton(
             key: const ValueKey('session-form-save'),
@@ -265,19 +260,20 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
-          EditorPanel(
-            child: TextField(
-              key: const ValueKey('session-form-name'),
-              controller: _name,
-              focusNode: _nameFocus,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                labelText: t.kindName,
-                errorText: _nameMissing ? t.kindNameMissing : null,
+          if (widget.noteId == null)
+            EditorPanel(
+              child: TextField(
+                key: const ValueKey('session-form-name'),
+                controller: _name,
+                focusNode: _nameFocus,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: t.kindName,
+                  errorText: _nameMissing ? t.kindNameMissing : null,
+                ),
               ),
             ),
-          ),
           _pool(t),
           Wrap(
             spacing: 8,
@@ -293,21 +289,75 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               SettingBadge(
                 key: const ValueKey('session-form-rule'),
                 setting: t.sessionRule,
-                icon: Icons.shuffle,
+                icon: sessionRuleBadgeIcon,
                 value: rule,
+                valueIcon: sessionRuleIcon(_draft.rule),
                 onTap: (_) => _editRule(),
               ),
-              SettingBadge(
-                key: const ValueKey('session-form-schedule'),
-                setting: t.sessionSchedule,
-                icon: Icons.event_repeat,
-                value: scheduleText(t, locale, _schedule.schedule),
-                onTap: (_) => _editSchedule(),
-              ),
+              if (widget.noteId == null)
+                SettingBadge(
+                  key: const ValueKey('session-form-schedule'),
+                  setting: t.sessionSchedule,
+                  icon: Icons.event_repeat,
+                  value: scheduleText(t, locale, _schedule.schedule),
+                  onTap: (_) => _editSchedule(),
+                ),
             ],
           ),
         ],
       ),
     );
   }
+}
+
+/// The icon of a Session's rule badge (#192), the same for every rule.
+const sessionRuleBadgeIcon = Icons.alt_route;
+
+/// The rule [rule] as the value icon of its badge (#192).
+IconData sessionRuleIcon(SessionRule rule) => switch (rule) {
+  SessionRule.random => Icons.shuffle,
+  SessionRule.rolling => Icons.format_list_numbered,
+  SessionRule.least => Icons.balance,
+};
+
+/// The rule [rule] in words, the value of its badge.
+String sessionRuleName(AppLocalizations t, SessionRule rule) => switch (rule) {
+  SessionRule.random => t.sessionRuleRandom,
+  SessionRule.rolling => t.sessionRuleRolling,
+  SessionRule.least => t.sessionRuleLeast,
+};
+
+/// The small editor of a Session's rule badge: the rules as radio
+/// buttons, [current] marked; a tap on one picks it and closes. Null when
+/// left without a pick.
+Future<SessionRule?> pickSessionRule(
+  BuildContext context,
+  SessionRule current,
+) {
+  final t = context.t;
+  return showDialog<SessionRule>(
+    context: context,
+    builder: (context) => BadgeDialog(
+      setting: t.sessionRule,
+      icon: sessionRuleBadgeIcon,
+      content: RadioColumn<SessionRule>(
+        key: const ValueKey('session-rule'),
+        value: current,
+        onChanged: (rule) => Navigator.of(context).pop(rule),
+        options: [
+          for (final rule in SessionRule.values)
+            RadioOption(
+              key: ValueKey('session-rule-${rule.name}'),
+              value: rule,
+              title: Text(sessionRuleName(t, rule)),
+              subtitle: Text(switch (rule) {
+                SessionRule.random => t.sessionRuleRandomDetail,
+                SessionRule.rolling => t.sessionRuleRollingDetail,
+                SessionRule.least => t.sessionRuleLeastDetail,
+              }),
+            ),
+        ],
+      ),
+    ),
+  );
 }

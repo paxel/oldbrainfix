@@ -399,8 +399,7 @@ impl TableView {
                     if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
                         answer = Some(false);
                     }
-                    let error = ui.visuals().error_fg_color;
-                    if ui.button(RichText::new(t.delete()).color(error)).clicked() {
+                    if theme::destructive(ui, true, t.delete()).clicked() {
                         answer = Some(true);
                     }
                 });
@@ -884,7 +883,7 @@ fn menu(
             ui.separator();
             let mut on = headings;
             let words = RichText::new(t.table_heading_column()).color(text);
-            if ui.checkbox(&mut on, words).changed() {
+            if theme::checkbox(ui, &mut on, words).changed() {
                 picked = Some(Op::Headings);
                 ui.close();
             }

@@ -80,7 +80,9 @@ use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::ics::routines_ics;
+use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
+use oldbrainfix_core::packs::{self, OpenedPack, Pack, PackError, PackFrom, PackTicks};
 use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::sent::{
@@ -90,18 +92,20 @@ use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
-    CaptureContext, CapturedDetail, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day,
-    DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes,
-    NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl,
-    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingLine,
-    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, ThemeChoice, Topic,
-    UnitSystem, bundle, markdown, text_format,
+    CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
+    ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
+    ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
+    OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuickNoteControl,
+    QuietHours, Routine, RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions,
+    ShoppingLine, ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies,
+    ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
 use crate::all_routines_view::{self, AllRoutinesAction};
+use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
@@ -109,13 +113,17 @@ use crate::backups;
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
 };
+use crate::card_glance;
+use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
-use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
+use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
 use crate::enrich::Enricher;
+use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
+use crate::help_notes;
 use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
@@ -132,6 +140,8 @@ use crate::media_view::{
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
+use crate::note_history_view;
+use crate::pack_view::{self, PackAsk};
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
@@ -140,12 +150,15 @@ use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
-use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
-use crate::setting_badges::{badge, badge_dialog, badge_row, badge_switch, menu_entry};
+use crate::session_view::{self, PicksShown, SessionAction, SessionCardShown, SessionPart};
+use crate::setting_badges::{
+    BadgeValue, badge, badge_dialog, badge_row, badge_switch, menu_entry, switch_icon,
+};
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
 use crate::starter_set_view;
+use crate::sync_line;
 use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
@@ -153,7 +166,7 @@ use crate::sync_view::{
 use crate::table_view::{self, Opening, TableView};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
-    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
+    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::theme::{self, AREA_PALETTE, Tones};
@@ -204,6 +217,9 @@ pub enum Page {
     About,
     /// Every third-party component and its licence, reached from About.
     Licences,
+    /// Send feedback (#214): the text, what goes along and its preview,
+    /// reached from the Settings.
+    Feedback,
     /// The user's own Profile: its picture, name and short code, and its
     /// card; Sync ▸ Profile.
     Profile,
@@ -252,6 +268,8 @@ struct Placed {
     area: Option<Area>,
     topic: Option<Topic>,
     author: Option<Profile>,
+    /// Who the Pack it came from unclaimed is from (#164), until removed.
+    pack_from: Option<PackFrom>,
 }
 
 /// What a Note is made: a Checklist, a Shopping List or a plain Note
@@ -275,30 +293,55 @@ struct Row {
     lines: Option<(Checklist, bool)>,
 }
 
-/// A Shopping List's row on today's Agenda (#123): one Line that came
-/// back today when `line` is set, else the list with what its row says,
-/// "Groceries: 3 back"; with the Area its Note is filed in and whether
+/// A Shopping List's group on today's Agenda (#123, #186, #208): its
+/// heading, the list's title, and its open `lines` under it; or, as
+/// chosen for it, the heading alone saying how many are open,
+/// "Groceries: 3 open". With the Area its Note is filed in and whether
 /// this Device may check its Lines.
 #[derive(Debug, Clone)]
 struct ShoppingRow {
     note_id: String,
     area: Option<Area>,
-    /// The list's title: the first line of its Note's text, else
-    /// "Shopping List".
-    title: String,
-    line: Option<ShoppingLine>,
-    /// What the row of the list says; the Line's text on a Line's row.
+    /// What the heading says.
     text: String,
+    lines: Vec<ShoppingLine>,
     checks: bool,
 }
 
-/// A Checklist's row on today's Agenda (#143): its Note, Area and what
-/// it says, "Before the trip: 3 of 7 open".
+/// A Checklist's group on today's Agenda (#143, #208), shaped as a
+/// Shopping List's: its Note, Area, what its heading says and its open
+/// Lines under it; with no Lines the heading says how many are open,
+/// "Packing: 3 of 7 open". With whether this Device may check them.
 #[derive(Debug, Clone)]
 struct ChecklistRow {
     note_id: String,
     area: Option<Area>,
     text: String,
+    lines: Vec<ShownLine>,
+    checks: bool,
+}
+
+/// The Lines a Checklist shows under its heading on the Agenda (#208): a
+/// Checklist Routine's Occurrence every Line, checked ones struck
+/// through, or only its open ones where this Device `hides_checked`
+/// (#217); a Checklist without a Routine its open ones. The one place
+/// that decides it.
+fn agenda_lines(list: &Checklist, hides_checked: bool) -> Vec<ShownLine> {
+    checklist_view::shown_lines(list)
+        .into_iter()
+        .filter(|line| (list.on.is_some() && !hides_checked) || !line.checked)
+        .collect()
+}
+
+/// Whether `row` shows as Done: checked off, or Done from the entries of
+/// every pick or from every Line checked.
+fn shown_done(row: &Row) -> bool {
+    row.row.done().is_some()
+        || matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
+        || row
+            .lines
+            .as_ref()
+            .is_some_and(|(list, _)| list.all_checked())
 }
 
 /// What the Agenda shows.
@@ -325,7 +368,28 @@ struct AgendaView {
     /// show.
     frogs: Option<FrogsToday>,
     frog_rows: Vec<FrogShown>,
+    /// Whether this Device hides what is checked instead of striking it
+    /// through (#217): the rows shown as Done are left out already; the
+    /// checked Lines and the picks with an entry go as they are drawn.
+    hides_checked: bool,
 }
+
+/// The Agenda read on a thread of its own (#207): the window draws on
+/// while it reads, the last rows showing.
+struct AgendaReads {
+    /// Hands the thread its connection to the window's database as it
+    /// reads.
+    open: Arc<dyn Fn() -> Arc<Store> + Send + Sync>,
+    /// The rows read last, shown until the next read is in.
+    shown: Option<AgendaView>,
+    /// The read running, with whether it wrote today's picks.
+    running: Option<std::sync::mpsc::Receiver<AgendaRead>>,
+    /// A change asked for one more read meanwhile.
+    again: bool,
+}
+
+/// What the Agenda's thread read, at its mark, and whether it wrote.
+type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
 
 /// What this Device may do to the selected Note in a Shared Area
 /// (ADR 0013): change it (edit, file, merge, delete), give it Routines,
@@ -416,6 +480,17 @@ struct View {
     /// pass for the cards, each with whether this Device may check its
     /// Lines (#122).
     shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
+    /// The Notes listed that are a Tally, read in one pass for the
+    /// cards, which show their name and description (#188).
+    tallies: HashSet<String>,
+    /// The Tallies listed whose card shows its detailed view, read for
+    /// their chart and entries on it (#190), by their Note.
+    card_tallies: HashMap<String, TallyShown>,
+    /// The Notes listed that are a Session, which show their name and
+    /// description (#191), and those whose card shows its detailed view,
+    /// read for their pool, today's picks and last weeks on it.
+    sessions: HashSet<String>,
+    card_sessions: HashMap<String, SessionCardShown>,
     /// The Notes listed whose text this Device may change from their
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
@@ -432,9 +507,20 @@ struct View {
     /// How the boxes of the table shown full screen show, while it is
     /// one of a stored text.
     table_ticking: Option<table_view::Ticking>,
-    /// Whether the list shows its Notes compact, by their first line,
-    /// as this Device keeps it for that list (#114).
+    /// Whether the list shows its cards in the compact view, as this
+    /// Device keeps it for that list (#114, #189).
     compact: bool,
+    /// The Notes of the list whose card a click on its view button
+    /// switched to the other view, kept on this Device until the list's
+    /// switch changes (#189).
+    switched: HashSet<String>,
+    /// What the compact view says of each listed Tally and Note running a
+    /// Session, by its id (#189).
+    glances: HashMap<String, Vec<String>>,
+    /// The Notes whose card this Device keeps with its struck Lines, or
+    /// its description, unfolded (#189).
+    struck_shown: HashSet<String>,
+    descriptions_unfolded: HashSet<String>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
     /// Whether the Note being captured may spawn where it goes (#113).
@@ -442,6 +528,9 @@ struct View {
     /// Whether this Device may set up Sessions and Frogs where the list
     /// shows, for what "+" offers (#161).
     list_manages: bool,
+    /// Whether the person chose Advanced (#197): only then are Tallies,
+    /// Sessions, Frogs and Topics made, the format bar and roles offered.
+    advanced: bool,
     /// What this Device's quick note shows (#142).
     capture_quick: QuickNote,
     /// The Shopping Lists the Note being captured can go into, by their
@@ -449,6 +538,13 @@ struct View {
     capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
+    /// What the selected Note asks to check off now (#215): of each of
+    /// them this Device may check off, the Occurrence due, else the
+    /// latest Missed one.
+    open: Vec<OpenOccurrence>,
+    /// Today's Occurrences of the Routines and Reminders of each Note
+    /// listed, read in one pass for the boxes on their cards (#215).
+    card_today: HashMap<String, Vec<CardOccurrence>>,
     /// How many of them a newer version of the app saved the schedule of,
     /// which shows only that (ADR 0034).
     newer_routines: usize,
@@ -465,6 +561,16 @@ struct View {
     /// whether this Device may make the selected Note one (#122).
     shopping: Option<ShoppingShown>,
     makes_shopping: bool,
+    /// Whether this Device may switch the selected Note's list, a
+    /// Checklist to a Shopping List or back (#188).
+    switches_list: bool,
+    /// The kind of the selected Note (#188), plain while none is.
+    kind: Option<NoteKind>,
+    /// The setup of the selected Note while it is a Session (#191), and
+    /// whether this Device may make it one, change its setup or make it
+    /// a plain Note again: as it may change the Note, in the lists.
+    session_setup: Option<SessionSetup>,
+    makes_session: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -538,6 +644,12 @@ enum Dialog {
     /// set it when (ADR 0035).
     BoxHistory {
         lines: Vec<(BoxState, String)>,
+    },
+    /// Every change of the Note `note`, the newest first (#193), each
+    /// with "Use this version" where it brings an old text back.
+    NoteHistory {
+        note: String,
+        rows: Vec<note_history_view::ChangeRow>,
     },
     /// The address of a link on the bytes `start..end` of the text being
     /// edited, `linked` when they are in a link already (#127).
@@ -649,6 +761,25 @@ enum Dialog {
         blocking: Option<Vec<String>>,
         held: Option<String>,
     },
+    /// Export as Pack… (#165): the tree of everything `pack` may hold,
+    /// the items `ticks` ticks, and whether "Add my Profile" is ticked.
+    PackExport {
+        pack: Box<Pack>,
+        ticks: PackTicks,
+        profile: bool,
+    },
+    /// A Pack opened here (#165): its tree, the items `ticks` ticks, and
+    /// whether "Claim as mine" is ticked.
+    PackOpened {
+        opened: Box<OpenedPack>,
+        ticks: PackTicks,
+        claim: bool,
+    },
+    /// Whether the "From `name`" badge of the Note `note` goes (#165).
+    RemovePackFrom {
+        note: String,
+        name: String,
+    },
     /// A stranger's Sent Item held until "Show" (#91): only who it is
     /// from, and, while "Decline and block" asks, the Shared Areas
     /// blocking them leaves.
@@ -752,12 +883,23 @@ enum Dialog {
 enum NoteBadge {
     Importance,
     Captured,
+    /// The Captured details of the Note's Section at this place in its
+    /// list, opened from its line (#170).
+    SectionCaptured(usize),
     /// The kind, with "Back to a plain Note".
     Kind,
+    /// A Plain Note's text format: plain, formatted or code (#213).
+    Format,
     OnAgenda,
     /// A Shopping List's "Show on the Agenda", its three ways (#186).
     ShoppingOnAgenda,
     Ticks,
+    /// A Session's rule and its weekdays' own counts (#191).
+    SessionRule,
+    SessionWeekdays,
+    /// The reappear time of the Shopping List's Line in `reappear_line`
+    /// (#195).
+    Reappear,
 }
 
 /// The dialogs back closes, or leads back from, on top of the others
@@ -918,10 +1060,14 @@ enum Action {
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
-    /// Shows the compact card of this Note in full, in place (#114).
-    Unfold(String),
-    /// Switches the list shown to compact cards or full ones and keeps
-    /// the choice for that list on this Device (#114).
+    /// Switches the card of this Note to its other view, in place, and
+    /// keeps that on this Device until the list's switch changes (#189).
+    SwitchView(String),
+    /// Keeps a fold of a card open, by its setting, or forgets it (#189).
+    Fold(String, bool),
+    /// Switches every card of the list shown to the compact view or the
+    /// detailed one and keeps the choice for that list on this Device
+    /// (#114, #189).
     Compact(bool),
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
@@ -974,6 +1120,11 @@ enum Action {
     /// Keeps it as a formatted text, its first format just applied
     /// (#127, ADR 0033): the Note's, or the Section's of this id (#183).
     FormatText(Option<String>),
+    /// Puts the Note's text, as typed, into this format (#213).
+    SetTextFormat(&'static str),
+    /// A paste that looks like code into the Note's text: "Keep as code"
+    /// under it (#213), or, without, that offer closed.
+    OfferCode(bool),
     /// Asks for the address of a link on the bytes `start..end` of the
     /// edited text, of the Amend field's with `amend` or of the field of
     /// the Section `section` (#183), `url` the link's there is one
@@ -1022,6 +1173,10 @@ enum Action {
     Toggle(String, Occurrence),
     /// Checks off a Missed Occurrence: Done, late.
     CheckMissed(String, Occurrence),
+    /// "Done and move to trash" at the top of the Note dialog (#215):
+    /// checks off the Occurrence of the open Note's one Reminder, moves
+    /// the Note with it to the trash and closes the dialog.
+    DoneAndTrash(String, Occurrence),
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
@@ -1040,8 +1195,23 @@ enum Action {
     /// A new Session from the Note with this id (#104), or with its Note
     /// made behind the scenes.
     NewSession(Option<String>),
-    /// Something asked of a Session's row on the Agenda.
+    /// Something asked of a Session's row on the Agenda, or of the picks
+    /// on a Session Note's card (#191).
     Session(SessionAction),
+    /// The setup's page of a Session made of the plain Note with this id,
+    /// from its kind badge (#191).
+    MakeSession(String),
+    /// Makes the Session Note with this id a plain Note again (#191).
+    UnmakeSession(String),
+    /// Writes what the open Session Note's page or one of its badges
+    /// changed of its setup, at once (#191): the draft as changed, and
+    /// the setup it was read from, which it is compared with. Carried
+    /// along, so a read of the view in between loses nothing.
+    SessionSetup(Box<(SessionDraft, SessionSetup)>),
+    /// "New Tally" in the open Session Note's pool (#191): the New Tally
+    /// page, filed where the Note is, its Tally coming back first and
+    /// ticked.
+    SessionPoolTally,
     Editor(Intent),
     /// Deletes the edited Routine, asked.
     DeleteRoutine,
@@ -1055,8 +1225,12 @@ enum Action {
     /// Moves the Frog the dialog asks about to the trash.
     DeleteFrog,
     RestoreFrog(String),
-    /// Something asked of the Tally part of the Note's editor (#103).
+    /// Something asked of the Tally setup in the Note dialog (#103,
+    /// #190).
     Tally(TallyAction),
+    /// Something asked of the Tally on the detailed card of the Note with
+    /// this id (#190).
+    CardTally(String, TallyAction),
     /// Something asked of the field page or the entry page.
     TallyForm(FormIntent),
     /// Removes the entry the dialog asks about.
@@ -1078,6 +1252,11 @@ enum Action {
         entity: String,
         id: String,
     },
+    /// Shows the History of the Note with this id (#193).
+    NoteHistory(String),
+    /// Writes the text of the change at this place in the open Note
+    /// History again, as a new change (#193).
+    UseVersion(usize),
     /// Shows after each box of the Note's text, and its Sections', who
     /// ticked it last and when, or no more, on this Device.
     ShowTicks {
@@ -1107,6 +1286,18 @@ enum Action {
     /// Saves the Note as a Markdown file with its photos and recordings
     /// beside it, where the user says (#129).
     SaveAsMarkdown(String),
+    /// Export as Pack… on the Area, Topic or Note (#165): its tree.
+    ExportPack(String),
+    /// Save…, Add, "Add … to People" or Cancel in a Pack's dialog.
+    Pack(PackAsk),
+    /// Mail, a save or the Notes tick on the Send feedback page (#214).
+    Feedback(FeedbackAsk),
+    /// File ▸ Open Pack…: asks for the file and opens it (#165).
+    OpenPack,
+    /// Asks whether the "From …" badge of the Note goes (#165).
+    AskRemovePackFrom(String),
+    /// Removes the "From …" badge of the Note (#165).
+    RemovePackFrom(String),
     /// Saves the Note of the send dialog as a Sent Item.
     SendNote,
     /// Accepts the Sent Item previewed, or declines it.
@@ -1232,6 +1423,10 @@ enum Action {
     Ai(AiAction),
 }
 
+/// How far "Bigger text and icons" zooms the window (#224), as "Fat
+/// fingers" grows the phone's.
+pub const BIGGER_ZOOM: f32 = 1.3;
+
 /// A change in the Settings.
 #[derive(Debug, Clone, PartialEq)]
 enum Setting {
@@ -1241,6 +1436,8 @@ enum Setting {
     NudgeRepeat(i64),
     QuietOn(bool),
     Quiet(QuietHours),
+    /// From when all-day Occurrences ring (#201).
+    AllDayFrom(ClockTime),
     /// The capture popup's key chord, as the settings show it.
     Hotkey(String),
     /// The sound file Occurrences ring with; `None` for the app's own
@@ -1251,6 +1448,18 @@ enum Setting {
     Units(Option<UnitSystem>),
     /// Whether a Routine's History shows its Streak (Q400).
     Streaks(bool),
+    /// Whether the Agenda hides what is checked instead of striking it
+    /// through (#217).
+    HideChecked(bool),
+    /// Whether text and icons show bigger, egui's zoom at
+    /// [`BIGGER_ZOOM`] (#224).
+    Bigger(bool),
+    /// Whether Done on a plain Note's only Reminder moves the Note to the
+    /// trash: the person's, on all of their own Devices (#211).
+    TrashDoneReminder(bool),
+    /// Simple or Advanced: the person's, on all of their own Devices
+    /// (#197).
+    Advanced(bool),
     /// Whether the quick note shows this control (#142).
     QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
@@ -1282,10 +1491,6 @@ pub struct App {
     error: Option<String>,
     /// How far the Notes list is scrolled, for the parallax.
     scrolled: f32,
-    /// The Notes a click unfolded on the compact list shown, and which
-    /// list that is; they fold again once another list shows (#114).
-    unfolded: HashSet<String>,
-    unfolded_of: Option<String>,
     /// The photo shown full screen over the window, while one is (#114).
     viewer: Option<Viewer>,
     /// The table shown full screen over the window, while one is (#128).
@@ -1314,6 +1519,8 @@ pub struct App {
     /// it yet.
     theme: ThemeChoice,
     theme_shown: bool,
+    /// Whether the window shows the zoom this Device chose yet (#224).
+    zoom_shown: bool,
     /// The address the browser is to open, and who opens it; egui's
     /// `open_url` when none.
     open_url: Option<String>,
@@ -1325,9 +1532,13 @@ pub struct App {
     /// The Note "To full editor" opens, until its text takes the
     /// keyboard in the Note dialog (#142).
     edit_wanted: Option<String>,
-    /// The selected Note's text as it is being edited, and that Note.
+    /// The selected Note's text as it is being edited, and that Note;
+    /// of a Note of a kind its description, its name in `name` (#188),
+    /// whether it is one in `text_kinded`.
     text: String,
     text_of: Option<String>,
+    name: String,
+    text_kinded: bool,
     /// Whether its text is being edited: a formatted text shows its
     /// source in the field meanwhile, and as it reads otherwise (#127).
     text_editing: bool,
@@ -1356,14 +1567,24 @@ pub struct App {
     tally_form: Option<TallyForm>,
     /// The New Tally page (#161), in its dialog.
     tally_page: Option<TallyPage>,
+    /// The pool and the count of the selected Session Note as its page
+    /// edits them (#191), read again with the view.
+    session_draft: Option<SessionDraft>,
     /// Whether the quick note's dialog shows (#146).
     quick_open: bool,
     /// The badge of the Note dialog whose small editor is open (#160).
     badge: Option<NoteBadge>,
+    /// The Shopping List Line whose reappear time dialog is open (#195).
+    reappear_line: Option<String>,
+    /// The Note whose text took a paste that looks like code, while
+    /// "Keep as code" waits under it (#213).
+    code_offer: Option<String>,
     /// Whether the Lines of the Note opened next are to be typed in at
     /// once: a Checklist or Shopping List just made (#161).
     start_lines: bool,
-    tally_look: TallyLook,
+    /// Whose entries each Tally shows, by its Note, once picked (#190);
+    /// the default until then.
+    tally_whose: HashMap<String, Whose>,
     /// The Lines of the Note shown as they are typed in place, and what
     /// the Shopping List's field holds (#141); what the menu of the card
     /// last opened offers (#120).
@@ -1383,6 +1604,8 @@ pub struct App {
     read_at: DateTime<Utc>,
     /// The Quiet Hours as typed in the Settings.
     quiet_text: (String, String),
+    /// The settings' "All-day items remind from" field as typed (#201).
+    all_day_text: String,
     /// The capture popup's hotkey, which the Settings move.
     hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
     /// The hotkey as typed in the Settings.
@@ -1438,6 +1661,12 @@ pub struct App {
     /// Tells the folder thread to sync now; without one, the window
     /// syncs itself.
     folder_wanted: Option<Arc<AtomicBool>>,
+    /// Whether a sync of this Device runs, for the line under the menu
+    /// bar (#225).
+    syncing: Option<Syncing>,
+    /// Where the Agenda is read off the window's thread (#207); without
+    /// it, the window reads it itself.
+    agenda_reads: Option<AgendaReads>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -1458,6 +1687,15 @@ pub struct App {
     item_saver: FileSaver,
     /// Asks where to save the own Profile card file (#144).
     card_saver: FileSaver,
+    /// Asks where to save a Pack and which one to open (#165).
+    pack_saver: FileSaver,
+    /// Asks where to save the text of Send feedback (#214).
+    feedback_saver: FileSaver,
+    /// What Send feedback says of this computer, and its page's state
+    /// while it shows (#214).
+    feedback_facts: FeedbackFacts,
+    feedback: FeedbackForm,
+    pack_opener: FolderPicker,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
     /// Asks where to save a Note as Markdown (#129).
@@ -1517,6 +1755,9 @@ pub struct App {
     /// Makes the own Profile from this computer's login, or fills in the
     /// defaults of one there (ADR 0017).
     profile_defaults: ProfileDefaults,
+    /// The version the help Notes are made for (#180); none in tests, so
+    /// no Area "Old Brain Fix" appears there unless a test asks.
+    help_version: Option<String>,
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
@@ -1575,6 +1816,33 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
         oldbrainfix_core::APP_NAME,
         &[bundle::EXTENSION, sent::EXTENSION, cards::EXTENSION],
     )
+}
+
+/// The bytes of the file at `path` when it is a Pack (#165), read whole:
+/// a Pack has no size limit. None for any other file, read only as far as
+/// its first byte that is no blank when that opens no JSON object.
+fn pack_file_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut head = [0u8; 64];
+    let read = std::fs::File::open(path)
+        .and_then(|mut file| file.read(&mut head))
+        .ok()?;
+    let first = head
+        .get(..read)?
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))?;
+    if *first != b'{' {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    packs::looks_like_pack(&bytes).then_some(bytes)
+}
+
+/// The dialogs' filter for Pack files (#165).
+fn pack_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(oldbrainfix_core::APP_NAME, &[packs::EXTENSION])
 }
 
 /// The open dialog's filter for the zip of a Google Takeout export.
@@ -1697,8 +1965,6 @@ impl App {
             view: View::default(),
             error: None,
             scrolled: 0.0,
-            unfolded: HashSet::new(),
-            unfolded_of: None,
             viewer: None,
             table: None,
             table_amends: false,
@@ -1712,6 +1978,7 @@ impl App {
             quick_note_wanted: false,
             theme,
             theme_shown: false,
+            zoom_shown: false,
             open_url: None,
             url_opener: None,
             capture: String::new(),
@@ -1719,6 +1986,8 @@ impl App {
             edit_wanted: None,
             text: String::new(),
             text_of: None,
+            name: String::new(),
+            text_kinded: false,
             text_editing: false,
             text_focus: false,
             text_select: None,
@@ -1731,10 +2000,13 @@ impl App {
             editor: None,
             tally_form: None,
             tally_page: None,
+            session_draft: None,
             quick_open: false,
             badge: None,
+            reappear_line: None,
+            code_offer: None,
             start_lines: false,
-            tally_look: TallyLook::new(None),
+            tally_whose: HashMap::new(),
             lines: TypedLines::default(),
             card_menu: None,
             region: region_of(sys_locale::get_locale().as_deref()),
@@ -1744,6 +2016,7 @@ impl App {
             autostart: None,
             read_at,
             quiet_text: (String::new(), String::new()),
+            all_day_text: String::new(),
             hotkey: None,
             hotkey_text: String::new(),
             recorder: None,
@@ -1770,6 +2043,8 @@ impl App {
             arrived: 0,
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
+            syncing: None,
+            agenda_reads: None,
             unsorted_wanted: None,
             changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
@@ -1781,6 +2056,17 @@ impl App {
             import: FolderImport::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
+            pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
+            feedback_saver: Box::new(|title, name| {
+                rfd::FileDialog::new()
+                    .set_title(title)
+                    .add_filter("Text", &["txt"])
+                    .set_file_name(name)
+                    .save_file()
+            }),
+            feedback_facts: FeedbackFacts::of_this_computer(),
+            feedback: FeedbackForm::default(),
+            pack_opener: Box::new(|title| pack_dialog(title).pick_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
             }),
@@ -1821,6 +2107,7 @@ impl App {
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
             profile_defaults: Box::new(login::apply_system_defaults),
+            help_version: None,
             ai_port: None,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
@@ -2024,6 +2311,10 @@ impl App {
                     .and_then(|w| w.starter.clone())
                     .unwrap_or_default();
                 let picked: Vec<&str> = picked.iter().map(String::as_str).collect();
+                // Simple or Advanced, for all of the person's own Devices
+                // (#197).
+                let advanced = self.welcome.as_ref().is_some_and(|w| w.advanced);
+                PersonSettings::new(&self.store).set_advanced(advanced)?;
                 Places::new(&self.store).plant_starter_set(&picked)?;
                 self.welcomed()?;
             }
@@ -2138,6 +2429,32 @@ impl App {
         backup_view::restore_answered(&self.store)?;
         self.welcome = None;
         (self.profile_defaults)(&self.store)?;
+        // Right after the first start: the help Notes never made for this
+        // person, and no What's new (#180). Without them the start goes
+        // on, as at launch.
+        if let Err(e) = self.help_due(true) {
+            eprintln!("help Notes: {e}");
+        }
+        Ok(())
+    }
+
+    /// Makes the help Notes of `version` (#180) from now on: at once
+    /// when the first start's view is not due, which is then an ordinary
+    /// start and owes an update's What's new, else once it is answered.
+    pub fn set_help(&mut self, version: &str) -> oldbrainfix_core::Result<()> {
+        self.help_version = Some(version.to_string());
+        if self.welcoming() {
+            return Ok(());
+        }
+        self.help_due(false)
+    }
+
+    /// The help Notes due now, once the own Profile exists; `fresh` right
+    /// after the first start.
+    fn help_due(&self, fresh: bool) -> oldbrainfix_core::Result<()> {
+        if let Some(version) = &self.help_version {
+            help_notes::make_due(&self.store, &self.t, version, fresh)?;
+        }
         Ok(())
     }
 
@@ -2150,6 +2467,28 @@ impl App {
     /// file (#144).
     pub fn set_card_saver(&mut self, saver: FileSaver) {
         self.card_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save a Pack (#165).
+    pub fn set_pack_saver(&mut self, saver: FileSaver) {
+        self.pack_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save the text of Send feedback
+    /// (#214).
+    pub fn set_feedback_saver(&mut self, saver: FileSaver) {
+        self.feedback_saver = saver;
+    }
+
+    /// Hands in what Send feedback says of this computer (#214), for
+    /// tests and the guide's frames.
+    pub fn set_feedback_facts(&mut self, facts: FeedbackFacts) {
+        self.feedback_facts = facts;
+    }
+
+    /// Hands in the dialog asking which Pack to open (#165).
+    pub fn set_pack_opener(&mut self, opener: FolderPicker) {
+        self.pack_opener = opener;
     }
 
     /// Hands in the dialog asking where to save a calendar file.
@@ -2332,6 +2671,7 @@ impl App {
             list,
             |r| names.get(&r.id).cloned().unwrap_or_default(),
             self.store.now(),
+            DeviceSettings::new(&self.store).all_day_from()?,
         );
         let Some(mut path) =
             (self.calendar_saver)(t.calendar_file_save_title(), CALENDAR_FILE_NAME)
@@ -2589,12 +2929,17 @@ impl App {
         Ok(())
     }
 
-    /// Opens the file at `path`: a Profile card file (#144) opens the
-    /// person's Profile or says why nobody was added, a Sent Item shows
-    /// its preview, a stranger's held and hidden until "Show" (#91);
-    /// anything else is imported as a bundle. A card file is JSON as a
-    /// Sent Item is, so it is asked for first.
+    /// Opens the file at `path`: a Pack (#165) shows its tree, a Profile
+    /// card file (#144) opens the person's Profile or says why nobody was
+    /// added, a Sent Item shows its preview, a stranger's held and hidden
+    /// until "Show" (#91); anything else is imported as a bundle. A Pack
+    /// and a card file are JSON as a Sent Item is, so they are asked for
+    /// first, a Pack read whole, as it has no size limit.
     fn open_file(&mut self, path: &std::path::Path) {
+        if let Some(bytes) = pack_file_bytes(path) {
+            self.open_pack(&bytes);
+            return;
+        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
         let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= most);
         let bytes = if small {
@@ -2635,6 +2980,206 @@ impl App {
                 );
             }
         }
+    }
+
+    /// Opens the Pack `bytes` (#165): its tree, everything ticked, "Claim
+    /// as mine" ticked; or why it did not open, behind the click.
+    fn open_pack(&mut self, bytes: &[u8]) {
+        let t = self.t;
+        let (why, details) = match self.store.open_pack(bytes) {
+            Ok(Ok(opened)) => {
+                let ticks = opened.pack.all_keys();
+                self.dialog = Some(Dialog::PackOpened {
+                    opened: Box::new(opened),
+                    ticks,
+                    claim: true,
+                });
+                return;
+            }
+            Ok(Err(e)) => {
+                let why = match e {
+                    PackError::NeedsUpdate => {
+                        (t.sent_item_needs_update(), t.update_open_again_fix())
+                    }
+                    PackError::FromBlocked => (t.pack_from_blocked(), t.blocked_fix()),
+                    PackError::NotAPack => (t.pack_unreadable(), t.pack_ask_again_fix()),
+                };
+                (why, format!("pack: {}", e.name()))
+            }
+            Err(e) => (
+                (t.pack_unreadable(), t.pack_ask_again_fix()),
+                format!("pack: {e}"),
+            ),
+        };
+        self.announce_failure(t.pack_not_opened(), t.pack_not_opened_title(), why, details);
+    }
+
+    /// Export as Pack… on the Area, Topic or Note `from` (#165): the tree
+    /// of what it holds, ticked as an export starts. The desktop has no
+    /// Area Locks, so no Area is closed.
+    fn export_pack(&mut self, from: &str) -> oldbrainfix_core::Result<()> {
+        let pack = self.store.pack_of(from, &HashSet::new())?;
+        let ticks = pack.export_ticks();
+        self.dialog = Some(Dialog::PackExport {
+            pack: Box::new(pack),
+            ticks,
+            profile: false,
+        });
+        Ok(())
+    }
+
+    /// What was asked in a Pack's dialog (#165).
+    fn pack_action(&mut self, asked: PackAsk) -> oldbrainfix_core::Result<()> {
+        match asked {
+            PackAsk::Cancel => self.dialog = None,
+            PackAsk::Save => self.save_pack(),
+            PackAsk::Add => self.add_pack()?,
+            PackAsk::AddPerson => self.add_pack_person()?,
+        }
+        Ok(())
+    }
+
+    /// What was asked on the Send feedback page (#214): Mail opens the
+    /// mail link with the preview's text; the saves write it, or the
+    /// Notes ticked as a Pack, where the user says and say nothing, a
+    /// failure is announced; the first tick of Notes makes the Pack of
+    /// everything, nothing ticked. The desktop has no Area Locks.
+    fn feedback_action(&mut self, asked: FeedbackAsk) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let body = self.feedback.body(&self.feedback_facts);
+        let day = Day::today(self.store.now(), &*self.wall);
+        let written = match asked {
+            FeedbackAsk::Notes(on) => {
+                if on && self.feedback.pack.is_none() {
+                    self.feedback.pack = Some(self.store.pack_of_all(&HashSet::new())?);
+                }
+                self.feedback.notes = on;
+                return Ok(());
+            }
+            FeedbackAsk::Mail => {
+                self.open_url = Some(feedback_view::mail_url(&body));
+                return Ok(());
+            }
+            FeedbackAsk::SaveFile => {
+                let name = feedback_view::file_name(&day.to_string());
+                let Some(path) = (self.feedback_saver)(t.feedback_save_title(), &name) else {
+                    return Ok(());
+                };
+                std::fs::write(&path, body).map_err(|e| e.to_string())
+            }
+            FeedbackAsk::SavePack => {
+                let Some(pack) = self.feedback.picked() else {
+                    return Ok(());
+                };
+                let name = packs::file_name(day);
+                let Some(mut path) = (self.pack_saver)(t.pack_save_title(), &name) else {
+                    return Ok(());
+                };
+                if path.extension().is_none_or(|e| e != packs::EXTENSION) {
+                    path.set_extension(packs::EXTENSION);
+                }
+                match self.store.write_pack(pack, &self.feedback.ticks, false) {
+                    Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+        };
+        if let Err(e) = written {
+            self.announce_failure(
+                t.feedback_not_saved(),
+                t.feedback_not_saved_title(),
+                (t.feedback_file_cause(), t.nothing_lost_fix()),
+                format!("feedback: {e}"),
+            );
+        }
+        Ok(())
+    }
+
+    /// Save… in the export: the Pack as ticked, saved where the user
+    /// says, and the dialog closed; saved says nothing, a failure is
+    /// announced and the dialog stays.
+    fn save_pack(&mut self) {
+        let Some(Dialog::PackExport {
+            pack,
+            ticks,
+            profile,
+        }) = &self.dialog
+        else {
+            return;
+        };
+        let t = self.t;
+        let day = Day::today(self.store.now(), &*self.wall);
+        let Some(mut path) = (self.pack_saver)(t.pack_save_title(), &packs::file_name(day)) else {
+            return;
+        };
+        if path.extension().is_none_or(|e| e != packs::EXTENSION) {
+            path.set_extension(packs::EXTENSION);
+        }
+        let written = match self.store.write_pack(pack, ticks, *profile) {
+            Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
+            Err(e) => Err(e.to_string()),
+        };
+        match written {
+            Ok(()) => self.dialog = None,
+            Err(e) => self.announce_failure(
+                t.pack_not_saved(),
+                t.pack_not_saved_title(),
+                (t.pack_not_written_cause(), t.nothing_lost_fix()),
+                format!("pack: {e}"),
+            ),
+        }
+    }
+
+    /// Add on a Pack opened: the ticked Notes into new Areas, the dialog
+    /// closed, how many announced.
+    fn add_pack(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::PackOpened {
+            opened,
+            ticks,
+            claim,
+        }) = &self.dialog
+        else {
+            return Ok(());
+        };
+        let t = self.t;
+        let added = self.store.add_pack(
+            opened,
+            ticks,
+            *claim,
+            &*self.wall,
+            t.pack_suffix(),
+            t.pack_no_area(),
+        )?;
+        self.dialog = None;
+        self.notice = Some(t.pack_added(added.notes as i64));
+        Ok(())
+    }
+
+    /// "Add … to People" on a Pack opened: its Profile card taken in, the
+    /// dialog kept with the person in People now; a card that adds
+    /// nobody says why.
+    fn add_pack_person(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::PackOpened { opened, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        let (Some(card), Some(from)) = (opened.pack.card.clone(), opened.from.clone()) else {
+            return Ok(());
+        };
+        let taken = self.store.open_profile_card(&card, false)?.taken;
+        if !matches!(
+            taken,
+            CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged
+        ) {
+            self.announce_card_not_added(taken, format!("pack card: {}", taken.name()));
+            return Ok(());
+        }
+        if let Some(Dialog::PackOpened { opened, .. }) = &mut self.dialog {
+            opened.from_kept = true;
+        }
+        let t = self.t;
+        let name = profile_view::display_name(&t, &from.name);
+        self.notice = Some(t.pack_person_added(name));
+        Ok(())
     }
 
     /// Shows what opening a Profile card file came to: the person's
@@ -3284,6 +3829,102 @@ impl App {
         self.folder_wanted = Some(wanted);
     }
 
+    /// Shows the line under the menu bar while `syncing` runs (#225).
+    pub fn set_syncing(&mut self, syncing: Syncing) {
+        self.syncing = Some(syncing);
+    }
+
+    /// Reads the Agenda on a thread of its own from now on (#207), on the
+    /// store `open` hands it each time: a connection of its own to the
+    /// window's database. The window draws on meanwhile, the rows read
+    /// last showing; a read the log has changed since is dropped and read
+    /// again.
+    pub fn set_agenda_store(&mut self, open: impl Fn() -> Arc<Store> + Send + Sync + 'static) {
+        self.agenda_reads = Some(AgendaReads {
+            open: Arc::new(open),
+            shown: self.view.agenda.clone(),
+            running: None,
+            again: false,
+        });
+    }
+
+    /// Starts a read of the Agenda on its thread while it shows, or one
+    /// more after the read running.
+    fn read_agenda_aside(&mut self) {
+        if self.agenda_reads.is_none() || self.selection != Selection::Agenda {
+            return;
+        }
+        let system = match self.unit_system() {
+            Ok(system) => system,
+            Err(e) => {
+                self.error = Some(e.to_string());
+                return;
+            }
+        };
+        let (t, wall) = (self.t, self.wall.clone());
+        let Some(reads) = &mut self.agenda_reads else {
+            return;
+        };
+        if reads.running.is_some() {
+            reads.again = true;
+            return;
+        }
+        let (sent, arrives) = std::sync::mpsc::channel();
+        let open = reads.open.clone();
+        std::thread::spawn(move || {
+            let store = open();
+            let before = store.current_seq().ok();
+            let read = read_agenda(&store, &t, &*wall, system);
+            let wrote = read.as_ref().map_or(true, |(_, seq)| before != Some(*seq));
+            drop(sent.send((read, wrote)));
+        });
+        reads.running = Some(arrives);
+    }
+
+    /// Shows the Agenda's read from its thread once it is in, unless the
+    /// log changed since it was read: then it reads again (#207). The
+    /// window looks again shortly while it runs.
+    fn agenda_arrived(&mut self, ctx: &egui::Context) {
+        let Some(reads) = &mut self.agenda_reads else {
+            return;
+        };
+        let Some(running) = &reads.running else {
+            return;
+        };
+        let (read, wrote) = match running.try_recv() {
+            Ok(arrived) => arrived,
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(std::time::Duration::from_millis(30));
+                return;
+            }
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                reads.running = None;
+                return;
+            }
+        };
+        reads.running = None;
+        // Today's picks written there: this connection reads them anew,
+        // which is no reason to read the Agenda again.
+        if wrote {
+            self.store.changed_elsewhere();
+        }
+        match read {
+            Ok((view, seq)) if self.store.current_seq().ok() == Some(seq) => {
+                if self.selection == Selection::Agenda {
+                    self.view.agenda = Some(view.clone());
+                }
+                reads.shown = Some(view);
+            }
+            Ok(_) => reads.again = true,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        let again = std::mem::take(&mut reads.again);
+        if again {
+            self.read_agenda_aside();
+        }
+        ctx.request_repaint();
+    }
+
     /// Shows Unsorted, what the phone's Nudge screen shows, whenever a
     /// click on the Nudge raised `wanted`.
     pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
@@ -3593,6 +4234,15 @@ impl App {
             theme::prefer(ctx, self.theme);
             ctx.request_repaint();
         }
+        // The same for the zoom (#224): set every frame it would undo
+        // Ctrl+Plus and Ctrl+Minus.
+        if !std::mem::replace(&mut self.zoom_shown, true) {
+            let bigger = DeviceSettings::new(&self.store)
+                .fat_fingers()
+                .unwrap_or(false);
+            ctx.set_zoom_factor(if bigger { BIGGER_ZOOM } else { 1.0 });
+            ctx.request_repaint();
+        }
     }
 
     /// Whether File ▸ Quick note was picked since asked last: the capture
@@ -3654,15 +4304,19 @@ impl App {
             }
             _ => None,
         };
-        // Each Note opened is looked at afresh; a page of another Note's
-        // Tally goes.
-        if self.tally_look.of != self.selected_note {
-            self.tally_look = TallyLook::new(self.selected_note.clone());
-        }
-        if self
+        // A page of a Note's Tally goes with its Note, opened from its
+        // card or its dialog (#190).
+        let form_note = self
             .tally_form
             .as_ref()
-            .is_some_and(|f| !f.capturing() && Some(f.note_id()) != self.selected_note.as_deref())
+            .filter(|f| !f.capturing())
+            .map(|f| f.note_id().to_string());
+        if let Some(id) = form_note
+            && !Notes::new(&self.store)
+                .by_id(&id)
+                .ok()
+                .flatten()
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged())
         {
             self.tally_form = None;
         }
@@ -3697,6 +4351,29 @@ impl App {
             Ok(view) => {
                 self.view = view;
                 self.error = None;
+                // The page's draft of a Session Note, read again with it
+                // (#191); its tag filter stays while the page is open
+                // (#220).
+                let picked = self
+                    .session_draft
+                    .take()
+                    .map(|d| d.picked)
+                    .unwrap_or_default();
+                self.session_draft = match &self.view.session_setup {
+                    Some(setup) => {
+                        match SessionDraft::of(&self.store, &self.t, &setup.note_id, Some(setup)) {
+                            Ok(mut draft) => {
+                                draft.picked = picked;
+                                Some(draft)
+                            }
+                            Err(e) => {
+                                self.error = Some(e.to_string());
+                                None
+                            }
+                        }
+                    }
+                    None => None,
+                };
                 // Only cards still shown stay selected (#148): none hidden
                 // by a search, or filed out of the list, moves unseen.
                 let shown = self.shown_cards();
@@ -3764,16 +4441,16 @@ impl App {
         if let Ok(quiet) = DeviceSettings::new(&self.store).quiet_hours() {
             self.quiet_text = (quiet.start.to_string(), quiet.end.to_string());
         }
-        // What a click unfolded stays while its list shows.
-        let cards = self.cards_key();
-        if cards != self.unfolded_of {
-            self.unfolded.clear();
-            self.unfolded_of = cards;
+        if let Ok(from) = DeviceSettings::new(&self.store).all_day_from() {
+            self.all_day_text = from.to_string();
         }
         let shown = self.view.detail.as_ref().map(|(p, _)| &p.note);
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
-            self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
+            let stored = shown.map(|n| n.text.clone()).unwrap_or_default();
             self.text_of = shown.map(|n| n.id.clone());
+            self.text_kinded = kinded;
+            self.put_typed(stored);
             self.text_editing = false;
             self.text_focus = false;
             self.text_select = None;
@@ -3781,6 +4458,12 @@ impl App {
             self.amend_focus = false;
             self.amend_select = None;
             self.section_texts.clear();
+        } else if kinded != self.text_kinded {
+            // Its kind changed while it shows: what is typed stays, now
+            // as the other kind holds it.
+            let typed = self.typed_text();
+            self.text_kinded = kinded;
+            self.put_typed(typed);
         }
         // Each Section this Device may edit has its field (#183), none
         // while the Note is in the trash; what is typed in one stays as
@@ -3807,6 +4490,8 @@ impl App {
             self.text_editing = true;
             self.text_focus = true;
         }
+        // The Agenda as it is now, on its thread where it has one (#207).
+        self.read_agenda_aside();
         self.kick();
     }
 
@@ -3936,48 +4621,9 @@ impl App {
             Selection::Trash => notes.trashed()?,
         };
         let store = &self.store;
-        let place = |note: Note| -> oldbrainfix_core::Result<Placed> {
-            let author = store.author_of(&note.id)?;
-            let Some(id) = note.place.clone() else {
-                return Ok(Placed {
-                    note,
-                    area: None,
-                    topic: None,
-                    author,
-                });
-            };
-            let topic = places.topic_by_id(&id)?;
-            let area_id = topic.as_ref().map_or(id, |t| t.area_id.clone());
-            Ok(Placed {
-                note,
-                area: places.area_by_id(&area_id)?,
-                topic,
-                author,
-            })
-        };
+        let place = |note: Note| place_note(store, &places, note);
         let frogs = Frogs::new(store);
-        let show_frog = |frog: Frog| -> oldbrainfix_core::Result<Option<FrogShown>> {
-            // A Frog whose Note is gone for good shows nowhere.
-            let Some(note) = frogs.note(&frog)? else {
-                return Ok(None);
-            };
-            let area = place(note.clone())?.area;
-            Ok(Some(FrogShown {
-                may_check: store.may_check_off(&frog.id)?,
-                manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
-                done_on: frog.done.map(|at| Day::of((self.wall)(at))),
-                frog,
-                note,
-                area,
-            }))
-        };
-        let shown_frogs = |list: Vec<Frog>| -> oldbrainfix_core::Result<Vec<FrogShown>> {
-            let mut out = Vec::new();
-            for frog in list {
-                out.extend(show_frog(frog)?);
-            }
-            Ok(out)
-        };
+        let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, &*self.wall, list);
         let detail = match &self.selected_note {
             Some(id) => match notes.by_id(id)? {
                 Some(note) if !note.is_merged() => Some((place(note)?, notes.sections(id)?)),
@@ -3996,6 +4642,13 @@ impl App {
         } else {
             notes.sections_of(&listed)?
         };
+        // A Note in the trash ticks nothing.
+        let card_today = if listed.is_empty() || self.selection == Selection::Trash {
+            HashMap::new()
+        } else {
+            let today = routines.today_by_note(&*self.wall)?;
+            card_occurrences::read(store, today, &listed)?
+        };
         let lists = Checklists::new(store);
         let mut checklists = BTreeMap::new();
         if !listed.is_empty() {
@@ -4010,6 +4663,22 @@ impl App {
             for (id, list) in shopping.of_notes(&listed, &*self.wall)? {
                 let checks = shopping.may_check(&id)?;
                 shopping_lists.insert(id, (list, checks));
+            }
+        }
+        // A Tally wins over a list (ADR 0030).
+        let mut tallies = HashSet::new();
+        let tally_notes = Tallies::new(store);
+        for id in &listed {
+            if tally_notes.is_tally(id)? {
+                tallies.insert(id.clone());
+            }
+        }
+        // A Tally wins over a Session too (ADR 0039).
+        let session_notes = Sessions::new(store);
+        let mut sessions = HashSet::new();
+        for id in listed.iter().filter(|id| !tallies.contains(*id)) {
+            if session_notes.is_session_note(id)? {
+                sessions.insert(id.clone());
             }
         }
         let mut card_changes = HashSet::new();
@@ -4037,12 +4706,66 @@ impl App {
         }
         let (box_looks, box_ticks, show_ticks) = self.box_looks(&texts)?;
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
-        let compact = match cards_key(&self.selection, &self.people, is_area) {
-            Some(key) => {
-                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true")
-            }
-            None => false,
+        let (compact, switched) = match cards_key(&self.selection, &self.people, is_area) {
+            Some(key) => (
+                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true"),
+                self.store
+                    .local_setting(&switched_setting(&key))?
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_string)
+                    .collect(),
+            ),
+            None => (false, HashSet::new()),
         };
+        let glances = card_glance::read(store, &self.t, &*self.wall, self.unit_system()?, &listed)?;
+        // The Tallies on a detailed card, with their chart and entries
+        // (#190).
+        let mut card_tallies = HashMap::new();
+        for id in listed.iter().filter(|id| tallies.contains(*id)) {
+            if compact != switched.contains(id) {
+                continue;
+            }
+            let whose = self.tally_whose.get(id);
+            if let Some(shown) =
+                tally_view::read(store, id, whose, self.unit_system()?, &*self.wall)?
+            {
+                card_tallies.insert(id.clone(), shown);
+            }
+        }
+        // The Sessions on a detailed card, with their pool, today's picks
+        // and last weeks (#191); today's picks as the Agenda shows them,
+        // written there, not here.
+        let detailed: Vec<&String> = listed
+            .iter()
+            .filter(|id| sessions.contains(*id) && compact == switched.contains(*id))
+            .collect();
+        let mut card_sessions = HashMap::new();
+        if !detailed.is_empty() {
+            let mut today = session_notes.today(&*self.wall)?;
+            for id in detailed {
+                let Some(setup) = session_notes.setup_of(id)? else {
+                    continue;
+                };
+                let (own, rest) = today.into_iter().partition(|o| o.session.note_id() == *id);
+                today = rest;
+                let wall: &oldbrainfix_core::WallClock = &*self.wall;
+                let shown = (self.unit_system()?, wall);
+                let card = SessionCardShown::read(store, &self.t, &setup, own, shown)?;
+                card_sessions.insert(id.clone(), card);
+            }
+        }
+        let kept_open = |prefix: &str| -> oldbrainfix_core::Result<HashSet<String>> {
+            Ok(store
+                .local_settings_with_prefix(prefix)?
+                .into_iter()
+                .filter(|(_, v)| v == "true")
+                .filter_map(|(k, _)| k.strip_prefix(prefix).map(str::to_string))
+                .collect())
+        };
+        let struck_shown = kept_open(STRUCK_SHOWN)?;
+        let descriptions_unfolded = kept_open(DESCRIPTION_UNFOLDED)?;
         let (note_routines, newer_routines) = match &detail {
             Some((p, _)) if !p.note.is_trashed() => (
                 routines.of_note(&p.note.id)?,
@@ -4050,6 +4773,16 @@ impl App {
             ),
             _ => (Vec::new(), 0),
         };
+        let mut open = Vec::new();
+        if let Some((p, _)) = &detail
+            && !p.note.is_trashed()
+        {
+            for o in Alarms::new(store).open_of(&p.note.id, &*self.wall)? {
+                if store.may_check_off(&o.routine.id)? {
+                    open.push(o);
+                }
+            }
+        }
         let mut note_frogs = Vec::new();
         if let Some((p, _)) = &detail
             && !p.note.is_trashed()
@@ -4063,7 +4796,7 @@ impl App {
             Some((p, _)) if !p.note.is_trashed() => tally_view::read(
                 store,
                 &p.note.id,
-                &self.tally_look,
+                self.tally_whose.get(&p.note.id),
                 self.unit_system()?,
                 &*self.wall,
             )?,
@@ -4092,6 +4825,29 @@ impl App {
                 shopping.may_make(&p.note.id)?,
             ),
             _ => (None, false),
+        };
+        let switches_list = match &detail {
+            Some((p, _)) => shopping.may_switch(&p.note.id)?,
+            None => false,
+        };
+        let kind = match &detail {
+            Some((p, _)) => Some(NoteKind::of(store, &p.note.id)?),
+            None => None,
+        };
+        // A Session Note becomes no list (ADR 0039).
+        let makes_checklist = makes_checklist && kind != Some(NoteKind::Session);
+        let makes_shopping = makes_shopping && kind != Some(NoteKind::Session);
+        // Its setup only while it is a Session: an older one spawned from
+        // a Tally stays a Tally (ADR 0039).
+        let session_setup = match &detail {
+            Some((p, _)) if kind == Some(NoteKind::Session) && !p.note.is_trashed() => {
+                session_notes.setup_of(&p.note.id)?
+            }
+            _ => None,
+        };
+        let makes_session = match &detail {
+            Some((p, _)) => may.changes && !p.note.is_trashed() && !p.note.is_merged(),
+            None => false,
         };
         let mut removable = HashSet::new();
         let mut text_removable = HashSet::new();
@@ -4148,177 +4904,12 @@ impl App {
             }
         }
         let agenda = match self.selection {
-            Selection::Agenda => {
-                let wall = &*self.wall;
-                // Read as the Agenda shows, never while it is drawn, and
-                // before the rows read their Done: today's picks are
-                // written for everyone the Session reaches when they are
-                // new (ADR 0029), and reading again writes nothing.
-                let sessions = Sessions::new(store);
-                let system = self.unit_system()?;
-                let mut picked = HashMap::new();
-                for today in sessions.pick_today(wall)? {
-                    let key = (today.session.id().to_string(), today.occurrence.key());
-                    picked.insert(key, PicksShown::read(store, &self.t, today, system)?);
-                }
-                let counts: HashMap<String, _> = sessions
-                    .all()?
-                    .into_iter()
-                    .map(|s| (s.id().to_string(), s))
-                    .collect();
-                let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
-                // The rows' Notes that are Checklists, read in one pass so
-                // only their rows read their Lines for the Occurrence.
-                let row_notes: Vec<String> = agenda
-                    .today_rows
-                    .iter()
-                    .chain(&agenda.tomorrow_rows)
-                    .chain(agenda.later_rows.iter().flatten())
-                    .filter_map(|row| row.note.as_ref().map(|n| n.id.clone()))
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect();
-                let list_notes: HashSet<String> = if row_notes.is_empty() {
-                    HashSet::new()
-                } else {
-                    lists.of_notes(&row_notes)?.into_keys().collect()
-                };
-                let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
-                    let area = match &row.note {
-                        Some(note) => place(note.clone())?.area,
-                        None => None,
-                    };
-                    let key = (row.routine.id.clone(), row.occurrence.key());
-                    let session = match picked.get(&key) {
-                        Some(shown) => Some(SessionPart::Today(Box::new(shown.clone()))),
-                        None => counts
-                            .get(&row.routine.id)
-                            .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
-                    };
-                    // A Session's picks win over Lines.
-                    let mut lines = None;
-                    if session.is_none()
-                        && row
-                            .note
-                            .as_ref()
-                            .is_some_and(|n| list_notes.contains(&n.id))
-                    {
-                        let on = RoutineOccurrence {
-                            routine_id: row.routine.id.clone(),
-                            occurrence: row.occurrence,
-                        };
-                        if let Some(list) = lists.for_occurrence(&on)?
-                            && list.count() > 0
-                        {
-                            lines = Some((list, store.may_check_off(&row.routine.id)?));
-                        }
-                    }
-                    Ok(Row {
-                        row,
-                        area,
-                        session,
-                        lines,
-                    })
-                };
-                let mut later = Vec::new();
-                for (i, rows) in agenda.later_rows.iter().enumerate() {
-                    let rows = rows
-                        .iter()
-                        .cloned()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?;
-                    later.push((agenda.later(i), rows));
-                }
-                // Read as the Agenda shows, never while it is drawn:
-                // today's pick is written for the user's own Devices when
-                // it is new, and reading again writes nothing.
-                let today = frogs.pick_today(wall)?;
-                let frog_rows = shown_frogs(today.shown.clone())?;
-                let mut shopping_rows = Vec::new();
-                for shown in shopping.agenda_rows(wall)? {
-                    let Some(note) = notes.by_id(&shown.list.note_id)? else {
-                        continue;
-                    };
-                    let title = match row_title(&self.t, Some(&note)).lines().next() {
-                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
-                        _ => self.t.shopping_heading().to_string(),
-                    };
-                    let checks = shopping.may_check(&note.id)?;
-                    let area = place(note.clone())?.area;
-                    let row = |line: Option<ShoppingLine>, text: String| ShoppingRow {
-                        note_id: note.id.clone(),
-                        area: area.clone(),
-                        title: title.clone(),
-                        line,
-                        text,
-                        checks,
-                    };
-                    // As this person chose for the list (#186); one kept
-                    // off is not among them.
-                    let count = shown.lines.len() as i64;
-                    match shown.shows {
-                        ShoppingOnAgenda::Lines => {
-                            for line in shown.lines {
-                                let text = line.text.clone();
-                                shopping_rows.push(row(Some(line), text));
-                            }
-                        }
-                        ShoppingOnAgenda::Count => {
-                            shopping_rows.push(row(None, self.t.shopping_row_open(&title, count)));
-                        }
-                        ShoppingOnAgenda::Off => {}
-                    }
-                }
-                let mut checklist_rows = Vec::new();
-                for list in lists.agenda()? {
-                    let Some(note) = notes.by_id(&list.note_id)? else {
-                        continue;
-                    };
-                    let title = match row_title(&self.t, Some(&note)).lines().next() {
-                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
-                        _ => self.t.checklist_heading().to_string(),
-                    };
-                    let (open, count) = (list.open_count() as i64, list.count() as i64);
-                    checklist_rows.push(ChecklistRow {
-                        area: place(note.clone())?.area,
-                        text: self.t.checklist_row_open(&title, open, count),
-                        note_id: note.id,
-                    });
-                }
-                Some(AgendaView {
-                    later,
-                    shopping: shopping_rows,
-                    checklists: checklist_rows,
-                    today: agenda
-                        .today_rows
-                        .into_iter()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?,
-                    tomorrow: agenda
-                        .tomorrow_rows
-                        .into_iter()
-                        .map(row)
-                        .collect::<oldbrainfix_core::Result<_>>()?,
-                    missed: Alarms::new(&self.store).missed(wall)?,
-                    unsorted: notes.unsorted()?.len(),
-                    // Counted from the pending sets, without reading each
-                    // held file.
-                    waiting: self
-                        .store
-                        .pending_sets()?
-                        .iter()
-                        .filter(|s| s.kind == sent::PENDING_KIND)
-                        .count(),
-                    offers: self
-                        .store
-                        .pending_sets()?
-                        .iter()
-                        .filter(|s| s.kind == offers::PENDING_KIND)
-                        .count(),
-                    frogs: Some(today),
-                    frog_rows,
-                })
-            }
+            // Read on a thread of its own where the window has one, the
+            // last rows showing meanwhile (#207).
+            Selection::Agenda => match &self.agenda_reads {
+                Some(reads) => reads.shown.clone(),
+                None => Some(read_agenda(store, &self.t, &*self.wall, self.unit_system()?)?.0),
+            },
             _ => None,
         };
         let ai_task = self.store.ai_task()?;
@@ -4415,20 +5006,31 @@ impl App {
             sections,
             checklists,
             shopping_lists,
+            tallies,
+            card_tallies,
+            sessions,
+            card_sessions,
             card_changes,
             box_looks,
             box_ticks,
             show_ticks,
             compact,
+            switched,
+            glances,
+            struck_shown,
+            descriptions_unfolded,
             detail,
             capture_spawns: capture_choices::may_spawn(
                 &self.store,
                 self.capture_place().as_deref(),
             )?,
             list_manages: capture_choices::may_spawn(&self.store, self.list_place().as_deref())?,
+            advanced: PersonSettings::new(&self.store).advanced()?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
             capture_quick: QuickNote::read(&self.store)?,
             routines: note_routines,
+            open,
+            card_today,
             newer_routines,
             note_frogs,
             tally,
@@ -4436,6 +5038,10 @@ impl App {
             makes_checklist,
             shopping: shopping_shown,
             makes_shopping,
+            switches_list,
+            kind,
+            session_setup,
+            makes_session,
             frogs_open,
             all_routines,
             all_newer,
@@ -4527,7 +5133,12 @@ impl App {
                 self.save_text()?;
                 self.pages = vec![page];
             }
-            Action::PageInto(page) => self.pages.push(page),
+            Action::PageInto(page) => {
+                if page == Page::Feedback {
+                    self.feedback = FeedbackForm::default();
+                }
+                self.pages.push(page);
+            }
             Action::PageBack => {
                 self.pages.pop();
             }
@@ -4720,8 +5331,29 @@ impl App {
             Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
             Action::OpenTable(opening) => self.open_table(opening)?,
             Action::Table(asked) => self.table_asked(asked)?,
-            Action::Unfold(id) => {
-                self.unfolded.insert(id);
+            Action::Fold(setting, open) => {
+                // Nothing kept means folded, the default.
+                if open {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
+            Action::SwitchView(id) => {
+                if let Some(key) = self.cards_key() {
+                    let mut switched = self.view.switched.clone();
+                    if !switched.remove(&id) {
+                        switched.insert(id);
+                    }
+                    let setting = switched_setting(&key);
+                    if switched.is_empty() {
+                        self.store.remove_local_setting(&setting)?;
+                    } else {
+                        let mut ids: Vec<&str> = switched.iter().map(String::as_str).collect();
+                        ids.sort_unstable();
+                        self.store.set_local_setting(&setting, &ids.join(","))?;
+                    }
+                }
             }
             Action::Theme(choice) => {
                 // Shown even when it cannot be kept.
@@ -4738,8 +5370,9 @@ impl App {
                     } else {
                         self.store.remove_local_setting(&setting)?;
                     }
+                    // Every card shows that view again.
+                    self.store.remove_local_setting(&switched_setting(&key))?;
                 }
-                self.unfolded.clear();
             }
             Action::Speech(asked) => {
                 if let Some(speech) = &self.speech {
@@ -4757,6 +5390,10 @@ impl App {
             Action::SaveText => self.save_text()?,
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
+            Action::SetTextFormat(format) => self.set_text_format(format)?,
+            Action::OfferCode(offer) => {
+                self.code_offer = offer.then(|| self.text_of.clone()).flatten()
+            }
             Action::AskLink {
                 start,
                 end,
@@ -4969,11 +5606,16 @@ impl App {
                 if done {
                     routines.unmark_done(&routine, &occurrence)?;
                 } else {
-                    routines.mark_done(&routine, &occurrence, None)?;
+                    self.check_off(&routine, &occurrence)?;
                 }
             }
-            Action::CheckMissed(routine, occurrence) => {
-                Routines::new(&self.store).mark_done(&routine, &occurrence, None)?;
+            Action::CheckMissed(routine, occurrence) => self.check_off(&routine, &occurrence)?,
+            Action::DoneAndTrash(routine, occurrence) => {
+                self.leave_note()?;
+                let routines = Routines::new(&self.store);
+                routines.mark_done(&routine, &occurrence, None)?;
+                // The Reminder goes with it, and comes back with it.
+                routines.trash_note(&selected, true)?;
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -5005,12 +5647,9 @@ impl App {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                    let mut editor = RoutineEditor::edit(&routine, note, today, renag);
-                    if let Some(session) = Sessions::new(&self.store).by_id(&id)? {
-                        let draft = SessionDraft::of(&self.store, &self.t, &id, Some(&session))?;
-                        editor = editor.with_session(draft, Some(session));
-                    }
-                    self.editor = Some(editor);
+                    // A Routine of a Session Note only schedules it: the
+                    // setup lies on the Note, on its page (#191).
+                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
                     self.tally_form = None;
                 }
             }
@@ -5031,6 +5670,15 @@ impl App {
                 ));
             }
             Action::NewSession(id) => {
+                // A Routine of a Session Note runs it already (#191).
+                if let Some(note) = &id
+                    && Sessions::new(&self.store).is_session_note(note)?
+                {
+                    return self.act(Action::NewRoutine {
+                        note: id,
+                        reminder: false,
+                    });
+                }
                 self.save_text()?;
                 let note = match &id {
                     Some(id) => Notes::new(&self.store).by_id(id)?,
@@ -5042,9 +5690,53 @@ impl App {
                 let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
                 self.tally_form = None;
                 let editor = RoutineEditor::new(note, false, self.store.now(), &*self.wall, renag);
-                self.editor = Some(editor.with_session(draft, None));
+                self.editor = Some(editor.with_session(draft));
             }
             Action::Session(asked) => self.session_action(asked)?,
+            Action::MakeSession(id) => {
+                self.save_text()?;
+                let Some(note) = Notes::new(&self.store).by_id(&id)? else {
+                    return Ok(());
+                };
+                let draft = SessionDraft::of(&self.store, &self.t, &id, None)?;
+                let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                let now = self.store.now();
+                self.tally_form = None;
+                self.editor = Some(RoutineEditor::make_session(
+                    note,
+                    draft,
+                    now,
+                    &*self.wall,
+                    renag,
+                ));
+            }
+            Action::UnmakeSession(id) => {
+                // A sync while the dialog was open may have changed it.
+                if Sessions::new(&self.store).is_session_note(&id)? {
+                    self.save_text()?;
+                    Sessions::new(&self.store).unmake(&id)?;
+                }
+            }
+            Action::SessionSetup(changed) => {
+                let (draft, setup) = *changed;
+                draft.write(&self.store, &setup)?;
+            }
+            Action::SessionPoolTally => {
+                let Some(setup) = &self.view.session_setup else {
+                    return Ok(());
+                };
+                let place = Notes::new(&self.store)
+                    .by_id(&setup.note_id)?
+                    .and_then(|n| n.place);
+                self.save_text()?;
+                let system = self.unit_system()?;
+                let text = self
+                    .session_draft
+                    .as_ref()
+                    .map(SessionDraft::new_tally_text)
+                    .unwrap_or_default();
+                self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
+            }
             Action::Editor(intent) => match intent {
                 Intent::Save => match &mut self.editor {
                     // Set up for the Note being captured: held with it.
@@ -5070,7 +5762,13 @@ impl App {
                 Intent::Session(SessionIntent::NewTally) => {
                     let place = self.editor.as_ref().and_then(|e| e.place.clone());
                     let system = self.unit_system()?;
-                    self.tally_page = Some(TallyPage::new(place, true, system));
+                    let text = self
+                        .editor
+                        .as_ref()
+                        .and_then(RoutineEditor::session)
+                        .map(SessionDraft::new_tally_text)
+                        .unwrap_or_default();
+                    self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
                 }
                 Intent::Delete => {
                     let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);
@@ -5112,7 +5810,8 @@ impl App {
                 }
             }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
-            Action::Tally(asked) => self.tally_action(asked)?,
+            Action::Tally(asked) => self.tally_action(None, asked)?,
+            Action::CardTally(note, asked) => self.tally_action(Some(note), asked)?,
             Action::TallyForm(intent) => self.tally_form_action(intent)?,
             Action::DeleteEntry => {
                 if let Some(Dialog::DeleteEntry { id }) = self.dialog.take() {
@@ -5149,6 +5848,39 @@ impl App {
                     lines.push((tick.state, said));
                 }
                 self.dialog = Some(Dialog::BoxHistory { lines });
+            }
+            Action::NoteHistory(note) => {
+                self.save_text()?;
+                let rows = note_history_view::rows(&self.store, &self.t, &note)?;
+                self.dialog = Some(Dialog::NoteHistory { note, rows });
+            }
+            Action::UseVersion(at) => {
+                let Some(Dialog::NoteHistory { note, rows }) = &self.dialog else {
+                    return Ok(());
+                };
+                let Some(row) = rows.get(at) else {
+                    return Ok(());
+                };
+                let (note, change) = (note.clone(), row.change.clone());
+                let history = NoteHistory::new(&self.store);
+                // A sync since the dialog opened may have changed it.
+                if !history.may_use(&note, &change)? {
+                    return Ok(());
+                }
+                history.use_version(&note, &change)?;
+                let now = self
+                    .store
+                    .current(&change.entity, oldbrainfix_core::notes::keys::TEXT)?;
+                let now = oldbrainfix_core::text_format::StoredText::read(now.as_deref()).text;
+                if self.text_of.as_deref() == Some(change.entity.as_str()) {
+                    self.put_typed(now);
+                } else if let Some(field) = self.section_texts.get_mut(&change.entity) {
+                    // A Section's field shows the text it has now, or the
+                    // next save would put the old one back (#183).
+                    field.text = now;
+                }
+                let rows = note_history_view::rows(&self.store, &self.t, &note)?;
+                self.dialog = Some(Dialog::NoteHistory { note, rows });
             }
             Action::ShowTicks { note, on } => {
                 self.store
@@ -5258,6 +5990,29 @@ impl App {
             Action::SaveAsMarkdown(id) => {
                 self.save_text()?;
                 self.save_as_markdown(&id)?;
+            }
+            Action::ExportPack(from) => {
+                self.save_text()?;
+                self.export_pack(&from)?;
+            }
+            Action::Pack(asked) => self.pack_action(asked)?,
+            Action::Feedback(asked) => self.feedback_action(asked)?,
+            Action::OpenPack => {
+                if let Some(path) = (self.pack_opener)(self.t.pack_open_title()) {
+                    self.open_file(&path);
+                }
+            }
+            Action::AskRemovePackFrom(note) => {
+                if let Some(from) = self.store.pack_from(&note)? {
+                    let name = profile_view::display_name(&self.t, &from.name).to_string();
+                    self.dialog = Some(Dialog::RemovePackFrom { note, name });
+                }
+            }
+            Action::RemovePackFrom(note) => {
+                if matches!(self.dialog, Some(Dialog::RemovePackFrom { .. })) {
+                    self.dialog = None;
+                }
+                self.store.remove_pack_from(&note)?;
             }
             Action::AcceptSent => match self.dialog.take() {
                 Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
@@ -5512,7 +6267,7 @@ impl App {
                 // (ADR 0033).
                 let written = notes.take_over(&note, generated, append)?;
                 if self.text_of.as_deref() == Some(note.as_str()) {
-                    self.text = written;
+                    self.put_typed(written);
                 } else if let Some(field) = self.section_texts.get_mut(&note) {
                     // A Section's field shows the text it has now, or the
                     // next save would put the old one back (#183).
@@ -5707,11 +6462,11 @@ impl App {
                     }
                 }
             }
-            ChecklistAction::ShowOnAgenda(note, on) => {
+            ChecklistAction::OnAgenda(note, shows) => {
                 let lists = Checklists::new(&self.store);
                 // A Routine may have come meanwhile.
                 if lists.may_show_on_agenda(&note)? {
-                    lists.set_show_on_agenda(&note, on)?;
+                    lists.set_on_agenda(&note, shows)?;
                 }
             }
             ChecklistAction::Check(line, checked, on) => {
@@ -5736,8 +6491,11 @@ impl App {
             }
             ChecklistAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ChecklistAction::Step(id, step) => {
-                // What was typed is stored first, so the step sees the
-                // list as shown.
+                // A new Line is stored first, and what was typed, so the
+                // step sees the list as shown (#202).
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &id)? else {
+                    return Ok(());
+                };
                 self.lines.keep(&self.store, &*self.wall)?;
                 let Some((list, line)) = self.line_of(&id)? else {
                     return Ok(());
@@ -5792,11 +6550,19 @@ impl App {
             }
             ShoppingAction::Typed(asked) => self.lines.typing(&self.store, &*self.wall, asked)?,
             ShoppingAction::Step(id, step) => {
+                // A new Line is stored first, and what was typed (#202).
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &id)? else {
+                    return Ok(());
+                };
                 self.lines.keep(&self.store, &*self.wall)?;
                 if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
                     return Ok(());
                 }
                 match step {
+                    ShopStep::PickReappear => {
+                        self.reappear_line = Some(id);
+                        self.badge = Some(NoteBadge::Reappear);
+                    }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
                     ShopStep::Delete => {
                         self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
@@ -5825,7 +6591,24 @@ impl App {
         }
         let lists = Checklists::new(&self.store);
         let shopping = ShoppingLists::new(&self.store);
+        // The other list switches, its Lines carried over (#188).
+        let other_list = match kind {
+            Kind::Checklist => shopping.is_shopping_list(note)?,
+            Kind::ShoppingList => lists.is_checklist(note)?,
+            Kind::Plain => false,
+        };
         match kind {
+            Kind::Checklist | Kind::ShoppingList if other_list => {
+                if !shopping.may_switch(note)? {
+                    return Ok(());
+                }
+                shopping.switch_list(note, &*self.wall)?;
+                // Its rows start again from the Lines of the new list, what
+                // was typed kept above.
+                if shown {
+                    self.lines = TypedLines::default();
+                }
+            }
             Kind::Checklist => {
                 if !lists.may_make(note)? {
                     return Ok(());
@@ -5854,7 +6637,9 @@ impl App {
             }
         }
         if shown && let Some(now) = Notes::new(&self.store).by_id(note)? {
-            self.text = now.text;
+            // Of the kind it is now, the view read again only after.
+            self.text_kinded = NoteKind::of(&self.store, note)? != NoteKind::Plain;
+            self.put_typed(now.text);
         }
         Ok(())
     }
@@ -6058,7 +6843,7 @@ impl App {
             table.take_stored(stored.clone(), at);
         }
         if self.text_of.as_deref() == Some(note.as_str()) {
-            self.text = stored;
+            self.put_typed(stored);
         } else if let Some(field) = self.section_texts.get_mut(&note) {
             field.text = stored;
         }
@@ -6086,11 +6871,18 @@ impl App {
         Ok(line.map(|line| (list, line)))
     }
 
-    /// Does what was asked of the Tally part of the Note's editor (#103).
-    fn tally_action(&mut self, asked: TallyAction) -> oldbrainfix_core::Result<()> {
+    /// Does what was asked of the Tally of the Note `on`, of its card,
+    /// or of the selected Note's setup (#103, #190).
+    fn tally_action(
+        &mut self,
+        on: Option<String>,
+        asked: TallyAction,
+    ) -> oldbrainfix_core::Result<()> {
         let tallies = Tallies::new(&self.store);
         let system = self.unit_system()?;
-        let note = self.selected_note.clone().unwrap_or_default();
+        let note = on
+            .or_else(|| self.selected_note.clone())
+            .unwrap_or_default();
         match asked {
             TallyAction::Make(id) => {
                 self.save_text()?;
@@ -6099,15 +6891,19 @@ impl App {
                     Some(TallyForm::Field(FieldForm::new(&id, None, system, &self.t)));
             }
             TallyAction::OpenField(field) => {
-                let field = match field {
-                    Some(id) => tallies.by_note(&note)?.and_then(|t| t.field(&id).cloned()),
-                    None => None,
+                let tally = tallies.by_note(&note)?;
+                let field = match (field, &tally) {
+                    (Some(id), Some(tally)) => tally.field(&id).cloned(),
+                    _ => None,
                 };
                 self.save_text()?;
                 self.editor = None;
-                self.tally_form = Some(TallyForm::Field(FieldForm::new(
-                    &note, field, system, &self.t,
-                )));
+                let form = FieldForm::new(&note, field, system, &self.t);
+                let form = match &tally {
+                    Some(tally) => form.multiplying(tally),
+                    None => form,
+                };
+                self.tally_form = Some(TallyForm::Field(form));
             }
             TallyAction::AddEntry | TallyAction::EditEntry(_) => {
                 let Some(tally) = tallies.by_note(&note)? else {
@@ -6136,9 +6932,26 @@ impl App {
             }
             TallyAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteEntry { id }),
             TallyAction::Restore(id) => tallies.restore_entry(&id)?,
-            TallyAction::Whose(whose) => self.tally_look.whose = Some(whose),
-            TallyAction::Period(period) => self.tally_look.period = period,
-            TallyAction::More => self.tally_look.count += tally_view::PAGE,
+            TallyAction::Whose(whose) => {
+                self.tally_whose.insert(note, whose);
+            }
+            TallyAction::Period(period) => {
+                let setting = tally_view::period_setting(&note);
+                if period == oldbrainfix_core::TallyPeriod::Day {
+                    self.store.remove_local_setting(&setting)?;
+                } else {
+                    self.store
+                        .set_local_setting(&setting, tally_view::period_name(period))?;
+                }
+            }
+            TallyAction::AllShown(shown) => {
+                let setting = tally_view::entries_shown_setting(&note);
+                if shown {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
             TallyAction::RemovedOpen(open) => {
                 let value = if open { "true" } else { "false" };
                 self.store
@@ -6318,7 +7131,7 @@ impl App {
                     // The Tallies of where it goes; while Unsorted, any.
                     let entity = place.as_deref().unwrap_or("");
                     let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
-                    editor = editor.with_session(draft, None);
+                    editor = editor.with_session(draft);
                 }
                 self.tally_form = None;
                 self.editor = Some(editor);
@@ -6330,6 +7143,25 @@ impl App {
                 self.tally_form = Some(TallyForm::Field(FieldForm::choose(system, &self.t)));
             }
         }
+        Ok(())
+    }
+
+    /// The user's Done on `occurrence` of the Routine `routine`, from the
+    /// Agenda, a card or the Note dialog: its Note may go to the trash
+    /// with it by the person's setting (#211), and the dialog showing it
+    /// closes first, as for "Done and move to trash".
+    fn check_off(
+        &mut self,
+        routine: &str,
+        occurrence: &Occurrence,
+    ) -> oldbrainfix_core::Result<()> {
+        let trashes = Routines::new(&self.store).trashes_when_done(routine)?;
+        if let Some(note) = trashes
+            && self.selected_note.as_deref() == Some(note.as_str())
+        {
+            self.leave_note()?;
+        }
+        Routines::new(&self.store).check_off(routine, occurrence, None)?;
         Ok(())
     }
 
@@ -6435,7 +7267,9 @@ impl App {
     }
 
     /// Does what was asked of the New Tally page: Save makes the Tally
-    /// and hands it to the New Session page it was opened from, ticked.
+    /// and hands it to the New Session page it was opened from, ticked,
+    /// or puts it first in the pool of the Session Note whose page it was
+    /// opened from (#191).
     fn tally_page_action(&mut self, intent: PageIntent) -> oldbrainfix_core::Result<()> {
         let Some(page) = &mut self.tally_page else {
             return Ok(());
@@ -6446,10 +7280,17 @@ impl App {
                 let Some(id) = page.save(&self.store)? else {
                     return Ok(());
                 };
-                if page.for_session
-                    && let Some(editor) = &mut self.editor
-                {
-                    editor.add_made_tally(&id, page.name());
+                if page.for_session {
+                    match (&mut self.editor, &self.view.session_setup) {
+                        (Some(editor), _) => editor.add_made_tally(&id, page.name()),
+                        // From a Session Note's page: first in its pool.
+                        (None, Some(setup)) => {
+                            let mut pool = vec![id.clone()];
+                            pool.extend(setup.pool.iter().filter(|p| **p != id).cloned());
+                            Sessions::new(&self.store).set_pool(&setup.note_id, &pool)?;
+                        }
+                        (None, None) => {}
+                    }
                 }
                 self.tally_page = None;
             }
@@ -6518,6 +7359,7 @@ impl App {
             }
             Setting::QuietOn(on) => settings.set_quiet_hours_on(on)?,
             Setting::Quiet(quiet) => settings.set_quiet_hours(quiet)?,
+            Setting::AllDayFrom(from) => settings.set_all_day_from(from)?,
             Setting::Hotkey(chord) => {
                 settings.set_capture_hotkey(&chord)?;
                 if let (Some(hotkey), Ok(chord)) = (&self.hotkey, chord.parse::<Chord>()) {
@@ -6527,6 +7369,15 @@ impl App {
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
+            Setting::HideChecked(on) => settings.set_agenda_hides_checked(on)?,
+            Setting::Bigger(on) => {
+                settings.set_fat_fingers(on)?;
+                self.zoom_shown = false;
+            }
+            Setting::TrashDoneReminder(on) => {
+                PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
+            }
+            Setting::Advanced(on) => PersonSettings::new(&self.store).set_advanced(on)?,
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
         }
@@ -6609,8 +7460,39 @@ impl App {
         Ok(())
     }
 
+    /// The shown Note's text as typed: of a Note of a kind its name and
+    /// its description joined (#188).
+    fn typed_text(&self) -> String {
+        if self.text_kinded {
+            note_kinds::join(&self.name, &self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+
+    /// Puts the text `whole` into the field of the shown Note, of a Note
+    /// of a kind split into its name and its description (#188).
+    fn put_typed(&mut self, whole: String) {
+        if self.text_kinded {
+            self.name = note_kinds::name(&whole).to_string();
+            self.text = note_kinds::description(&whole).to_string();
+        } else {
+            self.name.clear();
+            self.text = whole;
+        }
+    }
+
+    /// Whether the name and the description typed are those of `stored`
+    /// (#188): leaving them writes nothing, the text as stored kept.
+    fn kinded_unchanged(&self, stored: &str) -> bool {
+        self.text_kinded
+            && self.name == note_kinds::name(stored)
+            && self.text == note_kinds::description(stored)
+    }
+
     /// Keeps the edited text of the shown Note when it changed; an
-    /// emptied text goes back to what it was.
+    /// emptied text goes back to what it was, and so does an emptied
+    /// name of a Note of a kind (#188).
     fn save_note_text(&mut self) -> oldbrainfix_core::Result<()> {
         let Some((placed, _)) = &self.view.detail else {
             return Ok(());
@@ -6620,21 +7502,46 @@ impl App {
         if self.text_of.as_deref() != Some(note.id.as_str())
             || note.is_trashed()
             || !note.text_editable
+            || self.kinded_unchanged(&note.text)
         {
             return Ok(());
         }
-        let text = self.text.trim();
+        if self.text_kinded && self.name.trim().is_empty() {
+            self.name = note_kinds::name(&note.text).to_string();
+        }
+        let typed = self.typed_text();
+        let text = typed.trim();
         if text.is_empty() {
-            self.text = note.text.clone();
+            let stored = note.text.clone();
+            self.put_typed(stored);
         } else if text != note.text {
             let notes = Notes::new(&self.store);
             notes.edit(&note.id, text)?;
             // As stored: its new boxes with their ids (ADR 0035), or the
             // next save gives them new ones and their ticks are lost.
-            self.text = match notes.by_id(&note.id)? {
+            let stored = match notes.by_id(&note.id)? {
                 Some(now) => now.text,
                 None => text.to_string(),
             };
+            self.put_typed(stored);
+        }
+        Ok(())
+    }
+
+    /// Puts the shown Note's text into `format` (#213), what is typed kept
+    /// first: a plain or formatted text becomes code and back, a formatted
+    /// one never plain ([`Notes::set_format`]); the field then holds it as
+    /// stored.
+    fn set_text_format(&mut self, format: &str) -> oldbrainfix_core::Result<()> {
+        self.save_text()?;
+        self.code_offer = None;
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        let notes = Notes::new(&self.store);
+        notes.set_format(&id, format)?;
+        if let Some(now) = notes.by_id(&id)? {
+            self.put_typed(now.text);
         }
         Ok(())
     }
@@ -6653,7 +7560,11 @@ impl App {
         {
             return Ok(());
         }
-        let text = self.text.trim();
+        if self.text_kinded && self.name.trim().is_empty() {
+            self.name = note_kinds::name(&note.text).to_string();
+        }
+        let typed = self.typed_text();
+        let text = typed.trim();
         if text.is_empty() {
             return Ok(());
         }
@@ -6665,10 +7576,10 @@ impl App {
             if let Some(now) = notes.by_id(&note.id)?
                 && now.text != text
             {
-                let typed = self.text.clone();
                 let before = &typed[..typed.len() - typed.trim_start().len()];
                 let after = &typed[typed.trim_end().len()..];
-                self.text = format!("{before}{}{after}", now.text);
+                let kept = format!("{before}{}{after}", now.text);
+                self.put_typed(kept);
             }
         }
         Ok(())
@@ -6828,13 +7739,7 @@ impl App {
                                     // the other Device fetched what it needs.
                                     if hosted
                                         && !joining
-                                        && ui
-                                            .button(
-                                                RichText::new(t.host_continue())
-                                                    .strong()
-                                                    .color(text),
-                                            )
-                                            .clicked()
+                                        && theme::primary(ui, true, t.host_continue()).clicked()
                                     {
                                         asked.push(WelcomeAction::Synced);
                                     }
@@ -6875,6 +7780,7 @@ impl App {
 
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
+        self.agenda_arrived(ui.ctx());
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
@@ -7017,13 +7923,16 @@ impl App {
         }
         // Pictures and sound files dropped onto the window become a
         // Note; a bundle file is imported, a Sent Item previewed, a
-        // Profile card file opened, as are the files handed over from
-        // outside.
+        // Profile card file and a Pack opened, as are the files handed
+        // over from outside.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
         let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
             file.path.as_ref().is_some_and(|p| {
                 p.extension().is_some_and(|e| {
-                    e == bundle::EXTENSION || e == sent::EXTENSION || e == cards::EXTENSION
+                    e == bundle::EXTENSION
+                        || e == sent::EXTENSION
+                        || e == cards::EXTENSION
+                        || e == packs::EXTENSION
                 })
             })
         });
@@ -7167,13 +8076,17 @@ impl App {
         );
         // The menu bar tops the window, over the announcements (#145).
         if self.welcome.is_none() {
-            egui::Panel::top("menu bar")
+            let bar = egui::Panel::top("menu bar")
                 .frame(
                     Frame::NONE
                         .inner_margin(Margin::symmetric(8, 4))
                         .fill(tones.card),
                 )
                 .show(ui, |ui| self.menu_bar(ui, &mut actions));
+            // Under it, while a sync of this Device runs (#225).
+            if self.syncing.as_ref().is_some_and(Syncing::running) {
+                sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
+            }
         }
         // What the Note dialog lies over: all but the menu bar, which
         // stays at hand for its Note (#146).
@@ -7266,6 +8179,7 @@ impl App {
 
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
+        let advanced = self.view.advanced;
         egui::ScrollArea::vertical()
             .id_salt("places")
             .show(ui, |ui| {
@@ -7322,14 +8236,19 @@ impl App {
                     }
                     resp.context_menu(|ui| {
                         let mut items = Vec::new();
+                        // Topics are made only in Advanced (#197).
+                        if manages && advanced {
+                            items.push((t.new_topic(), Action::NewTopic(area.id.clone())));
+                        }
                         if manages {
                             items.extend([
-                                (t.new_topic(), Action::NewTopic(area.id.clone())),
                                 (t.rename(), Action::Rename(area.id.clone())),
                                 (t.area_look(), Action::Look(area.id.clone())),
                                 (t.share_area(), Action::Share(area.id.clone())),
                             ]);
                         }
+                        // Copies of what anyone may read (#165).
+                        items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
                         if people.is_some() {
                             items.push((t.people_title(), Action::People(area.id.clone())));
                         }
@@ -7348,14 +8267,17 @@ impl App {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
-                        if !manages {
-                            continue;
-                        }
+                        // Export as Pack… for anyone who may read it
+                        // (#165), the rest for who manages the Area.
                         resp.context_menu(|ui| {
-                            let items = [
-                                (t.rename(), Action::Rename(topic.id.clone())),
-                                (t.delete(), Action::Delete(topic.id.clone())),
-                            ];
+                            let mut items = Vec::new();
+                            if manages {
+                                items.push((t.rename(), Action::Rename(topic.id.clone())));
+                            }
+                            items.push((t.export_as_pack(), Action::ExportPack(topic.id.clone())));
+                            if manages {
+                                items.push((t.delete(), Action::Delete(topic.id.clone())));
+                            }
                             for (label, action) in items {
                                 if ui.button(RichText::new(label).color(text)).clicked() {
                                     actions.push(action);
@@ -7515,15 +8437,16 @@ impl App {
         }
         let may = self.view.may;
         let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
-        let plain = self.view.tally.is_none()
-            && self.view.checklist.is_none()
-            && self.view.shopping.is_none()
-            && !note.is_merged();
+        // A Code text becomes no Tally or Session (#213).
+        let code = note.text_format == text_format::CODE;
+        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
             schedules: may.schedules,
             frog: may.schedules && !frog_open,
+            // A Routine of a Session Note runs it already (#191).
+            session: may.schedules && self.view.kind == Some(NoteKind::Plain) && !code,
             amends: may.amends,
             checklist: may.amends && self.view.makes_checklist,
             shopping: may.amends && self.view.makes_shopping,
@@ -7621,6 +8544,7 @@ impl App {
                     (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
+                    (t.menu_open_pack(), None, true, Action::OpenPack),
                     (
                         t.save_as_markdown(),
                         None,
@@ -7666,9 +8590,10 @@ impl App {
                 }
                 ui.separator();
                 let compact = self.view.compact;
-                for (label, wanted) in
-                    [(t.menu_full_cards(), false), (t.menu_compact_cards(), true)]
-                {
+                for (label, wanted) in [
+                    (t.menu_detailed_views(), false),
+                    (t.menu_compact_views(), true),
+                ] {
                     let on = cards && compact == wanted;
                     let button = egui::Button::selectable(on, RichText::new(label).color(text));
                     if ui.add_enabled(cards, button).clicked() {
@@ -7719,20 +8644,28 @@ impl App {
                             reminder: true,
                         },
                     ),
-                    (
-                        t.frog(),
-                        None,
-                        may(|n| n.frog),
-                        Action::SpawnFrog(id.clone()),
-                    ),
-                    (
-                        t.session(),
-                        None,
-                        may(|n| n.schedules),
-                        Action::NewSession(Some(id.clone())),
-                    ),
                 ];
                 menu_entries(ui, items, actions);
+                // Frogs, Sessions and Tallies are made only in Advanced
+                // (#197).
+                let advanced = self.view.advanced;
+                if advanced {
+                    let items = [
+                        (
+                            t.frog(),
+                            None,
+                            may(|n| n.frog),
+                            Action::SpawnFrog(id.clone()),
+                        ),
+                        (
+                            t.session(),
+                            None,
+                            may(|n| n.session),
+                            Action::NewSession(Some(id.clone())),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                }
                 ui.separator();
                 let items = [
                     (
@@ -7747,14 +8680,17 @@ impl App {
                         may(|n| n.shopping),
                         Action::Shopping(ShoppingAction::Make(id.clone())),
                     ),
-                    (
+                ];
+                menu_entries(ui, items, actions);
+                if advanced {
+                    let items = [(
                         t.make_tally(),
                         None,
                         may(|n| n.tally),
                         Action::Tally(TallyAction::Make(id.clone())),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
+                    )];
+                    menu_entries(ui, items, actions);
+                }
                 ui.separator();
                 let items = [
                     (
@@ -7769,8 +8705,26 @@ impl App {
                         may(|n| n.amends),
                         Action::CopyAsText(id.clone()),
                     ),
+                    // Copies of what anyone may read (#165).
+                    (
+                        t.export_as_pack(),
+                        None,
+                        note.is_some(),
+                        Action::ExportPack(id.clone()),
+                    ),
                 ];
                 menu_entries(ui, items, actions);
+                ui.separator();
+                menu_entries(
+                    ui,
+                    [(
+                        t.history_title(),
+                        None,
+                        note.is_some(),
+                        Action::NoteHistory(id.clone()),
+                    )],
+                    actions,
+                );
                 ui.separator();
                 menu_entries(
                     ui,
@@ -7909,6 +8863,13 @@ impl App {
                         }
                     }
                     Page::Licences => about_view::licences_page(ui, &t),
+                    Page::Feedback => {
+                        let facts = &self.feedback_facts;
+                        if let Some(asked) = feedback_view::form(ui, &t, facts, &mut self.feedback)
+                        {
+                            actions.push(Action::Feedback(asked));
+                        }
+                    }
                     Page::Profile | Page::People | Page::Backups => {
                         self.profile_pane(ui, tones, actions, page);
                     }
@@ -8029,7 +8990,7 @@ impl App {
         let Some(open) = self.badge else {
             return;
         };
-        let Some((placed, _)) = &self.view.detail else {
+        let Some((placed, sections)) = &self.view.detail else {
             self.badge = None;
             return;
         };
@@ -8053,7 +9014,7 @@ impl App {
                         (Importance::Normal, t.importance_normal().to_string()),
                         (Importance::Important, t.importance_important().to_string()),
                     ];
-                    if radio_column(ui, &mut picked, options) {
+                    if chip_row(ui, &mut picked, options) {
                         if picked != note.importance {
                             actions.push(Action::Importance(picked));
                         }
@@ -8070,53 +9031,80 @@ impl App {
                 |ui| {
                     let id = &note.id;
                     let removable = |detail| captured_removable.contains(&(id.clone(), detail));
-                    let shown = (note.captured, &note.context, None);
+                    let shown = (note.captured, &note.context);
                     if let Some(detail) = capture_context(ui, &t, shown, removable) {
                         let id = id.clone();
                         actions.push(Action::AskRemoveCaptured { id, detail });
                     }
                 },
             ),
+            NoteBadge::SectionCaptured(at) => match sections.get(at) {
+                Some(section) => badge_dialog(
+                    ctx,
+                    shown,
+                    (icons::CONTEXT_WHEN, None),
+                    t.captured_heading(),
+                    |ui| {
+                        let id = &section.id;
+                        let removable = |detail| captured_removable.contains(&(id.clone(), detail));
+                        let shown = (section.captured, &section.context);
+                        if let Some(detail) = capture_context(ui, &t, shown, removable) {
+                            let id = id.clone();
+                            actions.push(Action::AskRemoveCaptured { id, detail });
+                        }
+                    },
+                ),
+                // Gone meanwhile.
+                None => true,
+            },
             NoteBadge::Kind => {
-                let kind = note_kind(&t, &self.view);
-                let (icon, name) = kind.map_or((icons::NOTE, ""), |(icon, name, _)| (icon, name));
-                let list = self.view.checklist.is_some();
-                let plainable = kind.is_some_and(|(_, _, plain)| plain);
-                badge_dialog(ctx, shown, (icon, None), t.badge_kind(), |ui| {
-                    let text = ui.visuals().text_color();
-                    ui.label(RichText::new(name).color(text));
-                    if plainable
-                        && ui
-                            .button(RichText::new(t.checklist_to_plain()).color(text))
-                            .clicked()
-                    {
-                        let id = note.id.clone();
-                        actions.push(if list {
-                            Action::Checklist(ChecklistAction::ToPlain(id))
-                        } else {
-                            Action::Shopping(ShoppingAction::ToPlain(id))
-                        });
+                let shown_kind = KindShown::of(&self.view);
+                let current = shown_kind.kind;
+                badge_dialog(ctx, shown, (icons::KIND, None), t.badge_kind(), |ui| {
+                    // The kinds as choice chips, the current one picked;
+                    // a pick changes it at once and closes (#188).
+                    let mut picked = current;
+                    let options = std::iter::once(current)
+                        .chain(shown_kind.choices.iter().copied())
+                        .map(|kind| (kind, kind_look(&t, kind).1.to_string()));
+                    if chip_row(ui, &mut picked, options) {
+                        if picked != current {
+                            actions.push(kind_action(&note.id, current, picked));
+                        }
                         actions.push(Action::Badge(None));
                     }
                 })
             }
-            NoteBadge::OnAgenda => {
-                let mut on = self
-                    .view
-                    .checklist
-                    .as_ref()
-                    .and_then(|c| c.on_agenda)
-                    .unwrap_or(false);
-                let setting = t.checklist_show_on_agenda();
-                badge_dialog(ctx, shown, (icons::ON_AGENDA, None), setting, |ui| {
-                    if badge_switch(ui, &t, setting, &mut on) {
-                        let asked = ChecklistAction::ShowOnAgenda(note.id.clone(), on);
-                        actions.push(Action::Checklist(asked));
+            // The formats the text may take, a formatted one never plain
+            // again (ADR 0033); a pick sets it at once and closes (#213).
+            NoteBadge::Format => {
+                let known = [text_format::PLAIN, text_format::MARKDOWN, text_format::CODE];
+                let current = known
+                    .into_iter()
+                    .find(|f| *f == note.text_format)
+                    .unwrap_or(text_format::PLAIN);
+                let setting = t.badge_text_format();
+                badge_dialog(ctx, shown, (icons::TEXT_FORMAT, None), setting, |ui| {
+                    let mut picked = current;
+                    let options = known
+                        .into_iter()
+                        .filter(|f| *f != text_format::PLAIN || current != text_format::MARKDOWN)
+                        .map(|f| (f, text_format_look(&t, f).1.to_string()));
+                    if chip_row(ui, &mut picked, options) {
+                        if picked != current {
+                            actions.push(Action::SetTextFormat(picked));
+                        }
+                        actions.push(Action::Badge(None));
                     }
                 })
             }
-            NoteBadge::ShoppingOnAgenda => {
-                let shows = self.view.shopping.as_ref().and_then(|s| s.on_agenda);
+            // A Checklist's (#219) or a Shopping List's (#186) three ways.
+            NoteBadge::OnAgenda | NoteBadge::ShoppingOnAgenda => {
+                let checklist = open == NoteBadge::OnAgenda;
+                let shows = match checklist {
+                    true => self.view.checklist.as_ref().and_then(|c| c.on_agenda),
+                    false => self.view.shopping.as_ref().and_then(|s| s.on_agenda),
+                };
                 let setting = t.checklist_show_on_agenda();
                 badge_dialog(ctx, shown, (icons::ON_AGENDA, None), setting, |ui| {
                     let Some(shows) = shows else {
@@ -8128,12 +9116,72 @@ impl App {
                     // A pick writes it and closes, as on the phone.
                     if radio_column(ui, &mut picked, options) {
                         if picked != shows {
-                            let asked = ShoppingAction::OnAgenda(note.id.clone(), picked);
-                            actions.push(Action::Shopping(asked));
+                            let note = note.id.clone();
+                            actions.push(match checklist {
+                                true => Action::Checklist(ChecklistAction::OnAgenda(note, picked)),
+                                false => Action::Shopping(ShoppingAction::OnAgenda(note, picked)),
+                            });
                         }
                         actions.push(Action::Badge(None));
                     }
                 })
+            }
+            // Each pick written at once, the rule's closing (#191).
+            NoteBadge::SessionRule => match (&mut self.session_draft, &self.view.session_setup) {
+                (Some(draft), Some(setup)) => {
+                    let icon = (icons::SESSION_RULE_BADGE, None);
+                    badge_dialog(ctx, shown, icon, t.session_rule(), |ui| {
+                        if draft.rules(ui, &t) {
+                            let changed = Box::new((draft.clone(), setup.clone()));
+                            actions.push(Action::SessionSetup(changed));
+                            actions.push(Action::Badge(None));
+                        }
+                    })
+                }
+                // No Session meanwhile.
+                _ => true,
+            },
+            NoteBadge::SessionWeekdays => match (&mut self.session_draft, &self.view.session_setup)
+            {
+                (Some(draft), Some(setup)) => {
+                    let icon = (icons::SESSION_WEEKDAYS, None);
+                    let setting = t.session_weekday_counts();
+                    badge_dialog(ctx, shown, icon, setting, |ui| {
+                        let before = draft.counts;
+                        draft.weekdays(ui, &t);
+                        if draft.counts != before {
+                            let changed = Box::new((draft.clone(), setup.clone()));
+                            actions.push(Action::SessionSetup(changed));
+                        }
+                    })
+                }
+                _ => true,
+            },
+            // Each pick written at once, as on the phone; gone with its Line.
+            NoteBadge::Reappear => {
+                let line = self.reappear_line.clone();
+                let current = line.as_ref().and_then(|id| {
+                    let shopping = self.view.shopping.as_ref()?;
+                    shopping
+                        .editable
+                        .contains(id)
+                        .then(|| shopping.list.line(id).map(|l| l.reappear))
+                        .flatten()
+                });
+                match (line, current) {
+                    (Some(id), Some(current)) => {
+                        let icon = (icons::REAPPEAR, None);
+                        badge_dialog(ctx, shown, icon, t.shopping_reappear(), |ui| {
+                            if let Some(picked) = shopping_view::reappear_editor(ui, &t, current)
+                                && picked != current
+                            {
+                                let step = ShopStep::Reappear(picked);
+                                actions.push(Action::Shopping(ShoppingAction::Step(id, step)));
+                            }
+                        })
+                    }
+                    _ => true,
+                }
             }
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
@@ -8493,7 +9541,7 @@ impl App {
             if sorted || !quick.nudge_buttons {
                 // A sorted Note needs no Nudge (#113); without the Nudge
                 // buttons, Save nudges in 1 h (#142).
-                if ui.button(RichText::new(t.save()).color(text)).clicked() {
+                if theme::primary(ui, true, t.save()).clicked() {
                     actions.push(Action::Capture(Notes::default_nudge()));
                 }
                 let hint = if sorted {
@@ -8542,7 +9590,7 @@ impl App {
             Selection::AllRoutines => {
                 let mut asked = Vec::new();
                 let rows = (&self.view.all_routines[..], &self.view.all_newer[..]);
-                all_routines_view::page(ui, &self.t, tones, rows, &mut asked);
+                all_routines_view::page(ui, &self.t, tones, rows, self.view.advanced, &mut asked);
                 actions.extend(asked.into_iter().map(|asked| match asked {
                     AllRoutinesAction::Open(id) => Action::OpenRoutine(id),
                     AllRoutinesAction::OpenNote(id) => Action::SelectNote(id),
@@ -8560,7 +9608,7 @@ impl App {
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
             ui.heading(RichText::new(self.title()).color(text));
-            // Every Note list but the trash has its full/compact switch.
+            // Every Note list but the trash has its compact/detailed switch.
             if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
                 actions.push(Action::Compact(!self.view.compact));
             }
@@ -8644,6 +9692,9 @@ impl App {
             let order: Vec<String> = self.view.notes.iter().map(|p| p.note.id.clone()).collect();
             // Ctrl (Cmd on macOS) and Shift as the card is clicked (#148).
             let modifiers = ui.input(|i| i.modifiers);
+            // A list with its switch has the view button on its cards
+            // (#189).
+            let switches = self.cards_key().is_some();
             for placed in &self.view.notes {
                 let id = &placed.note.id;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
@@ -8657,10 +9708,20 @@ impl App {
                     transcribing: transcribing.as_deref(),
                 };
                 let look = CardLook {
-                    full: !self.view.compact || self.unfolded.contains(id),
+                    full: self.view.compact == self.view.switched.contains(id),
+                    glance: self.view.glances.get(id).map_or(&[], Vec::as_slice),
+                    switches,
+                    folds: CardFolds {
+                        struck: self.view.struck_shown.contains(id),
+                        description: self.view.descriptions_unfolded.contains(id),
+                    },
                     sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
                     checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                     shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
+                    tally: self.view.tallies.contains(id),
+                    tally_shown: self.view.card_tallies.get(id),
+                    session: self.view.sessions.contains(id),
+                    session_shown: self.view.card_sessions.get(id),
                     menu: self.card_menu.as_ref(),
                     changes: self.view.card_changes.contains(id),
                     boxes: CardBoxes {
@@ -8668,6 +9729,7 @@ impl App {
                         ticks: &self.view.box_ticks,
                         show: self.view.show_ticks.contains(id),
                     },
+                    today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
                 };
                 let clicks = note_card(
                     ui,
@@ -8684,13 +9746,20 @@ impl App {
                     let moving = self.cards.moving(id, &order);
                     egui::DragAndDrop::set_payload(ui.ctx(), DraggedNotes(moving));
                 }
-                // A click selects the card and unfolds a compact Note,
-                // Ctrl-click and Shift-click select more (#148); a
-                // double-click or Edit opens the Note dialog (UI laws,
-                // "Desktop").
+                // A click selects the card, Ctrl-click and Shift-click
+                // select more (#148); its view button switches its view
+                // (#189); a double-click or Edit opens the Note dialog (UI
+                // laws, "Desktop").
                 if clicks.menu_opened {
                     actions.push(Action::Checklist(ChecklistAction::Menu(id.clone())));
                 }
+                actions.extend(
+                    clicks
+                        .tally
+                        .into_iter()
+                        .map(|asked| Action::CardTally(id.clone(), asked)),
+                );
+                actions.extend(clicks.session.into_iter().map(Action::Session));
                 if let Some(Action::AskFileInto(_)) = clicks.picked {
                     // The right-click's File into… files the cards selected
                     // with it.
@@ -8699,6 +9768,9 @@ impl App {
                     actions.push(picked);
                 } else if let Some(tag) = clicks.tag {
                     actions.push(Action::SearchFor(tag));
+                } else if let Some((routine, occurrence)) = clicks.occurrence {
+                    // As the Agenda row's box: it opens nothing (#215).
+                    actions.push(Action::Toggle(routine, occurrence));
                 } else if let Some((entity, asked)) = clicks.tick {
                     actions.push(box_action(entity, asked));
                 } else if let Some(opening) = clicks.table {
@@ -8718,6 +9790,10 @@ impl App {
                     && author.clicked()
                 {
                     actions.push(Action::OpenPerson(profile.id.clone()));
+                } else if let Some((setting, open)) = clicks.folded {
+                    actions.push(Action::Fold(setting, open));
+                } else if clicks.view.clicked() {
+                    actions.push(Action::SwitchView(id.clone()));
                 } else if clicks.edit.clicked()
                         // A click soon after two more counts as well.
                         || clicks.card.double_clicked()
@@ -8733,9 +9809,6 @@ impl App {
                         Pick::One
                     };
                     actions.push(Action::PickCard(id.clone(), pick));
-                    if pick == Pick::One && !look.full {
-                        actions.push(Action::Unfold(id.clone()));
-                    }
                 }
             }
         });
@@ -8749,7 +9822,8 @@ impl App {
     /// What "+" at the top of the list makes (#161), in the order its
     /// menu shows them: in All Notes, an Area and a Topic the six kinds,
     /// Session and Frog only for who may set them up there, in an Area
-    /// a Topic too for who may add one; in Unsorted a Note. Nothing among
+    /// a Topic too for who may add one; in Unsorted a Note. Tally,
+    /// Session, Frog and Topic only in Advanced (#197). Nothing among
     /// another person's Notes, nor in the trash.
     fn new_kinds(&self) -> Option<Vec<NewKind>> {
         if !self.people.is_everyone() {
@@ -8758,12 +9832,11 @@ impl App {
         match &self.selection {
             Selection::Unsorted => Some(vec![NewKind::Note]),
             Selection::All | Selection::Place(_) => {
-                let mut kinds = vec![
-                    NewKind::Note,
-                    NewKind::Checklist,
-                    NewKind::Shopping,
-                    NewKind::Tally,
-                ];
+                let mut kinds = vec![NewKind::Note, NewKind::Checklist, NewKind::Shopping];
+                if !self.view.advanced {
+                    return Some(kinds);
+                }
+                kinds.push(NewKind::Tally);
                 if self.view.list_manages {
                     kinds.extend([NewKind::Session, NewKind::Frog]);
                 }
@@ -8798,8 +9871,7 @@ impl App {
             .config(MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside))
             .ui(ui, |ui| {
                 let mut me = filter.me;
-                if ui
-                    .checkbox(&mut me, RichText::new(t.person_filter_me()).color(text))
+                if theme::checkbox(ui, &mut me, RichText::new(t.person_filter_me()).color(text))
                     .changed()
                 {
                     let mut next = filter.clone();
@@ -8809,10 +9881,7 @@ impl App {
                 for person in &self.view.people_shown {
                     let mut on = filter.people.contains(&person.id);
                     let name = profile_view::display_name(t, &person.name);
-                    if ui
-                        .checkbox(&mut on, RichText::new(name).color(text))
-                        .changed()
-                    {
+                    if theme::checkbox(ui, &mut on, RichText::new(name).color(text)).changed() {
                         let mut next = filter.clone();
                         next.toggle(&person.id);
                         actions.push(Action::FilterPeople(next));
@@ -8884,24 +9953,32 @@ impl App {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
-        let kind = note_kind(&self.t, &self.view);
+        let kind = KindShown::of(&self.view);
+        // A Checklist, a Shopping List or a Tally shows its text as its
+        // name and its description, its content under them (#188).
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         let linked = &self.view.routines;
         let newer_routines = self.view.newer_routines;
         let tally = self.view.tally.as_ref();
-        let tally_count = self.tally_look.count;
         let checklist = self.view.checklist.as_ref();
-        let makes_checklist = self.view.makes_checklist;
         let shopping = self.view.shopping.as_ref();
-        let makes_shopping = self.view.makes_shopping;
+        let session_setup = self.view.session_setup.as_ref();
+        let makes_session = self.view.makes_session;
+        let session_draft = &mut self.session_draft;
         let typed = &mut self.lines;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
+        // "Keep as code" under a paste that looks like code (#213).
+        let offers_code = self.code_offer.is_some()
+            && self.code_offer == self.text_of
+            && note.text_format != text_format::CODE;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let edited = &mut self.text;
+        let name = &mut self.name;
         let editing = &mut self.text_editing;
         let focus = &mut self.text_focus;
         let select = &mut self.text_select;
@@ -8929,19 +10006,32 @@ impl App {
         let no_boxes = BoxLook::default();
         let box_looks = &self.view.box_looks;
         let box_ticks = &self.view.box_ticks;
-        let captured_removable = &self.view.captured_removable;
         let look_of = |id: &str| box_looks.get(id).unwrap_or(&no_boxes);
         let boxes = look_of(&note.id);
         let ticks = box_ticks.contains(&note.id);
         let ticked = ticked_in(&note.boxes);
         let show_ticks = self.view.show_ticks.contains(&note.id);
         let has_boxes = !note.boxes.is_empty() || sections.iter().any(|s| !s.boxes.is_empty());
+        let open = &self.view.open;
+        let today = Day::today(store.now(), &*self.wall);
+        // Its one Reminder goes with it, where this Device moves it.
+        let trashes = may.changes && linked.len() == 1;
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
+                // At the top, over its name (#215).
+                match card_occurrences::open_lines(ui, &t, open, (today, trashes)) {
+                    Some(OpenAsked::Done(routine, occurrence)) => {
+                        actions.push(Action::CheckMissed(routine, occurrence));
+                    }
+                    Some(OpenAsked::DoneAndTrash(routine, occurrence)) => {
+                        actions.push(Action::DoneAndTrash(routine, occurrence));
+                    }
+                    None => {}
+                }
                 embossed(ui, tones, false, None, |ui| {
                     // A Member reads someone else's Note (ADR 0013); a text
                     // in a format not known here shows as it is stored
@@ -8950,12 +10040,37 @@ impl App {
                         ui.label(RichText::new(t.text_newer_format()).color(weak));
                     }
                     let formatted = note.text_format == text_format::MARKDOWN;
-                    if trashed || !may.changes || !note.text_editable {
+                    let writes = !trashed && may.changes && note.text_editable;
+                    if kinded {
+                        let shown = KindedText {
+                            note,
+                            writes,
+                            bar: self.view.advanced,
+                            boxes,
+                            ticks: (ticks, &ticked),
+                        };
+                        let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
+                        kinded_text(ui, (t, tones), shown, (&mut *name, state), actions);
+                        return;
+                    }
+                    if !writes {
                         // Its marks show, to read (#125), and a formatted
                         // text reads as it is formatted (#127); it selects
                         // to be copied (#183).
                         ui.style_mut().interaction.selectable_labels = true;
                         let all = (0, note.text.len());
+                        // A Code text moves sideways (#213).
+                        if note.text_format == text_format::CODE {
+                            let look = (Some(18.0), text);
+                            text_marks_view::code_text_label(
+                                ui,
+                                &note.text,
+                                all,
+                                look,
+                                (false, true),
+                            );
+                            return;
+                        }
                         let spots = text_marks_view::formatted_label(
                             ui,
                             (&note.text, &note.text_format, boxes),
@@ -8987,35 +10102,32 @@ impl App {
                         text_marks_view::link_clicks(ui, of, &spots.links);
                         return;
                     }
+                    let code = note.text_format == text_format::CODE;
                     let field = EditedText {
                         id: Id::new("note text"),
                         of: &note.id,
                         section: false,
                         stored: &note.text,
                         formatted,
+                        code,
+                        // A paste that looks like code offers it (#213).
+                        offers_code: !code,
+                        bar: self.view.advanced,
                         boxes,
                         ticks: (ticks, &ticked),
                         name: t.note_text_field_name(),
+                        look: (18.0, text),
+                        hint: None,
                     };
                     let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
                     edited_text(ui, (t, tones), field, state, actions);
+                    if offers_code {
+                        code_offer(ui, &t, actions);
+                    }
                 });
-                // Each setting as its badge, in one wrapping row under the
-                // text (#160).
-                let shown = BadgesShown {
-                    placed,
-                    routines: linked,
-                    newer: newer_routines,
-                    kind,
-                    on_agenda: checklist.and_then(|c| c.on_agenda),
-                    shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
-                    ticks: has_boxes.then_some(show_ticks),
-                    may,
-                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
-                };
-                note_badges(ui, (&t, tones), &shown, actions);
-                // Under the text field, as the Lines are under the text on
-                // a card; nothing while the Note is no Checklist.
+                // The kind's content under its name and description (#188),
+                // as the Lines are under them on a card; nothing while the
+                // Note is no Checklist.
                 if let Some(shown) = checklist {
                     let mut asked = Vec::new();
                     checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
@@ -9027,6 +10139,42 @@ impl App {
                     shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Shopping));
                 }
+                // Only its setup, nothing while the Note is no Tally; its
+                // chart and entries show on its card (#190).
+                if let Some(tally) = tally {
+                    let mut asked = Vec::new();
+                    tally_view::setup(ui, &t, tones, tally, &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Tally));
+                }
+                // A Session's pool and count, each change written at once;
+                // its picks and history show on its card (#191).
+                if let (Some(draft), Some(setup)) = (session_draft.as_mut(), session_setup) {
+                    draft.new_tally = makes_session;
+                    let (changed, asked) = draft.note_page(ui, &t, tones, makes_session);
+                    if changed {
+                        let changed = Box::new((draft.clone(), setup.clone()));
+                        actions.push(Action::SessionSetup(changed));
+                    }
+                    if asked == Some(SessionIntent::NewTally) {
+                        actions.push(Action::SessionPoolTally);
+                    }
+                }
+                // Each setting as its badge, in one wrapping row under the
+                // text and the kind's content (#160).
+                let shown = BadgesShown {
+                    placed,
+                    routines: linked,
+                    newer: newer_routines,
+                    kind: &kind,
+                    on_agenda: checklist.and_then(|c| c.on_agenda),
+                    shopping_on_agenda: shopping.and_then(|s| s.on_agenda),
+                    ticks: has_boxes.then_some(show_ticks),
+                    session: session_setup.map(|s| (s, makes_session)),
+                    may,
+                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
+                    advanced: self.view.advanced,
+                };
+                note_badges(ui, (&t, tones), &shown, actions);
                 let media = [
                     &note.photos,
                     &note.recordings,
@@ -9055,13 +10203,7 @@ impl App {
                         );
                     });
                 }
-                // Nothing while the Note is no Tally.
-                if let Some(tally) = tally {
-                    let mut asked = Vec::new();
-                    tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Tally));
-                }
-                for section in sections {
+                for (at, section) in sections.iter().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
                         if !section.text_editable {
                             ui.label(RichText::new(t.text_newer_format()).color(weak));
@@ -9078,9 +10220,14 @@ impl App {
                                 section: true,
                                 stored: &section.text,
                                 formatted: section.text_format == text_format::MARKDOWN,
+                                code: false,
+                                offers_code: false,
+                                bar: self.view.advanced,
                                 boxes: look,
                                 ticks: (section_ticks, &section_ticked),
                                 name: t.section_text_field_name(),
+                                look: (18.0, text),
+                                hint: None,
                             };
                             let state = (
                                 &mut field.text,
@@ -9154,13 +10301,17 @@ impl App {
                             (playing, transcribing, can_play, speed),
                             actions,
                         );
+                        // Its details, each removable on its own, in the
+                        // same dialog as the Note's Captured badge (#170).
+                        let before = at
+                            .checked_sub(1)
+                            .and_then(|above| sections.get(above))
+                            .map_or(note.captured, |above| above.captured);
+                        let line =
+                            capture_line(&t, (section.captured, &section.context), Some(before));
                         let edited = section_edited(&t, section);
-                        let shown = (section.captured, &section.context, edited.as_deref());
-                        let id = &section.id;
-                        let removable = |detail| captured_removable.contains(&(id.clone(), detail));
-                        if let Some(detail) = capture_context(ui, &t, shown, removable) {
-                            let id = id.clone();
-                            actions.push(Action::AskRemoveCaptured { id, detail });
+                        if capture_meta(ui, &t, &line, edited.as_deref(), true) {
+                            actions.push(Action::Badge(Some(NoteBadge::SectionCaptured(at))));
                         }
                     });
                 }
@@ -9187,7 +10338,11 @@ impl App {
                     let selected = format_bar::selection(ui, id, amend);
                     let at = format_bar::At::of(amend, selected, markdown::uses(amend));
                     let formats = &Format::ALL[1..];
-                    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), formats);
+                    // Only in Advanced (#197).
+                    let mut picked = match self.view.advanced {
+                        true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
+                        false => None,
+                    };
                     if focused {
                         ui.input_mut(|i| {
                             if i.consume_key(Modifiers::COMMAND, Key::B) {
@@ -9240,22 +10395,6 @@ impl App {
                         if add.clicked() {
                             actions.push(Action::Amend);
                         }
-                        // A plain Note becomes a Checklist of its text.
-                        if makes_checklist
-                            && ui
-                                .button(RichText::new(t.make_checklist()).color(text))
-                                .clicked()
-                        {
-                            actions.push(Action::Checklist(ChecklistAction::Make(note.id.clone())));
-                        }
-                        // Or a Shopping List of it.
-                        if makes_shopping
-                            && ui
-                                .button(RichText::new(t.make_shopping_list()).color(text))
-                                .clicked()
-                        {
-                            actions.push(Action::Shopping(ShoppingAction::Make(note.id.clone())));
-                        }
                     });
                 });
                 ui.horizontal_wrapped(|ui| {
@@ -9279,6 +10418,13 @@ impl App {
                     {
                         actions.push(Action::SaveAsMarkdown(note.id.clone()));
                     }
+                    // Copies of it for another person (#165).
+                    if ui
+                        .button(RichText::new(t.export_as_pack()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::ExportPack(note.id.clone()));
+                    }
                 });
                 if !may.changes {
                     return;
@@ -9290,20 +10436,21 @@ impl App {
                     {
                         actions.push(Action::StartMerge);
                     }
-                    if ui
-                        .button(RichText::new(t.move_to_trash()).color(text))
-                        .clicked()
-                    {
+                    if theme::destructive(ui, true, t.move_to_trash()).clicked() {
                         actions.push(Action::Trash);
                     }
                 });
                 // Only a Note in the lists becomes a Tally (ADR 0028); one
                 // that is adds entries in its Tally part above. A
-                // Checklist or Shopping List is no Tally (ADR 0030).
-                if tally.is_none()
+                // Checklist, a Shopping List or a Session is no Tally (ADR
+                // 0030, ADR 0039).
+                if self.view.advanced
+                    && tally.is_none()
                     && checklist.is_none()
                     && shopping.is_none()
+                    && session_setup.is_none()
                     && !note.is_merged()
+                    && note.text_format != text_format::CODE
                     && ui
                         .button(RichText::new(t.make_tally()).color(text))
                         .clicked()
@@ -9360,6 +10507,25 @@ impl App {
                                             ui.label(RichText::new(said).small().color(weak));
                                         });
                                     });
+                                }
+                            });
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
+                    Dialog::NoteHistory { rows, .. } => {
+                        title(ui, t.history_title());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.note_history_hint()).color(text));
+                        // As high as the window allows, the title, the
+                        // hint and Close around it.
+                        let high = (ui.ctx().content_rect().height() - 220.0).max(240.0);
+                        egui::ScrollArea::vertical()
+                            .max_height(high)
+                            .show(ui, |ui| {
+                                for (i, row) in rows.iter().enumerate() {
+                                    note_change(ui, &t, (i, row), (text, weak), actions);
                                 }
                             });
                         if ui.button(RichText::new(t.close()).color(text)).clicked() {
@@ -9469,7 +10635,13 @@ impl App {
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(ui, &t, &shown, (role, !afar.is_empty()), actions);
+                        share_form(
+                            ui,
+                            &t,
+                            &shown,
+                            (role, !afar.is_empty(), view.advanced),
+                            actions,
+                        );
                     }
                     Dialog::ShareAfar {
                         area,
@@ -9535,6 +10707,34 @@ impl App {
                         cancel,
                         ..
                     } => send_form(ui, &t, recipients, (picked, *update, cancel), actions),
+                    Dialog::PackExport {
+                        pack,
+                        ticks,
+                        profile,
+                    } => {
+                        let mut asked = None;
+                        pack_view::export_form(ui, &t, pack, (ticks, profile), &mut asked);
+                        actions.extend(asked.map(Action::Pack));
+                    }
+                    Dialog::PackOpened {
+                        opened,
+                        ticks,
+                        claim,
+                    } => {
+                        let mut asked = None;
+                        let shown = (opened.as_ref(), &mut *pictures);
+                        pack_view::import_form(ui, &t, shown, (ticks, claim), &mut asked);
+                        actions.extend(asked.map(Action::Pack));
+                    }
+                    Dialog::RemovePackFrom { note, name } => {
+                        title(ui, &t.remove_pack_from(name));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove()) {
+                                actions.push(Action::RemovePackFrom(note.clone()));
+                            }
+                        });
+                    }
                     Dialog::SentItem {
                         opened,
                         blocking: Some(areas),
@@ -9570,7 +10770,15 @@ impl App {
                         let mine = view.mine.get(area).map(String::as_str);
                         let names = &view.names;
                         let shown = (&view.shown, &mut *pictures);
-                        people_form(ui, &t, area, (people, names, mine), shown, manages, actions);
+                        people_form(
+                            ui,
+                            &t,
+                            area,
+                            (people, names, mine),
+                            shown,
+                            (manages, view.advanced),
+                            actions,
+                        );
                     }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
@@ -9879,7 +11087,8 @@ impl App {
     /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. Its bar leads to All
-    /// Routines and Reminders and to a new Routine.
+    /// Routines and Reminders, to a new Routine and, in Advanced, to a
+    /// new Session (#246).
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -9891,7 +11100,11 @@ impl App {
             if add_button(ui, &t, &[NewKind::Note]).is_some() {
                 actions.push(Action::NewNote);
             }
-            ui.add_space((ui.available_width() - 60.0).max(0.0));
+            // Room for the buttons at the end: 24 wide and 8 apart, and
+            // New Session only in Advanced (#197, #246).
+            let advanced = self.view.advanced;
+            let room = if advanced { 92.0 } else { 60.0 };
+            ui.add_space((ui.available_width() - room).max(0.0));
             if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
             }
@@ -9901,6 +11114,10 @@ impl App {
                     reminder: false,
                 });
             }
+            // Filed into no Area, so this Device may always set one up.
+            if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
+                actions.push(Action::NewSession(None));
+            }
         });
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.y = 16.0;
@@ -9908,7 +11125,8 @@ impl App {
             return;
         };
         let output = list_scroll(ui, "agenda", |ui| {
-            ui.spacing_mut().item_spacing.y = 12.0;
+            // Tighter than 0.3.1's 12 (#208).
+            ui.spacing_mut().item_spacing.y = 6.0;
             ui.add_space(4.0);
             if !agenda.missed.is_empty() {
                 missed_card(ui, &t, tones, &agenda.missed, actions);
@@ -9953,7 +11171,7 @@ impl App {
                 .unwrap_or(agenda.today.len());
             let (all_day, timed) = agenda.today.split_at(timed);
             for row in all_day {
-                agenda_row(ui, &t, tones, row, actions);
+                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
             }
             for row in &agenda.shopping {
                 shopping_row(ui, tones, row, actions);
@@ -9962,10 +11180,15 @@ impl App {
                 checklist_row(ui, tones, row, actions);
             }
             for row in timed {
-                agenda_row(ui, &t, tones, row, actions);
+                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
             }
-            // Under what is due, never above it (#101).
-            if let Some(frogs) = agenda.frogs.as_ref().filter(|f| f.visible) {
+            // Under what is due, never above it (#101); gone once today's
+            // Frog is eaten where this Device hides what is checked (#217).
+            if let Some(frogs) = agenda
+                .frogs
+                .as_ref()
+                .filter(|f| f.visible && !(agenda.hides_checked && f.eaten))
+            {
                 let mut asked = Vec::new();
                 ui.add_space(4.0);
                 frogs_view::heading(ui, &t, &mut asked);
@@ -9992,7 +11215,7 @@ impl App {
                     );
                 }
                 for row in &agenda.tomorrow {
-                    agenda_row(ui, &t, tones, row, actions);
+                    agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
                 }
             });
             // The days after, each under its weekday and date; one
@@ -10014,7 +11237,7 @@ impl App {
                         );
                     }
                     for row in rows {
-                        agenda_row(ui, &t, tones, row, actions);
+                        agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
                     }
                 });
             }
@@ -10578,6 +11801,7 @@ impl App {
         let settings = DeviceSettings::new(&self.store);
         let alerts = settings.alerts_on().unwrap_or(true);
         let autostart = settings.autostart_on().unwrap_or(true);
+        let bigger = settings.fat_fingers().unwrap_or(false);
         let renag = settings
             .renag_interval()
             .map(|d| d.num_minutes())
@@ -10608,6 +11832,10 @@ impl App {
         ui.label(RichText::new(t.settings_intro()).color(weak));
         ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
+        let all_day_text = &mut self.all_day_text;
+        let all_day_from = settings
+            .all_day_from()
+            .unwrap_or(oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM);
         let hotkey_text = &mut self.hotkey_text;
         let stored_hotkey = settings
             .capture_hotkey()
@@ -10627,7 +11855,12 @@ impl App {
         let units = settings.chosen_unit_system().ok().flatten();
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
+        let hides_checked = settings.agenda_hides_checked().unwrap_or(false);
+        let trashes_done = PersonSettings::new(&self.store)
+            .trashes_done_reminder()
+            .unwrap_or(false);
         let quick = self.view.capture_quick;
+        let advanced = self.view.advanced;
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -10637,21 +11870,26 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_computer()).strong().color(text));
                     let mut on = alerts;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.alerts_switch()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::Alerts(on)));
                     }
                     ui.label(RichText::new(t.alerts_detail()).small().color(weak));
                     let mut on = autostart;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.autostart_switch()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.autostart_switch()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::Autostart(on)));
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
+                    let mut on = bigger;
+                    if theme::checkbox(ui, &mut on, RichText::new(t.bigger_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::Bigger(on)));
+                    }
+                    ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                 });
                 let ai_shown = ai_view::PortShown {
                     url: ai_url.as_deref(),
@@ -10663,6 +11901,19 @@ impl App {
                 if let Some(asked) = ai_view::port_card(ui, &t, tones, ai_shown) {
                     actions.push(Action::Ai(asked));
                 }
+                embossed(ui, tones, false, None, |ui| {
+                    if ui
+                        .button(RichText::new(t.feedback_title()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::PageInto(Page::Feedback));
+                    }
+                    ui.label(
+                        RichText::new(t.feedback_settings_detail())
+                            .small()
+                            .color(weak),
+                    );
+                });
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.about_title()).color(text))
@@ -10696,6 +11947,28 @@ impl App {
                         actions.push(Action::Setting(Setting::Renag(m)));
                     });
                     ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(t.all_day_from()).color(text));
+                        let field = ui.add(
+                            TextEdit::singleline(all_day_text)
+                                .id(Id::new("all day from"))
+                                .hint_text(t.time_hint())
+                                .text_color(text)
+                                .desired_width(60.0),
+                        );
+                        if field.changed()
+                            && let Some(time) = ClockTime::parse(all_day_text.trim())
+                            && time != all_day_from
+                        {
+                            actions.push(Action::Setting(Setting::AllDayFrom(time)));
+                        }
+                    });
+                    if ClockTime::parse(all_day_text.trim()).is_none() {
+                        ui.label(
+                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
+                        );
+                    }
+                    ui.label(RichText::new(t.all_day_from_detail()).small().color(weak));
                     alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {
@@ -10714,8 +11987,7 @@ impl App {
                         actions.push(Action::Setting(Setting::NudgeRepeat(m)));
                     });
                     let mut on = quiet_on;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.quiet_hours()).color(text))
+                    if theme::checkbox(ui, &mut on, RichText::new(t.quiet_hours()).color(text))
                         .changed()
                     {
                         actions.push(Action::Setting(Setting::QuietOn(on)));
@@ -10787,15 +12059,60 @@ impl App {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_agenda()).strong().color(text));
+                    let mut on = hides_checked;
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.hide_checked_on_agenda()).color(text),
+                    )
+                    .changed()
+                    {
+                        actions.push(Action::Setting(Setting::HideChecked(on)));
+                    }
+                    ui.label(
+                        RichText::new(t.hide_checked_on_agenda_detail_device())
+                            .small()
+                            .color(weak),
+                    );
+                    let mut on = trashes_done;
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.trash_done_reminder()).color(text),
+                    )
+                    .changed()
+                    {
+                        actions.push(Action::Setting(Setting::TrashDoneReminder(on)));
+                    }
+                    ui.label(
+                        RichText::new(t.trash_done_reminder_detail())
+                            .small()
+                            .color(weak),
+                    );
+                });
+                embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_history()).strong().color(text));
                     let mut on = streaks;
-                    if ui
-                        .checkbox(&mut on, RichText::new(t.show_streaks_device()).color(text))
-                        .changed()
+                    if theme::checkbox(
+                        ui,
+                        &mut on,
+                        RichText::new(t.show_streaks_device()).color(text),
+                    )
+                    .changed()
                     {
                         actions.push(Action::Setting(Setting::Streaks(on)));
                     }
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
+                });
+                // Simple or Advanced, the person's (#197), last, so
+                // the settings of this computer come first.
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.features()).strong().color(text));
+                    let mut picked = advanced;
+                    if starter_set_view::features_choice(ui, &t, &mut picked) {
+                        actions.push(Action::Setting(Setting::Advanced(picked)));
+                    }
                 });
             });
     }
@@ -10909,6 +12226,7 @@ struct NoteMenu {
     changes: bool,
     schedules: bool,
     frog: bool,
+    session: bool,
     amends: bool,
     checklist: bool,
     shopping: bool,
@@ -10974,6 +12292,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::Settings => t.settings_title(),
         Page::About => t.about_title(),
         Page::Licences => t.open_source_licenses(),
+        Page::Feedback => t.feedback_title(),
         Page::Profile => t.profile_title(),
         Page::People => t.people_title(),
         Page::Backups => t.profile_backups(),
@@ -10986,10 +12305,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
 pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
-    if resp.hovered() {
-        ui.painter()
-            .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);
-    }
+    theme::icon_button_back(ui, &resp, rect);
     icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
     resp.on_hover_text(label)
 }
@@ -11002,6 +12318,40 @@ pub(crate) fn name_field(ui: &Ui, field: &egui::Response, name: &str) {
 }
 
 /// The heading of a dialog.
+/// One change of a Note's History (#193): what it changed, who made it
+/// and when, the values before and after it, and "Use this version"
+/// where it brings an old text back.
+fn note_change(
+    ui: &mut Ui,
+    t: &L10n,
+    (i, row): (usize, &note_history_view::ChangeRow),
+    (text, weak): (Color32, Color32),
+    actions: &mut Vec<Action>,
+) {
+    ui.vertical(|ui| {
+        ui.label(RichText::new(&row.title).strong().color(text));
+        ui.label(RichText::new(&row.said).small().color(weak));
+        if let Some(before) = &row.before {
+            ui.label(RichText::new(t.note_history_before()).small().color(weak));
+            ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
+        }
+        if let Some(after) = &row.after {
+            if row.before.is_some() {
+                ui.label(RichText::new(t.note_history_after()).small().color(weak));
+            }
+            ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
+        }
+        if row.may_use
+            && ui
+                .button(RichText::new(t.use_this_version()).color(text))
+                .clicked()
+        {
+            actions.push(Action::UseVersion(i));
+        }
+    });
+    ui.separator();
+}
+
 fn title(ui: &mut Ui, title: &str) {
     let text = ui.visuals().text_color();
     ui.label(RichText::new(title).size(18.0).strong().color(text));
@@ -11030,7 +12380,7 @@ fn focused_field(
 
 /// Where Report sends a problem's details: the developer's mail, as on
 /// the phone (crash_guard.dart).
-const REPORT_MAIL: &str = "taum@tuta.io";
+pub(crate) const REPORT_MAIL: &str = "taum@tuta.io";
 
 /// What a failure announced at the top was (UI laws, "Announcements"):
 /// `heading`, the cause and the fix in one sentence each, the full
@@ -11114,7 +12464,7 @@ fn report_url(details: &str) -> String {
 
 /// `text` with everything but unreserved characters percent-encoded,
 /// as a URL's query takes it.
-fn percent_encoded(text: &str) -> String {
+pub(crate) fn percent_encoded(text: &str) -> String {
     text.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
@@ -11162,6 +12512,31 @@ const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 /// the phone names it.
 const FROGS_DONE_OPEN: &str = "frogsDoneOpen";
 
+/// What the settings of this Device start with that keep a Shopping
+/// List's struck Lines, or the description of a Note of a kind, unfolded
+/// on its card, the Note's id after it, as the phone names them (#189).
+const STRUCK_SHOWN: &str = "shoppingStruckShown:";
+const DESCRIPTION_UNFOLDED: &str = "descriptionUnfolded:";
+
+/// The setting that keeps the struck Lines of the Shopping List `note`
+/// unfolded on its card.
+fn struck_shown_setting(note: &str) -> String {
+    format!("{STRUCK_SHOWN}{note}")
+}
+
+/// The setting that keeps the description of the Note `note` unfolded on
+/// its card.
+fn description_unfolded_setting(note: &str) -> String {
+    format!("{DESCRIPTION_UNFOLDED}{note}")
+}
+
+/// The setting of this Device that keeps the Notes of the list `key`
+/// whose card shows the view the list does not start in, joined by commas
+/// (#189).
+fn switched_setting(key: &str) -> String {
+    format!("switchedNotes:{key}")
+}
+
 /// The setting of this Device that keeps the Note list `key` compact
 /// (#114), the phone's; none while it shows in full, the default.
 fn compact_setting(key: &str) -> String {
@@ -11169,7 +12544,7 @@ fn compact_setting(key: &str) -> String {
 }
 
 /// Which Note list `selection` shows, by the phone's names, each keeping
-/// its own full/compact choice (#114): all Notes, or a person's while
+/// its own compact/detailed choice (#114): all Notes, or a person's while
 /// `people` keeps only some, Unsorted, an Area (`area`) or a Topic. A
 /// search inside one follows its choice; the trash has none.
 fn cards_key(selection: &Selection, people: &PersonFilter, area: bool) -> Option<String> {
@@ -11261,11 +12636,10 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
     });
 }
 
-/// A confirm button for a destructive step: its verb in the error colour
-/// (UI laws).
+/// A confirm button for a destructive step: its verb on the error
+/// colour (UI laws, #218).
 fn destructive(ui: &mut Ui, label: &str) -> bool {
-    let error = ui.visuals().error_fg_color;
-    ui.button(RichText::new(label).color(error)).clicked()
+    theme::destructive(ui, true, label).clicked()
 }
 
 /// Asks for a name: `(title, verb, done)` say what for. Enter takes it.
@@ -11284,9 +12658,7 @@ fn name_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let text = ui.visuals().text_color();
-        let button = egui::Button::new(RichText::new(verb).color(text));
-        if ui.add_enabled(ready, button).clicked() {
+        if theme::primary(ui, ready, verb).clicked() {
             actions.push(done);
         }
     });
@@ -11313,9 +12685,7 @@ fn link_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let text = ui.visuals().text_color();
-        let button = egui::Button::new(RichText::new(t.link_set()).color(text));
-        if ui.add_enabled(ready, button).clicked() {
+        if theme::primary(ui, ready, t.link_set()).clicked() {
             actions.push(Action::SetLink);
         }
     });
@@ -11330,20 +12700,26 @@ fn share_form(
     ui: &mut Ui,
     t: &L10n,
     area: &str,
-    (role, afar): (&mut AreaRole, bool),
+    (role, afar, advanced): (&mut AreaRole, bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     title(ui, &t.share_title(area));
     ui.label(RichText::new(t.share_host_intro()).color(weak));
-    ui.label(RichText::new(t.role_heading()).strong().color(text));
-    for (choice, label, detail) in [
-        (AreaRole::Member, t.role_member(), t.role_member_detail()),
-        (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
-    ] {
-        ui.radio_value(role, choice, RichText::new(label).color(text));
-        ui.label(RichText::new(detail).small().color(weak));
+    // Roles are chosen only in Advanced (#197); in Simple the person
+    // joins as a Member.
+    if advanced {
+        ui.label(RichText::new(t.role_heading()).strong().color(text));
+        for (choice, label, detail) in [
+            (AreaRole::Member, t.role_member(), t.role_member_detail()),
+            (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
+        ] {
+            ui.radio_value(role, choice, RichText::new(label).color(text));
+            ui.label(RichText::new(detail).small().color(weak));
+        }
+    } else {
+        *role = AreaRole::Member;
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
@@ -11628,7 +13004,7 @@ fn send_form(
         ui.label(RichText::new(t.send_plain_hint()).color(text));
     }
     if update {
-        ui.checkbox(cancelling, RichText::new(t.send_cancel()).color(text));
+        theme::checkbox(ui, cancelling, RichText::new(t.send_cancel()).color(text));
         ui.label(RichText::new(t.send_cancel_hint()).small().color(weak));
     }
     ui.label(RichText::new(t.send_what()).small().color(weak));
@@ -12039,7 +13415,7 @@ fn people_form(
         &std::collections::HashMap<String, Profile>,
         &mut profile_view::Pictures,
     ),
-    manages: bool,
+    (manages, advanced): (bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -12082,17 +13458,15 @@ fn people_form(
                 Some(AreaRole::Manager) => (t.make_member(), AreaRole::Member),
                 None => return,
             };
-            if ui.button(RichText::new(label).color(text)).clicked() {
+            // Roles are changed only in Advanced (#197).
+            if advanced && ui.button(RichText::new(label).color(text)).clicked() {
                 actions.push(Action::SetRole {
                     area: area.to_string(),
                     person: person.id.clone(),
                     role: next,
                 });
             }
-            if ui
-                .button(RichText::new(t.remove_person()).color(text))
-                .clicked()
-            {
+            if theme::destructive(ui, true, t.remove_person()).clicked() {
                 actions.push(Action::AskRemovePerson {
                     area: area.to_string(),
                     person: person.id.clone(),
@@ -12366,21 +13740,28 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
         ),
     ];
     for (control, shows, label) in switches {
-        let mut on = shows;
-        if ui
-            .checkbox(&mut on, RichText::new(label).color(text))
-            .changed()
+        // The format bar, Frogs, Sessions and Tallies are offered only in
+        // Advanced (#197); the alarm clock offers a Routine or Reminder
+        // without the switch (#223).
+        if matches!(
+            control,
+            QuickNoteControl::FormatBar | QuickNoteControl::Schedule
+        ) && !quick.advanced
         {
+            continue;
+        }
+        let mut on = shows;
+        if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
             actions.push(Action::Setting(Setting::QuickNote(control, on)));
         }
     }
     let mut on = quick.nudge_buttons;
-    if ui
-        .checkbox(
-            &mut on,
-            RichText::new(t.quick_note_nudge_buttons()).color(text),
-        )
-        .changed()
+    if theme::checkbox(
+        ui,
+        &mut on,
+        RichText::new(t.quick_note_nudge_buttons()).color(text),
+    )
+    .changed()
     {
         actions.push(Action::Setting(Setting::QuickNoteNudgeButtons(on)));
     }
@@ -12442,7 +13823,7 @@ fn alarm_sound_choice(
 /// The Nudge repeats offered, in minutes (the phone's choices).
 pub const NUDGE_REPEAT_CHOICES: [i64; 3] = [10, 30, 60];
 
-/// `label`, and below it a column of radio buttons for `minutes`;
+/// `label`, and below it a row of choice chips for `minutes`;
 /// `picked` gets a new one.
 fn minutes_choice(
     ui: &mut Ui,
@@ -12456,13 +13837,14 @@ fn minutes_choice(
     ui.label(RichText::new(label).color(text));
     let mut chosen = minutes;
     let options = choices.iter().map(|m| (*m, t.renag_minutes(*m)));
-    if radio_column(ui, &mut chosen, options) && chosen != minutes {
+    if chip_row(ui, &mut chosen, options) && chosen != minutes {
         picked(chosen);
     }
 }
 
-/// A single choice: one radio button per line, the `current` one marked.
-/// True when a click picked one.
+/// A long or wordy single choice: one radio button per line, the
+/// `current` one marked; a short one is a [`chip_row`]. True when a click
+/// picked one.
 pub(crate) fn radio_column<T: PartialEq + Copy>(
     ui: &mut Ui,
     current: &mut T,
@@ -12478,15 +13860,48 @@ pub(crate) fn radio_column<T: PartialEq + Copy>(
     changed
 }
 
-/// A pill to pick one of a few choices: self-painted so its text reads in
-/// every state, with the accent while `on`.
+/// A short single choice (#226): a wrapping row of pills, the `current`
+/// one selected, as the Routine editor's weekday pills look. A screen
+/// reader hears a radio group of radio buttons; Tab and the arrows move
+/// between them, Space or Enter picks one. True when a click picked one.
+pub(crate) fn chip_row<T: PartialEq + Copy>(
+    ui: &mut Ui,
+    current: &mut T,
+    options: impl IntoIterator<Item = (T, String)>,
+) -> bool {
+    let tones = theme::tones(ui.visuals());
+    ui.horizontal_wrapped(|ui| {
+        ui.ctx().accesskit_node_builder(ui.unique_id(), |node| {
+            node.set_role(egui::accesskit::Role::RadioGroup);
+        });
+        let mut changed = false;
+        for (value, label) in options {
+            let on = *current == value;
+            if pill_as(ui, tones, on, &label, WidgetType::RadioButton).clicked() {
+                *current = value;
+                changed = true;
+            }
+        }
+        changed
+    })
+    .inner
+}
+
+/// A pill to pick one or several of a few choices: self-painted so its
+/// text reads in every state, with the accent while `on`.
 pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Response {
+    pill_as(ui, tones, on, label, WidgetType::Button)
+}
+
+/// A [`pill`] a screen reader hears as `typ`, with the focus ring while
+/// it has the keyboard.
+fn pill_as(ui: &mut Ui, tones: Tones, on: bool, label: &str, typ: WidgetType) -> egui::Response {
     let font = FontId::proportional(14.0);
     let fg = ui.visuals().text_color();
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, fg);
     let pad = egui::vec2(10.0, 5.0);
     let (rect, resp) = ui.allocate_exact_size(galley.size() + pad * 2.0, Sense::click());
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, on, label));
+    resp.widget_info(|| WidgetInfo::selected(typ, true, on, label));
     if ui.is_rect_visible(rect) {
         let fill = if on {
             tones.accent.gamma_multiply(0.3)
@@ -12511,6 +13926,11 @@ pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Re
             ),
             egui::StrokeKind::Inside,
         );
+        if resp.has_focus() {
+            let ring = ui.visuals().widgets.active.bg_stroke;
+            ui.painter()
+                .rect_stroke(rect.expand(2.0), 14.0, ring, egui::StrokeKind::Outside);
+        }
         ui.painter().galley(rect.min + pad, galley, fg);
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -12532,6 +13952,253 @@ pub(crate) fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui:
     icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
+/// The Agenda of `store` on `wall`, its targets in `system`, as the
+/// window shows it, with the log's mark it was read at: today's picks
+/// written first when they are new, then everything read. It runs on the
+/// window's thread, or on one of its own with a connection of its own
+/// (#207).
+fn read_agenda(
+    store: &Store,
+    t: &L10n,
+    wall: &oldbrainfix_core::WallClock,
+    system: UnitSystem,
+) -> oldbrainfix_core::Result<(AgendaView, i64)> {
+    let notes = Notes::new(store);
+    let places = Places::new(store);
+    let routines = Routines::new(store);
+    let lists = Checklists::new(store);
+    let shopping = ShoppingLists::new(store);
+    let frogs = Frogs::new(store);
+    let place = |note: Note| place_note(store, &places, note);
+    let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, wall, list);
+    // Read as the Agenda shows, never while it is drawn, and
+    // before the rows read their Done: today's picks are
+    // written for everyone the Session reaches when they are
+    // new (ADR 0029), and reading again writes nothing.
+    let sessions = Sessions::new(store);
+    let picks = sessions.pick_today(wall)?;
+    // Likewise today's Frog, written for the user's own Devices when it
+    // is new.
+    let today = frogs.pick_today(wall)?;
+    // What is read from here on is of this mark (#207).
+    let seq = store.current_seq()?;
+    let mut picked = HashMap::new();
+    for today in picks {
+        let key = (today.session.id().to_string(), today.occurrence.key());
+        picked.insert(key, PicksShown::read(store, t, today, system)?);
+    }
+    let counts: HashMap<String, _> = sessions
+        .all()?
+        .into_iter()
+        .map(|s| (s.id().to_string(), s))
+        .collect();
+    let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
+    // The rows' Notes that are Checklists, read in one pass so
+    // only their rows read their Lines for the Occurrence.
+    let row_notes: Vec<String> = agenda
+        .today_rows
+        .iter()
+        .chain(&agenda.tomorrow_rows)
+        .chain(agenda.later_rows.iter().flatten())
+        .filter_map(|row| row.note.as_ref().map(|n| n.id.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let list_notes: HashSet<String> = if row_notes.is_empty() {
+        HashSet::new()
+    } else {
+        lists.of_notes(&row_notes)?.into_keys().collect()
+    };
+    let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
+        let area = match &row.note {
+            Some(note) => place(note.clone())?.area,
+            None => None,
+        };
+        let key = (row.routine.id.clone(), row.occurrence.key());
+        let session = match picked.get(&key) {
+            Some(shown) => Some(SessionPart::Today(Box::new(shown.clone()))),
+            None => counts
+                .get(&row.routine.id)
+                .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
+        };
+        // A Session's picks win over Lines.
+        let mut lines = None;
+        if session.is_none()
+            && row
+                .note
+                .as_ref()
+                .is_some_and(|n| list_notes.contains(&n.id))
+        {
+            let on = RoutineOccurrence {
+                routine_id: row.routine.id.clone(),
+                occurrence: row.occurrence,
+            };
+            if let Some(list) = lists.for_occurrence(&on)?
+                && list.count() > 0
+            {
+                lines = Some((list, store.may_check_off(&row.routine.id)?));
+            }
+        }
+        Ok(Row {
+            row,
+            area,
+            session,
+            lines,
+        })
+    };
+    // What shows as Done leaves where this Device hides it
+    // (#217).
+    let hides_checked = DeviceSettings::new(store).agenda_hides_checked()?;
+    let rows = |rows: Vec<AgendaRow>| -> oldbrainfix_core::Result<Vec<Row>> {
+        let mut shown = Vec::new();
+        for placed in rows.into_iter().map(row) {
+            let placed = placed?;
+            if !hides_checked || !shown_done(&placed) {
+                shown.push(placed);
+            }
+        }
+        Ok(shown)
+    };
+    let mut later = Vec::new();
+    for (i, day) in agenda.later_rows.iter().enumerate() {
+        later.push((agenda.later(i), rows(day.clone())?));
+    }
+    let frog_rows = shown_frogs(today.shown.clone())?;
+    let mut shopping_rows = Vec::new();
+    for shown in shopping.agenda_rows(wall)? {
+        let Some(note) = notes.by_id(&shown.list.note_id)? else {
+            continue;
+        };
+        let title = match row_title(t, Some(&note)).lines().next() {
+            Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+            _ => t.shopping_heading().to_string(),
+        };
+        // As this person chose for the list (#186); one kept
+        // off is not among them.
+        let count = shown.lines.len() as i64;
+        let (lines, text) = match shown.shows {
+            ShoppingOnAgenda::Lines => (shown.lines, title),
+            ShoppingOnAgenda::Count => (Vec::new(), t.shopping_row_open(&title, count)),
+            ShoppingOnAgenda::Off => continue,
+        };
+        shopping_rows.push(ShoppingRow {
+            area: place(note.clone())?.area,
+            checks: shopping.may_check(&note.id)?,
+            note_id: note.id,
+            text,
+            lines,
+        });
+    }
+    let mut checklist_rows = Vec::new();
+    for row in lists.agenda_rows()? {
+        let Some(note) = notes.by_id(&row.list.note_id)? else {
+            continue;
+        };
+        let title = match row_title(t, Some(&note)).lines().next() {
+            Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+            _ => t.checklist_heading().to_string(),
+        };
+        // As this person chose for the list (#219): every
+        // open Line, or none, which leaves the count.
+        let ChecklistAgendaRow { list, shows } = row;
+        let lines = match shows {
+            ListOnAgenda::Count => Vec::new(),
+            // Its checked Lines never show (#143).
+            _ => agenda_lines(&list, true),
+        };
+        let text = if lines.is_empty() {
+            let (open, count) = (list.open_count() as i64, list.count() as i64);
+            t.checklist_row_open(&title, open, count)
+        } else {
+            title
+        };
+        checklist_rows.push(ChecklistRow {
+            area: place(note.clone())?.area,
+            text,
+            lines,
+            checks: lists.may_check(&note.id)?,
+            note_id: note.id,
+        });
+    }
+    Ok((
+        AgendaView {
+            later,
+            shopping: shopping_rows,
+            checklists: checklist_rows,
+            today: rows(agenda.today_rows)?,
+            tomorrow: rows(agenda.tomorrow_rows)?,
+            missed: Alarms::new(store).missed(wall)?,
+            unsorted: notes.unsorted()?.len(),
+            // Counted from the pending sets, without reading each
+            // held file.
+            waiting: store
+                .pending_sets()?
+                .iter()
+                .filter(|s| s.kind == sent::PENDING_KIND)
+                .count(),
+            offers: store
+                .pending_sets()?
+                .iter()
+                .filter(|s| s.kind == offers::PENDING_KIND)
+                .count(),
+            frogs: Some(today),
+            frog_rows,
+            hides_checked,
+        },
+        seq,
+    ))
+}
+
+/// `note` with where it is filed, who wrote it and the Pack it came from.
+fn place_note(store: &Store, places: &Places, note: Note) -> oldbrainfix_core::Result<Placed> {
+    let author = store.author_of(&note.id)?;
+    let pack_from = store.pack_from(&note.id)?;
+    let Some(id) = note.place.clone() else {
+        return Ok(Placed {
+            note,
+            area: None,
+            topic: None,
+            author,
+            pack_from,
+        });
+    };
+    let topic = places.topic_by_id(&id)?;
+    let area_id = topic.as_ref().map_or(id, |t| t.area_id.clone());
+    Ok(Placed {
+        note,
+        area: places.area_by_id(&area_id)?,
+        topic,
+        author,
+        pack_from,
+    })
+}
+
+/// The Frogs of `list` as they show, their Done on `wall`; one whose Note
+/// is gone for good shows nowhere.
+fn frogs_shown(
+    store: &Store,
+    places: &Places,
+    wall: &oldbrainfix_core::WallClock,
+    list: Vec<Frog>,
+) -> oldbrainfix_core::Result<Vec<FrogShown>> {
+    let frogs = Frogs::new(store);
+    let mut out = Vec::new();
+    for frog in list {
+        let Some(note) = frogs.note(&frog)? else {
+            continue;
+        };
+        let area = place_note(store, places, note.clone())?.area;
+        out.push(FrogShown {
+            may_check: store.may_check_off(&frog.id)?,
+            manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
+            done_on: frog.done.map(|at| Day::of(wall(at))),
+            frog,
+            note,
+            area,
+        });
+    }
+    Ok(out)
+}
 
 /// What an Occurrence of a Routine shows as: its Note's text, what the
 /// Note holds when it has no words, or that the Note is gone.
@@ -12543,15 +14210,113 @@ pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     }
 }
 
-/// One Occurrence on the Agenda as an embossed row: the box to check it
-/// off, its time, its Note's text, its Area's colour and icon, and its
-/// ⋮. A click on the text opens its Routine; a right-click on it opens
-/// the menu of ⋮. A Session's row lists its picks under it today, and
-/// how many it picks on later days; once every pick has an entry, its
-/// box stays checked. A Routine spawned from a Checklist lists its Lines
-/// under it, checked for this Occurrence; once every Line is checked, its
-/// box stays checked too (#121).
-fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
+/// How far an entry under an Agenda group's heading is indented, beside
+/// the item spacing: its box stands where the heading's words begin, as
+/// far in as a box and the room after it (#208).
+const ENTRY_INDENT: f32 = 28.0 + 4.0;
+
+/// How much further a Line under another Line is indented.
+const ENTRY_STEP: f32 = 20.0;
+
+/// The room above and below an Agenda row's content in its card, tighter
+/// than a card's elsewhere (#208).
+const AGENDA_INSIDE: i8 = 6;
+
+/// The box of an Agenda heading that only shows Done, a Session's
+/// (#208): drawn as [`check`] in its usual colours, but nothing clicks
+/// it.
+fn shown_check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, false, done, label));
+    let (icon, colour) = if done {
+        (icons::CHECKED, tones.accent)
+    } else {
+        (icons::UNCHECKED, ui.visuals().text_color())
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    resp
+}
+
+/// The icon that leads an Agenda heading without a box, in a box's room.
+fn heading_icon(ui: &mut Ui, icon: char) {
+    let weak = ui.visuals().weak_text_color();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+    icons::paint(ui.painter(), rect.shrink(4.0), icon, weak);
+}
+
+/// What was clicked on an entry of an Agenda group.
+#[derive(Debug, Clone, Copy, Default)]
+struct EntryClicks {
+    boxed: bool,
+    words: bool,
+}
+
+/// One entry under an Agenda group's heading (#208): a Line, a Shopping
+/// List's Line or a Session's pick, all alike: its box, `checked`, and its
+/// words, struck through and dimmed when `struck`, indented under the
+/// heading, `depth` steps further for a Line under another. The box
+/// clicks while `boxes`, the words while `opens`, as a button named by
+/// them; `id` keeps their click apart from every other's.
+fn agenda_entry(
+    ui: &mut Ui,
+    tones: Tones,
+    (id, words, depth): (Id, &str, usize),
+    (checked, struck): (bool, bool),
+    (boxes, opens): (bool, bool),
+) -> EntryClicks {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal(|ui| {
+        let spacing = ui.spacing().item_spacing.x;
+        ui.add_space(ENTRY_INDENT + spacing + depth as f32 * ENTRY_STEP);
+        let boxed = ui
+            .add_enabled_ui(boxes, |ui| check(ui, tones, checked, words))
+            .inner
+            .clicked();
+        ui.add_space(4.0);
+        let mut shown = RichText::new(words).size(15.0).color(text);
+        if struck {
+            shown = shown.strikethrough().color(weak);
+        }
+        let label = ui.add(egui::Label::new(shown).truncate());
+        let sense = if opens {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let mut open = ui.interact(label.rect, id, sense);
+        open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, opens, words));
+        if opens {
+            open = open.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+        EntryClicks {
+            boxed,
+            words: open.clicked(),
+        }
+    })
+    .inner
+}
+
+/// One Occurrence on the Agenda as a group (#208): the heading an
+/// embossed card's top, with the box to check it off, its time, its
+/// Note's text, its Area's colour and icon, and its ⋮; a click on the
+/// text opens its Routine, a right-click on it the menu of ⋮. Under it a
+/// Session's picks today, each with its box showing whether it has an
+/// entry, its box and words opening its entry form, and "Another one"
+/// under each without one; how many it picks on later days. A Session's
+/// own box only shows Done: once every pick has an entry it checks
+/// itself, and nothing else checks it. A Routine spawned from a
+/// Checklist lists its Lines under it, checked for this Occurrence; once
+/// every Line is checked, its box stays checked too (#121). Where
+/// `hides_checked` (#217), the checked Lines and the picks with an entry
+/// are left out.
+fn agenda_row(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (row, hides_checked): (&Row, bool),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let routine = &row.row.routine;
@@ -12563,7 +14328,7 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
         .and_then(|a| area_colour(a.colour.as_deref()));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
-    embossed(ui, tones, false, colour, |ui| {
+    agenda_card(ui, tones, colour, |ui| {
         // Done from the entries of every pick, or from every Line
         // checked, stays checked.
         let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
@@ -12573,22 +14338,37 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 .is_some_and(|(list, _)| list.all_checked());
         ui.horizontal(|ui| {
             let label = format!("{}: {time} {title}", t.mark_done());
-            let toggled = ui
-                .add_enabled_ui(!complete, |ui| check(ui, tones, done, &label))
-                .inner;
-            if toggled.clicked() {
-                actions.push(Action::Toggle(routine.id.clone(), occurrence));
+            if row.session.is_some() {
+                // Its picks make it Done (#208).
+                shown_check(ui, tones, done || complete, &label);
+            } else {
+                let toggled = ui
+                    .add_enabled_ui(!complete, |ui| check(ui, tones, done, &label))
+                    .inner;
+                if toggled.clicked() {
+                    actions.push(Action::Toggle(routine.id.clone(), occurrence));
+                }
             }
             ui.add_space(4.0);
             let width = (ui.available_width() - 84.0).max(40.0);
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
+                ui.spacing_mut().item_spacing.y = 2.0;
                 ui.label(RichText::new(&time).strong().color(text));
                 let mut line = RichText::new(&title).size(15.0).color(text);
                 if done {
                     line = line.strikethrough();
                 }
                 ui.add(egui::Label::new(line).truncate());
+                match &row.session {
+                    Some(SessionPart::Later(count)) => {
+                        ui.label(RichText::new(t.session_picks(*count)).color(text));
+                    }
+                    Some(SessionPart::Today(shown)) if shown.today.picks.is_empty() => {
+                        ui.label(RichText::new(t.session_nothing_to_pick()).color(text));
+                    }
+                    _ => {}
+                }
             });
             let open = body
                 .response
@@ -12627,146 +14407,194 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 None => {}
             }
         });
-        // The picks go under the title, outside its click.
-        if let Some(part) = &row.session {
-            let mut asked = Vec::new();
-            ui.indent(("session part", &routine.id, occurrence.key()), |ui| {
-                session_view::part(ui, t, part, &mut asked);
-            });
-            actions.extend(asked.into_iter().map(Action::Session));
+        // The entries go under the heading, outside its click.
+        if let Some(SessionPart::Today(shown)) = &row.session {
+            session_picks(ui, t, tones, (shown, hides_checked), actions);
         } else if let Some((list, checks)) = &row.lines {
             // The Lines go there too, checked for this Occurrence.
-            let mut asked = Vec::new();
-            ui.indent(("row lines", &routine.id, occurrence.key()), |ui| {
-                checklist_view::lines(
+            for line in agenda_lines(list, hides_checked) {
+                let id = Id::new(("row line", &routine.id, occurrence.key(), &line.id));
+                let shown = (id, line.text.as_str(), usize::from(line.in_group));
+                let clicks = agenda_entry(
                     ui,
-                    (t, tones),
-                    &checklist_view::shown_lines(list),
-                    (*checks, list.on.as_ref()),
-                    (None, None),
-                    &mut asked,
+                    tones,
+                    shown,
+                    (line.checked, line.checked),
+                    (*checks, true),
                 );
-            });
-            actions.extend(asked.into_iter().map(Action::Checklist));
+                if clicks.boxed {
+                    actions.push(Action::Checklist(ChecklistAction::Check(
+                        line.id.clone(),
+                        !line.checked,
+                        list.on.clone(),
+                    )));
+                }
+                if clicks.words {
+                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                }
+            }
         }
     });
 }
 
-/// A Shopping List's row today as an embossed row with its Area's colour
-/// and icon (#123): a Line that came back today with its box and the
-/// list's title under it, checking it strikes it and it leaves the
-/// Agenda; or the list with the cart and how many came back or are open.
-/// A click on its text opens the Note.
-fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
+/// Today's picks of a Session under its heading (#208), in the order
+/// picked, each an entry with its box, checked once it has an entry and
+/// struck through; its box and its words open its entry form where this
+/// Device may; "Another one" goes under each without an entry while they
+/// swap (the control goes below its text). Where `hides_checked`
+/// (#217), a pick with an entry is left out.
+fn session_picks(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (shown, hides_checked): (&PicksShown, bool),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let today = &shown.today;
+    let session = today.session.id();
+    let occurrence = today.occurrence;
+    for (i, pick) in today.picks.iter().enumerate() {
+        if hides_checked && pick.done() {
+            continue;
+        }
+        let words = shown.texts.get(i).map(String::as_str).unwrap_or_default();
+        let opens = shown.opens.get(i).copied().unwrap_or(false);
+        let id = Id::new(("session pick", session, occurrence.key(), &pick.note_id));
+        let clicks = agenda_entry(
+            ui,
+            tones,
+            (id, words, 0),
+            (pick.done(), pick.done()),
+            (opens, opens),
+        );
+        if clicks.boxed || clicks.words {
+            actions.push(Action::Session(SessionAction::Open {
+                session: session.to_string(),
+                occurrence,
+                note_id: pick.note_id.clone(),
+                entry: pick.entries.last().map(|e| e.id.clone()),
+            }));
+        }
+        if shown.swaps && !pick.done() {
+            let another = ui.horizontal(|ui| {
+                ui.add_space(ENTRY_INDENT + ui.spacing().item_spacing.x);
+                icons::show(ui, icons::SWAP, 18.0, text);
+                ui.button(RichText::new(t.session_another()).color(text))
+            });
+            if another.inner.clicked() {
+                actions.push(Action::Session(SessionAction::Another {
+                    session: session.to_string(),
+                    occurrence,
+                    note_id: pick.note_id.clone(),
+                }));
+            }
+        }
+    }
+}
+
+/// The heading of a Shopping List's or Checklist's group: its kind's
+/// icon where a box would be, its `words`, a click on which opens the
+/// Note `note_id`, and its Area's icon.
+fn list_heading(
+    ui: &mut Ui,
+    (icon, area, colour): (char, Option<&Area>, Option<Color32>),
+    (note_id, words, salt): (&str, &str, &str),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let colour = row
-        .area
-        .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
-    embossed(ui, tones, false, colour, |ui| {
-        ui.horizontal(|ui| {
-            match &row.line {
-                Some(line) => {
-                    let ticked = ui
-                        .add_enabled_ui(row.checks, |ui| check(ui, tones, false, &line.text))
-                        .inner;
-                    if ticked.clicked() {
-                        actions.push(Action::Shopping(ShoppingAction::Check(
-                            line.id.clone(),
-                            true,
-                        )));
-                    }
-                }
-                None => {
-                    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-                    icons::paint(ui.painter(), rect.shrink(4.0), icons::SHOPPING_CART, weak);
-                }
+    ui.horizontal(|ui| {
+        heading_icon(ui, icon);
+        ui.add_space(4.0);
+        let width = (ui.available_width() - 32.0).max(40.0);
+        let body = ui.vertical(|ui| {
+            ui.set_max_width(width);
+            ui.add(egui::Label::new(RichText::new(words).size(15.0).color(text)).truncate());
+        });
+        let open = ui
+            .interact(body.response.rect, Id::new((salt, note_id)), Sense::click())
+            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
+        if open.clicked() {
+            actions.push(Action::SelectNote(note_id.to_string()));
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(icon) = area.and_then(|a| icons::area_icon(a.icon.as_deref())) {
+                icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
             }
-            ui.add_space(4.0);
-            let width = (ui.available_width() - 32.0).max(40.0);
-            let body = ui.vertical(|ui| {
-                ui.set_max_width(width);
-                ui.add(
-                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
-                );
-                if row.line.is_some() {
-                    ui.add(
-                        egui::Label::new(RichText::new(&row.title).small().color(weak)).truncate(),
-                    );
-                }
-            });
-            let salt = match &row.line {
-                Some(line) => ("shopping line", line.id.as_str()),
-                None => ("shopping row", row.note_id.as_str()),
-            };
-            let open = ui
-                .interact(body.response.rect, Id::new(salt), Sense::click())
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            let label = match &row.line {
-                Some(line) => format!("{}: {}", row.title, line.text),
-                None => row.text.clone(),
-            };
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
-            if open.clicked() {
-                actions.push(Action::SelectNote(row.note_id.clone()));
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(icon) = row
-                    .area
-                    .as_ref()
-                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
-                {
-                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
-                }
-            });
         });
     });
 }
 
-/// A Checklist's row today as an embossed row with its Area's colour and
-/// icon (#143): the list with how many of its Lines are open, "Before the
-/// trip: 3 of 7 open". A click on its text opens the Note.
-fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
+/// A Shopping List's group today (#123, #208): its title as the heading,
+/// with the cart and no box, and the Lines that came back today under it,
+/// each with its box, which strikes it and takes it off the Agenda; or,
+/// as chosen for it, the heading alone with how many are open. A click
+/// on a heading's or Line's words opens the Note.
+fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
     let colour = row
         .area
         .as_ref()
         .and_then(|a| area_colour(a.colour.as_deref()));
-    embossed(ui, tones, false, colour, |ui| {
-        ui.horizontal(|ui| {
-            let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
-            icons::paint(ui.painter(), rect.shrink(4.0), icons::CHECKLIST, weak);
-            ui.add_space(4.0);
-            let width = (ui.available_width() - 32.0).max(40.0);
-            let body = ui.vertical(|ui| {
-                ui.set_max_width(width);
-                ui.add(
-                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
-                );
-            });
-            let open = ui
-                .interact(
-                    body.response.rect,
-                    Id::new(("checklist row", row.note_id.as_str())),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &row.text));
-            if open.clicked() {
+    agenda_card(ui, tones, colour, |ui| {
+        let icon = (icons::SHOPPING_CART, row.area.as_ref(), colour);
+        list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
+        for line in &row.lines {
+            let id = Id::new(("shopping line", line.id.as_str()));
+            let clicks = agenda_entry(
+                ui,
+                tones,
+                (id, &line.text, 0),
+                (false, false),
+                (row.checks, true),
+            );
+            if clicks.boxed {
+                let check = ShoppingAction::Check(line.id.clone(), true);
+                actions.push(Action::Shopping(check));
+            }
+            if clicks.words {
                 actions.push(Action::SelectNote(row.note_id.clone()));
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(icon) = row
-                    .area
-                    .as_ref()
-                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
-                {
-                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
-                }
-            });
-        });
+        }
+    });
+}
+
+/// A Checklist's group today (#143, #208): its title as the heading,
+/// with the list's icon and no box, and its open Lines under it, each
+/// with its box, which checks it. A click on a heading's or Line's words
+/// opens the Note.
+fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Vec<Action>) {
+    let colour = row
+        .area
+        .as_ref()
+        .and_then(|a| area_colour(a.colour.as_deref()));
+    agenda_card(ui, tones, colour, |ui| {
+        let icon = (icons::CHECKLIST, row.area.as_ref(), colour);
+        list_heading(
+            ui,
+            icon,
+            (&row.note_id, &row.text, "checklist row"),
+            actions,
+        );
+        for line in &row.lines {
+            let id = Id::new(("checklist line", line.id.as_str()));
+            let shown = (id, line.text.as_str(), usize::from(line.in_group));
+            let clicks = agenda_entry(
+                ui,
+                tones,
+                shown,
+                (line.checked, line.checked),
+                (row.checks, true),
+            );
+            if clicks.boxed {
+                let check = ChecklistAction::Check(line.id.clone(), !line.checked, None);
+                actions.push(Action::Checklist(check));
+            }
+            if clicks.words {
+                actions.push(Action::SelectNote(row.note_id.clone()));
+            }
+        }
     });
 }
 
@@ -12906,22 +14734,16 @@ fn where_captured(context: &CaptureContext) -> Option<String> {
 }
 
 /// What a Capture Context says beyond the time, line by line with each
-/// line's icon, as the phone's `CaptureContextLines`: where, with its
-/// Named Place, the app it was shared in from, the calendar events
-/// running and the Bluetooth devices connected; each with the detail
-/// it shows.
+/// line's icon, as the phone's `CaptureContextLines`: where, by its
+/// Named Place, else its coordinates, the app it was shared in from,
+/// the calendar events running and the Bluetooth devices connected;
+/// each with the detail it shows.
 fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String, CapturedDetail)> {
     let mut lines = Vec::new();
-    if let Some(at) = context.location {
-        let at = coordinates_text(at);
-        lines.push((
-            icons::CONTEXT_WHERE,
-            match &context.named_place {
-                Some(place) => format!("{} ({at})", place.name),
-                None => at,
-            },
-            CapturedDetail::Place,
-        ));
+    if context.location.is_some()
+        && let Some(place) = where_captured(context)
+    {
+        lines.push((icons::CONTEXT_WHERE, place, CapturedDetail::Place));
     }
     if let Some(app) = &context.source_app {
         let line = t.context_source_app(app.name());
@@ -12966,29 +14788,21 @@ fn section_edited(t: &L10n, section: &Section) -> Option<String> {
 }
 
 /// The whole Capture Context of a Note or Section `captured` then, line
-/// by line, as the phone's `CaptureContextLines`: when, under it, small
-/// and dimmed, a Section's `edited` line (#183, [`section_edited`]), then
-/// [`context_lines`]. Each detail `removable` says may go ends in a
-/// Remove (ADR 0037), the time in none; the detail whose Remove was
-/// clicked.
+/// by line, in its Captured dialog, as the phone's `CaptureContextLines`:
+/// when, then [`context_lines`]. Each detail `removable` says may go
+/// ends in a Remove (ADR 0037), the time in none; the detail whose
+/// Remove was clicked. Beside its text the same reads as one
+/// [`capture_line`] (#170).
 fn capture_context(
     ui: &mut Ui,
     t: &L10n,
-    (captured, context, edited): (DateTime<Utc>, &CaptureContext, Option<&str>),
+    (captured, context): (DateTime<Utc>, &CaptureContext),
     removable: impl Fn(CapturedDetail) -> bool,
 ) -> Option<CapturedDetail> {
     let mut asked = None;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         context_line(ui, icons::CONTEXT_WHEN, &when(t, captured));
-        if let Some(edited) = edited {
-            let weak = ui.visuals().weak_text_color();
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                icons::show(ui, icons::EDIT, 16.0, weak);
-                ui.add(egui::Label::new(RichText::new(edited).size(12.0).color(weak)).wrap());
-            });
-        }
         for (icon, line, detail) in context_lines(t, context) {
             if !removable(detail) {
                 context_line(ui, icon, &line);
@@ -12997,8 +14811,7 @@ fn capture_context(
             // The Remove first, at the end of the line, so the line
             // wraps in what is left beside it.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                let text = ui.visuals().text_color();
-                let remove = ui.button(RichText::new(t.remove()).color(text));
+                let remove = theme::destructive(ui, true, t.remove());
                 let label = t.remove_captured_label(detail.name());
                 remove.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
                 if remove.clicked() {
@@ -13011,6 +14824,67 @@ fn capture_context(
         }
     });
     asked
+}
+
+/// A Capture Context `captured` then as one line read beside its text
+/// (#170), the phone's `captureLine`: when, then where (its Named Place,
+/// else its coordinates), the calendar events running, the Bluetooth
+/// devices connected and the app it was shared in from, joined by
+/// " · ". A part captured the same local day as the one before it
+/// (`after`) shows only its time; another day the date too.
+fn capture_line(
+    t: &L10n,
+    (captured, context): (DateTime<Utc>, &CaptureContext),
+    after: Option<DateTime<Utc>>,
+) -> String {
+    let local = captured.with_timezone(&Local);
+    let same_day =
+        after.is_some_and(|a| a.with_timezone(&Local).date_naive() == local.date_naive());
+    let mut parts = vec![if same_day {
+        local.format("%H:%M").to_string()
+    } else {
+        when(t, captured)
+    }];
+    parts.extend(where_captured(context));
+    if !context.calendar_events.is_empty() {
+        parts.push(context.calendar_events.join(", "));
+    }
+    if !context.bluetooth_devices.is_empty() {
+        parts.push(context.bluetooth_devices.join(", "));
+    }
+    if let Some(app) = &context.source_app {
+        parts.push(app.name().to_string());
+    }
+    parts.join(" · ")
+}
+
+/// A part's [`capture_line`] under its text, in the background (#170):
+/// small and in the weak colour, wrapped only where it must, and a
+/// Section's `edited` line (#183, [`section_edited`]) under it the same
+/// way. A `clickable` one is a button, read as "Captured: <line>", that
+/// opens the details; whether it was clicked.
+fn capture_meta(ui: &mut Ui, t: &L10n, line: &str, edited: Option<&str>, clickable: bool) -> bool {
+    let weak = ui.visuals().weak_text_color();
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 2.0;
+        let label = egui::Label::new(RichText::new(line).size(12.0).color(weak)).wrap();
+        let clicked = if clickable {
+            let shown = ui
+                .add(label.sense(Sense::click()))
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let name = t.setting_badge_label(t.captured_heading(), line);
+            shown.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &name));
+            shown.clicked()
+        } else {
+            ui.add(label);
+            false
+        };
+        if let Some(edited) = edited {
+            ui.add(egui::Label::new(RichText::new(edited).size(12.0).color(weak)).wrap());
+        }
+        clicked
+    })
+    .inner
 }
 
 /// Where a Note is filed, `Area / Topic`; `None` while it is in no
@@ -13115,14 +14989,35 @@ pub(crate) fn embossed(
     band: Option<Color32>,
     content: impl FnOnce(&mut Ui),
 ) -> egui::Response {
+    embossed_inside(ui, (tones, strong), (band, 14), content)
+}
+
+/// An Agenda row's card (#208): as [`embossed`], plain, with less room
+/// above and below its content.
+pub(crate) fn agenda_card(
+    ui: &mut Ui,
+    tones: Tones,
+    band: Option<Color32>,
+    content: impl FnOnce(&mut Ui),
+) -> egui::Response {
+    embossed_inside(ui, (tones, false), (band, AGENDA_INSIDE), content)
+}
+
+/// An embossed card with `inside` room above and below its content.
+fn embossed_inside(
+    ui: &mut Ui,
+    (tones, strong): (Tones, bool),
+    (band, inside): (Option<Color32>, i8),
+    content: impl FnOnce(&mut Ui),
+) -> egui::Response {
     let under = ui.painter().add(egui::Shape::Noop);
     let left = if band.is_some() { 22 } else { 16 };
     let inner = Frame::NONE
         .inner_margin(Margin {
             left,
             right: 16,
-            top: 14,
-            bottom: 14,
+            top: inside,
+            bottom: inside,
         })
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
@@ -13142,40 +15037,153 @@ pub(crate) fn embossed(
 /// its Routines and Reminders and how many of them a newer version saved,
 /// its kind with whether it may go back to a plain Note, Show on the
 /// Agenda of a Checklist or a Shopping List and Show ticks where they
-/// apply, what this Device may do to it and whether it has an open Frog.
+/// apply, a Session's setup, what this Device may do to it and whether it
+/// has an open Frog.
 struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
     newer: usize,
-    kind: Option<(char, &'static str, bool)>,
-    on_agenda: Option<bool>,
+    kind: &'a KindShown,
+    on_agenda: Option<ListOnAgenda>,
     shopping_on_agenda: Option<ShoppingOnAgenda>,
     ticks: Option<bool>,
+    /// A Session Note's setup, for its rule and weekdays' badges, and
+    /// whether this Device may change them (#191).
+    session: Option<(&'a SessionSetup, bool)>,
     may: NoteMay,
     frog_open: bool,
+    /// Whether Frogs and Sessions are offered under "+": only in
+    /// Advanced (#197).
+    advanced: bool,
 }
 
-/// The kind of the Note open, its icon and name, and whether this Device
-/// may turn it back into a plain Note: a Checklist's or Shopping List's
-/// "Back to a plain Note" (#160); `None` for a plain Note.
-fn note_kind(t: &L10n, view: &View) -> Option<(char, &'static str, bool)> {
-    if let Some(list) = &view.checklist {
-        return Some((icons::CHECKLIST, t.checklist_heading(), list.plain));
-    }
-    if let Some(list) = &view.shopping {
-        return Some((icons::SHOPPING_CART, t.shopping_heading(), list.plain));
-    }
-    view.tally
-        .as_ref()
-        .map(|_| (icons::TALLY, t.tally_heading(), false))
+/// The kind of the Note open (#188), and the kinds this Device may make
+/// it from its kind badge, in the order offered: a plain Note a
+/// Checklist, a Shopping List, a Tally or a Session (#191), as it may make
+/// it one; a list a plain Note again or the other list; a Session a plain
+/// Note again; a Tally none.
+#[derive(Debug, Clone, PartialEq)]
+struct KindShown {
+    kind: NoteKind,
+    choices: Vec<NoteKind>,
 }
 
-/// The row of badges under the Note's text (#160), in the phone's order:
+impl KindShown {
+    fn of(view: &View) -> KindShown {
+        let kind = view.kind.unwrap_or(NoteKind::Plain);
+        let Some((placed, _)) = &view.detail else {
+            return KindShown {
+                kind,
+                choices: Vec::new(),
+            };
+        };
+        let note = &placed.note;
+        let may = view.may;
+        let mut choices = Vec::new();
+        if !note.is_trashed() {
+            let plain = |list_plain: bool| list_plain.then_some(NoteKind::Plain);
+            let switch = |to: NoteKind| view.switches_list.then_some(to);
+            match kind {
+                // A Code text becomes no other kind (#213).
+                NoteKind::Plain if note.text_format == text_format::CODE => {}
+                NoteKind::Plain => {
+                    // As the Note menu offers them (#145).
+                    let tally = may.amends && may.changes && !note.is_merged();
+                    choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
+                    choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));
+                    // Made only in Advanced (#197).
+                    choices.extend((tally && view.advanced).then_some(NoteKind::Tally));
+                    choices
+                        .extend((view.makes_session && view.advanced).then_some(NoteKind::Session));
+                }
+                NoteKind::Checklist => {
+                    choices.extend(plain(view.checklist.as_ref().is_some_and(|l| l.plain)));
+                    choices.extend(switch(NoteKind::ShoppingList));
+                }
+                NoteKind::ShoppingList => {
+                    choices.extend(plain(view.shopping.as_ref().is_some_and(|l| l.plain)));
+                    choices.extend(switch(NoteKind::Checklist));
+                }
+                // No way out of a Tally.
+                NoteKind::Tally => {}
+                NoteKind::Session => {
+                    choices.extend(view.makes_session.then_some(NoteKind::Plain));
+                }
+            }
+        }
+        KindShown { kind, choices }
+    }
+}
+
+/// What making the Note `id` of the kind `from` one of the kind `to`
+/// asks (#188): the existing ways a Note becomes a list, a Tally or a
+/// plain Note again, a list the other list; a Session's setup page, and
+/// a Session a plain Note again (#191).
+fn kind_action(id: &str, from: NoteKind, to: NoteKind) -> Action {
+    let id = id.to_string();
+    match to {
+        NoteKind::Plain if from == NoteKind::Session => Action::UnmakeSession(id),
+        NoteKind::Plain if from == NoteKind::ShoppingList => {
+            Action::Shopping(ShoppingAction::ToPlain(id))
+        }
+        NoteKind::Plain => Action::Checklist(ChecklistAction::ToPlain(id)),
+        NoteKind::Checklist => Action::Checklist(ChecklistAction::Make(id)),
+        NoteKind::ShoppingList => Action::Shopping(ShoppingAction::Make(id)),
+        NoteKind::Tally => Action::Tally(TallyAction::Make(id)),
+        NoteKind::Session => Action::MakeSession(id),
+    }
+}
+
+/// The icon and the name of the kind `kind` (#188), the value of its
+/// badge (#192); the phone's `kindIcon` and `kindName`.
+/// Under the Note's text after a paste that looks like code (#213): says
+/// so and offers to keep the whole text as code; the cross lets it be.
+fn code_offer(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    ui.horizontal(|ui| {
+        icons::show(ui, icons::CODE, 18.0, text);
+        ui.label(RichText::new(t.code_pasted()).color(text));
+        if ui
+            .button(RichText::new(t.keep_as_code()).color(text))
+            .clicked()
+        {
+            actions.push(Action::SetTextFormat(text_format::CODE));
+        }
+        if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
+            actions.push(Action::OfferCode(false));
+        }
+    });
+}
+
+/// The value icon of the text format `format` in its badge, and the
+/// format in words (#213).
+fn text_format_look(t: &L10n, format: &str) -> (char, &'static str) {
+    match format {
+        text_format::MARKDOWN => (icons::FORMAT_BOLD, t.text_format_formatted()),
+        text_format::CODE => (icons::CODE, t.text_format_code()),
+        _ => (icons::SHORT_TEXT, t.text_format_plain()),
+    }
+}
+
+fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
+    match kind {
+        NoteKind::Plain => (icons::ALL_NOTES, t.kind_plain()),
+        NoteKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
+        NoteKind::ShoppingList => (icons::SHOPPING_CART, t.shopping_heading()),
+        NoteKind::Tally => (icons::TALLY, t.tally_heading()),
+        NoteKind::Session => (icons::SESSION, t.session()),
+    }
+}
+
+/// The row of badges under the Note's text (#160), each the setting's
+/// icon and its value, an icon for a fixed set of values, short text
+/// otherwise (#192), in the phone's order:
 /// the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
 /// opening its editor, and those a newer version saved, only shown; the
-/// kind; Show on the Agenda; Show ticks; and "+" with Routine, Reminder,
-/// Frog and Session, for who may set them up. A setting that does not
+/// kind; a Session's rule and weekdays' counts (#191); Show on the
+/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog and, on a
+/// plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
@@ -13190,27 +15198,26 @@ fn note_badges(
     let look = (t, tones);
     badge_row(ui, |ui| {
         let importance = match note.importance {
-            Importance::Unimportant => t.importance_unimportant(),
-            Importance::Normal => t.importance_normal(),
-            Importance::Important => t.importance_important(),
+            Importance::Unimportant => (icons::IMPORTANCE_LOW, t.importance_unimportant()),
+            Importance::Normal => (icons::IMPORTANCE_NORMAL, t.importance_normal()),
+            Importance::Important => (icons::IMPORTANCE_HIGH, t.importance_important()),
         };
         let icon = (icons::IMPORTANCE, None);
-        if badge(ui, look, icon, t.importance(), Some(importance), changes).clicked() {
+        let value = BadgeValue::Icon(importance.0, importance.1);
+        if badge(ui, look, icon, t.importance(), Some(value), changes).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Importance)));
         }
         // Area and Topic in one: File into… picks both at once.
+        // The folder for every place, in the Area's colour.
         let area = placed.area.as_ref();
-        let icon = area
-            .and_then(|a| icons::area_icon(a.icon.as_deref()))
-            .unwrap_or(icons::NO_AREA_ICON);
         let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
         if badge(
             ui,
             look,
-            (icon, colour),
+            (icons::NO_AREA_ICON, colour),
             t.badge_place(),
-            Some(&place),
+            Some(BadgeValue::Text(&place)),
             changes,
         )
         .clicked()
@@ -13219,8 +15226,18 @@ fn note_badges(
         }
         let captured = when(t, note.captured);
         let icon = (icons::CONTEXT_WHEN, None);
-        if badge(ui, look, icon, t.captured_heading(), Some(&captured), true).clicked() {
+        let value = Some(BadgeValue::Text(&captured));
+        if badge(ui, look, icon, t.captured_heading(), value, true).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Captured)));
+        }
+        // Who the Pack it came from is from, until removed (#165).
+        if let Some(from) = &placed.pack_from {
+            let said = t.pack_from(profile_view::display_name(t, &from.name));
+            let icon = (pack_view::PACK_ICON, None);
+            let value = Some(BadgeValue::Text(&said));
+            if badge(ui, look, icon, t.pack_title(), value, changes).clicked() {
+                actions.push(Action::AskRemovePackFrom(note.id.clone()));
+            }
         }
         for routine in shown.routines {
             let (icon, setting) = if routine.is_reminder() {
@@ -13229,49 +15246,83 @@ fn note_badges(
                 (icons::REPEAT, t.routine())
             };
             let schedule = schedule_text(t, &routine.schedule);
-            if badge(ui, look, (icon, None), setting, Some(&schedule), true).clicked() {
+            let value = Some(BadgeValue::Text(&schedule));
+            if badge(ui, look, (icon, None), setting, value, true).clicked() {
                 actions.push(Action::OpenRoutine(routine.id.clone()));
             }
         }
         for _ in 0..shown.newer {
-            let icon = (icons::HISTORY, None);
-            let newer = t.newer_version_needed();
-            badge(ui, look, icon, t.routine(), Some(newer), false);
+            let icon = (icons::REPEAT, None);
+            let newer = Some(BadgeValue::Text(t.newer_version_needed()));
+            badge(ui, look, icon, t.routine(), newer, false);
         }
-        if let Some((icon, name, plain)) = shown.kind
-            && badge(ui, look, (icon, None), t.badge_kind(), Some(name), plain).clicked()
-        {
+        // Every Note has its kind, a plain Note too (#188); it opens
+        // where there is another to make it.
+        let (icon, name) = kind_look(t, shown.kind.kind);
+        let choosing = !shown.kind.choices.is_empty();
+        let value = Some(BadgeValue::Icon(icon, name));
+        let kind = (icons::KIND, None);
+        if badge(ui, look, kind, t.badge_kind(), value, choosing).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Kind)));
         }
-        // A Shopping List's three ways, where a Checklist's switch sits.
-        if let Some(shows) = shown.shopping_on_agenda {
-            let value = shopping_view::on_agenda_label(t, shows);
-            let icon = (icons::ON_AGENDA, None);
-            let setting = t.checklist_show_on_agenda();
-            if badge(ui, look, icon, setting, Some(value), true).clicked() {
-                actions.push(Action::Badge(Some(NoteBadge::ShoppingOnAgenda)));
+        // A Plain Note's text is plain, formatted or code (#213).
+        if shown.kind.kind == NoteKind::Plain && note.text_editable {
+            let (icon, name) = text_format_look(t, &note.text_format);
+            let value = Some(BadgeValue::Icon(icon, name));
+            let setting = (icons::TEXT_FORMAT, None);
+            if badge(ui, look, setting, t.badge_text_format(), value, changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::Format)));
             }
         }
-        let switches = [
-            (
-                shown.on_agenda,
-                icons::ON_AGENDA,
-                t.checklist_show_on_agenda(),
-                NoteBadge::OnAgenda,
-            ),
-            (
-                shown.ticks,
-                icons::SHOW_TICKS,
-                t.box_show_ticks(),
-                NoteBadge::Ticks,
-            ),
+        // A Session's rule and its weekdays' counts (#191).
+        if let Some((setup, changes)) = shown.session {
+            let rule = session_view::rule_name(t, setup.rule);
+            let rule = Some(BadgeValue::Icon(session_view::rule_icon(setup.rule), rule));
+            let icon = (icons::SESSION_RULE_BADGE, None);
+            if badge(ui, look, icon, t.session_rule(), rule, changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::SessionRule)));
+            }
+            let own = t.session_weekday_counts_summary(setup.counts.len() as i64);
+            let icon = (icons::SESSION_WEEKDAYS, None);
+            let setting = t.session_weekday_counts();
+            let own = Some(BadgeValue::Text(&own));
+            if badge(ui, look, icon, setting, own, changes).clicked() {
+                actions.push(Action::Badge(Some(NoteBadge::SessionWeekdays)));
+            }
+        }
+        // A Shopping List's (#186) or a Checklist's (#219) three ways.
+        let ways = [
+            (shown.on_agenda, NoteBadge::OnAgenda),
+            (shown.shopping_on_agenda, NoteBadge::ShoppingOnAgenda),
         ];
+        for (shows, open) in ways {
+            let Some(shows) = shows else {
+                continue;
+            };
+            let value = shopping_view::on_agenda_label(t, shows);
+            let value = Some(BadgeValue::Icon(
+                shopping_view::on_agenda_icon(shows),
+                value,
+            ));
+            let icon = (icons::ON_AGENDA, None);
+            let setting = t.checklist_show_on_agenda();
+            if badge(ui, look, icon, setting, value, true).clicked() {
+                actions.push(Action::Badge(Some(open)));
+            }
+        }
+        let switches = [(
+            shown.ticks,
+            icons::SHOW_TICKS,
+            t.box_show_ticks(),
+            NoteBadge::Ticks,
+        )];
         for (on, icon, setting, open) in switches {
             let Some(on) = on else {
                 continue;
             };
             let value = if on { t.setting_on() } else { t.setting_off() };
-            if badge(ui, look, (icon, None), setting, Some(value), true).clicked() {
+            let value = Some(BadgeValue::Icon(switch_icon(on), value));
+            if badge(ui, look, (icon, None), setting, value, true).clicked() {
                 actions.push(Action::Badge(Some(open)));
             }
         }
@@ -13308,15 +15359,23 @@ fn note_badges(
                     },
                 ),
             ];
-            // A Note has one open Frog at a time.
-            if !shown.frog_open {
+            // A Note has one open Frog at a time; Frogs and Sessions are
+            // made only in Advanced (#197).
+            if shown.advanced && !shown.frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
-            entries.push((
-                icons::SESSION,
-                t.session(),
-                Action::NewSession(Some(id.clone())),
-            ));
+            // Only a plain Note becomes a Session, and no Code text
+            // (#213); a Routine of a Session Note runs it already (#191).
+            if shown.advanced
+                && shown.kind.kind == NoteKind::Plain
+                && note.text_format != text_format::CODE
+            {
+                entries.push((
+                    icons::SESSION,
+                    t.session(),
+                    Action::NewSession(Some(id.clone())),
+                ));
+            }
             for (icon, label, action) in entries {
                 if menu_entry(ui, (icon, text), label).clicked() {
                     actions.push(action);
@@ -13439,17 +15498,34 @@ struct CardMedia<'a> {
     transcribing: Option<&'a str>,
 }
 
-/// How a card shows its Note (#114): `full`, the whole Note with its
-/// `sections`, or compact, by its first line; its Checklist or Shopping
-/// List, if it is one, as it shows now, with whether this Device may
-/// check its Lines, and what the card's menu offers of it once read for
-/// this Note (#120, #121, #122).
+/// How a card shows its Note (#114, #189): `full`, its detailed view,
+/// the whole Note with its `sections`, or its compact view, by its kind,
+/// with the `glance` of its Tally or of the Session it runs; whether it
+/// has the view button that switches it (`switches`); its Checklist or
+/// Shopping List, if it is one, as it shows now, with whether this Device
+/// may check its Lines, and what the card's menu offers of it once read
+/// for this Note (#120, #121, #122).
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
+    glance: &'a [String],
+    switches: bool,
+    /// Which of its folds this Device keeps open (#189).
+    folds: CardFolds,
     sections: &'a [Section],
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
+    /// Whether the Note is a Tally, whose full card shows its name and
+    /// description as a list's does (#188).
+    tally: bool,
+    /// The Tally a full card shows under them: its chart, its entries and
+    /// "Add entry" (#190).
+    tally_shown: Option<&'a TallyShown>,
+    /// Whether the Note is a Session, shown by its name and description as
+    /// a Tally is, and what a full card shows under them: its pool, today's
+    /// picks and last weeks (#191).
+    session: bool,
+    session_shown: Option<&'a SessionCardShown>,
     menu: Option<&'a CardMenu>,
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
@@ -13458,6 +15534,18 @@ struct CardLook<'a> {
     /// them this Device may tick, and whether Show ticks is on for it
     /// (ADR 0035).
     boxes: CardBoxes<'a>,
+    /// Today's Occurrences of its Routines and Reminders, a box for each
+    /// that ticks it as on the Agenda (#215).
+    today: &'a [CardOccurrence],
+}
+
+/// The folds of a card this Device keeps open (UI laws, "Lists"; #189):
+/// a Shopping List's struck Lines and the description of a Note of a
+/// kind.
+#[derive(Debug, Clone, Copy, Default)]
+struct CardFolds {
+    struck: bool,
+    description: bool,
 }
 
 /// How the boxes of the texts listed show, by id, the texts whose boxes
@@ -13487,8 +15575,15 @@ struct CardClicks {
     card: egui::Response,
     author: Option<egui::Response>,
     edit: egui::Response,
+    /// The view button, switching the card's view (#189).
+    view: egui::Response,
+    /// The setting of a fold clicked, a Shopping List's struck Lines or a
+    /// description, and whether it is open now (#189).
+    folded: Option<(String, bool)>,
     photo: Option<String>,
     check: Option<(String, bool)>,
+    /// The box of today's Occurrence clicked, by its Routine (#215).
+    occurrence: Option<(String, Occurrence)>,
     /// What a click on a box of the Note's text or a Section's asked,
     /// with that text's id (ADR 0035).
     tick: Option<(String, BoxAsk)>,
@@ -13498,6 +15593,10 @@ struct CardClicks {
     tag: Option<String>,
     menu_opened: bool,
     picked: Option<Action>,
+    /// What was asked of the Tally on a full card (#190).
+    tally: Vec<TallyAction>,
+    /// What was asked of the picks on a Session Note's full card (#191).
+    session: Vec<SessionAction>,
 }
 
 /// The room after the last row of every list (#158): its last card,
@@ -13553,8 +15652,8 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
     picked
 }
 
-/// The bar button of a Note list's full/compact switch (#114): it says
-/// what clicking it does and shows as selected while the list is
+/// The bar button of a Note list's compact/detailed switch (#114, #189):
+/// it says what clicking it does and shows as selected while the list is
 /// `compact`; whether it was clicked.
 fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     let (icon, label) = if compact {
@@ -13564,15 +15663,11 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     };
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
-    let fill = if compact {
-        tones.accent.gamma_multiply(0.3)
-    } else if resp.hovered() {
-        ui.visuals().widgets.hovered.weak_bg_fill
-    } else {
-        Color32::TRANSPARENT
-    };
-    if fill.a() > 0 {
-        ui.painter().rect_filled(rect, 6.0, fill);
+    // The hover under the tint, so the selected look stays.
+    theme::icon_button_back(ui, &resp, rect);
+    if compact {
+        let fill = tones.accent.gamma_multiply(0.3);
+        ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, fill);
     }
     let text = ui.visuals().text_color();
     icons::paint(ui.painter(), rect.shrink(2.0), icon, text);
@@ -13590,12 +15685,24 @@ struct EditedText<'a> {
     /// Its text as stored, and whether it is a formatted one.
     stored: &'a str,
     formatted: bool,
+    /// Whether it is a Code text (#213), and whether a paste that looks
+    /// like code offers it.
+    code: bool,
+    offers_code: bool,
+    /// Whether the format bar shows above it: only in Advanced (#197);
+    /// typed Markdown and Ctrl+B and Ctrl+I format either way.
+    bar: bool,
     /// How its boxes show, whether this Device may tick them and which
     /// were ticked (ADR 0035).
     boxes: &'a BoxLook,
     ticks: (bool, &'a dyn Fn(&str) -> bool),
     /// What a screen reader calls the field.
     name: &'a str,
+    /// The size and colour of its text: a description's smaller and
+    /// weaker (#188).
+    look: (f32, Color32),
+    /// What it says while empty.
+    hint: Option<&'a str>,
 }
 
 /// The field of a text of the Note dialog, `edit`, its format bar above
@@ -13616,6 +15723,7 @@ fn edited_text(
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
+    let (size, written) = edit.look;
     let (formatted, boxes) = (edit.formatted, edit.boxes);
     // Kept as a formatted text at once: the Note's, or the Section's.
     let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
@@ -13633,8 +15741,13 @@ fn edited_text(
     // Ctrl+I as its bold and italic while typing.
     let selected = format_bar::selection(ui, id, edited);
     let at = format_bar::At::of(edited, selected, formatted);
-    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL);
-    if focused {
+    // A Code text has none (#213).
+    let as_code = edit.code;
+    let mut picked = match as_code || !edit.bar {
+        true => None,
+        false => format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL),
+    };
+    if focused && !as_code {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::B) {
                 picked = Some(Format::Bold);
@@ -13651,7 +15764,7 @@ fn edited_text(
                 ui,
                 (edited, text_format::MARKDOWN, boxes),
                 all,
-                (Some(18.0), text),
+                (Some(size), written),
                 false,
             )
         });
@@ -13692,14 +15805,21 @@ fn edited_text(
         // ticks room after each for who ticked it.
         let accent = ui.visuals().hyperlink_color;
         let weak = ui.visuals().weak_text_color();
+        let code = ui.visuals().code_bg_color;
         let small = FontId::proportional(13.0);
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
-            let font = FontId::proportional(18.0);
+            let font = FontId::proportional(size);
+            // A Code text as written in the fixed-width font, unwrapped.
+            if as_code {
+                let format = egui::TextFormat::simple(FontId::monospace(size * 0.9), written);
+                let job = egui::text::LayoutJob::single_section(typed.to_string(), format);
+                return ui.fonts_mut(|f| f.layout_job(job));
+            }
             let job = if formatted {
-                text_marks_view::source_job(typed, font, (text, accent, weak))
+                text_marks_view::source_job(typed, font, (written, accent, weak, code))
             } else {
-                text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
+                text_marks_view::tag_job(typed, (0, typed.len()), font, (written, accent))
             };
             let gap = |after: &str| {
                 let said = after.to_string();
@@ -13710,9 +15830,19 @@ fn edited_text(
             job.wrap.max_width = width;
             ui.fonts_mut(|f| f.layout_job(job))
         };
-        // Pasted with a format, a plain text becomes a
-        // formatted one (ADR 0033).
-        let pasted = focused
+        // Pasted, a text that looks like code offers it and formats
+        // nothing (#213); else pasted with a format, a plain text
+        // becomes a formatted one (ADR 0033).
+        let pasted_code = edit.offers_code
+            && focused
+            && ui.input(|i| {
+                i.events.iter().any(|e| {
+                    matches!(e, egui::Event::Paste(p)
+                        if p.chars().nth(1).is_some() && text_format::looks_like_code(p))
+                })
+            });
+        let pasted = !pasted_code
+            && focused
             && ui.input(|i| {
                 i.events
                     .iter()
@@ -13738,14 +15868,47 @@ fn edited_text(
         // A box goes whole, its id with it, and the cursor
         // stays where it was as a save gives boxes ids.
         let cut = text_marks_view::guard_field(ui, id, edited, !placed);
-        let output = TextEdit::multiline(edited)
+        // As wide as its longest line, for a Code text, which moves
+        // sideways (#213).
+        let widest = as_code.then(|| {
+            let font = FontId::monospace(size * 0.9);
+            let galley = ui.fonts_mut(|f| f.layout_no_wrap(edited.clone(), font, written));
+            galley.size().x + 8.0
+        });
+        let mut field = TextEdit::multiline(edited)
             .id(id)
-            .font(FontId::proportional(18.0))
+            .font(FontId::proportional(size))
             .layouter(&mut layouter)
             .desired_rows(1)
             .desired_width(f32::INFINITY)
-            .frame(Frame::NONE)
-            .show(ui);
+            .frame(Frame::NONE);
+        if let Some(hint) = edit.hint {
+            field = field.hint_text(RichText::new(hint).size(size).color(weak));
+        }
+        let output = match widest {
+            None => field.show(ui),
+            Some(widest) => {
+                Frame::NONE
+                    .fill(code)
+                    .corner_radius(4.0)
+                    .inner_margin(egui::Margin::symmetric(8, 6))
+                    .show(ui, |ui| {
+                        egui::ScrollArea::horizontal()
+                            .id_salt(("code", of))
+                            .show(ui, |ui| {
+                                let width = widest.max(ui.available_width());
+                                let room = egui::vec2(width, ui.available_height());
+                                let rect = egui::Rect::from_min_size(ui.cursor().min, room);
+                                ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                                    field.show(ui)
+                                })
+                                .inner
+                            })
+                            .inner
+                    })
+                    .inner
+            }
+        };
         text_marks_view::guard_cursor(ui, id, edited);
         if cut {
             ui.ctx().request_repaint();
@@ -13756,9 +15919,12 @@ fn edited_text(
             *editing = false;
             actions.push(Action::SaveText);
         }
+        if output.response.response.changed() && pasted_code {
+            actions.push(Action::OfferCode(true));
+        }
         // A shortcut typed makes a plain text a formatted
         // one, as the first format from the bar does.
-        if output.response.response.changed() && !formatted {
+        if output.response.response.changed() && !formatted && !as_code {
             let cursor = output.cursor_range.map_or(0, |range| range.primary.index.0);
             let byte = edited
                 .char_indices()
@@ -13846,11 +16012,287 @@ fn edited_text(
         let changed = edited.trim();
         if !changed.is_empty()
             && changed != edit.stored
-            && ui.button(RichText::new(t.save()).color(text)).clicked()
+            && theme::primary(ui, true, t.save()).clicked()
         {
             actions.push(Action::SaveText);
         }
     });
+}
+
+/// The size of the name of a Note of a kind (#188), a heading, and of
+/// its description, smaller than a text.
+const NAME_SIZE: f32 = 22.0;
+const DESCRIPTION_SIZE: f32 = 14.0;
+
+/// The text of a Note of a kind in the Note dialog (#188): the Note,
+/// whether this Device may change its text here, how its boxes show,
+/// whether it may tick them and which were ticked (ADR 0035).
+struct KindedText<'a> {
+    note: &'a Note,
+    writes: bool,
+    /// Whether the description's format bar shows: only in Advanced
+    /// (#197).
+    bar: bool,
+    boxes: &'a BoxLook,
+    ticks: (bool, &'a dyn Fn(&str) -> bool),
+}
+
+/// What is typed into the text of a Note of a kind: its name, and its
+/// description as [`edited_text`] edits it.
+type KindedState<'a> = (
+    &'a mut String,
+    (
+        &'a mut String,
+        &'a mut bool,
+        &'a mut bool,
+        &'a mut Option<(usize, usize)>,
+    ),
+);
+
+/// The text of a Note of a kind as its name, a heading on one line, and
+/// its description under it (#188), small and weak, folded to its first
+/// line while it is not edited: a click unfolds it, into its field where
+/// this Device may change it, which an empty one always shows. Read only,
+/// both select to be copied (#183) and a click folds the description
+/// again.
+fn kinded_text(
+    ui: &mut Ui,
+    (t, tones): (L10n, Tones),
+    shown: KindedText<'_>,
+    (name, (edited, editing, focus, select)): KindedState<'_>,
+    actions: &mut Vec<Action>,
+) {
+    let note = shown.note;
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let formatted = note.text_format == text_format::MARKDOWN;
+    if !shown.writes {
+        ui.style_mut().interaction.selectable_labels = true;
+        let whole = note.text.as_str();
+        let look = (whole, note.text_format.as_str(), shown.boxes);
+        // In the offsets of the whole text, as its boxes, tables, tags
+        // and links are found.
+        let named = note_kinds::name(whole).len();
+        let mut spots = Spots::default();
+        if named > 0 {
+            let heading = (Some(NAME_SIZE), text);
+            let label = text_marks_view::formatted_label(ui, look, (0, named), heading, false);
+            spots.extend(label);
+        }
+        let description = note_kinds::description(whole);
+        let start = whole.len() - description.len();
+        if let Some((from, to)) = first_line(description) {
+            let id = Id::new(("description open", &note.id));
+            let open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+            let range = if open {
+                (start, whole.len())
+            } else {
+                (start + from, start + to)
+            };
+            let small = (Some(DESCRIPTION_SIZE), weak);
+            let drawn = folded_row(ui, open, |ui| {
+                text_marks_view::formatted_label(ui, look, range, small, !open)
+            });
+            if description_fold(ui, &t, (drawn.response.rect, id), open) {
+                ui.data_mut(|d| d.insert_temp(id, !open));
+            }
+            spots.extend(drawn.inner);
+        }
+        let of = Id::new(("text", &note.id));
+        // Its tables open to read (#128).
+        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
+            actions.push(Action::OpenTable(Opening {
+                note: None,
+                text: note.text.clone(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(note.id.clone()),
+            }));
+        }
+        // A Member ticks the boxes of a Note not theirs.
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, of, &spots.boxes, shown.ticks) {
+            actions.push(box_action(note.id.clone(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, of, &spots.links);
+        return;
+    }
+    // Enter in the name goes on at the start of the description.
+    if name_edit(ui, &t, (name, formatted, shown.boxes), actions) {
+        *editing = true;
+        *focus = true;
+        *select = Some((0, 0));
+    }
+    let id = Id::new("note text");
+    let open = *editing || ui.memory(|m| m.has_focus(id));
+    if open {
+        let field = EditedText {
+            id,
+            of: &note.id,
+            section: false,
+            stored: note_kinds::description(&note.text),
+            formatted,
+            code: false,
+            offers_code: false,
+            bar: shown.bar,
+            boxes: shown.boxes,
+            ticks: shown.ticks,
+            name: t.note_description(),
+            look: (DESCRIPTION_SIZE, weak),
+            hint: Some(t.note_description()),
+        };
+        edited_text(
+            ui,
+            (t, tones),
+            field,
+            (edited, editing, focus, select),
+            actions,
+        );
+    } else if edited.trim().is_empty() {
+        // Empty, its field with its hint; typed into, it is edited.
+        let hint = RichText::new(t.note_description())
+            .size(DESCRIPTION_SIZE)
+            .color(weak);
+        let field = ui.add(
+            TextEdit::multiline(edited)
+                .id(id)
+                .font(FontId::proportional(DESCRIPTION_SIZE))
+                .text_color(weak)
+                .hint_text(hint)
+                .desired_rows(1)
+                .desired_width(f32::INFINITY)
+                .frame(Frame::NONE),
+        );
+        name_field(ui, &field, t.note_description());
+        if field.has_focus() {
+            *editing = true;
+        }
+    } else {
+        // Folded to its first line with words, as typed.
+        let range = first_line(edited).unwrap_or((0, 0));
+        let look = (edited.as_str(), note.text_format.as_str(), shown.boxes);
+        let small = (Some(DESCRIPTION_SIZE), weak);
+        let drawn = folded_row(ui, false, |ui| {
+            text_marks_view::formatted_label(ui, look, range, small, true)
+        });
+        let fold = Id::new(("description open", &note.id));
+        if description_fold(ui, &t, (drawn.response.rect, fold), false) {
+            *editing = true;
+            *focus = true;
+        }
+        // Its boxes tick and its tags and links open, folded too.
+        let spots = drawn.inner;
+        let marked = Id::new(("field", &note.id));
+        if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, shown.ticks)
+        {
+            actions.push(box_action(note.id.clone(), asked));
+        }
+        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags) {
+            actions.push(Action::SearchFor(tag));
+        }
+        text_marks_view::link_clicks(ui, marked, &spots.links);
+    }
+}
+
+/// The name of a Note of a kind being edited (#188): one line, as a
+/// heading, its tags marked and its boxes as they show (ADR 0035), a
+/// formatted text's marks dimmed. Leaving it keeps it; Enter goes on in
+/// the description, which `true` says. A line break pasted becomes a
+/// space, as in any one-line field.
+fn name_edit(
+    ui: &mut Ui,
+    t: &L10n,
+    (name, formatted, boxes): (&mut String, bool, &BoxLook),
+    actions: &mut Vec<Action>,
+) -> bool {
+    let id = Id::new("note name");
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let accent = ui.visuals().hyperlink_color;
+    let code = ui.visuals().code_bg_color;
+    let mut moved = false;
+    if ui.memory(|m| m.has_focus(id)) {
+        ui.input_mut(|i| {
+            if i.consume_key(Modifiers::COMMAND, Key::Enter) {
+                actions.push(Action::SaveText);
+            } else if i.consume_key(Modifiers::NONE, Key::Enter) {
+                moved = true;
+            }
+        });
+    }
+    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+        let typed = typed.as_str();
+        let font = FontId::proportional(NAME_SIZE);
+        let job = if formatted {
+            text_marks_view::source_job(typed, font, (text, accent, weak, code))
+        } else {
+            text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
+        };
+        let mut job = text_marks_view::field_job(job, boxes, &|_: &str| 0.0);
+        job.wrap.max_width = width;
+        ui.fonts_mut(|f| f.layout_job(job))
+    };
+    let cut = text_marks_view::guard_field(ui, id, name, true);
+    let output = TextEdit::singleline(name)
+        .id(id)
+        .font(FontId::proportional(NAME_SIZE))
+        .layouter(&mut layouter)
+        .hint_text(RichText::new(t.note_name()).size(NAME_SIZE).color(weak))
+        .desired_width(f32::INFINITY)
+        .return_key(None)
+        .frame(Frame::NONE)
+        .show(ui);
+    text_marks_view::guard_cursor(ui, id, name);
+    if cut {
+        ui.ctx().request_repaint();
+    }
+    text_marks_view::remember_text(ui, id, name);
+    let field = &output.response.response;
+    name_field(ui, field, t.note_name());
+    if moved {
+        ui.memory_mut(|m| m.surrender_focus(id));
+    } else if field.lost_focus() {
+        actions.push(Action::SaveText);
+    }
+    moved
+}
+
+/// A description of a Note of a kind as `add` draws it, folded or
+/// `open`, after the sign of which it is (#188).
+fn folded_row<R>(
+    ui: &mut Ui,
+    open: bool,
+    add: impl FnOnce(&mut Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal_top(|ui| {
+        let icon = if open {
+            icons::EXPAND_LESS
+        } else {
+            icons::EXPAND_MORE
+        };
+        icons::show(ui, icon, 16.0, weak);
+        ui.vertical(add).inner
+    })
+}
+
+/// Whether the description drawn at `rect` was clicked to unfold it, or
+/// to fold it while `open` (#188); a screen reader reads what the click
+/// does.
+fn description_fold(ui: &mut Ui, t: &L10n, (rect, id): (egui::Rect, Id), open: bool) -> bool {
+    let said = if open {
+        t.note_description_fold()
+    } else {
+        t.note_description_unfold()
+    };
+    let fold = ui.interact(rect, id.with("fold"), Sense::click());
+    fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+    fold.on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(said)
+        .clicked()
 }
 
 /// What a click on a box of the text `entity` asked, as an action.
@@ -13960,18 +16402,59 @@ fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &
     }
 }
 
+/// The text `text` of a Note of a kind in `format` on its full card
+/// (#188): its name as the card's title, its description under it,
+/// small, folded to its first line with words unless `unfolded`; where
+/// its boxes, tags and links lie added to `marks`, and where the
+/// description shows.
+fn card_kinded_text(
+    ui: &mut Ui,
+    (text, format, look): (&str, &str, &BoxLook),
+    unfolded: bool,
+    marks: &mut Spots,
+) -> Option<egui::Rect> {
+    let colour = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let named = note_kinds::name(text).len();
+    if named > 0 {
+        let heading = (Some(20.0), colour);
+        let label =
+            text_marks_view::formatted_label(ui, (text, format, look), (0, named), heading, false);
+        marks.extend(label);
+    }
+    let description = note_kinds::description(text);
+    let start = text.len() - description.len();
+    let (from, to) = first_line(description)?;
+    let range = if unfolded {
+        (start, text.len())
+    } else {
+        (start + from, start + to)
+    };
+    let small = (Some(13.0), weak);
+    let drawn = folded_row(ui, unfolded, |ui| {
+        text_marks_view::formatted_label(ui, (text, format, look), range, small, !unfolded)
+    });
+    marks.extend(drawn.inner);
+    Some(drawn.response.rect)
+}
+
 /// The photo cache, the store the photos are read from and the
 /// recording being transcribed, for [`whole`].
 type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 
-/// A Note as a card (UI laws, "Cards"): when it was captured, with ⋮
-/// (but in the trash) and Edit, and where it is filed, its Area's colour
-/// down the left edge and icon before the place; then, as `look` says,
-/// the whole Note under its Capture Context, a Checklist's or a Shopping
-/// List's Lines under its text, checkable, with every Section oldest
-/// first, each under its own, its photos opening full screen on a click;
-/// or, compact, where it was captured, its first line, how many of its
-/// Lines are checked or open and its media. ⋮ and a right-click open
+/// A Note as a card (UI laws, "Cards"): Edit, ⋮ (but in the trash) and,
+/// in a list with its switch, the view button top right (#189), and where
+/// it is filed, its Area's colour down the left edge and icon before the
+/// place; then, as `look` says, its detailed view: the whole Note with its
+/// Capture Context as one line under its text (#170), a Checklist's or a
+/// Shopping List's Lines under its name and description (#188), checkable,
+/// a Shopping List's struck ones folded under its open ones, with every
+/// Section oldest first, each with its own line, its photos opening full
+/// screen on a click; or its compact view, a glance by its kind (#189): a
+/// plain Note's first line and the two lines after it or the `glance` of
+/// the Session it runs, a list's or a Tally's name with how many of its
+/// Lines are open or the Tally's `glance`, a Note without words its
+/// media; no Capture Context. ⋮ and a right-click open
 /// the same menu: Edit, then making it a Checklist, "Uncheck all", "Back
 /// to a plain Note" and making it a Shopping List as this Device may
 /// (#120, #122). Important cards carry the accent marker and a stronger
@@ -13999,6 +16482,17 @@ fn note_card(
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
+    let mut view_rect = None;
+    // Where the fold of a Shopping List's struck Lines shows in the
+    // detailed view, how many, and whether it is open (#189).
+    let struck_id = Id::new(("card struck", &note.id));
+    let struck_open = look.folds.struck;
+    let mut struck_rect = None;
+    // Where the description of a Note of a kind shows on a full card, and
+    // whether it is unfolded (#188).
+    let fold_id = Id::new(("card description", &note.id));
+    let unfolded = look.folds.description;
+    let mut description_rect = None;
     // The photos shown in full, where they lie, the checkboxes of its
     // Lines and the status marks and tags of its text and of its
     // Sections'.
@@ -14006,6 +16500,13 @@ fn note_card(
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
     let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
+    // Where the Tally or the Session of a full card lies, out of the
+    // card's own click, and what was asked of it (#190, #191).
+    let mut tally_rect = None;
+    let mut tally_asked = Vec::new();
+    let mut session_asked = Vec::new();
+    // Where the boxes of today's Occurrences lie (#215).
+    let mut today_rects = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -14040,24 +16541,6 @@ fn note_card(
                     );
                     author_rect = Some(picture.rect);
                 }
-                if look.full {
-                    context_line(ui, icons::CONTEXT_WHEN, &when(t, note.captured));
-                } else {
-                    ui.label(RichText::new(when(t, note.captured)).small().color(weak));
-                    // Where, and that the editor shows more (UI laws,
-                    // "Cards"); room is left for ⋮ and Edit.
-                    let room = (ui.available_width() - 88.0).max(0.0);
-                    if let Some(at) = where_captured(&note.context) {
-                        icons::show(ui, icons::CONTEXT_WHERE, 14.0, weak);
-                        ui.allocate_ui(egui::vec2(room, 20.0), |ui| {
-                            let at = RichText::new(at).small().color(weak);
-                            ui.add(egui::Label::new(at).truncate());
-                        });
-                    }
-                    if note.context.has_more() {
-                        icons::show(ui, icons::MORE, 16.0, weak);
-                    }
-                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     edit_rect = ui
                         .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
@@ -14069,14 +16552,23 @@ fn note_card(
                                 .0,
                         );
                     }
+                    // Its view shows under the Note's text, its time and
+                    // place in the detailed view (#170, #189).
+                    if look.switches {
+                        view_rect = Some(
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                .0,
+                        );
+                    }
                 });
             });
-            if look.full {
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    for (icon, line, _) in context_lines(t, &note.context) {
-                        context_line(ui, icon, &line);
-                    }
+            // Who the Pack it came from unclaimed is from, until
+            // removed (#165).
+            if let Some(from) = &placed.pack_from {
+                ui.horizontal(|ui| {
+                    icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
+                    let said = t.pack_from(profile_view::display_name(t, &from.name));
+                    ui.label(RichText::new(said).size(13.0).color(weak));
                 });
             }
             // A Note that spawned a Routine is not Unsorted, though not
@@ -14099,6 +16591,8 @@ fn note_card(
                 });
             }
             ui.separator();
+            // Under where it is filed, over its text (#215).
+            today_rects = card_occurrences::card_rows(ui, t, tones, look.today);
             if look.full {
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
@@ -14108,11 +16602,40 @@ fn note_card(
                         (None, Some((list, _))) => Some(shopping_view::shown_lines(t, list)),
                         (None, None) => None,
                     };
-                    if let Some(lines) = lines {
-                        // Its Lines right under its text.
+                    if lines.is_some() || look.tally || look.session {
+                        // Its name as its title, its description folded
+                        // under it (#188), its Lines right under them.
                         let text = (part.text, part.format, look.boxes.look(part.id));
-                        card_text(ui, text, &mut marks);
-                        boxes = checklist_view::card_lines(ui, tones, &lines);
+                        description_rect = card_kinded_text(ui, text, unfolded, &mut marks);
+                        if let Some(lines) = &lines {
+                            // A Shopping List's struck Lines fold under its
+                            // open ones (#189).
+                            let (open, struck): (Vec<_>, Vec<_>) = lines
+                                .iter()
+                                .cloned()
+                                .partition(|l| look.shopping.is_none() || !l.checked);
+                            boxes = checklist_view::card_lines(ui, tones, &open);
+                            if !struck.is_empty() {
+                                let said = t.shopping_struck_count(struck.len() as i64);
+                                let row = folded_row(ui, struck_open, |ui| {
+                                    ui.label(RichText::new(&said).size(13.0).color(weak));
+                                });
+                                struck_rect = Some((row.response.rect, said));
+                                if struck_open {
+                                    boxes.extend(checklist_view::card_lines(ui, tones, &struck));
+                                }
+                            }
+                        }
+                        if let Some(shown) = look.tally_shown {
+                            let drawn =
+                                ui.scope(|ui| tally_view::card(ui, t, shown, &mut tally_asked));
+                            tally_rect = Some(drawn.response.rect);
+                        }
+                        if let Some(shown) = look.session_shown {
+                            let drawn =
+                                ui.scope(|ui| session_view::card(ui, t, shown, &mut session_asked));
+                            tally_rect = Some(drawn.response.rect);
+                        }
                         shown.extend(media_view::whole_media(
                             ui,
                             t,
@@ -14126,33 +16649,79 @@ fn note_card(
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
                     }
+                    // Each part's Capture Context under its text (#170).
+                    let line = capture_line(t, (note.captured, &note.context), None);
+                    capture_meta(ui, t, &line, None, false);
+                    let mut before = note.captured;
                     for section in look.sections {
                         ui.separator();
-                        let edited = section_edited(t, section);
-                        let captured = (section.captured, &section.context, edited.as_deref());
-                        capture_context(ui, t, captured, |_| false);
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);
                         let boxes = look.boxes.look(part.id);
                         shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
                         section_marks.push((section, spots));
+                        let line =
+                            capture_line(t, (section.captured, &section.context), Some(before));
+                        let edited = section_edited(t, section);
+                        capture_meta(ui, t, &line, edited.as_deref(), false);
+                        before = section.captured;
                     }
                 });
                 return;
             }
-            // A photo Note may have no words.
-            if let Some(line) = first_line(&note.text) {
-                let shown = (Some(16.0), text);
-                let boxes = look.boxes.look(&note.id);
-                let text = (note.text.as_str(), note.text_format.as_str(), boxes);
-                marks = text_marks_view::formatted_label(ui, text, line, shown, true);
+            // The compact view, by the Note's kind (#189).
+            let text_of = (
+                note.text.as_str(),
+                note.text_format.as_str(),
+                look.boxes.look(&note.id),
+            );
+            if look.checklist.is_some() || look.shopping.is_some() || look.tally || look.session {
+                // Its name, then how many Lines are open, or the Tally's
+                // totals today, or the Session's next run and week (#191).
+                let named = note_kinds::name(&note.text).len();
+                if named > 0 {
+                    marks = text_marks_view::formatted_label(
+                        ui,
+                        text_of,
+                        (0, named),
+                        (Some(20.0), text),
+                        true,
+                    );
+                }
+                if let Some((list, _)) = look.checklist {
+                    checklist_view::card_count(ui, t, list);
+                } else if let Some((list, _)) = look.shopping {
+                    shopping_view::card_count(ui, t, list);
+                }
+                card_glance_lines(ui, look.glance);
+                return;
             }
-            if let Some((list, _)) = look.checklist {
-                checklist_view::card_count(ui, t, list);
-            } else if let Some((list, _)) = look.shopping {
-                shopping_view::card_count(ui, t, list);
+            // A plain Note: its first line and the two after it, or, running
+            // a Session, its next run and this week (#189).
+            if let Some(line) =
+                card_first_line(&note.text, note.text_format == text_format::MARKDOWN)
+            {
+                marks =
+                    text_marks_view::formatted_label(ui, text_of, line, (Some(16.0), text), true);
+                if look.glance.is_empty() {
+                    if let Some(next) = next_lines(&note.text, line.1) {
+                        let more = text_marks_view::formatted_label(
+                            ui,
+                            text_of,
+                            next,
+                            (Some(14.0), text),
+                            false,
+                        );
+                        marks.extend(more);
+                    }
+                } else {
+                    card_glance_lines(ui, look.glance);
+                }
+                return;
             }
+            card_glance_lines(ui, look.glance);
+            // Without words it shows what it holds instead.
             if !note.photos.is_empty() {
                 media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
             }
@@ -14204,7 +16773,17 @@ fn note_card(
     } else {
         Sense::click()
     };
-    let resp = ui.interact(rect, Id::new(("card", &note.id)), sense);
+    // Around the Tally or the Session of a full card, whose own buttons
+    // take its clicks (#190, #191).
+    let resp = match tally_rect {
+        Some(hole) => {
+            let above = egui::Rect::from_min_max(rect.min, egui::pos2(rect.max.x, hole.min.y));
+            let below = egui::Rect::from_min_max(egui::pos2(rect.min.x, hole.max.y), rect.max);
+            let top = ui.interact(above, Id::new(("card", &note.id)), sense);
+            top.union(ui.interact(below, Id::new(("card below", &note.id)), sense))
+        }
+        None => ui.interact(rect, Id::new(("card", &note.id)), sense),
+    };
     let label = note.visible_text();
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
     // The author's picture and Edit lie over the card: registered after
@@ -14221,6 +16800,57 @@ fn note_card(
         });
     let edit = ui.interact(edit_rect, Id::new(("edit", &note.id)), Sense::click());
     edit.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
+    // A fold clicked open or closed, kept per Note on this Device (#189).
+    let mut folded = None;
+    // The view button over the card, switching its view (#189).
+    let view_said = if look.full {
+        t.card_show_compact()
+    } else {
+        t.card_show_detailed()
+    };
+    let view = ui.interact(
+        view_rect.unwrap_or(egui::Rect::NOTHING),
+        Id::new(("view", &note.id)),
+        Sense::click(),
+    );
+    if let Some(view_rect) = view_rect {
+        view.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, view_said));
+        if ui.is_rect_visible(view_rect) {
+            if view.hovered() {
+                let fill = ui.visuals().widgets.hovered.weak_bg_fill;
+                ui.painter().rect_filled(view_rect, 6.0, fill);
+            }
+            let icon = if look.full {
+                icons::EXPAND_LESS
+            } else {
+                icons::EXPAND_MORE
+            };
+            icons::paint(
+                ui.painter(),
+                view_rect.shrink(2.0),
+                icon,
+                ui.visuals().weak_text_color(),
+            );
+        }
+    }
+    // A click on the struck Lines' fold shows or hides them (#189).
+    if let Some((rect, said)) = &struck_rect {
+        let fold = ui.interact(*rect, struck_id.with("fold"), Sense::click());
+        fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+        if fold
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            folded = Some((struck_shown_setting(&note.id), !struck_open));
+        }
+    }
+    // Over the card too: a click on the description folds or unfolds it,
+    // not the card's own (#188).
+    if let Some(rect) = description_rect
+        && description_fold(ui, t, (rect, fold_id), unfolded)
+    {
+        folded = Some((description_unfolded_setting(&note.id), !unfolded));
+    }
     if ui.is_rect_visible(edit_rect) {
         let dim = |c: Color32| {
             if unimportant {
@@ -14285,11 +16915,27 @@ fn note_card(
         {
             picked = Some(Action::SaveAsMarkdown(note.id.clone()));
         }
+        // Copies for another person (#165), and who they came from.
+        if ui
+            .button(RichText::new(t.export_as_pack()).color(text))
+            .clicked()
+        {
+            picked = Some(Action::ExportPack(note.id.clone()));
+        }
+        if let Some(from) = placed.pack_from.as_ref().filter(|_| look.changes) {
+            let name = profile_view::display_name(t, &from.name);
+            if ui
+                .button(RichText::new(t.remove_pack_from(name)).color(text))
+                .clicked()
+            {
+                picked = Some(Action::RemovePackFrom(note.id.clone()));
+            }
+        }
         // Who ticked each box last and when (ADR 0035), where it has any.
         if has_boxes {
             let mut on = look.boxes.show;
             let label = RichText::new(t.box_show_ticks()).color(text);
-            if ui.checkbox(&mut on, label).clicked() {
+            if theme::checkbox(ui, &mut on, label).clicked() {
                 picked = Some(Action::ShowTicks {
                     note: note.id.clone(),
                     on,
@@ -14334,6 +16980,8 @@ fn note_card(
     let checks = look.checklist.is_some_and(|(_, checks)| checks)
         || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
+    let occurrence =
+        card_occurrences::card_clicks(ui, (t, tones), &note.id, look.today, &today_rects);
     // Sections have no edit of their text: their marks only show. A
     // table opens full screen, to edit where its marks may change (#128);
     // taken first, its marks, tags and links keep their clicks.
@@ -14384,13 +17032,18 @@ fn note_card(
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
         edit: edit.on_hover_text(t.edit()),
+        view: view.on_hover_text(view_said),
+        folded,
         photo,
         check,
+        occurrence,
         tick,
         table,
         tag,
         menu_opened,
         picked,
+        tally: tally_asked,
+        session: session_asked,
     }
 }
 
@@ -14402,6 +17055,52 @@ fn same_table((from, at): (&str, usize), to: &str) -> Option<usize> {
         .iter()
         .position(|t| t.start == at)?;
     markdown::table::all(to).get(index).map(|t| t.start)
+}
+
+/// Where the `2` lines after the byte `from` of `text` lie in it, from the
+/// first with words, without the spaces around them, as a compact card
+/// shows them under a plain Note's first line (#189); none when no words
+/// follow.
+fn next_lines(text: &str, from: usize) -> Option<(usize, usize)> {
+    let rest = text.get(from..)?;
+    let start = from + rest.len() - rest.trim_start().len();
+    let after = text.get(start..)?;
+    if after.is_empty() {
+        return None;
+    }
+    let end = match after.match_indices('\n').nth(1) {
+        Some((at, _)) => start + at,
+        None => text.len(),
+    };
+    let lines = text.get(start..end)?.trim_end();
+    Some((start, start + lines.len()))
+}
+
+/// Where the first line a compact card shows of `text` lies, in bytes:
+/// [`first_line`], or, a formatted text opening with a code block, the
+/// first line with words after its opening fence, which shows nothing
+/// (#212).
+fn card_first_line(text: &str, formatted: bool) -> Option<(usize, usize)> {
+    let line = first_line(text)?;
+    if formatted
+        && let Some(block) = markdown::parse(text).get(markdown::line_at(text, line.0))
+        && block
+            .code
+            .as_ref()
+            .is_some_and(|c| c.first_line == block.line)
+        && let Some((a, b)) = text.get(block.end..).and_then(first_line)
+    {
+        return Some((block.end + a, block.end + b));
+    }
+    Some(line)
+}
+
+/// The lines the compact view says of a Tally or of a Session (#189).
+fn card_glance_lines(ui: &mut Ui, glance: &[String]) {
+    let text = ui.visuals().text_color();
+    for line in glance {
+        ui.label(RichText::new(line).size(14.0).color(text));
+    }
 }
 
 /// Where the first line of `text` that a compact card shows lies in it,

@@ -20,6 +20,8 @@ jobs:
         run: |
           dart pub get
           dart analyze --fatal-infos
+          # No `!` null assertion outside tests, in the core or the app (#230).
+          dart run tool/no_null_assertions.dart lib ../../lib
           dart test
       - name: App — analyze and test
         run: |
@@ -41,6 +43,30 @@ jobs:
           name: guide-frames-phone
           path: build/guide-frames
           if-no-files-found: ignore
+
+  # Known vulnerabilities in any lockfile (pubspec.lock, the core's
+  # pubspec.lock, desktop/Cargo.lock, android/ocr/Cargo.lock) fail every
+  # push (#231). A notice that a crate is unmaintained is listed but does
+  # not fail; tool/osv_gate.py decides. Ignores live in the osv-scanner.toml
+  # beside each lockfile. The weekly Security run stays stricter.
+  osv-scanner:
+    name: Vulnerable dependencies (OSV-Scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Exits 1 on any finding, unmaintained notices too; the next step
+      # decides from the results, and fails when there are none.
+      - name: osv-scanner
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --output-file=osv-results.json
+            --recursive
+            ./
+      - name: No known vulnerability (unmaintained notices reported only)
+        run: python3 tool/osv_gate.py osv-results.json
 
   desktop:
     name: Desktop (Rust)
@@ -119,9 +145,9 @@ jobs:
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo, What's-new and alarm sound tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate and coverage floor tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor
       - name: Render the files as Flathub gets them
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
@@ -191,10 +217,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
+          components: clippy
       - run: cargo install cargo-ndk --locked --version 4.1.2
-      - name: OCR library — unit tests
+      # The crate's own lints (#229) with -D warnings, as for the desktop.
+      - name: OCR library — lint and unit tests
         working-directory: android/ocr
-        run: cargo test --locked
+        run: |
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
       - run: flutter pub get
       - run: flutter build apk --debug
       - name: Every Android library is in the licences

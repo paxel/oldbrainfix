@@ -172,6 +172,21 @@ class FakeAlarms implements AlarmPlatform {
     return tapped;
   }
 
+  WidgetPick? _pickTapped;
+
+  /// A Session's pick is tapped on the Agenda widget while the app runs.
+  void tapPick(WidgetPick pick) {
+    _pickTapped = pick;
+    _actions.add(null);
+  }
+
+  @override
+  Future<WidgetPick?> pickOpened() async {
+    final tapped = _pickTapped;
+    _pickTapped = null;
+    return tapped;
+  }
+
   @override
   Future<Map<AlarmPermission, bool>> permissions() async => Map.of(granted);
 

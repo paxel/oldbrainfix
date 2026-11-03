@@ -13,8 +13,8 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::{
-    ClockTime, Day, Notes, Places, Recurrence, Routine, Routines, Schedule, SigningKey, Store,
-    parse_time,
+    ClockTime, Day, DeviceSettings, Notes, Places, Recurrence, Routine, Routines, Schedule,
+    SigningKey, Store, parse_time,
 };
 use oldbrainfix_gui::app::area_colour;
 use oldbrainfix_gui::icons;
@@ -141,7 +141,8 @@ fn expected_ics(store: &Store, list: &[Routine]) -> Result<String, Box<dyn std::
             .map(|(_, text)| text.clone())
             .unwrap_or_default()
     };
-    Ok(routines_ics(list, text_of, store.now()))
+    let from = DeviceSettings::new(store).all_day_from()?;
+    Ok(routines_ics(list, text_of, store.now(), from))
 }
 
 #[test]

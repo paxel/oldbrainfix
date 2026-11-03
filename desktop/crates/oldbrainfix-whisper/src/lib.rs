@@ -9,6 +9,11 @@
 //! MP3, Ogg Vorbis and Ogg Opus, as messengers send voice messages
 //! ([`decode`]).
 
+// The FFI to the whisper.cpp bridge is the crate's one unsafe code (#229):
+// allowed here, in this module only, with a `// SAFETY:` reason on each
+// block; `model` stays under the workspace's deny.
+#![allow(unsafe_code)]
+
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::path::Path;
 
@@ -21,8 +26,11 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
+#[deny(unsafe_code)]
 pub mod model;
 
+// SAFETY: the declarations match the bridge's `native/` C signatures; each
+// call states below what it relies on.
 unsafe extern "C" {
     fn obf_whisper_open(path: *const c_char) -> *mut c_void;
     fn obf_whisper_transcribe(
@@ -232,10 +240,10 @@ fn open(bytes: Vec<u8>) -> Result<Opened, Problem> {
 /// for more, which this decoder does not take.
 fn opus_channels(head: Option<&[u8]>) -> Option<usize> {
     let head = head?;
-    if head.len() < 19 || &head[..8] != b"OpusHead" {
+    if head.get(..8) != Some(b"OpusHead".as_slice()) {
         return None;
     }
-    let (channels, family) = (usize::from(head[9]), head[18]);
+    let (channels, family) = (usize::from(*head.get(9)?), *head.get(18)?);
     ((family == 0 || family == 1) && (1..=2).contains(&channels)).then_some(channels)
 }
 
@@ -286,7 +294,8 @@ pub fn pcm(bytes: Vec<u8>) -> Option<Pcm> {
             } => {
                 opus.resize(decoder.max_frame_size_per_channel() * *channels, 0.0);
                 if let Ok(frames) = decoder.decode_float(&packet.data, &mut opus, false) {
-                    samples.extend_from_slice(&opus[..(frames * *channels).min(opus.len())]);
+                    let decoded = opus.get(..frames * *channels).unwrap_or(&opus);
+                    samples.extend_from_slice(decoded);
                 }
             }
         }
@@ -332,13 +341,16 @@ pub fn resample(samples: &[f32], from: u32, to: u32) -> Vec<f32> {
     let count = (samples.len() as u64 * u64::from(to) / u64::from(from)) as usize;
     let step = f64::from(from) / f64::from(to);
     let last = samples.len() - 1;
+    // `left` and `right` are clamped to `last`, so both are always found
+    // and no sample is left out.
     (0..count)
-        .map(|i| {
+        .filter_map(|i| {
             let at = i as f64 * step;
             let left = (at as usize).min(last);
             let right = (left + 1).min(last);
             let part = (at - left as f64) as f32;
-            samples[left] + (samples[right] - samples[left]) * part
+            let (&l, &r) = (samples.get(left)?, samples.get(right)?);
+            Some(l + (r - l) * part)
         })
         .collect()
 }

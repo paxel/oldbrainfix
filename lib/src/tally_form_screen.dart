@@ -63,7 +63,16 @@ class TallyFormScreen extends StatefulWidget {
   /// The Area or Topic it goes into; null for none.
   final String? place;
 
-  const TallyFormScreen({super.key, required this.notes, this.place});
+  /// What its name starts with, such as the tags a Session's pool is
+  /// filtered by (#220).
+  final String text;
+
+  const TallyFormScreen({
+    super.key,
+    required this.notes,
+    this.place,
+    this.text = '',
+  });
 
   @override
   State<TallyFormScreen> createState() => _TallyFormScreenState();
@@ -77,7 +86,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
     AppLocalizations.supportedLocales.map(lookupAppLocalizations),
     _system,
   );
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: widget.text);
   final _nameFocus = FocusNode();
   final _fields = [_FieldDraft()];
   var _nameMissing = false;
@@ -159,7 +168,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
       builder: (context) => BadgeDialog(
         setting: t.tallyRule,
         icon: Icons.functions,
-        content: RadioColumn<TallyRule>(
+        content: ChoiceChips<TallyRule>(
           key: const ValueKey('tally-rule'),
           value: field.rule,
           onChanged: (rule) => Navigator.of(context).pop(rule),
@@ -248,6 +257,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
                 value: field.rule == TallyRule.sum
                     ? t.tallyRuleSumShort
                     : t.tallyRuleMaxShort,
+                valueIcon: tallyRuleIcon(field.rule),
                 onTap: (_) => _editRule(field),
               ),
               SettingBadge(

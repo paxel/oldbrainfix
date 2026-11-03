@@ -253,7 +253,7 @@ pub fn parse_shown(text: &str, unit: &str, system: UnitSystem) -> Option<f64> {
         let shaped = (2..=3).contains(&parts.len())
             && (1..=6).contains(&first.len())
             && digits(first)
-            && parts[1..].iter().all(|p| p.len() == 2 && digits(p));
+            && parts.iter().skip(1).all(|p| p.len() == 2 && digits(p));
         if !shaped {
             return None;
         }

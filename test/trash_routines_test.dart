@@ -326,7 +326,9 @@ void main() {
     await tap(tester, find.byTooltip('Alle Notizen'));
     await tester.longPress(find.text('Tabletten'));
     await tester.pumpAndSettle();
-    await tap(tester, find.byTooltip('In den Papierkorb'));
+    // On a phone the bar's last actions overflow into its ⋮.
+    await tap(tester, find.byTooltip('Mehr').last);
+    await tap(tester, find.text('In den Papierkorb'));
     await tap(
       tester,
       find.text('Mit ihren 2 Routinen und Erinnerungen löschen'),

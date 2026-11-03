@@ -127,7 +127,8 @@ class Frogs {
         );
       }
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Checks off the Frog [id], at [at] or the store's now. Checking off

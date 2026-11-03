@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/look.dart';
@@ -238,6 +239,132 @@ void main() {
       expect(picks, isEmpty);
     });
   });
+
+  group('choice chips', () {
+    Future<List<int>> pump(WidgetTester tester, {bool enabled = true}) async {
+      final picks = <int>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Material(
+            child: ChoiceChips<int>(
+              value: 1,
+              options: [
+                for (final n in [1, 2, 3])
+                  RadioOption(value: n, title: Text('$n')),
+              ],
+              onChanged: enabled ? picks.add : null,
+            ),
+          ),
+        ),
+      );
+      return picks;
+    }
+
+    testWidgets('one chip per option, only the chosen one selected', (
+      tester,
+    ) async {
+      await pump(tester);
+      final chips = tester.widgetList<ChoiceChip>(find.byType(ChoiceChip));
+      expect(chips.map((c) => c.selected), [true, false, false]);
+      expect(find.byType(Radio<int>), findsNothing);
+    });
+
+    testWidgets('a tap picks another option, not the chosen one', (
+      tester,
+    ) async {
+      final picks = await pump(tester);
+      await tester.tap(find.text('1'));
+      await tester.tap(find.text('3'));
+      expect(picks, [3]);
+    });
+
+    testWidgets('without onChanged nothing changes', (tester) async {
+      final picks = await pump(tester, enabled: false);
+      await tester.tap(find.text('2'));
+      expect(picks, isEmpty);
+    });
+
+    testWidgets('a screen reader hears a group of selectable buttons', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pump(tester);
+      final group = tester.getSemantics(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Semantics && w.properties.role == SemanticsRole.radioGroup,
+        ),
+      );
+      expect(group.getSemanticsData().role, SemanticsRole.radioGroup);
+      expect(
+        tester.getSemantics(find.text('1')),
+        matchesSemantics(
+          label: '1',
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          isInMutuallyExclusiveGroup: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.text('2')),
+        matchesSemantics(
+          label: '2',
+          isButton: true,
+          hasSelectedState: true,
+          isInMutuallyExclusiveGroup: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  });
+
+  // Without a child the grown box is what a proxy box without one is
+  // (#230): as small as allowed, with nothing to measure or hit.
+  testWidgets('a grown box without a child is as small as allowed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 10, minHeight: 5),
+          child: const _Childless(),
+        ),
+      ),
+    );
+    final box = tester.renderObject<RenderGrown>(find.byType(_Childless));
+    expect(box.size, const Size(10, 5));
+    expect(
+      box.getDryLayout(const BoxConstraints(minWidth: 3, minHeight: 4)),
+      const Size(3, 4),
+    );
+    expect(box.getMinIntrinsicWidth(100), 0);
+    expect(box.getMaxIntrinsicWidth(100), 0);
+    expect(box.getMinIntrinsicHeight(100), 0);
+    expect(box.getMaxIntrinsicHeight(100), 0);
+    expect(
+      box.hitTestChildren(BoxHitTestResult(), position: const Offset(1, 1)),
+      isFalse,
+    );
+  });
+}
+
+/// A [RenderGrown] at twice the size, without a child.
+class _Childless extends LeafRenderObjectWidget {
+  const _Childless();
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderGrown(2);
 }
 
 /// WCAG contrast ratio of two colours.

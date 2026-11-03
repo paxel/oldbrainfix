@@ -23,6 +23,7 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'shopping_pick_screen.dart';
 import 'speech_platform.dart';
+import 'sync_line.dart';
 import 'tally_field_screen.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -227,10 +228,11 @@ void announceUntranscribable(
 ///
 /// Uncluttered by default (#142): what sorts the Note shows only once
 /// this Device switched it on in Settings ▸ Quick note ([QuickNoteControl]),
-/// in the Note card's action row (#113): "File into…", a Routine,
-/// Reminder, Frog or Session, and ⋮ with the Importance, "Make it a
-/// Tally", which goes with the Routine and the rest (Q481), and "Add to a
-/// Shopping List"; and so does the format bar. Each opens its usual page
+/// in the Note card's action row (#113): "File into…", a Frog or Session
+/// in the alarm clock's menu, and ⋮ with the Importance, "Make it a
+/// Tally", which goes with the Frog and Session (Q481), and "Add to a
+/// Shopping List"; and so does the format bar. The alarm clock itself,
+/// for a Routine or Reminder, is always there (#223). Each opens its usual page
 /// and comes back here with the choice shown at the top, not written yet;
 /// all of it is written with the Note when the screen is left, nothing of
 /// it while the Note is empty. A sorted Note, filed into an Area or Topic
@@ -318,11 +320,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// scroll instead.
   static const _textRoom = 56.0;
 
-  /// What this Device's quick note shows, read once (ADR 0008).
+  /// What this Device's quick note shows, read once (ADR 0008); the
+  /// format bar only in Advanced (#197).
   late final _shows = {
     for (final control in QuickNoteControl.values)
-      if (widget.notes.store.quickNoteShows(control)) control,
+      if (widget.notes.store.quickNoteShows(control) &&
+          (_advanced || control != QuickNoteControl.formatBar))
+        control,
   };
+
+  /// Whether Frogs, Sessions, Tallies and the format bar are offered,
+  /// read once (#197).
+  late final _advanced = widget.notes.store.advanced;
   late final _nudgeButtons = widget.notes.store.quickNoteNudgeButtonsOn;
 
   /// With the format bar, its tags highlighted and a formatted text
@@ -1132,6 +1141,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           actions: recording
               ? null
               : [TextButton(onPressed: _save, child: Text(t.save))],
+          flexibleSpace: const SyncLine(),
         ),
         body: SafeArea(
           child: Padding(
@@ -1218,8 +1228,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// The Note card's action row, after "To full editor", with what
-  /// Settings ▸ Quick note switched on; null while that is nothing.
+  /// The Note card's action row, after "To full editor": the alarm clock
+  /// for a Routine or Reminder (#223), and what Settings ▸ Quick note
+  /// switched on; null while that is nothing, as while the lines go into
+  /// a Shopping List or a Shared Area lets only its Managers set them up.
   /// What it opens comes back here. Behind the App Lock it offers neither
   /// "File into…" nor the Session, which show Areas and Tallies.
   Widget? _actions(BuildContext context) {
@@ -1231,12 +1243,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final onFile = _shows.contains(QuickNoteControl.fileInto)
         ? (locked || shopping ? null : _file)
         : null;
+    // The alarm clock is always there for a Routine or Reminder (#223);
+    // the switch adds Frog and Session to it.
     final schedule = _shows.contains(QuickNoteControl.schedule);
-    final onSchedule = schedule
-        ? (_mayManage && !shopping ? _spawn : null)
-        : null;
-    // "Make it a Tally" goes with the Routine and the rest (Q481).
-    final onMakeTally = schedule && !shopping ? _makeTally : null;
+    final onSchedule = _mayManage && !shopping ? _spawn : null;
+    // "Make it a Tally" goes with the Frog and Session (Q481), only in
+    // Advanced (#197).
+    final onMakeTally = schedule && !shopping && _advanced ? _makeTally : null;
     if (onFile == null &&
         onSchedule == null &&
         onMakeTally == null &&
@@ -1250,7 +1263,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
       onSchedule: onSchedule,
       spawns: [
         for (final spawn in Spawn.values)
-          if (!locked || spawn != Spawn.session) spawn,
+          if (spawn == Spawn.routine ||
+              spawn == Spawn.reminder ||
+              // Frogs and Sessions are made only in Advanced (#197), and
+              // only once switched on.
+              (schedule && _advanced && (!locked || spawn != Spawn.session)))
+            spawn,
       ],
       actions: importance || toShopping || onMakeTally != null
           ? NoteActions(

@@ -12,7 +12,16 @@
 //! the Docker choice without a Docker bridge says so and does not open.
 //! The set-ups of Tallies, Checklists and Shopping Lists, Frogs and
 //! Sessions (#168) show in groups of their own, before and after; how a
-//! Shopping List shows on the Agenda (#186) in the words of its choice.
+//! Shopping List (#186) or a Checklist (#219) shows on the Agenda in the
+//! words of its choice.
+
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use std::path::Path;
 use std::sync::Arc;
@@ -26,8 +35,8 @@ use oldbrainfix_core::ai_port::{Reach, docker_bridge};
 use oldbrainfix_core::schedule::{ClockTime, Day, Schedule};
 use oldbrainfix_core::tallies::Tallies;
 use oldbrainfix_core::{
-    Checklists, Frogs, Notes, OwnProfile, Places, SessionRule, Sessions, ShoppingLists,
-    ShoppingOnAgenda, SigningKey, Store,
+    Checklists, Frogs, ListOnAgenda, Notes, OwnProfile, Places, SessionRule, Sessions,
+    ShoppingLists, ShoppingOnAgenda, SigningKey, Store,
 };
 use oldbrainfix_gui::ai_view::{AiAction, PortShown, port_card};
 use oldbrainfix_gui::l10n::L10n;
@@ -291,6 +300,26 @@ fn how_a_shopping_list_shows_on_the_agenda_reads_in_the_words_of_the_choice() ->
     // None chosen before: as this Device showed Shopping Lists.
     assert!(shows(&harness, &t.ai_before(t.shopping_on_agenda_count())));
     assert!(shows(&harness, &t.ai_after(t.shopping_on_agenda_lines())));
+    Ok(())
+}
+
+#[test]
+fn how_a_checklist_shows_on_the_agenda_reads_in_the_words_of_the_choice() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let trip = Notes::new(&store).capture("Trip\nTent", None, None)?.id;
+    let lists = Checklists::new(&store);
+    lists.make(&trip)?;
+    let task = store.open_ai_task()?;
+    store.drafting(&task, || lists.set_on_agenda(&trip, ListOnAgenda::Count))?;
+
+    let harness = window(App::new(store.clone(), "en"));
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, t.ai_kind_list()));
+    assert!(shows(&harness, t.checklist_show_on_agenda()));
+    // None chosen before: every open Line (#219).
+    assert!(shows(&harness, &t.ai_before(t.shopping_on_agenda_lines())));
+    assert!(shows(&harness, &t.ai_after(t.shopping_on_agenda_count())));
     Ok(())
 }
 

@@ -52,13 +52,16 @@ typedef NoteChecklist = ({Checklist? Function() read, Checklists lists});
 /// finger is. A Line [field] gives a field for is typed in that field, in
 /// place of its text (#141), and its ⋮ is the only way to its menu: a
 /// long press in the field selects. [compact] draws the rows close
-/// together, as one block of text in the editor (#184).
+/// together, as one block of text in the editor (#184). What [trailing]
+/// gives for a Line sits at its end, before ⋮, such as a Shopping List
+/// Line's reappear time badge (#195).
 class ChecklistLines extends StatelessWidget {
   final List<ShownLine> lines;
   final void Function(String id, bool checked)? onCheck;
   final void Function(String id, Offset at)? onMenu;
   final Set<String> editable;
   final Widget? Function(ShownLine line)? field;
+  final Widget? Function(ShownLine line)? trailing;
   final bool compact;
 
   const ChecklistLines({
@@ -68,6 +71,7 @@ class ChecklistLines extends StatelessWidget {
     this.onMenu,
     this.editable = const {},
     this.field,
+    this.trailing,
     this.compact = false,
   });
 
@@ -119,6 +123,7 @@ class ChecklistLines extends StatelessWidget {
         onCheck: onCheck,
         onMenu: editable.contains(line.id) ? onMenu : null,
         field: field?.call(line),
+        trailing: trailing?.call(line),
         compact: compact,
       );
       if (line.inGroup && head != null) {
@@ -149,12 +154,14 @@ TextStyle? lineStyle(BuildContext context, {required bool checked}) {
       : style;
 }
 
-/// One Line: its checkbox, its text or [field] and, with [onMenu], ⋮.
+/// One Line: its checkbox, its text or [field], [trailing] and, with
+/// [onMenu], ⋮.
 class _LineRow extends StatelessWidget {
   final ShownLine line;
   final void Function(String id, bool checked)? onCheck;
   final void Function(String id, Offset at)? onMenu;
   final Widget? field;
+  final Widget? trailing;
   final bool compact;
 
   const _LineRow({
@@ -162,6 +169,7 @@ class _LineRow extends StatelessWidget {
     this.onCheck,
     this.onMenu,
     this.field,
+    this.trailing,
     this.compact = false,
   });
 
@@ -211,6 +219,7 @@ class _LineRow extends StatelessWidget {
               ? MergeSemantics(child: Row(children: [box, text]))
               : Row(children: [box, text]),
         ),
+        ?trailing,
         if (menu != null)
           Builder(
             builder: (button) => IconButton(
@@ -237,7 +246,7 @@ class _LineRow extends StatelessWidget {
 
 /// A Checklist on a Note's card (#120): every Line with its checkbox on a
 /// [full] card, checkable where this Device may, else how many of its
-/// Lines are checked. Nothing for a Note that is none. It reads the
+/// Lines are open (#189). Nothing for a Note that is none. It reads the
 /// Checklist whenever the card is built anew, and again after a check.
 class CardChecklist extends StatefulWidget {
   final String noteId;
@@ -296,7 +305,7 @@ class _CardChecklistState extends State<CardChecklist> {
       return Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          context.t.checklistCount(list.checkedCount, list.count),
+          context.t.checklistOpenCount(list.openCount, list.count),
           key: const ValueKey('checklist-count'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
@@ -552,8 +561,11 @@ class _ChecklistSectionState extends State<ChecklistSection>
     _lists.indent(line.id);
   }
 
-  Future<void> _menu(String id, Offset at) async {
-    // What was typed is stored first, so the menu sees the list as shown.
+  Future<void> _menu(String shown, Offset at) async {
+    // A new Line is stored first, and what was typed, so the menu sees
+    // the list as shown.
+    final id = storedId(shown);
+    if (id == null) return;
     keepTyped(leaving: false);
     final list = _lists.shownNow(widget.noteId, deviceWallClock);
     final line = list?.line(id);
@@ -681,7 +693,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
               ],
               onCheck: _checks ? _check : null,
               onMenu: _menu,
-              editable: _editable,
+              editable: withMenus(_editable),
               field: _adds ? _field : null,
               compact: true,
             ),

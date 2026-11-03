@@ -1,0 +1,319 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Plain stars ** stay",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:26.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "# Shopping\n- **oat milk** `#code` #real",
+          "after": "# Shopping\n- **oat milk** `#code` #real\n2\\*3 \\[x] \\_y\\_",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:21.000Z",
+          "entity": "section:00000000000000000000000000000005",
+          "kind": "amended",
+          "before": null,
+          "after": "> ~~old~~ *new*",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:09.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "text",
+          "before": "# Shopping\n- **milk** `#code` #real",
+          "after": "# Shopping\n- **oat milk** `#code` #real",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:05.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "# Shopping\n- **milk** `#code` #real",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:15.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "text",
+          "before": "Call **mum**",
+          "after": "Call **mum** later",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:14.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "text",
+          "before": "Call mum",
+          "after": "Call **mum**",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:10.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Call mum",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:20.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "format",
+          "before": "plain",
+          "after": "markdown",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:16.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "- eggs\n- ~~bread~~",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:49.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "kind",
+          "before": "checklist",
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:48.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "text",
+          "before": "**Packing**",
+          "after": "**Packing**\nsocks\n  wool",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:41.000Z",
+          "entity": "line:00000000000000000000000000000009",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "wool",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:35.000Z",
+          "entity": "line:00000000000000000000000000000008",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "socks",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:32.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "text",
+          "before": "**Packing**\n- socks\n  - wool",
+          "after": "**Packing**",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:00:31.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:27.000Z",
+          "entity": "note:00000000000000000000000000000006",
+          "kind": "captured",
+          "before": null,
+          "after": "**Packing**\n- socks\n  - wool",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:54.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "text",
+          "before": "Item | Qty\n:-|-:\n**Milk** | 2",
+          "after": "| Item | Qty |\n| :-- | --: |\n| **Milk** | 3 \\| 4 |",
+          "format": "markdown",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:50.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "captured",
+          "before": null,
+          "after": "Item | Qty\n:-|-:\n**Milk** | 2",
+          "format": "markdown",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:59.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "text",
+          "before": "#!/bin/sh\n# ☐ no box\necho \"#tag\"",
+          "after": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+          "format": "code",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:55.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "captured",
+          "before": null,
+          "after": "#!/bin/sh\n# ☐ no box\necho \"#tag\"",
+          "format": "code",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:05.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "format",
+          "before": "markdown",
+          "after": "code",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:04.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "format",
+          "before": "plain",
+          "after": "markdown",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:00.000Z",
+          "entity": "note:0000000000000000000000000000000c",
+          "kind": "captured",
+          "before": null,
+          "after": "# comment\nls -l",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:11.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "format",
+          "before": "code",
+          "after": "plain",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:10.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "format",
+          "before": "plain",
+          "after": "code",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:06.000Z",
+          "entity": "note:0000000000000000000000000000000d",
+          "kind": "captured",
+          "before": null,
+          "after": "int x;\nx = 1; ☐",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

@@ -553,7 +553,8 @@ class Notes {
         }
       }
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Adds the photo [bytes] to the Note [noteId], without their metadata;
@@ -780,8 +781,8 @@ class Notes {
   /// never overwritten (ADR 0018).
   ///
   /// The text keeps the Note's format, or takes [format] when one is
-  /// given; a formatted text stays formatted, whatever [format] says
-  /// (ADR 0033).
+  /// given; a formatted text stays formatted and a code text code,
+  /// whatever [format] says (ADR 0033): [setFormat] changes them.
   void edit(String noteId, String text, {String? format}) {
     if (format != null) _requireFormat(format);
     final note = byId(noteId);
@@ -791,9 +792,10 @@ class Notes {
     if (!note.textEditable) {
       throw StateError('the text of $noteId is in a format not known here');
     }
-    final written = note.textFormat == TextFormats.markdown
-        ? TextFormats.markdown
-        : format ?? note.textFormat;
+    final written = switch (note.textFormat) {
+      TextFormats.markdown || TextFormats.code => note.textFormat,
+      _ => format ?? note.textFormat,
+    };
     store.append(
       noteId,
       NoteKeys.text,
@@ -802,21 +804,32 @@ class Notes {
   }
 
   /// Puts the text of the Note [noteId] in [format] as it is: a plain
-  /// text becomes formatted, for its first format. A formatted text
-  /// stays formatted, and nothing is written when the format is the
-  /// same.
+  /// text becomes formatted, for its first format, and a plain or
+  /// formatted text becomes code and back (#213). A formatted text never
+  /// becomes plain, and nothing is written when the format is the same.
+  /// Into code the text goes as it shows, each box in the glyph of its
+  /// state and without its id; out of it, its glyphs become boxes.
   void setFormat(String noteId, String format) {
     _requireFormat(format);
     final note = byId(noteId);
     if (note == null) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note');
     }
+    if (!note.textEditable) {
+      throw StateError('the text of $noteId is in a format not known here');
+    }
     if (note.textFormat == format ||
-        note.textFormat == TextFormats.markdown ||
+        (note.textFormat == TextFormats.markdown &&
+            format == TextFormats.plain) ||
         note.text.trim().isEmpty) {
       return;
     }
-    edit(noteId, note.text, format: format);
+    final text = format == TextFormats.code ? note.shownText : note.text;
+    store.append(
+      noteId,
+      NoteKeys.text,
+      StoredText.of(format, _boxed(text, format)).encode(),
+    );
   }
 
   /// Takes the Transcript or Photo Text [generated] over into the text
@@ -876,7 +889,8 @@ class Notes {
         date: now,
       );
     });
-    return _section(id)!;
+    return _section(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Whether this Device may edit the text of the Section [id], an Amend
@@ -1255,13 +1269,14 @@ class Notes {
   }
 
   /// The boxes of the stored [text] of [id] with the ticks that count
-  /// (ADR 0035); none in a text this version may not change.
+  /// (ADR 0035); none in a text this version may not change, nor in a
+  /// code text (#213).
   List<ShownBox> _boxes(
     String id,
     StoredText text,
     Map<String, String?> fields,
   ) {
-    if (!text.editable) return const [];
+    if (!text.editable || text.format == TextFormats.code) return const [];
     final ticked = fields.keys.any((k) => k.startsWith(BoxKeys.prefix));
     final ticks = ticked ? Boxes(store).ticks(id) : const <String, BoxTick>{};
     return TextBoxes.shown(text.text, ticks).boxes;

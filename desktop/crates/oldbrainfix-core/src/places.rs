@@ -25,9 +25,9 @@ pub mod keys {
 
 /// The icons an Area can carry, as keys every front end draws its own
 /// way: the Dart core's `areaIcons`.
-pub const AREA_ICONS: [&str; 14] = [
+pub const AREA_ICONS: [&str; 15] = [
     "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping", "money",
-    "pets", "sport", "travel", "star",
+    "pets", "sport", "travel", "star", "brain",
 ];
 
 /// The id every Device plants the starter place `slug` of `ty` under.

@@ -150,23 +150,30 @@ impl TranscriptPrompts {
         let mut i = 0;
         while i < words.len() {
             let mut n = 0;
-            while n < lead_in.len() && i + n < words.len() && words[i + n] == lead_in[n] {
+            while lead_in
+                .get(n)
+                .is_some_and(|word| words.get(i + n) == Some(word))
+            {
                 n += 1;
             }
             if n >= opening.len() {
-                dropped[i..i + n].fill(true);
+                dropped.iter_mut().skip(i).take(n).for_each(|d| *d = true);
                 i += n;
             } else {
                 i += 1;
             }
         }
-        let left: Vec<usize> = (0..words.len()).filter(|&i| !dropped[i]).collect();
-        let rest: Vec<&str> = left.iter().map(|&i| words[i].as_str()).collect();
+        let (left, rest): (Vec<usize>, Vec<&str>) = words
+            .iter()
+            .zip(&dropped)
+            .enumerate()
+            .filter(|(_, (_, d))| !**d)
+            .map(|(i, (word, _))| (i, word.as_str()))
+            .unzip();
         let listed: Vec<String> = self.names.iter().flat_map(|n| words_of(n)).collect();
         if self.names.len() >= 2 && rest == listed {
-            for &i in &left {
-                dropped[i] = true;
-            }
+            // All that is left goes, so every word does.
+            dropped.fill(true);
         } else {
             let vocabulary: Vec<Vec<String>> = self
                 .names
@@ -182,7 +189,10 @@ impl TranscriptPrompts {
                     if item.len() <= longest || at + item.len() > rest.len() {
                         continue;
                     }
-                    if rest[at..at + item.len()] == item[..] {
+                    if rest
+                        .get(at..at + item.len())
+                        .is_some_and(|run| run == item.as_slice())
+                    {
                         longest = item.len();
                     }
                 }
@@ -201,8 +211,11 @@ impl TranscriptPrompts {
                     count += 1;
                 }
                 if count >= 3 {
-                    for &k in &left[i..end] {
-                        dropped[k] = true;
+                    // Each of `left` is a word's place, so in `dropped`.
+                    for &k in left.iter().skip(i).take(end - i) {
+                        if let Some(d) = dropped.get_mut(k) {
+                            *d = true;
+                        }
                     }
                 }
                 i = if end > i { end } else { i + 1 };

@@ -59,12 +59,12 @@ pub fn paint(painter: &Painter, rect: Rect, background: Color32, mark: Color32, 
 /// A stroke's move and quadratic curves as a line of points.
 fn flatten(stroke: &[f64], place: &impl Fn(f64, f64) -> Pos2) -> Vec<Pos2> {
     let mut points = Vec::new();
-    let (Some(&x0), Some(&y0)) = (stroke.first(), stroke.get(1)) else {
+    let [x0, y0, curves @ ..] = stroke else {
         return points;
     };
-    let (mut x, mut y) = (x0, y0);
+    let (mut x, mut y) = (*x0, *y0);
     points.push(place(x, y));
-    for &[cx, cy, ex, ey] in stroke[2..].as_chunks::<4>().0 {
+    for &[cx, cy, ex, ey] in curves.as_chunks::<4>().0 {
         for i in 1..=STEPS {
             let t = i as f64 / STEPS as f64;
             let u = 1.0 - t;

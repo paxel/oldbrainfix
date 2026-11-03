@@ -1,0 +1,243 @@
+{
+  "now": "2026-01-02T10:02:42.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Trip\nfor the weekend",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "text": "Shop",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:51.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000012",
+      "text": "Hardware",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:42.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000001c",
+      "text": "Gym\nMondays and Thursdays",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:30.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000001e",
+      "text": "Call Ben\nabout the car",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:39.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:0000000000000000000000000000001e",
+    "note:0000000000000000000000000000001c",
+    "note:00000000000000000000000000000012",
+    "note:0000000000000000000000000000000a",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:0000000000000000000000000000001e"
+  ],
+  "trashed": [],
+  "inside": {},
+  "sections": {
+    "note:0000000000000000000000000000001e": [],
+    "note:0000000000000000000000000000001c": [],
+    "note:00000000000000000000000000000012": [],
+    "note:0000000000000000000000000000000a": [],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:0000000000000000000000000000001e": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Call Ben\nabout the car"
+    },
+    "note:0000000000000000000000000000001c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Gym\nMondays and Thursdays"
+    },
+    "note:00000000000000000000000000000012": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Hardware"
+    },
+    "note:0000000000000000000000000000000a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Shop"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Trip\nfor the weekend"
+    }
+  },
+  "search": {
+    "": [
+      "note:0000000000000000000000000000001e",
+      "note:0000000000000000000000000000001c",
+      "note:00000000000000000000000000000012",
+      "note:0000000000000000000000000000000a",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:0000000000000000000000000000000a"
+    ],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:0000000000000000000000000000001e",
+      "note:00000000000000000000000000000012",
+      "note:0000000000000000000000000000000a",
+      "note:00000000000000000000000000000001"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {},
+  "conflicts": []
+}

@@ -513,17 +513,19 @@ impl Store {
         let Some(id) = Profile::parse(&sent.record).map(|p| p.id) else {
             return Ok(());
         };
-        let mut value = json!({"profile": sent.to_json(), "seen": seen});
+        let mut value = serde_json::Map::new();
+        value.insert("profile".into(), sent.to_json());
+        value.insert("seen".into(), json!(seen));
         if let Some(shown) = shown {
-            value["shown"] = json!(BASE64.encode(shown));
+            value.insert("shown".into(), json!(BASE64.encode(shown)));
         }
         if stripped {
-            value["stripped"] = json!(true);
+            value.insert("stripped".into(), json!(true));
         }
         if verified {
-            value["verified"] = json!(true);
+            value.insert("verified".into(), json!(true));
         }
-        self.set_local_setting(&format!("{PREFIX}{id}"), &value.to_string())?;
+        self.set_local_setting(&format!("{PREFIX}{id}"), &Value::Object(value).to_string())?;
         *self.people.lock() = None;
         Ok(())
     }
@@ -1055,6 +1057,30 @@ mod tests {
 
     fn own_id(store: &Store) -> std::result::Result<String, Box<dyn std::error::Error>> {
         Ok(OwnProfile::new(store).get()?.ok_or("a Profile")?.id)
+    }
+
+    #[test]
+    fn a_sync_through_another_connection_shows_once_it_says_so() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("oldbrainfix.db");
+        let ann = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        OwnProfile::new(&ann).apply_defaults("Device", None)?;
+        OwnProfile::new(&ann).rename("Ann")?;
+        // The sync's own connection, as its thread opens it.
+        let sync = Store::open(&path, ticking(), || {
+            Err(crate::Error::Invalid("the same Device".into()))
+        })?;
+        let ben = device(2, "Ben")?;
+        assert!(ann.kept_people()?.is_empty());
+        household(&sync, &ben)?;
+        assert!(
+            ann.kept_people()?.is_empty(),
+            "what was read stays until told"
+        );
+        ann.changed_elsewhere();
+        let names: Vec<String> = ann.kept_people()?.into_iter().map(|p| p.name).collect();
+        assert_eq!(names, ["Ben"]);
+        Ok(())
     }
 
     #[test]

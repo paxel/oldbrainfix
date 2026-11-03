@@ -17,3 +17,13 @@ Amended by #186: each person chooses how each Shopping List shows on their Agend
 ## Units (ADR 0028)
 
 Amended by ADR 0028 (#103): whether a Device shows the known units of Tallies in metric or imperial is a setting of its own, following the region the system reports until one is chosen.
+
+## From when all-day items remind (#201)
+
+Amended by #201: from when on an all-day Occurrence rings is a setting of each Device ("All-day items remind from", 15:00 unless changed), replacing the fixed 09:00 of both cores; before it the Occurrence only shows on the Agenda. A calendar file a Device exports gives an all-day event its alarm at that Device's time.
+
+## Settings of the person (ADR 0040)
+
+Amended by #211: "Move a Note to the Trash when its one-time Reminder is done" belongs to the person, not the Device. It lies in the log as an Override does and is the same on all of their own Devices (ADR 0040).
+
+Amended by #197: Simple or Advanced is the second setting of the person, kept the same way and the same on all of their own Devices (ADR 0041).

@@ -33,6 +33,48 @@ class AgendaTapTest {
         assertEquals("line:passport", line.line)
         assertEquals("frog:taxes", (check("frog", "frog:taxes") as AgendaTap.Check).alarm.routine)
         assertEquals("line:milk", (check("shopping", line = "line:milk") as AgendaTap.Check).line)
+        assertEquals("line:tickets", (check("checklist", line = "line:tickets") as AgendaTap.Check).line)
+    }
+
+    @Test
+    fun aPickOpensItsEntryForm() {
+        val pick = tap(
+            AgendaTap.EXTRA_TAP to AgendaTap.TAP_PICK,
+            AlarmReceiver.EXTRA_ROUTINE to "session:sport",
+            AlarmReceiver.EXTRA_OCCURRENCE to "2026-10-24T07:00",
+            AgendaTap.EXTRA_NOTE to "note:push-ups",
+        )
+        assertEquals(AgendaTap.Pick("session:sport", "2026-10-24T07:00", "note:push-ups"), pick)
+        // Without its Tally it opens the app.
+        assertEquals(
+            AgendaTap.Open,
+            tap(
+                AgendaTap.EXTRA_TAP to AgendaTap.TAP_PICK,
+                AlarmReceiver.EXTRA_ROUTINE to "session:sport",
+                AlarmReceiver.EXTRA_OCCURRENCE to "2026-10-24T07:00",
+            ),
+        )
+    }
+
+    @Test
+    fun aSessionsBoxDoesNothing() {
+        assertEquals(AgendaTap.None, tap(AgendaTap.EXTRA_TAP to AgendaTap.TAP_NONE))
+    }
+
+    @Test
+    fun everyTapReadsBackFromTheExtrasItPutsIn() {
+        val taps = listOf(
+            AgendaTap.Check("done", Alarm("", "routine:pills", "2026-10-24T08:00", null, null, "Pills", "08:00"), ""),
+            AgendaTap.Check("checklist", Alarm("", "", "", null, null, "Tickets", ""), "line:tickets"),
+            AgendaTap.Pick("session:sport", "2026-10-24T07:00", "note:push-ups"),
+            AgendaTap.Open,
+            AgendaTap.Unsorted,
+            AgendaTap.None,
+        )
+        for (tap in taps) {
+            val extras = tap.extras()
+            assertEquals(tap, AgendaTap.of { extras[it] })
+        }
     }
 
     @Test
@@ -41,6 +83,7 @@ class AgendaTapTest {
         assertEquals(AgendaTap.Open, check("line", "routine:trip", "2026-10-24"))
         assertEquals(AgendaTap.Open, check("frog"))
         assertEquals(AgendaTap.Open, check("shopping"))
+        assertEquals(AgendaTap.Open, check("checklist"))
         assertEquals(AgendaTap.Open, check("snooze", "routine:pills", "2026-10-24T08:00"))
         assertEquals(AgendaTap.Open, tap(AgendaTap.EXTRA_TAP to AgendaTap.TAP_CHECK))
     }

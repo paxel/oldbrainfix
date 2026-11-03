@@ -40,7 +40,7 @@ use crate::l10n::L10n;
 use crate::names::area_name;
 use crate::profile_view::{Pictures, display_name, person_picture};
 use crate::schedule_text::schedule_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the user asked for in the view this frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -617,12 +617,12 @@ impl SyncHost {
                             let when = wall(device.last_sync).format("%Y-%m-%d %H:%M").to_string();
                             ui.label(RichText::new(t.paired_last_sync(&when)).small().color(weak));
                             let mut on = store.auto_sync_on(&device.id).unwrap_or(true);
-                            if ui
-                                .checkbox(
-                                    &mut on,
-                                    RichText::new(t.sync_automatically()).color(text),
-                                )
-                                .changed()
+                            if theme::checkbox(
+                                ui,
+                                &mut on,
+                                RichText::new(t.sync_automatically()).color(text),
+                            )
+                            .changed()
                             {
                                 action = Some(SyncAction::AutoSync(device.id.clone(), on));
                             }
@@ -1217,9 +1217,11 @@ pub(crate) fn qr(
     painter.rect_filled(rect, 0.0, Color32::WHITE);
     let quiet = 2.0;
     let cell = size / (width as f32 + 2.0 * quiet);
-    for y in 0..width {
-        for x in 0..width {
-            if colors[y * width + x] == qrcode::Color::Dark {
+    // A QR code is at least 21 modules wide; the colours come a row of
+    // `width` at a time.
+    for (y, row) in colors.chunks(width.max(1)).enumerate() {
+        for (x, color) in row.iter().enumerate() {
+            if *color == qrcode::Color::Dark {
                 let min =
                     rect.min + Vec2::new((x as f32 + quiet) * cell, (y as f32 + quiet) * cell);
                 painter.rect_filled(

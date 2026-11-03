@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'chips.dart';
 import 'open_capture.dart';
 import 'reveal.dart';
 
@@ -81,14 +83,31 @@ void main() {
       .any((o) => o.opacity == AgendaScreen.tomorrowOpacity);
 
   group('the Agenda', () {
-    testWidgets('is the home screen, with "+" and the magnifier floating', (
-      tester,
-    ) async {
+    testWidgets('is the home screen, with only "+" floating and the folder '
+        'in the top bar', (tester) async {
       await start(tester);
       expect(find.byType(AgendaScreen), findsOneWidget);
-      expect(find.byType(FloatingActionButton), findsNWidgets(2));
+      expect(find.byType(FloatingActionButton), findsOneWidget);
       expect(find.byTooltip('Capture a Note'), findsOneWidget);
-      expect(find.byTooltip('Search and browse'), findsOneWidget);
+      final folder = find.byKey(const ValueKey('browse'));
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: folder),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: folder,
+          matching: find.byIcon(Icons.folder_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byTooltip('Search and browse'),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.text('Nothing due today. Tap + to capture a thought.'),
         findsOneWidget,
@@ -234,6 +253,28 @@ void main() {
       expect(dentist, lessThan(tester.getTopLeft(find.text(week[6])).dy));
     });
 
+    testWidgets('rows are tighter than in 0.3.1, their boxes and ⋮ still '
+        '40 dp (#208)', (tester) async {
+      routines.create('pills', daily([at(8)]));
+      routines.create('call Mum', daily([at(12)]));
+      await start(tester);
+      Finder card(String text) => find
+          .ancestor(of: find.text(text), matching: find.byType(Embossed))
+          .first;
+      // 0.3.1: 56 high, 68 from one row's top to the next's.
+      expect(tester.getSize(card('pills')).height, lessThanOrEqualTo(48));
+      expect(
+        tester.getTopLeft(card('call Mum')).dy -
+            tester.getTopLeft(card('pills')).dy,
+        lessThanOrEqualTo(54),
+      );
+      final box = tester.getSize(find.byType(Checkbox).first);
+      expect(box.width, greaterThanOrEqualTo(40));
+      expect(box.height, greaterThanOrEqualTo(40));
+      final menu = tester.getSize(find.byTooltip('More').first);
+      expect(menu.height, greaterThanOrEqualTo(40));
+    });
+
     testWidgets('a day after tomorrow is checked off today', (tester) async {
       final dentist = routines.create(
         'dentist',
@@ -283,6 +324,51 @@ void main() {
       // Unchecking takes it back.
       await tap(tester, find.byType(Checkbox).first);
       expect(agendaRows(tester).first, '08:00 pills');
+    });
+
+    testWidgets('with checked items hidden, a Done Occurrence leaves the '
+        'Agenda; off, it strikes through (#217)', (tester) async {
+      store.agendaHidesChecked = true;
+      final pills = routines.create('pills', daily([at(8), at(14)]));
+      routines.create(
+        'weekly report',
+        Schedule(start: tomorrow, rule: Recurrence.parse('FREQ=WEEKLY')),
+      );
+      routines.markDone(pills.id, Occurrence(tomorrow, at(8)));
+      await start(tester);
+      // Tomorrow's checked off already is gone too.
+      expect(agendaRows(tester).take(4), [
+        '08:00 pills',
+        '14:00 pills',
+        'All day weekly report',
+        '14:00 pills',
+      ]);
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).take(3), [
+        '14:00 pills',
+        'All day weekly report',
+        '14:00 pills',
+      ]);
+      expect(
+        routines.byId(pills.id)?.doneAt(Occurrence(today, at(8))),
+        isNotNull,
+      );
+      // Everything of today checked off: the day says so.
+      await tap(tester, find.byType(Checkbox).first);
+      expect(
+        find.text('Nothing due today. Tap + to capture a thought.'),
+        findsOneWidget,
+      );
+      store.agendaHidesChecked = false;
+      routines.markDone(pills.id, Occurrence(tomorrow, at(14)));
+      await tester.pumpAndSettle();
+      expect(agendaRows(tester).take(5), [
+        '[x] 08:00 pills',
+        '[x] 14:00 pills',
+        'All day weekly report',
+        '[x] 08:00 pills',
+        '[x] 14:00 pills',
+      ]);
     });
 
     testWidgets('moves on to the new day at midnight while open', (
@@ -449,7 +535,7 @@ void main() {
         isNull,
         reason: 'nothing typed yet',
       );
-      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.enterText(find.byType(TextField).first, 'pills');
       await tester.pumpAndSettle();
       await tap(tester, find.text('Save'));
 
@@ -466,7 +552,7 @@ void main() {
       tall(tester);
       await start(tester);
       await tap(tester, find.byTooltip('New Routine or Reminder'));
-      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.enterText(find.byType(TextField).first, 'pills');
       await tester.pumpAndSettle();
     }
 
@@ -496,29 +582,33 @@ void main() {
       expect(schedule.start, today);
     });
 
-    testWidgets('its choices are radio buttons, one per line', (tester) async {
+    testWidgets('its short choices are a wrapping row of choice chips', (
+      tester,
+    ) async {
       await openNew(tester);
       expect(find.byType(SegmentedButton<bool>), findsNothing);
       expect(find.byType(SegmentedButton<RepeatKind>), findsNothing);
-      expect(find.byType(RadioListTile<bool>), findsNWidgets(2));
-      expect(find.byType(RadioListTile<RepeatKind>), findsNWidgets(5));
-      // One option per line: each sits below the one before.
-      final tops = [
-        for (final tile in find.byType(RadioListTile<RepeatKind>).evaluate())
-          tester.getTopLeft(find.byWidget(tile.widget)),
-      ];
-      expect(tops.map((o) => o.dx).toSet(), hasLength(1));
-      expect(tops[1].dy, greaterThan(tops[0].dy));
-      expect(tops[2].dy, greaterThan(tops[1].dy));
-      expect(tops[4].dy, greaterThan(tops[3].dy));
+      expect(find.byType(RadioListTile<bool>), findsNothing);
+      expect(find.byType(RadioListTile<RepeatKind>), findsNothing);
+      expect(chipLabels(tester, find.byType(ChoiceChips<bool>)), [
+        'Simple',
+        'Advanced',
+      ]);
+      expect(pickedChip(tester, find.byType(ChoiceChips<bool>)), 'Simple');
+      expect(chipLabels(tester, find.byType(ChoiceChips<RepeatKind>)), [
+        'Once',
+        'Every …',
+        'Weekdays',
+        'Monthly on a day',
+        'Monthly on a weekday',
+      ]);
+      // A row: the second chip stands beside the first.
+      final first = tester.getTopLeft(chip('Once'));
+      final second = tester.getTopLeft(chip('Every …'));
+      expect(second.dy, first.dy);
+      expect(second.dx, greaterThan(first.dx));
 
-      await tap(
-        tester,
-        find.descendant(
-          of: find.widgetWithText(RadioListTile<RepeatKind>, 'Weekdays'),
-          matching: find.byType(Radio<RepeatKind>),
-        ),
-      );
+      await tap(tester, chip('Weekdays'));
       await tester.ensureVisible(find.text('Save'));
       await tap(tester, find.text('Save'));
       expect(
@@ -612,19 +702,7 @@ void main() {
       await tap(tester, find.text('Every month on the last Friday · All day'));
       // In the simple editor, as it was built.
       expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsNothing);
-      // Whether the option [text] is the one its radio group holds.
-      bool picked(String text) {
-        final tile = find.ancestor(
-          of: find.text(text),
-          matching: find.byWidgetPredicate((w) => w is RadioListTile),
-        );
-        final group = find.ancestor(
-          of: tile,
-          matching: find.byWidgetPredicate((w) => w is RadioGroup),
-        );
-        return (tester.widget(group.first) as RadioGroup).groupValue ==
-            (tester.widget(tile) as RadioListTile).value;
-      }
+      bool picked(String text) => chipPicked(tester, text);
 
       expect(picked('Monthly on a weekday'), isTrue);
       await reveal(tester, find.text('Friday'));
@@ -690,5 +768,73 @@ void main() {
       expect(find.text('Wiederholregel (RRULE)'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  });
+
+  group('the Agenda loads once per change (#205)', () {
+    setUp(() {
+      // A Frog makes the first load on a day write its pick, a change of
+      // the log the Agenda listens to.
+      Frogs(store).spawn(notes.capture('eat the frog').id);
+      routines.create('pills', daily([at(10)]));
+    });
+
+    testWidgets('on starting', (tester) async {
+      AgendaScreen.loads = 0;
+      await start(tester);
+      expect(find.text('eat the frog'), findsOneWidget);
+      expect(AgendaScreen.loads, 1);
+    });
+
+    testWidgets('on a check-off', (tester) async {
+      await start(tester);
+      AgendaScreen.loads = 0;
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).first, startsWith('[x] '));
+      expect(AgendaScreen.loads, 1);
+    });
+
+    testWidgets('on a sync arrival, however many entries it brings', (
+      tester,
+    ) async {
+      await start(tester);
+      AgendaScreen.loads = 0;
+      // As a sync applies what came: one batch, and one more write
+      // straight after it.
+      store.batch(() {
+        notes.capture('from the laptop');
+        routines.create('stretch', daily([at(11)]));
+      });
+      routines.create('walk', daily([at(12)]));
+      await tester.pumpAndSettle();
+      expect(find.text('stretch'), findsWidgets);
+      expect(find.text('walk'), findsWidgets);
+      expect(AgendaScreen.loads, 1);
+    });
+
+    for (final newDay in [false, true]) {
+      testWidgets(
+        'on a resume${newDay ? ' on a new day, which picks anew' : ''}',
+        (tester) async {
+          await start(tester);
+          AgendaScreen.loads = 0;
+          if (newDay) now = now.add(const Duration(days: 1));
+          final before = store.currentSeq();
+          for (final state in [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused,
+            AppLifecycleState.hidden,
+            AppLifecycleState.inactive,
+            AppLifecycleState.resumed,
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+          await tester.pumpAndSettle();
+          // The new day's pick went into the log as the Agenda read it.
+          expect(store.currentSeq() > before, newDay);
+          expect(AgendaScreen.loads, 1);
+        },
+      );
+    }
   });
 }

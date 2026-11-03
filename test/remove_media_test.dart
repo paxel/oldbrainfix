@@ -81,9 +81,6 @@ void main() {
       find.descendant(of: find.byType(NoteEditorScreen), matching: finder);
 
   group('the card\'s ⋮', () {
-    // The compact card, which shows no Photo Text beside its photo (#114).
-    setUp(() => store.setLocalSetting('compactNotes:unsorted', 'true'));
-
     testWidgets('offers only photos and recordings with a text', (
       tester,
     ) async {
@@ -100,7 +97,13 @@ void main() {
       expect(find.byKey(ValueKey('note-remove-$silent')), findsNothing);
       // Each entry says which one it is by the start of its text.
       expect(find.text('Remove photo, keep text'), findsOneWidget);
-      expect(find.text('Room 12'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(PopupMenuItem<VoidCallback>),
+          matching: find.text('Room 12'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Remove recording, keep text'), findsOneWidget);
     });
 
@@ -111,8 +114,8 @@ void main() {
       await start(tester);
       await tap(tester, find.text('1 Unsorted'));
       expect(inCard(find.byType(NotePhoto)), findsNWidgets(2));
-      // The card shows no Photo Text while the photo is there.
-      expect(inCard(find.text('Room 12')), findsNothing);
+      // The detailed view shows the Photo Text under its photo.
+      expect(inCard(find.text('Room 12')), findsOneWidget);
       await tap(tester, find.byKey(const ValueKey('note-menu')));
       await tap(tester, find.byKey(ValueKey('note-remove-$read')));
 
@@ -136,6 +139,8 @@ void main() {
       expect(inCard(find.byType(NotePhoto)), findsOneWidget);
       expect(inCard(find.text('Room 12')), findsOneWidget);
 
+      // The card got shorter: its first line may sit above the screen.
+      await reveal(tester, inCard(find.text('doctor')));
       await tester.longPress(inCard(find.text('doctor')));
       await tester.pumpAndSettle();
       expect(inEditor(find.byType(NotePhoto)), findsOneWidget);
@@ -150,7 +155,7 @@ void main() {
         ..removePhoto(note.id, note.photos.first)
         ..capture('call the garage');
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tester.enterText(
         find.descendant(
           of: find.byType(AreasScreen),

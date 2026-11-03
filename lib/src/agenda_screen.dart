@@ -6,18 +6,20 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'agenda_group.dart';
 import 'agenda_rows.dart';
+import 'agenda_widget.dart';
+import 'agenda_reader.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
-import 'area_look.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
-import 'checklist_view.dart';
 import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
 import 'calendar_screen.dart';
+import 'card_glance.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
@@ -54,10 +56,11 @@ enum _RowChoice { history, share }
 /// today. "+"
 /// fans out Text, Voice, Photo, Gallery and Paste to capture a Note, whose card
 /// then shows on top with its enrich options
-/// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar opens the list of all Routines and
-/// Reminders and the Calendar page, makes a Routine without a Note, and
-/// has the Profile picture in its corner, the only way to Settings. Each
+/// until the browser opens or the app comes back. The app bar's folder,
+/// its first action, opens the notes browser; the bar also opens the list
+/// of all Routines and Reminders and the Calendar page, makes a Routine
+/// without a Note, and has the Profile picture in its corner, the only
+/// way to Settings. Each
 /// row's ⋮, or a long press on it, shares its Routine or Reminder as a
 /// calendar file, and a Routine's leads to its history. A red
 /// banner on top shows while alarms lack a permission, and leads to the
@@ -81,11 +84,13 @@ enum _RowChoice { history, share }
 /// heading opens the Frog view; it shows while a Frog is open or one was
 /// eaten today. A Frog of a Masked Area shows masked, as an Occurrence.
 ///
-/// A Session's row today lists its picks (ADR 0029), written for
-/// everyone the Session reaches as it loads: each opens its entry form
-/// and has "Another one" until it has an entry. Once each has one, the
-/// box stays checked. On later days the row says how many it picks. A
-/// Masked row lists none, and a pick from a Masked Area shows masked.
+/// A Session's group today lists its picks under its title (ADR 0029,
+/// #208), written for everyone the Session reaches as it loads: each an
+/// entry with its box, which with its words opens its entry form, and
+/// "Another one" until it has an entry. The title's box only shows Done:
+/// once each pick has an entry it checks itself, and a tap on it does
+/// nothing. On later days the row says how many it picks. A Masked row
+/// lists none, and a pick from a Masked Area shows masked.
 ///
 /// Where switched on, every day also shows the appointments of the
 /// calendars picked on the Calendar page (#116), read as the Agenda
@@ -95,20 +100,22 @@ enum _RowChoice { history, share }
 /// and "Copy into a Note" makes a Note of one.
 ///
 /// Today also shows the Shopping Lists with open Lines, after the
-/// all-day rows, each as the user chose for it (#186): each open Line
-/// with its box, or one row with how many are open, or none. A tap opens
-/// the list; a Masked one is one row that names no Line.
+/// all-day rows, each as the user chose for it (#186, #208): its name as
+/// a heading with each open Line under it with its box, or the heading
+/// alone with how many are open, or none. A tap opens the list; a Masked
+/// one is the heading alone and names no Line.
 ///
 /// After them today shows each Checklist without a Routine or Reminder
 /// that has open Lines and that the user did not switch off for their
-/// own Agenda (#143), as one row with how many of its Lines are open; a
-/// tap opens it, and a Masked one names nothing of it.
+/// own Agenda (#143, #208): its name as a heading with its open Lines
+/// under it, each with its box; a tap opens it, and a Masked one is the
+/// heading alone with its counts, naming nothing of it.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
 
   /// How many days the Agenda shows, today included.
-  static const days = 7;
+  static const days = AgendaDays.shown;
 
   final Notes notes;
   final Places places;
@@ -139,6 +146,11 @@ class AgendaScreen extends StatefulWidget {
     this.onThemeChanged,
   });
 
+  /// How many times an Agenda read its rows, for the tests that count
+  /// them: once per change (#205).
+  @visibleForTesting
+  static var loads = 0;
+
   @override
   State<AgendaScreen> createState() => _AgendaScreenState();
 }
@@ -155,6 +167,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
+
+  /// The days as read last, for a calendar read to go into (#205).
+  AgendaDays? _days;
   List<DayEntry> _today = const [];
   List<DayEntry> _tomorrow = const [];
 
@@ -188,8 +203,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
   String? _capturedId;
   PlacedNote? _captured;
 
-  /// The captured Note when a tap unfolded its compact card (#114).
-  String? _unfoldedId;
+  /// The captured Note when a tap switched its card to the compact view;
+  /// it starts detailed, its buttons at hand for what was not done while
+  /// capturing (#189).
+  String? _compactId;
 
   /// Where shares come from; set with the first dependencies.
   PhotoPlatform? _photos;
@@ -220,7 +237,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         unawaited(_openWaiting());
       },
     );
-    widget.alarms.addListener(_reload);
+    widget.alarms.addListener(_alarmsChanged);
     // Notes sorted on a page opened from elsewhere, like the Nudge
     // screen, change the Unsorted count.
     widget.notes.store.addListener(_logChanged);
@@ -243,7 +260,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     unawaited(_shares?.cancel());
     unawaited(_requests.cancel());
     _timer?.cancel();
-    widget.alarms.removeListener(_reload);
+    widget.alarms.removeListener(_alarmsChanged);
     widget.notes.store.removeListener(_logChanged);
     _lifecycle.dispose();
     super.dispose();
@@ -293,35 +310,131 @@ class _AgendaScreenState extends State<AgendaScreen> {
           const [];
     }
     if (!mounted || read != _calendarReads) return;
-    _appointments = [
+    final shown = [
       for (final appointment in appointments)
         if (picked.contains(appointment.calendarId)) appointment,
     ];
-    _readCalendars = {for (final calendar in calendars) calendar.id: calendar};
-    _reload();
+    // Nothing shown before nor now, as while the calendar is off.
+    if (shown.isEmpty &&
+        _appointments.isEmpty &&
+        calendars.isEmpty &&
+        _readCalendars.isEmpty) {
+      return;
+    }
+    // Into the days as read, without reading the log again (#205).
+    setState(() {
+      _appointments = shown;
+      _readCalendars = {
+        for (final calendar in calendars) calendar.id: calendar,
+      };
+      if (_days case final days?) _show(days.withAppointments(shown));
+    });
   }
 
+  /// Set while [_load] writes today's picks, or the app's store hears
+  /// of those an isolate wrote, so the log's change by its own picks
+  /// reads nothing again (#205).
+  var _loading = false;
+
+  /// Set while a read runs off the UI thread (#207); [_again] when a
+  /// change asked for one more meanwhile.
+  var _reading = false;
+  var _again = false;
+
+  /// What the boxes tapped here show until the next read is in, by
+  /// [_boxKey]: checked or not (#207). A tap shows at once, and a second
+  /// one undoes what the first did.
+  final _tapped = <String, bool>{};
+
+  /// The key of the box of a Routine's [occurrence], of one of its Lines
+  /// with [line], a Frog's with [frog], or a list's Line with [line]
+  /// alone.
+  static String _boxKey({
+    String? routine,
+    Occurrence? occurrence,
+    String? line,
+    String? frog,
+  }) => [routine, occurrence?.key, line, frog].join('|');
+
+  /// Reads the rows with the alarms' reader: at once on the store, or
+  /// off the UI thread, the last rows showing meanwhile (#207).
   void _load() {
+    AgendaScreen.loads++;
+    final store = widget.notes.store;
+    final FutureOr<AgendaLoad> loading;
     // Writes today's picks when they are new, before the rows read their
-    // Done; the reload that follows writes nothing.
-    final sessions = _sessions.pickToday(deviceWallClock);
-    final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
-    final days = AgendaDays.read(
-      store: widget.notes.store,
-      places: widget.places,
-      wallClock: deviceWallClock,
-      days: AgendaScreen.days,
-      sessions: sessions,
-      frogsToday: frogs,
-      appointments: _appointments,
+    // Done; the log's change they make is no reason to read again.
+    _loading = true;
+    try {
+      loading = widget.alarms.reader.load(
+        store,
+        deviceWallClock,
+        deviceUnitSystem(store),
+      );
+    } finally {
+      _loading = false;
+    }
+    switch (loading) {
+      case AgendaLoad():
+        _apply(loading);
+      case Future<AgendaLoad>():
+        unawaited(_loaded(loading));
+    }
+  }
+
+  /// Shows the read [loading] once it arrives, unless the log changed
+  /// since it was read: then it reads again (#207).
+  Future<void> _loaded(Future<AgendaLoad> loading) async {
+    _reading = true;
+    try {
+      final load = await loading;
+      if (!mounted) return;
+      final store = widget.notes.store;
+      if (load.wroteElsewhere) {
+        _loading = true;
+        try {
+          store.changedElsewhere();
+        } finally {
+          _loading = false;
+        }
+      }
+      if (load.seq == store.currentSeq()) {
+        setState(() => _apply(load));
+      } else {
+        _again = true;
+      }
+    } finally {
+      _reading = false;
+      if (_again && mounted) {
+        _again = false;
+        _reload();
+      }
+    }
+  }
+
+  /// Shows what [load] read.
+  void _apply(AgendaLoad load) {
+    _tapped.clear();
+    final frogs = _frogsToday = load.frogs;
+    _show(
+      _appointments.isEmpty
+          ? load.days
+          : load.days.withAppointments(_appointments),
     );
-    _system = days.system;
-    _today = days.todayRows;
-    _tomorrow = days.tomorrowRows;
-    _later = days.later;
-    _frogRows = days.frogs;
-    _missed = _alarms.missed(deviceWallClock);
-    _unsorted = widget.notes.unsorted().length;
+    _missed = load.missed;
+    _unsorted = load.unsorted;
+    // The widget's snapshot is made of this read, not of one of its own
+    // (#204); it reads the calendar itself.
+    widget.alarms.agendaRead(
+      AgendaRead(
+        wallClock: deviceWallClock,
+        days: load.days,
+        frogs: frogs,
+        missed: _missed,
+        unsorted: _unsorted,
+      ),
+      seq: load.seq,
+    );
     // Counted from the pending sets, without reading each held file.
     _waiting = widget.notes.store.pendingSets
         .where((s) => s.kind == sentItemPendingKind)
@@ -340,6 +453,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
             (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
+  }
+
+  /// Whether this Device hides what is checked on the Agenda (#217), as
+  /// the rows were read.
+  bool get _hidesChecked => _days?.hidesChecked ?? false;
+
+  /// Shows the rows of [days].
+  void _show(AgendaDays days) {
+    _days = days;
+    _system = days.system;
+    _today = days.todayRows;
+    _tomorrow = days.tomorrowRows;
+    _later = days.later;
+    _frogRows = days.frogs;
   }
 
   /// Back on the Agenda: the Areas opened meanwhile close again.
@@ -363,23 +490,43 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  void _reload() => setState(_load);
+  var _reloadQueued = false;
+
+  /// Reads the rows again once, however many changes asked for it
+  /// meanwhile, and never in the middle of whatever changed (#205): a
+  /// check-off and the log's change it makes, a sync's writes, a resume
+  /// and its calendar read.
+  void _reload() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    scheduleMicrotask(() {
+      _reloadQueued = false;
+      if (!mounted) return;
+      // Once the read running off the UI thread is in (#207).
+      if (_reading) {
+        // What was tapped meanwhile shows at once.
+        setState(() => _again = true);
+      } else {
+        setState(_load);
+      }
+    });
+  }
 
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
 
-  var _reloadQueued = false;
-
-  /// Reloads once after the log changed, never in the middle of whatever
-  /// changed it.
+  /// The log changed: read again, unless the change is the Agenda's own
+  /// picks written as it read.
   void _logChanged() {
-    if (_reloadQueued) return;
-    _reloadQueued = true;
-    scheduleMicrotask(() {
-      _reloadQueued = false;
-      _reloadIfMounted();
-    });
+    if (_loading) return;
+    _reload();
+  }
+
+  /// The alarms' permissions or ringing changed, which only the banner
+  /// shows; what a tap applied changed the log, which reads again.
+  void _alarmsChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Fans out the ways to capture from "+", the ones this Device has,
@@ -463,11 +610,15 @@ class _AgendaScreenState extends State<AgendaScreen> {
         query: query,
       ),
     );
-    route.popped.then((_) {
-      if (!mounted) return;
-      _closeAreas();
-      _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (!mounted) return;
+        _closeAreas();
+        _reload();
+      }),
+    );
     return route;
   }
 
@@ -538,6 +689,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
     unawaited(_readCalendar());
   }
 
+  Future<void> _newSession() async {
+    await newSession(context, widget.notes, widget.places);
+  }
+
   Future<void> _newRoutine() async {
     await newRoutine(context, widget.notes, widget.places);
     if (!mounted) return;
@@ -557,13 +712,31 @@ class _AgendaScreenState extends State<AgendaScreen> {
     checked
         ? _checklists.check(lineId, on: on)
         : _checklists.uncheck(lineId, on: on);
+    _tapped[_boxKey(
+          routine: row.routine.id,
+          occurrence: row.occurrence,
+          line: lineId,
+        )] =
+        checked;
+    _reload();
+  }
+
+  /// Checks the Line [lineId] of a Checklist without a Routine from its
+  /// group today: it leaves the Agenda, and the list with its last.
+  void _checkListLine(String lineId) {
+    // Checked already, its box shown so until the read is in.
+    if (_tapped[_boxKey(line: lineId)] ?? false) return;
+    _checklists.check(lineId);
+    _tapped[_boxKey(line: lineId)] = true;
     _reload();
   }
 
   /// Checks the Line [lineId] of a Shopping List from its row today: it
   /// is struck through and leaves the Agenda until it comes back.
   void _checkShopping(String lineId) {
+    if (_tapped[_boxKey(line: lineId)] ?? false) return;
     _shopping.check(lineId, deviceWallClock);
+    _tapped[_boxKey(line: lineId)] = true;
     _reload();
   }
 
@@ -578,17 +751,21 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   void _toggle(AgendaRow row) {
-    if (row.done == null) {
-      _routines.markDone(row.routine.id, row.occurrence);
+    final key = _boxKey(routine: row.routine.id, occurrence: row.occurrence);
+    final done = _tapped[key] ?? row.done != null;
+    if (!done) {
+      // Its Note may go to the trash with it (#211).
+      _routines.checkOff(row.routine.id, row.occurrence);
     } else {
       _routines.unmarkDone(row.routine.id, row.occurrence);
     }
+    _tapped[key] = !done;
     _reload();
   }
 
   /// Checks off a Missed Occurrence: Done, late.
   void _checkMissed(Routine routine, Occurrence occurrence) {
-    _routines.markDone(routine.id, occurrence);
+    _routines.checkOff(routine.id, occurrence);
     _reload();
   }
 
@@ -679,116 +856,230 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  _OccurrenceRow _occurrenceRow(
-    AppLocalizations t,
-    String locale,
-    PlacedRow placed,
-  ) {
-    final (:row, :area, :masked, :picks, :lines, session: _) = placed;
+  /// An Occurrence's group (#208): its box, time and title as the
+  /// heading, and under it a Session's picks or a Checklist Routine's
+  /// Lines, each with its box.
+  Widget _occurrenceRow(AppLocalizations t, String locale, PlacedRow placed) {
+    final (:row, :area, :masked, :picks, :lines, :session) = placed;
+    final note = row.note;
     // Done from the entries of every pick, or from every Line checked,
     // stays checked.
     final complete =
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
-    return _OccurrenceRow(
-      row: row,
+    // As tapped here while the Agenda reads again (#207).
+    final tapped =
+        _tapped[_boxKey(routine: row.routine.id, occurrence: row.occurrence)];
+    final done = tapped ?? (row.done != null || complete);
+    // A Session's box only shows Done: its picks make it (#208).
+    final checks = !complete && session == null;
+    return AgendaGroup(
+      key: ValueKey('row-${row.routine.id}@${row.occurrence.key}'),
       // A Masked row tells nothing of its Area either.
       area: masked ? null : area,
-      masked: masked
-          ? maskedText(t, locale, row.routine, row.occurrence)
-          : null,
+      lead: AgendaBox(
+        value: done,
+        label: t.markDone,
+        onChanged: checks ? (_) => _toggle(row) : null,
+      ),
       time: occurrenceTime(t, locale, row.occurrence),
-      below: _sessionPart(t, placed) ?? _checklistPart(placed),
-      onToggle: complete ? null : () => _toggle(row),
+      title: masked
+          ? maskedText(t, locale, row.routine, row.occurrence)
+          : note == null
+          ? t.noteGone
+          : noteText(t, note),
+      struck: tapped ?? row.done != null,
+      under: _sessionUnder(t, placed),
+      marks: [
+        if (row.routine.isReminder)
+          Icon(
+            Icons.notifications_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            semanticLabel: t.reminder,
+          ),
+      ],
       onTap: () => _openRow(row),
       onMenu: _rowMenu(row),
+      menuKey: ValueKey('row-menu-${row.routine.id}'),
+      entries: [..._sessionPicks(t, placed), ..._routineLines(placed)],
     );
   }
 
-  /// What shows under a Session's title: today its picks, on later days
-  /// how many it picks; nothing on a Masked row.
-  Widget? _sessionPart(AppLocalizations t, PlacedRow placed) {
+  /// What shows under a Session's title: on later days how many it
+  /// picks, today that there is nothing left to pick; nothing on a Masked
+  /// row.
+  Widget? _sessionUnder(AppLocalizations t, PlacedRow placed) {
     final (:row, :masked, :session, :picks, area: _, lines: _) = placed;
     if (masked || session == null) return null;
     if (picks == null) {
       return Text(t.sessionPicks(session.countOn(row.occurrence.day)));
     }
+    if (picks.today.picks.isEmpty) {
+      return Text(
+        t.sessionNothingToPick,
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+    return null;
+  }
+
+  /// Today's picks of a Session under its title, each with its box, which
+  /// shows whether it has an entry; the box and the words open its entry
+  /// form, and "Another one" goes under each without an entry while it
+  /// swaps; nothing on a Masked row.
+  List<Widget> _sessionPicks(AppLocalizations t, PlacedRow placed) {
+    final (:masked, :picks, row: _, session: _, area: _, lines: _) = placed;
+    if (masked || picks == null) return const [];
     final (:today, masked: hidden, :opens, :swaps) = picks;
     final decimal = decimalSign(context);
-    return SessionPicks(
-      today: today,
-      texts: [
-        for (final (i, pick) in today.picks.indexed)
-          hidden[i] ? t.maskedTally : pickText(t, pick, _system, decimal),
+    return [
+      for (final (i, pick) in agendaPicks(
+        picks,
+        hidesChecked: _hidesChecked,
+      )) ...[
+        AgendaEntry(
+          key: ValueKey('session-pick-${pick.noteId}'),
+          boxKey: ValueKey('session-check-${pick.noteId}'),
+          text: hidden[i] ? t.maskedTally : pickText(t, pick, _system, decimal),
+          checked: pick.done,
+          onBox: opens[i] ? () => _openPick(today, pick) : null,
+          onTap: opens[i] ? () => _openPick(today, pick) : null,
+        ),
+        // The control goes below its text.
+        if (swaps && !pick.done)
+          Padding(
+            padding: EdgeInsets.only(left: AgendaSizes.of(context).indent),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('session-another-${pick.noteId}'),
+                onPressed: () => _anotherPick(today, pick),
+                icon: const Icon(Icons.swap_horiz),
+                label: Text(t.sessionAnother),
+              ),
+            ),
+          ),
       ],
-      onOpen: (i) => opens[i] ? () => _openPick(today, today.picks[i]) : null,
-      onAnother: (i) =>
-          swaps ? () => _anotherPick(today, today.picks[i]) : null,
-    );
+    ];
   }
 
-  /// What shows under the title of a Routine spawned from a Checklist:
-  /// its Lines as checked for this Occurrence, checkable where this
-  /// Device may check it off, on every day shown; nothing on a Masked
-  /// row.
-  Widget? _checklistPart(PlacedRow placed) {
+  /// The Lines of a Routine spawned from a Checklist under its title, as
+  /// checked for this Occurrence, checkable where this Device may check
+  /// it off, on every day shown; a tap on one's words opens the Routine
+  /// as the heading does. Nothing on a Masked row.
+  List<Widget> _routineLines(PlacedRow placed) {
     final (:row, :masked, :lines, area: _, session: _, picks: _) = placed;
-    if (masked || lines == null) return null;
+    if (masked || lines == null) return const [];
     final (:list, :checks) = lines;
-    return KeyedSubtree(
-      key: ValueKey('row-checklist-${row.routine.id}@${row.occurrence.key}'),
-      child: ChecklistLines(
-        lines: shownLines(list),
-        onCheck: checks ? (id, checked) => _checkLine(row, id, checked) : null,
+    return [
+      KeyedSubtree(
+        key: ValueKey('row-checklist-${row.routine.id}@${row.occurrence.key}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final line in agendaLines(list, hidesChecked: _hidesChecked))
+              if (_tapped[_boxKey(
+                        routine: row.routine.id,
+                        occurrence: row.occurrence,
+                        line: line.id,
+                      )] ??
+                      line.checked
+                  case final checked)
+                _lineEntry(
+                  line,
+                  checked: checked,
+                  onBox: checks
+                      ? () => _checkLine(row, line.id, !checked)
+                      : null,
+                  onTap: () => _openRow(row),
+                ),
+          ],
+        ),
       ),
-    );
+    ];
   }
 
-  /// A Shopping List's row today: an open Line, with its box and the
-  /// list's title under it, or the list with how many Lines are open. A
-  /// tap opens the list.
+  /// A Checklist's Line as an entry, a Line under another one step
+  /// further in.
+  Widget _lineEntry(
+    Line line, {
+    required bool checked,
+    required VoidCallback? onBox,
+    required VoidCallback onTap,
+  }) => AgendaEntry(
+    boxKey: ValueKey('checklist-check-${line.id}'),
+    textKey: ValueKey('checklist-line-${line.id}'),
+    text: line.text,
+    checked: checked,
+    depth: line.inGroup ? 1 : 0,
+    onBox: onBox,
+    onTap: onTap,
+  );
+
+  /// The title of the list [note]: its first line, else [fallback].
+  String _listTitle(AppLocalizations t, Note note, String fallback) =>
+      switch (noteText(t, note).trim().split('\n').first.trim()) {
+        '' => fallback,
+        final title => title,
+      };
+
+  /// A Shopping List's group today (#208): its name as the heading, with
+  /// no box, and its open Lines under it, each with its box, which checks
+  /// it and takes it off; or, as chosen for it or Masked, the heading
+  /// alone with how many are open. A tap opens the list.
   Widget _shoppingRow(AppLocalizations t, ShoppingRow shopping) {
-    final (:note, :area, :masked, :line, :count, :checks) = shopping;
-    final title = switch (noteText(t, note).trim().split('\n').first.trim()) {
-      '' => t.shoppingHeading,
-      final title => title,
-    };
-    final shown = masked ? t.maskedShoppingList : title;
-    return _ShoppingListRow(
-      icon: Icons.shopping_cart_outlined,
-      key: ValueKey(
-        line == null ? 'shopping-row-${note.id}' : 'shopping-line-${line.id}',
-      ),
+    final (:note, :area, :masked, :lines, :count, :checks) = shopping;
+    final title = _listTitle(t, note, t.shoppingHeading);
+    return AgendaGroup(
+      key: ValueKey('shopping-row-${note.id}'),
       area: masked ? null : area,
-      text: switch (line) {
-        final line? => line.text,
-        null => t.shoppingRowOpen(shown, count),
-      },
-      list: line == null ? null : title,
-      checkKey: line == null ? null : ValueKey('shopping-check-${line.id}'),
-      onCheck: line != null && checks ? () => _checkShopping(line.id) : null,
+      lead: AgendaGroup.icon(context, Icons.shopping_cart_outlined),
+      title: lines.isNotEmpty
+          ? title
+          : t.shoppingRowOpen(masked ? t.maskedShoppingList : title, count),
       onTap: () => _openList(note),
+      entries: [
+        for (final line in lines)
+          AgendaEntry(
+            key: ValueKey('shopping-line-${line.id}'),
+            boxKey: ValueKey('shopping-check-${line.id}'),
+            text: line.text,
+            checked: _tapped[_boxKey(line: line.id)] ?? false,
+            onBox: checks ? () => _checkShopping(line.id) : null,
+            onTap: () => _openList(note),
+          ),
+      ],
     );
   }
 
-  /// A Checklist's row today: its title with how many of its Lines are
-  /// open, "Before the trip: 3 of 7 open". A tap opens the list.
+  /// A Checklist's group today (#208), as a Shopping List's: its name as
+  /// the heading, with no box, and its open Lines under it, each with its
+  /// box; without Lines, as a Masked one, the heading alone with the count,
+  /// "Private Checklist: 3 of 7 open". A tap opens the list.
   Widget _checklistRow(AppLocalizations t, ChecklistRow row) {
-    final (:note, :area, :masked, :list) = row;
-    final title = masked
-        ? t.maskedChecklist
-        : switch (noteText(t, note).trim().split('\n').first.trim()) {
-            '' => t.checklistHeading,
-            final title => title,
-          };
-    return _ShoppingListRow(
+    final (:note, :area, :masked, :list, :lines, :checks) = row;
+    final title = _listTitle(t, note, t.checklistHeading);
+    return AgendaGroup(
       key: ValueKey('checklist-row-${note.id}'),
-      icon: Icons.checklist,
       area: masked ? null : area,
-      text: t.checklistRowOpen(title, list.openCount, list.count),
-      list: null,
-      checkKey: null,
-      onCheck: null,
+      lead: AgendaGroup.icon(context, Icons.checklist),
+      title: lines.isNotEmpty
+          ? title
+          : t.checklistRowOpen(
+              masked ? t.maskedChecklist : title,
+              list.openCount,
+              list.count,
+            ),
       onTap: () => _openList(note),
+      entries: [
+        for (final line in lines)
+          _lineEntry(
+            line,
+            checked: _tapped[_boxKey(line: line.id)] ?? line.checked,
+            onBox: checks ? () => _checkListLine(line.id) : null,
+            onTap: () => _openList(note),
+          ),
+      ],
     );
   }
 
@@ -856,16 +1147,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
       nudgeIn: Notes.defaultNudge,
     );
     _capturedId = note.id;
-    _unfoldedId = null;
+    _compactId = null;
     _reload();
   }
 
   void _toggleFrog(Frog frog) {
-    if (frog.isDone) {
+    final key = _boxKey(frog: frog.id);
+    final done = _tapped[key] ?? frog.isDone;
+    if (done) {
       _frogs.unmarkDone(frog.id);
     } else {
       _frogs.markDone(frog.id);
     }
+    _tapped[key] = !done;
     _reload();
   }
 
@@ -924,6 +1218,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
+    // Read only when its compact view shows.
+    final glances = CardGlances.inContext(context, widget.notes.store);
     List<Widget> rows(List<DayEntry> entries) => [
       for (final entry in entries)
         if (entry.piece case final piece?)
@@ -935,7 +1231,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         else if (entry.checklist case final checklist?)
           _checklistRow(t, checklist),
     ];
-    // Swipe left opens the notes browser, as the magnifier does.
+    // Swipe left opens the notes browser, as the folder does.
     return BrowserSwipes(
       forwardRoute: _areasRoute,
       back: false,
@@ -954,24 +1250,43 @@ class _AgendaScreenState extends State<AgendaScreen> {
               excludeFromSemantics: true,
             ),
             actions: [
+              // The Areas list, first in the bar (#221).
               IconButton(
+                key: const ValueKey('browse'),
+                tooltip: t.browseTooltip,
+                onPressed: _browse,
+                icon: const Icon(Icons.folder_outlined),
+              ),
+              // What does not fit goes into ⋮ from the end, the folder
+              // and the Profile picture never (UI laws, "The bar").
+              BarAction(
                 key: const ValueKey('allRoutines'),
-                tooltip: t.allRoutinesTitle,
+                label: t.allRoutinesTitle,
                 onPressed: _openAllRoutines,
-                icon: const Icon(Icons.format_list_bulleted),
+                icon: Icons.format_list_bulleted,
               ),
               if (hasCalendarPage(context))
-                IconButton(
+                BarAction(
                   key: const ValueKey('calendarPage'),
-                  tooltip: t.calendarPageTitle,
+                  label: t.calendarPageTitle,
                   onPressed: _openCalendar,
-                  icon: const Icon(Icons.event_outlined),
+                  icon: Icons.event_outlined,
                 ),
-              IconButton(
-                tooltip: t.newRoutineTooltip,
+              BarAction(
+                key: const ValueKey('newRoutine'),
+                label: t.newRoutineTooltip,
                 onPressed: _newRoutine,
-                icon: const Icon(Icons.add_alarm),
+                icon: Icons.add_alarm,
               ),
+              // Sessions are made only in Advanced (#197, #246); filed
+              // into no Area, so this Device may always set one up.
+              if (widget.notes.store.advanced)
+                BarAction(
+                  key: const ValueKey('newSession'),
+                  label: t.newSession,
+                  onPressed: _newSession,
+                  icon: Icons.event_repeat,
+                ),
               // The Profile picture, where the settings gear was: Settings,
               // Sync and Backups are reached through the Profile page.
               IconButton(
@@ -986,8 +1301,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
             padding: clearOfFloatingButtons(
               context,
               const EdgeInsets.only(top: 8),
-              // "+" with the magnifier above it.
-              buttons: 40 + 16 + floatingButtonHeight,
             ),
             children: [
               if (widget.alarms.missing.isNotEmpty)
@@ -1041,7 +1354,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     _reload,
                     onEdit: () => _open(captured.note),
                   ),
-                  full: _unfoldedId == captured.note.id,
+                  full: _compactId != captured.note.id,
                   sections: () => widget.notes.sections(captured.note.id),
                   checklist: (
                     read: () =>
@@ -1055,91 +1368,93 @@ class _AgendaScreenState extends State<AgendaScreen> {
                             .byNote(captured.note.id, deviceWallClock),
                     lists: ShoppingLists(widget.notes.store),
                   ),
+                  tally: widget.notes,
+                  session: widget.notes,
+                  kind: () =>
+                      NoteKinds(widget.notes.store).of(captured.note.id),
+                  glance: () => glances.of(captured.note.id),
                   boxes: boxTicks(widget.notes, captured, _reload),
                   onTable: tableEdit(widget.notes, captured, _reload),
-                  onTap: _unfoldedId == captured.note.id
-                      ? null
-                      : () => setState(() => _unfoldedId = captured.note.id),
+                  onTap: () => setState(
+                    () => _compactId = _compactId == captured.note.id
+                        ? null
+                        : captured.note.id,
+                  ),
                   onEdit: () => _open(captured.note),
                 ),
               ],
-              _Heading(t.agendaToday),
-              if (_today.isEmpty)
-                BrowserEmpty(text: t.nothingToday)
-              else
-                ...rows(_today),
-              // Under what is due, never above it (#101).
-              if (_frogsToday case final frogs? when frogs.visible) ...[
-                _FrogsHeading(onTap: _openFrogs),
-                for (final (:placed, :masked) in _frogRows)
-                  FrogRow(
-                    key: ValueKey('frog-${placed.frog.id}'),
-                    frog: placed.frog,
-                    // A Masked row tells nothing of its Area either.
-                    area: masked ? null : placed.area,
-                    title: masked ? t.maskedFrog : noteText(t, placed.note),
-                    onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
-                        ? () => _toggleFrog(placed.frog)
-                        : null,
-                    onTap: () => _openFrogNote(placed.note),
-                    onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
-                    onAnother: frogs.canSwap && !frogs.eaten
-                        ? () => _anotherFrog(placed.frog)
-                        : null,
-                  ),
-              ],
-              // The visible gap between today and tomorrow.
-              const SizedBox(height: 32),
-              Opacity(
-                opacity: AgendaScreen.tomorrowOpacity,
-                child: Column(
-                  children: [
-                    _Heading(t.agendaTomorrow),
-                    // Only today's empty day tells how to capture.
-                    if (_tomorrow.isEmpty)
-                      _NothingPlanned(t.nothingPlanned)
-                    else
-                      ...rows(_tomorrow),
-                  ],
-                ),
-              ),
-              // The days after, each under its weekday and date; one with
-              // nothing due still shows.
-              for (final (:day, rows: later) in _later) ...[
-                const SizedBox(height: 16),
+              // Nothing of the days before their first read is in (#207):
+              // no "Nothing planned" that is not so.
+              if (_days != null) ...[
+                _Heading(t.agendaToday),
+                if (_today.isEmpty)
+                  BrowserEmpty(text: t.nothingToday)
+                else
+                  ...rows(_today),
+                // Under what is due, never above it (#101).
+                if (_frogsToday case final frogs?
+                    when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
+                  _FrogsHeading(onTap: _openFrogs),
+                  for (final (:placed, :masked) in _frogRows)
+                    FrogRow(
+                      key: ValueKey('frog-${placed.frog.id}'),
+                      frog: placed.frog,
+                      // A Masked row tells nothing of its Area either.
+                      area: masked ? null : placed.area,
+                      title: masked ? t.maskedFrog : noteText(t, placed.note),
+                      done: _tapped[_boxKey(frog: placed.frog.id)],
+                      onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
+                          ? () => _toggleFrog(placed.frog)
+                          : null,
+                      onTap: () => _openFrogNote(placed.note),
+                      onMenu: (at) =>
+                          frogMenu(context, _frogs, placed.frog, at),
+                      onAnother: frogs.canSwap && !frogs.eaten
+                          ? () => _anotherFrog(placed.frog)
+                          : null,
+                    ),
+                ],
+                // The visible gap between today and tomorrow.
+                const SizedBox(height: 32),
                 Opacity(
                   opacity: AgendaScreen.tomorrowOpacity,
                   child: Column(
                     children: [
-                      _Heading(t.agendaDay(day.wall)),
-                      if (later.isEmpty)
+                      _Heading(t.agendaTomorrow),
+                      // Only today's empty day tells how to capture.
+                      if (_tomorrow.isEmpty)
                         _NothingPlanned(t.nothingPlanned)
                       else
-                        ...rows(later),
+                        ...rows(_tomorrow),
                     ],
                   ),
                 ),
+                // The days after, each under its weekday and date; one with
+                // nothing due still shows.
+                for (final (:day, rows: later) in _later) ...[
+                  const SizedBox(height: 16),
+                  Opacity(
+                    opacity: AgendaScreen.tomorrowOpacity,
+                    child: Column(
+                      children: [
+                        _Heading(t.agendaDay(day.wall)),
+                        if (later.isEmpty)
+                          _NothingPlanned(t.nothingPlanned)
+                        else
+                          ...rows(later),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton.small(
-                heroTag: 'browse',
-                tooltip: t.browseTooltip,
-                onPressed: _browse,
-                child: const Icon(Icons.search),
-              ),
-              const SizedBox(height: 16),
-              FloatingActionButton(
-                key: _plus,
-                heroTag: 'capture',
-                tooltip: t.captureTooltip,
-                onPressed: _capture,
-                child: const Icon(Icons.add),
-              ),
-            ],
+          floatingActionButton: FloatingActionButton(
+            key: _plus,
+            heroTag: 'capture',
+            tooltip: t.captureTooltip,
+            onPressed: _capture,
+            child: const Icon(Icons.add),
           ),
         ),
       ),
@@ -1302,268 +1617,6 @@ class _NothingPlanned extends StatelessWidget {
   );
 }
 
-/// One Occurrence as an embossed row: the box to check it off, its time,
-/// its Note's text, its Area's colour and icon, and ⋮. Tapping the row
-/// opens its Routine; a long press opens [onMenu] where the finger is,
-/// and ⋮ opens it at the button, when there is one.
-class _OccurrenceRow extends StatelessWidget {
-  final AgendaRow row;
-  final Area? area;
-
-  /// The masked text shown instead of the Note's; null when it shows in
-  /// full.
-  final String? masked;
-  final String time;
-
-  /// What shows under the title, such as a Session's picks.
-  final Widget? below;
-
-  /// Checks it off or unchecks it; the box is disabled when null.
-  final VoidCallback? onToggle;
-  final VoidCallback onTap;
-  final void Function(Offset at)? onMenu;
-
-  const _OccurrenceRow({
-    required this.row,
-    required this.area,
-    this.masked,
-    required this.time,
-    this.below,
-    required this.onToggle,
-    required this.onTap,
-    this.onMenu,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final colour = areaColour(area?.colour);
-    final done = row.done != null;
-    final note = row.note;
-    final title = masked ?? (note == null ? t.noteGone : noteText(t, note));
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The row's ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: GestureDetector(
-              onLongPressStart: switch (onMenu) {
-                null => null,
-                final onMenu => (details) => onMenu(details.globalPosition),
-              },
-              child: InkWell(
-                onTap: onTap,
-                child: Container(
-                  decoration: colour == null
-                      ? null
-                      : BoxDecoration(
-                          border: Border(
-                            left: BorderSide(color: colour, width: 6),
-                          ),
-                        ),
-                  padding: EdgeInsets.fromLTRB(
-                    4,
-                    4,
-                    onMenu == null ? 16 : 4,
-                    4,
-                  ),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: done,
-                        semanticLabel: t.markDone,
-                        onChanged: switch (onToggle) {
-                          null => null,
-                          final onToggle => (_) => onToggle(),
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(time, style: text.labelLarge),
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: text.bodyLarge?.copyWith(
-                                decoration: done
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                            ),
-                            ?below,
-                          ],
-                        ),
-                      ),
-                      if (row.routine.isReminder)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Icon(
-                            Icons.notifications_outlined,
-                            size: 18,
-                            color: scheme.onSurfaceVariant,
-                            semanticLabel: t.reminder,
-                          ),
-                        ),
-                      if (areaIconData(area?.icon) case final icon?)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Icon(icon, size: 20, color: colour),
-                        ),
-                      if (onMenu case final onMenu?)
-                        // The same menu as the long press, at the button.
-                        Builder(
-                          builder: (button) => IconButton(
-                            key: ValueKey('row-menu-${row.routine.id}'),
-                            tooltip: t.more,
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () {
-                              final box =
-                                  button.findRenderObject() as RenderBox?;
-                              if (box == null) return;
-                              onMenu(
-                                box.localToGlobal(
-                                  box.size.bottomLeft(Offset.zero),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A Shopping List's or Checklist's row today as an embossed row, its
-/// Area's colour and icon on it: a Line that came back today with its box
-/// and the list's title under it, or the list with its [icon]. Tapping it
-/// opens the list.
-class _ShoppingListRow extends StatelessWidget {
-  /// What leads a row of the list, which has no box.
-  final IconData icon;
-  final Area? area;
-  final String text;
-
-  /// The list's title under a Line's text; null on a row of the list.
-  final String? list;
-
-  /// The box's key on a Line's row; null on a row of the list, which has
-  /// no box.
-  final Key? checkKey;
-
-  /// Checks the Line; the box is disabled when null.
-  final VoidCallback? onCheck;
-  final VoidCallback onTap;
-
-  const _ShoppingListRow({
-    super.key,
-    required this.icon,
-    required this.area,
-    required this.text,
-    required this.list,
-    required this.checkKey,
-    required this.onCheck,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final styles = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final colour = areaColour(area?.colour);
-    final list = this.list;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The row's ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
-              child: Container(
-                decoration: colour == null
-                    ? null
-                    : BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: colour, width: 6),
-                        ),
-                      ),
-                padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
-                child: Row(
-                  children: [
-                    if (checkKey case final checkKey?)
-                      Checkbox(
-                        key: checkKey,
-                        value: false,
-                        semanticLabel: text,
-                        onChanged: switch (onCheck) {
-                          null => null,
-                          final onCheck => (_) => onCheck(),
-                        },
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(icon, color: scheme.onSurfaceVariant),
-                      ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              text,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: styles.bodyLarge,
-                            ),
-                            if (list != null)
-                              Text(
-                                list,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: styles.labelMedium?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (areaIconData(area?.icon) case final icon?)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(icon, size: 20, color: colour),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// A calendar appointment's part on one day as an embossed row, read
 /// only: its calendar's colour down the side and its icon, its time, its
 /// title, its calendar's name, and ⋮; no box, as nothing here checks it
@@ -1603,8 +1656,9 @@ class _AppointmentRow extends StatelessWidget {
     final location = appointment.location.trim();
     final description = appointment.description.trim();
     final dim = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final sizes = AgendaSizes.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -1619,7 +1673,7 @@ class _AppointmentRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(left: BorderSide(color: colour, width: 6)),
                   ),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                  padding: const EdgeInsets.fromLTRB(12, 2, 0, 2),
                   child: Row(
                     children: [
                       Icon(
@@ -1632,7 +1686,7 @@ class _AppointmentRow extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1663,6 +1717,8 @@ class _AppointmentRow extends StatelessWidget {
                         builder: (button) => IconButton(
                           key: ValueKey('appointment-menu-${piece.key}'),
                           tooltip: t.more,
+                          // 40 by 40, as the boxes (#208).
+                          style: sizes.button,
                           icon: const Icon(Icons.more_vert),
                           onPressed: () {
                             final box = button.findRenderObject() as RenderBox?;

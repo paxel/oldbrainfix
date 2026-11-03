@@ -1,5 +1,5 @@
-//! Shopping Lists in the window (#122, ADR 0030): "Make it a Shopping
-//! List" in a Note's editor and in its card's ⋮ turns its lines into
+//! Shopping Lists in the window (#122, ADR 0030): the kind badge of a
+//! Note's editor (#188) and its card's ⋮ turn its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
 //! it comes back, and at the start of that day it is open in its place
 //! again; the Lines are typed in place as one block of text, as a
@@ -29,7 +29,8 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
     AreaRole, ClockTime, Day, ImportReport, Invite, Notes, OwnProfile, PairedDevice, Places,
-    Reappear, Routines, Schedule, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, Store,
+    Reappear, ReappearUnit, Routines, Schedule, ShoppingList, ShoppingLists, ShoppingOnAgenda,
+    SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -98,6 +99,16 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
 
 fn shows_part(harness: &Harness<'_, App>, part: &str) -> bool {
     harness.query_all_by_label_contains(part).next().is_some()
+}
+
+/// Whether the Agenda shows the list "Weekly", as its heading alone or
+/// with its Lines under it (#208).
+fn shows_weekly(harness: &Harness<'_, App>) -> bool {
+    shows_part(harness, "Weekly:")
+        || harness
+            .query_all_by_role_and_label(Role::Button, "Weekly")
+            .next()
+            .is_some()
 }
 
 /// Clicks the last widget labelled `label`: a menu's or a dialog's, over
@@ -206,7 +217,10 @@ fn type_line(harness: &mut Harness<'_, App>, text: &str) {
 fn rows(harness: &Harness<'_, App>) -> Vec<String> {
     let mut fields: Vec<(f32, String)> = harness
         .query_all_by(|n| {
-            n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+            // Not the Note's name (#188).
+            n.role() == Role::TextInput
+                && n.placeholder().unwrap_or_default().is_empty()
+                && n.label().as_deref() != Some("Name")
         })
         .map(|n| (n.rect().top(), n.value().unwrap_or_default()))
         .collect();
@@ -267,19 +281,21 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
     let (store, note, _) = with_note()?;
     let mut harness = window(&store, Some(&note));
     assert!(!shows(&harness, "Shopping List"));
-    click(&mut harness, "Make it a Shopping List")?;
+    click(&mut harness, "Kind: Plain Note")?;
+    pick(&mut harness, "Shopping List")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples"]);
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
     assert_eq!(now.text, "Weekly");
-    // The field holds the title now, so leaving it writes nothing old.
-    assert!(
+    // The name holds the title now, so leaving it writes nothing old
+    // (#188).
+    assert_eq!(
         harness
-            .query_by(
-                |n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Weekly")
-            )
-            .is_some()
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .value()
+            .as_deref(),
+        Some("Weekly")
     );
     assert!(shows(&harness, "Shopping List"));
     assert!(!shows(&harness, "Make it a Shopping List"));
@@ -294,6 +310,7 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
 fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
     let mut harness = window(&store, Some(&note));
     tick(&mut harness, "Milk")?;
     assert!(checked(&harness, "Milk")?);
@@ -312,9 +329,13 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
+    weekly(&store, &note)?;
     let bread = line_id(&store, &note, "Bread")?;
     lists.check(&bread, &utc)?;
     let mut harness = window(&store, None);
+    // Folded under the open Lines until a click shows it (#189).
+    assert!(boxes(&harness, "Bread").is_empty());
+    click(&mut harness, "1 struck through")?;
     assert!(checked(&harness, "Bread")?);
     assert!(shows(&harness, "back Sat, Oct 31"));
     // Late on the day before: still struck.
@@ -480,58 +501,90 @@ fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
     Ok(())
 }
 
+/// Gives each Line of the Shopping List of `note` a week (#195).
+fn weekly(store: &Store, note: &str) -> TestResult {
+    let lists = ShoppingLists::new(store);
+    for line in list_of(store, note)?.lines {
+        lists.set_reappear(&line.id, Reappear::FALLBACK)?;
+    }
+    Ok(())
+}
+
+/// The reappear time badges of the Lines in the editor, in the order of
+/// their rows (#195).
+fn badges(harness: &Harness<'_, App>) -> Vec<String> {
+    harness
+        .query_all_by_label_contains("Reappear time: ")
+        .filter(|n| n.accesskit_node().role() == Role::Button)
+        .map(|n| n.accesskit_node().label().unwrap_or_default())
+        .collect()
+}
+
+/// Clicks the reappear time badge of the row `row` of the editor.
+fn click_badge(harness: &mut Harness<'_, App>, row: usize) -> TestResult {
+    harness
+        .query_all_by_label_contains("Reappear time: ")
+        .filter(|n| n.accesskit_node().role() == Role::Button)
+        .nth(row)
+        .ok_or(format!("badge {row}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
 #[test]
-fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
+fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
-    // A new Line comes back after a week.
-    click(&mut harness, "More: Milk")?;
+    // A new Line has none (#195).
+    assert_eq!(badges(&harness), ["Reappear time: None"; 3]);
+    click_badge(&mut harness, 0)?;
     assert!(shows(&harness, "Reappear time"));
-    let radios: Vec<(String, bool)> = harness
-        .query_all_by_role(Role::RadioButton)
-        .filter(|n| {
-            let label = n.accesskit_node().label().unwrap_or_default();
-            label == "Once" || label.ends_with("week") || label.ends_with("weeks")
-        })
-        .map(|n| {
-            let label = n.accesskit_node().label().unwrap_or_default();
-            (label, n.accesskit_node().toggled() == Some(Toggled::True))
-        })
-        .collect();
-    let want = [
-        ("Once", false),
-        ("1 week", true),
-        ("2 weeks", false),
-        ("3 weeks", false),
-        ("4 weeks", false),
-    ];
-    assert_eq!(
-        radios,
-        want.map(|(l, on)| (l.to_string(), on)).to_vec(),
-        "the reappear times"
-    );
-    assert!(!shows(&harness, "Move up"));
-    assert!(!shows(&harness, "Put under the Line above"));
-    click(&mut harness, "3 weeks")?;
+    for label in ["None", "Once", "After"] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    assert!(!shows(&harness, "week"), "units only for After");
     let milk = line_id(&store, &note, "Milk")?;
     let reappear = |harness: &Harness<'_, App>| -> Result<Reappear, Box<dyn std::error::Error>> {
         Ok(list(harness, &note)?.line(&milk).ok_or("Milk")?.reappear)
     };
-    // The pick closed the menu; Esc now would close the Note dialog.
-    assert_eq!(reappear(&harness)?, Reappear::Week3);
+    // After starts at a week, each pick written at once.
+    click(&mut harness, "After")?;
+    assert_eq!(reappear(&harness)?, Reappear::FALLBACK);
+    for unit in ["day", "week", "month", "year"] {
+        assert!(shows(&harness, unit), "{unit}");
+    }
+    click(&mut harness, "More")?;
+    click(&mut harness, "More")?;
+    assert_eq!(reappear(&harness)?, Reappear::After(3, ReappearUnit::Week));
+    click(&mut harness, "months")?;
+    assert_eq!(reappear(&harness)?, Reappear::After(3, ReappearUnit::Month));
+    click(&mut harness, "Close")?;
+    assert!(!shows(&harness, "After"));
+    assert_eq!(badges(&harness)[0], "Reappear time: 3 months");
     tick(&mut harness, "Milk")?;
-    assert!(shows(&harness, "back Sat, Nov 14"));
+    assert!(shows(&harness, "back Sun, Jan 24"));
+    // Back to none: struck until a time is set.
+    click_badge(&mut harness, 0)?;
+    click(&mut harness, "None")?;
+    assert_eq!(reappear(&harness)?, Reappear::Unset);
+    click(&mut harness, "Close")?;
+    assert!(list(&harness, &note)?.line(&milk).ok_or("Milk")?.struck);
+    assert!(!shows_part(&harness, "back "));
 
     // Once: gone when checked.
-    click(&mut harness, "More: Apples")?;
+    click_badge(&mut harness, 2)?;
     click(&mut harness, "Once")?;
+    click(&mut harness, "Close")?;
     tick(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
 
-    // Renaming is typing in place: the menu has no Rename.
+    // Renaming is typing in place, the reappear time is the badge's: the
+    // menu has neither.
     click(&mut harness, "More: Bread")?;
     assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Once"));
     harness.key_press(egui::Key::Escape);
     harness.run();
 
@@ -549,6 +602,39 @@ fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
 }
 
 #[test]
+fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_entry_stores_it_first() -> TestResult
+{
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    // An empty new Line has nothing to act on (#202).
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert!(!shows(&harness, "More: "));
+    type_line(&mut harness, "Tea");
+    assert_eq!(list(&harness, &note)?.count(), 3);
+    click_badge(&mut harness, 3)?;
+    click(&mut harness, "Once")?;
+    click(&mut harness, "Close")?;
+    let tea = line_id(&store, &note, "Tea")?;
+    assert_eq!(
+        list(&harness, &note)?.line(&tea).ok_or("Tea")?.reappear,
+        Reappear::Once
+    );
+
+    to_end_of(&mut harness, "Tea")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Salt");
+    click(&mut harness, "More: Salt")?;
+    click(&mut harness, "Delete")?;
+    click(&mut harness, "Delete")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Tea"]);
+    assert!(!shows(&harness, "More: Salt"));
+    Ok(())
+}
+
+#[test]
 fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
     let (store, note, _) = with_note()?;
     let lists = ShoppingLists::new(&store);
@@ -557,7 +643,7 @@ fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
     let mut harness = window(&store, Some(&note));
     // In the Note dialog's kind badge (#160).
     click(&mut harness, "Kind: Shopping List")?;
-    click(&mut harness, "Back to a plain Note")?;
+    pick(&mut harness, "Plain Note")?;
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
@@ -573,7 +659,7 @@ fn back_to_a_plain_note_marks_the_struck_lines() -> TestResult {
                 && n.value().as_deref() == Some(now.text.as_str()))
             .is_some()
     );
-    assert!(shows(&harness, "Make it a Shopping List"));
+    assert!(shows(&harness, "Kind: Plain Note"));
     Ok(())
 }
 
@@ -601,11 +687,15 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
 fn full_cards_check_lines_and_compact_cards_count_the_open_ones() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
     let mut harness = window(&store, None);
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
-    assert!(checked(&harness, "Bread")?);
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // Struck, it folds under the open Lines until a click shows it (#189).
+    assert!(boxes(&harness, "Bread").is_empty());
+    click(&mut harness, "1 struck through")?;
+    assert!(checked(&harness, "Bread")?);
     assert!(shows(&harness, "back Sat, Oct 31"));
     // The card's checkbox writes a check, never the Note's text.
     assert_eq!(
@@ -680,10 +770,12 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     // His own Line is his to change, in place too.
     assert!(shows(&harness, "More: Water"));
     assert!(line_field(&harness, "Water").is_ok());
-    click(&mut harness, "More: Water")?;
-    assert!(shows(&harness, "Reappear time"));
-    harness.key_press(egui::Key::Escape);
-    harness.run();
+    // His badge of Ann's Lines only shows; his own opens its dialog.
+    assert_eq!(badges(&harness), ["Reappear time: None"]);
+    assert!(harness.query_all_by_label("Reappear time: None").count() > 3);
+    click_badge(&mut harness, 0)?;
+    assert!(shows(&harness, "After"));
+    click(&mut harness, "Close")?;
     // His card's menu offers nothing of the kind.
     harness.state_mut().select(Selection::All);
     harness.run();
@@ -796,7 +888,7 @@ fn an_update_that_makes_a_shopping_list_says_so_and_shows_each_reappear_time() -
     assert!(shows_part(&harness, "Reappear time: Once"));
     assert_eq!(
         harness
-            .query_all_by_label_contains("Reappear time: 1 week")
+            .query_all_by_label_contains("Reappear time: None")
             .count(),
         2
     );
@@ -808,10 +900,40 @@ fn the_reappear_time_reads_in_both_languages() {
     use oldbrainfix_gui::shopping_view::reappear_label;
     let en = L10n::new("en");
     let de = L10n::new("de");
+    use oldbrainfix_gui::shopping_view::reappear_short;
     assert_eq!(reappear_label(&en, Reappear::Once), "Once");
-    assert_eq!(reappear_label(&en, Reappear::Week1), "1 week");
-    assert_eq!(reappear_label(&de, Reappear::Week4), "4 Wochen");
+    assert_eq!(reappear_label(&en, Reappear::Unset), "None");
+    assert_eq!(
+        reappear_label(&en, Reappear::After(1, ReappearUnit::Week)),
+        "1 week"
+    );
+    assert_eq!(
+        reappear_label(&en, Reappear::After(3, ReappearUnit::Month)),
+        "3 months"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(4, ReappearUnit::Week)),
+        "4 Wochen"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(2, ReappearUnit::Day)),
+        "2 Tage"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(1, ReappearUnit::Year)),
+        "1 Jahr"
+    );
     assert_eq!(reappear_label(&de, Reappear::Once), "Einmal");
+    assert_eq!(reappear_label(&de, Reappear::Unset), "Keine");
+    let short = |t: &L10n, r| reappear_short(t, r);
+    assert_eq!(short(&en, Reappear::Unset), "—");
+    assert_eq!(short(&en, Reappear::After(4, ReappearUnit::Week)), "4w");
+    assert_eq!(short(&en, Reappear::After(3, ReappearUnit::Month)), "3m");
+    assert_eq!(short(&en, Reappear::After(1, ReappearUnit::Day)), "1d");
+    assert_eq!(short(&en, Reappear::After(20, ReappearUnit::Year)), "20y");
+    assert_eq!(short(&de, Reappear::After(4, ReappearUnit::Week)), "4W");
+    assert_eq!(short(&de, Reappear::After(1, ReappearUnit::Year)), "1J");
+    assert_eq!(short(&de, Reappear::Once), "Einmal");
 }
 
 /// The start of Saturday, 31 October 2026, on UTC: the day a Line
@@ -828,6 +950,7 @@ fn agenda_with(
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
+    weekly(&store, &note)?;
     lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
     moment.store(
         DateTime::parse_from_rfc3339(BACK)?.timestamp(),
@@ -878,23 +1001,37 @@ fn by_default_the_agenda_has_one_row_with_the_open_lines_of_the_list() -> TestRe
 #[test]
 fn the_lines_choice_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    // The list's name as the heading, its open Lines under it (#208).
+    let heading = harness.get_by_role_and_label(Role::Button, "Weekly").rect();
     for line in ["Milk", "Bread", "Apples"] {
-        assert!(shows(&harness, &format!("Weekly: {line}")), "{line}");
+        let words = harness.get_by_role_and_label(Role::Button, line).rect();
+        let tick = boxes(&harness, line).pop().ok_or(line)?.rect();
+        assert!(words.top() > heading.top(), "{line} under the heading");
+        assert!(tick.left() >= heading.left() - 0.5, "{line} indented");
     }
     assert!(!shows_part(&harness, "open"));
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
-    assert!(!shows(&harness, "Weekly: Bread"));
-    assert!(shows(&harness, "Weekly: Milk"));
+    assert!(boxes(&harness, "Bread").is_empty());
+    assert!(!boxes(&harness, "Milk").is_empty());
     Ok(())
 }
 
 #[test]
 fn a_line_row_opens_its_note() -> TestResult {
     let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
+    harness.get_by_role_and_label(Role::Button, "Milk").click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_heading_of_a_list_with_its_lines_opens_its_note() -> TestResult {
+    let (mut harness, note) = agenda(Some(ShoppingOnAgenda::Lines))?;
     harness
-        .get_by_role_and_label(Role::Button, "Weekly: Milk")
+        .get_by_role_and_label(Role::Button, "Weekly")
         .click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
@@ -904,7 +1041,7 @@ fn a_line_row_opens_its_note() -> TestResult {
 #[test]
 fn the_off_choice_shows_no_shopping_list() -> TestResult {
     let (harness, _) = agenda(Some(ShoppingOnAgenda::Off))?;
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     assert!(boxes(&harness, "Bread").is_empty());
     assert!(shows(&harness, NOTHING_TODAY));
     Ok(())
@@ -923,7 +1060,7 @@ fn a_list_without_open_lines_never_shows() -> TestResult {
             }
             Ok(())
         })?;
-        assert!(!shows_part(&harness, "Weekly:"), "{shows_as:?}");
+        assert!(!shows_weekly(&harness), "{shows_as:?}");
         assert!(shows(&harness, NOTHING_TODAY), "{shows_as:?}");
     }
     Ok(())
@@ -939,9 +1076,10 @@ fn a_list_nobody_chose_for_shows_as_this_device_showed_shopping_lists() -> TestR
         }
     };
     let (harness, _) = agenda_with(old("off"))?;
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     let (harness, _) = agenda_with(old("lines"))?;
-    assert!(shows(&harness, "Weekly: Bread"));
+    assert!(shows(&harness, "Weekly"));
+    assert!(!boxes(&harness, "Bread").is_empty());
     let (harness, _) = agenda_with(old("back"))?;
     assert!(shows(&harness, "Weekly: 3 open"));
     Ok(())
@@ -1032,7 +1170,7 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     assert_eq!(radio(&harness, LINES), None, "the menu closed");
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(shows(&harness, "Weekly: Milk"));
+    assert!(!boxes(&harness, "Milk").is_empty());
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Weekly")?;
@@ -1041,7 +1179,7 @@ fn the_cards_menu_chooses_how_the_list_shows_on_the_agenda() -> TestResult {
     assert_eq!(lists.on_agenda(&note)?, ShoppingOnAgenda::Off);
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(!shows_weekly(&harness));
     Ok(())
 }
 

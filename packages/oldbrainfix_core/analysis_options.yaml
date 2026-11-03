@@ -1,1 +1,29 @@
 include: package:lints/recommended.yaml
+
+analyzer:
+  # Strict typing (#230, Q556 (a)): no implicit downcasts from dynamic, no
+  # raw generic types, no inference that falls back to dynamic.
+  language:
+    strict-casts: true
+    strict-raw-types: true
+    strict-inference: true
+  # The Dart counterpart of the Rust panic rules (#230, Q560 (a)): a dynamic
+  # call, a future nobody awaits or handles, and a subscription or sink left
+  # open fail the analysis. use_build_context_synchronously has no Flutter
+  # here to check but stays listed so both packages carry the same rules.
+  errors:
+    avoid_dynamic_calls: error
+    unawaited_futures: error
+    discarded_futures: error
+    cancel_subscriptions: error
+    close_sinks: error
+    use_build_context_synchronously: error
+
+linter:
+  rules:
+    - avoid_dynamic_calls
+    - unawaited_futures
+    - discarded_futures
+    - cancel_subscriptions
+    - close_sinks
+    - use_build_context_synchronously

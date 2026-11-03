@@ -40,6 +40,7 @@ void main() {
     bool showPlace = false,
     String locale = 'en',
     double width = 800,
+    bool full = false,
   }) async {
     tester.view.physicalSize = Size(width, 1200);
     tester.view.devicePixelRatio = 1;
@@ -63,6 +64,7 @@ void main() {
                 onMerge: () {},
                 onSchedule: (_) {},
                 actions: NoteActions(onSend: () {}, onDelete: () {}),
+                full: full,
               ),
             ],
           ),
@@ -76,10 +78,10 @@ void main() {
       tester.getTopLeft(finder).dy;
 
   group('order', () {
-    testWidgets('another person\'s Note: Profile, date, separator, Note, '
-        'separator, actions', (tester) async {
+    testWidgets('another person\'s Note, detailed: Profile, separator, Note, '
+        'its Capture Context, separator, actions', (tester) async {
       final note = notes.capture('Buy milk');
-      await card(tester, note, author: ann);
+      await card(tester, note, author: ann, full: true);
 
       final date = DateFormat.yMd('en')
           .add_Hm()
@@ -88,9 +90,9 @@ void main() {
       expect(dividers, findsNWidgets(2));
       final order = [
         top(tester, find.byKey(const ValueKey('author'))),
-        top(tester, find.text(date)),
         top(tester, dividers.first),
         top(tester, find.text('Buy milk')),
+        top(tester, find.text(date)),
         top(tester, dividers.last),
         top(tester, find.byTooltip('File into…')),
       ];
@@ -101,22 +103,49 @@ void main() {
       }
     });
 
+    testWidgets('another person\'s Note, compact: Profile, separator, Note, '
+        'its ⋮ top right, no Capture Context and no buttons at the bottom '
+        '(#189)', (tester) async {
+      final note = notes.capture('Buy milk');
+      await card(tester, note, author: ann);
+
+      final date = DateFormat.yMd('en')
+          .add_Hm()
+          .format(note.captured.toLocal());
+      expect(find.text(date), findsNothing);
+      expect(find.byType(Divider), findsOneWidget);
+      expect(find.byKey(const ValueKey('note-actions')), findsNothing);
+      expect(find.byTooltip('File into…'), findsNothing);
+      final order = [
+        top(tester, find.byKey(const ValueKey('author'))),
+        top(tester, find.byType(Divider)),
+        top(tester, find.text('Buy milk')),
+      ];
+      for (var i = 1; i < order.length; i++) {
+        expect(order[i], greaterThan(order[i - 1]), reason: 'step $i');
+      }
+      final menu = find.byKey(const ValueKey('note-menu'));
+      expect(
+        tester.getTopLeft(menu).dy,
+        lessThan(top(tester, find.byKey(const ValueKey('author')))),
+      );
+      expect(
+        tester.getTopLeft(menu).dx,
+        greaterThan(tester.getTopRight(find.text('Ann')).dx),
+      );
+    });
+
     testWidgets('one\'s own Note has no Profile line', (tester) async {
       final note = notes.capture('Buy milk');
       await card(tester, note);
 
       expect(find.byKey(const ValueKey('author')), findsNothing);
       expect(find.byKey(const ValueKey('author-name')), findsNothing);
-      final date = DateFormat.yMd('en')
-          .add_Hm()
-          .format(note.captured.toLocal());
-      expect(
-        top(tester, find.text(date)),
-        lessThan(top(tester, find.byType(Divider).first)),
-      );
+      // Nothing over the text, so no separator under it.
+      expect(find.byType(Divider), findsNothing);
     });
 
-    testWidgets('where it is filed is the third line, when shown', (
+    testWidgets('where it is filed comes after the Profile, when shown', (
       tester,
     ) async {
       final places = Places(store);
@@ -132,12 +161,8 @@ void main() {
         showPlace: true,
       );
 
-      final date = DateFormat.yMd('en')
-          .add_Hm()
-          .format(note.captured.toLocal());
       final order = [
         top(tester, find.byKey(const ValueKey('author'))),
-        top(tester, find.text(date)),
         top(tester, find.text('Household / Kitchen')),
         top(tester, find.byType(Divider).first),
         top(tester, find.text('Buy milk')),
@@ -176,7 +201,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(Divider), findsOneWidget);
+      expect(find.byType(Divider), findsNothing);
       expect(find.byKey(const ValueKey('note-actions')), findsNothing);
       expect(find.byKey(const ValueKey('note-menu')), findsNothing);
     });
@@ -187,7 +212,14 @@ void main() {
       tester,
     ) async {
       final note = notes.capture('Buy milk and bread for the weekend');
-      await card(tester, note, author: ann, locale: locale, width: 360);
+      await card(
+        tester,
+        note,
+        author: ann,
+        locale: locale,
+        width: 360,
+        full: true,
+      );
 
       expect(tester.takeException(), isNull);
       final row = find.byKey(const ValueKey('note-actions'));

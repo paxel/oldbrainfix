@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/host_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/profile.dart';
 import 'package:oldbrainfix/src/profile_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
@@ -160,6 +161,37 @@ void main() {
     await tap(tester, find.text('Start'));
     expect(find.byType(SpeechOfferScreen), findsOneWidget);
     expect(store.ownProfile?.name, 'Pixel');
+  });
+
+  testWidgets('the Starter Set asks Simple or Advanced, Simple '
+      'preselected, and Start keeps the choice', (tester) async {
+    await start(tester);
+    await tap(tester, newUser);
+    final simple = find.byKey(const ValueKey('features-simple'));
+    final advanced = find.byKey(const ValueKey('features-advanced'));
+    expect(simple, findsOneWidget);
+    expect(advanced, findsOneWidget);
+    expect(
+      tester
+          .widget<RadioColumn<bool>>(find.byKey(const ValueKey('features')))
+          .value,
+      isFalse,
+    );
+    await tap(tester, find.text('Start'));
+    expect(store.advanced, isFalse);
+  });
+
+  testWidgets('Advanced picked on the Starter Set is kept', (tester) async {
+    await start(tester);
+    await tap(tester, newUser);
+    await tester.ensureVisible(find.byKey(const ValueKey('features-advanced')));
+    await tap(tester, find.byKey(const ValueKey('features-advanced')));
+    await tap(tester, find.text('Start'));
+    expect(store.advanced, isTrue);
+    expect(
+      store.current(PersonSettingKeys.entity, PersonSettingKeys.features),
+      PersonSettingKeys.advanced,
+    );
   });
 
   testWidgets('Restore a Backup opens the restore', (tester) async {

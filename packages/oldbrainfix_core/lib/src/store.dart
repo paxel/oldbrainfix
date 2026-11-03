@@ -86,10 +86,28 @@ class Store {
     }
   }
 
+  var _elsewhere = 0;
+
+  /// How often [changedElsewhere] was told: what is kept beside the
+  /// store from its local settings is read again after it.
+  @internal
+  int get elsewhere => _elsewhere;
+
+  /// Another connection to the same database wrote, such as the automatic
+  /// sync in an isolate of its own (#225): what was worked out or read is
+  /// forgotten and the listeners hear of it, as after a change here; with
+  /// [profile], the Profile listeners too.
+  void changedElsewhere({bool profile = false}) {
+    _elsewhere++;
+    _changed();
+    if (profile) profileChanged();
+  }
+
   void _changed() {
     _judged = null;
     _overlay = null;
     _shownJudged = null;
+    _forgetWorkedOut();
     if (_inBatch) return;
     for (final listener in List.of(_listeners)) {
       listener();
@@ -206,13 +224,19 @@ class Store {
   void close() => _db.close();
 
   /// This installation's stable device id; created once.
-  String get deviceId => localSetting('device')!;
+  String get deviceId =>
+      localSetting('device') ??
+      (throw StateError('the store was opened without a device id'));
 
   SigningKey? _signingKey;
 
   /// This Device's signing key.
-  SigningKey get signingKey =>
-      _signingKey ??= SigningKey.fromSeed(fromHex(localSetting('signseed')!));
+  SigningKey get signingKey => _signingKey ??= SigningKey.fromSeed(
+    fromHex(
+      localSetting('signseed') ??
+          (throw StateError('the store was opened without a signing seed')),
+    ),
+  );
 
   /// Author name stamped on own entries.
   String get author => localSetting('author') ?? '';
@@ -572,6 +596,7 @@ class Store {
     } catch (_) {
       _db.execute('ROLLBACK');
       _judged = null;
+      _forgetWorkedOut();
       rethrow;
     } finally {
       _inBatch = false;
@@ -698,6 +723,7 @@ class Store {
     }
     _overlay = null;
     _shownJudged = null;
+    _forgetWorkedOut();
   }
 
   /// The pending sets, the oldest first.
@@ -926,10 +952,15 @@ class Store {
     return [...logged, ...pending]..sort(_compareBytes);
   }
 
+  /// How often [history] was read: what a test counts reads by.
+  @visibleForTesting
+  var historyReads = 0;
+
   /// Every entry of [entity] that counts, in log order, then those of
   /// the shown pending sets: what no role in a Shared Area allows is left
   /// out, judged with those sets too.
   List<Entry> history(String entity) {
+    historyReads++;
     final shown = _shown;
     if (shown.isEmpty) return loggedHistory(entity);
     final all = [
@@ -985,6 +1016,37 @@ class Store {
 
   JudgedLog? _judged;
 
+  final _workedOut = <Object, Object?>{};
+  var _generation = 0;
+  var _workedSeq = -1;
+
+  /// What [build] works out from the reads, kept under [key] until what
+  /// they show changes: the log, or the shown pending sets. An entry
+  /// another store open on the same file wrote, such as the phone's
+  /// background sync, counts too, by the log's high-water mark. What it
+  /// returns is shared by every caller, so nobody changes it.
+  @internal
+  T workedOut<T>(Object key, T Function() build) {
+    final seq = currentSeq();
+    if (seq != _workedSeq) {
+      _forgetWorkedOut();
+      _workedSeq = seq;
+    }
+    if (_workedOut.containsKey(key)) return _workedOut[key] as T;
+    final generation = _generation;
+    final value = build();
+    // Kept only when nothing changed while it was worked out.
+    if (generation == _generation && seq == currentSeq()) {
+      _workedOut[key] = value;
+    }
+    return value;
+  }
+
+  void _forgetWorkedOut() {
+    _generation++;
+    _workedOut.clear();
+  }
+
   /// What the roles of the Shared Areas allow (ADR 0013), worked out
   /// from the whole log after every change; nothing to work out while no
   /// Area was ever shared. Pending Changes never count here: this is
@@ -1020,23 +1082,74 @@ class Store {
     };
   }
 
-  /// Entities whose current `$type` is [type].
-  List<String> entitiesOfType(String type) {
-    final ids = {
-      for (final r in _db.select(
-        'SELECT DISTINCT entity FROM entries WHERE $_applied '
-        r"AND field = '$type' AND value = ?",
-        [type],
-      ))
-        r['entity'] as String,
-      for (final e in _shown)
-        if (e.field == r'$type' && e.value == type) e.entity,
-    };
-    return [
-      for (final id in ids)
-        if (current(id, r'$type') == type) id,
+  /// What [currentFields] gives for each of [entities], read in one
+  /// query rather than one per entity (#204); those without an entry
+  /// that counts are left out. It counts as one [history] read.
+  Map<String, Map<String, String?>> currentFieldsOf(Iterable<String> entities) {
+    final ids = entities.toSet();
+    if (ids.isEmpty) return {};
+    historyReads++;
+    final list = ids.toList();
+    final shown = _shown;
+    final all = [
+      for (var i = 0; i < list.length; i += _inChunk)
+        ..._entries(
+          'SELECT * FROM entries WHERE $_applied AND entity IN '
+          '(${List.filled(min(_inChunk, list.length - i), '?').join(', ')}) '
+          'ORDER BY seq',
+          list.sublist(i, min(i + _inChunk, list.length)),
+        ),
+      for (final e in shown)
+        if (ids.contains(e.entity)) e,
     ];
+    final ignored = shown.isEmpty ? judged.ignored : _displayJudged.ignored;
+    final latest = <String, Map<String, Entry>>{};
+    for (final e in all) {
+      if (ignored.contains(e.id)) continue;
+      final fields = latest.putIfAbsent(e.entity, () => {});
+      final held = fields[e.field];
+      if (held == null || _newer(e, held)) fields[e.field] = e;
+    }
+    return {
+      for (final MapEntry(key: id, value: fields) in latest.entries)
+        id: {
+          for (final MapEntry(:key, :value) in fields.entries) key: value.value,
+        },
+    };
   }
+
+  /// How many entities one query of [currentFieldsOf] names, well under
+  /// SQLite's limit of bound values.
+  static const _inChunk = 500;
+
+  /// Entities whose current `$type` is [type].
+  List<String> entitiesOfType(String type) => [
+    for (final id in _everOfType(type))
+      if (current(id, r'$type') == type) id,
+  ];
+
+  /// What [currentFields] gives for each entity whose current `$type` is
+  /// [type], read in one [currentFieldsOf] query rather than one per
+  /// entity (#216).
+  Map<String, Map<String, String?>> currentFieldsOfType(String type) => {
+    for (final MapEntry(key: id, value: fields) in currentFieldsOf(
+      _everOfType(type),
+    ).entries)
+      if (fields[r'$type'] == type) id: fields,
+  };
+
+  /// Entities whose `$type` was [type] at some time, the shown pending
+  /// sets included.
+  Set<String> _everOfType(String type) => {
+    for (final r in _db.select(
+      'SELECT DISTINCT entity FROM entries WHERE $_applied '
+      r"AND field = '$type' AND value = ?",
+      [type],
+    ))
+      r['entity'] as String,
+    for (final e in _shown)
+      if (e.field == r'$type' && e.value == type) e.entity,
+  };
 
   /// Latest-wins order: date, then recording time, then device, then
   /// dseq. Sorting a field's entries by it puts the current value last.
@@ -1143,7 +1256,7 @@ class RefusalMark {
   static RefusalMark? parse(String text) {
     try {
       final json = jsonDecode(text);
-      if (json case {'runs': final List list}) {
+      if (json case {'runs': final List<Object?> list}) {
         final runs = <RefusedRun>[];
         for (final r in list) {
           if (r

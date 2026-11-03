@@ -126,12 +126,14 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
         context,
         title: t.allRoutinesTitle,
         actions: [
-          IconButton(
-            key: const ValueKey('new-session'),
-            tooltip: t.newSession,
-            onPressed: _newSession,
-            icon: const Icon(Icons.event_repeat),
-          ),
+          // Sessions are made only in Advanced (#197).
+          if (widget.notes.store.advanced)
+            IconButton(
+              key: const ValueKey('new-session'),
+              tooltip: t.newSession,
+              onPressed: _newSession,
+              icon: const Icon(Icons.event_repeat),
+            ),
           if (CalendarScope.of(context).available)
             IconButton(
               key: const ValueKey('export'),

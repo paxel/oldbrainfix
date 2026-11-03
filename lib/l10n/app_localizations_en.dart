@@ -448,6 +448,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteGone => 'The Note is gone';
 
   @override
+  String get scheduleSentenceLabel => 'When';
+
+  @override
+  String get scheduleSentenceHint => 'Every day at 08:00';
+
+  @override
+  String get scheduleSentenceUnknown =>
+      'Marked words are not understood and change nothing.';
+
+  @override
+  String get scheduleSentenceAdvanced => 'Switch to Simple to type.';
+
+  @override
   String get scheduleSimple => 'Simple';
 
   @override
@@ -939,7 +952,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.';
+      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.';
 
   @override
   String get nudgeRepeat => 'Nudge again after';
@@ -1438,7 +1451,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsIntro =>
-      'These settings belong to this phone and are never synced.';
+      'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.';
 
   @override
   String get settingsLook => 'Look';
@@ -1453,6 +1466,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeDark => 'Dark';
 
   @override
+  String get fatFingers => 'Fat fingers';
+
+  @override
+  String get fatFingersDetail =>
+      'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
+
+  @override
   String get settingsAlarms => 'Alarms';
 
   @override
@@ -1462,6 +1482,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsRenagDetail =>
       'How often an ignored alarm rings again, unless its Routine has its own interval.';
+
+  @override
+  String get allDayFrom => 'All-day items remind from';
+
+  @override
+  String get allDayFromDetail =>
+      'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.';
 
   @override
   String get alarmSound => 'Alarm sound';
@@ -1837,7 +1864,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncSettingsStay =>
-      'Settings stay on each Device and are never synced.';
+      'Simple or Advanced and the Trash setting sync to your own Devices; other settings stay on each Device.';
 
   @override
   String get syncAutomatically => 'Sync automatically';
@@ -2626,7 +2653,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDeviceSettingsDetail =>
-      'They belong to this Device and are never synced.';
+      'Most belong to this Device; Simple or Advanced and the Trash setting sync to your own Devices.';
 
   @override
   String get profileWhichTitle => 'Which one is you?';
@@ -2735,7 +2762,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crashLastRunBody =>
-      'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.';
+      'Old Brain Fix stopped unexpectedly last time. Tap for details.';
+
+  @override
+  String get crashLastRunTitle => 'Old Brain Fix stopped unexpectedly';
+
+  @override
+  String get crashLastRunErrorCause =>
+      'The last run ended with an error or was ended by the system; the text below says how.';
+
+  @override
+  String get crashLastRunKilledCause =>
+      'The last run was ended while on screen without leaving an error behind, most likely because the phone ran short of memory.';
+
+  @override
+  String get crashLastRunFix =>
+      'Your saved Notes are safe. “Report” sends this text to the developer by mail; “Close” sends nothing.';
 
   @override
   String get sendToPerson => 'Send to a person';
@@ -3287,8 +3329,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checklistHeading => 'Checklist';
 
   @override
-  String checklistCount(int checked, int count) {
-    return '$checked of $count checked';
+  String checklistOpenCount(int open, int count) {
+    return '$open of $count open';
+  }
+
+  @override
+  String shoppingStruckCount(int count) {
+    return '$count struck through';
+  }
+
+  @override
+  String tallyCardTotal(String field, String total, String target) {
+    return '$field $total / $target';
+  }
+
+  @override
+  String tallyCardTotalOnly(String field, String total) {
+    return '$field $total';
+  }
+
+  @override
+  String sessionCardNext(String when) {
+    return 'Next: $when';
+  }
+
+  @override
+  String sessionCardWeek(int done, int skipped) {
+    return 'done $done / skipped $skipped this week';
+  }
+
+  @override
+  String get sessionHistory => 'Last 4 weeks';
+
+  @override
+  String sessionHistoryWeek(String day, int done, int skipped) {
+    return 'Week of $day: done $done / skipped $skipped';
   }
 
   @override
@@ -3340,6 +3415,65 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 week',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get shoppingReappearNone => 'None';
+
+  @override
+  String get shoppingReappearAfter => 'After';
+
+  @override
+  String shoppingDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count months',
+      one: '1 month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count years',
+      one: '1 year',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingShortDays(int count) {
+    return '${count}d';
+  }
+
+  @override
+  String shoppingShortWeeks(int count) {
+    return '${count}w';
+  }
+
+  @override
+  String shoppingShortMonths(int count) {
+    return '${count}m';
+  }
+
+  @override
+  String shoppingShortYears(int count) {
+    return '${count}y';
   }
 
   @override
@@ -3506,6 +3640,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyNoTarget => 'No target';
 
   @override
+  String get tallyMultiplies => 'Multiplies';
+
+  @override
+  String get tallyMultipliesNothing => 'Nothing';
+
+  @override
+  String get tallyMultipliesDetail =>
+      'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.';
+
+  @override
+  String tallyTimes(String factor, String value) {
+    return '$factor × $value';
+  }
+
+  @override
   String get tallyFields => 'Fields';
 
   @override
@@ -3572,12 +3721,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String tallyTargetValue(String value) {
-    return 'Target $value';
+  String tallyOlderEntries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count older entries',
+      one: '1 older entry',
+    );
+    return '$_temp0';
   }
-
-  @override
-  String get tallyMoreEntries => 'Show more';
 
   @override
   String get tallyRemovedEntries => 'Removed entries';
@@ -3635,6 +3787,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionPoolMissing => 'Choose at least one Tally.';
+
+  @override
+  String sessionPoolHidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more ticked, hidden by the filter',
+      one: '1 more ticked, hidden by the filter',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get sessionSchedule => 'Schedule';
@@ -3772,10 +3935,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteBeingCaptured => 'The Note being captured';
 
   @override
-  String get showNotesCompact => 'Show Notes compact';
+  String get showNotesCompact => 'Show compact views';
 
   @override
-  String get showNotesFull => 'Show Notes in full';
+  String get showNotesFull => 'Show detailed views';
 
   @override
   String get transcriptLabel => 'Transcript';
@@ -4384,6 +4547,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get formatCode => 'Code';
 
   @override
+  String get formatCodeBlock => 'Code block';
+
+  @override
   String get formatIndent => 'Indent list item';
 
   @override
@@ -4510,7 +4676,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -4523,7 +4689,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.';
 
   @override
-  String get quickNoteSchedule => 'Routine, Reminder, Frog, Session or Tally';
+  String get quickNoteSchedule => 'Frog, Session or Tally';
 
   @override
   String get copyPhoto => 'Copy';
@@ -4768,8 +4934,534 @@ class AppLocalizationsEn extends AppLocalizations {
   String get badgeKind => 'Kind';
 
   @override
+  String get kindPlain => 'Plain Note';
+
+  @override
+  String get noteName => 'Name';
+
+  @override
+  String get noteDescription => 'Description';
+
+  @override
+  String get noteDescriptionUnfold => 'Show the whole description';
+
+  @override
+  String get noteDescriptionFold => 'Fold the description';
+
+  @override
   String get settingOn => 'On';
 
   @override
   String get settingOff => 'Off';
+
+  @override
+  String get settingsAgenda => 'Agenda';
+
+  @override
+  String get hideCheckedOnAgenda => 'Hide what\'s checked on the Agenda';
+
+  @override
+  String get hideCheckedOnAgendaDetail =>
+      'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.';
+
+  @override
+  String get trashDoneReminder =>
+      'Move a Note to the Trash when its one-time Reminder is done';
+
+  @override
+  String get trashDoneReminderDetail =>
+      'Done on a one-time Reminder that is a plain Note\'s only Routine or Reminder moves the Note to the trash with it, wherever you check it off. Lists, Tallies and Sessions stay. The same on all your own Devices; unchecking doesn\'t bring the Note back, the trash does for 30 days.';
+
+  @override
+  String occurrenceDue(String when) {
+    return 'Due $when';
+  }
+
+  @override
+  String occurrenceMissedAt(String when) {
+    return 'Missed $when';
+  }
+
+  @override
+  String get doneAndTrash => 'Done and move to trash';
+
+  @override
+  String get badgeTextFormat => 'Text format';
+
+  @override
+  String get textFormatPlain => 'Plain text';
+
+  @override
+  String get textFormatFormatted => 'Formatted text';
+
+  @override
+  String get textFormatCode => 'Code';
+
+  @override
+  String get codePasted => 'This looks like code.';
+
+  @override
+  String get keepAsCode => 'Keep as code';
+
+  @override
+  String get noteHistoryHint =>
+      'Every change of this Note, its Amends and its Lines, the newest first.';
+
+  @override
+  String get noteHistoryCaptured => 'Captured';
+
+  @override
+  String get noteHistoryText => 'Text changed';
+
+  @override
+  String get noteHistoryAmended => 'Amended';
+
+  @override
+  String get noteHistoryAmendEdited => 'Amend changed';
+
+  @override
+  String get noteHistoryMergedIn => 'Note merged in';
+
+  @override
+  String get noteHistoryLineAdded => 'Line added';
+
+  @override
+  String get noteHistoryLineRenamed => 'Line renamed';
+
+  @override
+  String get noteHistoryLineChecked => 'Line checked';
+
+  @override
+  String get noteHistoryLineUnchecked => 'Line unchecked';
+
+  @override
+  String get noteHistoryLineRemoved => 'Line deleted';
+
+  @override
+  String get noteHistoryLineRestored => 'Line restored';
+
+  @override
+  String get noteHistoryTrashed => 'Moved to the trash';
+
+  @override
+  String get noteHistoryRestored => 'Restored from the trash';
+
+  @override
+  String get noteHistoryPhotoAdded => 'Photo added';
+
+  @override
+  String get noteHistoryPhotoRemoved => 'Photo removed';
+
+  @override
+  String get noteHistoryRecordingAdded => 'Recording added';
+
+  @override
+  String get noteHistoryRecordingRemoved => 'Recording removed';
+
+  @override
+  String get noteHistoryPlaceGone => 'An Area or Topic that is gone';
+
+  @override
+  String get noteHistoryLocked => 'A locked Area';
+
+  @override
+  String get noteHistoryBefore => 'Before';
+
+  @override
+  String get noteHistoryAfter => 'After';
+
+  @override
+  String get useThisVersion => 'Use this version';
+
+  @override
+  String get useThisVersionDone =>
+      'The old text is back. The History keeps every version.';
+
+  @override
+  String get features => 'What Old Brain Fix offers';
+
+  @override
+  String get featuresDetail =>
+      'What you already made stays, either way. The same on all your own Devices; Settings changes it any time.';
+
+  @override
+  String get featuresSimple => 'Simple';
+
+  @override
+  String get featuresSimpleDetail =>
+      'Notes, Checklists, Shopping Lists, Reminders and Routines.';
+
+  @override
+  String get featuresAdvanced => 'Advanced';
+
+  @override
+  String get featuresAdvancedDetail =>
+      'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.';
+
+  @override
+  String get helpAreaName => 'Old Brain Fix';
+
+  @override
+  String get helpQuickStartTitle => 'Quick start';
+
+  @override
+  String get helpQuickStart1 => 'Capture a thought with +.';
+
+  @override
+  String get helpQuickStart2 => 'File the new Note into an Area.';
+
+  @override
+  String get helpQuickStart3 => 'Give a Note a Reminder.';
+
+  @override
+  String get helpQuickStart4 => 'Give a Note a Routine that repeats.';
+
+  @override
+  String get helpQuickStart5 =>
+      'Tick this Line: that is how a Checklist works.';
+
+  @override
+  String get helpQuickStart6 => 'Find a Note with Search and browse.';
+
+  @override
+  String get helpQuickStart7 => 'Make a Backup in Settings ▸ Backups.';
+
+  @override
+  String get helpQuickStart8 => 'Sync with your other Device in Settings.';
+
+  @override
+  String get helpIconsTitle => 'What the icons mean';
+
+  @override
+  String get helpIconsBadges => 'In a Note\'s badges';
+
+  @override
+  String get helpIconsAgenda => 'On the Agenda';
+
+  @override
+  String get helpIconsCard => 'On a Note card';
+
+  @override
+  String get helpIconKind => 'Kind';
+
+  @override
+  String get helpIconKindMeans =>
+      'what the Note is: a plain Note, a Checklist or a Shopping List.';
+
+  @override
+  String get helpIconImportance => 'Importance';
+
+  @override
+  String get helpIconImportanceMeans => 'how important the Note is.';
+
+  @override
+  String get helpIconPlace => 'Area and Topic';
+
+  @override
+  String get helpIconPlaceMeans => 'where the Note is filed.';
+
+  @override
+  String get helpIconCaptured => 'Captured';
+
+  @override
+  String get helpIconCapturedMeans => 'when you captured the Note.';
+
+  @override
+  String get helpIconReminder => 'Reminder';
+
+  @override
+  String get helpIconReminderMeans => 'rings once at its time.';
+
+  @override
+  String get helpIconRoutine => 'Routine';
+
+  @override
+  String get helpIconRoutineMeans => 'rings again on its days.';
+
+  @override
+  String get helpIconAdd => 'Add';
+
+  @override
+  String get helpIconAddMeans => 'gives the Note a Routine or Reminder.';
+
+  @override
+  String get helpIconBrowse => 'Search and browse';
+
+  @override
+  String get helpIconBrowseMeans => 'opens your Areas and searches every Note.';
+
+  @override
+  String get helpIconAllRoutines => 'All Routines and Reminders';
+
+  @override
+  String get helpIconAllRoutinesMeans => 'lists every Routine and Reminder.';
+
+  @override
+  String get helpIconNewRoutine => 'New Routine or Reminder';
+
+  @override
+  String get helpIconNewRoutineMeans => 'makes one with a new Note.';
+
+  @override
+  String get helpIconNewSession => 'New Session';
+
+  @override
+  String get helpIconNewSessionMeans =>
+      'makes a Session with a new Note, in Advanced.';
+
+  @override
+  String get helpIconUnsorted => 'Unsorted';
+
+  @override
+  String get helpIconUnsortedMeans => 'Notes still to file into an Area.';
+
+  @override
+  String get helpIconFileInto => 'File into…';
+
+  @override
+  String get helpIconFileIntoMeans => 'moves the Note into an Area or Topic.';
+
+  @override
+  String get helpIconAlarm => 'Routine or Reminder';
+
+  @override
+  String get helpIconAlarmMeans => 'gives the card\'s Note one.';
+
+  @override
+  String get helpIconMerge => 'Merge into…';
+
+  @override
+  String get helpIconMergeMeans => 'joins the Note with another one.';
+
+  @override
+  String get helpIconMore => 'More';
+
+  @override
+  String get helpIconMoreMeans => 'the card\'s other actions.';
+
+  @override
+  String helpWhatsNewTitle(String version) {
+    return 'What\'s new in $version';
+  }
+
+  @override
+  String get exportAsPack => 'Export as Pack…';
+
+  @override
+  String get packExportTitle => 'Export as Pack';
+
+  @override
+  String get packTickAll => 'Tick all';
+
+  @override
+  String get packUntickAll => 'Untick all';
+
+  @override
+  String packSize(String size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String get packAddProfile => 'Add my Profile';
+
+  @override
+  String get packAddProfileHint =>
+      'The receiver sees your name and picture, and can tell nobody changed the Pack.';
+
+  @override
+  String get packShare => 'Share…';
+
+  @override
+  String get packNothingTicked => 'Tick at least one Note.';
+
+  @override
+  String packPhoto(String size) {
+    return 'Photo · $size';
+  }
+
+  @override
+  String packRecording(String size) {
+    return 'Recording · $size';
+  }
+
+  @override
+  String packPhotoText(String text) {
+    return 'Photo Text: $text';
+  }
+
+  @override
+  String packTranscript(String text) {
+    return 'Transcript: $text';
+  }
+
+  @override
+  String packRoutine(String when) {
+    return 'Routine: $when';
+  }
+
+  @override
+  String packReminder(String when) {
+    return 'Reminder: $when';
+  }
+
+  @override
+  String get packFrog => 'Frog';
+
+  @override
+  String get packTitle => 'Pack';
+
+  @override
+  String packFrom(String name) {
+    return 'From $name';
+  }
+
+  @override
+  String packAddPerson(String name) {
+    return 'Add $name to People';
+  }
+
+  @override
+  String get packClaim => 'Claim as mine';
+
+  @override
+  String get packClaimHint =>
+      'Unticked, each Note shows who it came from until you remove it.';
+
+  @override
+  String get packAdd => 'Add';
+
+  @override
+  String packAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes added',
+      one: '1 Note added',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get packSuffix => 'Pack';
+
+  @override
+  String get packNoArea => 'From a Pack';
+
+  @override
+  String get packNotSent => 'The Pack was not shared.';
+
+  @override
+  String get packNotSentTitle => 'Pack not shared';
+
+  @override
+  String get packNotWrittenCause =>
+      'The file for the Pack could not be written.';
+
+  @override
+  String get packNotOpened => 'The Pack was not opened.';
+
+  @override
+  String get packNotOpenedTitle => 'Pack not opened';
+
+  @override
+  String get packUnreadable =>
+      'This file is no Pack, or it was changed after it was made.';
+
+  @override
+  String get packFromBlocked => 'This Pack is from a person you blocked.';
+
+  @override
+  String get packAskAgainFix => 'Ask the person to send it again.';
+
+  @override
+  String removePackFrom(String name) {
+    return 'Remove “From $name”';
+  }
+
+  @override
+  String get feedbackTitle => 'Send feedback';
+
+  @override
+  String get feedbackSettingsDetail =>
+      'Tell the developer what happened or what could be better. You see everything before it is sent.';
+
+  @override
+  String get feedbackTextLabel => 'What happened / what could be better';
+
+  @override
+  String get feedbackGoesAlong => 'What goes along';
+
+  @override
+  String get feedbackVersion => 'Version';
+
+  @override
+  String get feedbackSystem => 'OS and device';
+
+  @override
+  String get feedbackInstall => 'Install method';
+
+  @override
+  String get feedbackCrash => 'The last crash report';
+
+  @override
+  String get feedbackCrashNone => 'This phone keeps none.';
+
+  @override
+  String feedbackCrashFrom(String date) {
+    return 'From $date';
+  }
+
+  @override
+  String get feedbackNotes => 'Notes as a Pack';
+
+  @override
+  String get feedbackNotesHint => 'Pick them in the Pack\'s tree.';
+
+  @override
+  String feedbackNotesPicked(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes',
+      one: '1 Note',
+    );
+    return '$_temp0, $size';
+  }
+
+  @override
+  String get feedbackPickNotes => 'Pick the Notes…';
+
+  @override
+  String get feedbackNotesTitle => 'Notes for the feedback';
+
+  @override
+  String get feedbackPreview => 'Preview: exactly this is sent';
+
+  @override
+  String feedbackPackAlong(String notes) {
+    return 'With it, as a file: a Pack of $notes';
+  }
+
+  @override
+  String get feedbackMail => 'Mail';
+
+  @override
+  String get feedbackShare => 'Share…';
+
+  @override
+  String get feedbackTextFirst => 'Write what happened first.';
+
+  @override
+  String get feedbackTooLongForMail =>
+      'Too long for a mail link. Share sends all of it.';
+
+  @override
+  String get feedbackPackNotInMail =>
+      'A mail link cannot carry the Pack. Share sends it along: pick your mail app there.';
+
+  @override
+  String get feedbackNotSent => 'The feedback was not shared.';
+
+  @override
+  String get feedbackNotSentTitle => 'Feedback not shared';
 }

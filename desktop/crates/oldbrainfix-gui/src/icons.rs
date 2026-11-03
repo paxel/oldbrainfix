@@ -97,6 +97,13 @@ pub const FORMAT_NUMBERS: char = '\u{e2b9}';
 pub const FORMAT_QUOTE: char = '\u{e2bc}';
 pub const LINK: char = '\u{e380}';
 pub const CODE: char = '\u{e176}';
+/// The format bar's code block (#212), as the phone's: `data_object`.
+pub const CODE_BLOCK: char = '\u{f04e6}';
+/// The text format badge (#213), as the phone's: `text_format` for the
+/// setting, `short_text` for a plain text; [`FORMAT_BOLD`] and [`CODE`]
+/// for the others.
+pub const TEXT_FORMAT: char = '\u{e64a}';
+pub const SHORT_TEXT: char = '\u{e59d}';
 pub const INDENT: char = '\u{e2b5}';
 pub const OUTDENT: char = '\u{e2b4}';
 /// The format bar's table and the table view's, as the phone's (#128):
@@ -120,14 +127,47 @@ pub const FROG: char = '\u{1F438}';
 pub const IMPORTANCE: char = '\u{e362}';
 pub const ON_AGENDA: char = '\u{f44d}';
 pub const SHOW_TICKS: char = '\u{e316}';
+/// A Shopping List Line's reappear time, `autorenew` (#195).
+pub const REAPPEAR: char = '\u{e0c1}';
 pub const TALLY_RULE: char = '\u{e2cd}';
 pub const TALLY_UNIT: char = '\u{e60e}';
 pub const TALLY_TARGET: char = '\u{f07b}';
+/// A Tally field hidden (#190), `visibility_off_outlined`.
+pub const TALLY_HIDDEN: char = '\u{f4a0}';
+/// What a Tally field multiplies (#200), `calculate_outlined`.
+pub const TALLY_MULTIPLIES: char = '\u{ef10}';
 pub const SESSION_COUNT: char = '\u{e640}';
 pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';
+/// A Session's weekdays' own counts (#191), `calendar_view_week`.
+pub const SESSION_WEEKDAYS: char = '\u{e125}';
 pub const TALLY: char = '\u{e0cc}';
 pub const NEW_NOTE: char = '\u{f04f6}';
+/// The badges' own icons and their values' (#192): `category_outlined`
+/// for the kind; `priority_high`, `remove` and `low_priority` for
+/// important, normal and unimportant; `toggle_on` and `toggle_off` for an
+/// on-or-off setting; `numbers` for a Shopping List's count on the
+/// Agenda, its Lines `format_list_bulleted` ([`FORMAT_BULLETS`]);
+/// `add_circle_outline` and `vertical_align_top` for a Tally field's Sum
+/// and Max; `alt_route` for a Session's rule, its Random `shuffle`
+/// ([`SESSION_RULE`]), its Rolling `format_list_numbered`
+/// ([`FORMAT_NUMBERS`]) and its Least `balance`; and `folder_outlined`
+/// for Area and Topic ([`NO_AREA_ICON`]).
+pub const KIND: char = '\u{ef37}';
+pub const IMPORTANCE_HIGH: char = '\u{e4ec}';
+pub const IMPORTANCE_NORMAL: char = '\u{e516}';
+pub const IMPORTANCE_LOW: char = '\u{e3bd}';
+pub const TOGGLE_ON: char = '\u{e66c}';
+pub const TOGGLE_OFF: char = '\u{e66b}';
+pub const COUNT: char = '\u{f0542}';
+pub const TALLY_SUM: char = '\u{e050}';
+pub const TALLY_MAX: char = '\u{e69d}';
+pub const SESSION_RULE_BADGE: char = '\u{e080}';
+pub const SESSION_LEAST: char = '\u{f04c6}';
+/// A folded description of a Note of a kind (#188), `expand_more`, and
+/// one unfolded, `expand_less`.
+pub const EXPAND_MORE: char = '\u{e246}';
+pub const EXPAND_LESS: char = '\u{e245}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
@@ -146,6 +186,8 @@ pub fn area_icon(key: Option<&str>) -> Option<char> {
         "sport" => '\u{e28d}',
         "travel" => '\u{e297}',
         "star" => '\u{e5f9}',
+        // `psychology`, the phone's brain for the help Notes' Area (#180).
+        "brain" => '\u{e4ef}',
         _ => return None,
     })
 }

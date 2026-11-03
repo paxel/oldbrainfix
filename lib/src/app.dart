@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_reader.dart';
 import 'agenda_screen.dart';
 import 'alarm_platform.dart';
 import 'alarm_sync.dart';
@@ -26,6 +28,7 @@ import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
+import 'help_notes.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -36,12 +39,14 @@ import 'nudge_screen.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
+import 'place_names.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
 import 'ring_screen.dart';
+import 'session_view.dart';
 import 'routine_editor_screen.dart';
 import 'sent_item_screen.dart';
 import 'setup_screen.dart';
@@ -50,6 +55,7 @@ import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
+import 'sync_runner.dart';
 import 'sync_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
@@ -59,6 +65,10 @@ class OldBrainFixApp extends StatefulWidget {
 
   /// What the app has to say; the app keeps its own when none is given.
   final Announcements? announcements;
+
+  /// The root navigator, for what is announced before the app runs,
+  /// such as the report of a run that died.
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   /// Where the Note editor keeps unsaved text; in memory when none is
   /// given.
@@ -121,6 +131,15 @@ class OldBrainFixApp extends StatefulWidget {
   /// How an automatic sync is run; tests hand in a fake.
   final PairedJoin autoJoin;
 
+  /// Where the automatic sync's folder rounds and joins run: the app
+  /// hands in an isolate of their own (#225); without one, on [store]
+  /// with [folders] and [autoJoin].
+  final SyncRunner? syncRunner;
+
+  /// Where the Agenda's reads and the alarms' plan run: the app hands in
+  /// an isolate of their own (#207); without one, on [store] at once.
+  final AgendaReader agendaReader;
+
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
@@ -144,10 +163,16 @@ class OldBrainFixApp extends StatefulWidget {
   /// none is given, no Backup is written on its own while the app shows.
   final String? workDir;
 
+  /// The help Notes this version makes (#180) and what they are made
+  /// from; none in tests, so no Area "Old Brain Fix" appears there unless
+  /// a test hands one in.
+  final HelpSetup? help;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
     this.announcements,
+    this.navigatorKey,
     this.drafts,
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
@@ -165,6 +190,8 @@ class OldBrainFixApp extends StatefulWidget {
     this.pairing = const NoPairing(),
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
+    this.syncRunner,
+    this.agendaReader = const InlineAgendaReader(),
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -172,6 +199,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.bundles = const NoBundles(),
     this.profile = const NoProfilePlatform(),
     this.workDir,
+    this.help,
   });
 
   @override
@@ -180,8 +208,9 @@ class OldBrainFixApp extends StatefulWidget {
 
 class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _scroll = ParallaxScroll();
-  final _light = lookTheme(Brightness.light);
-  final _dark = lookTheme(Brightness.dark);
+  late var _fatFingers = widget.store.fatFingers;
+  late var _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
+  late var _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
   late var _themeMode = themeModeOf(widget.store.themeChoice);
@@ -211,6 +240,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     folders: widget.folders,
     workDir: widget.workDir,
     host: widget.pairedHost,
+    runner: widget.syncRunner,
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
@@ -229,6 +259,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       store: widget.store,
       platform: widget.alarms,
       wallClock: deviceWallClock,
+      reader: widget.agendaReader,
     );
     // Transcripts come in the background once the model is checked.
     _transcriber = Transcriber(
@@ -278,6 +309,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: widget.navigatorKey,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -285,54 +317,57 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     darkTheme: _dark,
     themeMode: _themeMode,
     navigatorObservers: [_scroll, _routes],
-    builder: (context, child) => QuestionMarkBackground(
-      scroll: _scroll,
-      child: AnnouncementStrip(
-        announcements: _announcements,
-        child: AnnouncementsScope(
+    builder: (context, child) => FatFingersText(
+      on: _fatFingers,
+      child: QuestionMarkBackground(
+        scroll: _scroll,
+        child: AnnouncementStrip(
           announcements: _announcements,
-          child: LocationScope(
-            location: widget.location,
-            child: ContextScope(
-              source: widget.context,
-              child: PhotoScope(
-                photos: widget.photos,
-                bytes: _notes.photoBytes,
-                child: VoiceScope(
-                  voice: widget.voice,
-                  playback: _playback,
-                  child: SpeechScope(
-                    model: _speechModel,
-                    transcriber: _transcriber,
-                    child: PhotoReaderScope(
-                      reader: _photoReader,
-                      child: CalendarScope(
-                        calendar: widget.calendar,
-                        child: CalendarMirrorScope(
-                          mirror: _mirror,
-                          child: AppointmentScope(
-                            source: widget.appointments,
-                            child: DraftsScope(
-                              drafts: _drafts,
-                              child: LockScope(
-                                lock: _lock,
-                                child: PairingScope(
-                                  pairing: widget.pairing,
-                                  child: AutoSyncScope(
-                                    sync: _autoSync,
-                                    child: FolderScope(
-                                      folders: widget.folders,
-                                      child: BundleScope(
-                                        bundles: widget.bundles,
-                                        child: PersonScope(
-                                          store: widget.store,
-                                          platform: widget.profile,
-                                          onChangesSent: _alarms.replan,
-                                          child: TagSearchScope(
-                                            onSearch: _searchTag,
-                                            child:
-                                                child ??
-                                                const SizedBox.shrink(),
+          child: AnnouncementsScope(
+            announcements: _announcements,
+            child: LocationScope(
+              location: widget.location,
+              child: ContextScope(
+                source: widget.context,
+                child: PhotoScope(
+                  photos: widget.photos,
+                  bytes: _notes.photoBytes,
+                  child: VoiceScope(
+                    voice: widget.voice,
+                    playback: _playback,
+                    child: SpeechScope(
+                      model: _speechModel,
+                      transcriber: _transcriber,
+                      child: PhotoReaderScope(
+                        reader: _photoReader,
+                        child: CalendarScope(
+                          calendar: widget.calendar,
+                          child: CalendarMirrorScope(
+                            mirror: _mirror,
+                            child: AppointmentScope(
+                              source: widget.appointments,
+                              child: DraftsScope(
+                                drafts: _drafts,
+                                child: LockScope(
+                                  lock: _lock,
+                                  child: PairingScope(
+                                    pairing: widget.pairing,
+                                    child: AutoSyncScope(
+                                      sync: _autoSync,
+                                      child: FolderScope(
+                                        folders: widget.folders,
+                                        child: BundleScope(
+                                          bundles: widget.bundles,
+                                          child: PersonScope(
+                                            store: widget.store,
+                                            platform: widget.profile,
+                                            onChangesSent: _alarms.replan,
+                                            child: TagSearchScope(
+                                              onSearch: _searchTag,
+                                              child:
+                                                  child ??
+                                                  const SizedBox.shrink(),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -353,29 +388,45 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
         ),
       ),
     ),
-    home: _Home(
-      store: widget.store,
-      notes: _notes,
-      places: _places,
-      trail: _trail,
-      alarms: _alarms,
-      autoSync: _autoSync,
-      mirror: _mirror,
-      lock: _lock,
-      routes: _routes,
-      requests: widget.requests,
-      bundles: widget.bundles,
-      profile: _profile,
-      speech: _speechModel,
-      join: widget.join,
-      hosting: widget.hosting,
-      onThemeChanged: _themeChanged,
-    ),
+    // Its own route, so the notes browser coming does not build the
+    // Agenda anew (BrowserHomeRoute). There are no named pages.
+    onGenerateRoute: (_) => null,
+    onGenerateInitialRoutes: (_) => [
+      BrowserHomeRoute<void>(
+        settings: const RouteSettings(name: Navigator.defaultRouteName),
+        builder: (_) => _home(),
+      ),
+    ],
   );
 
-  /// Shows the theme this Device chose in Settings at once.
-  void _themeChanged() =>
-      setState(() => _themeMode = themeModeOf(widget.store.themeChoice));
+  _Home _home() => _Home(
+    store: widget.store,
+    notes: _notes,
+    places: _places,
+    trail: _trail,
+    alarms: _alarms,
+    autoSync: _autoSync,
+    mirror: _mirror,
+    lock: _lock,
+    routes: _routes,
+    requests: widget.requests,
+    bundles: widget.bundles,
+    profile: _profile,
+    speech: _speechModel,
+    join: widget.join,
+    hosting: widget.hosting,
+    help: widget.help,
+    onThemeChanged: _themeChanged,
+  );
+
+  /// Shows the theme this Device chose in Settings at once, and its
+  /// "Fat fingers" (#224).
+  void _themeChanged() => setState(() {
+    _themeMode = themeModeOf(widget.store.themeChoice);
+    _fatFingers = widget.store.fatFingers;
+    _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
+    _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
+  });
 }
 
 /// Keeps track of the routes on the app's navigator, bottom first, so
@@ -417,14 +468,15 @@ class RouteStack extends NavigatorObserver {
 /// then the alarm setup where there are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
-/// tapped, and the Unsorted list when the Agenda widget's Unsorted
-/// count was, and imports the bundles other apps opened with this one
+/// tapped, the Unsorted list when the Agenda widget's Unsorted
+/// count was and a pick's entry form when its pick was, and imports the bundles other apps opened with this one
 /// and opens the Profile card links tapped in them.
 /// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
 /// again, while Capture and the full-screen alarm stay, and the Nudge
-/// screen and the Unsorted list wait for the unlock.
+/// screen, the Unsorted list and a pick's entry form wait for the
+/// unlock.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -441,6 +493,7 @@ class _Home extends StatefulWidget {
   final SpeechModel speech;
   final Join join;
   final StartHosting hosting;
+  final HelpSetup? help;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -459,6 +512,7 @@ class _Home extends StatefulWidget {
     required this.speech,
     required this.join,
     required this.hosting,
+    required this.help,
     required this.onThemeChanged,
   });
 
@@ -505,6 +559,7 @@ class _HomeState extends State<_Home> {
   var _nudgeWaiting = false;
   var _changesWaiting = false;
   var _unsortedWaiting = false;
+  WidgetPick? _pickWaiting;
 
   /// Whether the bundles of the Changes Nudge are going out now.
   var _sendingChanges = false;
@@ -528,10 +583,12 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_changesOpened);
     widget.alarms.addListener(_unsortedOpened);
+    widget.alarms.addListener(_pickOpened);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
     widget.autoSync.addListener(_updatesNeeded);
+    widget.autoSync.syncing.addListener(_syncing);
     // Paired Devices sync while the app shows, from the first frame on:
     // what it brings is announced.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -540,6 +597,9 @@ class _HomeState extends State<_Home> {
       // A bundle, Sent Item or Profile card file that opened the app.
       unawaited(_importOpened());
       unawaited(_autoBackupStart());
+      // Past the first start already: what this version's help Notes
+      // still owe (#180), an update's What's new among them.
+      if (_starterSetOffered) _helpDue(fresh: false);
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -563,7 +623,28 @@ class _HomeState extends State<_Home> {
     SpeechScope.of(context)?.transcriber.setTexts(context.t);
   }
 
+  /// Whether "Syncing" was said since the app came into view.
+  var _syncingSaid = false;
+
+  /// A sync of this Device started: a screen reader hears so once each
+  /// time the app comes into view, not with every sync while it shows;
+  /// the line under the bar shows every one (#225).
+  void _syncing() {
+    if (!mounted || _syncingSaid || !widget.autoSync.syncing.value) return;
+    if (!MediaQuery.accessibleNavigationOf(context)) return;
+    _syncingSaid = true;
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        context.t.syncSyncing,
+        Directionality.of(context),
+      ),
+    );
+  }
+
   void _hidden() {
+    // A sync out of sight is not announced; one after coming back is.
+    _syncingSaid = true;
     widget.lock.hidden();
     unawaited(widget.alarms.refresh());
     widget.autoSync.hidden();
@@ -573,6 +654,7 @@ class _HomeState extends State<_Home> {
   /// in step with what other Devices synced meanwhile, and a sync with
   /// the paired Devices.
   void _resumed() {
+    _syncingSaid = false;
     unawaited(widget.alarms.refresh());
     unawaited(widget.mirror.sync());
     widget.autoSync.shown();
@@ -638,10 +720,12 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_changesOpened);
     widget.alarms.removeListener(_unsortedOpened);
+    widget.alarms.removeListener(_pickOpened);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
+    widget.autoSync.syncing.removeListener(_syncing);
     unawaited(_bundlesOpened.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
@@ -652,7 +736,8 @@ class _HomeState extends State<_Home> {
   /// what each brought; Conflicts as an automatic sync's, not past the
   /// App Lock. A Sent Item among them opens its preview, behind the App
   /// Lock once it is unlocked. A Profile card file (#144) opens the
-  /// person's Profile, which is browsing, so it waits for the unlock as
+  /// person's Profile, and a Pack (#164) its tree, which is browsing, so
+  /// each waits for the unlock as
   /// well; nor before the first start made the own Profile, so nothing is
   /// kept before the user chose to restore or add a Device of theirs.
   Future<void> _importOpened() async {
@@ -662,8 +747,10 @@ class _HomeState extends State<_Home> {
     var conflicts = 0;
     for (final path in paths) {
       if (!mounted) return;
-      final card = isProfileCardFile(path);
-      // A Sent Item or a card shows what is in it: not past the App Lock.
+      // A Pack names its sender as a card does (#164).
+      final card = isProfileCardFile(path) || isPackFile(path);
+      // A Sent Item, a card or a Pack shows what is in it: not past the
+      // App Lock.
       if ((widget.lock.locked && (card || isSentItemFile(path))) ||
           (card && widget.profile.profile == null)) {
         _openedWaiting.add(path);
@@ -725,6 +812,10 @@ class _HomeState extends State<_Home> {
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));
+    }
+    if (_pickWaiting case final pick?) {
+      _pickWaiting = null;
+      unawaited(_openPick(pick));
     }
   }
 
@@ -825,12 +916,65 @@ class _HomeState extends State<_Home> {
     unawaited(openUnsorted(context, widget.notes, widget.places));
   }
 
-  /// Plants what the user kept of the Starter Set; it is not offered
+  /// Opens a pick's entry form when it was tapped on the Agenda widget
+  /// (#209); behind the App Lock it waits for the unlock.
+  void _pickOpened() {
+    if (!mounted) return;
+    final pick = widget.alarms.takePickOpened();
+    if (pick == null) return;
+    if (widget.lock.locked) {
+      _pickWaiting = pick;
+      return;
+    }
+    unawaited(_openPick(pick));
+  }
+
+  /// Opens the entry form of today's [pick], as its box on the Agenda
+  /// does: its locked Area first. A pick no longer there, or one this
+  /// Device may not record for, opens nothing, the Agenda being open.
+  Future<void> _openPick(WidgetPick pick) async {
+    final store = widget.store;
+    final today = Sessions(store)
+        .today(deviceWallClock)
+        .where(
+          (o) =>
+              o.session.id == pick.sessionId &&
+              o.occurrence.key == pick.occurrenceKey,
+        )
+        .firstOrNull;
+    final picked = today?.picks
+        .where((p) => p.noteId == pick.noteId)
+        .firstOrNull;
+    if (today == null || picked == null) return;
+    if (!opensPick(store, pick.sessionId, picked)) return;
+    final lock = LockScope.of(context);
+    final areaId = switch (picked.note) {
+      final note? => AreaLocks(store).lockedAreaOf(note),
+      null => null,
+    };
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await openPick(context, widget.notes, today, picked);
+    lock?.closeAreas();
+  }
+
+  /// Plants what the user kept of the Starter Set and keeps Simple or
+  /// Advanced (#197) for all of their own Devices; it is not offered
   /// again on this Device.
-  void _plant(Set<String> picked) {
+  void _plant(Set<String> picked, bool advanced) {
+    widget.store.advanced = advanced;
     widget.places.plantStarterSet(picked);
     widget.store.starterSetOffered = true;
     unawaited(widget.profile.applyDefaults());
+    _helpDue(fresh: true);
     setState(() {
       _starterSetOffered = true;
       _speechOfferDue = _speechWanted;
@@ -929,8 +1073,29 @@ class _HomeState extends State<_Home> {
       _speechOfferDue = _speechWanted;
     });
     unawaited(widget.profile.applyDefaults());
+    _helpDue(fresh: true);
     unawaited(widget.alarms.refresh());
     widget.autoSync.devicesChanged();
+  }
+
+  /// Makes the help Notes due (#180) once the own Profile exists, which
+  /// their ids are made from; [fresh] right after the first start, which
+  /// makes no What's new. Nothing without [_Home.help].
+  void _helpDue({required bool fresh}) {
+    final help = widget.help;
+    if (help == null) return;
+    final t = context.t;
+    unawaited(() async {
+      await widget.profile.applyDefaults();
+      if (!mounted) return;
+      await makeHelpNotes(
+        widget.store,
+        help.source,
+        t,
+        version: help.version,
+        fresh: fresh,
+      );
+    }());
   }
 
   /// The alarm setup was walked through; it is not offered again here.

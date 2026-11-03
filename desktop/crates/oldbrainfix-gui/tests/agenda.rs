@@ -2,6 +2,14 @@
 //! Settings, driven headless by egui_kittest over the Dart core's
 //! `routines` fixture log, on a European wall clock.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -11,8 +19,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, Schedule, SigningKey,
-    SimpleRepeat, Store, WireEntry, parse_time,
+    ClockTime, Day, DeviceSettings, Notes, Occurrence, PersonSettings, Routines, Schedule,
+    SigningKey, SimpleRepeat, Store, WireEntry, parse_time,
 };
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -59,6 +67,12 @@ fn window(store: Store, locale: &str) -> Harness<'static, App> {
 
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
+}
+
+/// How many labels say "All day": the Routine editor's, and the time of
+/// an all-day Occurrence's box on a card behind it (#215).
+fn all_day(harness: &Harness<'_, App>) -> usize {
+    harness.query_all_by_label("All day").count()
 }
 
 /// The text field whose hint is `hint`.
@@ -151,6 +165,29 @@ fn dentist_store(now: &str) -> Result<Store, Box<dyn std::error::Error>> {
     let once = Schedule::new(Day::new(2026, 11, 2), &nine, None).ok_or("a schedule")?;
     Routines::new(&store).create("Dentist", &once)?;
     Ok(store)
+}
+
+/// 0.3.1's rows from one box's top to the next's (#208).
+const PITCH_0_3_1: f32 = 84.0;
+
+#[test]
+fn the_rows_are_tighter_than_in_0_3_1() -> TestResult {
+    let now = parse_time("2026-11-02T07:00:00.000Z")?;
+    let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([9; 32])))?;
+    let routines = Routines::new(&store);
+    for (text, hour) in [("Alpha", 9), ("Beta", 10)] {
+        let at = ClockTime::new(hour, 0).into_iter().collect::<Vec<_>>();
+        let once = Schedule::new(Day::new(2026, 11, 2), &at, None).ok_or("a schedule")?;
+        routines.create(text, &once)?;
+    }
+    let harness = window(store, "en");
+    let first = harness.get_by_label("Done: 09:00 Alpha").rect();
+    let second = harness.get_by_label("Done: 10:00 Beta").rect();
+    let pitch = second.top() - first.top();
+    assert!(pitch < PITCH_0_3_1 * 0.75, "{pitch}");
+    // The box keeps its size.
+    assert!(first.height() >= 28.0, "{}", first.height());
+    Ok(())
 }
 
 #[test]
@@ -298,6 +335,7 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     harness.run();
     edit(&harness, "Another thought").click();
     harness.run();
+    let behind = all_day(&harness);
     // The "+" badge of the Note dialog (#160).
     harness
         .get_by_label("Routine, Reminder, Frog or Session")
@@ -313,12 +351,12 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     assert!(shows(&harness, "From the Note"));
     // All day to start with; the time field holds the current time,
     // 12:00 in Berlin, which is typed over with 20:00 and added.
-    assert!(shows(&harness, "All day"));
+    assert!(all_day(&harness) > behind);
     type_over(&mut harness, "12:00", "20:00");
     harness.get_by_label("Add a time").click();
     harness.run();
     assert!(shows(&harness, "Remove 20:00"));
-    assert!(!shows(&harness, "All day"));
+    assert_eq!(all_day(&harness), behind);
     // The field holds the current time again, which "Add" takes as is.
     holding(&harness, "12:00");
     harness.get_by_label("Add a time").click();
@@ -378,6 +416,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     harness.run();
     edit(&harness, "Another thought").click();
     harness.run();
+    let behind = all_day(&harness);
     harness
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
@@ -392,7 +431,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     // 13:00, the next full hour after 12:00 in Berlin; with its one time
     // there is no time field.
     assert!(shows(&harness, "Remove 13:00"));
-    assert!(!shows(&harness, "All day"));
+    assert_eq!(all_day(&harness), behind);
     assert!(
         harness
             .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some("12:00"))
@@ -402,13 +441,13 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
     // Without it, the field shows, holding the current time.
     harness.get_by_label("Remove 13:00").click();
     harness.run();
-    assert!(shows(&harness, "All day"));
+    assert!(all_day(&harness) > behind);
     holding(&harness, "12:00");
     Ok(())
 }
 
 #[test]
-fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestResult {
+fn the_unit_of_every_n_is_a_row_of_choice_chips_below_the_stepper() -> TestResult {
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("New Routine or Reminder").click();
     harness.run();
@@ -421,10 +460,26 @@ fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestR
         .map(|u| radio(&harness, u).rect())
         .collect();
     assert!(more.bottom() <= units[0].top());
-    // One option per line.
-    assert!(units.windows(2).all(|w| w[0].bottom() <= w[1].top()));
-    radio(&harness, "weeks").click();
+    // A wrapping row of chips (#226): side by side, left to right.
+    assert!(units.windows(2).all(|w| w[0].top() == w[1].top()));
+    assert!(units.windows(2).all(|w| w[0].right() <= w[1].left()));
+    // A radio group a screen reader hears, the chosen one selected.
+    let group = radio(&harness, "days")
+        .parent()
+        .map(|g| g.accesskit_node().role());
+    assert_eq!(group, Some(Role::RadioGroup));
+    assert!(picked(&harness, "days"));
+    assert!(!picked(&harness, "weeks"));
+    // By keyboard: the arrow moves to the next chip, Space picks it.
+    radio(&harness, "days").focus();
     harness.run();
+    harness.key_press(egui::Key::ArrowRight);
+    harness.run();
+    assert!(radio(&harness, "weeks").is_focused());
+    harness.key_press(egui::Key::Space);
+    harness.run();
+    assert!(picked(&harness, "weeks"));
+    assert!(!picked(&harness, "days"));
     harness.get_by_label("Save").click();
     harness.run();
     let routine = routine_of(harness.state(), "Clean the bike chain")?;
@@ -455,7 +510,7 @@ fn the_simple_editor_repeats_on_the_last_weekday_of_a_month_a_number_of_times() 
     harness.get_by_label("New Routine or Reminder").click();
     harness.run();
     type_into(&mut harness, "What is to be done?", "Descale the kettle");
-    // The kinds are one column of radio buttons.
+    // The kinds are a row of choice chips, the first beside the next.
     let kinds: Vec<_> = [
         "Once",
         "Every …",
@@ -466,7 +521,8 @@ fn the_simple_editor_repeats_on_the_last_weekday_of_a_month_a_number_of_times() 
     .iter()
     .map(|k| radio(&harness, k).rect())
     .collect();
-    assert!(kinds.windows(2).all(|w| w[0].bottom() <= w[1].top()));
+    assert_eq!(kinds[0].top(), kinds[1].top());
+    assert!(kinds[0].right() <= kinds[1].left());
     radio(&harness, "Monthly on a weekday").click();
     harness.run();
     // The start's place in its month until another is chosen.
@@ -713,7 +769,7 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     assert!(shows(
         &harness,
-        "These settings belong to this computer and are never synced."
+        "Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this computer."
     ));
     harness
         .get_by_label("Notifications on this computer")
@@ -732,6 +788,11 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     type_over(&mut harness, "22:00", "21:30");
     let quiet = DeviceSettings::new(harness.state().store()).quiet_hours()?;
     assert_eq!(quiet.to_string(), "21:30-08:00");
+    // All-day items remind from 15:00 until another time is typed (#201).
+    assert!(shows(&harness, "All-day items remind from"));
+    type_over(&mut harness, "15:00", "11:30");
+    let from = DeviceSettings::new(harness.state().store()).all_day_from()?;
+    assert_eq!(from.to_string(), "11:30");
     // The Re-nag default, a radio button per choice.
     assert!(radio(&harness, "20 min").accesskit_node().toggled() == Some(Toggled::True));
     radio(&harness, "15 min").click();
@@ -756,5 +817,104 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     harness.run();
     assert_eq!(harness.state().page(), None);
     assert_eq!(harness.state().selection(), &Selection::Agenda);
+    Ok(())
+}
+
+#[test]
+fn with_done_reminders_trashed_done_moves_the_note_to_the_trash() -> TestResult {
+    let mut harness = window(dentist_store("2026-11-02T11:00:00.000Z")?, "en");
+    // Switched on in the settings, for the person (#211).
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    harness
+        .get_by_label("Move a Note to the Trash when its one-time Reminder is done")
+        .click();
+    harness.run();
+    let store = harness.state().store();
+    assert!(PersonSettings::new(store).trashes_done_reminder()?);
+    assert!(!DeviceSettings::new(store).agenda_hides_checked()?);
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    harness.get_by_label("Done: 09:00 Dentist").click();
+    harness.run();
+    assert!(!shows(&harness, "Done: 09:00 Dentist"));
+    let notes = Notes::new(harness.state().store()).all()?;
+    assert!(notes.is_empty(), "the Dentist went to the trash");
+    Ok(())
+}
+
+#[test]
+fn new_session_on_the_agendas_bar_opens_the_new_session_page_in_advanced() -> TestResult {
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    // After New Routine, inside the window (#246).
+    let routine = harness.get_by_label("New Routine or Reminder").rect();
+    let session = harness.get_by_label("New Session").rect();
+    assert!(routine.right() <= session.left(), "{routine:?} {session:?}");
+    assert!((routine.center().y - session.center().y).abs() < 1.0);
+    assert!(session.right() <= 1280.0 - 8.0, "{session:?}");
+    harness.get_by_label("New Session").click();
+    harness.run();
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert!(editor.session().is_some());
+    Ok(())
+}
+
+#[test]
+fn the_agendas_bar_has_no_new_session_in_simple() -> TestResult {
+    let store = store("2026-10-25T11:00:00.000Z")?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let harness = window(store, "en");
+    assert!(shows(&harness, "New Routine or Reminder"));
+    assert!(!shows(&harness, "New Session"));
+    Ok(())
+}
+
+#[test]
+fn settings_switch_simple_or_advanced_for_the_person() -> TestResult {
+    let mut harness = window(dentist_store("2026-11-02T11:00:00.000Z")?, "en");
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    // Never chosen: Advanced, so nothing is hidden (#197).
+    assert!(radio(&harness, "Advanced").accesskit_node().toggled() == Some(Toggled::True));
+    assert!(shows(&harness, "Format bar"));
+    radio(&harness, "Simple").click_accesskit();
+    harness.run();
+    assert!(!PersonSettings::new(harness.state().store()).advanced()?);
+    assert!(radio(&harness, "Simple").accesskit_node().toggled() == Some(Toggled::True));
+    assert!(!shows(&harness, "Format bar"));
+    radio(&harness, "Advanced").click_accesskit();
+    harness.run();
+    assert!(PersonSettings::new(harness.state().store()).advanced()?);
+    Ok(())
+}
+
+#[test]
+fn with_checked_items_hidden_a_done_occurrence_leaves_the_agenda() -> TestResult {
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    // Off, as by default: checked off, it strikes through and stays.
+    harness.get_by_label("Done: 09:00 Dentist").click();
+    harness.run();
+    assert!(shows(&harness, "Done: 09:00 Dentist"));
+    // Switched on in the settings, for this computer only (#217).
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    assert!(shows(&harness, "Agenda"));
+    harness
+        .get_by_label("Hide what's checked on the Agenda")
+        .click();
+    harness.run();
+    assert!(DeviceSettings::new(harness.state().store()).agenda_hides_checked()?);
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().page(), None);
+    assert!(!shows(&harness, "Done: 09:00 Dentist"));
+    // Its day says nothing is planned, as every other one.
+    assert_eq!(harness.query_all_by_label("Nothing planned").count(), 6);
     Ok(())
 }

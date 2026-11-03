@@ -63,7 +63,7 @@ void main() {
     tester,
   ) async {
     phoneWithNavigationBar(tester);
-    await show(tester, StarterSetScreen(onDone: (_) {}));
+    await show(tester, StarterSetScreen(onDone: (_, _) {}));
     await scrollToEnd(tester);
 
     expectAboveBar(tester, find.byType(CheckboxListTile).last);

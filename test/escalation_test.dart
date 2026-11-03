@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
@@ -107,20 +108,10 @@ void main() {
       final column = find.byKey(const ValueKey('escalationAfter'));
       expect(find.byType(DropdownButton<int>), findsNothing);
       expect(
-        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        find.descendant(of: column, matching: find.byType(ChoiceChip)),
         findsNWidgets(6),
       );
-      expect(
-        tester
-            .widget<RadioGroup<int>>(
-              find.descendant(
-                of: column,
-                matching: find.byType(RadioGroup<int>),
-              ),
-            )
-            .groupValue,
-        4,
-      );
+      expect(tester.widget<ChoiceChips<int>>(column).value, 4);
     });
 
     testWidgets('turned off again, the Routine no longer escalates', (

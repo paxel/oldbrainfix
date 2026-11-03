@@ -1,0 +1,104 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Clean out the cupboard",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:09.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Wash the windows",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:17.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "Sort out the old DVDs",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:59.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:25.000Z",
+          "entity": "note:00000000000000000000000000000007",
+          "kind": "captured",
+          "before": null,
+          "after": "Fix the gate",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:33.000Z",
+          "entity": "note:00000000000000000000000000000009",
+          "kind": "captured",
+          "before": null,
+          "after": "Paint the shed",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:02.000Z",
+          "entity": "note:0000000000000000000000000000000b",
+          "kind": "captured",
+          "before": null,
+          "after": "Unsorted thought",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

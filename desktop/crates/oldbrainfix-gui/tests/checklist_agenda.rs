@@ -1,10 +1,13 @@
-//! Checklists on the Agenda in the window (#143, ADR 0030): today shows
-//! each Checklist without a Routine or Reminder that has open Lines as
-//! one row, "Packing: 3 of 3 open", after the Shopping Lists and before
-//! the timed Occurrences, oldest capture first; a click opens it; once
-//! every Line is checked it is gone; "Show on the Agenda" in the card's
-//! ⋮ and in the editor takes it off for this person; a Checklist with a
-//! Routine has neither the row nor the switch.
+//! Checklists on the Agenda in the window (#143, #208, #219, ADR 0030):
+//! today shows each Checklist without a Routine or Reminder that has open
+//! Lines as a heading with its name, its open Lines indented under it,
+//! each with its box, after the Shopping Lists and before the timed
+//! Occurrences, oldest capture first; a click on the heading or a Line's
+//! words opens it, a box checks its Line; once every Line is checked it
+//! is gone; "Show on the Agenda" in the card's ⋮ and in the editor offers
+//! the three ways of a Shopping List for this person: off, its heading
+//! with the count, or every open Line; a Checklist with a Routine has
+//! neither the row nor the choice.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -14,7 +17,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    Checklists, ClockTime, Day, Notes, OwnProfile, Routines, Schedule, SigningKey, Store,
+    Checklists, ClockTime, Day, ListOnAgenda, Notes, OwnProfile, Routines, Schedule, SigningKey,
+    Store,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -27,8 +31,11 @@ const NOW: &str = "2026-10-24T07:00:00Z";
 /// in the group of "Passport".
 const PACKING: &str = "Packing\nPassport\n  Charger\nTicket";
 
-/// The switch's words.
-const SWITCH: &str = "Show on the Agenda";
+/// The choice's words, and its three ways'.
+const SETTING: &str = "Show on the Agenda";
+const OFF: &str = "Off";
+const COUNT: &str = "One row with the number of open Lines";
+const LINES: &str = "Each open Line on its own row";
 
 /// The Agenda's message for a day with nothing due.
 const NOTHING_TODAY: &str = "Nothing due today. Click + to capture a thought.";
@@ -93,12 +100,58 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
-/// Whether the switch "Show on the Agenda" shows, and on.
-fn switch(harness: &Harness<'_, App>) -> Option<bool> {
+/// Whether the last radio button `label` shows chosen, or `None` while
+/// none shows.
+fn radio(harness: &Harness<'_, App>, label: &str) -> Option<bool> {
     harness
-        .query_all_by_role_and_label(Role::CheckBox, SWITCH)
+        .query_all_by_role_and_label(Role::RadioButton, label)
         .last()
         .map(|n| n.accesskit_node().toggled() == Some(Toggled::True))
+}
+
+/// The three ways as their radio buttons show them chosen: off, count,
+/// lines; `None` for one not showing.
+fn chosen(harness: &Harness<'_, App>) -> [Option<bool>; 3] {
+    [OFF, COUNT, LINES].map(|way| radio(harness, way))
+}
+
+/// Clicks the last radio button `label`.
+fn pick(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::RadioButton, label)
+        .last()
+        .ok_or(format!("{label:?}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
+/// Whether no switch "Show on the Agenda" shows, as #143 had.
+fn no_switch(harness: &Harness<'_, App>) -> bool {
+    harness
+        .query_all_by_role_and_label(Role::CheckBox, SETTING)
+        .next()
+        .is_none()
+}
+
+/// Whether the Agenda shows the group of the Checklist `name`: its
+/// heading, a button of its name with no box of a Routine's beside it.
+fn group(harness: &Harness<'_, App>, name: &str) -> bool {
+    let headings = harness
+        .query_all_by_role_and_label(Role::Button, name)
+        .count();
+    let occurrences = harness
+        .query_all_by_label_contains(&format!(" {name}"))
+        .filter(|n| n.accesskit_node().role() == Role::CheckBox)
+        .count();
+    headings > occurrences
+}
+
+/// The box of the Line `text`.
+fn line_box<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> Option<egui_kittest::Node<'a>> {
+    harness
+        .query_all_by_role_and_label(Role::CheckBox, text)
+        .next()
 }
 
 /// The top of the first widget labelled `label`.
@@ -128,20 +181,58 @@ fn line_id(store: &Store, note: &str, text: &str) -> Result<String, Box<dyn std:
 fn a_checklist_shows_today_with_its_open_lines_and_opens() -> TestResult {
     let (store, note) = packing()?;
     let mut harness = window(&store, Selection::Agenda, None);
-    assert!(shows(&harness, "Packing: 3 of 3 open"));
+    assert!(group(&harness, "Packing"));
     assert!(!shows(&harness, NOTHING_TODAY));
+    assert!(
+        harness
+            .query_all_by_label_contains("of 3 open")
+            .next()
+            .is_none()
+    );
     // Only today: tomorrow has nothing planned.
-    let rows = harness
-        .query_all_by_label_contains("Packing:")
-        .filter(|n| n.accesskit_node().role() == Role::Button)
+    let headings = harness
+        .query_all_by_role_and_label(Role::Button, "Packing")
         .count();
-    assert_eq!(rows, 1);
-    // The parent counts as it shows: checking its group checks it.
-    Checklists::new(&store).check(&line_id(&store, &note, "Charger")?)?;
+    assert_eq!(headings, 1);
+    // Its open Lines under it, each with its box, indented; a Line in a
+    // group one step further (#208).
+    let heading = harness
+        .get_by_role_and_label(Role::Button, "Packing")
+        .rect();
+    let passport = line_box(&harness, "Passport").ok_or("Passport")?.rect();
+    let charger = line_box(&harness, "Charger").ok_or("Charger")?.rect();
+    assert!(passport.top() > heading.top());
+    assert!(passport.left() >= heading.left() - 0.5);
+    assert!(charger.left() > passport.left());
+    // The box checks its Line; the parent counts as it shows: checking
+    // its group checks it.
+    line_box(&harness, "Charger")
+        .ok_or("Charger")?
+        .click_accesskit();
+    harness.run();
     reload_agenda(&mut harness);
-    assert!(shows(&harness, "Packing: 1 of 3 open"));
+    let lists = Checklists::new(&store);
+    let checked = |text: &str| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(lists
+            .by_note(&note)?
+            .ok_or("a Checklist")?
+            .lines
+            .iter()
+            .any(|l| l.text == text && l.checked))
+    };
+    assert!(checked("Charger")?);
+    assert!(line_box(&harness, "Charger").is_none());
+    assert!(line_box(&harness, "Passport").is_none());
+    assert!(line_box(&harness, "Ticket").is_some());
     harness
-        .get_by_role_and_label(Role::Button, "Packing: 1 of 3 open")
+        .get_by_role_and_label(Role::Button, "Ticket")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, "Packing")
         .click();
     harness.run();
     assert_eq!(harness.state().selected_note(), Some(note.as_str()));
@@ -155,11 +246,12 @@ fn every_line_checked_takes_it_off_until_one_is_unchecked() -> TestResult {
     lists.check(&line_id(&store, &note, "Charger")?)?;
     lists.check(&line_id(&store, &note, "Ticket")?)?;
     let mut harness = window(&store, Selection::Agenda, None);
-    assert!(!shows(&harness, "Packing: 0 of 3 open"));
+    assert!(!group(&harness, "Packing"));
     assert!(shows(&harness, NOTHING_TODAY));
     lists.uncheck(&line_id(&store, &note, "Ticket")?)?;
     reload_agenda(&mut harness);
-    assert!(shows(&harness, "Packing: 1 of 3 open"));
+    assert!(group(&harness, "Packing"));
+    assert!(line_box(&harness, "Ticket").is_some());
     Ok(())
 }
 
@@ -180,8 +272,8 @@ fn the_rows_go_oldest_capture_first_between_all_day_and_timed() -> TestResult {
         &Schedule::new(day, &nine, None).ok_or("at nine")?,
     )?;
     let harness = window(&store, Selection::Agenda, None);
-    let packing = top(&harness, "Packing: 3 of 3 open")?;
-    let errands = top(&harness, "Errands: 1 of 1 open")?;
+    let packing = top(&harness, "Packing")?;
+    let errands = top(&harness, "Errands")?;
     assert!(top(&harness, "Water the plants")? < packing);
     assert!(packing < errands);
     assert!(errands < top(&harness, "Call Dana")?);
@@ -189,73 +281,111 @@ fn the_rows_go_oldest_capture_first_between_all_day_and_timed() -> TestResult {
 }
 
 #[test]
-fn the_cards_menu_switches_it_off_the_agenda_and_on_again() -> TestResult {
+fn shown_as_its_count_it_is_its_heading_with_how_many_are_open() -> TestResult {
     let (store, note) = packing()?;
-    // A Line checked, so "Uncheck all" shows after the switch.
+    let lists = Checklists::new(&store);
+    lists.set_on_agenda(&note, ListOnAgenda::Count)?;
+    let mut harness = window(&store, Selection::Agenda, None);
+    let heading = "Packing: 3 of 3 open";
+    assert!(shows(&harness, heading));
+    assert!(line_box(&harness, "Passport").is_none());
+    assert!(line_box(&harness, "Ticket").is_none());
+    harness.get_by_role_and_label(Role::Button, heading).click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    // Without an open Line it never shows.
+    lists.check(&line_id(&store, &note, "Passport")?)?;
+    lists.check(&line_id(&store, &note, "Ticket")?)?;
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    reload_agenda(&mut harness);
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn the_cards_menu_offers_the_three_ways() -> TestResult {
+    let (store, note) = packing()?;
+    // A Line checked, so "Uncheck all" shows after the choice.
     Checklists::new(&store).check(&line_id(&store, &note, "Ticket")?)?;
     let mut harness = window(&store, Selection::All, None);
     click(&mut harness, "More: Packing")?;
-    assert_eq!(switch(&harness), Some(true));
+    assert!(no_switch(&harness));
+    assert_eq!(chosen(&harness), [Some(false), Some(false), Some(true)]);
     let below = top(&harness, "Uncheck all")?;
-    let switch_top = harness
-        .query_all_by_role_and_label(Role::CheckBox, SWITCH)
+    let lines_top = harness
+        .query_all_by_role_and_label(Role::RadioButton, LINES)
         .last()
-        .ok_or("the switch")?
+        .ok_or("the choice")?
         .rect()
         .top();
-    assert!(switch_top < below);
-    click(&mut harness, SWITCH)?;
-    assert!(!Checklists::new(&store).shows_on_agenda(&note)?);
+    assert!(lines_top < below);
+    pick(&mut harness, COUNT)?;
+    let lists = Checklists::new(&store);
+    assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Count);
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(!shows(&harness, "Packing: 2 of 3 open"));
+    assert!(shows(&harness, "Packing: 2 of 3 open"));
+    assert!(line_box(&harness, "Passport").is_none());
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    click(&mut harness, "More: Packing")?;
+    assert_eq!(chosen(&harness), [Some(false), Some(true), Some(false)]);
+    pick(&mut harness, OFF)?;
+    assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Off);
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    assert!(!group(&harness, "Packing"));
     assert!(shows(&harness, NOTHING_TODAY));
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Packing")?;
-    assert_eq!(switch(&harness), Some(false));
-    click(&mut harness, SWITCH)?;
-    assert!(Checklists::new(&store).shows_on_agenda(&note)?);
+    pick(&mut harness, LINES)?;
+    assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Lines);
     Ok(())
 }
 
 #[test]
-fn the_editor_switches_it_off_the_agenda() -> TestResult {
+fn the_editors_badge_names_it_and_chooses_it() -> TestResult {
     let (store, note) = packing()?;
     let mut harness = window(&store, Selection::All, Some(&note));
-    // The Note dialog's badge for it (#160), its switch in its editor.
-    assert!(harness.query_by_label("Show on the Agenda: On").is_some());
-    click(&mut harness, "Show on the Agenda: On")?;
-    assert_eq!(switch(&harness), Some(true));
-    click(&mut harness, SWITCH)?;
-    assert!(!Checklists::new(&store).shows_on_agenda(&note)?);
-    assert_eq!(switch(&harness), Some(false));
-    click(&mut harness, "Close")?;
-    assert!(harness.query_by_label("Show on the Agenda: Off").is_some());
+    // The Note dialog's badge for it (#160), its ways in its editor.
+    let badge = format!("{SETTING}: {LINES}");
+    assert!(harness.query_by_label(&badge).is_some());
+    click(&mut harness, &badge)?;
+    assert!(no_switch(&harness));
+    assert_eq!(radio(&harness, LINES), Some(true));
+    pick(&mut harness, OFF)?;
+    assert_eq!(Checklists::new(&store).on_agenda(&note)?, ListOnAgenda::Off);
+    assert!(
+        harness
+            .query_by_label(&format!("{SETTING}: {OFF}"))
+            .is_some()
+    );
     harness.state_mut().select(Selection::Agenda);
     harness.run();
-    assert!(!shows(&harness, "Packing: 3 of 3 open"));
+    assert!(!group(&harness, "Packing"));
     Ok(())
 }
 
 #[test]
-fn a_checklist_with_a_routine_has_no_row_and_no_switch() -> TestResult {
+fn a_checklist_with_a_routine_has_no_row_and_no_choice() -> TestResult {
     let (store, note) = packing()?;
     let schedule = Schedule::new(Day::new(2026, 10, 24), &[], None).ok_or("a schedule")?;
     Routines::new(&store).spawn(&note, &schedule)?;
     let mut harness = window(&store, Selection::Agenda, None);
-    assert!(!shows(&harness, "Packing: 3 of 3 open"));
+    assert!(!group(&harness, "Packing"));
     // It shows as its Routine's Occurrence instead.
     assert!(shows(&harness, "Packing"));
     harness.state_mut().select(Selection::All);
     harness.run();
     click(&mut harness, "More: Packing")?;
-    assert_eq!(switch(&harness), None);
+    assert_eq!(chosen(&harness), [None; 3]);
     harness.key_press(egui::Key::Escape);
     harness.run();
     harness.state_mut().select_note(&note);
     harness.run();
-    assert_eq!(switch(&harness), None);
+    assert_eq!(chosen(&harness), [None; 3]);
     assert!(
         harness
             .query_all_by_label_contains("Show on the Agenda")
@@ -266,12 +396,12 @@ fn a_checklist_with_a_routine_has_no_row_and_no_switch() -> TestResult {
 }
 
 #[test]
-fn a_plain_note_has_no_switch() -> TestResult {
+fn a_plain_note_has_no_choice() -> TestResult {
     let (store, _) = packing()?;
     let plain = Notes::new(&store).capture("Call the bank", None, None)?;
     let mut harness = window(&store, Selection::All, Some(&plain.id));
-    assert_eq!(switch(&harness), None);
+    assert_eq!(chosen(&harness), [None; 3]);
     click(&mut harness, "More: Call the bank")?;
-    assert_eq!(switch(&harness), None);
+    assert_eq!(chosen(&harness), [None; 3]);
     Ok(())
 }

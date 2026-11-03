@@ -11,6 +11,14 @@
 //! asks where to save each waiting person's bundle, one after another;
 //! only a bundle saved ends their wait.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};

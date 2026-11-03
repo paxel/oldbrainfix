@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'agenda_group.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
 import 'browser.dart';
@@ -122,6 +123,10 @@ class FrogRow extends StatelessWidget {
   /// Swaps it for the next Frog; no button when null.
   final VoidCallback? onAnother;
 
+  /// Whether it shows Done, where that differs from the [frog] as read:
+  /// checked here while the Agenda reads again (#207).
+  final bool? done;
+
   const FrogRow({
     super.key,
     required this.frog,
@@ -132,6 +137,7 @@ class FrogRow extends StatelessWidget {
     required this.onTap,
     required this.onMenu,
     this.onAnother,
+    this.done,
   });
 
   @override
@@ -139,11 +145,12 @@ class FrogRow extends StatelessWidget {
     final t = context.t;
     final text = Theme.of(context).textTheme;
     final colour = areaColour(area?.colour);
-    final done = frog.isDone;
+    final done = this.done ?? frog.isDone;
     final subtitle = this.subtitle;
     final onAnother = this.onAnother;
+    final sizes = AgendaSizes.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -162,12 +169,20 @@ class FrogRow extends StatelessWidget {
                             left: BorderSide(color: colour, width: 6),
                           ),
                         ),
-                  padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+                  padding: EdgeInsets.fromLTRB(
+                    4,
+                    sizes.inside,
+                    16,
+                    sizes.inside,
+                  ),
                   child: Row(
                     children: [
                       Checkbox(
                         value: done,
                         semanticLabel: t.markDone,
+                        // 40 by 40, as on the Agenda's rows (#208).
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: sizes.density,
                         onChanged: switch (onToggle) {
                           null => null,
                           final onToggle => (_) => onToggle(),

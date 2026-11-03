@@ -242,8 +242,8 @@ abstract final class MarkdownTables {
   /// more row, on lines of its own, a blank line between it and the
   /// lines around it: at a blank line in place of it, at the start of a
   /// line before that line, anywhere else in a line after that line, and
-  /// in a table after that table. It takes the text's first kind of line
-  /// break, `\n` when there is none.
+  /// in a table or a code block after it. It takes the text's first
+  /// kind of line break, `\n` when there is none.
   static MarkdownChange insert(String text, int at) {
     final offset = at.clamp(0, text.length);
     final blocks = Markdown.parse(text);
@@ -266,13 +266,14 @@ abstract final class MarkdownTables {
     final String tail;
     final String before;
     final String after;
-    final line = block.table?.lastLine ?? block.line;
-    if (block.table == null && blank(line)) {
+    final whole = block.table != null || block.code != null;
+    final line = block.table?.lastLine ?? block.code?.lastLine ?? block.line;
+    if (!whole && blank(line)) {
       head = text.substring(0, block.start);
       tail = text.substring(block.end);
       before = line > 0 && !blank(line - 1) ? br : '';
       after = line + 1 < blocks.length && !blank(line + 1) ? br : '';
-    } else if (block.table == null &&
+    } else if (!whole &&
         offset <= Markdown._skipBlank(text, block.start, block.end)) {
       head = text.substring(0, block.start);
       tail = text.substring(block.start);
@@ -405,8 +406,8 @@ const _dash = 0x2D;
 /// many cells, and every line under those that is a row too; before its
 /// header row may come [MarkdownTables.headingColumnLine]. A row is a
 /// line of at least one cell that would be a paragraph line, indented by
-/// at most three, not blank, no comment (`<!--`), no fence of three
-/// backticks or tildes and no rule (three `-`, `*` or `_`). The
+/// at most three, not blank, no comment (`<!--`), no code block's fence
+/// and no rule (three `-`, `*` or `_`). The
 /// delimiter row holds a `|` and cells of `-`, a `:` at either end
 /// telling the alignment.
 MarkdownTable? _tableAt(String text, List<(int, int)> lines, int first) {
@@ -486,11 +487,8 @@ bool _isRow(String text, int start, int end) {
     return false;
   }
   if (text.startsWith('<!--', at)) return false;
+  if (Markdown._fence(text, start, end) != null) return false;
   final c = text.codeUnitAt(at);
-  if ((c == Markdown._backtick || c == Markdown._tilde) &&
-      text.startsWith(String.fromCharCodes([c, c, c]), at)) {
-    return false;
-  }
   if (c == _dash || c == Markdown._star || c == Markdown._underscore) {
     var count = 0;
     var rule = true;

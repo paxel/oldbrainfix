@@ -44,6 +44,17 @@ void main() {
 
   Finder key(String value) => find.byKey(ValueKey(value));
 
+  /// Gives each Line of the Shopping List of [note] a week (#195).
+  void weekly(String note) {
+    for (final line in lists.byNote(note, deviceWallClock)!.lines) {
+      lists.setReappear(line.id, Reappear.after(1, ReappearUnit.week));
+    }
+  }
+
+  /// The text the reappear time badge of the Line [id] shows (#195).
+  String badgeText(WidgetTester tester, String id) =>
+      tester.widget<SettingBadge>(key('shopping-reappear-$id')).value!;
+
   Future<void> tap(WidgetTester tester, Finder finder) async {
     if (finder.evaluate().isEmpty) await reveal(tester, finder);
     await tester.ensureVisible(finder);
@@ -190,7 +201,7 @@ void main() {
       for (final text in ['Milk', 'Eggs']) {
         expect(key('checklist-check-${idOf(note, text)}'), findsOneWidget);
       }
-      expect(lineOf(note, 'Milk').reappear, Reappear.week1);
+      expect(lineOf(note, 'Milk').reappear, Reappear.unset);
 
       await cardMenu(tester);
       expect(key('note-make-shopping'), findsNothing);
@@ -200,12 +211,12 @@ void main() {
       expect(key('note-to-plain'), findsOneWidget);
     });
 
-    testWidgets('a full card checks a Line: struck through, at the end, with '
-        'the day it comes back; on that day it is open at the top', (
-      tester,
-    ) async {
+    testWidgets('a full card checks a Line: struck through, folded at the '
+        'end (#189), with the day it comes back; on that day it is open at '
+        'the top', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs\nTea').id;
       lists.make(note);
+      weekly(note);
       final milk = idOf(note, 'Milk');
       final tea = idOf(note, 'Tea');
       await startAtNotes(tester);
@@ -214,6 +225,9 @@ void main() {
 
       await tap(tester, key('checklist-check-$milk'));
       expect(shown(note), ['Eggs', 'Tea', '[x] Milk']);
+      expect(key('checklist-check-$milk'), findsNothing);
+      expect(find.text('1 struck through'), findsOneWidget);
+      await tap(tester, key('shopping-struck'));
       expect(struck(tester, milk), isTrue);
       expect(top(tester, milk), greaterThan(top(tester, tea)));
       final line = lineOf(note, 'Milk');
@@ -267,8 +281,20 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     }
 
+    /// Makes the Note the kind [kind] through its kind badge (#188).
+    Future<void> pickKind(WidgetTester tester, NoteKind kind) async {
+      await tester.ensureVisible(key('badge-kind'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-${kind.name}'));
+    }
+
     Future<void> lineMenu(WidgetTester tester, String id) =>
         tap(tester, key('checklist-menu-$id'));
+
+    /// Opens the reappear time dialog of the Line [id] by its badge (#195).
+    Future<void> reappearBadge(WidgetTester tester, String id) =>
+        tap(tester, key('shopping-reappear-$id'));
 
     /// Opens the editor of [text] again after [leave].
     Future<void> reopen(WidgetTester tester, String text) async {
@@ -285,16 +311,14 @@ void main() {
       return true;
     }
 
-    testWidgets('"Make it a Shopping List" makes the text as typed one; the '
-        'field keeps the title, also after leaving', (tester) async {
+    testWidgets('Shopping List in the kind badge makes the text as typed '
+        'one; the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
       await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
-      await tap(tester, key('shopping-make'));
+      await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('shopping'), findsOneWidget);
-      expect(key('shopping-make'), findsNothing);
-      expect(key('checklist-make'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
         'Shop',
@@ -354,10 +378,14 @@ void main() {
       expect(top(tester, milk), lessThan(top(tester, lk)));
       expect(top(tester, lk), lessThan(top(tester, tea)));
 
-      // ⋮ of a Line typed here has its reappear time too.
-      await lineMenu(tester, tea);
-      await tap(tester, key('shopping-reappear-2w'));
-      expect(lineOf(note, 'TeaBread').reappear, Reappear.week2);
+      // The badge of a Line typed here sets its reappear time too.
+      await reappearBadge(tester, tea);
+      await tap(tester, key('reappear-after'));
+      await tap(tester, key('badge-close'));
+      expect(
+        lineOf(note, 'TeaBread').reappear,
+        Reappear.after(1, ReappearUnit.week),
+      );
       await leave(tester);
       expect(shown(note), ['Mi', 'lk', 'TeaBread', 'Eggs']);
       // Opened again, in the order typed.
@@ -370,7 +398,7 @@ void main() {
         'editor is opened again, then below the open ones', (tester) async {
       final note = notes.capture('Trip').id;
       await openEditor(tester, 'Trip');
-      await tap(tester, key('shopping-make'));
+      await pickKind(tester, NoteKind.shoppingList);
       expect(shown(note), isEmpty);
       expect(cursor(tester), ('', 0));
       await backspaceAtStart(tester, 'new-1');
@@ -426,65 +454,125 @@ void main() {
       expect(lists.byNote(note, deviceWallClock)!.lines, hasLength(2));
     });
 
-    testWidgets('a Line\'s ⋮ picks its reappear time as radio buttons and '
-        'deletes it for good', (tester) async {
+    testWidgets('a Line\'s badge shows its reappear time and picks a number '
+        'and a unit (#195); its ⋮ deletes it for good', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs').id;
       lists.make(note);
       await openEditor(tester, 'Shop');
       final milk = idOf(note, 'Milk');
 
-      await lineMenu(tester, milk);
-      final picked = [
-        for (final code in ['once', '1w', '2w', '3w', '4w'])
-          tester
-              .widget<Icon>(
-                find.descendant(
-                  of: key('shopping-reappear-$code'),
-                  matching: find.byType(Icon),
-                ),
-              )
-              .icon,
-      ];
-      expect(picked, [
-        Icons.radio_button_unchecked,
-        Icons.radio_button_checked,
-        Icons.radio_button_unchecked,
-        Icons.radio_button_unchecked,
-        Icons.radio_button_unchecked,
-      ]);
-      for (final label in [
-        'Reappear time',
-        'Once',
-        '1 week',
-        '2 weeks',
-        '4 weeks',
-        'Delete',
-      ]) {
-        expect(find.text(label), findsOneWidget);
+      // A new Line has none.
+      expect(badgeText(tester, milk), '—');
+      expect(
+        find.bySemanticsLabel('Reappear time: None'),
+        findsNWidgets(2),
+        reason: 'both Lines',
+      );
+      await reappearBadge(tester, milk);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      for (final label in ['Reappear time', 'None', 'Once', 'After']) {
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(label),
+          ),
+          findsOneWidget,
+          reason: label,
+        );
       }
-      await tap(tester, key('shopping-reappear-3w'));
-      expect(lineOf(note, 'Milk').reappear, Reappear.week3);
+      expect(key('reappear-count'), findsNothing, reason: 'only for After');
+      // After starts at a week, written at once.
+      await tap(tester, key('reappear-after'));
+      expect(
+        lineOf(note, 'Milk').reappear,
+        Reappear.after(1, ReappearUnit.week),
+      );
+      for (final unit in ['day', 'week', 'month', 'year']) {
+        expect(
+          find.descendant(of: key('reappear-unit'), matching: find.text(unit)),
+          findsOneWidget,
+          reason: unit,
+        );
+      }
+      final more = find.descendant(
+        of: key('reappear-count'),
+        matching: find.byTooltip('More'),
+      );
+      await tap(tester, more);
+      await tap(tester, more);
+      expect(
+        lineOf(note, 'Milk').reappear,
+        Reappear.after(3, ReappearUnit.week),
+      );
+      await tap(tester, key('reappear-unit-m'));
+      expect(
+        lineOf(note, 'Milk').reappear,
+        Reappear.after(3, ReappearUnit.month),
+      );
+      await tap(tester, key('badge-close'));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(badgeText(tester, milk), '3m');
+      expect(find.bySemanticsLabel('Reappear time: 3 months'), findsOneWidget);
       await tap(tester, key('checklist-check-$milk'));
+      final today = Day.of(deviceWallClock(now));
       expect(
         lineOf(note, 'Milk').backOn,
-        Day.of(deviceWallClock(now)).addDays(21),
+        Reappear.after(3, ReappearUnit.month).backFrom(today),
       );
+      // Opened again, it shows what the Line has.
+      await reappearBadge(tester, milk);
+      expect(find.text('3'), findsOneWidget);
+      await tap(tester, key('reappear-none'));
+      expect(lineOf(note, 'Milk').reappear, Reappear.unset);
+      expect(lineOf(note, 'Milk').struck, isTrue);
+      expect(lineOf(note, 'Milk').backOn, isNull);
+      await tap(tester, key('badge-close'));
 
       // Once: gone when checked.
       final eggs = idOf(note, 'Eggs');
-      await lineMenu(tester, eggs);
-      await tap(tester, key('shopping-reappear-once'));
+      await reappearBadge(tester, eggs);
+      await tap(tester, key('reappear-once'));
+      await tap(tester, key('badge-close'));
+      expect(badgeText(tester, eggs), 'Once');
       await tap(tester, key('checklist-check-$eggs'));
       expect(shown(note), ['[x] Milk']);
       expect(drawn(eggs), findsNothing);
-      // Renaming is typed in place.
+      // Renaming is typed in place; ⋮ has Delete alone.
       await lineMenu(tester, milk);
       expect(key('shopping-rename'), findsNothing);
+      expect(find.text('Reappear time'), findsNothing);
       await tap(tester, key('shopping-delete'));
       expect(find.byType(AlertDialog), findsOneWidget);
       await tap(tester, key('checklist-delete-confirm'));
       expect(shown(note), isEmpty);
       expect(find.byType(BottomSheet), findsNothing);
+    });
+
+    testWidgets('a Line just typed has its ⋮ once it holds text, and each '
+        'entry stores it first (#202)', (tester) async {
+      final note = notes.capture('Shop\nMilk').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+
+      // An empty new Line has nothing to act on.
+      await type(tester, milk, 'Milk\n', 5);
+      expect(key('checklist-menu-new-1'), findsNothing);
+      await type(tester, 'new-1', 'Tea', 3);
+      expect(shown(note), ['Milk']);
+      expect(key('checklist-menu-new-1'), findsOneWidget);
+      await reappearBadge(tester, 'new-1');
+      await tap(tester, key('reappear-once'));
+      await tap(tester, key('badge-close'));
+      expect(lineOf(note, 'Tea').reappear, Reappear.once);
+
+      await type(tester, idOf(note, 'Tea'), 'Tea\n', 4);
+      await type(tester, 'new-2', 'Salt', 4);
+      await lineMenu(tester, 'new-2');
+      await tap(tester, key('shopping-delete'));
+      await tap(tester, key('checklist-delete-confirm'));
+      expect(shown(note), ['Milk', 'Tea']);
+      expect(key('shopping-field-new-2'), findsNothing);
     });
 
     testWidgets('a Line is renamed in place, kept on leaving; one emptied '
@@ -526,7 +614,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tap(tester, key('kind-to-plain'));
+      await tap(tester, key('kind-plain'));
       expect(lists.isShoppingList(note), isFalse);
       expect(key('shopping'), findsNothing);
       expect(
@@ -590,6 +678,12 @@ void main() {
       await tester.longPress(find.text('Shop'));
       await tester.pumpAndSettle();
       expect(key('checklist-menu-$milk'), findsNothing);
+      // His badge of Ann's Line only shows its reappear time (#195).
+      expect(badgeText(tester, milk), '—');
+      expect(
+        tester.widget<SettingBadge>(key('shopping-reappear-$milk')).onTap,
+        isNull,
+      );
       expect(
         tester.widget<SettingBadge>(key('badge-kind')).onTap,
         isNull,
@@ -608,8 +702,11 @@ void main() {
       // His own Line is his to change.
       final bread = idOf(note, 'Bread', ben);
       expect(field(bread), findsOneWidget);
+      expect(
+        tester.widget<SettingBadge>(key('shopping-reappear-$bread')).onTap,
+        isNotNull,
+      );
       await tap(tester, key('checklist-menu-$bread'));
-      expect(key('shopping-reappear-2w'), findsOneWidget);
       expect(key('shopping-delete'), findsOneWidget);
     });
   });
@@ -678,7 +775,7 @@ void main() {
         screen(SentItemScreen(store: store, opened: opened)),
       );
       await tester.pumpAndSettle();
-      for (final text in ['Milk', 'Reappear time: 1 week']) {
+      for (final text in ['Milk', 'Reappear time: None']) {
         expect(
           find.descendant(of: key('sent-lines'), matching: find.text(text)),
           findsOneWidget,
@@ -713,6 +810,7 @@ void main() {
         'short weekday and date', (tester) async {
       final note = notes.capture('Einkauf\nMilch').id;
       lists.make(note);
+      weekly(note);
       lists.check(idOf(note, 'Milch'), deviceWallClock);
       await tester.pumpWidget(
         screen(
@@ -727,6 +825,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Einkaufsliste'), findsOneWidget);
       expect(find.text('wieder Sa., 31. Okt.'), findsOneWidget);
+      expect(badgeText(tester, idOf(note, 'Milch')), '1W');
+      expect(find.bySemanticsLabel('Wiederkehr: 1 Woche'), findsOneWidget);
     });
   });
 }

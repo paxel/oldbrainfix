@@ -215,4 +215,26 @@ void main() {
       }
     });
   }
+
+  group('a full bar (UI laws, "The bar")', () {
+    BarAction action(String label) =>
+        BarAction(icon: Icons.star, label: label, onPressed: () {});
+    const calendar = Icon(Icons.event);
+
+    test('shows every action while they fit', () {
+      final actions = [action('a'), calendar, action('b')];
+      expect(barActions(actions, 3), actions);
+    });
+
+    test('keeps the actions that fit in their order, then ⋮ with the rest; '
+        'a button with its own menu never goes into ⋮', () {
+      final a = action('a');
+      final b = action('b');
+      final shown = barActions([a, calendar, b, action('c')], 3);
+      expect(shown, hasLength(3));
+      expect(shown.take(2), [a, calendar]);
+      expect(shown.last, isNot(isA<BarAction>()));
+      expect(shown, isNot(contains(b)));
+    });
+  });
 }

@@ -204,6 +204,81 @@ void main() {
     });
   });
 
+  group('Done moves the Note to the trash, when chosen (#211)', () {
+    final once = Schedule(start: today, times: [at(8)]);
+    final morning = Occurrence(today, at(8));
+
+    /// A Note with [text] and a one-time Reminder at 08:00 today.
+    Routine reminder(String text) =>
+        routines.spawn(notes.capture(text).id, once);
+
+    bool trashed(Routine r) => notes.byId(r.noteId)?.isTrashed ?? false;
+
+    test('off by default: Done checks off and moves nothing', () {
+      final dentist = reminder('dentist');
+      expect(store.trashesDoneReminder, isFalse);
+      expect(routines.checkOff(dentist.id, morning), isFalse);
+      expect(routines.byId(dentist.id)?.doneAt(morning), now);
+      expect(trashed(dentist), isFalse);
+    });
+
+    test('on: the Note goes with its Reminder, and stays when unchecked', () {
+      final dentist = reminder('dentist');
+      store.trashesDoneReminder = true;
+      expect(routines.checkOff(dentist.id, morning), isTrue);
+      expect(trashed(dentist), isTrue);
+      final gone = routines.byId(dentist.id);
+      expect(gone?.doneAt(morning), now);
+      expect(gone?.trashedWith, dentist.noteId);
+      // No unchecking brings it back: it comes back from the trash, Done.
+      expect(
+        () => routines.unmarkDone(dentist.id, morning),
+        throwsArgumentError,
+      );
+      routines.restoreNote(dentist.noteId);
+      expect(trashed(dentist), isFalse);
+      expect(routines.byId(dentist.id)?.doneAt(morning), now);
+      routines.unmarkDone(dentist.id, morning);
+      expect(trashed(dentist), isFalse);
+    });
+
+    test('a notification\'s Done applied later trashes too', () {
+      final dentist = reminder('dentist');
+      store.trashesDoneReminder = true;
+      expect(Alarms(store).applyDone(dentist.id, morning.key, now), isTrue);
+      expect(trashed(dentist), isTrue);
+    });
+
+    test('a Routine, a second schedule or a Note of a kind never go', () {
+      store.trashesDoneReminder = true;
+      final pills = routines.spawn(notes.capture('pills').id, daily([at(8)]));
+      final twice = reminder('passport');
+      routines.spawn(twice.noteId, Schedule(start: tomorrow, times: [at(8)]));
+      final packing = reminder('packing');
+      Checklists(store).make(packing.noteId);
+      final groceries = reminder('groceries');
+      ShoppingLists(store).make(groceries.noteId);
+      final gym = reminder('gym');
+      Tallies(store).addField(gym.noteId, name: 'Push-ups', unit: 'times');
+      final squats = notes.capture('squats').id;
+      Tallies(store).addField(squats, name: 'Squats', unit: 'times');
+      final session = reminder('workout');
+      Sessions(
+        store,
+      ).make(session.noteId, pool: [squats], count: 1, rule: SessionRule.least);
+      for (final r in [pills, twice, packing, groceries, gym, session]) {
+        expect(routines.checkOff(r.id, morning), isFalse, reason: r.noteId);
+        expect(trashed(r), isFalse, reason: r.noteId);
+        expect(routines.byId(r.id)?.doneAt(morning), now, reason: r.noteId);
+      }
+      // Its other schedule in the trash, the Reminder is the only one.
+      final last = reminder('last one');
+      final other = routines.spawn(last.noteId, daily([at(20)]));
+      routines.trash(other.id);
+      expect(routines.checkOff(last.id, morning), isTrue);
+    });
+  });
+
   group('Re-nag override', () {
     test('a Routine has its own Re-nag interval, or the Device\'s', () {
       final id = routines.create('pills', daily([at(8)])).id;
@@ -331,6 +406,34 @@ void main() {
       final routine = routines.create('pills', daily([at(8)]));
       routines.trash(routine.id);
       expect(routines.agenda(europe).todayRows, isEmpty);
+    });
+  });
+
+  group("a card's Occurrences today (#215)", () {
+    List<AgendaRow> cardRows(String note) =>
+        routines.todayByNote(europe)[note] ?? const [];
+
+    test('of each Routine the first open one today, else the last Done', () {
+      final note = notes.capture('pills').id;
+      final pills = routines.spawn(note, daily([at(8), at(20)]));
+      expect(rows(cardRows(note)), ['2026-10-24T08:00 pills']);
+      routines.markDone(pills.id, Occurrence(today, at(8)));
+      expect(rows(cardRows(note)), [
+        '2026-10-24T20:00 pills',
+      ], reason: 'one ahead today is open too');
+      routines.markDone(pills.id, Occurrence(today, at(20)));
+      final done = cardRows(note).single;
+      expect(done.occurrence, Occurrence(today, at(20)));
+      expect(done.done, now, reason: 'Done today, there all day');
+    });
+
+    test('none for a Routine without one today, nor of another Note', () {
+      final note = notes.capture('dentist').id;
+      routines.spawn(note, Schedule(start: tomorrow, times: [at(10)]));
+      final other = notes.capture('tidy up').id;
+      routines.spawn(other, daily([]));
+      expect(cardRows(note), isEmpty);
+      expect(rows(cardRows(other)), ['2026-10-24 tidy up']);
     });
   });
 

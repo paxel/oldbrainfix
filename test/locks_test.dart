@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/agenda_widget.dart';
@@ -607,7 +608,9 @@ void main() {
       routines.create('Water plants', daily(12));
       final snapshot = AgendaSnapshot.of(store, deviceWallClock, en, 'en');
       expect(
-        [for (final row in snapshot.days['2026-10-24'] ?? []) row.title],
+        [
+          for (final row in [...?snapshot.days['2026-10-24']]) row.title,
+        ],
         [en.maskedRoutineAt('10:00'), 'Water plants'],
       );
     });
@@ -831,14 +834,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        find.descendant(of: column, matching: find.byType(ChoiceChip)),
         findsNWidgets(5),
       );
-      int chosen() => tester
-          .widget<RadioGroup<int>>(
-            find.descendant(of: column, matching: find.byType(RadioGroup<int>)),
-          )
-          .groupValue!;
+      int chosen() => tester.widget<ChoiceChips<int>>(column).value;
       expect(chosen(), 10);
       expect(
         find.descendant(of: column, matching: find.text('10 min')),

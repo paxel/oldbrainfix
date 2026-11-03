@@ -19,6 +19,7 @@ use crate::notes::{Note, Notes, keys as note_keys};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{Day, Occurrence, Schedule, WallClock};
 use crate::sent::keys as sent_keys;
+use crate::shopping_lists::ListOnAgenda;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
 use crate::text_format::{self, StoredText, VERSION};
@@ -77,8 +78,11 @@ pub mod keys {
     /// outside every Area like an Override, so it is sealed under the
     /// personal key and goes only to the user's own Devices.
     pub const AGENDA_PREFIX: &str = "agenda:";
-    /// On that entity: [`AGENDA_OFF`] while the Checklist stays off the
-    /// Agenda; absent, none or any other value while it shows.
+    /// On that entity: how the Checklist shows on the Agenda (#219), a
+    /// [`crate::ListOnAgenda`]'s code: [`AGENDA_OFF`] while it stays off,
+    /// `count` for one row with the number of its open Lines; absent,
+    /// none, `lines` or any other value for every open Line under its
+    /// name.
     pub const AGENDA: &str = "agenda";
     pub const AGENDA_OFF: &str = "off";
 }
@@ -96,14 +100,22 @@ pub fn parse_list_kind(value: Option<&str>) -> Option<(&str, &str)> {
 /// The keys that place Lines, as the Dart core's `LineOrder`: digits of
 /// base 62 in ASCII order, compared as text, never ending in `0`.
 pub mod order {
-    pub const DIGITS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    pub const DIGITS: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    /// The middle digit of [`DIGITS`] (a test checks it).
+    const MID: u8 = b'V';
 
     fn digit(c: u8) -> Option<usize> {
         DIGITS.iter().position(|d| *d == c)
     }
 
+    /// The digit of value `d`, none past the last.
+    fn symbol(d: usize) -> Option<char> {
+        DIGITS.get(d).map(|c| char::from(*c))
+    }
+
     fn mid() -> char {
-        char::from(DIGITS[DIGITS.len() / 2])
+        char::from(MID)
     }
 
     /// Whether `key` is one this order reads: any other sorts after them.
@@ -123,8 +135,8 @@ pub mod order {
             let Some(d) = digit(c) else {
                 break;
             };
-            if d < DIGITS.len() - 1 {
-                return format!("{}{}", &a[..i], char::from(DIGITS[d + 1]));
+            if let Some(next) = symbol(d + 1) {
+                return format!("{}{next}", &a[..i]);
             }
         }
         format!("{a}{}", mid())
@@ -138,7 +150,10 @@ pub mod order {
         }
         let (ab, bb) = (a.as_bytes(), b.as_bytes());
         let mut n = 0;
-        while n < bb.len() && ab.get(n).copied().unwrap_or(b'0') == bb[n] {
+        while bb
+            .get(n)
+            .is_some_and(|c| ab.get(n).copied().unwrap_or(b'0') == *c)
+        {
             n += 1;
         }
         if n >= bb.len() {
@@ -149,20 +164,28 @@ pub mod order {
             Some(c) => digit(*c),
             None => Some(0),
         };
-        let (Some(da), Some(db)) = (da, digit(bb[n])) else {
+        let (Some(da), Some(db)) = (da, bb.get(n).and_then(|c| digit(*c))) else {
             return after(a);
         };
         if db <= da {
             return after(a);
         }
+        // `da` and `db` are digits, so their middle and `da` are too;
+        // were they not, the key after `a` still sorts right.
         if db - da > 1 {
-            return format!("{prefix}{}", char::from(DIGITS[(da + db) / 2]));
+            let Some(middle) = symbol((da + db) / 2) else {
+                return after(a);
+            };
+            return format!("{prefix}{middle}");
         }
         if bb.len() > n + 1 {
             return b[..n + 1].to_string();
         }
         let rest = if n < ab.len() { &a[n + 1..] } else { "" };
-        format!("{prefix}{}{}", char::from(DIGITS[da]), after(rest))
+        let Some(da) = symbol(da) else {
+            return after(a);
+        };
+        format!("{prefix}{da}{}", after(rest))
     }
 
     /// The key for a place after `a` and before `b`, either `None` for
@@ -173,6 +196,16 @@ pub mod order {
             (None, Some(b)) => between("", b),
             (Some(a), None) => after(a),
             (Some(a), Some(b)) => between(a, b),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn the_middle_digit_is_the_middle_of_the_digits() {
+            assert_eq!(DIGITS[DIGITS.len() / 2], MID);
         }
     }
 }
@@ -208,6 +241,15 @@ impl Line {
 pub struct RoutineOccurrence {
     pub routine_id: String,
     pub occurrence: Occurrence,
+}
+
+/// A Checklist on today's Agenda (#219) and how it shows there: every
+/// open Line under its name for [`ListOnAgenda::Lines`], its name with the
+/// count for [`ListOnAgenda::Count`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChecklistAgendaRow {
+    pub list: Checklist,
+    pub shows: ListOnAgenda,
 }
 
 /// A Note whose Lines are checked off (CONTEXT.md).
@@ -564,6 +606,17 @@ pub(crate) fn write_line(
     line: &NewLine,
 ) -> Result<String> {
     let id = format!("{}{}", keys::LINE_PREFIX, store.new_id()?);
+    write_line_as(store, id, note_id, making, line)
+}
+
+/// Writes a new Line as [`write_line`] does, under the id `id`.
+pub(crate) fn write_line_as(
+    store: &Store,
+    id: String,
+    note_id: &str,
+    making: &str,
+    line: &NewLine,
+) -> Result<String> {
     let now = line.at.unwrap_or_else(|| store.now());
     store.append(&id, keys::TYPE, Some(keys::TYPE_LINE), Some(now))?;
     store.append(&id, keys::NOTE, Some(note_id), Some(now))?;
@@ -602,7 +655,7 @@ impl<'a> Checklists<'a> {
 
     /// Whether the Note `note_id` is a Checklist.
     pub fn is_checklist(&self, note_id: &str) -> Result<bool> {
-        Ok(self.by_note(note_id)?.is_some())
+        Ok(self.making(note_id)?.is_some())
     }
 
     /// The Checklists of the Notes `note_ids` that are one, read in one
@@ -729,15 +782,16 @@ impl<'a> Checklists<'a> {
         Ok(out)
     }
 
-    /// The Checklists on today's Agenda (#143): each not in the trash nor
-    /// merged, with no Routine or Reminder out of the trash, that
-    /// [`Checklists::shows_on_agenda`] and has a Line open; oldest capture
-    /// first. One with a Routine shows as its Occurrence instead. Each row
-    /// says how many Lines are open of how many
+    /// The Checklists on today's Agenda (#143, #219): each not in the
+    /// trash nor merged, with no Routine or Reminder out of the trash,
+    /// that this person does not keep [`ListOnAgenda::Off`] and that has a
+    /// Line open, with how it shows ([`Checklists::on_agenda`]); oldest
+    /// capture first. One with a Routine shows as its Occurrence instead.
+    /// Each list says how many Lines are open of how many
     /// ([`Checklist::open_count`], [`Checklist::count`]); the apps show one
     /// of a locked Area set to Masked as a row that tells nothing of it,
-    /// as a Shopping List's.
-    pub fn agenda(&self) -> Result<Vec<Checklist>> {
+    /// as a Shopping List's. Reading writes nothing.
+    pub fn agenda_rows(&self) -> Result<Vec<ChecklistAgendaRow>> {
         let notes = Notes::new(self.store);
         let routines = Routines::new(self.store);
         let mut spawned = HashSet::new();
@@ -752,45 +806,53 @@ impl<'a> Checklists<'a> {
             if self.making(&id)?.is_none() || spawned.contains(&id) {
                 continue;
             }
+            let shows = self.shows(&id, &mut own)?;
+            if shows == ListOnAgenda::Off {
+                continue;
+            }
             if let Some(note) = notes.by_id(&id)?
                 && !note.is_trashed()
                 && !note.is_merged()
-                && self.shows(&id, &mut own)?
             {
-                shown.push(note);
+                shown.push((note, shows));
             }
         }
-        shown.sort_by(|a, b| {
+        shown.sort_by(|(a, _), (b, _)| {
             a.captured
                 .cmp(&b.captured)
                 .then_with(|| utf16_cmp(&a.id, &b.id))
         });
-        let ids: Vec<String> = shown.iter().map(|n| n.id.clone()).collect();
+        let ids: Vec<String> = shown.iter().map(|(n, _)| n.id.clone()).collect();
         let mut lists = self.of_notes(&ids)?;
         let mut out = Vec::new();
-        for id in &ids {
-            if let Some(list) = lists.remove(id)
+        for (note, shows) in shown {
+            if let Some(list) = lists.remove(&note.id)
                 && list.open_count() > 0
             {
-                out.push(list);
+                out.push(ChecklistAgendaRow { list, shows });
             }
         }
         Ok(out)
     }
 
-    /// Whether the Checklist of `note_id` shows on today's Agenda for
-    /// this person, as far as it is theirs to say: unless one of the
-    /// user's own Devices switched it off last. What another person's
-    /// Device wrote counts for nothing, so in a Shared Area each person
-    /// decides for their own Agenda.
-    pub fn shows_on_agenda(&self, note_id: &str) -> Result<bool> {
+    /// How the Checklist of `note_id` shows on today's Agenda for this
+    /// person (#219), as one of the user's own Devices chose last: off,
+    /// one row with its count, or, for a list nobody chose for or a value
+    /// no app writes, every open Line, as #143's "on" showed it. What
+    /// another person's Device wrote counts for nothing, so in a Shared
+    /// Area each person decides for their own Agenda.
+    pub fn on_agenda(&self, note_id: &str) -> Result<ListOnAgenda> {
         self.shows(note_id, &mut HashMap::new())
     }
 
-    fn shows(&self, note_id: &str, own: &mut HashMap<String, bool>) -> Result<bool> {
+    fn shows(&self, note_id: &str, own: &mut HashMap<String, bool>) -> Result<ListOnAgenda> {
         let entity = format!("{}{note_id}", keys::AGENDA_PREFIX);
         let value = self.store.own_current(&entity, keys::AGENDA, own)?;
-        Ok(value.as_deref() != Some(keys::AGENDA_OFF))
+        Ok(match value.as_deref() {
+            Some(keys::AGENDA_OFF) => ListOnAgenda::Off,
+            Some(code) if code == ListOnAgenda::Count.code() => ListOnAgenda::Count,
+            _ => ListOnAgenda::Lines,
+        })
     }
 
     /// Whether "Show on the Agenda" applies to the Note `note_id`: a
@@ -806,26 +868,27 @@ impl<'a> Checklists<'a> {
             && Routines::new(self.store).of_note(note_id)?.is_empty())
     }
 
-    /// Switches "Show on the Agenda" of the Checklist of `note_id` on or
-    /// off for this person alone, kept like an Override: on the user's
-    /// own Devices only, whatever their role in its Area. The same again
-    /// writes nothing.
-    pub fn set_show_on_agenda(&self, note_id: &str, shown: bool) -> Result<()> {
+    /// Sets how the Checklist of `note_id` shows on the Agenda for this
+    /// person alone (#219), kept like an Override: on the user's own
+    /// Devices only, whatever their role in its Area. A choice it already
+    /// shows by writes nothing, as every Device reads no choice as every
+    /// open Line.
+    pub fn set_on_agenda(&self, note_id: &str, shows: ListOnAgenda) -> Result<()> {
         if self.making(note_id)?.is_none() {
             return Err(Error::Invalid(format!("not a Checklist: {note_id}")));
         }
-        if self.shows_on_agenda(note_id)? == shown {
+        if self.on_agenda(note_id)? == shows {
             return Ok(());
         }
         let entity = format!("{}{note_id}", keys::AGENDA_PREFIX);
-        let value = (!shown).then_some(keys::AGENDA_OFF);
-        self.store.append(&entity, keys::AGENDA, value, None)?;
+        self.store
+            .append(&entity, keys::AGENDA, Some(shows.code()), None)?;
         Ok(())
     }
 
     /// Whether this Device may make the Note `note_id` a Checklist: a Note
-    /// in the lists, of a text known here, neither a Tally nor a list
-    /// already, which it may change.
+    /// in the lists, of a text known here and not code, neither a Tally
+    /// nor a list already, which it may change.
     pub fn may_make(&self, note_id: &str) -> Result<bool> {
         let Some(note) = Notes::new(self.store).by_id(note_id)? else {
             return Ok(false);
@@ -833,8 +896,10 @@ impl<'a> Checklists<'a> {
         Ok(!note.is_trashed()
             && !note.is_merged()
             && note.text_editable
+            && note.text_format != crate::text_format::CODE
             && parse_list_kind(self.store.current(note_id, keys::KIND)?.as_deref()).is_none()
             && !Tallies::new(self.store).is_tally(note_id)?
+            && !crate::sessions::Sessions::new(self.store).is_session_note(note_id)?
             && self.store.may_change(note_id)?)
     }
 
@@ -1086,11 +1151,11 @@ impl<'a> Checklists<'a> {
         }
         let grouped = block.len() > 1;
         if grouped {
-            while pos < rest.len() && rest[pos].in_group() {
+            while rest.get(pos).is_some_and(Line::in_group) {
                 pos += 1;
             }
         }
-        let indent = !grouped && pos < rest.len() && rest[pos].in_group();
+        let indent = !grouped && rest.get(pos).is_some_and(Line::in_group);
         let (mut a, b) = neighbours(&rest, pos);
         let ids: Vec<String> = block.iter().map(|l| l.id.clone()).collect();
         let indented = self.indented(line_id)?;
@@ -1466,12 +1531,14 @@ fn last_day(schedule: &Schedule, today: Day) -> Option<Day> {
 /// The valid keys around the place `pos` of `lines`: the last one before
 /// it, and the first one after it past that one.
 fn neighbours(lines: &[Line], pos: usize) -> (Option<String>, Option<String>) {
-    let a = lines[..pos]
+    // A place past the end is the end.
+    let (before, after) = lines.split_at_checked(pos).unwrap_or((lines, &[]));
+    let a = before
         .iter()
         .rev()
         .find(|l| order::is_valid(l.order.as_deref()))
         .and_then(|l| l.order.clone());
-    let b = lines[pos..]
+    let b = after
         .iter()
         .filter_map(|l| l.order.as_deref())
         .find(|key| {
@@ -2592,10 +2659,15 @@ pub(crate) mod tests {
     fn agenda_rows(store: &Store) -> Made<Vec<String>> {
         let notes = Notes::new(store);
         let mut out = Vec::new();
-        for list in Checklists::new(store).agenda()? {
+        for row in Checklists::new(store).agenda_rows()? {
+            let list = row.list;
             let title = notes.by_id(&list.note_id)?.ok_or("the Note")?.text;
+            let suffix = match row.shows {
+                ListOnAgenda::Count => " as count",
+                _ => "",
+            };
             out.push(format!(
-                "{title}: {} of {}",
+                "{title}: {} of {}{suffix}",
                 list.open_count(),
                 list.count()
             ));
@@ -2644,18 +2716,21 @@ pub(crate) mod tests {
         let ann = device(1, "Ann")?;
         let trip = checklist(&ann, "Before the trip\nTent\nTorch\n  Batteries", None)?;
         let lists = Checklists::new(&ann);
-        assert!(lists.shows_on_agenda(&trip)?);
+        assert_eq!(lists.on_agenda(&trip)?, ListOnAgenda::Lines);
         assert!(lists.may_show_on_agenda(&trip)?);
         assert_eq!(agenda_rows(&ann)?, ["Before the trip: 3 of 3"]);
         lists.check(&id_of(&ann, &trip, "Batteries")?)?;
         assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
-        lists.set_show_on_agenda(&trip, false)?;
-        assert!(!lists.shows_on_agenda(&trip)?);
+        lists.set_on_agenda(&trip, ListOnAgenda::Off)?;
+        assert_eq!(lists.on_agenda(&trip)?, ListOnAgenda::Off);
         assert!(agenda_rows(&ann)?.is_empty());
         let count = ann.all_entries()?.len();
-        lists.set_show_on_agenda(&trip, false)?;
+        lists.set_on_agenda(&trip, ListOnAgenda::Off)?;
         assert_eq!(ann.all_entries()?.len(), count, "the same again");
-        lists.set_show_on_agenda(&trip, true)?;
+        lists.set_on_agenda(&trip, ListOnAgenda::Count)?;
+        assert_eq!(lists.on_agenda(&trip)?, ListOnAgenda::Count);
+        assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3 as count"]);
+        lists.set_on_agenda(&trip, ListOnAgenda::Lines)?;
         assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
         let values: Vec<Option<String>> = ann
             .all_entries()?
@@ -2663,14 +2738,40 @@ pub(crate) mod tests {
             .filter(|e| e.entity.starts_with(keys::AGENDA_PREFIX))
             .map(|e| e.value)
             .collect();
-        assert_eq!(values, [Some("off".to_string()), None]);
+        assert_eq!(
+            values,
+            [Some("off"), Some("count"), Some("lines")].map(|v| v.map(String::from))
+        );
         lists.check(&id_of(&ann, &trip, "Tent")?)?;
         assert!(agenda_rows(&ann)?.is_empty(), "every Line checked");
         lists.uncheck(&id_of(&ann, &trip, "Tent")?)?;
         assert_eq!(agenda_rows(&ann)?, ["Before the trip: 1 of 3"]);
         let count = ann.all_entries()?.len();
-        lists.agenda()?;
+        lists.agenda_rows()?;
         assert_eq!(ann.all_entries()?.len(), count, "reading writes nothing");
+        Ok(())
+    }
+
+    #[test]
+    fn one_shown_as_its_count_never_shows_without_an_open_line() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let trip = checklist(&ann, "Trip\nTent", None)?;
+        let lists = Checklists::new(&ann);
+        lists.set_on_agenda(&trip, ListOnAgenda::Count)?;
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1 as count"]);
+        lists.check(&id_of(&ann, &trip, "Tent")?)?;
+        assert!(agenda_rows(&ann)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_checklist_nobody_chose_for_shows_every_open_line_writing_nothing() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let trip = checklist(&ann, "Trip\nTent", None)?;
+        let count = ann.all_entries()?.len();
+        Checklists::new(&ann).set_on_agenda(&trip, ListOnAgenda::Lines)?;
+        assert_eq!(ann.all_entries()?.len(), count);
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
         Ok(())
     }
 
@@ -2734,20 +2835,29 @@ pub(crate) mod tests {
         }
         assert!(lists.may_show_on_agenda(&first)?);
         assert!(lists.may_show_on_agenda(&second)?);
-        assert!(lists.set_show_on_agenda(&shop, false).is_err());
-        assert!(lists.set_show_on_agenda(&into, false).is_err());
+        assert!(lists.set_on_agenda(&shop, ListOnAgenda::Off).is_err());
+        assert!(lists.set_on_agenda(&into, ListOnAgenda::Off).is_err());
         assert_eq!(choices(&ann)?.1, 0);
         Ok(())
     }
 
     #[test]
-    fn an_agenda_choice_no_app_writes_reads_as_on() -> TestResult {
+    fn an_agenda_choice_no_app_writes_or_none_reads_as_every_open_line() -> TestResult {
         let ann = device(1, "Ann")?;
         let trip = checklist(&ann, "Trip\nTent", None)?;
         let entity = format!("{}{trip}", keys::AGENDA_PREFIX);
-        for value in ["OFF", "off ", "false", ""] {
-            ann.append(&entity, keys::AGENDA, Some(value), None)?;
-            assert!(Checklists::new(&ann).shows_on_agenda(&trip)?, "{value}");
+        for value in [
+            Some("OFF"),
+            Some("off "),
+            Some("false"),
+            Some(""),
+            Some("Count"),
+            Some("on"),
+            None,
+        ] {
+            ann.append(&entity, keys::AGENDA, value, None)?;
+            let shows = Checklists::new(&ann).on_agenda(&trip)?;
+            assert_eq!(shows, ListOnAgenda::Lines, "{value:?}");
         }
         assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
         Ok(())
@@ -2760,18 +2870,18 @@ pub(crate) mod tests {
         exchange(&ben, &ann)?;
         assert_eq!(agenda_rows(&ben)?, ["Trip: 2 of 2"]);
         // Ben, a Member, may switch off a list he did not write.
-        Checklists::new(&ben).set_show_on_agenda(&trip, false)?;
+        Checklists::new(&ben).set_on_agenda(&trip, ListOnAgenda::Off)?;
         assert!(agenda_rows(&ben)?.is_empty());
         exchange(&ben, &ann)?;
         assert_eq!(agenda_rows(&ann)?, ["Trip: 2 of 2"]);
         assert_eq!(choices(&ann)?.1, 0);
-        // And Ann hers: Ben's stays on.
-        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
-        Checklists::new(&ben).set_show_on_agenda(&trip, true)?;
+        // And Ann hers: Ben's shows its count.
+        Checklists::new(&ann).set_on_agenda(&trip, ListOnAgenda::Off)?;
+        Checklists::new(&ben).set_on_agenda(&trip, ListOnAgenda::Count)?;
         exchange(&ben, &ann)?;
         exchange(&ann, &ben)?;
         assert!(agenda_rows(&ann)?.is_empty());
-        assert_eq!(agenda_rows(&ben)?, ["Trip: 2 of 2"]);
+        assert_eq!(agenda_rows(&ben)?, ["Trip: 2 of 2 as count"]);
         assert_eq!(choices(&ann)?.0, [ann.device_id()?]);
         assert_eq!(choices(&ben)?.0, [ben.device_id()?]);
         Ok(())
@@ -2783,12 +2893,12 @@ pub(crate) mod tests {
         let desk = device(3, "Ann at the desk")?;
         own_exchange(&desk, &ann)?;
         let trip = checklist(&ann, "Trip\nTent", None)?;
-        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+        Checklists::new(&ann).set_on_agenda(&trip, ListOnAgenda::Off)?;
         own_exchange(&desk, &ann)?;
         assert!(agenda_rows(&desk)?.is_empty());
-        Checklists::new(&desk).set_show_on_agenda(&trip, true)?;
+        Checklists::new(&desk).set_on_agenda(&trip, ListOnAgenda::Count)?;
         send(&desk, &ann)?;
-        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
+        assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1 as count"]);
         Ok(())
     }
 
@@ -2811,10 +2921,10 @@ pub(crate) mod tests {
             &mut ImportReport::default(),
         )?;
         assert_eq!(choices(&ann)?, (vec![ben.device_id()?], 1));
-        assert!(Checklists::new(&ann).shows_on_agenda(&trip)?);
+        assert_eq!(Checklists::new(&ann).on_agenda(&trip)?, ListOnAgenda::Lines);
         assert_eq!(agenda_rows(&ann)?, ["Trip: 1 of 1"]);
         // Nor does it stop her switching it off herself.
-        Checklists::new(&ann).set_show_on_agenda(&trip, false)?;
+        Checklists::new(&ann).set_on_agenda(&trip, ListOnAgenda::Off)?;
         assert!(agenda_rows(&ann)?.is_empty());
         Ok(())
     }

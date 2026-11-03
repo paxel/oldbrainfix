@@ -161,6 +161,24 @@ void main() {
       });
     }
 
+    testWidgets('in Simple fans out Note, Checklist and Shopping List only, '
+        'and a Tally made before stays', (tester) async {
+      final pushUps = notes.capture('Push-ups', place: home.id);
+      Tallies(store).addField(pushUps.id, name: 'Push-ups', unit: 'times');
+      store.advanced = false;
+      await openPage(tester, _Page.area);
+      expect(find.text('Push-ups'), findsWidgets);
+      await tap(tester, find.byTooltip('Add here'));
+      for (final kind in NewKind.values) {
+        expect(key('addFan-${kind.name}'), switch (kind) {
+          NewKind.note ||
+          NewKind.checklist ||
+          NewKind.shopping => findsOneWidget,
+          _ => findsNothing,
+        }, reason: kind.name);
+      }
+    });
+
     testWidgets('a Topic still comes from the Area\'s fan', (tester) async {
       await openPage(tester, _Page.area);
       await pick(tester, NewKind.topic);
@@ -188,6 +206,19 @@ void main() {
         await openPage(tester, page);
         await pick(tester, NewKind.checklist);
         await name(tester, 'Before the trip');
+        // Its name on top, the kind's content under it (#188).
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: key('note-name'),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller!
+              .text,
+          'Before the trip',
+        );
         expect(find.byType(NoteEditorScreen), findsOneWidget);
         // The cursor waits in its first Line.
         final line = find.descendant(
@@ -224,6 +255,19 @@ void main() {
         await openPage(tester, page);
         await pick(tester, NewKind.shopping);
         await name(tester, 'Groceries');
+        // Its name on top, the kind's content under it (#188).
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: key('note-name'),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller!
+              .text,
+          'Groceries',
+        );
         // The cursor waits in its first Line, as a Checklist's (#184).
         expect(key('shopping-add-text'), findsNothing);
         final line = find.descendant(
@@ -315,13 +359,16 @@ void main() {
       // largest, a time the sum.
       Finder badge(String badge, String text) =>
           find.descendant(of: key(badge), matching: find.text(text));
-      expect(badge('tally-form-rule-0', 'Sum'), findsOneWidget);
-      expect(badge('tally-form-rule-1', 'Largest'), findsOneWidget);
+      // The rule as its icon (#192).
+      Finder rule(String badge, IconData icon) =>
+          find.descendant(of: key(badge), matching: find.byIcon(icon));
+      expect(rule('tally-form-rule-0', Icons.add_circle_outline), findsOne);
+      expect(rule('tally-form-rule-1', Icons.vertical_align_top), findsOne);
       expect(badge('tally-form-unit-1', '°'), findsOneWidget);
       expect(badge('tally-form-target-0', '2 min'), findsOneWidget);
       await tap(tester, key('tally-form-rule-0'));
       await tap(tester, key('tally-rule-max'));
-      expect(badge('tally-form-rule-0', 'Largest'), findsOneWidget);
+      expect(rule('tally-form-rule-0', Icons.vertical_align_top), findsOne);
 
       await tap(tester, key('tally-form-save'));
       final fields = Tallies(store).byNote(only().id)!.fields;
@@ -438,7 +485,16 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('Schedule'), findsWidgets);
       final allDay = find.widgetWithText(Chip, 'All day');
-      await tester.scrollUntilVisible(allDay, 200);
+      await tester.scrollUntilVisible(
+        allDay,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(allDay, findsOneWidget);
       await tap(tester, find.text('Save'));
       expect(find.byType(SessionFormScreen), findsOneWidget);

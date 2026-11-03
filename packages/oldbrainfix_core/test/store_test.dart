@@ -4,6 +4,8 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
+import 'shared_areas_test.dart' show exchange, ticking;
+
 void main() {
   test('own entries are signed and verify under the Device key', () {
     final store = Store.inMemory();
@@ -21,6 +23,64 @@ void main() {
     );
     expect(verifySignature(store.signingKey.publicKey, bytes, e.sig), isTrue);
     expect(store.deviceId, deviceIdFromKey(store.signingKey.publicKey));
+  });
+
+  test('reads the fields of many entities in one query as one by one '
+      '(#204)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    store.append('note:a', 'text', 'new', date: DateTime.utc(2026, 5, 2));
+    store.append('note:a', 'text', 'old', date: DateTime.utc(2026, 5, 1));
+    store.append('note:a', 'place', 'home');
+    store.append('note:b', 'text', 'b');
+    store.append('note:b', 'text', null);
+    final ids = [for (var i = 0; i < 1200; i++) 'note:x$i'];
+    for (final id in ids) {
+      store.append(id, 'text', id);
+    }
+    // Shown pending changes count as they do one by one.
+    final set = store.openPending('ai-task', shown: true);
+    store.draftPending(set, 'note:a', 'place', 'work');
+    store.draftPending(set, 'note:c', 'text', 'drafted');
+    final all = ['note:a', 'note:b', 'note:c', 'note:none', ...ids];
+    final before = store.historyReads;
+    final read = store.currentFieldsOf(all);
+    expect(store.historyReads - before, 1);
+    expect(read.keys, isNot(contains('note:none')));
+    expect(read, {
+      for (final id in all)
+        if (store.currentFields(id) case final fields when fields.isNotEmpty)
+          id: fields,
+    });
+    expect(read['note:a'], {'text': 'new', 'place': 'work'});
+    expect(read['note:c'], {'text': 'drafted'});
+    expect(store.currentFieldsOf(const []), isEmpty);
+  });
+
+  test('reads the fields of every entity of a type in one query as one '
+      'by one (#216)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    for (var i = 0; i < 30; i++) {
+      store.append('thing:$i', r'$type', 'thing');
+      store.append('thing:$i', 'text', 't$i');
+    }
+    store.append('thing:0', r'$type', 'other');
+    store.append('other:a', r'$type', 'other');
+    // Shown pending changes count as they do one by one.
+    final set = store.openPending('ai-task', shown: true);
+    store.draftPending(set, 'thing:new', r'$type', 'thing');
+    store.draftPending(set, 'thing:1', 'text', 'drafted');
+    final before = store.historyReads;
+    final read = store.currentFieldsOfType('thing');
+    expect(store.historyReads - before, 1);
+    expect(read, {
+      for (final id in store.entitiesOfType('thing'))
+        id: store.currentFields(id),
+    });
+    expect(read.keys, isNot(contains('thing:0')));
+    expect(read['thing:1'], {r'$type': 'thing', 'text': 'drafted'});
+    expect(read.keys, contains('thing:new'));
   });
 
   test('the latest date wins, not the latest append', () {
@@ -97,6 +157,43 @@ void main() {
     addTearDown(second.close);
     expect(second.deviceId, device);
     expect(second.current('note:a', 'text'), 'kept');
+  });
+
+  test('a sync through another connection to the same file shows once '
+      'that one says so (#225)', () {
+    final dir = Directory.systemTemp.createTempSync('obf');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/oldbrainfix.db';
+    final clock = ticking();
+    final ui = Store.open(path, clock: clock)
+      ..applyProfileDefaults(name: 'Ann');
+    addTearDown(ui.close);
+    var told = 0;
+    var profile = 0;
+    ui.addListener(() => told++);
+    ui.addProfileListener(() => profile++);
+    // The sync's own connection, as its isolate opens it.
+    final sync = Store.open(path, clock: clock);
+    addTearDown(sync.close);
+    expect(sync.deviceId, ui.deviceId);
+    final ben = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ben');
+    addTearDown(ben.close);
+    final house = ui.share(Places(ui).addArea('Household').id);
+    told = 0;
+    expect(ui.keptPeople, isEmpty);
+    exchange(ben, sync, inviting: Invite(house, role: AreaRole.member));
+    Notes(ben).capture('From Ben', place: house);
+    exchange(ben, sync);
+    expect(told, 0, reason: 'the other connection told only its own');
+    expect(ui.keptPeople, isEmpty, reason: 'what was read stays until told');
+    ui.changedElsewhere(profile: true);
+    expect(told, 1);
+    expect(profile, 1);
+    expect(ui.keptPeople.map((p) => p.name), ['Ben']);
+    expect([for (final n in Notes(ui).all()) n.text], contains('From Ben'));
+    ui.changedElsewhere();
+    expect(told, 2);
+    expect(profile, 1, reason: 'only when the Profiles changed');
   });
 
   group('the database version', () {

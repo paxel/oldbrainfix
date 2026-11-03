@@ -1,0 +1,59 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Take the pills",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:22.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Water the plants",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:40.000Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "Water the plants",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:36.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Garden",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

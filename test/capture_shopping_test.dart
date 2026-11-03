@@ -68,7 +68,7 @@ void main() {
   /// The Lines of the Shopping List [id] as they show: `~text` for a
   /// struck one.
   List<String> shown(String id) => [
-    for (final line in lists.byNote(id, deviceWallClock)?.lines ?? const [])
+    for (final line in [...?lists.byNote(id, deviceWallClock)?.lines])
       '${line.struck ? '~' : ''}${line.text}',
   ];
 

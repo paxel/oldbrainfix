@@ -1,0 +1,254 @@
+{
+  "now": "2026-01-02T10:00:56.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:help-00000000000000000000000000000001",
+      "name": "Old Brain Fix",
+      "starter": null,
+      "colour": "00796B",
+      "icon": "brain",
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:help-00000000000000000000000000000001-icons",
+      "text": "What the icons mean\n\nKind: what the Note is",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:25.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:help-00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:47.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-quick-start",
+      "text": "Quick start",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:07.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:help-00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:31.000Z",
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+      "text": "What's new in 0.4.0\n\nAdded\n• Help Notes.",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:38.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:help-00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:43.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+      "text": "Neu in 0.4.1\n\nBehoben\n• Eine Sache.",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:33.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:help-00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:45.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:help-00000000000000000000000000000001-whats-new-0.5.0",
+      "text": "What's new in 0.5.0\n\nAdded\n• More.",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:52.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:help-00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0"
+  ],
+  "unsorted": [],
+  "trashed": [
+    "note:help-00000000000000000000000000000001-icons",
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1",
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0",
+    "note:help-00000000000000000000000000000001-quick-start"
+  ],
+  "inside": {
+    "area:help-00000000000000000000000000000001": [
+      "note:help-00000000000000000000000000000001-whats-new-0.5.0"
+    ]
+  },
+  "sections": {
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0": [],
+    "note:help-00000000000000000000000000000001-icons": [],
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1": [],
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0": [],
+    "note:help-00000000000000000000000000000001-quick-start": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "What's new in 0.5.0\n\nAdded\n• More."
+    },
+    "note:help-00000000000000000000000000000001-icons": {
+      "html": null,
+      "photos": [
+        "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85"
+      ],
+      "recordings": [],
+      "text": "What the icons mean\n\nKind: what the Note is"
+    },
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Neu in 0.4.1\n\nBehoben\n• Eine Sache."
+    },
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "What's new in 0.4.0\n\nAdded\n• Help Notes."
+    },
+    "note:help-00000000000000000000000000000001-quick-start": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Quick start"
+    }
+  },
+  "search": {
+    "": [
+      "note:help-00000000000000000000000000000001-whats-new-0.5.0"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:help-00000000000000000000000000000001-whats-new-0.5.0"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:help-00000000000000000000000000000001": [
+      "note:help-00000000000000000000000000000001-whats-new-0.5.0"
+    ]
+  },
+  "conflicts": []
+}

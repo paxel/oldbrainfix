@@ -206,14 +206,17 @@ abstract final class TextBoxes {
   /// [text] in [format] as it is saved: every bare ☐, ✅ or ❌, one not
   /// part of another emoji, becomes a box with a new id, and a box whose
   /// id came up before in the text gets a new one. In a formatted text
-  /// a glyph in inline code or in a link's address stays as it is. Each
-  /// id is drawn from [newId], the store's maker of entity ids, again
-  /// while it is in the text already.
+  /// a glyph in inline code, in a code block or in a link's address stays
+  /// as it is, and in any text one in a web address (#222); a code text
+  /// (#213) has no boxes and stays as it is. Each
+  /// id is drawn from [newId], the store's maker of entity
+  /// ids, again while it is in the text already.
   static String convert(
     String text, {
     String format = TextFormats.plain,
     required String Function() newId,
   }) {
+    if (format == TextFormats.code) return text;
     final found = _scan(text);
     if (found.every((b) => b.id != null && !b.repeated)) return text;
     final used = {
@@ -222,7 +225,7 @@ abstract final class TextBoxes {
     };
     final skipped = format == TextFormats.markdown
         ? _literalRanges(text)
-        : const <(int, int)>[];
+        : Markdown.plainAutolinks(text);
     final out = StringBuffer();
     var from = 0;
     for (final b in found) {
@@ -334,27 +337,8 @@ abstract final class TextBoxes {
     ]);
   }
 
-  /// Where a glyph of the formatted text [text] is no box: inline code
-  /// and links' addresses, as (start, end).
-  static List<(int, int)> _literalRanges(String text) {
-    final ranges = <(int, int)>[];
-    void walk(List<MarkdownSpan> spans) {
-      for (final s in spans) {
-        switch (s.kind) {
-          case MarkdownSpanKind.code:
-            ranges.add((s.start, s.end));
-          case MarkdownSpanKind.link:
-            ranges.add((s.contentEnd, s.end));
-            walk(s.children);
-          default:
-            walk(s.children);
-        }
-      }
-    }
-
-    for (final block in Markdown.parse(text)) {
-      walk(block.spans);
-    }
-    return ranges;
-  }
+  /// Where a glyph of the formatted text [text] is no box: inline code,
+  /// a code block, links' addresses and web addresses, as (start, end).
+  static List<(int, int)> _literalRanges(String text) =>
+      Markdown.literalRanges(text);
 }

@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
@@ -167,6 +168,7 @@ class _TableScreenState extends State<TableScreen> {
   MarkdownTable? _table;
   List<DrawnBox> _boxes = const [];
   List<FoundTag> _tags = const [];
+  List<(int, int)> _links = const [];
 
   /// The ticks of the boxes, read again after each tick here.
   late BoxTicking? _ticking = _watched(widget.ticking);
@@ -220,6 +222,7 @@ class _TableScreenState extends State<TableScreen> {
     _table = MarkdownTables.at(_text, _at);
     _boxes = storedBoxes(_text, _ticking);
     _tags = Markdown.tags(_text);
+    _links = Markdown.autolinks(_text);
   }
 
   /// [ticking] telling this screen of each tick too.
@@ -436,10 +439,12 @@ class _TableScreenState extends State<TableScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(t.tableHeadingColumn),
-                      Switch(
-                        value: table.headingColumn,
-                        onChanged: (_) =>
-                            Navigator.of(context).pop(_Op.headings),
+                      LookGrown(
+                        child: Switch(
+                          value: table.headingColumn,
+                          onChanged: (_) =>
+                              Navigator.of(context).pop(_Op.headings),
+                        ),
                       ),
                     ],
                   ),
@@ -713,6 +718,7 @@ class _TableScreenState extends State<TableScreen> {
         table.rows[r].cells[c],
         boxes: _boxes,
         tags: _tags,
+        links: _links,
         style: style,
         textAlign: cellAlign(table.aligns[c]),
         ticking: _ticking,

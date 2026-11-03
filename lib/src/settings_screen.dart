@@ -14,6 +14,8 @@ import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
 import 'failure_dialog.dart';
+import 'features_choice.dart';
+import 'feedback_screen.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
 import 'keep_import.dart';
@@ -38,18 +40,19 @@ enum _UnitChoice { region, metric, imperial }
 enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme; the units of Tallies; the alarm setup, the default Re-nag interval and the
+/// page: the theme and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
 /// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; and About. Each is a local setting, never synced,
+/// Google Keep export; Send feedback (#214); and About. Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
 
-  /// Called after the theme was changed, to show it at once.
+  /// Called after the theme or "Fat fingers" was changed, to show it at
+  /// once.
   final VoidCallback? onThemeChanged;
 
   /// The notes browser's way back in, which the Area an Import made
@@ -70,10 +73,15 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late ThemeChoice _theme = widget.store.themeChoice;
+  late bool _fatFingers = widget.store.fatFingers;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
+  late bool _hidesChecked = widget.store.agendaHidesChecked;
+  late bool _trashesDone = widget.store.trashesDoneReminder;
+  late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
+  late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
     null => _UnitChoice.region,
     UnitSystem.metric => _UnitChoice.metric,
@@ -91,9 +99,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onThemeChanged?.call();
   }
 
+  void _setFatFingers(bool on) {
+    widget.store.fatFingers = on;
+    setState(() => _fatFingers = on);
+    widget.onThemeChanged?.call();
+    // The widget's text grows with it.
+    unawaited(widget.alarms.refresh());
+  }
+
   void _setRenag(Duration interval) {
     widget.store.renagInterval = interval;
     setState(() => _renag = interval);
+    unawaited(widget.alarms.refresh());
+  }
+
+  /// Picks from when all-day items ring (#201); backing out changes
+  /// nothing.
+  Future<void> _pickAllDayFrom() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: _allDayFrom.hour,
+        minute: _allDayFrom.minute,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    widget.store.allDayFrom = ClockTime(picked.hour, picked.minute);
+    setState(() => _allDayFrom = widget.store.allDayFrom);
     unawaited(widget.alarms.refresh());
   }
 
@@ -116,6 +148,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _UnitChoice.imperial => UnitSystem.imperial,
     };
     setState(() => _units = choice);
+  }
+
+  void _setHidesChecked(bool on) {
+    widget.store.agendaHidesChecked = on;
+    setState(() => _hidesChecked = on);
+  }
+
+  /// The person's own setting, on all of their own Devices (#211).
+  void _setTrashesDone(bool on) {
+    widget.store.trashesDoneReminder = on;
+    setState(() => _trashesDone = on);
+  }
+
+  /// Simple or Advanced (#197), the person's own, on all of their own
+  /// Devices.
+  void _setAdvanced(bool on) {
+    widget.store.advanced = on;
+    setState(() => _advanced = on);
   }
 
   void _setStreaks(bool on) {
@@ -455,7 +505,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsHeading(t.settingsLook),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: RadioColumn<ThemeChoice>(
+              child: ChoiceChips<ThemeChoice>(
                 key: const ValueKey('theme'),
                 value: _theme,
                 options: [
@@ -477,6 +527,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 onChanged: _setTheme,
               ),
+            ),
+            SettingsSection(
+              children: [
+                SwitchBelow(
+                  switchKey: const ValueKey('fatFingers'),
+                  leading: const Icon(Icons.touch_app_outlined),
+                  value: _fatFingers,
+                  onChanged: _setFatFingers,
+                  title: Text(t.fatFingers),
+                  subtitle: Text(t.fatFingersDetail),
+                ),
+              ],
             ),
             SettingsHeading(t.settingsUnits),
             Padding(
@@ -513,6 +575,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: _setUnits,
               ),
             ),
+            SettingsHeading(t.settingsAgenda),
+            SettingsSection(
+              children: [
+                SwitchBelow(
+                  switchKey: const ValueKey('agendaHideChecked'),
+                  leading: const Icon(Icons.playlist_remove),
+                  value: _hidesChecked,
+                  onChanged: _setHidesChecked,
+                  title: Text(t.hideCheckedOnAgenda),
+                  subtitle: Text(t.hideCheckedOnAgendaDetail),
+                ),
+                SwitchBelow(
+                  switchKey: const ValueKey('trashDoneReminder'),
+                  leading: const Icon(Icons.auto_delete_outlined),
+                  value: _trashesDone,
+                  onChanged: _setTrashesDone,
+                  title: Text(t.trashDoneReminder),
+                  subtitle: Text(t.trashDoneReminderDetail),
+                ),
+              ],
+            ),
             SettingsHeading(t.settingsAlarms),
             SettingsSection(
               children: [
@@ -535,7 +618,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.repeat),
                   title: Text(t.renagDevice),
                   subtitle: Text(t.settingsRenagDetail),
-                  control: RadioColumn<int>(
+                  control: ChoiceChips<int>(
                     key: const ValueKey('renagDevice'),
                     value: renag,
                     onChanged: (minutes) =>
@@ -545,6 +628,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         RadioOption(value: m, title: Text(t.renagMinutes(m))),
                     ],
                   ),
+                ),
+                ListTile(
+                  key: const ValueKey('allDayFrom'),
+                  leading: const Icon(Icons.wb_sunny_outlined),
+                  title: Text(t.allDayFrom),
+                  subtitle: Text(t.allDayFromDetail),
+                  trailing: Text(
+                    clockText(
+                      Localizations.localeOf(context).toString(),
+                      _allDayFrom,
+                    ),
+                  ),
+                  onTap: _pickAllDayFrom,
                 ),
                 if (widget.alarms.platform.available)
                   ListTile(
@@ -589,7 +685,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             SettingsHeading(t.settingsQuickNote),
-            _QuickNoteSettings(store: widget.store),
+            _QuickNoteSettings(store: widget.store, advanced: _advanced),
             if (hasCalendarPage(context)) ...[
               SettingsHeading(t.settingsCalendar),
               SettingsSection(
@@ -663,9 +759,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ],
+            // The person's own, on all of their own Devices (#197): after
+            // the settings of this phone, before About.
+            SettingsHeading(t.features),
+            FeaturesChoice(advanced: _advanced, onChanged: _setAdvanced),
             const SizedBox(height: 16),
             SettingsSection(
               children: [
+                ListTile(
+                  key: const ValueKey('sendFeedback'),
+                  leading: const Icon(Icons.feedback_outlined),
+                  title: Text(t.feedbackTitle),
+                  subtitle: Text(t.feedbackSettingsDetail),
+                  onTap: () => _push(FeedbackScreen(store: widget.store)),
+                ),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: Text(t.aboutTitle),
@@ -774,7 +881,7 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
         ControlBelow(
           leading: const Icon(Icons.notifications_paused_outlined),
           title: Text(t.nudgeRepeat),
-          control: RadioColumn<int>(
+          control: ChoiceChips<int>(
             key: const ValueKey('nudgeRepeat'),
             value: repeat,
             onChanged: (minutes) {
@@ -825,7 +932,10 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
 class _QuickNoteSettings extends StatefulWidget {
   final Store store;
 
-  const _QuickNoteSettings({required this.store});
+  /// Whether the format bar's switch shows: only in Advanced (#197).
+  final bool advanced;
+
+  const _QuickNoteSettings({required this.store, required this.advanced});
 
   @override
   State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
@@ -870,22 +980,26 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
           Icons.drive_file_move_outline,
           t.fileInto,
         ),
-        shows(
-          QuickNoteControl.schedule,
-          Icons.alarm_add_outlined,
-          t.quickNoteSchedule,
-        ),
+        // The alarm clock offers a Routine or Reminder without it (#223);
+        // Frogs, Sessions and Tallies are made only in Advanced (#197).
+        if (widget.advanced)
+          shows(
+            QuickNoteControl.schedule,
+            Icons.alarm_add_outlined,
+            t.quickNoteSchedule,
+          ),
         shows(
           QuickNoteControl.shopping,
           Icons.add_shopping_cart,
           t.addToShoppingList,
         ),
         shows(QuickNoteControl.importance, Icons.priority_high, t.importance),
-        shows(
-          QuickNoteControl.formatBar,
-          Icons.format_bold,
-          t.quickNoteFormatBar,
-        ),
+        if (widget.advanced)
+          shows(
+            QuickNoteControl.formatBar,
+            Icons.format_bold,
+            t.quickNoteFormatBar,
+          ),
         SwitchBelow(
           switchKey: const ValueKey('quickNote-nudgeButtons'),
           leading: const Icon(Icons.snooze),

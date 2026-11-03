@@ -232,19 +232,19 @@ void main() {
       expect(checkbox(tester, soap), isFalse);
     });
 
-    testWidgets('a compact card shows how many are checked; "Uncheck all" '
+    testWidgets('a compact card shows how many are open (#189); "Uncheck all" '
         'in the ⋮ unchecks them', (tester) async {
       final note = notes.capture('Shop\n✓ Milk\nEggs\n✓ Tea').id;
       lists.make(note);
       await startAtNotes(tester);
       await tap(tester, key('compactNotes'));
-      expect(find.text('2 of 3 checked'), findsOneWidget);
+      expect(find.text('1 of 3 open'), findsOneWidget);
       expect(find.byType(Checkbox), findsNothing);
 
       await cardMenu(tester);
       await tap(tester, key('note-uncheck-all'));
       expect(shown(note), ['Milk', 'Eggs', 'Tea']);
-      expect(find.text('0 of 3 checked'), findsOneWidget);
+      expect(find.text('3 of 3 open'), findsOneWidget);
       await cardMenu(tester);
       // Nothing left to uncheck.
       expect(key('note-uncheck-all'), findsNothing);
@@ -273,18 +273,25 @@ void main() {
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     }
 
+    /// Makes the Note the kind [kind] through its kind badge (#188).
+    Future<void> pickKind(WidgetTester tester, NoteKind kind) async {
+      await tester.ensureVisible(key('badge-kind'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('badge-kind'));
+      await tap(tester, key('kind-${kind.name}'));
+    }
+
     Future<void> lineMenu(WidgetTester tester, String id) =>
         tap(tester, key('checklist-menu-$id'));
 
-    testWidgets('"Make it a Checklist" makes the text as typed one; the '
-        'field keeps the title, also after leaving', (tester) async {
+    testWidgets('Checklist in the kind badge makes the text as typed one; '
+        'the name keeps the title, also after leaving', (tester) async {
       final note = notes.capture('Shop').id;
       await openEditor(tester, 'Shop');
       await tester.enterText(find.byType(TextField).first, 'Shop\nMilk\nEggs');
-      await tap(tester, key('checklist-make'));
+      await pickKind(tester, NoteKind.checklist);
       expect(shown(note), ['Milk', 'Eggs']);
       expect(key('checklist'), findsOneWidget);
-      expect(key('checklist-make'), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField).first).controller!.text,
         'Shop',
@@ -366,7 +373,7 @@ void main() {
         'Return makes the next, and the only Line stays', (tester) async {
       final note = notes.capture('Trip').id;
       await openEditor(tester, 'Trip');
-      await tap(tester, key('checklist-make'));
+      await pickKind(tester, NoteKind.checklist);
       expect(shown(note), isEmpty);
       expect(key('checklist-field-new-1'), findsOneWidget);
       expect(cursor(tester), ('', 0));
@@ -542,6 +549,38 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
     });
 
+    testWidgets('a Line just typed has its ⋮ once it holds text, and each '
+        'entry stores it first (#202)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nEggs').id;
+      lists.make(note);
+      await openEditor(tester, 'Shop');
+      final eggs = idOf(note, 'Eggs');
+
+      // An empty new Line has nothing to act on.
+      await type(tester, eggs, 'Eggs\n', 5);
+      expect(key('checklist-menu-new-1'), findsNothing);
+      await type(tester, 'new-1', 'Tea', 3);
+      expect(shown(note), ['Milk', 'Eggs']);
+      expect(key('checklist-menu-new-1'), findsOneWidget);
+      await lineMenu(tester, 'new-1');
+      await tap(tester, key('checklist-up'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs']);
+
+      await type(tester, eggs, 'Eggs\n', 5);
+      await type(tester, 'new-2', 'Soap', 4);
+      await lineMenu(tester, 'new-2');
+      await tap(tester, key('checklist-indent'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
+
+      await type(tester, idOf(note, 'Soap'), 'Soap\n', 5);
+      await type(tester, 'new-3', 'Salt', 4);
+      await lineMenu(tester, 'new-3');
+      await tap(tester, key('checklist-delete'));
+      await tap(tester, key('checklist-delete-confirm'));
+      expect(shown(note), ['Milk', 'Tea', 'Eggs', '  Soap']);
+      expect(key('checklist-field-new-3'), findsNothing);
+    });
+
     testWidgets('checks and "Uncheck all" there too, "Back to a plain Note" '
         'in its kind badge; the field then holds the whole text', (
       tester,
@@ -558,8 +597,7 @@ void main() {
       expect(shown(note), ['Milk', 'Eggs']);
 
       await tap(tester, key('checklist-check-$milk'));
-      await tap(tester, key('badge-kind'));
-      await tap(tester, key('kind-to-plain'));
+      await pickKind(tester, NoteKind.plain);
       expect(lists.isChecklist(note), isFalse);
       expect(key('checklist'), findsNothing);
       expect(

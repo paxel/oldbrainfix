@@ -452,6 +452,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noteGone => 'Die Notiz gibt es nicht mehr';
 
   @override
+  String get scheduleSentenceLabel => 'Wann';
+
+  @override
+  String get scheduleSentenceHint => 'Jeden Tag um 08:00';
+
+  @override
+  String get scheduleSentenceUnknown =>
+      'Markierte Wörter werden nicht verstanden und ändern nichts.';
+
+  @override
+  String get scheduleSentenceAdvanced => 'Wechsle zu Einfach, um zu tippen.';
+
+  @override
   String get scheduleSimple => 'Einfach';
 
   @override
@@ -945,7 +958,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nudgeSettingsExplain =>
-      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich.';
+      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich; nur eine ganztägige wartet, bis sie endet.';
 
   @override
   String get nudgeRepeat => 'Erneut stupsen nach';
@@ -1447,7 +1460,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsIntro =>
-      'Diese Einstellungen gelten nur für dieses Handy und werden nie synchronisiert.';
+      'Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; die anderen Einstellungen gelten nur für dieses Handy.';
 
   @override
   String get settingsLook => 'Aussehen';
@@ -1462,6 +1475,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get themeDark => 'Dunkel';
 
   @override
+  String get fatFingers => 'Dicke Finger';
+
+  @override
+  String get fatFingersDetail =>
+      'Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.';
+
+  @override
   String get settingsAlarms => 'Alarme';
 
   @override
@@ -1471,6 +1491,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsRenagDetail =>
       'Wie oft ein unbeachteter Alarm erneut klingelt, wenn seine Routine keinen eigenen Abstand hat.';
+
+  @override
+  String get allDayFrom => 'Ganztägiges erinnert ab';
+
+  @override
+  String get allDayFromDetail =>
+      'Vorher steht eine ganztägige Routine oder Erinnerung nur auf der Agenda. Ab dieser Uhrzeit klingelt sie und erinnert erneut. Die Ruhezeit geht vor.';
 
   @override
   String get alarmSound => 'Alarmton';
@@ -1853,7 +1880,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncSettingsStay =>
-      'Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.';
+      'Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; andere Einstellungen bleiben auf jedem Gerät.';
 
   @override
   String get syncAutomatically => 'Automatisch synchronisieren';
@@ -2653,7 +2680,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDeviceSettingsDetail =>
-      'Sie gelten nur für dieses Gerät und werden nie synchronisiert.';
+      'Die meisten gelten nur für dieses Gerät; Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert.';
 
   @override
   String get profileWhichTitle => 'Welches Profil bist du?';
@@ -2762,7 +2789,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get crashLastRunBody =>
-      'Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken.';
+      'Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe für Details.';
+
+  @override
+  String get crashLastRunTitle => 'Old Brain Fix wurde unerwartet beendet';
+
+  @override
+  String get crashLastRunErrorCause =>
+      'Der letzte Lauf endete mit einem Fehler oder wurde vom System beendet; der Text unten sagt, wie.';
+
+  @override
+  String get crashLastRunKilledCause =>
+      'Der letzte Lauf wurde auf dem Bildschirm beendet, ohne einen Fehler zu hinterlassen, wahrscheinlich weil dem Telefon der Speicher knapp wurde.';
+
+  @override
+  String get crashLastRunFix =>
+      'Deine gespeicherten Notizen sind sicher. „Melden“ schickt diesen Text per Mail an den Entwickler; „Schließen“ schickt nichts.';
 
   @override
   String get sendToPerson => 'An eine Person senden';
@@ -3324,8 +3366,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get checklistHeading => 'Checkliste';
 
   @override
-  String checklistCount(int checked, int count) {
-    return '$checked von $count abgehakt';
+  String checklistOpenCount(int open, int count) {
+    return '$open von $count offen';
+  }
+
+  @override
+  String shoppingStruckCount(int count) {
+    return '$count durchgestrichen';
+  }
+
+  @override
+  String tallyCardTotal(String field, String total, String target) {
+    return '$field $total / $target';
+  }
+
+  @override
+  String tallyCardTotalOnly(String field, String total) {
+    return '$field $total';
+  }
+
+  @override
+  String sessionCardNext(String when) {
+    return 'Als Nächstes: $when';
+  }
+
+  @override
+  String sessionCardWeek(int done, int skipped) {
+    return 'diese Woche $done erledigt / $skipped ausgelassen';
+  }
+
+  @override
+  String get sessionHistory => 'Letzte 4 Wochen';
+
+  @override
+  String sessionHistoryWeek(String day, int done, int skipped) {
+    return 'Woche ab $day: $done erledigt / $skipped ausgelassen';
   }
 
   @override
@@ -3377,6 +3452,65 @@ class AppLocalizationsDe extends AppLocalizations {
       one: '1 Woche',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get shoppingReappearNone => 'Keine';
+
+  @override
+  String get shoppingReappearAfter => 'Nach';
+
+  @override
+  String shoppingDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Tage',
+      one: '1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Monate',
+      one: '1 Monat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Jahre',
+      one: '1 Jahr',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingShortDays(int count) {
+    return '${count}T';
+  }
+
+  @override
+  String shoppingShortWeeks(int count) {
+    return '${count}W';
+  }
+
+  @override
+  String shoppingShortMonths(int count) {
+    return '${count}M';
+  }
+
+  @override
+  String shoppingShortYears(int count) {
+    return '${count}J';
   }
 
   @override
@@ -3542,6 +3676,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyNoTarget => 'Kein Ziel';
 
   @override
+  String get tallyMultiplies => 'Multipliziert';
+
+  @override
+  String get tallyMultipliesNothing => 'Nichts';
+
+  @override
+  String get tallyMultipliesDetail =>
+      'In jedem Eintrag multipliziert sein Wert das gewählte Feld, etwa 3 Runden × 10 Liegestütze zu 30 Liegestützen. Es zählt dann keinen eigenen Wert: keine Summe, kein Diagramm, kein Ziel.';
+
+  @override
+  String tallyTimes(String factor, String value) {
+    return '$factor × $value';
+  }
+
+  @override
   String get tallyFields => 'Felder';
 
   @override
@@ -3608,12 +3757,15 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String tallyTargetValue(String value) {
-    return 'Ziel $value';
+  String tallyOlderEntries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ältere Einträge',
+      one: '1 älterer Eintrag',
+    );
+    return '$_temp0';
   }
-
-  @override
-  String get tallyMoreEntries => 'Mehr zeigen';
 
   @override
   String get tallyRemovedEntries => 'Entfernte Einträge';
@@ -3671,6 +3823,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sessionPoolMissing => 'Wähle mindestens eine Strichliste.';
+
+  @override
+  String sessionPoolHidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weitere angehakt, vom Filter ausgeblendet',
+      one: '1 weitere angehakt, vom Filter ausgeblendet',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get sessionSchedule => 'Zeitplan';
@@ -3810,10 +3973,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noteBeingCaptured => 'Die Notiz, die gerade erfasst wird';
 
   @override
-  String get showNotesCompact => 'Notizen kompakt zeigen';
+  String get showNotesCompact => 'Kompaktansichten zeigen';
 
   @override
-  String get showNotesFull => 'Notizen vollständig zeigen';
+  String get showNotesFull => 'Detailansichten zeigen';
 
   @override
   String get transcriptLabel => 'Transkript';
@@ -4445,6 +4608,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get formatCode => 'Code';
 
   @override
+  String get formatCodeBlock => 'Codeblock';
+
+  @override
   String get formatIndent => 'Listenpunkt einrücken';
 
   @override
@@ -4571,7 +4737,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen und „Zum vollen Editor“. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, „Zum vollen Editor“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -4584,8 +4750,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite.';
 
   @override
-  String get quickNoteSchedule =>
-      'Routine, Erinnerung, Frosch, Einheit oder Strichliste';
+  String get quickNoteSchedule => 'Frosch, Einheit oder Strichliste';
 
   @override
   String get copyPhoto => 'Kopieren';
@@ -4830,8 +4995,543 @@ class AppLocalizationsDe extends AppLocalizations {
   String get badgeKind => 'Art';
 
   @override
+  String get kindPlain => 'Einfache Notiz';
+
+  @override
+  String get noteName => 'Name';
+
+  @override
+  String get noteDescription => 'Beschreibung';
+
+  @override
+  String get noteDescriptionUnfold => 'Ganze Beschreibung zeigen';
+
+  @override
+  String get noteDescriptionFold => 'Beschreibung einklappen';
+
+  @override
   String get settingOn => 'Ein';
 
   @override
   String get settingOff => 'Aus';
+
+  @override
+  String get settingsAgenda => 'Agenda';
+
+  @override
+  String get hideCheckedOnAgenda => 'Abgehaktes auf der Agenda ausblenden';
+
+  @override
+  String get hideCheckedOnAgendaDetail =>
+      'Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda und vom Widget, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.';
+
+  @override
+  String get trashDoneReminder =>
+      'Notiz in den Papierkorb legen, wenn ihre einmalige Erinnerung erledigt ist';
+
+  @override
+  String get trashDoneReminderDetail =>
+      '„Erledigt“ bei einer einmaligen Erinnerung, der einzigen Routine oder Erinnerung einer einfachen Notiz, legt die Notiz mit ihr in den Papierkorb, wo auch immer du sie abhakst. Listen, Strichlisten und Einheiten bleiben. Auf allen deinen eigenen Geräten gleich; Zurücknehmen holt die Notiz nicht zurück, der Papierkorb 30 Tage lang schon.';
+
+  @override
+  String occurrenceDue(String when) {
+    return 'Fällig $when';
+  }
+
+  @override
+  String occurrenceMissedAt(String when) {
+    return 'Verpasst $when';
+  }
+
+  @override
+  String get doneAndTrash => 'Erledigt und in den Papierkorb';
+
+  @override
+  String get badgeTextFormat => 'Textformat';
+
+  @override
+  String get textFormatPlain => 'Unformatierter Text';
+
+  @override
+  String get textFormatFormatted => 'Formatierter Text';
+
+  @override
+  String get textFormatCode => 'Code';
+
+  @override
+  String get codePasted => 'Das sieht nach Code aus.';
+
+  @override
+  String get keepAsCode => 'Als Code behalten';
+
+  @override
+  String get noteHistoryHint =>
+      'Jede Änderung dieser Notiz, ihrer Ergänzungen und ihrer Zeilen, die neueste zuerst.';
+
+  @override
+  String get noteHistoryCaptured => 'Erfasst';
+
+  @override
+  String get noteHistoryText => 'Text geändert';
+
+  @override
+  String get noteHistoryAmended => 'Ergänzt';
+
+  @override
+  String get noteHistoryAmendEdited => 'Ergänzung geändert';
+
+  @override
+  String get noteHistoryMergedIn => 'Notiz zusammengeführt';
+
+  @override
+  String get noteHistoryLineAdded => 'Zeile hinzugefügt';
+
+  @override
+  String get noteHistoryLineRenamed => 'Zeile umbenannt';
+
+  @override
+  String get noteHistoryLineChecked => 'Zeile abgehakt';
+
+  @override
+  String get noteHistoryLineUnchecked => 'Haken entfernt';
+
+  @override
+  String get noteHistoryLineRemoved => 'Zeile gelöscht';
+
+  @override
+  String get noteHistoryLineRestored => 'Zeile wiederhergestellt';
+
+  @override
+  String get noteHistoryTrashed => 'In den Papierkorb gelegt';
+
+  @override
+  String get noteHistoryRestored => 'Aus dem Papierkorb geholt';
+
+  @override
+  String get noteHistoryPhotoAdded => 'Foto hinzugefügt';
+
+  @override
+  String get noteHistoryPhotoRemoved => 'Foto entfernt';
+
+  @override
+  String get noteHistoryRecordingAdded => 'Aufnahme hinzugefügt';
+
+  @override
+  String get noteHistoryRecordingRemoved => 'Aufnahme entfernt';
+
+  @override
+  String get noteHistoryPlaceGone =>
+      'Ein Bereich oder Thema, das es nicht mehr gibt';
+
+  @override
+  String get noteHistoryLocked => 'Ein gesperrter Bereich';
+
+  @override
+  String get noteHistoryBefore => 'Vorher';
+
+  @override
+  String get noteHistoryAfter => 'Nachher';
+
+  @override
+  String get useThisVersion => 'Diese Version verwenden';
+
+  @override
+  String get useThisVersionDone =>
+      'Der alte Text ist zurück. Der Verlauf behält jede Version.';
+
+  @override
+  String get features => 'Was Old Brain Fix anbietet';
+
+  @override
+  String get featuresDetail =>
+      'Was du schon angelegt hast, bleibt so oder so. Auf allen deinen eigenen Geräten gleich; die Einstellungen ändern es jederzeit.';
+
+  @override
+  String get featuresSimple => 'Einfach';
+
+  @override
+  String get featuresSimpleDetail =>
+      'Notizen, Checklisten, Einkaufslisten, Erinnerungen und Routinen.';
+
+  @override
+  String get featuresAdvanced => 'Erweitert';
+
+  @override
+  String get featuresAdvancedDetail =>
+      'Dazu Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen.';
+
+  @override
+  String get helpAreaName => 'Old Brain Fix';
+
+  @override
+  String get helpQuickStartTitle => 'Schnellstart';
+
+  @override
+  String get helpQuickStart1 => 'Erfasse einen Gedanken mit +.';
+
+  @override
+  String get helpQuickStart2 => 'Lege die neue Notiz in einem Bereich ab.';
+
+  @override
+  String get helpQuickStart3 => 'Gib einer Notiz eine Erinnerung.';
+
+  @override
+  String get helpQuickStart4 =>
+      'Gib einer Notiz eine Routine, die wiederkehrt.';
+
+  @override
+  String get helpQuickStart5 =>
+      'Hake diese Zeile ab: So funktioniert eine Checkliste.';
+
+  @override
+  String get helpQuickStart6 => 'Finde eine Notiz mit „Suchen und stöbern“.';
+
+  @override
+  String get helpQuickStart7 =>
+      'Lege unter Einstellungen ▸ Sicherungen eine Sicherung an.';
+
+  @override
+  String get helpQuickStart8 =>
+      'Synchronisiere in den Einstellungen mit deinem anderen Gerät.';
+
+  @override
+  String get helpIconsTitle => 'Was die Symbole bedeuten';
+
+  @override
+  String get helpIconsBadges => 'In den Abzeichen einer Notiz';
+
+  @override
+  String get helpIconsAgenda => 'In der Agenda';
+
+  @override
+  String get helpIconsCard => 'Auf der Karte einer Notiz';
+
+  @override
+  String get helpIconKind => 'Art';
+
+  @override
+  String get helpIconKindMeans =>
+      'was die Notiz ist: eine einfache Notiz, eine Checkliste oder eine Einkaufsliste.';
+
+  @override
+  String get helpIconImportance => 'Wichtigkeit';
+
+  @override
+  String get helpIconImportanceMeans => 'wie wichtig die Notiz ist.';
+
+  @override
+  String get helpIconPlace => 'Bereich und Thema';
+
+  @override
+  String get helpIconPlaceMeans => 'wo die Notiz abgelegt ist.';
+
+  @override
+  String get helpIconCaptured => 'Erfasst';
+
+  @override
+  String get helpIconCapturedMeans => 'wann du die Notiz erfasst hast.';
+
+  @override
+  String get helpIconReminder => 'Erinnerung';
+
+  @override
+  String get helpIconReminderMeans => 'klingelt einmal zu ihrer Zeit.';
+
+  @override
+  String get helpIconRoutine => 'Routine';
+
+  @override
+  String get helpIconRoutineMeans => 'klingelt an ihren Tagen immer wieder.';
+
+  @override
+  String get helpIconAdd => 'Hinzufügen';
+
+  @override
+  String get helpIconAddMeans => 'gibt der Notiz eine Routine oder Erinnerung.';
+
+  @override
+  String get helpIconBrowse => 'Suchen und stöbern';
+
+  @override
+  String get helpIconBrowseMeans =>
+      'öffnet deine Bereiche und durchsucht jede Notiz.';
+
+  @override
+  String get helpIconAllRoutines => 'Alle Routinen und Erinnerungen';
+
+  @override
+  String get helpIconAllRoutinesMeans =>
+      'listet jede Routine und Erinnerung auf.';
+
+  @override
+  String get helpIconNewRoutine => 'Neue Routine oder Erinnerung';
+
+  @override
+  String get helpIconNewRoutineMeans => 'legt eine mit einer neuen Notiz an.';
+
+  @override
+  String get helpIconNewSession => 'Neue Einheit';
+
+  @override
+  String get helpIconNewSessionMeans =>
+      'legt in Erweitert eine Einheit mit einer neuen Notiz an.';
+
+  @override
+  String get helpIconUnsorted => 'Unsortiert';
+
+  @override
+  String get helpIconUnsortedMeans =>
+      'Notizen, die noch in einen Bereich gehören.';
+
+  @override
+  String get helpIconFileInto => 'Ablegen in …';
+
+  @override
+  String get helpIconFileIntoMeans =>
+      'legt die Notiz in einem Bereich oder Thema ab.';
+
+  @override
+  String get helpIconAlarm => 'Routine oder Erinnerung';
+
+  @override
+  String get helpIconAlarmMeans => 'gibt der Notiz der Karte eine.';
+
+  @override
+  String get helpIconMerge => 'Zusammenführen mit …';
+
+  @override
+  String get helpIconMergeMeans => 'fügt die Notiz mit einer anderen zusammen.';
+
+  @override
+  String get helpIconMore => 'Mehr';
+
+  @override
+  String get helpIconMoreMeans => 'die weiteren Aktionen der Karte.';
+
+  @override
+  String helpWhatsNewTitle(String version) {
+    return 'Neu in $version';
+  }
+
+  @override
+  String get exportAsPack => 'Als Paket exportieren…';
+
+  @override
+  String get packExportTitle => 'Als Paket exportieren';
+
+  @override
+  String get packTickAll => 'Alle auswählen';
+
+  @override
+  String get packUntickAll => 'Alle abwählen';
+
+  @override
+  String packSize(String size) {
+    return 'Größe: $size';
+  }
+
+  @override
+  String get packAddProfile => 'Mein Profil beifügen';
+
+  @override
+  String get packAddProfileHint =>
+      'Die Person sieht deinen Namen und dein Bild und kann erkennen, dass niemand das Paket verändert hat.';
+
+  @override
+  String get packShare => 'Teilen…';
+
+  @override
+  String get packNothingTicked => 'Wähle mindestens eine Notiz aus.';
+
+  @override
+  String packPhoto(String size) {
+    return 'Foto · $size';
+  }
+
+  @override
+  String packRecording(String size) {
+    return 'Aufnahme · $size';
+  }
+
+  @override
+  String packPhotoText(String text) {
+    return 'Fototext: $text';
+  }
+
+  @override
+  String packTranscript(String text) {
+    return 'Transkript: $text';
+  }
+
+  @override
+  String packRoutine(String when) {
+    return 'Routine: $when';
+  }
+
+  @override
+  String packReminder(String when) {
+    return 'Erinnerung: $when';
+  }
+
+  @override
+  String get packFrog => 'Frosch';
+
+  @override
+  String get packTitle => 'Paket';
+
+  @override
+  String packFrom(String name) {
+    return 'Von $name';
+  }
+
+  @override
+  String packAddPerson(String name) {
+    return '$name zu Menschen hinzufügen';
+  }
+
+  @override
+  String get packClaim => 'Als meine übernehmen';
+
+  @override
+  String get packClaimHint =>
+      'Ohne Haken zeigt jede Notiz, von wem sie kam, bis du es entfernst.';
+
+  @override
+  String get packAdd => 'Hinzufügen';
+
+  @override
+  String packAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen hinzugefügt',
+      one: '1 Notiz hinzugefügt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get packSuffix => 'Paket';
+
+  @override
+  String get packNoArea => 'Aus einem Paket';
+
+  @override
+  String get packNotSent => 'Das Paket wurde nicht geteilt.';
+
+  @override
+  String get packNotSentTitle => 'Paket nicht geteilt';
+
+  @override
+  String get packNotWrittenCause =>
+      'Die Datei für das Paket konnte nicht geschrieben werden.';
+
+  @override
+  String get packNotOpened => 'Das Paket wurde nicht geöffnet.';
+
+  @override
+  String get packNotOpenedTitle => 'Paket nicht geöffnet';
+
+  @override
+  String get packUnreadable =>
+      'Diese Datei ist kein Paket, oder sie wurde verändert, nachdem sie gemacht wurde.';
+
+  @override
+  String get packFromBlocked =>
+      'Dieses Paket ist von einer Person, die du blockiert hast.';
+
+  @override
+  String get packAskAgainFix => 'Bitte die Person, es noch einmal zu senden.';
+
+  @override
+  String removePackFrom(String name) {
+    return '„Von $name“ entfernen';
+  }
+
+  @override
+  String get feedbackTitle => 'Feedback senden';
+
+  @override
+  String get feedbackSettingsDetail =>
+      'Sag dem Entwickler, was passiert ist oder was besser sein könnte. Du siehst alles, bevor es gesendet wird.';
+
+  @override
+  String get feedbackTextLabel => 'Was ist passiert / was könnte besser sein';
+
+  @override
+  String get feedbackGoesAlong => 'Was mitgeht';
+
+  @override
+  String get feedbackVersion => 'Version';
+
+  @override
+  String get feedbackSystem => 'System und Gerät';
+
+  @override
+  String get feedbackInstall => 'Installiert über';
+
+  @override
+  String get feedbackCrash => 'Der letzte Absturzbericht';
+
+  @override
+  String get feedbackCrashNone => 'Dieses Handy hat keinen.';
+
+  @override
+  String feedbackCrashFrom(String date) {
+    return 'Vom $date';
+  }
+
+  @override
+  String get feedbackNotes => 'Notizen als Paket';
+
+  @override
+  String get feedbackNotesHint => 'Wähle sie im Baum des Pakets.';
+
+  @override
+  String feedbackNotesPicked(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen',
+      one: '1 Notiz',
+    );
+    return '$_temp0, $size';
+  }
+
+  @override
+  String get feedbackPickNotes => 'Notizen wählen …';
+
+  @override
+  String get feedbackNotesTitle => 'Notizen für das Feedback';
+
+  @override
+  String get feedbackPreview => 'Vorschau: genau das wird gesendet';
+
+  @override
+  String feedbackPackAlong(String notes) {
+    return 'Dazu als Datei: ein Paket mit $notes';
+  }
+
+  @override
+  String get feedbackMail => 'Mail';
+
+  @override
+  String get feedbackShare => 'Teilen …';
+
+  @override
+  String get feedbackTextFirst => 'Schreib zuerst, was passiert ist.';
+
+  @override
+  String get feedbackTooLongForMail =>
+      'Zu lang für einen Mail-Link. Teilen sendet alles.';
+
+  @override
+  String get feedbackPackNotInMail =>
+      'Ein Mail-Link kann das Paket nicht mitnehmen. Teilen sendet es mit: Wähle dort deine Mail-App.';
+
+  @override
+  String get feedbackNotSent => 'Das Feedback wurde nicht geteilt.';
+
+  @override
+  String get feedbackNotSentTitle => 'Feedback nicht geteilt';
 }

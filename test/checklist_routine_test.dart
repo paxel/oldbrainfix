@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_group.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -90,9 +91,13 @@ void main() {
     String text,
   ) => tester.widget<Checkbox>(lineBox(routine, occurrence, text)).value;
 
-  /// The row's own box, which checks the Occurrence off.
+  /// The row's own box, which checks the Occurrence off: its heading's,
+  /// above its Lines in its group (#208).
   Finder rowBox(String routine, Occurrence occurrence) => find.descendant(
-    of: find.ancestor(of: row(routine, occurrence), matching: find.byType(Row)),
+    of: find.ancestor(
+      of: row(routine, occurrence),
+      matching: find.byType(AgendaGroup),
+    ),
     matching: find.byWidgetPredicate(
       (w) => w is Checkbox && w.semanticLabel == 'Done',
     ),
@@ -158,6 +163,24 @@ void main() {
     expect(doneAt(routine, today), isNull);
     expect(rowCheckbox(tester, routine, today).value, isFalse);
     expect(rowCheckbox(tester, routine, today).onChanged, isNotNull);
+  });
+
+  testWidgets('with checked items hidden, a checked Line leaves the row and '
+      'the last one takes the row with it (#217)', (tester) async {
+    store.agendaHidesChecked = true;
+    final routine = packing();
+    await start(tester);
+    await tap(tester, lineBox(routine, today, 'Bath'));
+    expect(lineBox(routine, today, 'Bath'), findsNothing);
+    expect(lineBox(routine, today, 'Tent'), findsOneWidget);
+    // Tomorrow's keeps it.
+    expect(lineBox(routine, tomorrow, 'Bath'), findsOneWidget);
+
+    await tap(tester, lineBox(routine, today, 'Tent'));
+    await tap(tester, lineBox(routine, today, 'Map'));
+    expect(doneAt(routine, today), isNotNull);
+    expect(row(routine, today), findsNothing);
+    expect(rowBox(routine, tomorrow), findsOneWidget);
   });
 
   testWidgets('the row is still checked off by hand, its Lines unchecked', (

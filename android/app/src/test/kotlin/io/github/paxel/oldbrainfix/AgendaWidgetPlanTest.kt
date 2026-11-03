@@ -112,7 +112,25 @@ class AgendaWidgetPlanTest {
         Action(seq, kind, routine, occurrence, 0, 0, "", "", line)
 
     private fun view(pending: List<Action> = emptyList(), appointments: List<WidgetRow> = emptyList(), day: String = "2026-10-24") =
-        AgendaWidgetPlan.view(snapshot, day, pending, appointments, "Open the app")
+        AgendaWidgetPlan.view(snapshot, day, pending, mapOf(day to appointments), "Open the app")
+
+    /** [snapshot] as version 4 writes it (#194): the Agenda's days, each with its heading. */
+    private val week = snapshot.copy(
+        days = mapOf(
+            "2026-10-24" to today,
+            "2026-10-25" to tomorrow,
+            "2026-10-26" to emptyList(),
+            "2026-10-27" to listOf(occurrence("bins", "2026-10-27")),
+        ),
+        headings = mapOf(
+            "2026-10-24" to "Saturday, 24 Oct",
+            "2026-10-25" to "Sunday, 25 Oct",
+            "2026-10-26" to "Monday, 26 Oct",
+            "2026-10-27" to "Tuesday, 27 Oct",
+        ),
+        tomorrow = "Tomorrow",
+        planned = "Nothing planned",
+    )
 
     private fun titles(view: AgendaView) = view.rows.map { it.title }
 
@@ -143,6 +161,84 @@ class AgendaWidgetPlanTest {
     }
 
     @Test
+    fun showsTheAgendasComingDaysUnderTheirHeadingsAfterToday() {
+        val view = AgendaWidgetPlan.view(week, "2026-10-24", emptyList(), emptyMap(), "Open the app")
+
+        assertEquals(
+            listOf(
+                "Missed", "pills · once", "Fri, 10/23/2026",
+                "2 Unsorted",
+                "Today",
+                "bins", "Milk · Groceries", "water", "trip", "passport", "tickets", "plants",
+                "Eat a frog", "taxes", "dentist",
+                "Tomorrow", "dentist",
+                "Monday, 26 Oct", "Nothing planned",
+                "Tuesday, 27 Oct", "bins",
+            ),
+            titles(view),
+        )
+        assertEquals(listOf(WidgetRow.HEADING, WidgetRow.MESSAGE), view.rows.subList(17, 19).map { it.kind })
+        assertFalse(view.stale)
+    }
+
+    @Test
+    fun theComingDaysMoveOnAtMidnightWithoutTheApp() {
+        val view = AgendaWidgetPlan.view(week, "2026-10-25", emptyList(), emptyMap(), "Open the app")
+
+        assertEquals(
+            listOf("Today", "dentist", "Tomorrow", "Nothing planned", "Tuesday, 27 Oct", "bins"),
+            titles(view).drop(4),
+        )
+    }
+
+    @Test
+    fun onlyTodaysAndTheMissedRowsAreTickable() {
+        val view = AgendaWidgetPlan.view(week, "2026-10-24", emptyList(), emptyMap(), "")
+        val dentists = view.rows.filter { it.title == "dentist" }
+
+        // Today's Frog and Missed Occurrence check off; tomorrow's dentist only opens the app.
+        assertEquals(WidgetTap("frog", "frog:dentist", "", ""), dentists[0].tap)
+        assertEquals(WidgetTap("done", "routine:pills", "2026-10-23T08:00", ""), view.rows[2].tap)
+        val coming = view.rows.dropWhile { it.title != "Tomorrow" }.filter { it.box }
+        assertEquals(listOf("dentist", "bins"), coming.map { it.title })
+        for (row in coming) {
+            // The snapshot says this Device may check them: on a coming day it still does not.
+            assertTrue(row.checks)
+            assertNull(row.title, row.tap)
+            assertEquals(row.title, AgendaTap.Open, row.onBox)
+            assertEquals(row.title, AgendaTap.Open, row.onRow)
+        }
+        // Nor does a coming day's Line or pick.
+        val ahead = line(occurrence("trip", "2026-10-25T08:00"), "passport").copy(ahead = true)
+        assertNull(ahead.tap)
+        assertEquals(AgendaTap.Open, ahead.onBox)
+        val pick = WidgetRow(
+            WidgetRow.PICK, "Push-ups", checks = true, indent = 1, ahead = true,
+            routine = "session:sport", occurrence = "2026-10-25T07:00", note = "note:push-ups",
+        )
+        assertEquals(AgendaTap.Open, pick.onBox)
+        assertEquals(AgendaTap.Open, pick.onRow)
+    }
+
+    @Test
+    fun theComingDaysTakeTheirOwnAppointments() {
+        val holiday = WidgetRow(WidgetRow.APPOINTMENT, "Holiday", "All day", block = WidgetRow.ALL_DAY)
+        val film = WidgetRow(WidgetRow.APPOINTMENT, "Film", "21:00", block = WidgetRow.TIMED, at = 21 * 60)
+
+        val view = AgendaWidgetPlan.view(
+            week, "2026-10-24", emptyList(), mapOf("2026-10-26" to listOf(holiday), "2026-10-27" to listOf(film)), "",
+        )
+
+        assertEquals(listOf("Monday, 26 Oct", "Holiday", "Tuesday, 27 Oct", "bins", "Film"), titles(view).takeLast(5))
+        // Dimmed with the rest of their day.
+        assertTrue(view.rows.filter { it.kind == WidgetRow.APPOINTMENT }.all { it.ahead })
+        assertEquals(listOf("2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"), AgendaWidgetPlan.shownDays(week, "2026-10-24"))
+        assertEquals(listOf("2026-10-26", "2026-10-27"), AgendaWidgetPlan.shownDays(week, "2026-10-26"))
+        // An older snapshot holds no headings: it shows today alone, as before.
+        assertEquals(listOf("2026-10-24"), AgendaWidgetPlan.shownDays(snapshot, "2026-10-24"))
+    }
+
+    @Test
     fun aDayWithNothingDueSaysSoAboveItsFrogs() {
         val frogs = snapshot.copy(
             days = mapOf("2026-10-24" to listOf(WidgetRow(WidgetRow.HEADING, "Eat a frog", block = WidgetRow.FROGS), frog("taxes"))),
@@ -150,7 +246,7 @@ class AgendaWidgetPlanTest {
             unsorted = 0,
         )
 
-        val view = AgendaWidgetPlan.view(frogs, "2026-10-24", emptyList(), emptyList(), "Open the app")
+        val view = AgendaWidgetPlan.view(frogs, "2026-10-24", emptyList(), emptyMap(), "Open the app")
 
         assertEquals(listOf("Today", "Nothing due today.", "Eat a frog", "taxes"), titles(view))
         assertEquals(WidgetRow.MESSAGE, view.rows[1].kind)
@@ -162,7 +258,7 @@ class AgendaWidgetPlanTest {
         assertTrue(stale.stale)
         assertEquals(listOf("Missed", "pills · once", "Fri, 10/23/2026", "2 Unsorted", "Open the app"), titles(stale))
         assertTrue(view(day = "2026-10-23").stale)
-        val none = AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), emptyList(), "Open the app")
+        val none = AgendaWidgetPlan.view(null, "2026-10-24", emptyList(), emptyMap(), "Open the app")
         assertTrue(none.stale)
         assertEquals(listOf("Open the app"), titles(none))
     }
@@ -244,7 +340,7 @@ class AgendaWidgetPlanTest {
     fun whatIsCheckedInTheSnapshotStaysChecked() {
         val checked = snapshot.copy(days = mapOf("2026-10-24" to listOf(occurrence("pills", "2026-10-24T08:00", done = true))))
 
-        val view = AgendaWidgetPlan.view(checked, "2026-10-24", emptyList(), emptyList(), "")
+        val view = AgendaWidgetPlan.view(checked, "2026-10-24", emptyList(), emptyMap(), "")
 
         assertTrue(view.rows.single { it.title == "pills" }.done)
     }
@@ -314,7 +410,7 @@ class AgendaWidgetPlanTest {
         assertTrue(rows[1].done)
         assertEquals(emptyList<String>(), read?.calendars)
         assertEquals("1 Unsorted", read?.unsortedText)
-        val view = AgendaWidgetPlan.view(read, "2026-10-24", emptyList(), emptyList(), "")
+        val view = AgendaWidgetPlan.view(read, "2026-10-24", emptyList(), emptyMap(), "")
         assertEquals(listOf("1 Unsorted", "Today", "pills", "bins"), titles(view))
     }
 
@@ -362,8 +458,152 @@ class AgendaWidgetPlanTest {
     }
 
     @Test
+    fun aSnapshotOfVersionTwoTakesNoKindOfALaterOne() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val day = JSONArray()
+            .put(row("occurrence", "Sport").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00"))
+            .put(row("pick", "Push-ups").put("note", "note:push-ups"))
+            .put(row("checklistLine", "Tickets").put("line", "line:tickets"))
+        val snapshot = JSONObject().put("v", 2).put("days", JSONObject().put("2026-10-24", day)).put("labels", JSONObject())
+
+        val rows = AgendaWidgetPlan.snapshotOf(snapshot.toString())?.days?.get("2026-10-24") ?: emptyList()
+
+        assertEquals(listOf("Sport"), rows.map { it.title })
+    }
+
+    @Test
+    fun aSnapshotOfVersionThreeReadsTheGroups() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val day = JSONArray()
+            .put(row("shopping", "Groceries").put("block", "lists"))
+            .put(row("shopping", "Milk").put("line", "line:milk").put("checks", true).put("indent", 1).put("block", "lists"))
+            .put(row("checklist", "Before the trip").put("block", "lists"))
+            .put(row("checklistLine", "Tickets").put("line", "line:tickets").put("checks", true).put("indent", 1).put("block", "lists"))
+            .put(row("session", "Sport").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00").put("time", "07:00").put("block", "timed").put("at", 420))
+            .put(row("pick", "Push-ups 20 times").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00").put("note", "note:push-ups").put("checks", true).put("indent", 1).put("block", "timed").put("at", 420))
+            .put(row("laterKind", "?"))
+        val snapshot = JSONObject()
+            .put("v", 3)
+            .put("days", JSONObject().put("2026-10-24", day))
+            .put("unsorted", 0)
+            .put("labels", JSONObject().put("today", "Today"))
+
+        val read = AgendaWidgetPlan.snapshotOf(snapshot.toString())
+
+        val rows = read?.days?.get("2026-10-24") ?: emptyList()
+        assertEquals(listOf("shopping", "shopping", "checklist", "checklistLine", "session", "pick"), rows.map { it.kind })
+        assertEquals(listOf(0, 1, 0, 1, 0, 1), rows.map { it.indent })
+        assertEquals("note:push-ups", rows[5].note)
+        assertEquals("Today", read?.today)
+        // The headings of the lists have no box; their Lines, the Session and its picks have.
+        assertEquals(listOf(false, true, false, true, true, true), rows.map { it.box })
+        assertEquals(listOf(true, false, true, false, false, false), rows.map { it.heading })
+    }
+
+    @Test
+    fun aSnapshotOfVersionFourReadsTheDaysWithTheirHeadings() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val days = JSONObject()
+            .put("2026-10-24", JSONArray().put(row("session", "Sport").put("routine", "session:sport").put("occurrence", "2026-10-24T07:00")))
+            .put("2026-10-25", JSONArray().put(row("occurrence", "dentist").put("routine", "routine:dentist").put("occurrence", "2026-10-25T10:00").put("checks", true)))
+            .put("2026-10-26", JSONArray())
+        val snapshot = JSONObject()
+            .put("v", 4)
+            .put("days", days)
+            .put("headings", JSONObject().put("2026-10-24", "Saturday, 24 Oct").put("2026-10-25", "Sunday, 25 Oct").put("2026-10-26", "Monday, 26 Oct").put("2026-10-27", 7))
+            .put("labels", JSONObject().put("today", "Heute").put("tomorrow", "Morgen").put("planned", "Nichts geplant"))
+
+        val read = AgendaWidgetPlan.snapshotOf(snapshot.toString())
+
+        assertEquals(listOf("Sport"), read?.days?.get("2026-10-24")?.map { it.title })
+        // A heading that is no text is left out.
+        assertEquals(
+            mapOf("2026-10-24" to "Saturday, 24 Oct", "2026-10-25" to "Sunday, 25 Oct", "2026-10-26" to "Monday, 26 Oct"),
+            read?.headings,
+        )
+        assertEquals("Morgen", read?.tomorrow)
+        assertEquals("Nichts geplant", read?.planned)
+        // Without "Fat fingers" the text keeps its size (#224).
+        assertEquals(1f, read?.textScale)
+        val fat = AgendaWidgetPlan.snapshotOf(snapshot.put("fatFingers", true).toString())
+        assertEquals(1.3f, fat?.textScale)
+        val view = AgendaWidgetPlan.view(read, "2026-10-24", emptyList(), emptyMap(), "")
+        assertEquals(listOf("Heute", "Sport", "Morgen", "dentist", "Monday, 26 Oct", "Nichts geplant"), titles(view))
+    }
+
+    @Test
+    fun aSnapshotOfVersionThreeStillShowsTodayAlone() {
+        fun row(kind: String, title: String) = JSONObject().put("kind", kind).put("title", title)
+        val snapshot = JSONObject()
+            .put("v", 3)
+            .put("days", JSONObject().put("2026-10-24", JSONArray().put(row("occurrence", "pills"))).put("2026-10-25", JSONArray().put(row("occurrence", "dentist"))))
+            .put("labels", JSONObject().put("today", "Today"))
+
+        val read = AgendaWidgetPlan.snapshotOf(snapshot.toString())
+
+        assertEquals(listOf("Today", "pills"), titles(AgendaWidgetPlan.view(read, "2026-10-24", emptyList(), emptyMap(), "")))
+        assertEquals(listOf("Today", "dentist"), titles(AgendaWidgetPlan.view(read, "2026-10-25", emptyList(), emptyMap(), "")))
+    }
+
+    @Test
+    fun aSessionsBoxOnlyShowsDoneAndAPickOpensItsEntryForm() {
+        val sport = WidgetRow(
+            WidgetRow.SESSION, "Sport", "07:00", checks = false,
+            routine = "session:sport", occurrence = "2026-10-24T07:00", block = WidgetRow.TIMED, at = 420,
+        )
+        val pick = WidgetRow(
+            WidgetRow.PICK, "Push-ups 20 times", checks = true, indent = 1,
+            routine = "session:sport", occurrence = "2026-10-24T07:00", note = "note:push-ups",
+            block = WidgetRow.TIMED, at = 420,
+        )
+
+        assertTrue(sport.box)
+        assertNull(sport.tap)
+        assertEquals(AgendaTap.None, sport.onBox)
+        assertEquals(AgendaTap.Open, sport.onRow)
+        // Even with checks, as a snapshot might say.
+        assertEquals(AgendaTap.None, sport.copy(checks = true).onBox)
+        val opens = AgendaTap.Pick("session:sport", "2026-10-24T07:00", "note:push-ups")
+        assertTrue(pick.box)
+        assertNull(pick.tap)
+        assertEquals(opens, pick.onBox)
+        assertEquals(opens, pick.onRow)
+        // Its entry form open here or not, its box shows whether it has an entry.
+        assertEquals(opens, pick.copy(done = true).onRow)
+        assertEquals(AgendaTap.Open, pick.copy(checks = false).onBox)
+        assertEquals(AgendaTap.Open, pick.copy(note = "").onRow)
+        // Done on its notification and not yet applied, it shows Done.
+        val day = snapshot.copy(days = mapOf("2026-10-24" to listOf(sport, pick)))
+        val view = AgendaWidgetPlan.view(day, "2026-10-24", listOf(action(1, "done", "session:sport", "2026-10-24T07:00")), emptyMap(), "")
+        assertTrue(view.rows.single { it.title == "Sport" }.done)
+    }
+
+    @Test
+    fun aChecklistsLineChecksItAndShowsCheckedUntilTheAppHasIt() {
+        val tickets = WidgetRow(
+            WidgetRow.CHECKLIST_LINE, "Tickets", checks = true, indent = 1, line = "line:tickets", block = WidgetRow.LISTS,
+        )
+        val day = snapshot.copy(days = mapOf("2026-10-24" to listOf(WidgetRow(WidgetRow.CHECKLIST, "Before the trip", block = WidgetRow.LISTS), tickets)))
+
+        assertEquals(WidgetTap("checklist", "", "", "line:tickets"), tickets.tap)
+        assertEquals(AgendaTap.Check("checklist", Alarm("", "", "", null, null, "Tickets", ""), "line:tickets"), tickets.onBox)
+        assertEquals(AgendaTap.Open, tickets.onRow)
+        assertNull(tickets.copy(checks = false).tap)
+        val view = AgendaWidgetPlan.view(day, "2026-10-24", listOf(action(1, "checklist", "", line = "line:tickets")), emptyMap(), "")
+        assertTrue(view.rows.single { it.title == "Tickets" }.done)
+    }
+
+    @Test
+    fun everyGroupsEntriesAreIndentedAlikeTheirBoxesWhereTheHeadingsWordsBegin() {
+        assertEquals(0, AgendaWidgetPlan.indentDp(0))
+        // A box is 40 wide: an entry's box stands where its heading's words begin.
+        assertEquals(AgendaWidgetPlan.BOX_DP, AgendaWidgetPlan.indentDp(1))
+        assertEquals(AgendaWidgetPlan.BOX_DP + AgendaWidgetPlan.STEP_DP, AgendaWidgetPlan.indentDp(2))
+    }
+
+    @Test
     fun aSnapshotOfALaterVersionAsksToOpenTheApp() {
-        for (version in listOf("3", "\"2\"", "2.0", "0")) {
+        for (version in listOf("5", "\"4\"", "4.0", "0")) {
             val text = """{"v":$version,"days":{"2026-10-24":[]},"labels":{}}"""
             assertNull(version, AgendaWidgetPlan.snapshotOf(text))
         }

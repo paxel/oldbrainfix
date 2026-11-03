@@ -20,8 +20,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
-use crate::error::Result;
-use crate::markdown::{self, Span, SpanKind};
+use crate::error::{Error, Result};
+use crate::markdown;
 use crate::text_format;
 
 /// The state a box shows, and the character it is written as.
@@ -317,14 +317,17 @@ pub fn baked(text: &str, ticks: &BTreeMap<String, BoxTick>) -> String {
 /// `text` in `format` as it is saved: every bare ☐, ✅ or ❌, one not
 /// part of another emoji, becomes a box with a new id, and a box whose
 /// id came up before in the text gets a new one. In a formatted text a
-/// glyph in inline code or in a link's address stays as it is. Each id
-/// is drawn from `new_id`, the store's maker of entity ids, again while
-/// it is in the text already.
+/// glyph in inline code, in a code block or in a link's address stays as
+/// it is, and in any text one in a web address (#222). Each id is drawn from `new_id`, the store's maker of entity
+/// ids, again while it is in the text already.
 pub fn convert(
     text: &str,
     format: &str,
     mut new_id: impl FnMut() -> Result<String>,
 ) -> Result<String> {
+    if format == text_format::CODE {
+        return Ok(text.to_string());
+    }
     let found = scan(text);
     if found.iter().all(|b| b.id.is_some() && !b.repeated) {
         return Ok(text.to_string());
@@ -335,9 +338,9 @@ pub fn convert(
         .filter_map(|b| b.id.clone())
         .collect();
     let skipped = if format == text_format::MARKDOWN {
-        literal_ranges(text)
+        markdown::literal_ranges(text)
     } else {
-        Vec::new()
+        markdown::plain_autolinks(text)
     };
     let mut out = String::with_capacity(text.len());
     let mut from = 0;
@@ -366,33 +369,16 @@ pub fn convert(
 fn drawn(new_id: &mut impl FnMut() -> Result<String>) -> Result<String> {
     let digest = Sha256::digest(new_id()?.as_bytes());
     let alphabet = ID_ALPHABET.as_bytes();
-    Ok(digest
+    digest
         .iter()
         .take(ID_LENGTH)
-        .map(|b| char::from(alphabet[usize::from(*b) % alphabet.len()]))
-        .collect())
-}
-
-/// Where a glyph of the formatted text `text` is no box: inline code and
-/// links' addresses, as (start, end).
-fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
-    fn walk(spans: &[Span], ranges: &mut Vec<(usize, usize)>) {
-        for s in spans {
-            match s.kind {
-                SpanKind::Code => ranges.push((s.start, s.end)),
-                SpanKind::Link => {
-                    ranges.push((s.content_end, s.end));
-                    walk(&s.children, ranges);
-                }
-                _ => walk(&s.children, ranges),
-            }
-        }
-    }
-    let mut ranges = Vec::new();
-    for block in markdown::parse(text) {
-        walk(&block.spans, &mut ranges);
-    }
-    ranges
+        .map(|b| {
+            alphabet
+                .get(usize::from(*b) % alphabet.len())
+                .map(|c| char::from(*c))
+                .ok_or_else(|| Error::Invalid("an empty id alphabet".into()))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -409,6 +395,18 @@ mod tests {
             n += 1;
             Ok(n.to_string())
         }
+    }
+
+    #[test]
+    fn no_glyph_of_a_code_text_becomes_a_box() -> Result<()> {
+        let mut drawn = 0;
+        let text = convert("☐ x ✅", text_format::CODE, || {
+            drawn += 1;
+            Ok(drawn.to_string())
+        })?;
+        assert_eq!(text, "☐ x ✅");
+        assert_eq!(drawn, 0);
+        Ok(())
     }
 
     #[test]
@@ -467,10 +465,21 @@ mod tests {
         let saved = convert(text, text_format::MARKDOWN, counted())?;
         assert_eq!(find(&saved).len(), 3);
         assert_eq!(strip(&saved), text);
+        // As plain text only the glyph in the web address stays bare.
         assert_eq!(
             find(&convert(text, text_format::PLAIN, counted())?).len(),
-            5
+            4
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_glyph_inside_a_web_address_gets_no_id() -> Result<()> {
+        for format in [text_format::PLAIN, text_format::MARKDOWN] {
+            let saved = convert("https://x.org/☐ ☐", format, counted())?;
+            assert!(saved.starts_with("https://x.org/☐ ☐"), "{saved:?}");
+            assert_eq!(find(&saved).len(), 1);
+        }
         Ok(())
     }
 

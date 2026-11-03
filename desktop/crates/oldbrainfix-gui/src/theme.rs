@@ -5,7 +5,9 @@
 //! readable in both brightnesses (WCAG AA).
 
 use egui::epaint::{CornerRadius, Shadow};
-use egui::{Color32, Context, Rect, Shape, Stroke, Theme, ThemePreference, Visuals};
+use egui::{
+    Button, Color32, Context, Rect, Response, Shape, Stroke, Theme, ThemePreference, Ui, Visuals,
+};
 use oldbrainfix_core::ThemeChoice;
 
 /// The colours of one brightness.
@@ -99,6 +101,150 @@ pub fn on_accent(dark: bool) -> Color32 {
     if dark { Color32::BLACK } else { Color32::WHITE }
 }
 
+/// How round a button is (#218).
+pub const BUTTON_RADIUS: u8 = 8;
+
+/// The room between a button's words and its outline.
+const BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 4.0);
+
+/// What a button does (#218): the main action of a dialog or page, one
+/// that deletes or removes, or any other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ButtonKind {
+    Secondary,
+    Primary,
+    Destructive,
+}
+
+/// The colours of a kind of button in one brightness: its fill idle,
+/// under the pointer and pressed or focused, its 1 px outline, the
+/// 2 px ring it wears while pressed or focused, and its text, readable
+/// on all three fills (WCAG AA).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ButtonTones {
+    pub idle: Color32,
+    pub hovered: Color32,
+    pub pressed: Color32,
+    pub outline: Color32,
+    pub ring: Color32,
+    pub text: Color32,
+}
+
+/// The tones of a `kind` of button: secondary ones a tonal fill, darker
+/// under the pointer in light and lighter in dark; primary ones the
+/// accent, destructive ones the error colour, both with the text of
+/// [`on_accent`].
+pub fn button_tones(dark: bool, kind: ButtonKind) -> ButtonTones {
+    let x = if dark { DARK_TEXT } else { LIGHT_TEXT };
+    let filled = |[idle, hovered, pressed]: [u32; 3]| ButtonTones {
+        idle: argb(idle),
+        hovered: argb(hovered),
+        pressed: argb(pressed),
+        outline: argb(pressed),
+        ring: x.text,
+        text: on_accent(dark),
+    };
+    match (kind, dark) {
+        (ButtonKind::Secondary, false) => ButtonTones {
+            idle: argb(0xFFB2DFDB),
+            hovered: argb(0xFF9ED5CF),
+            pressed: argb(0xFF85C9C2),
+            outline: argb(0xFF467F79),
+            ring: LIGHT.accent,
+            text: x.text,
+        },
+        (ButtonKind::Secondary, true) => ButtonTones {
+            idle: argb(0xFF4A5359),
+            hovered: argb(0xFF535D64),
+            pressed: argb(0xFF3A4A4E),
+            outline: argb(0xFF8A979E),
+            ring: DARK.accent,
+            text: x.text,
+        },
+        (ButtonKind::Primary, false) => filled([0xFF00796B, 0xFF00695C, 0xFF004D40]),
+        (ButtonKind::Primary, true) => filled([0xFF4DB6AC, 0xFF80CBC4, 0xFFB2DFDB]),
+        (ButtonKind::Destructive, false) => filled([0xFFA8231C, 0xFF8E1B15, 0xFF731410]),
+        (ButtonKind::Destructive, true) => filled([0xFFFFB4AB, 0xFFFFCDC6, 0xFFFFDAD6]),
+    }
+}
+
+/// Paints `visuals`' interactive widgets in the button `tones`: filled,
+/// outlined, rounded, the text in its colour in every state.
+fn paint_buttons(visuals: &mut Visuals, b: ButtonTones) {
+    let w = &mut visuals.widgets;
+    let outline = Stroke::new(1.0, b.outline);
+    for (state, fill, stroke) in [
+        (&mut w.inactive, b.idle, outline),
+        (&mut w.hovered, b.hovered, outline),
+        (&mut w.active, b.pressed, Stroke::new(2.0, b.ring)),
+        (&mut w.open, b.hovered, outline),
+    ] {
+        state.weak_bg_fill = fill;
+        state.bg_stroke = stroke;
+        state.corner_radius = CornerRadius::same(BUTTON_RADIUS);
+        state.fg_stroke.color = b.text;
+    }
+}
+
+/// A dialog's or page's main action (Save, Add, Done, Create): a button
+/// on the accent, greyed unless `enabled`.
+pub fn primary(ui: &mut Ui, enabled: bool, label: &str) -> Response {
+    emphasised(ui, ButtonKind::Primary, enabled, label)
+}
+
+/// An action that deletes or removes: a button on the error colour,
+/// greyed unless `enabled`.
+pub fn destructive(ui: &mut Ui, enabled: bool, label: &str) -> Response {
+    emphasised(ui, ButtonKind::Destructive, enabled, label)
+}
+
+fn emphasised(ui: &mut Ui, kind: ButtonKind, enabled: bool, label: &str) -> Response {
+    let tones = button_tones(ui.visuals().dark_mode, kind);
+    ui.scope(|ui| {
+        paint_buttons(ui.visuals_mut(), tones);
+        ui.add_enabled(enabled, Button::new(label))
+    })
+    .inner
+}
+
+/// How round a checkbox's box is: a button's radius would make the
+/// small box a circle, as a radio button is.
+pub const CHECKBOX_RADIUS: u8 = 3;
+
+/// Draws the checkboxes `add` adds as boxes with softly rounded corners,
+/// not as the circles the buttons' radius would make of them.
+pub fn square_boxes<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    ui.scope(|ui| {
+        let w = &mut ui.visuals_mut().widgets;
+        for state in [&mut w.inactive, &mut w.hovered, &mut w.active] {
+            state.corner_radius = CornerRadius::same(CHECKBOX_RADIUS);
+        }
+        add(ui)
+    })
+    .inner
+}
+
+/// A checkbox, its box square ([`square_boxes`]).
+pub fn checkbox(ui: &mut Ui, checked: &mut bool, text: impl Into<egui::WidgetText>) -> Response {
+    square_boxes(ui, |ui| ui.checkbox(checked, text))
+}
+
+/// The rounded background of an icon-only button over `rect` (#218):
+/// the hovered fill under the pointer, the focus ring while it has the
+/// keyboard.
+pub fn icon_button_back(ui: &Ui, resp: &Response, rect: Rect) {
+    let w = &ui.visuals().widgets;
+    let radius = CornerRadius::same(BUTTON_RADIUS);
+    if resp.hovered() {
+        ui.painter()
+            .rect_filled(rect, radius, w.hovered.weak_bg_fill);
+    }
+    if resp.has_focus() {
+        ui.painter()
+            .rect_stroke(rect, radius, w.active.bg_stroke, egui::StrokeKind::Inside);
+    }
+}
+
 /// How strongly a marked row, a selected entry and selected text are
 /// tinted with the accent.
 const SELECTION_TINT: f32 = 0.25;
@@ -128,6 +274,7 @@ pub fn visuals(dark: bool) -> Visuals {
     v.text_edit_bg_color = Some(t.card);
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
+    paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));
     v
 }
 
@@ -136,6 +283,9 @@ pub fn visuals(dark: bool) -> Visuals {
 pub fn install(ctx: &Context) {
     ctx.set_visuals_of(Theme::Light, visuals(false));
     ctx.set_visuals_of(Theme::Dark, visuals(true));
+    for theme in [Theme::Light, Theme::Dark] {
+        ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
+    }
 }
 
 /// Shows the theme this Device chose: the system's, light or dark.
@@ -325,6 +475,89 @@ mod tests {
             assert!(contrast(t.card, t.background) >= 1.2, "{name}");
             assert!(contrast(t.card, t.mark) >= 1.2, "{name}");
             assert!(contrast(t.mark, t.background) < 1.2, "{name}");
+        }
+    }
+
+    const KINDS: [ButtonKind; 3] = [
+        ButtonKind::Secondary,
+        ButtonKind::Primary,
+        ButtonKind::Destructive,
+    ];
+
+    #[test]
+    fn the_text_of_every_button_is_readable_on_its_fill_in_every_state() {
+        for (name, _, _, _) in both() {
+            for kind in KINDS {
+                let b = button_tones(name == "dark", kind);
+                for (state, fill) in [
+                    ("idle", b.idle),
+                    ("hovered", b.hovered),
+                    ("pressed", b.pressed),
+                ] {
+                    assert_eq!(fill.a(), 255, "{name} {kind:?} {state} is opaque");
+                    let ratio = contrast(b.text, fill);
+                    assert!(ratio >= 4.5, "{name} {kind:?} text {state}: {ratio:.2}");
+                }
+                assert_ne!(b.idle, b.hovered, "{name} {kind:?} hover shows");
+                assert_ne!(b.hovered, b.pressed, "{name} {kind:?} press shows");
+            }
+        }
+    }
+
+    #[test]
+    fn a_button_stands_out_by_its_outline_and_its_focus_ring() {
+        for (name, t, _, _) in both() {
+            for kind in KINDS {
+                let b = button_tones(name == "dark", kind);
+                for (ground, under) in [
+                    ("ground", t.background),
+                    ("marks", t.mark),
+                    ("card", t.card),
+                ] {
+                    let outline = contrast(b.outline, under);
+                    let ring = contrast(b.ring, under);
+                    assert!(
+                        outline >= 3.0 || kind != ButtonKind::Secondary,
+                        "{name} {kind:?} outline on the {ground}: {outline:.2}"
+                    );
+                    assert!(
+                        ring >= 3.0,
+                        "{name} {kind:?} ring on the {ground}: {ring:.2}"
+                    );
+                }
+            }
+            // The primary and destructive ones differ from the rest.
+            let dark = name == "dark";
+            let fills = KINDS.map(|kind| button_tones(dark, kind).idle);
+            assert_ne!(fills[0], fills[1], "{name}");
+            assert_ne!(fills[1], fills[2], "{name}");
+            assert_ne!(fills[0], fills[2], "{name}");
+        }
+    }
+
+    #[test]
+    fn every_button_draws_rounded_filled_and_outlined_in_the_secondary_tones() {
+        for (name, _, x, v) in both() {
+            let b = button_tones(v.dark_mode, ButtonKind::Secondary);
+            assert_eq!(b.text, x.text, "{name}");
+            let w = &v.widgets;
+            for (state, fill, stroke) in [
+                ("idle", b.idle, Stroke::new(1.0, b.outline)),
+                ("hovered", b.hovered, Stroke::new(1.0, b.outline)),
+                ("pressed", b.pressed, Stroke::new(2.0, b.ring)),
+                ("open", b.hovered, Stroke::new(1.0, b.outline)),
+            ] {
+                let s = match state {
+                    "idle" => w.inactive,
+                    "hovered" => w.hovered,
+                    "pressed" => w.active,
+                    _ => w.open,
+                };
+                assert_eq!(s.weak_bg_fill, fill, "{name} {state}");
+                assert_eq!(s.bg_stroke, stroke, "{name} {state}");
+                assert_eq!(s.corner_radius, CornerRadius::same(BUTTON_RADIUS), "{name}");
+                assert_eq!(s.fg_stroke.color, x.text, "{name} {state} text");
+            }
         }
     }
 

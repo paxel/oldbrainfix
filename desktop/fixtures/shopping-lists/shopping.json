@@ -19,7 +19,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -29,7 +29,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -39,7 +39,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -49,7 +49,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -59,7 +59,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -81,7 +81,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Z"
@@ -91,7 +91,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -101,7 +101,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -111,7 +111,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": "2026-01-08",
               "cameBackOn": null,
               "order": "z1"
@@ -121,7 +121,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": "2026-01-08",
               "cameBackOn": null,
               "order": "z2"
@@ -141,7 +141,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -151,7 +151,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
@@ -167,20 +167,20 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -195,7 +195,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -213,7 +213,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -223,7 +223,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -241,7 +241,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -252,6 +252,74 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
@@ -259,7 +327,8 @@
         "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -450,7 +519,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -460,7 +529,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -470,7 +539,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -480,7 +549,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -490,7 +559,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -502,7 +571,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -512,7 +581,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -542,7 +611,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Z"
@@ -552,7 +621,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -562,7 +631,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -572,7 +641,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -582,7 +651,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
@@ -598,20 +667,20 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -626,7 +695,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -644,7 +713,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -654,7 +723,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -672,7 +741,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -683,6 +752,74 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
@@ -690,7 +827,8 @@
         "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -896,7 +1034,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -906,7 +1044,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -916,7 +1054,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -926,7 +1064,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -936,7 +1074,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -948,7 +1086,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -958,7 +1096,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -988,7 +1126,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Z"
@@ -998,7 +1136,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -1008,7 +1146,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -1018,7 +1156,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": "2026-01-09",
               "cameBackOn": null,
               "order": "X"
@@ -1028,7 +1166,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
@@ -1044,20 +1182,20 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1072,7 +1210,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1090,7 +1228,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1100,7 +1238,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1118,7 +1256,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1129,6 +1267,74 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
@@ -1136,7 +1342,8 @@
         "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -1342,7 +1549,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1354,7 +1561,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
@@ -1362,7 +1569,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1372,7 +1579,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1382,7 +1589,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1392,7 +1599,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1404,7 +1611,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -1414,7 +1621,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -1444,7 +1651,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Z"
@@ -1454,7 +1661,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -1464,7 +1671,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -1474,7 +1681,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
@@ -1490,20 +1697,20 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1518,7 +1725,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1536,7 +1743,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1546,7 +1753,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1564,7 +1771,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1575,6 +1782,74 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
@@ -1582,7 +1857,8 @@
         "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -1793,7 +2069,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1805,7 +2081,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
@@ -1813,7 +2089,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1823,7 +2099,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1833,7 +2109,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1843,7 +2119,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1855,7 +2131,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -1865,7 +2141,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -1895,7 +2171,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Z"
@@ -1905,7 +2181,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -1915,7 +2191,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -1925,7 +2201,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": "2026-01-15",
               "cameBackOn": null,
               "order": "Y"
@@ -1941,20 +2217,20 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
-              "backOn": "2026-01-15",
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
               "cameBackOn": null,
               "order": "W"
             }
@@ -1969,7 +2245,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1987,7 +2263,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1997,7 +2273,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2015,7 +2291,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2026,6 +2302,74 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
@@ -2033,7 +2377,8 @@
         "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -2244,7 +2589,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2256,7 +2601,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
@@ -2266,7 +2611,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -2276,7 +2621,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Z"
@@ -2284,7 +2629,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2294,7 +2639,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2304,7 +2649,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2314,7 +2659,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2326,7 +2671,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -2336,7 +2681,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -2366,7 +2711,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": "2026-01-22",
               "cameBackOn": null,
               "order": "a"
@@ -2376,7 +2721,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -2392,27 +2737,27 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
           "count": 2,
-          "openCount": 2,
-          "struckCount": 0
+          "openCount": 0,
+          "struckCount": 2
         },
         "note:00000000000000000000000000000016": {
           "making": "00000000000000000000000000000017",
@@ -2420,7 +2765,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2438,7 +2783,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2448,7 +2793,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2466,7 +2811,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2477,14 +2822,83 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Coffee\n✓ Rice",
-        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -2505,14 +2919,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -2552,14 +2958,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -2593,14 +2991,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -2640,14 +3030,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -2664,14 +3046,6 @@
           }
         ],
         "off": [
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
           {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
@@ -2706,14 +3080,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -2753,7 +3119,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2765,7 +3131,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
@@ -2775,7 +3141,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -2785,7 +3151,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Z"
@@ -2795,7 +3161,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-22",
               "order": "a"
@@ -2803,7 +3169,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2813,7 +3179,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2823,7 +3189,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2833,7 +3199,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2845,7 +3211,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -2855,7 +3221,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -2885,7 +3251,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": true,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": "2026-01-29",
               "cameBackOn": null,
               "order": "b"
@@ -2901,27 +3267,27 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
           "count": 2,
-          "openCount": 2,
-          "struckCount": 0
+          "openCount": 0,
+          "struckCount": 2
         },
         "note:00000000000000000000000000000016": {
           "making": "00000000000000000000000000000017",
@@ -2929,7 +3295,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2947,7 +3313,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2957,7 +3323,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2975,7 +3341,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -2986,14 +3352,83 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key\n✓ Rice",
-        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -3015,14 +3450,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -3063,14 +3490,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -3105,14 +3524,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -3153,14 +3564,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -3177,14 +3580,6 @@
           }
         ],
         "off": [
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
           {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
@@ -3220,14 +3615,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -3267,7 +3654,7 @@
             {
               "id": "line:0000000000000000000000000000000c",
               "text": "Butter",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3279,7 +3666,7 @@
               "text": "Tea",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T23:32:56.000Z",
+              "checkedAt": "2026-01-01T23:33:02.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-09",
               "order": "X"
@@ -3289,7 +3676,7 @@
               "text": "Bread",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-08T11:33:01.000Z",
+              "checkedAt": "2026-01-08T11:33:07.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Y"
@@ -3299,7 +3686,7 @@
               "text": "Apples",
               "reappear": "2w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:18.000Z",
+              "checkedAt": "2026-01-01T10:01:24.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-15",
               "order": "Z"
@@ -3309,7 +3696,7 @@
               "text": "Coffee",
               "reappear": "3w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:01:22.000Z",
+              "checkedAt": "2026-01-01T10:01:28.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-22",
               "order": "a"
@@ -3319,7 +3706,7 @@
               "text": "Rice",
               "reappear": "4w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:20.000Z",
+              "checkedAt": "2026-01-01T10:02:26.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-29",
               "order": "b"
@@ -3327,7 +3714,7 @@
             {
               "id": "line:0000000000000000000000000000000a",
               "text": "Salt",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3337,7 +3724,7 @@
             {
               "id": "line:0000000000000000000000000000000b",
               "text": "Soy milk",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3347,7 +3734,7 @@
             {
               "id": "line:0000000000000000000000000000000d",
               "text": "Pasta",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3357,7 +3744,7 @@
             {
               "id": "line:0000000000000000000000000000000e",
               "text": "Flour",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3369,7 +3756,7 @@
               "text": "Odd five",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:30.000Z",
+              "checkedAt": "2026-01-01T10:02:36.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z1"
@@ -3379,7 +3766,7 @@
               "text": "Odd blank",
               "reappear": "1w",
               "struck": false,
-              "checkedAt": "2026-01-01T10:02:39.000Z",
+              "checkedAt": "2026-01-01T10:02:45.000Z",
               "backOn": null,
               "cameBackOn": "2026-01-08",
               "order": "z2"
@@ -3415,27 +3802,27 @@
             {
               "id": "line:00000000000000000000000000000014",
               "text": "Glue",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
               "id": "line:00000000000000000000000000000015",
               "text": "Nails",
-              "reappear": "1w",
-              "struck": false,
-              "checkedAt": "2026-01-08T11:33:34.000Z",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
           "count": 2,
-          "openCount": 2,
-          "struckCount": 0
+          "openCount": 0,
+          "struckCount": 2
         },
         "note:00000000000000000000000000000016": {
           "making": "00000000000000000000000000000017",
@@ -3443,7 +3830,7 @@
             {
               "id": "line:00000000000000000000000000000018",
               "text": "Plasters",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3461,7 +3848,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Seeds",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3471,7 +3858,7 @@
             {
               "id": "line:0000000000000000000000000000001c",
               "text": "Twine",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3489,7 +3876,7 @@
             {
               "id": "line:0000000000000000000000000000001f",
               "text": "Wicks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -3500,14 +3887,83 @@
           "count": 1,
           "openCount": 1,
           "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": "2026-02-01",
+              "cameBackOn": null,
+              "order": "a"
+            }
+          ],
+          "count": 6,
+          "openCount": 0,
+          "struckCount": 6
         }
       },
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
-        "note:0000000000000000000000000000000f": "Hardware\nGlue\nNails",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
         "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
         "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
-        "note:0000000000000000000000000000001d": "Candles\nWicks"
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax\n✓ Matches"
       },
       "agenda": {
         "none": [
@@ -3530,14 +3986,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -3579,14 +4027,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -3622,14 +4062,6 @@
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
               "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
-            ]
-          },
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
             ]
           },
           {
@@ -3671,14 +4103,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -3695,14 +4119,6 @@
           }
         ],
         "off": [
-          {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
           {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
@@ -3742,14 +4158,6 @@
             ]
           },
           {
-            "note": "note:0000000000000000000000000000000f",
-            "shows": "lines",
-            "lines": [
-              "line:00000000000000000000000000000014",
-              "line:00000000000000000000000000000015"
-            ]
-          },
-          {
             "note": "note:00000000000000000000000000000019",
             "shows": "count",
             "lines": [
@@ -3766,6 +4174,2931 @@
           }
         ]
       }
+    },
+    {
+      "now": "2026-01-31T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:33:02.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Bread",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-08T11:33:07.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Apples",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:24.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:28.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:26.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "text": "Odd five",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:36.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z1"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "text": "Odd blank",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:45.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z2"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "text": "Odd garbled",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z3"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
+            }
+          ],
+          "count": 15,
+          "openCount": 15,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000014",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 0,
+          "struckCount": 2
+        },
+        "note:00000000000000000000000000000016": {
+          "making": "00000000000000000000000000000017",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000018",
+              "text": "Plasters",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000019": {
+          "making": "0000000000000000000000000000001a",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Seeds",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001c",
+              "text": "Twine",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001d": {
+          "making": "0000000000000000000000000000001e",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001f",
+              "text": "Wicks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-01",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": "2026-02-03",
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            }
+          ],
+          "count": 6,
+          "openCount": 1,
+          "struckCount": 5
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
+        "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
+        "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\nMatches\n✓ Yeast\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "off": [
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          }
+        ],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-02-02T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:33:02.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Bread",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-08T11:33:07.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Apples",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:24.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:28.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:26.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "text": "Odd five",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:36.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z1"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "text": "Odd blank",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:45.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z2"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "text": "Odd garbled",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z3"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
+            }
+          ],
+          "count": 15,
+          "openCount": 15,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000014",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 0,
+          "struckCount": 2
+        },
+        "note:00000000000000000000000000000016": {
+          "making": "00000000000000000000000000000017",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000018",
+              "text": "Plasters",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000019": {
+          "making": "0000000000000000000000000000001a",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Seeds",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001c",
+              "text": "Twine",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001d": {
+          "making": "0000000000000000000000000000001e",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001f",
+              "text": "Wicks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-03",
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-01",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": "2026-02-28",
+              "cameBackOn": null,
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            }
+          ],
+          "count": 6,
+          "openCount": 2,
+          "struckCount": 4
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
+        "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
+        "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\nYeast\nMatches\n✓ Flour\n✓ Honey\n✓ Soap\n✓ Wax"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "off": [
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          }
+        ],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-02-27T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:33:02.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Bread",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-08T11:33:07.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Apples",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:24.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:28.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:26.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "text": "Odd five",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:36.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z1"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "text": "Odd blank",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:45.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z2"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "text": "Odd garbled",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z3"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
+            }
+          ],
+          "count": 15,
+          "openCount": 15,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000014",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 0,
+          "struckCount": 2
+        },
+        "note:00000000000000000000000000000016": {
+          "making": "00000000000000000000000000000017",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000018",
+              "text": "Plasters",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000019": {
+          "making": "0000000000000000000000000000001a",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Seeds",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001c",
+              "text": "Twine",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001d": {
+          "making": "0000000000000000000000000000001e",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001f",
+              "text": "Wicks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-03",
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-28",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-01",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": "2026-03-14",
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            }
+          ],
+          "count": 6,
+          "openCount": 3,
+          "struckCount": 3
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
+        "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
+        "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\nYeast\nHoney\nMatches\n✓ Flour\n✓ Soap\n✓ Wax"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "off": [
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          }
+        ],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-03-13T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:33:02.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Bread",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-08T11:33:07.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Apples",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:24.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:28.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:26.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "text": "Odd five",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:36.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z1"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "text": "Odd blank",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:45.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z2"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "text": "Odd garbled",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z3"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
+            }
+          ],
+          "count": 15,
+          "openCount": 15,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000014",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 0,
+          "struckCount": 2
+        },
+        "note:00000000000000000000000000000016": {
+          "making": "00000000000000000000000000000017",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000018",
+              "text": "Plasters",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000019": {
+          "making": "0000000000000000000000000000001a",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Seeds",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001c",
+              "text": "Twine",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001d": {
+          "making": "0000000000000000000000000000001e",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001f",
+              "text": "Wicks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-03",
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-03-14",
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-28",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-01",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": "2027-01-31",
+              "cameBackOn": null,
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            }
+          ],
+          "count": 6,
+          "openCount": 4,
+          "struckCount": 2
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
+        "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
+        "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\nYeast\nFlour\nHoney\nMatches\n✓ Soap\n✓ Wax"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "off": [
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          }
+        ],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2027-01-30T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Milk",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Butter",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "VV"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Tea",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T23:33:02.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-09",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Bread",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-08T11:33:07.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Apples",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:24.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-15",
+              "order": "Z"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Coffee",
+              "reappear": "3w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:01:28.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-22",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Rice",
+              "reappear": "4w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:26.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-29",
+              "order": "b"
+            },
+            {
+              "id": "line:0000000000000000000000000000000a",
+              "text": "Salt",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "c"
+            },
+            {
+              "id": "line:0000000000000000000000000000000b",
+              "text": "Soy milk",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "d"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Pasta",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "e"
+            },
+            {
+              "id": "line:0000000000000000000000000000000e",
+              "text": "Flour",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "f"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "text": "Odd five",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:36.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z1"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "text": "Odd blank",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": "2026-01-01T10:02:45.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z2"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "text": "Odd garbled",
+              "reappear": "1w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": "2026-01-08",
+              "order": "z3"
+            },
+            {
+              "id": "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "text": "Odd key",
+              "reappear": "2w",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "é"
+            }
+          ],
+          "count": 15,
+          "openCount": 15,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000013",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000014",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-08T11:33:40.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 0,
+          "struckCount": 2
+        },
+        "note:00000000000000000000000000000016": {
+          "making": "00000000000000000000000000000017",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000018",
+              "text": "Plasters",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000019": {
+          "making": "0000000000000000000000000000001a",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Seeds",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001c",
+              "text": "Twine",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        },
+        "note:0000000000000000000000000000001d": {
+          "making": "0000000000000000000000000000001e",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001f",
+              "text": "Wicks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            }
+          ],
+          "count": 1,
+          "openCount": 1,
+          "struckCount": 0
+        },
+        "note:00000000000000000000000000000021": {
+          "making": "00000000000000000000000000000022",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000023",
+              "text": "Yeast",
+              "reappear": "3d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:51.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-03",
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000024",
+              "text": "Flour",
+              "reappear": "6w",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:55.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-03-14",
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000025",
+              "text": "Honey",
+              "reappear": "1m",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:35:59.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-28",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000026",
+              "text": "Soap",
+              "reappear": "1y",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:03.000Z",
+              "backOn": null,
+              "cameBackOn": "2027-01-31",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000028",
+              "text": "Matches",
+              "reappear": "1d",
+              "struck": false,
+              "checkedAt": "2026-01-31T11:36:11.000Z",
+              "backOn": null,
+              "cameBackOn": "2026-02-01",
+              "order": "a"
+            },
+            {
+              "id": "line:00000000000000000000000000000027",
+              "text": "Wax",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-31T11:36:07.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "Z"
+            }
+          ],
+          "count": 6,
+          "openCount": 5,
+          "struckCount": 1
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Groceries\nMilk\nButter\nTea\nBread\nApples\nCoffee\nRice\nSalt\nSoy milk\nPasta\nFlour\nOdd five\nOdd blank\nOdd garbled\nOdd key",
+        "note:0000000000000000000000000000000f": "Hardware\n✓ Glue\n✓ Nails",
+        "note:00000000000000000000000000000016": "Pharmacy\nPlasters",
+        "note:00000000000000000000000000000019": "Garden\nSeeds\nTwine",
+        "note:0000000000000000000000000000001d": "Candles\nWicks",
+        "note:00000000000000000000000000000021": "Pantry\nYeast\nFlour\nHoney\nSoap\nMatches\n✓ Wax"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000026",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000026",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000026",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000026",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ],
+        "off": [
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          }
+        ],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000c",
+              "line:00000000000000000000000000000005",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000009",
+              "line:0000000000000000000000000000000a",
+              "line:0000000000000000000000000000000b",
+              "line:0000000000000000000000000000000d",
+              "line:0000000000000000000000000000000e",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000019",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001b",
+              "line:0000000000000000000000000000001c"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000001d",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001f"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000021",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000023",
+              "line:00000000000000000000000000000024",
+              "line:00000000000000000000000000000025",
+              "line:00000000000000000000000000000026",
+              "line:00000000000000000000000000000028"
+            ]
+          }
+        ]
+      }
     }
   ],
   "isShoppingList": {
@@ -3775,7 +7108,8 @@
     "note:00000000000000000000000000000019": true,
     "note:0000000000000000000000000000001d": true,
     "note:00000000000000000000000000000020": false,
-    "note:00000000000000000000000000000022": false
+    "note:00000000000000000000000000000021": true,
+    "note:0000000000000000000000000000002a": false
   },
   "mayMake": {
     "note:00000000000000000000000000000001": false,
@@ -3784,7 +7118,8 @@
     "note:00000000000000000000000000000019": false,
     "note:0000000000000000000000000000001d": false,
     "note:00000000000000000000000000000020": true,
-    "note:00000000000000000000000000000022": true
+    "note:00000000000000000000000000000021": false,
+    "note:0000000000000000000000000000002a": true
   },
   "onAgenda": {
     "none": {
@@ -3792,42 +7127,48 @@
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "count"
     },
     "lines": {
       "note:00000000000000000000000000000001": "lines",
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "lines"
     },
     "back": {
       "note:00000000000000000000000000000001": "count",
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "count"
     },
     "open": {
       "note:00000000000000000000000000000001": "count",
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "count"
     },
     "off": {
       "note:00000000000000000000000000000001": "off",
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "off"
     },
     "sideways": {
       "note:00000000000000000000000000000001": "count",
       "note:0000000000000000000000000000000f": "lines",
       "note:00000000000000000000000000000016": "off",
       "note:00000000000000000000000000000019": "count",
-      "note:0000000000000000000000000000001d": "count"
+      "note:0000000000000000000000000000001d": "count",
+      "note:00000000000000000000000000000021": "count"
     }
   },
   "mayShowOnAgenda": {
@@ -3837,11 +7178,12 @@
     "note:00000000000000000000000000000019": true,
     "note:0000000000000000000000000000001d": true,
     "note:00000000000000000000000000000020": false,
-    "note:00000000000000000000000000000022": false
+    "note:00000000000000000000000000000021": true,
+    "note:0000000000000000000000000000002a": false
   },
   "routines": [
     {
-      "id": "routine:00000000000000000000000000000021",
+      "id": "routine:00000000000000000000000000000029",
       "noteId": "note:00000000000000000000000000000001",
       "start": "2026-01-09",
       "times": [],
@@ -3849,7 +7191,7 @@
       "done": {},
       "renag": null,
       "escalation": null,
-      "scheduledAt": "2026-01-08T11:34:54.000Z",
+      "scheduledAt": "2026-01-31T11:36:19.000Z",
       "trashed": null,
       "trashedWith": null,
       "reminder": true
@@ -3857,14 +7199,25 @@
   ],
   "reappear": {
     "once": "once",
+    "none": "none",
     "1w": "1w",
     "2w": "2w",
     "3w": "3w",
     "4w": "4w",
+    "1d": "1d",
+    "20w": "20w",
+    "3m": "3m",
+    "99y": "99y",
     "0": "1w",
     "5": "1w",
     "x": "1w",
-    "": "1w"
+    "": "1w",
+    "0w": "1w",
+    "01w": "1w",
+    "100d": "1w",
+    "1W": "1w",
+    "w1": "1w",
+    "1 w": "1w"
   },
   "names": {
     " Milk ": "milk",

@@ -4,10 +4,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
 import 'src/about_screen.dart';
+import 'src/agenda_reader.dart';
 import 'src/alarm_platform.dart';
 import 'src/alarm_sync.dart';
 import 'src/announcements.dart';
@@ -22,6 +24,7 @@ import 'src/context_platform.dart';
 import 'src/crash_guard.dart';
 import 'src/drafts.dart';
 import 'src/folder_platform.dart';
+import 'src/help_notes.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -32,6 +35,7 @@ import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
 import 'src/store_needs_update_screen.dart';
 import 'src/sync_platform.dart';
+import 'src/sync_runner.dart';
 import 'src/voice_platform.dart';
 
 /// The store the running app writes to; closed before Restart opens it
@@ -40,6 +44,9 @@ Store? _store;
 
 /// What the app has to say; one for the whole run, across Restarts.
 final _announcements = Announcements();
+
+/// The app's root navigator, where the report of a run that died opens.
+final _navigator = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -65,11 +72,14 @@ Future<void> main() async {
         PlatformDispatcher.instance.locales,
         AppLocalizations.supportedLocales,
       );
-      offerCrashReport(_announcements, lookupAppLocalizations(locale));
+      offerCrashReport(
+        _announcements,
+        lookupAppLocalizations(locale),
+        navigator: _navigator,
+      );
     }
     markRunning();
-    // Out of sight is a clean end; back on screen, running again.
-    AppLifecycleListener(onHide: markCleanExit, onShow: markRunning);
+    watchRunning();
     await _openAndRun(dir);
   }, reportCrash);
 }
@@ -80,17 +90,27 @@ Future<void> main() async {
 Future<void> _openAndRun(Directory dir) async {
   final work = await getTemporaryDirectory();
   final Store store;
+  final path = '${dir.path}/oldbrainfix.db';
   try {
-    store = Store.open('${dir.path}/oldbrainfix.db');
+    store = Store.open(path);
   } on StoreNeedsUpdate {
     runApp(const StoreNeedsUpdateApp());
     return;
   }
   _store = store;
+  // The version the help Notes are made for (#180); without it the app
+  // starts without them.
+  String? version;
+  try {
+    version = (await PackageInfo.fromPlatform()).version;
+  } on Exception {
+    version = null;
+  }
   runApp(
     OldBrainFixApp(
       store: store,
       announcements: _announcements,
+      navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),
@@ -108,9 +128,22 @@ Future<void> _openAndRun(Directory dir) async {
       sync: AndroidSync(),
       pairedHost: startPairedHosting,
       folders: const AndroidFolders(),
+      // The automatic sync in an isolate of its own, so the app keeps
+      // drawing while it merges (#225).
+      syncRunner: IsolateSyncRunner(
+        path: path,
+        open: openSafFolder,
+        token: RootIsolateToken.instance,
+      ),
+      // The Agenda's reads and the alarms' plan there too, so the app
+      // draws on while they read (#207).
+      agendaReader: IsolateAgendaReader(path),
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,
+      help: version == null
+          ? null
+          : HelpSetup(const BundledHelp(), version: version),
     ),
   );
 }

@@ -231,9 +231,10 @@ void main() {
       await folderSync(desk, folders.folder);
       phone.chooseSyncFolder('content://tree/x');
       sync.localNetwork = false;
+      final alarms = FakeAlarms();
       final armed = AlarmSync(
         store: phone,
-        platform: FakeAlarms(),
+        platform: alarms,
         wallClock: deviceWallClock,
       );
       addTearDown(armed.dispose);
@@ -247,6 +248,9 @@ void main() {
       );
       expect(Notes(phone).all().map((n) => n.text), ['Done on the desk']);
       expect(sync.looked, isNull, reason: 'no paired host to look for');
+      // The widget has its snapshot before the background run ends,
+      // since nothing waits for the app's Agenda there.
+      expect(alarms.agendas, isNotEmpty);
     });
   });
 }

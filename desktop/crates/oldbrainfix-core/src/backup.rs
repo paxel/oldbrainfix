@@ -276,10 +276,13 @@ pub fn read_header(path: &Path) -> Result<Option<Header>> {
     File::open(path)?
         .take(MAX_HEADER_BYTES)
         .read_to_end(&mut head)?;
-    let Some(end) = head.iter().position(|b| *b == b'\n') else {
+    let Some(line) = head
+        .iter()
+        .position(|b| *b == b'\n')
+        .and_then(|end| head.get(..end))
+    else {
         return Ok(None);
     };
-    let line = &head[..end];
     let header = Header::parse(line);
     if header.is_none() && later_header(line) {
         return Err(problem(Problem::NeedsUpdate));
@@ -540,8 +543,11 @@ impl<W: Write> ChunkWriter<'_, W> {
     fn add(&mut self, mut bytes: &[u8]) -> Result<()> {
         while !bytes.is_empty() {
             let take = bytes.len().min(self.chunk - self.buffer.len());
-            self.buffer.extend_from_slice(&bytes[..take]);
-            bytes = &bytes[take..];
+            let (now, later) = bytes
+                .split_at_checked(take)
+                .ok_or_else(|| Error::Invalid("a Backup chunk past its bytes".into()))?;
+            self.buffer.extend_from_slice(now);
+            bytes = later;
             if self.buffer.len() == self.chunk {
                 self.seal(false)?;
             }
@@ -733,10 +739,15 @@ impl<R: Read> ChunkReader<R> {
                 }
                 continue;
             }
-            let rest = &self.plain[self.at..];
+            let rest = self
+                .plain
+                .get(self.at..)
+                .ok_or_else(|| problem(Problem::Damaged))?;
             match rest.iter().position(|b| *b == b'\n') {
                 Some(end) => {
-                    bytes.extend_from_slice(&rest[..end]);
+                    bytes.extend_from_slice(
+                        rest.get(..end).ok_or_else(|| problem(Problem::Damaged))?,
+                    );
                     self.at += end + 1;
                     return String::from_utf8(bytes)
                         .map(Some)
@@ -761,7 +772,11 @@ impl<R: Read> ChunkReader<R> {
                 return Err(problem(Problem::Damaged));
             }
             let take = (length - out.len()).min(self.plain.len() - self.at);
-            out.extend_from_slice(&self.plain[self.at..self.at + take]);
+            let taken = self
+                .plain
+                .get(self.at..self.at + take)
+                .ok_or_else(|| problem(Problem::Damaged))?;
+            out.extend_from_slice(taken);
             self.at += take;
         }
         Ok(out)
@@ -941,7 +956,11 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             }
         }
         for m in &moments {
-            let seq = marks[m.seq.min(marks.len() - 1)];
+            // A moment past the last entry that landed goes to that one.
+            let seq = *marks
+                .get(m.seq)
+                .or(marks.last())
+                .ok_or_else(|| problem(Problem::Damaged))?;
             let at = dart_iso(parse_time(&m.at)?);
             store.add_moment_at(seq, &m.cause, m.label.as_deref(), &at)?;
         }
@@ -1099,7 +1118,7 @@ fn back_up_into(store: &Store, dir: &Path, now: DateTime<Utc>, random: Random) -
         .collect();
     mine.sort();
     let over = mine.len().saturating_sub(KEPT);
-    for old in &mine[..over] {
+    for old in mine.iter().take(over) {
         std::fs::remove_file(dir.join(old))?;
     }
     Ok(name)

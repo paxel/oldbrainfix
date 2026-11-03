@@ -19,7 +19,7 @@ void main() {
   }
 
   Future<void> openAreas(WidgetTester tester) async {
-    await tester.tap(find.byIcon(Icons.search));
+    await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
   }
 
@@ -64,7 +64,15 @@ void main() {
       Theme.of(tester.element(find.byType(AlertDialog))).colorScheme.error;
 
   group('Starter Set', () {
+    // Tall enough for Simple or Advanced above every Area (#197).
+    void tall(WidgetTester tester) {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
+
     testWidgets('first start offers it with everything ticked', (tester) async {
+      tall(tester);
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
@@ -85,6 +93,7 @@ void main() {
     testWidgets('keeps what stays ticked and is not offered again', (
       tester,
     ) async {
+      tall(tester);
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
@@ -125,6 +134,7 @@ void main() {
     testWidgets('names show in German; renamed and own ones as typed', (
       tester,
     ) async {
+      tall(tester);
       speakGerman(tester);
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));

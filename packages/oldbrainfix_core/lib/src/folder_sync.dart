@@ -270,8 +270,10 @@ class FolderManifest {
   static bool isNewer(List<int>? bytes) {
     if (bytes == null) return false;
     try {
-      final m = jsonDecode(utf8.decode(bytes));
-      return m is Map && m['format'] is int && m['format'] > manifestFormat;
+      return switch (jsonDecode(utf8.decode(bytes))) {
+        {'format': final int format} => format > manifestFormat,
+        _ => false,
+      };
     } on FormatException {
       return false;
     }
@@ -501,8 +503,8 @@ Future<bool> _learnKeys(
       }
       if (json is! Map) continue;
       store.learnKeys([
-        for (final k in json['signing'] is List ? json['signing'] : const [])
-          ?KeyRecord.fromJson(k),
+        if (json['signing'] case final List<Object?> signing)
+          for (final k in signing) ?KeyRecord.fromJson(k),
       ], report: report);
       if (store.pinnedKey(device)?.record.publicKey case final key?) {
         final taken = store.takeOwnProfile(json['profile'], from: key);
@@ -563,8 +565,8 @@ Future<void> _learnAreaSigningKeys(
     }
     if (json is! Map) continue;
     store.learnKeys([
-      for (final k in json['keys'] is List ? json['keys'] : const [])
-        ?KeyRecord.fromJson(k),
+      if (json['keys'] case final List<Object?> keys)
+        for (final k in keys) ?KeyRecord.fromJson(k),
     ], report: report);
   }
 }
@@ -626,7 +628,7 @@ String _readStateKey(String device) => 'folderRead:$device';
       final m = jsonDecode(raw);
       if (m case {
         'generation': final int generation,
-        'lines': final Map lines,
+        'lines': final Map<Object?, Object?> lines,
       }) {
         return (
           generation: generation,
@@ -954,7 +956,8 @@ Future<int> _writeSegments(
   }
 
   for (final id in lines.keys.toList()..sort()) {
-    final fresh = lines[id]!;
+    final fresh = lines[id];
+    if (fresh == null) continue;
     final run = [
       for (final s in segments)
         if (s.key == id) s,
@@ -1079,7 +1082,8 @@ Future<int> _publishBlobs(
   var out = 0;
   for (final pair in order) {
     final (ref, _) = pair;
-    final key = wanted[pair]!;
+    final key = wanted[pair];
+    if (key == null) continue;
     final name = blobName(key.key, ref);
     if (names.contains(name)) continue;
     final (kind, hash) = splitBlobRef(ref);

@@ -17,3 +17,7 @@ Amended by ADR 0028 (#103): a Note made a Tally, by its first field, leaves Unso
 ## Sessions (ADR 0029)
 
 Amended by ADR 0029 (#104): a Session is a kind of Routine, spawned from a Note like any, that picks Tallies from a pool for each Occurrence.
+
+## A Note is its kind (ADR 0038)
+
+Amended by ADR 0038 (#188): a Note has one kind, Plain Note, Checklist, Shopping List or Tally, and for every kind but the Plain Note the kind's content is the page: the text shows as its name, heading it, and its description, folded under it. Nothing is rewritten for it.

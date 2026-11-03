@@ -348,10 +348,10 @@ void main() {
       ]);
       final lists = Checklists(store);
       final id = only(summary).id;
-      expect(lists.showsOnAgenda(id), isFalse);
-      expect(lists.agenda(), isEmpty);
-      lists.setShowOnAgenda(id, true);
-      expect(lists.agenda().map((l) => l.noteId), [id]);
+      expect(lists.onAgenda(id), ListOnAgenda.off);
+      expect(lists.agendaRows(), isEmpty);
+      lists.setOnAgenda(id, ListOnAgenda.lines);
+      expect(lists.agendaRows().map((r) => r.list.noteId), [id]);
     });
 
     test('a list checked before it was made is checked when it was made', () {

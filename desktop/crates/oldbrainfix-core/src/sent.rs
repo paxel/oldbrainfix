@@ -172,7 +172,7 @@ pub struct SentItem {
 
 /// Builds a JSON object in key order, the same with or without
 /// serde_json's `preserve_order`.
-fn object(pairs: Vec<(&str, Value)>) -> Value {
+pub(crate) fn object(pairs: Vec<(&str, Value)>) -> Value {
     let mut map = Map::new();
     for (key, value) in pairs {
         map.insert(key.to_string(), value);
@@ -401,7 +401,7 @@ fn sent_lines(json: &Value, shopping: bool) -> Option<Vec<SentLine>> {
 /// its current state, its id kept, so the receiver starts from the
 /// sender's states and the same boxes take the later ones (ADR 0035); a
 /// text that is not `editable` here as it is.
-fn baked(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
+pub(crate) fn baked(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
     if !editable {
         return text.to_string();
     }
@@ -435,7 +435,7 @@ fn stored(item: &SentItem) -> String {
     StoredText::of(&item.text_format, &item.text, item.text_version).encode()
 }
 
-fn times(schedule: &Schedule) -> String {
+pub(crate) fn times(schedule: &Schedule) -> String {
     schedule
         .times
         .iter()
@@ -1210,11 +1210,11 @@ impl Store {
                     at: Some(at),
                 },
             )?;
-            let reappear = l.reappear.unwrap_or(Reappear::STANDARD);
+            let reappear = l.reappear.unwrap_or(Reappear::FALLBACK);
             self.append(
                 &id,
                 shopping_keys::REAPPEAR,
-                Some(reappear.code()),
+                Some(&reappear.code()),
                 Some(at),
             )?;
         }
@@ -2187,6 +2187,38 @@ mod tests {
             ben.open_sent_item(b"PK\x03\x04")?.err(),
             Some(OpenError::NotASentItem)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_session_goes_as_a_plain_note_its_routines_with_it() -> TestResult {
+        use crate::note_kinds::NoteKind;
+        use crate::sessions::{SessionRule, Sessions};
+        let ann = device(1);
+        let ben = device(2);
+        let push = Notes::new(&ann).capture("Push-ups", None, None)?.id;
+        Tallies::new(&ann).add_field(&push, "Times", "times", None, None)?;
+        let note = Notes::new(&ann).capture("Sport", None, None)?.id;
+        Sessions::new(&ann).make(&note, std::slice::from_ref(&push), 1, SessionRule::Rolling)?;
+        for at in [7, 18] {
+            let schedule = Schedule::new(
+                Day::parse("2026-03-06").ok_or("day")?,
+                &[ClockTime::new(at, 0).ok_or("time")?],
+                None,
+            )
+            .ok_or("schedule")?;
+            Routines::new(&ann).spawn(&note, &schedule)?;
+        }
+        let opened = ben
+            .open_sent_item(&ann.send_note(&note, None, false)?)?
+            .map_err(|_| "opened")?;
+        let id = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        // The pool names Tallies Ben does not hold (ADR 0028, 0039).
+        assert_eq!(NoteKind::of(&ben, &id)?, NoteKind::Plain);
+        assert_eq!(Routines::new(&ben).of_note(&id)?.len(), 2);
+        assert!(Sessions::new(&ben).all()?.is_empty());
         Ok(())
     }
 

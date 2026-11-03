@@ -15,17 +15,19 @@ import 'tally_form_screen.dart';
 enum NewKind { note, checklist, shopping, tally, session, frog, topic }
 
 /// The kinds the "+" of the page showing [place] offers, null for All
-/// Notes, in the order they fan out from the button: Session and Frog
-/// only where this Device may set them up, a Topic only with [topic].
+/// Notes, in the order they fan out from the button: Tally, Session,
+/// Frog and Topic only in Advanced (#197); Session and Frog only where
+/// this Device may set them up, a Topic only with [topic].
 List<NewKind> newKinds(Store store, String? place, {bool topic = false}) {
   final manages = store.mayManage(place == null ? null : store.areaOf(place));
+  final advanced = store.advanced;
   return [
     NewKind.note,
     NewKind.checklist,
     NewKind.shopping,
-    NewKind.tally,
-    if (manages) ...[NewKind.session, NewKind.frog],
-    if (topic && manages) NewKind.topic,
+    if (advanced) NewKind.tally,
+    if (advanced && manages) ...[NewKind.session, NewKind.frog],
+    if (advanced && topic && manages) NewKind.topic,
   ];
 }
 

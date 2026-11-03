@@ -96,7 +96,8 @@ object Bundles {
      * The share chooser for a Note's [text] (#129), with [html] beside it
      * when there is one, and the files at [paths] as [types], telling
      * [ShareChosenReceiver] which app is picked; null when one of them is
-     * no such file to share.
+     * no such file to share. A mail app picked fills in [mailTo] and
+     * [subject] where they are given (#214).
      */
     fun textChooser(
         context: Context,
@@ -104,6 +105,8 @@ object Bundles {
         html: String?,
         paths: List<String>,
         types: List<String>,
+        mailTo: String? = null,
+        subject: String? = null,
     ): Intent? {
         val dir = FileShare.dir(context)
         val files = paths.map(::File)
@@ -112,6 +115,9 @@ object Bundles {
         val send = Intent(if (uris.size > 1) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND)
             .setType(typeOf(types))
         if (text.isNotEmpty()) send.putExtra(Intent.EXTRA_TEXT, text)
+        // A mail app picked fills them in; any other app ignores them.
+        if (mailTo != null) send.putExtra(Intent.EXTRA_EMAIL, arrayOf(mailTo))
+        if (subject != null) send.putExtra(Intent.EXTRA_SUBJECT, subject)
         // Android asks for the text beside its HTML.
         if (html != null && text.isNotEmpty()) send.putExtra(Intent.EXTRA_HTML_TEXT, html)
         if (uris.size == 1) send.putExtra(Intent.EXTRA_STREAM, uris[0])

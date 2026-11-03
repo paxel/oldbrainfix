@@ -1,0 +1,87 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Plain stars ** stay",
+      "shown": "Plain stars ** stay",
+      "visible": "Plain stars ** stay",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "# Shopping\n- **oat milk** `#code` #real\n2\\*3 \\[x] \\_y\\_",
+      "shown": "# Shopping\n- **oat milk** `#code` #real\n2\\*3 \\[x] \\_y\\_",
+      "visible": "Shopping\noat milk #code #real\n2*3 [x] _y_",
+      "boxes": []
+    },
+    {
+      "id": "section:00000000000000000000000000000005",
+      "text": "> ~~old~~ *new*",
+      "shown": "> ~~old~~ *new*",
+      "visible": "old new",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Call **mum** later",
+      "shown": "Call **mum** later",
+      "visible": "Call mum later",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "- eggs\n- ~~bread~~",
+      "shown": "- eggs\n- ~~bread~~",
+      "visible": "eggs\nbread",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "**Packing**\nsocks\n  wool",
+      "shown": "**Packing**\nsocks\n  wool",
+      "visible": "Packing\nsocks\n  wool",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "text": "| Item | Qty |\n| :-- | --: |\n| **Milk** | 3 \\| 4 |",
+      "shown": "| Item | Qty |\n| :-- | --: |\n| **Milk** | 3 \\| 4 |",
+      "visible": "Item Qty\nMilk 3 | 4",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "text": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+      "shown": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+      "visible": "#!/bin/sh\n# ☐ no box\necho \"#tag **x**\"",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "text": "# comment\nls -l",
+      "shown": "# comment\nls -l",
+      "visible": "# comment\nls -l",
+      "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "int x;\nx = 1; ☐󠁪󠀹󠀰󠁰󠁿",
+      "shown": "int x;\nx = 1; ☐",
+      "visible": "int x;\nx = 1; ☐",
+      "boxes": [
+        {
+          "id": "j90p",
+          "state": "open",
+          "starting": "open",
+          "start": 14,
+          "end": 15,
+          "sourceStart": 14,
+          "idStart": 15,
+          "sourceEnd": 20,
+          "last": null,
+          "history": []
+        }
+      ]
+    }
+  ]
+}

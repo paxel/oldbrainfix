@@ -54,6 +54,9 @@ class TypedLine {
   /// Whether its text starts with [lineStart].
   final bool marked;
 
+  /// Whether it was last drawn new with text, its ⋮ showing (#202).
+  bool menued = false;
+
   /// Which new Line it was started as, counted by its list; 0 for one
   /// read from the list.
   final int started;
@@ -311,12 +314,33 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
       marked: true,
       started: id == null ? ++_started : 0,
     );
-    row.text.addListener(() => _changed(row));
+    row.text.addListener(() {
+      _changed(row);
+      _followMenu(row);
+    });
     row.focus.addListener(() {
       if (!row.focus.hasFocus) scheduleMicrotask(() => _left(row));
     });
     return row;
   }
+
+  /// Draws the list anew as the new [row] gets text or loses it: its ⋮
+  /// comes and goes with it (#202).
+  void _followMenu(TypedLine row) {
+    final menued = row.id == null && row.typed.isNotEmpty;
+    if (menued == row.menued) return;
+    row.menued = menued;
+    if (mounted) setState(() {});
+  }
+
+  /// The Lines with ⋮: [editable], and the new ones that hold text, stored
+  /// as an entry of their ⋮ is used (#202). An empty new one has none.
+  Set<String> withMenus(Set<String> editable) => {
+    ...editable,
+    if (mayAddLine && linesWritable)
+      for (final row in rows)
+        if (row.id == null && row.typed.isNotEmpty) shownId(row),
+  };
 
   /// Disposes [row] once its field is gone.
   void retire(TypedLine row) {
@@ -535,7 +559,12 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
       });
       return;
     }
-    final group = row.inGroup || (row.id != null && hasGroup(row.id!));
+    final group =
+        row.inGroup ||
+        switch (row.id) {
+          final id? => hasGroup(id),
+          null => false,
+        };
     final first = filled.first;
     row.set(
       TextEditingValue(

@@ -1,32 +1,52 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_reader.dart';
 import 'agenda_rows.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
 import 'missed_summary_card.dart';
 import 'session_view.dart';
+import 'tally_view.dart';
 import 'schedule_text.dart';
 
 /// One row of the home-screen Agenda widget, in the words it shows: an
 /// Occurrence, a Line of its Checklist or a pick of its Session under
-/// it, a Shopping List's or a Checklist's row, a Frog, a Missed
-/// Occurrence, or a heading or a line of text.
+/// it, a Shopping List's or a Checklist's heading and its Lines under
+/// it, a Frog, a Missed Occurrence, or a heading or a line of text. A
+/// group of the Agenda (#208) is its heading's row with its entries'
+/// rows after it, indented (#209).
 class WidgetRow {
   /// An Occurrence; its box checks it off as Done.
   static const occurrence = 'occurrence';
+
+  /// A Session's Occurrence, its picks' heading; its box only shows
+  /// whether it is Done, and a tap on it does nothing (#209).
+  static const session = 'session';
+
+  /// A pick of a Session's Occurrence today, the Tally [noteId]; its box
+  /// shows whether it has an entry, and a tap on it opens its entry form
+  /// where this Device may ([checks]) (#209).
+  static const pick = 'pick';
 
   /// A Line of a Checklist Routine's Occurrence; its box checks it for
   /// that Occurrence.
   static const line = 'line';
 
-  /// A Shopping List's row: with [lineId] a Line that came back, whose
-  /// box checks it, else the list's count, with no box.
+  /// A Shopping List's row: with [lineId] an open Line under the list's
+  /// heading, whose box checks it, else the heading, with no box: the
+  /// list's name, or its count when it shows no Lines.
   static const shopping = 'shopping';
 
-  /// A Checklist without a Routine, with how many Lines are open; no box.
+  /// A Checklist without a Routine, its Lines' heading, with no box: its
+  /// name, or how many Lines are open when it shows none.
   static const checklist = 'checklist';
+
+  /// An open Line of a Checklist without a Routine, under its heading;
+  /// its box checks it (#209).
+  static const checklistLine = 'checklistLine';
 
   /// A Frog of today's "Eat a frog"; its box checks it off.
   static const frog = 'frog';
@@ -60,7 +80,8 @@ class WidgetRow {
   /// Whether this Device may check it here, where it has a box.
   final bool checks;
 
-  /// How far it is indented: 1 under its Occurrence, 2 in a group.
+  /// How far it is indented: 1 under its heading, 2 for a Line under
+  /// another Line.
   final int indent;
 
   /// The Routine and the [Occurrence.key] an Occurrence, a Missed one or
@@ -73,6 +94,9 @@ class WidgetRow {
 
   /// The Frog its box checks off.
   final String? frogId;
+
+  /// The Tally a [pick] opens the entry form of.
+  final String? noteId;
 
   /// Where it sorts among the appointments: [allDay], [lists], [timed]
   /// or [frogs]; null outside a day.
@@ -92,6 +116,7 @@ class WidgetRow {
     this.occurrenceKey,
     this.lineId,
     this.frogId,
+    this.noteId,
     this.block,
     this.at,
   });
@@ -107,25 +132,65 @@ class WidgetRow {
     'occurrence': ?occurrenceKey,
     'line': ?lineId,
     'frog': ?frogId,
+    'note': ?noteId,
     'block': ?block,
     'at': ?at,
   };
 }
 
+/// What the Agenda read of the log as it loaded, all the widget's
+/// snapshot needs of it (#204): its days, today's Frogs, the Missed
+/// Summary and the Unsorted count, on [wallClock].
+class AgendaRead {
+  final WallClock wallClock;
+
+  /// The days the Agenda shows, without the calendar's appointments,
+  /// which the widget reads itself.
+  final AgendaDays days;
+  final FrogsToday frogs;
+  final MissedSummary missed;
+  final int unsorted;
+
+  const AgendaRead({
+    required this.wallClock,
+    required this.days,
+    required this.frogs,
+    required this.missed,
+    required this.unsorted,
+  });
+
+  /// What [load] read, on [wallClock] (#207).
+  AgendaRead.of(AgendaLoad load, this.wallClock)
+    : days = load.days,
+      frogs = load.frogs,
+      missed = load.missed,
+      unsorted = load.unsorted;
+}
+
 /// What the home-screen Agenda widget shows, handed to the platform
-/// whenever the alarms are synced: the Missed Summary, and today's rows
-/// in Agenda order as [AgendaDays] reads them for the Agenda, and
-/// tomorrow's as well, so the widget moves on to the new day at
-/// midnight without the app; the Unsorted count; the calendars whose
+/// whenever the alarms are synced: the Missed Summary, and the rows of
+/// the days the Agenda shows in Agenda order as [AgendaDays] reads them
+/// for the Agenda, each with its heading (#194), so the widget shows
+/// them and moves on to the new day at midnight without the app; the
+/// Unsorted count; the calendars whose
 /// appointments the widget reads itself, as nothing of an appointment is
 /// kept; and the texts, in the reader's language.
 class AgendaSnapshot {
   /// The version of its structure (ADR 0034): 2 since the widget shows
-  /// every kind of row the Agenda does (#153).
-  static const version = 2;
+  /// every kind of row the Agenda does (#153), 3 since it shows the
+  /// Agenda's groups (#209): a Session's heading and picks, and a
+  /// Checklist's and a Shopping List's heading with their Lines, 4 since
+  /// it holds the days the Agenda shows, each with its heading (#194).
+  static const version = 4;
 
-  /// The days, `YYYY-MM-DD`, with their rows: today and tomorrow.
+  /// The days, `YYYY-MM-DD`, with their rows: today and the days after
+  /// it the Agenda shows.
   final Map<String, List<WidgetRow>> days;
+
+  /// Each of [days]' own heading, its weekday and date; the widget calls
+  /// the day it shows as today [today] and the next [tomorrow], as they
+  /// are then.
+  final Map<String, String> headings;
 
   /// The Missed Summary's rows, with its heading; none while it is empty.
   final List<WidgetRow> missed;
@@ -135,14 +200,22 @@ class AgendaSnapshot {
   /// is off.
   final List<String> calendars;
 
-  /// The heading, "Today".
+  /// The headings "Today" and "Tomorrow".
   final String today;
+  final String tomorrow;
 
-  /// Shown when the day has nothing due.
+  /// Shown when today has nothing due.
   final String empty;
+
+  /// Shown when a later day has nothing due, "Nothing planned".
+  final String planned;
 
   /// "x Unsorted", with the number in.
   final String unsortedText;
+
+  /// Whether this Device has "Fat fingers" on (#224): the widget's text
+  /// grows with the app's.
+  final bool fatFingers;
 
   /// What the checkbox says to a screen reader.
   final String done;
@@ -156,18 +229,28 @@ class AgendaSnapshot {
 
   const AgendaSnapshot({
     required this.days,
+    required this.headings,
     required this.missed,
     required this.unsorted,
     required this.calendars,
     required this.today,
+    required this.tomorrow,
     required this.empty,
+    required this.planned,
     required this.unsortedText,
     required this.done,
     required this.allDay,
     required this.noTitle,
     required this.since,
     required this.until,
+    this.fatFingers = false,
   });
+
+  /// How many times a snapshot read the log itself ([AgendaSnapshot.of]),
+  /// for the tests that count them: not while the Agenda's read is
+  /// current (#204).
+  @visibleForTesting
+  static var reads = 0;
 
   /// The snapshot of [store] now, with days as [wallClock] shows them.
   /// It writes nothing: a Session's or the Frogs' pick not made yet
@@ -177,45 +260,79 @@ class AgendaSnapshot {
     WallClock wallClock,
     AppLocalizations t,
     String locale,
+  ) => AgendaSnapshot.from(
+    store,
+    AgendaRead.of(
+      readLog(store, wallClock, deviceUnitSystem(store)),
+      wallClock,
+    ),
+    t,
+    locale,
+  );
+
+  /// The log as a snapshot of its own reads it, writing nothing, counted
+  /// in [reads].
+  static AgendaLoad readLog(
+    Store store,
+    WallClock wallClock,
+    UnitSystem system,
   ) {
-    final frogs = Frogs(store).today(wallClock);
-    final read = AgendaDays.read(
-      store: store,
-      places: Places(store),
-      wallClock: wallClock,
-      days: 2,
-      sessions: Sessions(store).today(wallClock),
-      frogsToday: frogs,
-    );
+    reads++;
+    return readAgenda(store, wallClock, system);
+  }
+
+  /// The snapshot of what [read] holds, as the Agenda read it (#204): no
+  /// read of the log again but the words.
+  factory AgendaSnapshot.from(
+    Store store,
+    AgendaRead agenda,
+    AppLocalizations t,
+    String locale,
+  ) {
+    final frogs = agenda.frogs;
+    final read = agenda.days;
     final words = _Words(
       t,
       locale,
       store,
       read.system,
       NumberFormat.decimalPattern(locale).symbols.DECIMAL_SEP,
+      read.hidesChecked,
     );
-    final unsorted = Notes(store).unsorted().length;
+    final unsorted = agenda.unsorted;
     return AgendaSnapshot(
       days: {
         '${read.today}': [
           ...words.day(read.today, read.todayRows),
-          if (frogs.visible) ...words.frogs(read.frogs),
+          if (read.showsFrogs(frogs)) ...words.frogs(read.frogs),
         ],
         '${read.tomorrow}': words.day(read.tomorrow, read.tomorrowRows),
+        for (final (:day, :rows) in read.later) '$day': words.day(day, rows),
       },
-      missed: words.missed(Alarms(store).missed(wallClock)),
+      headings: {
+        for (final day in [
+          read.today,
+          read.tomorrow,
+          for (final (:day, rows: _) in read.later) day,
+        ])
+          '$day': t.agendaDay(day.wall),
+      },
+      missed: words.missed(agenda.missed),
       unsorted: unsorted,
       calendars: store.agendaCalendarOn
           ? ([...store.agendaCalendars]..sort())
           : const [],
       today: t.agendaToday,
+      tomorrow: t.agendaTomorrow,
       empty: t.widgetNothingToday,
+      planned: t.nothingPlanned,
       unsortedText: t.unsortedBanner(unsorted),
       done: t.markDone,
       allDay: t.allDay,
       noTitle: t.appointmentNoTitle,
       since: t.appointmentSince('{time}'),
       until: t.appointmentUntil('{time}'),
+      fatFingers: store.fatFingers,
     );
   }
 
@@ -225,12 +342,16 @@ class AgendaSnapshot {
       for (final MapEntry(:key, :value) in days.entries)
         key: [for (final row in value) row.toMap()],
     },
+    'headings': headings,
     'missed': [for (final row in missed) row.toMap()],
     'unsorted': unsorted,
     'calendars': calendars,
+    if (fatFingers) 'fatFingers': true,
     'labels': {
       'today': today,
+      'tomorrow': tomorrow,
       'empty': empty,
+      'planned': planned,
       'unsorted': unsortedText,
       'done': done,
       'allDay': allDay,
@@ -252,7 +373,18 @@ class _Words {
   final UnitSystem system;
   final String decimal;
 
-  _Words(this.t, this.locale, this.store, this.system, this.decimal);
+  /// Whether this Device hides what is checked, as the Agenda read it
+  /// (#217).
+  final bool hidesChecked;
+
+  _Words(
+    this.t,
+    this.locale,
+    this.store,
+    this.system,
+    this.decimal,
+    this.hidesChecked,
+  );
 
   /// The first line of [note]'s text, "Photo" for a photo Note without
   /// words.
@@ -265,9 +397,9 @@ class _Words {
       if (entry.row case final placed?)
         ..._occurrence(day, placed)
       else if (entry.shopping case final shopping?)
-        _shopping(shopping)
+        ..._shopping(shopping)
       else if (entry.checklist case final checklist?)
-        _checklist(checklist),
+        ..._checklist(checklist),
   ];
 
   List<WidgetRow> _occurrence(Day day, PlacedRow placed) {
@@ -282,15 +414,16 @@ class _Words {
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
     return [
       WidgetRow(
-        kind: WidgetRow.occurrence,
+        kind: session == null ? WidgetRow.occurrence : WidgetRow.session,
         title: masked
             ? maskedText(t, locale, row.routine, row.occurrence)
             : note == null
             ? t.noteGone
             : _firstLine(note),
         time: occurrenceTime(t, locale, row.occurrence),
-        done: row.done != null,
-        checks: !complete,
+        done: row.done != null || complete,
+        // A Session's box only shows Done: its picks make it (#208).
+        checks: !complete && session == null,
         routineId: row.routine.id,
         occurrenceKey: row.occurrence.key,
         block: block,
@@ -305,20 +438,35 @@ class _Words {
             block: block,
             at: at,
           )
+        else if (picks.today.picks.isEmpty)
+          WidgetRow(
+            kind: WidgetRow.text,
+            title: t.sessionNothingToPick,
+            indent: 1,
+            block: block,
+            at: at,
+          )
         else
-          for (final (i, pick) in picks.today.picks.indexed)
+          for (final (i, pick) in agendaPicks(
+            picks,
+            hidesChecked: hidesChecked,
+          ))
             WidgetRow(
-              kind: WidgetRow.text,
+              kind: WidgetRow.pick,
               title: picks.masked[i]
                   ? t.maskedTally
                   : pickText(t, pick, system, decimal),
               done: pick.done,
+              checks: picks.opens[i],
               indent: 1,
+              routineId: row.routine.id,
+              occurrenceKey: row.occurrence.key,
+              noteId: pick.noteId,
               block: block,
               at: at,
             )
       else if (!masked && lines != null)
-        for (final line in lines.list.lines)
+        for (final line in agendaLines(lines.list, hidesChecked: hidesChecked))
           WidgetRow(
             kind: WidgetRow.line,
             title: line.text,
@@ -339,32 +487,60 @@ class _Words {
     final title => title,
   };
 
-  WidgetRow _shopping(ShoppingRow shopping) {
-    final (:note, :masked, :line, :count, :checks, area: _) = shopping;
+  /// A Shopping List's group, as the Agenda's (#208): its name as the
+  /// heading, without a box, and its open Lines under it, each with its
+  /// box; or the heading alone with how many are open.
+  List<WidgetRow> _shopping(ShoppingRow shopping) {
+    final (:note, :masked, :lines, :count, :checks, area: _) = shopping;
     final title = _listTitle(note, t.shoppingHeading);
     final shown = masked ? t.maskedShoppingList : title;
-    return WidgetRow(
-      kind: WidgetRow.shopping,
-      title: switch (line) {
-        final line? => '${line.text} · $title',
-        null => t.shoppingRowOpen(shown, count),
-      },
-      checks: line != null && checks,
-      lineId: line?.id,
-      block: WidgetRow.lists,
-    );
+    return [
+      WidgetRow(
+        kind: WidgetRow.shopping,
+        title: lines.isEmpty ? t.shoppingRowOpen(shown, count) : title,
+        block: WidgetRow.lists,
+      ),
+      for (final line in lines)
+        WidgetRow(
+          kind: WidgetRow.shopping,
+          title: line.text,
+          checks: checks,
+          indent: 1,
+          lineId: line.id,
+          block: WidgetRow.lists,
+        ),
+    ];
   }
 
-  WidgetRow _checklist(ChecklistRow row) {
-    final (:note, :masked, :list, area: _) = row;
-    final title = masked
-        ? t.maskedChecklist
-        : _listTitle(note, t.checklistHeading);
-    return WidgetRow(
-      kind: WidgetRow.checklist,
-      title: t.checklistRowOpen(title, list.openCount, list.count),
-      block: WidgetRow.lists,
-    );
+  /// A Checklist's group, as the Agenda's (#208): its name as the
+  /// heading, without a box, and the Lines it shows under it, each with
+  /// its box; or, Masked, the heading alone with how many are open.
+  List<WidgetRow> _checklist(ChecklistRow row) {
+    final (:note, :masked, :list, :lines, :checks, area: _) = row;
+    final title = _listTitle(note, t.checklistHeading);
+    return [
+      WidgetRow(
+        kind: WidgetRow.checklist,
+        title: lines.isEmpty
+            ? t.checklistRowOpen(
+                masked ? t.maskedChecklist : title,
+                list.openCount,
+                list.count,
+              )
+            : title,
+        block: WidgetRow.lists,
+      ),
+      for (final line in lines)
+        WidgetRow(
+          kind: WidgetRow.checklistLine,
+          title: line.text,
+          done: line.checked,
+          checks: checks,
+          indent: line.inGroup ? 2 : 1,
+          lineId: line.id,
+          block: WidgetRow.lists,
+        ),
+    ];
   }
 
   /// Today's "Eat a frog" section, under what is due.

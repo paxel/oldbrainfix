@@ -179,9 +179,9 @@ class SpeechModelScreen extends StatelessWidget {
             ),
           ],
           onChanged: idle
-              ? (picked) {
+              ? (picked) async {
                   if (picked == null) return;
-                  fetchSpeechModel(context, () => model.download(picked));
+                  await fetchSpeechModel(context, () => model.download(picked));
                 }
               : null,
         ),

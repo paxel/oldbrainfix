@@ -28,7 +28,7 @@ use crate::notes::keys as note_keys;
 use crate::pending::{GiveWay, PendingDraft};
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
-use crate::sessions::keys as session_keys;
+use crate::sessions::{Sessions, keys as session_keys};
 use crate::shopping_lists::{ShoppingLists, keys as shopping_keys};
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
@@ -44,7 +44,7 @@ pub const AI_TASK_KIND: &str = "ai-task";
 /// Override, a Sent Item's link, a Profile, nor a photo or recording; and
 /// none of the user's own data: no check-off, Tally entry, tick of a Line
 /// or Box, Session pick nor eaten Frog.
-const NOTE_FIELDS: [&str; 10] = [
+const NOTE_FIELDS: [&str; 13] = [
     note_keys::TYPE,
     note_keys::CAPTURED,
     note_keys::TEXT,
@@ -55,14 +55,18 @@ const NOTE_FIELDS: [&str; 10] = [
     note_keys::SPAWNED,
     note_keys::NUDGE,
     line_keys::KIND,
+    session_keys::POOL,
+    session_keys::COUNT,
+    session_keys::RULE,
 ];
 /// The keys of a Tally's field on its Note, `tally:<field id>:<key>`.
-const TALLY_FIELD_KEYS: [&str; 5] = [
+const TALLY_FIELD_KEYS: [&str; 6] = [
     tally_keys::NAME,
     tally_keys::UNIT,
     tally_keys::TARGET,
     tally_keys::RULE,
     tally_keys::HIDDEN,
+    tally_keys::MULTIPLIES,
 ];
 const SECTION_FIELDS: [&str; 4] = [
     note_keys::TYPE,
@@ -70,7 +74,8 @@ const SECTION_FIELDS: [&str; 4] = [
     note_keys::CAPTURED,
     note_keys::TEXT,
 ];
-const ROUTINE_FIELDS: [&str; 12] = [
+/// A Routine: never a Session's setup, which lies on its Note (ADR 0039).
+const ROUTINE_FIELDS: [&str; 9] = [
     routine_keys::TYPE,
     routine_keys::NOTE,
     routine_keys::START,
@@ -80,9 +85,6 @@ const ROUTINE_FIELDS: [&str; 12] = [
     routine_keys::ESCALATION,
     routine_keys::TRASHED,
     routine_keys::TRASHED_WITH,
-    session_keys::POOL,
-    session_keys::COUNT,
-    session_keys::RULE,
 ];
 /// A Line of a Checklist or Shopping List: never whether it is checked.
 const LINE_FIELDS: [&str; 8] = [
@@ -109,8 +111,9 @@ const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys:
 /// ([`crate::checklists::keys::AGENDA_PREFIX`]).
 const AGENDA_TYPE: &str = "agenda";
 /// The user's own choices for the Agenda, `agenda:<note id>`: how a
-/// Shopping List shows there (#186), never a Checklist's switch.
-const AGENDA_FIELDS: [&str; 1] = [shopping_keys::AGENDA];
+/// Shopping List (#186) or a Checklist without a Routine (#219) shows
+/// there.
+const AGENDA_FIELDS: [&str; 2] = [shopping_keys::AGENDA, line_keys::AGENDA];
 
 /// The fields of a Note's or Section's Capture Context, which an AI Task
 /// only ever removes (ADR 0037): it never says where or when something
@@ -139,7 +142,8 @@ fn is_tally_field(field: &str) -> bool {
         .is_some_and(|(id, key)| !id.is_empty() && TALLY_FIELD_KEYS.contains(&key))
 }
 
-/// Whether `field` is the count of a Session for one weekday.
+/// Whether `field` is the count of a Session for one weekday, on its
+/// Note.
 fn is_weekday_count(field: &str) -> bool {
     (1..=7).any(|weekday| field == session_keys::count_on(weekday))
 }
@@ -233,10 +237,11 @@ impl AiReview {
 
 /// The group the change of `field` to `after` on an entity of type `ty`
 /// falls in; `made` for an entity the task made, `session` for a Routine
-/// that is a Session.
+/// that runs a Session.
 fn kind_of(ty: &str, made: bool, session: bool, field: &str, after: Option<&str>) -> AiChangeKind {
     match ty {
         "note" if is_tally_field(field) => AiChangeKind::Tally,
+        "note" if session_keys::is_setup(field) => AiChangeKind::Session,
         "note" if field == line_keys::KIND => AiChangeKind::List,
         "note" if made => AiChangeKind::NoteAdded,
         "note" => match field {
@@ -396,8 +401,7 @@ impl Store {
             return refuse("a captured detail it only removes");
         }
         let set_up = match ty {
-            "note" => is_tally_field(field),
-            "routine" => is_weekday_count(field),
+            "note" => is_tally_field(field) || is_weekday_count(field),
             _ => false,
         };
         if !context && !set_up && !fields.contains(&field) {
@@ -459,7 +463,10 @@ impl Store {
             // The user's own, whatever their role in the list's Area.
             AGENDA_TYPE => {
                 let note = entity.split_once(':').map_or("", |(_, note)| note);
-                ShoppingLists::new(self).making(note)?.is_some()
+                match field {
+                    line_keys::AGENDA => Checklists::new(self).may_show_on_agenda(note)?,
+                    _ => ShoppingLists::new(self).making(note)?.is_some(),
+                }
             }
             "area" => made || self.may_manage(Some(entity))?,
             "topic" => {
@@ -526,7 +533,7 @@ impl Store {
                 AGENDA_TYPE => entity.split_once(':').map(|(_, note)| note.to_string()),
                 _ => None,
             };
-            let session = ty == "routine" && self.current(entity, session_keys::POOL)?.is_some();
+            let session = ty == "routine" && Sessions::new(self).is_session(entity)?;
             let mut items: Vec<AiReviewItem> = Vec::new();
             for field in fields.get(entity).into_iter().flatten() {
                 let Some(d) = last.get(&(entity.clone(), field.clone())) else {
@@ -850,13 +857,22 @@ mod tests {
             Some(crate::schedule::Recurrence::parse("FREQ=DAILY").map_err(|e| e.to_string())?),
         )
         .ok_or("a schedule")?;
-        let session = Sessions::new(&store).spawn(
-            &trip,
-            &daily,
-            std::slice::from_ref(&run),
-            1,
-            SessionRule::Rolling,
-        )?;
+        // A Session an older version spawned from the Checklist, its setup
+        // on the Routine (ADR 0039), so one Routine takes ticks and picks.
+        let routine = Routines::new(&store).spawn_with(&trip, &daily, |id| {
+            store.append(id, session_keys::POOL, Some(&run), None)?;
+            store.append(id, session_keys::COUNT, Some("1"), None)?;
+            store.append(
+                id,
+                session_keys::RULE,
+                Some(SessionRule::Rolling.name()),
+                None,
+            )?;
+            Ok(())
+        })?;
+        let session = Sessions::new(&store)
+            .by_id(&routine.id)?
+            .ok_or("a Session")?;
         let first = Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(8, 0));
         let task = store.open_ai_task()?;
         let raw = |entity: &str, field: &str, value: &str| -> Result<()> {
@@ -993,7 +1009,7 @@ mod tests {
         })?;
         let (ben, milk) = (&shared.ben, &shared.milk);
         let (trip, run) = (&shared.more[0], &shared.more[1]);
-        let (bank, session) = (&shared.more[2], &shared.more[3]);
+        let bank = &shared.more[2];
         let socks = Checklists::new(ben)
             .by_note(trip)?
             .ok_or("a Checklist")?
@@ -1029,16 +1045,14 @@ mod tests {
                 serde_json::json!({"id": milk, "list": "checklist"}),
             ),
             ("list_to_plain", serde_json::json!({"id": trip})),
+            ("switch_list", serde_json::json!({"id": trip})),
             ("move_line", serde_json::json!({"id": socks})),
             (
                 "group_line",
                 serde_json::json!({"id": socks, "under": false}),
             ),
             ("frog_to_plain", serde_json::json!({"id": bank})),
-            (
-                "set_session",
-                serde_json::json!({"count": 2, "id": session}),
-            ),
+            ("set_session", serde_json::json!({"count": 2, "id": bank})),
         ] {
             let out = call(name, args)?;
             assert!(out.is_error, "{name} went through: {out:?}");

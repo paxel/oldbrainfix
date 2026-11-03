@@ -145,7 +145,7 @@ void main() {
       OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
     );
     await tester.pumpAndSettle();
-    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.byKey(const ValueKey('browse')));
     await tap(tester, find.text('Household'));
     await tap(tester, find.byKey(const ValueKey('author-open')));
     expect(find.byType(PersonScreen), findsOneWidget);
@@ -481,7 +481,7 @@ void main() {
         OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
       );
       await tester.pumpAndSettle();
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.text('Household'));
       expect(find.byType(NoteCard), findsNWidgets(3));
       await pick(tester, 'me');
@@ -515,7 +515,7 @@ void main() {
         OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
       );
       await tester.pumpAndSettle();
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       expect(find.byKey(const ValueKey('personFilter')), findsNothing);
       await tester.enterText(find.byType(TextField), 'bread');
       await tester.pumpAndSettle();

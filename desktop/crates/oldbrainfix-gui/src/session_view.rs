@@ -1,16 +1,25 @@
-//! A Session's part of its Agenda row (#104, ADR 0029), as the phone's
-//! `session_view.dart` draws it: today its picks under the title, in the
-//! order picked, each a line with its targets, struck through once it
-//! has an entry, a click opening its entry form, and under each without
-//! an entry "Another one"; on later days how many it picks.
+//! A Session's part of its Agenda row (#104, ADR 0029): what it shows,
+//! today its picks with their targets, drawn under the row's heading as
+//! entries with boxes (#208), on later days how many it picks. A Session
+//! Note's detailed card (#191, ADR 0039) shows the picks for today
+//! under each of its Routines' times, after its pool, and how often it was
+//! Done and skipped in each of the last four weeks.
 
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
-use oldbrainfix_core::{Occurrence, SessionOccurrence, SessionPick, Store, UnitSystem};
+use oldbrainfix_core::{
+    Day, Notes, Occurrence, Routines, Session, SessionOccurrence, SessionPick, SessionRule,
+    SessionSetup, Sessions, Store, UnitSystem, WallClock,
+};
 
 use crate::app::row_title;
+use crate::history_view;
 use crate::icons;
 use crate::l10n::L10n;
+use crate::schedule_text::{day_text, occurrence_time};
 use crate::tally_view::{decimal_sign, shown_value};
+
+/// How many weeks of its history a Session Note's card shows (#191).
+pub const CARD_WEEKS: i64 = 4;
 
 /// Today's Occurrence of a Session as its row shows it: the text of each
 /// pick, whether each opens its entry form here, and whether they swap.
@@ -45,6 +54,144 @@ impl PicksShown {
             opens,
             today,
         })
+    }
+}
+
+/// A Session Note's detailed card as it shows (#191): its pool, how many
+/// it picks and how, today's picks of each of its Routines under their
+/// time, and how often its Routines were Done and Missed in each of the
+/// last weeks, this week first; read with the card, never while drawn.
+#[derive(Debug, Clone)]
+pub struct SessionCardShown {
+    pub pool: Vec<String>,
+    pub setup: String,
+    pub today: Vec<(String, PicksShown)>,
+    pub weeks: Vec<String>,
+}
+
+impl SessionCardShown {
+    /// The card of the Session `setup` of its Note, with `today`, the
+    /// Occurrences of its Routines today as the Agenda shows them, by time
+    /// and then by Routine, written nowhere; days as `wall` shows them.
+    pub fn read(
+        store: &Store,
+        t: &L10n,
+        setup: &SessionSetup,
+        today: Vec<SessionOccurrence>,
+        (system, wall): (UnitSystem, &WallClock),
+    ) -> oldbrainfix_core::Result<SessionCardShown> {
+        let sessions = Sessions::new(store);
+        let notes = Notes::new(store);
+        let mut pool = Vec::new();
+        for id in sessions.pool(setup)? {
+            pool.push(row_title(t, notes.by_id(&id)?.as_ref()));
+        }
+        let setup_line = format!(
+            "{} · {}",
+            t.session_picks(setup.count),
+            rule_name(t, setup.rule)
+        );
+        let mut shown = Vec::new();
+        for occurrence in today {
+            let time = occurrence_time(t, &occurrence.occurrence);
+            shown.push((time, PicksShown::read(store, t, occurrence, system)?));
+        }
+        let runs = sessions.of_note(&setup.note_id)?;
+        let weeks = weeks(store, t, &runs, wall)?;
+        Ok(SessionCardShown {
+            pool,
+            setup: setup_line,
+            today: shown,
+            weeks,
+        })
+    }
+}
+
+/// How often the Routines `runs` of a Session Note were Done and Missed
+/// in each of the last [`CARD_WEEKS`] weeks, this week first, up to
+/// today, weeks starting as this Device's language has them; none
+/// without a Routine.
+fn weeks(
+    store: &Store,
+    t: &L10n,
+    runs: &[Session],
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<Vec<String>> {
+    if runs.is_empty() {
+        return Ok(Vec::new());
+    }
+    let routines = Routines::new(store);
+    let week_start = history_view::week_start(t);
+    let mut histories = Vec::new();
+    for run in runs {
+        histories.push(routines.history(&run.routine, wall, week_start)?);
+    }
+    let today = Day::today(store.now(), wall);
+    let back = (i64::from(today.weekday()) - i64::from(week_start)).rem_euclid(7);
+    let start = today.add_days(-back);
+    let mut lines = Vec::new();
+    for i in 0..CARD_WEEKS {
+        let from = start.add_days(-7 * i);
+        let to = if i == 0 { today } else { from.add_days(6) };
+        let (mut done, mut missed) = (0, 0);
+        for history in &histories {
+            let week = history.adherence(from, to);
+            done += week.done as i64;
+            missed += week.missed as i64;
+        }
+        lines.push(t.session_history_week(&day_text(t, from), done, missed));
+    }
+    Ok(lines)
+}
+
+/// The rule `rule` in words, the value of its badge.
+pub fn rule_name(t: &L10n, rule: SessionRule) -> &'static str {
+    match rule {
+        SessionRule::Random => t.session_rule_random(),
+        SessionRule::Rolling => t.session_rule_rolling(),
+        SessionRule::Least => t.session_rule_least(),
+    }
+}
+
+/// The rule `rule` as the value icon of its badge (#192), the phone's
+/// `sessionRuleIcon`.
+pub fn rule_icon(rule: SessionRule) -> char {
+    match rule {
+        SessionRule::Random => icons::SESSION_RULE,
+        SessionRule::Rolling => icons::FORMAT_NUMBERS,
+        SessionRule::Least => icons::SESSION_LEAST,
+    }
+}
+
+/// Draws a Session Note's detailed card `shown`: its pool, its setup,
+/// today's picks of each Routine under its time, each opening its entry
+/// form and offering "Another one" as on the Agenda, then its last weeks.
+pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<SessionAction>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.style_mut().interaction.selectable_labels = false;
+    ui.label(RichText::new(t.session_pool()).strong().color(text));
+    for name in &shown.pool {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::TALLY, 18.0, text);
+            ui.add(egui::Label::new(RichText::new(name).color(text)).wrap());
+        });
+    }
+    ui.label(RichText::new(&shown.setup).size(13.0).color(weak));
+    if !shown.today.is_empty() {
+        ui.add_space(4.0);
+        ui.label(RichText::new(t.agenda_today()).strong().color(text));
+        for (time, picks_shown) in &shown.today {
+            ui.label(RichText::new(time).color(text));
+            ui.scope(|ui| picks(ui, t, picks_shown, actions));
+        }
+    }
+    if !shown.weeks.is_empty() {
+        ui.add_space(4.0);
+        ui.label(RichText::new(t.session_history()).strong().color(text));
+        for week in &shown.weeks {
+            ui.label(RichText::new(week).color(text));
+        }
     }
 }
 
@@ -122,17 +269,6 @@ pub fn opens_pick(
     match pick.entries.last() {
         Some(entry) => store.may_change(&entry.id),
         None => Ok(store.may_check_off(session)? && store.may_write_in(&pick.note_id)?),
-    }
-}
-
-/// Draws `part` under a Session's title.
-pub fn part(ui: &mut Ui, t: &L10n, part: &SessionPart, actions: &mut Vec<SessionAction>) {
-    let text = ui.visuals().text_color();
-    match part {
-        SessionPart::Later(count) => {
-            ui.label(RichText::new(t.session_picks(*count)).color(text));
-        }
-        SessionPart::Today(shown) => picks(ui, t, shown, actions),
     }
 }
 

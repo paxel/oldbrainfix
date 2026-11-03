@@ -17,6 +17,7 @@ use crate::error::{Error, Result};
 use crate::notes::keys;
 use crate::places::Places;
 use crate::search::lower_case;
+use crate::shopping_lists::ListOnAgenda;
 use crate::store::Store;
 use crate::text_boxes;
 use crate::text_format::{self, KNOWN, MARKDOWN, PLAIN, StoredText, VERSION};
@@ -304,7 +305,7 @@ impl<'a> Imports<'a> {
                 s.append(&id, checklist_keys::CHECKED, Some(&dart_iso(on)), Some(on))?;
             }
         }
-        Checklists::new(s).set_show_on_agenda(note_id, false)
+        Checklists::new(s).set_on_agenda(note_id, ListOnAgenda::Off)
     }
 
     /// Makes one Note of each note of a Google Keep export in a new Area
@@ -469,7 +470,11 @@ const PHOTO_KINDS: [&str; 5] = ["jpg", "jpeg", "png", "webp", "gif"];
 /// of ASCII letters.
 fn in_keep_folder(path: &str) -> bool {
     let folders: Vec<&str> = path.split(['/', '\\']).collect();
-    folders.len() > 1 && folders[folders.len() - 2].eq_ignore_ascii_case("keep")
+    folders
+        .iter()
+        .rev()
+        .nth(1)
+        .is_some_and(|folder| folder.eq_ignore_ascii_case("keep"))
 }
 
 /// The extension of the file `base` in lower case ASCII letters, empty
@@ -603,7 +608,12 @@ fn decode(bytes: &[u8]) -> Option<String> {
         Err(_) => bytes
             .iter()
             .map(|&b| match b {
-                0x80..=0x9f => CP1252[usize::from(b - 0x80)],
+                // The table holds all 32 of them; were one missing, the
+                // byte would read as Latin-1, as the rest do.
+                0x80..=0x9f => CP1252
+                    .get(usize::from(b - 0x80))
+                    .copied()
+                    .unwrap_or(char::from(b)),
                 _ => char::from(b),
             })
             .collect(),
@@ -1143,10 +1153,14 @@ mod tests {
             )?;
             let lists = Checklists::new(&store);
             let id = only(&store, &summary)?.id;
-            assert!(!lists.shows_on_agenda(&id)?);
-            assert!(lists.agenda()?.is_empty());
-            lists.set_show_on_agenda(&id, true)?;
-            let shown: Vec<_> = lists.agenda()?.into_iter().map(|l| l.note_id).collect();
+            assert_eq!(lists.on_agenda(&id)?, ListOnAgenda::Off);
+            assert!(lists.agenda_rows()?.is_empty());
+            lists.set_on_agenda(&id, ListOnAgenda::Lines)?;
+            let shown: Vec<_> = lists
+                .agenda_rows()?
+                .into_iter()
+                .map(|r| r.list.note_id)
+                .collect();
             assert_eq!(shown, [id]);
             Ok(())
         }

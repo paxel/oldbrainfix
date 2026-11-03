@@ -9,10 +9,27 @@ members = [
 
 # The version equals the pubspec's (a test in oldbrainfix-core checks it).
 [workspace.package]
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/paxel/oldbrainfix"
+
+# No unsafe and no panics (#229, Q555 (a), Q560 (a)). `unsafe_code` is
+# `deny`, not `forbid`: a `forbid` cannot be lifted by the module-level
+# `allow` the two FFI modules (oldbrainfix-whisper's lib.rs and
+# oldbrainfix-gui's login.rs) need. Tests may unwrap, expect, panic and
+# index (clippy.toml; the files in tests/ allow them at the top).
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
 
 # RustO is far too slow unoptimised, also in `cargo test`.
 [profile.dev.package.rusto-rs]

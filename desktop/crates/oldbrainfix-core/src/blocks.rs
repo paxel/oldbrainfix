@@ -52,25 +52,26 @@ fn is_instant(text: &str) -> bool {
         b.get(range)
             .is_some_and(|d| d.iter().all(u8::is_ascii_digit))
     };
+    let at = |i: usize, want: u8| b.get(i) == Some(&want);
     if b.len() < 20
         || !digits(0..4)
-        || b[4] != b'-'
+        || !at(4, b'-')
         || !digits(5..7)
-        || b[7] != b'-'
+        || !at(7, b'-')
         || !digits(8..10)
-        || b[10] != b'T'
+        || !at(10, b'T')
         || !digits(11..13)
-        || b[13] != b':'
+        || !at(13, b':')
         || !digits(14..16)
-        || b[16] != b':'
+        || !at(16, b':')
         || !digits(17..19)
-        || b[b.len() - 1] != b'Z'
+        || b.last() != Some(&b'Z')
     {
         return false;
     }
     match b.len() - 20 {
         0 => true,
-        n => (2..=7).contains(&n) && b[19] == b'.' && digits(20..b.len() - 1),
+        n => (2..=7).contains(&n) && at(19, b'.') && digits(20..b.len() - 1),
     }
 }
 

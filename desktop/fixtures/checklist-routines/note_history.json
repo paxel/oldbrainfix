@@ -1,0 +1,344 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:16.000Z",
+          "entity": "line:00000000000000000000000000000007",
+          "kind": "lineRemoved",
+          "before": null,
+          "after": "Bottle",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:09.000Z",
+          "entity": "line:00000000000000000000000000000009",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Lock",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:42.000Z",
+          "entity": "line:00000000000000000000000000000003",
+          "kind": "lineChecked",
+          "before": null,
+          "after": "Towel",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:35.000Z",
+          "entity": "line:00000000000000000000000000000007",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Bottle",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:28.000Z",
+          "entity": "line:00000000000000000000000000000006",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Socks",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:21.000Z",
+          "entity": "line:00000000000000000000000000000005",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Laces",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:15.000Z",
+          "entity": "line:00000000000000000000000000000004",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Shoes",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:09.000Z",
+          "entity": "line:00000000000000000000000000000003",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Towel",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:06.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "text",
+          "before": "Gym bag\nTowel\nShoes\n  Laces\n  Socks\nBottle",
+          "after": "Gym bag",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:05.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:01.000Z",
+          "entity": "note:00000000000000000000000000000001",
+          "kind": "captured",
+          "before": null,
+          "after": "Gym bag\nTowel\nShoes\n  Laces\n  Socks\nBottle",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "history": [
+        {
+          "at": "2026-01-01T10:01:31.000Z",
+          "entity": "line:0000000000000000000000000000000d",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Form",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:25.000Z",
+          "entity": "line:0000000000000000000000000000000c",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Photo",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:22.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "text",
+          "before": "Passport\nPhoto\nForm",
+          "after": "Passport",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:21.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:17.000Z",
+          "entity": "note:0000000000000000000000000000000a",
+          "kind": "captured",
+          "before": null,
+          "after": "Passport\nPhoto\nForm",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000f",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:25.000Z",
+          "entity": "line:00000000000000000000000000000016",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Bin",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:19.000Z",
+          "entity": "line:00000000000000000000000000000015",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Desk",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:18.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "text",
+          "before": "Tidy\nDesk\nBin",
+          "after": "Tidy",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:17.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:16.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "kind",
+          "before": "checklist",
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:15.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "text",
+          "before": "Tidy",
+          "after": "Tidy\nDesk\nBin",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        },
+        {
+          "at": "2026-01-01T10:02:00.000Z",
+          "entity": "line:00000000000000000000000000000012",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Bin",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:54.000Z",
+          "entity": "line:00000000000000000000000000000011",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Desk",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:51.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "text",
+          "before": "Tidy\nDesk\nBin",
+          "after": "Tidy",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:50.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:01:46.000Z",
+          "entity": "note:0000000000000000000000000000000f",
+          "kind": "captured",
+          "before": null,
+          "after": "Tidy\nDesk\nBin",
+          "format": "plain",
+          "by": null,
+          "mayUse": true
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000017",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:41.000Z",
+          "entity": "note:00000000000000000000000000000017",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:37.000Z",
+          "entity": "note:00000000000000000000000000000017",
+          "kind": "captured",
+          "before": null,
+          "after": "Empty",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000001a",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:50.000Z",
+          "entity": "note:0000000000000000000000000000001a",
+          "kind": "captured",
+          "before": null,
+          "after": "Walk the dog",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000001c",
+      "history": [
+        {
+          "at": "2026-01-01T10:03:01.000Z",
+          "entity": "note:0000000000000000000000000000001c",
+          "kind": "captured",
+          "before": null,
+          "after": "Unsorted thought",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

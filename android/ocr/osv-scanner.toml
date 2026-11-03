@@ -1,0 +1,13 @@
+# OSV-Scanner's exceptions for android/ocr/Cargo.lock, read as those of
+# desktop/osv-scanner.toml are: CI and the release gate list an unmaintained
+# notice without failing, the weekly Security run fails on it, and an
+# entry's date passing makes the weekly run fail again for review.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+ignoreUntil = 2027-05-03
+reason = """paste is unmaintained; no vulnerability is described. A proc \
+macro, run at compile time only. It comes only through rusto-rs 0.3.2 -> \
+nalgebra 0.33 -> simba 0.9. rusto-rs 0.3.2, the latest, requires nalgebra \
+^0.33, which requires simba ^0.9, and simba 0.9.1 requires paste; only \
+simba 0.10 drops it."""

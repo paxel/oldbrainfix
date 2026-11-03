@@ -1,0 +1,149 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000002",
+      "history": [
+        {
+          "at": "2023-08-15T06:45:00.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2023-08-15T06:45:00.000Z",
+          "entity": "note:00000000000000000000000000000002",
+          "kind": "captured",
+          "before": null,
+          "after": "Locker code 4711",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "history": [
+        {
+          "at": "2024-03-01T08:00:00.000250Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "photoAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-03-01T08:00:00.000250Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "photoAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-03-01T08:00:00.000250Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-03-01T08:00:00.000250Z",
+          "entity": "note:00000000000000000000000000000003",
+          "kind": "captured",
+          "before": null,
+          "after": "Dentist\nTuesday 9:00\nbring the X-ray #errands\n#Home-Garden #2024",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "history": [
+        {
+          "at": "2025-01-10T12:00:00.000Z",
+          "entity": "line:00000000000000000000000000000006",
+          "kind": "lineChecked",
+          "before": null,
+          "after": "Milk",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "line:00000000000000000000000000000008",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Über-Brot",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "line:00000000000000000000000000000007",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Eggs",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "line:00000000000000000000000000000006",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Milk",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "kind",
+          "before": null,
+          "after": "checklist",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2024-11-05T17:30:00.000Z",
+          "entity": "note:00000000000000000000000000000004",
+          "kind": "captured",
+          "before": null,
+          "after": "Groceries\n#shopping",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

@@ -260,7 +260,7 @@ pub fn toggle_heading_column(text: &str, at: usize) -> Change {
 /// more row, on lines of its own, a blank line between it and the lines
 /// around it: at a blank line in place of it, at the start of a line
 /// before that line, anywhere else in a line after that line, and in a
-/// table after that table. It takes the text's first kind of line break,
+/// table or a code block after it. It takes the text's first kind of line break,
 /// `\n` when there is none.
 pub fn insert(text: &str, at: usize) -> Change {
     let offset = floor(text, at);
@@ -281,10 +281,16 @@ pub fn insert(text: &str, at: usize) -> Change {
             .get(line)
             .is_some_and(|b| skip_blank(bytes, b.start, b.end) == b.end)
     };
-    let line = block.table.as_ref().map_or(block.line, |t| t.last_line);
+    let whole = block.table.is_some() || block.code.is_some();
+    let line = block
+        .table
+        .as_ref()
+        .map(|t| t.last_line)
+        .or(block.code.as_ref().map(|c| c.last_line))
+        .unwrap_or(block.line);
     let next_blank = |line: usize| line + 1 >= blocks.len() || blank(line + 1);
     let before_blank = |line: usize| line == 0 || blank(line - 1);
-    let (split, before, after) = if block.table.is_none() && blank(line) {
+    let (split, before, after) = if !whole && blank(line) {
         let before = if before_blank(line) { "" } else { br };
         let after = if next_blank(line) { "" } else { br };
         (
@@ -292,7 +298,7 @@ pub fn insert(text: &str, at: usize) -> Change {
             before.to_string(),
             after.to_string(),
         )
-    } else if block.table.is_none() && offset <= skip_blank(bytes, block.start, block.end) {
+    } else if !whole && offset <= skip_blank(bytes, block.start, block.end) {
         let before = if before_blank(line) { "" } else { br };
         (
             (block.start, block.start),
@@ -376,7 +382,7 @@ fn break_at(text: &str, at: usize) -> &'static str {
     }
 }
 
-fn first_break(text: &str) -> &'static str {
+pub(super) fn first_break(text: &str) -> &'static str {
     text.bytes()
         .position(|c| c == b'\n' || c == b'\r')
         .map_or("\n", |i| break_at(text, i))
@@ -449,8 +455,8 @@ impl Grid {
 /// many cells, and every line under those that is a row too; before its
 /// header row may come [`HEADING_COLUMN_LINE`]. A row is a line of at
 /// least one cell that would be a paragraph line, indented by at most
-/// three, not blank, no comment (`<!--`), no fence of three backticks or
-/// tildes and no rule (three `-`, `*` or `_`). The delimiter row holds a
+/// three, not blank, no comment (`<!--`), no code block's fence and no
+/// rule (three `-`, `*` or `_`). The delimiter row holds a
 /// `|` and cells of `-`, a `:` at either end telling the alignment.
 pub(super) fn table_at(text: &str, lines: &[(usize, usize)], first: usize) -> Option<Table> {
     let flagged = is_heading_column_line(text, *lines.get(first)?);
@@ -547,6 +553,7 @@ pub(super) fn blocks(table: Table, lines: &[(usize, usize)]) -> Vec<Block> {
                 spans,
                 table: Some(Arc::clone(&table)),
                 row,
+                code: None,
             }
         })
         .collect()
@@ -573,7 +580,7 @@ fn is_row(text: &str, start: usize, end: usize) -> bool {
         return false;
     }
     let rest = slice(text, at, end);
-    if rest.starts_with("<!--") || rest.starts_with("```") || rest.starts_with("~~~") {
+    if rest.starts_with("<!--") || super::fence_at(text, start, end).is_some() {
         return false;
     }
     let c = byte(at);

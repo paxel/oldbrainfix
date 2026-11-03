@@ -10,6 +10,8 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -51,6 +53,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  group('Simple or Advanced', () {
+    testWidgets('reads Advanced where nothing was chosen; Simple is kept for '
+        'the person and hides the quick note\'s format bar switch', (
+      tester,
+    ) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      final choice = find.byKey(const ValueKey('features'));
+      expect(tester.widget<RadioColumn<bool>>(choice).value, isTrue);
+      expect(
+        find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
+        findsOneWidget,
+      );
+      await tap(tester, find.byKey(const ValueKey('features-simple')));
+      expect(store.advanced, isFalse);
+      expect(tester.widget<RadioColumn<bool>>(choice).value, isFalse);
+      expect(
+        find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
+        findsNothing,
+      );
+      await tap(tester, find.byKey(const ValueKey('features-advanced')));
+      expect(store.advanced, isTrue);
+    });
+  });
+
   group('the Profile picture', () {
     testWidgets('sits in the Agenda\'s top bar where the gear was and leads '
         'to Settings through the Profile page; no drawer, no ⋮ menu', (
@@ -74,7 +101,10 @@ void main() {
       await openDeviceSettings(tester);
       expect(find.byType(SettingsScreen), findsOneWidget);
       expect(
-        find.text('These settings belong to this phone and are never synced.'),
+        find.text(
+          'Simple or Advanced and the Trash setting sync to your own Devices; '
+          'the other settings belong to this phone.',
+        ),
         findsOneWidget,
       );
     });
@@ -209,6 +239,39 @@ void main() {
       expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
     });
 
+    testWidgets('strike through what is checked on the Agenda until it is '
+        'hidden, which the Agenda follows on the way back (#217)', (
+      tester,
+    ) async {
+      final routines = Routines(store);
+      final today = Day.today(DateTime.now(), deviceWallClock);
+      final pills = routines.create('pills', Schedule(start: today));
+      routines.markDone(pills.id, Occurrence(today));
+      await start(tester);
+      expect(find.text('pills'), findsOneWidget);
+      await openDeviceSettings(tester);
+      expect(find.text('Agenda'), findsOneWidget);
+      final hide = find.byKey(const ValueKey('agendaHideChecked'));
+      if (hide.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(
+          hide,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+      }
+      expect(tester.widget<Switch>(hide).value, isFalse);
+      final logged = store.allEntries().length;
+      await tap(tester, hide);
+      expect(store.agendaHidesChecked, isTrue);
+      expect(store.allEntries(), hasLength(logged), reason: 'never logged');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.text('pills'), findsNothing);
+    });
+
     testWidgets('are radio columns that keep a value outside the choices', (
       tester,
     ) async {
@@ -229,10 +292,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.descendant(
-            of: column,
-            matching: find.byType(RadioListTile<int>),
-          ),
+          find.descendant(of: column, matching: find.byType(ChoiceChip)),
           findsNWidgets(count),
           reason: key,
         );
@@ -242,14 +302,7 @@ void main() {
           reason: key,
         );
         expect(
-          tester
-              .widget<RadioGroup<int>>(
-                find.descendant(
-                  of: column,
-                  matching: find.byType(RadioGroup<int>),
-                ),
-              )
-              .groupValue,
+          tester.widget<ChoiceChips<int>>(column).value,
           chosen,
           reason: key,
         );
@@ -268,6 +321,64 @@ void main() {
       }
       await tap(tester, find.text('Done'));
       expect(find.byType(SettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('ring all-day items from 15:00 until another time is picked, '
+        'which is kept on this Device and armed at once (#201)', (
+      tester,
+    ) async {
+      final note = Notes(store).capture('water the plants');
+      Routines(store).spawn(
+        note.id,
+        Schedule(
+          start: Day.today(store.clock(), (utc) => utc.toLocal()),
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      await start(tester);
+      List<ClockTime?> allDayTimes() => [
+        for (final a in alarms.armed)
+          if (a.alarm.occurrence.time == null) a.alarm.wall?.time,
+      ];
+      expect(allDayTimes(), isNotEmpty);
+      expect(allDayTimes().toSet(), {ClockTime(15, 0)});
+
+      await openDeviceSettings(tester);
+      final tile = find.byKey(const ValueKey('allDayFrom'));
+      await tap(tester, tile);
+      expect(find.byType(TimePickerDialog), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(store.localSetting('allDayFrom'), isNull, reason: 'backed out');
+      expect(
+        find.descendant(of: tile, matching: find.text('15:00')),
+        findsOneWidget,
+      );
+
+      await tap(tester, tile);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(TimePickerDialog),
+          matching: find.byIcon(Icons.keyboard_outlined),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final fields = find.descendant(
+        of: find.byType(TimePickerDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(fields.at(0), '4');
+      await tester.enterText(fields.at(1), '30');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(store.allDayFrom, ClockTime(16, 30));
+      expect(
+        find.descendant(of: tile, matching: find.text('16:30')),
+        findsOneWidget,
+      );
+      expect(allDayTimes().toSet(), {ClockTime(16, 30)});
+      expect(store.allEntries().where((e) => e.field == 'allDayFrom'), isEmpty);
     });
 
     testWidgets('offer no alarm setup where there are no alarms', (
@@ -956,7 +1067,7 @@ void main() {
         ('Passport', true),
         ('Charger', false),
       ]);
-      expect(Checklists(store).showsOnAgenda(packing.id), isFalse);
+      expect(Checklists(store).onAgenda(packing.id), ListOnAgenda.off);
       expect(notes.unsorted(), isEmpty);
       expect(find.text('Import from Google Keep'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);

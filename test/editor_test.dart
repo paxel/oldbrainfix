@@ -100,7 +100,14 @@ void main() {
       await reveal(tester, find.text('Update: sauce bought'));
       expect(find.text('Update: sauce bought'), findsOneWidget);
       expect(find.text(shown(DateTime.utc(2026, 10, 25, 8))), findsOneWidget);
-      expect(find.text('Normal'), findsOneWidget);
+      // The Importance as its icon (#192).
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('badge-importance')),
+          matching: find.byIcon(Icons.remove),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('an edit changes the text in place; the log keeps the old', (
@@ -155,7 +162,14 @@ void main() {
       await tap(tester, find.text('Add'));
 
       expect(find.text('Update: sauce bought'), findsOneWidget);
-      expect(find.text(shown(DateTime.utc(2026, 10, 24, 11))), findsOneWidget);
+      // Under it, the same day as the Note, its time only (#170).
+      expect(
+        find.text(
+          DateFormat.Hm('en').format(DateTime.utc(2026, 10, 24, 11).toLocal()),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(shown(DateTime.utc(2026, 10, 24, 11))), findsNothing);
       final section = notes.sections(note.id).single;
       expect(section.text, 'Update: sauce bought');
       expect(section.context.captured, DateTime.utc(2026, 10, 24, 11));
@@ -299,6 +313,12 @@ void main() {
         for (final card in tester.widgetList<NoteCard>(find.byType(NoteCard)))
           card.note.text,
       ];
+      // A phone-tall page: the default 600 is too short for the third
+      // card, so it is not built.
+      tester.view
+        ..physicalSize = const Size(1080, 2340)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
 
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));

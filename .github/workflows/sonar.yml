@@ -1,0 +1,78 @@
+# SonarQube Cloud analysis (#233) of summer after each merge; the free plan
+# analyses the main branch only. Report only: the quality gate shows on
+# https://sonarcloud.io/summary/new_code?id=paxel_oldbrainfix and fails no
+# build. What is analysed is in sonar-project.properties.
+#
+# One-time setup: the project paxel_oldbrainfix on SonarQube Cloud with
+# Automatic Analysis off, and the repository secret SQ_TOKEN.
+#
+# Third-party actions are pinned to full commit SHAs (githubactions:S7637);
+# the comment names the version.
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [summer]
+
+permissions:
+  contents: read
+
+jobs:
+  sonar:
+    name: SonarQube Cloud analysis
+    runs-on: ubuntu-latest
+    # As in the release's desktop gate: the coverage build's test binaries
+    # with full debug info would fill the runner's disk.
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - name: Room on the runner's disk (its preinstalled SDKs are not used here)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      # The full history, for the blame and the new-code period.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      # Clippy compiles the desktop's build scripts, so the same system
+      # libraries as CI's Desktop job: ALSA for the microphone, cmake and
+      # g++ for whisper.cpp; lavapipe for the GUI tests the coverage runs.
+      - name: System libraries (ALSA, cmake for whisper.cpp, lavapipe for the GUI tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ mesa-vulkan-drivers libvulkan1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        with:
+          toolchain: stable
+          components: clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: desktop
+      - name: Clippy report for the analyzer
+        working-directory: desktop
+        run: |
+          mkdir -p ../build
+          cargo clippy --workspace --all-targets --locked --message-format=json > ../build/clippy-report.json
+
+      # The Dart analysis needs the packages resolved (Sonar's Dart page).
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Dart packages of the core and the app
+        run: |
+          (cd packages/oldbrainfix_core && dart pub get)
+          flutter pub get
+
+      # The LCOV files sonar-project.properties names (#232), from the
+      # same script as the release's coverage floors. Report only, like
+      # the analysis: a group below its floor still writes its file, and
+      # a failing test leaves the scan without that coverage.
+      - name: Coverage (LCOV for the analyzer)
+        continue-on-error: true
+        run: |
+          cargo install cargo-llvm-cov --locked --version 0.9.1
+          tool/coverage.sh
+
+      - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SQ_TOKEN }}

@@ -25,7 +25,7 @@ class AgendaWidgetLayoutTest {
     private val kinds = listOf(
         WidgetRow.OCCURRENCE, WidgetRow.LINE, WidgetRow.SHOPPING, WidgetRow.CHECKLIST, WidgetRow.FROG,
         WidgetRow.MISSED, WidgetRow.HEADING, WidgetRow.TEXT, WidgetRow.UNSORTED, WidgetRow.APPOINTMENT,
-        WidgetRow.MESSAGE,
+        WidgetRow.MESSAGE, WidgetRow.SESSION, WidgetRow.PICK, WidgetRow.CHECKLIST_LINE,
     )
 
     private fun widgetLayouts(): List<File> =

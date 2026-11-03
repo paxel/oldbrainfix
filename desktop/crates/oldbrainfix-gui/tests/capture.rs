@@ -141,9 +141,14 @@ fn enter_on_a_nudge_button_takes_that_buttons_time() -> TestResult {
     let mut harness = popup_over(store.clone(), "en");
     typing(&harness).type_text("Water the plants");
     harness.run();
-    // "To full editor" comes first, above the Nudge times; the Note
-    // card's buttons wait in Settings ▸ Quick note (#142).
-    for label in ["To full editor", "10 min"] {
+    // "To full editor" comes first, then the alarm clock (#223), above
+    // the Nudge times; the Note card's other buttons wait in Settings ▸
+    // Quick note (#142).
+    for label in [
+        "To full editor",
+        "Routine, Reminder, Frog or Session",
+        "10 min",
+    ] {
         harness.key_press(Key::Tab);
         harness.run();
         assert!(harness.get_by_label(label).is_focused(), "{label}");

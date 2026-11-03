@@ -42,9 +42,12 @@ class Day implements Comparable<Day> {
   static Day? tryParse(String text) {
     final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(text);
     if (match == null) return null;
-    final [y, m, d] = [for (var i = 1; i <= 3; i++) int.parse(match[i]!)];
-    final day = Day(y, m, d);
-    return day.year == y && day.month == m && day.day == d ? day : null;
+    final parts = [for (var i = 1; i <= 3; i++) int.tryParse(match[i] ?? '')];
+    if (parts case [final y?, final m?, final d?]) {
+      final day = Day(y, m, d);
+      return day.year == y && day.month == m && day.day == d ? day : null;
+    }
+    return null;
   }
 
   DateTime get _utc => DateTime.utc(year, month, day);
@@ -97,9 +100,11 @@ class ClockTime implements Comparable<ClockTime> {
   static ClockTime? tryParse(String text) {
     final match = RegExp(r'^(\d{2}):(\d{2})$').firstMatch(text);
     if (match == null) return null;
-    final hour = int.parse(match[1]!);
-    final minute = int.parse(match[2]!);
-    if (hour > 23 || minute > 59) return null;
+    final hour = int.tryParse(match[1] ?? '');
+    final minute = int.tryParse(match[2] ?? '');
+    if (hour == null || minute == null || hour > 23 || minute > 59) {
+      return null;
+    }
     return ClockTime(hour, minute);
   }
 
@@ -241,7 +246,7 @@ class Recurrence {
     this.weekStart = DateTime.monday,
   }) {
     if (interval < 1) throw ArgumentError.value(interval, 'interval');
-    if (count != null && count! < 1) throw ArgumentError.value(count, 'count');
+    if ((count ?? 1) < 1) throw ArgumentError.value(count, 'count');
   }
 
   /// Parses an RRULE value, with or without the `RRULE:` prefix, in any
@@ -328,7 +333,10 @@ class Recurrence {
       if (count != null) 'COUNT=$count',
       if (until != null)
         'UNTIL=${_compact(until.day)}'
-            '${until.time == null ? '' : 'T${_two(until.time!.hour)}${_two(until.time!.minute)}00'}',
+            '${switch (until.time) {
+              null => '',
+              final time => 'T${_two(time.hour)}${_two(time.minute)}00',
+            }}',
       if (byMonth.isNotEmpty) 'BYMONTH=${byMonth.join(',')}',
       if (byMonthDay.isNotEmpty) 'BYMONTHDAY=${byMonthDay.join(',')}',
       if (byDay.isNotEmpty) 'BYDAY=${byDay.join(',')}',
@@ -507,8 +515,10 @@ class Recurrence {
   static List<String> _list(String? value) =>
       value == null ? const [] : value.split(',');
 
-  static int? _number(String? value, String key, int min, int max) {
-    if (value == null) return null;
+  static int? _number(String? value, String key, int min, int max) =>
+      value == null ? null : _numberIn(value, key, min, max);
+
+  static int _numberIn(String value, String key, int min, int max) {
     final n = int.tryParse(value);
     if (n == null || n < min || n > max) {
       throw FormatException('out of range', '$key=$value');
@@ -517,13 +527,13 @@ class Recurrence {
   }
 
   static List<int> _numbers(String? value, String key, int min, int max) => [
-    for (final item in _list(value)) _number(item, key, min, max)!,
+    for (final item in _list(value)) _numberIn(item, key, min, max),
   ];
 
   static WeekdayRule _weekdayRule(String item, Frequency frequency) {
     final match = RegExp(r'^([+-]?\d{1,2})?([A-Z]{2})$').firstMatch(item);
     if (match == null) throw FormatException('not a weekday', item);
-    final weekday = _weekday(match[2]!);
+    final weekday = _weekday(match[2] ?? '');
     final ordinalText = match[1];
     if (ordinalText == null) return WeekdayRule(weekday);
     final ordinal = int.parse(ordinalText);

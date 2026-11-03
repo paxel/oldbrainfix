@@ -61,3 +61,6 @@ serde_json = { version = "1.0", features = ["float_roundtrip"] }
 tempfile = "3.10"
 # Joins the host in the tests as the phone does.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
+
+[lints]
+workspace = true

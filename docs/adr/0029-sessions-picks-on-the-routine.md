@@ -50,3 +50,7 @@ The marks of a pick lie on the Routine rather than on the entry, so a private Se
 - ADR 0005: a Session is a kind of Routine, spawned from a Note.
 - ADR 0013: a Member writes a Session's `pick@` and `entry@` fields, as `done@`; the rest of it is the Manager's.
 - ADR 0021: a blocked person's picks and marks are refused.
+
+## A Session is a kind of Note (ADR 0039)
+
+Amended by ADR 0039 (#191). The setup (`session:pool`, `session:count`, `session:count:<weekday>`, `session:rule`) lies on the Note, which is a Session, and every Routine of that Note runs it. The setup is changed as the Note is. The picks and the entries recorded for them stay per Occurrence on each Routine as above, healed as above. Rolling goes over the picks of all the Note's Routines. A Session written as above, with its setup on the Routine, reads as the setup of its Note until a change writes it there.

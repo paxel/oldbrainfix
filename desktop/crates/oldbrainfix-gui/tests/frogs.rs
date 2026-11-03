@@ -15,7 +15,7 @@ use egui::accesskit::{Role, Toggled};
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use oldbrainfix_core::{Frogs, Notes, OwnProfile, SigningKey, Store};
+use oldbrainfix_core::{DeviceSettings, Frogs, Notes, OwnProfile, SigningKey, Store};
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Selection};
 
@@ -147,6 +147,23 @@ fn another_one_swaps_a_frog_for_the_next() -> TestResult {
     assert_ne!(after, before);
     let third = JOBS.into_iter().find(|j| !before.contains(j));
     assert!(after.iter().any(|j| Some(*j) == third), "{after:?}");
+    Ok(())
+}
+
+#[test]
+fn with_checked_items_hidden_the_section_leaves_once_todays_frog_is_eaten() -> TestResult {
+    let store = device()?;
+    DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
+    let t = L10n::new("en");
+    let mut harness = window(&store, "en");
+    let two = shown(&harness);
+    assert_eq!(two.len(), 2, "{two:?}");
+    // Eaten, the Frog is checked, and the section goes with it (#217).
+    harness.get_by_label(&format!("Done: {}", two[0])).click();
+    harness.run();
+    assert_eq!(Frogs::new(&store).done()?.len(), 1);
+    assert!(!shows(&harness, t.eat_a_frog()));
+    assert!(shown(&harness).is_empty());
     Ok(())
 }
 

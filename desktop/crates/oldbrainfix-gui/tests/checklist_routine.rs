@@ -13,8 +13,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::{
-    Checklists, Day, Notes, Occurrence, OwnProfile, Recurrence, RoutineOccurrence, Routines,
-    Schedule, SigningKey, Store,
+    Checklists, Day, DeviceSettings, Notes, Occurrence, OwnProfile, Recurrence, RoutineOccurrence,
+    Routines, Schedule, SigningKey, Store,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -273,5 +273,35 @@ fn the_editor_checks_and_unchecks_all_for_the_occurrence_it_is_on() -> TestResul
     harness.run();
     assert!(!editor(&harness)?);
     assert_eq!(checked_for(&harness, &routine, today())?, 0);
+    Ok(())
+}
+
+#[test]
+fn with_checked_items_hidden_a_checked_line_leaves_and_the_last_takes_the_row() -> TestResult {
+    let (store, _, routine) = packing()?;
+    DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
+    let mut harness = window(&store);
+    let days = boxes(&harness, "Bath").len();
+    let rows = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by(|n| {
+                n.role() == Role::CheckBox
+                    && n.label()
+                        .is_some_and(|l| l.starts_with("Done: ") && l.contains("Packing"))
+            })
+            .count()
+    };
+    assert_eq!(rows(&harness), days);
+    // Checked for today, it leaves today's row only (#217).
+    tick(&mut harness, "Bath", 0)?;
+    assert_eq!(boxes(&harness, "Bath").len(), days - 1);
+    assert!(boxes(&harness, "Bath").iter().all(|b| !is_checked(b)));
+    assert_eq!(rows(&harness), days);
+    // The last one checked takes the Done row with it.
+    tick(&mut harness, "Tent", 0)?;
+    tick(&mut harness, "Map", 0)?;
+    assert!(done(&harness, &routine, &today()));
+    assert_eq!(rows(&harness), days - 1);
+    assert_eq!(boxes(&harness, "Map").len(), days - 1);
     Ok(())
 }

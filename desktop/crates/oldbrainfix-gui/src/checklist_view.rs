@@ -24,13 +24,13 @@
 //! day a struck one comes back under it and a menu of its own, and the
 //! card's menu offers making a Note one (`shopping_view`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, ShoppingOnAgenda, Store,
-    WallClock,
+    Checklist, Checklists, Line, ListOnAgenda, Note, RoutineOccurrence, Sessions, ShoppingLists,
+    ShoppingOnAgenda, Store, WallClock,
 };
 
 use crate::app::{check, embossed, icon_button};
@@ -110,9 +110,9 @@ pub enum ChecklistAction {
     ToPlain(String),
     /// Unchecks every Line of the Note's Checklist as it shows now.
     UncheckAll(String),
-    /// Switches "Show on the Agenda" of the Note's Checklist on or off
-    /// for this person (#143).
-    ShowOnAgenda(String, bool),
+    /// Sets how the Note's Checklist shows on this person's Agenda (#143,
+    /// #219).
+    OnAgenda(String, ListOnAgenda),
     /// Checks the Line with this id, or unchecks it: for the Occurrence
     /// given, or by its own checks without one.
     Check(String, bool, Option<RoutineOccurrence>),
@@ -137,9 +137,9 @@ pub struct ChecklistShown {
     pub editable: HashSet<String>,
     /// Whether it may turn it back into a plain Note.
     pub plain: bool,
-    /// Whether it shows on this person's Agenda, while "Show on the
-    /// Agenda" applies to it: a Checklist without a Routine (#143).
-    pub on_agenda: Option<bool>,
+    /// How it shows on this person's Agenda, while "Show on the Agenda"
+    /// applies to it: a Checklist without a Routine (#143, #219).
+    pub on_agenda: Option<ListOnAgenda>,
 }
 
 /// Whether this Device may check the Lines of `list` as it shows: for
@@ -181,13 +181,14 @@ pub fn read(
     }))
 }
 
-/// Whether the Checklist of `note` shows on this person's Agenda, or
-/// `None` while "Show on the Agenda" does not apply to it (#143).
-fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<bool>> {
+/// How the Checklist of `note` shows on this person's Agenda, or `None`
+/// while "Show on the Agenda" does not apply to it (#143, #219): offered
+/// while no Line is open too, for when Lines open again.
+fn on_agenda(lists: &Checklists, note: &str) -> oldbrainfix_core::Result<Option<ListOnAgenda>> {
     if !lists.may_show_on_agenda(note)? {
         return Ok(None);
     }
-    Ok(Some(lists.shows_on_agenda(note)?))
+    Ok(Some(lists.on_agenda(note)?))
 }
 
 /// What the menu of a Note's card offers of a Checklist (#120) and a
@@ -199,9 +200,9 @@ pub struct CardMenu {
     pub note: String,
     pub make: bool,
     pub make_shopping: bool,
-    /// Whether the Checklist shows on this person's Agenda, while the
-    /// switch applies to it.
-    pub on_agenda: Option<bool>,
+    /// How the Checklist shows on this person's Agenda, while the choice
+    /// applies to it (#219).
+    pub on_agenda: Option<ListOnAgenda>,
     /// How the Shopping List shows on this person's Agenda, while the
     /// choice applies to it (#186).
     pub shopping_on_agenda: Option<ShoppingOnAgenda>,
@@ -225,10 +226,12 @@ pub fn card_menu(
     let shopping = ShoppingLists::new(store);
     let is_list = list.is_some() || shopping.is_shopping_list(&note.id)?;
     let to_plain = is_list && note.text_editable && store.may_change(&note.id)?;
+    // A Session Note becomes no list (ADR 0039).
+    let session = Sessions::new(store).is_session_note(&note.id)?;
     Ok(CardMenu {
         note: note.id.clone(),
-        make: list.is_none() && lists.may_make(&note.id)?,
-        make_shopping: shopping.may_make(&note.id)?,
+        make: list.is_none() && !session && lists.may_make(&note.id)?,
+        make_shopping: !session && shopping.may_make(&note.id)?,
         on_agenda: on_agenda(&lists, &note.id)?,
         shopping_on_agenda: shopping_view::on_agenda(&shopping, &note.id)?,
         uncheck_all,
@@ -252,7 +255,10 @@ fn neighbours(list: &Checklist, line: &Line) -> (Option<String>, bool) {
     let Some(at) = level.iter().position(|l| l.id == line.id) else {
         return (None, false);
     };
-    let before = at.checked_sub(1).map(|i| level[i].id.clone());
+    let before = at
+        .checked_sub(1)
+        .and_then(|i| level.get(i))
+        .map(|l| l.id.clone());
     (before, at + 1 < level.len())
 }
 
@@ -277,6 +283,52 @@ pub fn steps(list: &Checklist, line: &Line) -> Vec<LineStep> {
     steps
 }
 
+/// The steps the menu of the new Line at `at` of `rows` offers, as if it
+/// were stored where it shows among the stored Lines (#202).
+pub fn new_line_steps(rows: &[TypedLine], at: usize) -> Vec<LineStep> {
+    // The stored Lines and it: whether each is it, and in a group.
+    let lines: Vec<(bool, bool)> = rows
+        .iter()
+        .enumerate()
+        .filter(|(i, r)| *i == at || r.id.is_some())
+        .map(|(i, r)| (i == at, r.in_group))
+        .collect();
+    let Some(me) = lines.iter().position(|(it, _)| *it) else {
+        return Vec::new();
+    };
+    let grouped = |i: usize| lines.get(i).is_some_and(|(_, g)| *g);
+    let in_group = grouped(me) && me > 0;
+    // Its level: the Lines of its group, or those at the top.
+    let level: Vec<usize> = if in_group {
+        let head = lines.iter().take(me).rposition(|(_, g)| !g).unwrap_or(0);
+        (head + 1..lines.len())
+            .take_while(|&i| grouped(i))
+            .collect()
+    } else {
+        (0..lines.len())
+            .filter(|&i| i == me || !grouped(i))
+            .collect()
+    };
+    let Some(on) = level.iter().position(|&i| i == me) else {
+        return Vec::new();
+    };
+    let mut steps = Vec::new();
+    if on > 0 {
+        steps.push(LineStep::Up);
+    }
+    if on + 1 < level.len() {
+        steps.push(LineStep::Down);
+    }
+    if !in_group && me > 0 {
+        steps.push(LineStep::Indent);
+    }
+    if in_group {
+        steps.push(LineStep::Outdent);
+    }
+    steps.push(LineStep::Delete);
+    steps
+}
+
 /// Moves `line` one place up on its level.
 pub fn move_up(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_core::Result<()> {
     match neighbours(list, line).0 {
@@ -293,8 +345,8 @@ pub fn move_down(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_co
     let Some(at) = level.iter().position(|l| l.id == line.id) else {
         return Ok(());
     };
-    if at + 2 < level.len() {
-        return lists.move_line(&line.id, Some(&level[at + 2].id));
+    if let Some(past) = level.get(at + 2) {
+        return lists.move_line(&line.id, Some(&past.id));
     }
     if !line.in_group() {
         return lists.move_line(&line.id, None);
@@ -367,12 +419,12 @@ fn group_frame(ui: &Ui, gap: f32) -> Frame {
 /// one frame with its group indented under it, every Line by `row`.
 fn grouped(ui: &mut Ui, lines: &[ShownLine], gap: f32, row: &mut dyn FnMut(&mut Ui, &ShownLine)) {
     ui.spacing_mut().item_spacing.y = gap;
-    let mut at = 0;
-    while at < lines.len() {
-        let head = &lines[at];
-        let end = at + 1 + lines[at + 1..].iter().take_while(|l| l.in_group).count();
-        let group = &lines[at + 1..end];
-        at = end;
+    let mut rest = lines;
+    while let Some((head, after)) = rest.split_first() {
+        let size = after.iter().take_while(|l| l.in_group).count();
+        // `size` counts Lines of `after`, so never more than it holds.
+        let (group, next) = after.split_at_checked(size).unwrap_or((after, &[]));
+        rest = next;
         if group.is_empty() {
             row(ui, head);
             continue;
@@ -417,6 +469,14 @@ pub type LineField<'f> = dyn FnMut(&mut Ui, &ShownLine, f32) -> bool + 'f;
 /// A [`LineField`] lent to the rows that draw it.
 pub type FieldFor<'a> = &'a mut LineField<'a>;
 
+/// What draws something at the end of a Line, before its ⋮, such as a
+/// Shopping List Line's reappear time badge (#195): what was asked by a
+/// click on it.
+pub type Trailing<'a, P> = &'a dyn Fn(&mut Ui, &ShownLine) -> Option<P>;
+
+/// The room a [`Trailing`] badge takes at a Line's end.
+const TRAILING_ROOM: f32 = 112.0;
+
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
 /// and its text, or the field `field` draws for it; with `menus`, the
@@ -437,7 +497,7 @@ pub fn lines(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
         )
     });
-    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field)) {
+    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field, None)) {
         actions.push(match asked {
             LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),
             LineAsk::Menu(id, step) => ChecklistAction::Step(id, step),
@@ -455,14 +515,15 @@ const TO_MIDDLE: f32 = 5.0;
 /// The Lines `shown`, each with its checkbox, checkable with `checks`,
 /// its text, or the field `field` draws for it, and what shows under it;
 /// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
-/// takes the clicks, a right-click with the menu it draws. What is asked,
+/// takes the clicks, a right-click with the menu it draws; with
+/// `trailing`, what it draws at each Line's end, before ⋮. What is asked,
 /// in the order clicked.
 pub fn line_rows<P>(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     checks: bool,
-    (menus, mut field): (Option<MenuOf<P>>, Option<FieldFor>),
+    (menus, mut field, trailing): (Option<MenuOf<P>>, Option<FieldFor>, Option<Trailing<P>>),
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
@@ -480,11 +541,13 @@ pub fn line_rows<P>(
                     asked.push(LineAsk::Check(line.id.clone(), !line.checked));
                 }
                 let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
-                let room = if editable.is_some() {
-                    (ui.available_width() - 32.0).max(40.0)
-                } else {
-                    ui.available_width()
-                };
+                let reserved = if editable.is_some() { 32.0 } else { 0.0 }
+                    + if trailing.is_some() {
+                        TRAILING_ROOM
+                    } else {
+                        0.0
+                    };
+                let room = (ui.available_width() - reserved).max(40.0);
                 // Its words take the right-click where it has a menu.
                 let sense = if editable.is_some() {
                     Sense::click()
@@ -499,6 +562,17 @@ pub fn line_rows<P>(
                     })
                     .inner;
                 let Some((_, menu)) = editable else {
+                    // The badge at the right edge, where no ⋮ is.
+                    if let Some(trailing) = trailing {
+                        let asked_here = ui
+                            .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                trailing(ui, line)
+                            })
+                            .inner;
+                        if let Some(step) = asked_here {
+                            asked.push(LineAsk::Menu(line.id.clone(), step));
+                        }
+                    }
                     return;
                 };
                 let mut picked = None;
@@ -514,12 +588,18 @@ pub fn line_rows<P>(
                 if let Some(words) = words {
                     words.context_menu(&mut entries);
                 }
-                // ⋮ at the right edge, as on an Agenda row.
-                let more = ui
+                // ⋮ at the right edge, as on an Agenda row, what `trailing`
+                // draws before it.
+                let (more, asked_here) = ui
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak)
+                        let more =
+                            icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak);
+                        (more, trailing.and_then(|trailing| trailing(ui, line)))
                     })
                     .inner;
+                if let Some(step) = asked_here {
+                    asked.push(LineAsk::Menu(line.id.clone(), step));
+                }
                 egui::Popup::menu(&more).show(&mut entries);
                 if let Some(step) = picked {
                     asked.push(LineAsk::Menu(line.id.clone(), step));
@@ -588,7 +668,7 @@ pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox
     boxes
 }
 
-fn paint_box(ui: &Ui, tones: Tones, rect: egui::Rect, checked: bool, hovered: bool) {
+pub(crate) fn paint_box(ui: &Ui, tones: Tones, rect: egui::Rect, checked: bool, hovered: bool) {
     if hovered {
         ui.painter()
             .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);
@@ -641,10 +721,10 @@ pub fn card_checks(
     clicked
 }
 
-/// How many Lines of `list` are checked, on a compact card.
+/// How many Lines of `list` are open, on a compact card (#189).
 pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
     let text = ui.visuals().text_color();
-    let said = t.checklist_count(list.checked_count() as i64, list.count() as i64);
+    let said = t.checklist_open_count(list.open_count() as i64, list.count() as i64);
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 
@@ -688,13 +768,25 @@ pub fn section(
             .filter(|r| in_place(r))
             .map(|r| r.key)
             .collect();
+        let menus = typed.with_menus(&shown.editable);
+        // A new Line's ⋮ offers what it would once stored where it shows.
+        let new_steps: HashMap<String, Vec<LineStep>> = typed
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| menus.contains(&r.shown_id()) && r.id.is_none())
+            .map(|(at, r)| (r.shown_id(), new_line_steps(&typed.rows, at)))
+            .collect();
         let mut typing = Vec::new();
         let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
             let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
                 return false;
             };
             let at = fields.iter().position(|k| *k == key);
-            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let above = at
+                .and_then(|at| at.checked_sub(1))
+                .and_then(|at| fields.get(at))
+                .copied();
             let below = at.and_then(|at| fields.get(at + 1)).copied();
             line_editing::field(
                 ui,
@@ -706,13 +798,16 @@ pub fn section(
             );
             true
         };
-        let steps = |id: &str| list.line(id).map(|l| steps(list, l)).unwrap_or_default();
+        let steps = |id: &str| match list.line(id) {
+            Some(line) => steps(list, line),
+            None => new_steps.get(id).cloned().unwrap_or_default(),
+        };
         lines(
             ui,
             (t, tones),
             &rows,
             (shown.checks, list.on.as_ref()),
-            (Some((&shown.editable, &steps)), Some(&mut field)),
+            (Some((&menus, &steps)), Some(&mut field)),
             actions,
         );
         actions.extend(typing.into_iter().map(ChecklistAction::Typed));
@@ -753,17 +848,13 @@ pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<Check
     ];
     let mut picked = None;
     for (i, (shown, label, action)) in entries.into_iter().enumerate() {
-        // "Show on the Agenda" before "Uncheck all", as on the phone.
+        // "Show on the Agenda" before "Uncheck all", as on the phone: its
+        // three ways as a Shopping List's (#219).
         if i == 1
-            && let Some(mut on) = menu.on_agenda
-            && ui
-                .checkbox(
-                    &mut on,
-                    RichText::new(t.checklist_show_on_agenda()).color(text),
-                )
-                .clicked()
+            && let Some(current) = menu.on_agenda
+            && let Some(shows) = shopping_view::agenda_radios(ui, t, current)
         {
-            picked = Some(ChecklistAction::ShowOnAgenda(note.clone(), on));
+            picked = Some(ChecklistAction::OnAgenda(note.clone(), shows));
         }
         if shown && ui.button(RichText::new(label).color(text)).clicked() {
             picked = Some(action);

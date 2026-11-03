@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'checklists.dart';
 import 'notes.dart';
 import 'places.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'text_boxes.dart';
 import 'text_format.dart';
@@ -311,7 +312,7 @@ class Imports {
         store.append(id, ChecklistKeys.checked, on.toIso8601String(), date: on);
       }
     }
-    Checklists(store).setShowOnAgenda(noteId, false);
+    Checklists(store).setOnAgenda(noteId, ListOnAgenda.off);
   }
 
   static int _size(StoredText text) => utf8.encode(text.encode()).length;

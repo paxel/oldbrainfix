@@ -1,5 +1,5 @@
-//! Checklists in the window (#120, ADR 0030): "Make it a Checklist" in
-//! a Note's editor and in its card's ⋮ turns its lines into Lines, one
+//! Checklists in the window (#120, ADR 0030): the kind badge of a Note's
+//! editor (#188) and its card's ⋮ turn its lines into Lines, one
 //! indented under the Line above; the editor checks them, moves, indents
 //! and deletes them after asking once, unchecks all and goes back to a
 //! plain Note; the Lines are typed in place as one block of text (#141,
@@ -142,6 +142,14 @@ fn texts(
         .collect())
 }
 
+/// Picks the radio button `label` of the open small editor (#188).
+fn pick(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_by_role_and_label(Role::RadioButton, label)
+        .click_accesskit();
+    harness.run();
+}
+
 /// Opens the ⋮ of the Line `text` in the editor and clicks `step`.
 fn line_step(harness: &mut Harness<'_, App>, text: &str, step: &str) -> TestResult {
     click(harness, &format!("More: {text}"))?;
@@ -153,19 +161,21 @@ fn make_it_a_checklist_in_the_editor_turns_the_lines_into_lines() -> TestResult 
     let (store, note) = with_note()?;
     let mut harness = window(&store, Some(&note));
     assert!(!shows(&harness, "Checklist"));
-    click(&mut harness, "Make it a Checklist")?;
+    click(&mut harness, "Kind: Plain Note")?;
+    pick(&mut harness, "Checklist");
     assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
     assert_eq!(now.text, "Packing");
-    // The field holds the title now, so leaving it writes nothing old.
-    assert!(
+    // The name holds the title now, so leaving it writes nothing old
+    // (#188).
+    assert_eq!(
         harness
-            .query_by(
-                |n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Packing")
-            )
-            .is_some()
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .value()
+            .as_deref(),
+        Some("Packing")
     );
     assert!(shows(&harness, "Checklist"));
     assert!(!shows(&harness, "Make it a Checklist"));
@@ -509,6 +519,46 @@ fn the_line_menu_moves_indents_and_deletes_after_asking() -> TestResult {
 }
 
 #[test]
+fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_step_stores_it_first() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    // An empty new Line has nothing to act on (#202).
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    assert!(!shows(&harness, "More: "));
+    type_in(&mut harness, "Seat");
+    assert_eq!(list(&harness, &note)?.count(), 3);
+    line_step(&mut harness, "Seat", "Move up")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket"]
+    );
+
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Enter);
+    type_in(&mut harness, "Window");
+    line_step(&mut harness, "Window", "Put under the Line above")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket", "  Window"]
+    );
+
+    into_line(&mut harness, "Window")?;
+    press(&mut harness, egui::Key::Enter);
+    type_in(&mut harness, "Bag");
+    line_step(&mut harness, "Bag", "Delete")?;
+    click(&mut harness, "Delete")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Seat", "Ticket", "  Window"]
+    );
+    assert!(!shows(&harness, "More: Bag"));
+    Ok(())
+}
+
+#[test]
 fn back_to_a_plain_note_marks_the_checked_lines_and_indents_the_groups() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;
@@ -517,7 +567,7 @@ fn back_to_a_plain_note_marks_the_checked_lines_and_indents_the_groups() -> Test
     let mut harness = window(&store, Some(&note));
     // In the Note dialog's kind badge (#160).
     click(&mut harness, "Kind: Checklist")?;
-    click(&mut harness, "Back to a plain Note")?;
+    pick(&mut harness, "Plain Note");
     let now = Notes::new(harness.state().store())
         .by_id(&note)?
         .ok_or("note")?;
@@ -534,7 +584,7 @@ fn back_to_a_plain_note_marks_the_checked_lines_and_indents_the_groups() -> Test
                 && n.value().as_deref() == Some(now.text.as_str()))
             .is_some()
     );
-    assert!(shows(&harness, "Make it a Checklist"));
+    assert!(shows(&harness, "Kind: Plain Note"));
     Ok(())
 }
 
@@ -593,7 +643,7 @@ fn full_cards_check_lines_in_place_and_compact_cards_count_them() -> TestResult 
     );
     let compact = L10n::new("en").show_notes_compact();
     click(&mut harness, compact)?;
-    assert!(shows(&harness, "1 of 3 checked"));
+    assert!(shows(&harness, "2 of 3 open"));
     assert!(boxes(&harness, "Ticket").is_empty());
     Ok(())
 }

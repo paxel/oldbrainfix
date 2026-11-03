@@ -181,10 +181,10 @@ void main() {
     });
 
     testWidgets('a compact card ticks the box of its first line and does '
-        'not unfold', (tester) async {
+        'not switch its view', (tester) async {
       final id = notes.capture('☐ Call Ann\nabout the car').id;
       await startAtNotes(tester);
-      await tap(tester, find.byTooltip('Show Notes compact'));
+      await tap(tester, find.byTooltip('Show compact views'));
       expect(key('note-first-line'), findsOneWidget);
 
       await tap(tester, boxKey(boxesOf(id).single));

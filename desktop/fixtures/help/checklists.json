@@ -1,0 +1,556 @@
+{
+  "lists": {
+    "note:help-00000000000000000000000000000001-quick-start": {
+      "making": "help-00000000000000000000000000000001-quick-start",
+      "lines": [
+        {
+          "id": "line:help-00000000000000000000000000000001-quick-start-0",
+          "text": "Capture a thought with +",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:help-00000000000000000000000000000001-quick-start-1",
+          "text": "File it into an Area",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "W"
+        }
+      ],
+      "checkedCount": 0,
+      "count": 2
+    }
+  },
+  "ofNotes": [
+    "note:help-00000000000000000000000000000001-quick-start"
+  ],
+  "mayMake": {
+    "note:help-00000000000000000000000000000001-icons": false,
+    "note:help-00000000000000000000000000000001-quick-start": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0": true
+  },
+  "agenda": [],
+  "onAgenda": {
+    "note:help-00000000000000000000000000000001-icons": "lines",
+    "note:help-00000000000000000000000000000001-quick-start": "count",
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0": "lines",
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1": "lines",
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0": "lines"
+  },
+  "mayShowOnAgenda": {
+    "note:help-00000000000000000000000000000001-icons": false,
+    "note:help-00000000000000000000000000000001-quick-start": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.4.0": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.4.1": false,
+    "note:help-00000000000000000000000000000001-whats-new-0.5.0": false
+  },
+  "plain": {
+    "note:help-00000000000000000000000000000001-quick-start": "Quick start\nCapture a thought with +\nFile it into an Area"
+  },
+  "rows": [
+    null,
+    null,
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Red",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Lead nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Em space",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Bom",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Trailing",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓x",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Two spaces",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "✓ Twice",
+      "indent": false,
+      "checked": true
+    }
+  ],
+  "markdownRows": [
+    null,
+    null,
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Red",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Lead nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Em space",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Bom",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Trailing",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓x",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Two spaces",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "✓ Twice",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    null,
+    null,
+    {
+      "text": "-Knife",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Map",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Big",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "1234567890. Too long",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "12) Paren",
+      "indent": false,
+      "checked": false
+    },
+    null,
+    {
+      "text": "Torch",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Close",
+      "indent": false,
+      "checked": false
+    },
+    null,
+    {
+      "text": "Three spaces",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "> Four spaces",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "- Both",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "> Both",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "# Heading",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "**Bold**",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tab",
+      "indent": false,
+      "checked": false
+    }
+  ],
+  "split": [
+    "a",
+    "b",
+    "c",
+    "",
+    "d",
+    "",
+    ""
+  ],
+  "after": {
+    "": "V",
+    "V": "W",
+    "Vz": "W",
+    "z": "zV",
+    "zzz": "zzzV",
+    "0V": "1",
+    "Zy": "a"
+  },
+  "between": [
+    [
+      "",
+      "V",
+      "F"
+    ],
+    [
+      "",
+      "1",
+      "0V"
+    ],
+    [
+      "",
+      "0V",
+      "0F"
+    ],
+    [
+      "V",
+      "W",
+      "VV"
+    ],
+    [
+      "V",
+      "V05",
+      "V02"
+    ],
+    [
+      "V",
+      "X",
+      "W"
+    ],
+    [
+      "VV",
+      "W",
+      "VW"
+    ],
+    [
+      "Vz",
+      "W",
+      "VzV"
+    ],
+    [
+      "0",
+      "01",
+      "00V"
+    ],
+    [
+      "y",
+      "z",
+      "yV"
+    ],
+    [
+      "yz",
+      "z",
+      "yzV"
+    ],
+    [
+      "a",
+      "azzzV",
+      "aU"
+    ]
+  ],
+  "valid": {
+    "": false,
+    "V": true,
+    "V0": false,
+    "0": false,
+    "a1": true,
+    "é": false,
+    "a-b": false,
+    "zz": true
+  },
+  "routines": [],
+  "occurrences": {},
+  "now": [
+    {
+      "occurrenceNow": {
+        "note:help-00000000000000000000000000000001-quick-start": null
+      },
+      "shownNow": {
+        "note:help-00000000000000000000000000000001-quick-start": {
+          "making": "help-00000000000000000000000000000001-quick-start",
+          "lines": [
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-0",
+              "text": "Capture a thought with +",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-1",
+              "text": "File it into an Area",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:help-00000000000000000000000000000001-quick-start": null
+      },
+      "shownNow": {
+        "note:help-00000000000000000000000000000001-quick-start": {
+          "making": "help-00000000000000000000000000000001-quick-start",
+          "lines": [
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-0",
+              "text": "Capture a thought with +",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-1",
+              "text": "File it into an Area",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:help-00000000000000000000000000000001-quick-start": null
+      },
+      "shownNow": {
+        "note:help-00000000000000000000000000000001-quick-start": {
+          "making": "help-00000000000000000000000000000001-quick-start",
+          "lines": [
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-0",
+              "text": "Capture a thought with +",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-1",
+              "text": "File it into an Area",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:help-00000000000000000000000000000001-quick-start": null
+      },
+      "shownNow": {
+        "note:help-00000000000000000000000000000001-quick-start": {
+          "making": "help-00000000000000000000000000000001-quick-start",
+          "lines": [
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-0",
+              "text": "Capture a thought with +",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-1",
+              "text": "File it into an Area",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:help-00000000000000000000000000000001-quick-start": null
+      },
+      "shownNow": {
+        "note:help-00000000000000000000000000000001-quick-start": {
+          "making": "help-00000000000000000000000000000001-quick-start",
+          "lines": [
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-0",
+              "text": "Capture a thought with +",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:help-00000000000000000000000000000001-quick-start-1",
+              "text": "File it into an Area",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        }
+      }
+    }
+  ]
+}

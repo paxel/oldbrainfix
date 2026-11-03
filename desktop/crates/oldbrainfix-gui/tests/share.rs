@@ -19,7 +19,8 @@ use oldbrainfix_core::lan::{
     answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
 };
 use oldbrainfix_core::{
-    AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store,
+    AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonSettings, Places,
+    SigningKey, Store,
 };
 use oldbrainfix_gui::{App, Page, Selection};
 
@@ -349,6 +350,29 @@ fn another_persons_note_shows_their_picture_and_ones_own_none() -> TestResult {
     let harness = self::harness(ben, Selection::Place(area));
     assert!(shows(&harness, "Written by Ann"));
     assert!(!shows(&harness, "Written by Ben"));
+    Ok(())
+}
+
+#[test]
+fn in_simple_roles_show_but_are_neither_chosen_nor_changed() -> TestResult {
+    let (ann, _ben, _area) = shared(AreaRole::Member)?;
+    PersonSettings::new(&ann).set_advanced(false)?;
+    Places::new(&ann).add_area("Garden")?;
+    let mut harness = harness(ann, Selection::All);
+    open_menu(&mut harness, "Household");
+    harness.get_by_label("People").click();
+    harness.run();
+    assert!(shows(&harness, "Member"));
+    assert!(!shows(&harness, "Make Manager"));
+    assert!(shows(&harness, "Remove"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    open_menu(&mut harness, "Garden");
+    harness.get_by_label("Share…").click();
+    harness.run();
+    assert!(shows(&harness, "Show the code"));
+    assert!(!shows(&harness, "Manager"));
+    assert!(!shows(&harness, "Member"));
     Ok(())
 }
 

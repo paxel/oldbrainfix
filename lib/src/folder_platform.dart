@@ -146,6 +146,10 @@ class NoFolders implements FolderPlatform {
 /// Access Framework), in Kotlin behind the app's method channel: good for
 /// shared storage, a USB stick and cloud providers alike, none of which
 /// is a path an app may read.
+/// The shared folder [setting] as Android's folder channel reads and
+/// writes it: what the automatic sync's isolate opens (#225).
+SyncFolder openSafFolder(String setting) => SafSyncFolder(setting);
+
 class AndroidFolders implements FolderPlatform {
   static const channel = MethodChannel('io.github.paxel.oldbrainfix/folder');
 

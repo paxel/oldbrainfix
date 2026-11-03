@@ -291,6 +291,15 @@ typedef FieldAction = ({
 /// passes and an edit keeps whole ([keepTables]); in two rows the bottom
 /// row shows it as a table's sign.
 ///
+/// A [TagTextController] holding a Code text (#213) has no bar of
+/// formats: its text shows in monospace, unwrapped, on the grey ground of
+/// code, and a one-finger drag moves it sideways. With [onCodePasted], a
+/// pasted text that looks like code ([TextFormats.looksLikeCode]) calls
+/// it, and the paste does not make the text formatted.
+///
+/// Without [bar] (Simple, #197) the bar has neither ☐ nor the formats;
+/// typing, pasting and tapping a formatted text work as with it.
+///
 /// [actions] put buttons of the field's own on the same bar, first, such
 /// as a Line's "in" and "out" (#141). With [focusNode] the field takes
 /// the focus its owner moves; it stays the owner's to dispose.
@@ -319,7 +328,9 @@ class TwoRowTextField extends StatefulWidget {
   final void Function(int start, Offset at)? onBox;
   final bool formats;
   final bool lineFormats;
+  final bool bar;
   final VoidCallback? onFormatted;
+  final VoidCallback? onCodePasted;
   final List<FieldAction> actions;
   final FocusNode? focusNode;
 
@@ -335,7 +346,9 @@ class TwoRowTextField extends StatefulWidget {
     this.onBox,
     this.formats = false,
     this.lineFormats = true,
+    this.bar = true,
     this.onFormatted,
+    this.onCodePasted,
     this.actions = const [],
     this.focusNode,
   });
@@ -489,8 +502,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   /// Whether the field has the bar of formats, ☐ or its own buttons.
   bool get _hasBar =>
-      _formatting != null ||
-      _inserts ||
+      (widget.bar && (_formatting != null || _inserts)) ||
       (widget.actions.isNotEmpty && !widget.readOnly);
 
   bool get _barShown => _hasBar && _keyboardOpen;
@@ -498,16 +510,27 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// The controller, when this field formats its text.
   TagTextController? get _formatting => switch (widget.controller) {
     final TagTextController controller
-        when widget.formats && !widget.readOnly =>
+        when widget.formats && !widget.readOnly && !controller.code =>
       controller,
     _ => null,
   };
 
+  /// Whether the field holds a Code text (#213).
+  bool get _code => switch (widget.controller) {
+    final TagTextController controller => controller.code,
+    _ => false,
+  };
+
   /// A change the user made, typed or pasted: a plain text becomes
-  /// formatted with a format typed as Markdown or pasted (ADR 0033).
+  /// formatted with a format typed as Markdown or pasted (ADR 0033); a
+  /// pasted text that looks like code goes to [TwoRowTextField.onCodePasted]
+  /// instead (#213).
   void _userChanged(String text) {
+    final onCode = widget.onCodePasted;
     final controller = _formatting;
-    if (controller == null || controller.markdown) return;
+    if (onCode == null && (controller == null || controller.markdown)) {
+      return;
+    }
     final before = _before;
     final most = math.min(before.length, text.length);
     var head = 0;
@@ -522,6 +545,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
     final inserted = text.substring(head, text.length - tail);
     if (inserted.isEmpty) return;
+    if (onCode != null &&
+        inserted.length > 1 &&
+        TextFormats.looksLikeCode(inserted)) {
+      onCode();
+      return;
+    }
+    if (controller == null || controller.markdown) return;
     final selection = controller.selection;
     final cursor = selection.isValid ? selection.extentOffset : text.length;
     if (Markdown.shortcutAt(text, cursor) ||
@@ -786,7 +816,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
   }
 
-  bool get _inserts => widget.boxes && !widget.readOnly;
+  bool get _inserts => widget.boxes && !widget.readOnly && !_code;
 
   String? _blocksText;
   List<MarkdownBlock> _blocksOf = const [];
@@ -1021,7 +1051,12 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         readOnly: widget.readOnly,
         autofocus: widget.autofocus,
         maxLines: null,
-        textCapitalization: TextCapitalization.sentences,
+        // Code is typed as it is (#213).
+        textCapitalization: _code
+            ? TextCapitalization.none
+            : TextCapitalization.sentences,
+        autocorrect: !_code,
+        enableSuggestions: !_code,
         style: widget.style,
         strutStyle: strut,
         decoration: widget.decoration,
@@ -1036,12 +1071,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
               }
             : null,
       );
+      final Widget shown = _code ? _sideways(context, field) : field;
       final Widget tapped = widget.onBox == null && _formatting == null
-          ? field
+          ? shown
           // The field tells its tap, not where it was.
           : Listener(
               onPointerDown: (event) => _down = event.position,
-              child: field,
+              child: shown,
             );
       if (!_hasBar) return tapped;
       return OverlayPortal(
@@ -1057,7 +1093,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       readOnly: widget.readOnly,
       autofocus: widget.autofocus,
       maxLines: null,
-      textCapitalization: TextCapitalization.sentences,
+      textCapitalization: _code
+          ? TextCapitalization.none
+          : TextCapitalization.sentences,
+      autocorrect: !_code,
+      enableSuggestions: !_code,
       style: widget.style,
       strutStyle: strut,
       decoration: widget.decoration,
@@ -1072,17 +1112,37 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // they are switched off, and these, which drag nothing, take their
     // place. Long-press selection, the handles of a selection and the
     // menu work as in the field.
+    final region = TextFieldTapRegion(
+      child: _gestures.buildGestureDetector(
+        behavior: HitTestBehavior.translucent,
+        child: IgnorePointer(child: field),
+      ),
+    );
     return OverlayPortal(
       controller: _row,
       overlayChildBuilder: _aboveKeyboard,
-      child: TextFieldTapRegion(
-        child: _gestures.buildGestureDetector(
-          behavior: HitTestBehavior.translucent,
-          child: IgnorePointer(child: field),
-        ),
-      ),
+      child: _code ? _sideways(context, region) : region,
     );
   }
+
+  /// A Code text's [field] (#213): as wide as its longest line and at
+  /// least as the room, on the grey ground of code, moved sideways.
+  Widget _sideways(BuildContext context, Widget field) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        key: const ValueKey('code-sideways'),
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: IntrinsicWidth(child: field),
+        ),
+      ),
+    ),
+  );
 
   /// The bar of formats and, in two rows, the bottom row, on the
   /// keyboard while it is open.
@@ -1140,14 +1200,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           icon: (_) => Icon(action.icon),
           run: action.run,
         ),
-      if (_inserts)
+      if (_inserts && widget.bar)
         _Format(
           key: 'two-row-insert-box',
           label: t.boxInsert,
           icon: (_) => const Icon(Icons.check_box_outline_blank),
           run: _insertBox,
         ),
-      if (controller != null) ...[
+      if (controller != null && widget.bar) ...[
         _Format(
           key: 'format-bold',
           label: t.formatBold,
@@ -1231,6 +1291,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           run: () => toggle(MarkdownSpanKind.code),
         ),
         if (widget.lineFormats) ...[
+          _Format(
+            key: 'format-code-block',
+            label: t.formatCodeBlock,
+            icon: (_) => const Icon(Icons.data_object),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.code,
+            run: () => _format(Markdown.codeBlock),
+          ),
           _Format(
             key: 'format-indent',
             label: t.formatIndent,
@@ -1883,10 +1951,9 @@ class _RenderCursorStrip extends RenderBox
     }
     var x = -_scroll;
     for (final child in children) {
-      (child.parentData! as _StripParentData).offset = Offset(
-        x,
-        (size.height - child.size.height) / 2,
-      );
+      if (child.parentData case final _StripParentData data) {
+        data.offset = Offset(x, (size.height - child.size.height) / 2);
+      }
       x += child.size.width;
     }
   }

@@ -41,7 +41,8 @@ use oldbrainfix_core::{
     APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
 };
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
-use oldbrainfix_gui::auto_sync;
+use oldbrainfix_gui::app::BIGGER_ZOOM;
+use oldbrainfix_gui::auto_sync::{self, Syncing};
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
@@ -211,6 +212,8 @@ struct PopupWindow {
     edit: Rc<RefCell<Option<String>>>,
     /// The theme this Device chose, until it is shown.
     theme: Option<ThemeChoice>,
+    /// The zoom this Device chose (#224), until it is set.
+    zoom: Option<f32>,
     system_theme: SystemTheme,
 }
 
@@ -220,6 +223,9 @@ impl eframe::App for PopupWindow {
         self.system_theme.hand_to(ui.ctx());
         if let Some(choice) = self.theme.take() {
             theme::prefer(ui.ctx(), choice);
+        }
+        if let Some(zoom) = self.zoom.take() {
+            ui.ctx().set_zoom_factor(zoom);
         }
         let mut outcome = Outcome::Open;
         for command in waiting(&self.commands) {
@@ -259,6 +265,9 @@ fn focus(ctx: &egui::Context) {
 /// Everything the windows share while the app runs.
 struct Shell {
     store: Arc<Store>,
+    /// The Agenda's own connection, which reads it beside the window
+    /// (#207).
+    agenda_store: Arc<Store>,
     locale: &'static str,
     changes: Arc<AtomicU64>,
     events: Sender<Event>,
@@ -271,6 +280,9 @@ struct Shell {
     reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
+    /// Whether a sync of this Device runs, for the line under the menu
+    /// bar (#225).
+    syncing: Syncing,
     /// Raised by a click on the Nudge, for the window to show Unsorted.
     unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge, for the window to save the
@@ -328,12 +340,20 @@ impl Shell {
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
+        app.set_syncing(self.syncing.clone());
+        let agenda = self.agenda_store.clone();
+        app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
         app.offer_restore();
+        // The help Notes this version owes (#180); after the first start
+        // once it is answered.
+        if let Err(e) = app.set_help(env!("CARGO_PKG_VERSION")) {
+            eprintln!("help Notes: {e}");
+        }
         if let Some(id) = self.edit.borrow_mut().take() {
             app.edit_note(&id);
         }
@@ -375,7 +395,15 @@ impl Shell {
     fn popup(&self) -> Result<Option<Command>, String> {
         let popup = (self.new_popup)();
         let next = Rc::new(Cell::new(None));
-        let viewport = popup.viewport();
+        // "Bigger text and icons" (#224): its own window opens unzoomed,
+        // so it is opened as large as the zoom set on its first frame
+        // needs.
+        let bigger = DeviceSettings::new(&self.store)
+            .fat_fingers()
+            .unwrap_or(false);
+        let zoom = if bigger { BIGGER_ZOOM } else { 1.0 };
+        let mut viewport = popup.viewport();
+        viewport.inner_size = viewport.inner_size.map(|size| size * zoom);
         let window = PopupWindow {
             popup,
             commands: self.commands.clone(),
@@ -383,6 +411,7 @@ impl Shell {
             edit: self.edit.clone(),
             // The system's when it cannot be read.
             theme: Some(DeviceSettings::new(&self.store).theme().unwrap_or_default()),
+            zoom: Some(zoom),
             system_theme: self.system_theme.clone(),
         };
         self.run(viewport, Box::new(window))?;
@@ -408,6 +437,19 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
         Box::new(chrono::Utc::now),
         SigningKey::generate,
     )
+}
+
+/// A store of its own on the database in `dir`, for a sync thread
+/// (#225): its merge never holds the window's connection. The window's
+/// `shared` one when it does not open.
+fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
+    match open_store(dir) {
+        Ok(store) => Arc::new(store),
+        Err(e) => {
+            eprintln!("oldbrainfix: {e}");
+            shared.clone()
+        }
+    }
 }
 
 /// What the command line says when the store does not open.
@@ -594,16 +636,30 @@ fn run() -> Result<i32, String> {
             );
         });
     }
+    // While a sync of this Device runs, the line under the menu bar
+    // moves (#225).
+    let syncing = {
+        let window = window.clone();
+        Syncing::new(move || wake(&window))
+    };
     // Paired Devices sync on their own while the app runs, in the tray
-    // too: the alerts plan again after it (a Done elsewhere closes the
-    // notification here), the window reads the log again.
+    // too, on a connection of their own, so a merge never holds the
+    // window's (#225): the alerts plan again after it (a Done elsewhere
+    // closes the notification here), the window reads the log again.
     let auto_stop = Arc::new(AtomicBool::new(false));
     let auto_sync = {
-        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
-        let (stop, wake_window) = (auto_stop.clone(), waker(&window));
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let store = own_store(&dir, &store);
+        let (stop, wake_window, syncing) = (auto_stop.clone(), waker(&window), syncing.clone());
         std::thread::spawn(move || {
-            auto_sync::run(&store, &device_name(), &stop, |session| {
-                if !session.applied.is_empty() || session.profile.changed() {
+            auto_sync::run(&store, &device_name(), &stop, &syncing, |session| {
+                // Another person's Profile alone counts too: the window's
+                // People were read on its own connection.
+                if !session.applied.is_empty()
+                    || session.profile.changed()
+                    || session.people_changed
+                {
+                    shown.changed_elsewhere();
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }
@@ -616,14 +672,20 @@ fn run() -> Result<i32, String> {
     // and the window reads the log and the status again.
     let folder_wanted = Arc::new(AtomicBool::new(false));
     let folder_sync = {
-        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
-        let (stop, wanted, wake_window) =
-            (auto_stop.clone(), folder_wanted.clone(), waker(&window));
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let store = own_store(&dir, &store);
+        let (stop, wanted, wake_window, syncing) = (
+            auto_stop.clone(),
+            folder_wanted.clone(),
+            waker(&window),
+            syncing.clone(),
+        );
         std::thread::spawn(move || {
-            folder_sync::run(&store, &stop, &wanted, |result| {
+            folder_sync::run(&store, &stop, &wanted, &syncing, |result| {
                 // Photos and recordings come on their own too, after
                 // the entries naming them.
                 if !result.applied.is_empty() || result.blobs_in > 0 || result.profile_changed {
+                    shown.changed_elsewhere();
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }
@@ -768,6 +830,7 @@ fn run() -> Result<i32, String> {
 
     let system_theme = SystemTheme::follow(waker(&window));
     let shell = Shell {
+        agenda_store: own_store(&dir, &store),
         store,
         locale,
         changes,
@@ -781,6 +844,7 @@ fn run() -> Result<i32, String> {
         reader,
         speech,
         folder_wanted,
+        syncing,
         unsorted_wanted,
         changes_wanted,
         handed,

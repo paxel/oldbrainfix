@@ -1,16 +1,19 @@
 //! Tallies on the desktop's screen (#103, ADR 0028), as the phone's
 //! `tally_view.dart`, `tally_field_screen.dart` and
-//! `tally_entry_screen.dart` draw them: the Tally part of a Note's
-//! editor, and the field page and the entry page, each in a dialog over
-//! the window as the Routine editor is, Save at their top.
+//! `tally_entry_screen.dart` draw them: the setup in the Note dialog, the
+//! Tally on its Note's detailed card, and the field page and the entry
+//! page, each in a dialog over the window as the Routine editor is, Save
+//! at their top.
 //!
-//! The Tally part lists the fields, each opening its field page for who
-//! may change the Note, with "Add entry" and "Add field"; in a Shared
-//! Area the choice of whose entries show, the user's own by default; the
-//! length of a bar; one chart per field shown; the entries, newest first,
-//! 30 at a time, each clicked to edit it and right-clicked for a menu;
-//! and a folded "Removed entries" with Restore, closed until opened,
-//! remembered on this Device.
+//! The setup (#190) lists the fields, each its name and its settings as
+//! badges, opening its field page for who may change the Note, and "Add
+//! field". The detailed card shows "Add entry"; in a Shared Area the
+//! choice of whose entries show, the user's own by default; the length of
+//! a bar, kept per Note on this Device; one chart per field shown; the
+//! entries, newest first, the older folded under the latest five until a
+//! click shows them, kept per Note on this Device, each clicked to edit
+//! it and right-clicked for a menu; and a folded "Removed entries" with
+//! Restore, closed until opened, remembered on this Device.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -22,20 +25,61 @@ use oldbrainfix_core::{
     TallyEntry, TallyField, TallyPeriod, TallyRule, UnitKind, UnitSystem, WallClock,
 };
 
-use crate::app::{embossed, icon_button, radio_column, when};
+use crate::app::{chip_row, embossed, icon_button, radio_column, when};
 use crate::capture_choices::TallyFieldChoice;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
+use crate::setting_badges::BadgeValue::{self, Icon, Text};
+use crate::setting_badges::{badge, badge_row, switch_icon};
 use crate::tally_unit_match::{self, UnitNames};
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The local setting that keeps "Removed entries" open, the phone's.
 pub const REMOVED_OPEN: &str = "tallyRemovedOpen";
 
-/// How many entries show before "Show more".
-pub const PAGE: usize = 30;
+/// How many entries a card shows before the older ones fold (#190).
+pub const SHOWN_ENTRIES: usize = 5;
+
+/// The setting of this Device that keeps the length of a bar of the
+/// Tally of `note` (#190), the phone's; nothing kept means a day.
+pub fn period_setting(note: &str) -> String {
+    format!("tallyPeriod:{note}")
+}
+
+/// The setting of this Device that keeps all entries of the Tally of
+/// `note` shown on its card (#190), the phone's; nothing kept means
+/// folded after [`SHOWN_ENTRIES`].
+pub fn entries_shown_setting(note: &str) -> String {
+    format!("tallyEntriesShown:{note}")
+}
+
+/// The name a length of a bar is kept by, the phone's.
+pub fn period_name(period: TallyPeriod) -> &'static str {
+    match period {
+        TallyPeriod::Day => "day",
+        TallyPeriod::Week => "week",
+        TallyPeriod::Month => "month",
+        TallyPeriod::Year => "year",
+    }
+}
+
+/// The person filter the Tally of `note_id` counts by unless one is
+/// picked: the user's own entries in a Shared Area (ADR 0028), everyone's,
+/// which are the user's own too, elsewhere. The compact view's totals and
+/// the detailed view count alike (#190).
+pub fn default_filter(store: &Store, note_id: &str) -> oldbrainfix_core::Result<PersonFilter> {
+    let shared = match store.area_of(note_id)? {
+        Some(area) => store.is_shared(&area)?,
+        None => false,
+    };
+    Ok(if shared {
+        Whose::Mine.filter()
+    } else {
+        Whose::Everyone.filter()
+    })
+}
 
 /// How wide a bar of a chart is at least, with the gap after it.
 const SLOT: f32 = 10.0;
@@ -65,31 +109,6 @@ impl Whose {
     }
 }
 
-/// How the Tally part of the selected Note is looked at: whose entries,
-/// the length of a bar and how many entries show. It starts again for
-/// every Note opened.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TallyLook {
-    /// The Note it is for.
-    pub of: Option<String>,
-    /// `None` until picked: the user's own in a Shared Area, else
-    /// everyone's, which outside one are the user's own too.
-    pub whose: Option<Whose>,
-    pub period: TallyPeriod,
-    pub count: usize,
-}
-
-impl TallyLook {
-    pub fn new(of: Option<String>) -> TallyLook {
-        TallyLook {
-            of,
-            whose: None,
-            period: TallyPeriod::Day,
-            count: PAGE,
-        }
-    }
-}
-
 /// An entry with who wrote it, `None` for the user's own (ADR 0017),
 /// and whether this Device may change it.
 #[derive(Debug, Clone)]
@@ -99,7 +118,7 @@ pub struct EntryShown {
     pub changes: bool,
 }
 
-/// The Tally of the selected Note as its editor shows it.
+/// A Tally as its setup and its detailed card show it.
 #[derive(Debug, Clone)]
 pub struct TallyShown {
     pub tally: Tally,
@@ -115,8 +134,10 @@ pub struct TallyShown {
     /// The removed entries, the last removed first.
     pub removed: Vec<EntryShown>,
     pub removed_open: bool,
-    /// The length of a bar the charts were read with.
+    /// The length of a bar the charts were read with, kept per Note.
     pub period: TallyPeriod,
+    /// Whether the older entries show, kept per Note.
+    pub all_shown: bool,
     /// Whether this Device may add entries and fields.
     pub adds: bool,
     pub defines: bool,
@@ -125,12 +146,12 @@ pub struct TallyShown {
     pub system: UnitSystem,
 }
 
-/// Reads the Tally of the Note `note_id` as `look` asks, or `None` while
-/// it is no Tally.
+/// Reads the Tally of the Note `note_id`, with the entries of `whose`
+/// when picked, or `None` while it is no Tally.
 pub fn read(
     store: &Store,
     note_id: &str,
-    look: &TallyLook,
+    whose: Option<&Whose>,
     system: UnitSystem,
     wall: &WallClock,
 ) -> oldbrainfix_core::Result<Option<TallyShown>> {
@@ -159,7 +180,7 @@ pub fn read(
             }
         }
     }
-    let mut whose = match &look.whose {
+    let mut whose = match whose {
         Some(whose) => whose.clone(),
         None if shared => Whose::Mine,
         None => Whose::Everyone,
@@ -171,13 +192,19 @@ pub fn read(
         whose = Whose::Mine;
     }
     let filter = whose.filter();
+    let period = match store.local_setting(&period_setting(note_id))?.as_deref() {
+        Some("week") => TallyPeriod::Week,
+        Some("month") => TallyPeriod::Month,
+        Some("year") => TallyPeriod::Year,
+        _ => TallyPeriod::Day,
+    };
     let mut entries = Vec::new();
     for entry in tallies.entries(note_id, &filter)? {
         entries.push(shown(entry)?);
     }
     let mut charts = BTreeMap::new();
-    for field in tally.shown() {
-        let bars = tallies.chart(note_id, &field.id, look.period, wall, &filter)?;
+    for field in tally.counting() {
+        let bars = tallies.chart(note_id, &field.id, period, wall, &filter)?;
         charts.insert(field.id.clone(), bars);
     }
     let mut removed = Vec::new();
@@ -199,7 +226,11 @@ pub fn read(
         charts,
         removed,
         removed_open: store.local_setting(REMOVED_OPEN)?.as_deref() == Some("true"),
-        period: look.period,
+        period,
+        all_shown: store
+            .local_setting(&entries_shown_setting(note_id))?
+            .as_deref()
+            == Some("true"),
         adds: store.may_write_in(note_id)?,
         defines: store.may_change(note_id)?,
         changeable,
@@ -208,7 +239,7 @@ pub fn read(
     }))
 }
 
-/// What the user asked of the Tally part of a Note's editor.
+/// What the user asked of a Tally's setup or of its detailed card.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TallyAction {
     /// Opens the field page for the first field of the Note with this
@@ -224,9 +255,10 @@ pub enum TallyAction {
     /// Opens the field page of the field with this id, or of a new one.
     OpenField(Option<String>),
     Whose(Whose),
+    /// Keeps the length of a bar.
     Period(TallyPeriod),
-    /// Shows the next entries.
-    More,
+    /// Keeps whether the older entries show.
+    AllShown(bool),
     /// Keeps whether "Removed entries" is open.
     RemovedOpen(bool),
 }
@@ -251,9 +283,23 @@ pub fn shown_value(base: f64, unit: &str, system: UnitSystem, decimal: &str) -> 
 }
 
 /// `base` as typed into a field of `unit`: as shown, without the unit.
-fn typed_value(base: Option<f64>, unit: &str, system: UnitSystem, decimal: &str) -> String {
+pub(crate) fn typed_value(
+    base: Option<f64>,
+    unit: &str,
+    system: UnitSystem,
+    decimal: &str,
+) -> String {
     base.map(|b| tally_units::format_shown(b, unit, system, decimal))
         .unwrap_or_default()
+}
+
+/// The rule `rule` as the value of a field's rule badge (#192): its icon
+/// and its short words, the phone's `tallyRuleIcon`.
+pub(crate) fn rule_value(t: &L10n, rule: TallyRule) -> BadgeValue<'static> {
+    match rule {
+        TallyRule::Sum => Icon(icons::TALLY_SUM, t.tally_rule_sum_short()),
+        TallyRule::Max => Icon(icons::TALLY_MAX, t.tally_rule_max_short()),
+    }
 }
 
 /// The name of a kind of unit; "Another unit" for a typed one.
@@ -269,91 +315,142 @@ pub(crate) fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
     }
 }
 
-/// What `entry` holds for the fields shown, one after the other.
+/// What `entry` holds for the fields shown, one after the other; a
+/// multiplied field's value after the values of its multipliers the
+/// entry holds, as bare numbers ("Reps 3 × 10 reps"), and a multiplier
+/// not on its own (#200).
 fn values_line(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem) -> String {
     let decimal = decimal_sign(t);
     tally
-        .shown()
+        .counting()
         .into_iter()
         .filter_map(|field| {
             let value = entry.values.get(&field.id)?;
-            Some(format!(
-                "{} {}",
-                field.name,
-                shown_value(*value, &field.unit, system, decimal)
-            ))
+            let mut shown = shown_value(*value, &field.unit, system, decimal);
+            for multiplier in tally.multipliers_of(&field.id).into_iter().rev() {
+                if let Some(factor) = entry.values.get(&multiplier.id) {
+                    let number =
+                        tally_units::format_shown(*factor, &multiplier.unit, system, decimal);
+                    shown = t.tally_times(&number, &shown);
+                }
+            }
+            Some(format!("{} {shown}", field.name))
         })
         .collect::<Vec<_>>()
         .join(" · ")
 }
 
-/// The Tally part of a Note's editor: nothing to draw while the Note is
-/// no Tally.
-pub fn section(
+/// The setup of a Tally in the Note dialog (#190): a row per field, its
+/// name and its settings as badges as on the New Tally page (#161), how a
+/// day with several entries counts, its unit and its target, the other
+/// field it multiplies (#200) while it does or may, a multiplier without
+/// a rule or a target, "Hidden" while it is hidden; a click on the name
+/// or a badge opens the field's
+/// page for who may change the Note, and "Add field" the page of a new
+/// one. The chart and the entries show on the card, not here.
+pub fn setup(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    (shown, count): (&TallyShown, usize),
+    shown: &TallyShown,
     actions: &mut Vec<TallyAction>,
 ) {
     let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
     let tally = &shown.tally;
     let system = shown.system;
     let decimal = decimal_sign(t);
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_heading()).strong().color(text));
+        ui.label(RichText::new(t.tally_fields()).strong().color(text));
         for field in &tally.fields {
-            let unit = tally_units::shown_unit(&field.unit, system);
-            let mut parts = Vec::new();
-            if !unit.is_empty() {
-                parts.push(unit);
+            let changes = shown.changeable.contains(&field.id);
+            let name = RichText::new(&field.name).strong().color(text);
+            if !changes {
+                ui.label(name);
+            } else if ui.add(egui::Button::new(name).frame(false)).clicked() {
+                actions.push(TallyAction::OpenField(Some(field.id.clone())));
             }
-            if let Some(target) = field.target {
-                let value = shown_value(target, &field.unit, system, decimal);
-                parts.push(t.tally_target_value(&value));
+            let unit = tally_units::shown_unit(&field.unit, system);
+            let rule = rule_value(t, field.rule);
+            let unit_value = if unit.is_empty() {
+                t.tally_no_unit().to_string()
+            } else {
+                unit
+            };
+            let target_value = match field.target {
+                Some(target) => shown_value(target, &field.unit, system, decimal),
+                None => t.tally_no_target().to_string(),
+            };
+            let multiplies = field.multiplies.as_deref().and_then(|id| tally.field(id));
+            let mut badges = Vec::new();
+            // A multiplier counts no value: no rule, no target (#200).
+            if multiplies.is_none() {
+                badges.push((icons::TALLY_RULE, t.tally_rule(), rule));
+            }
+            badges.push((icons::TALLY_UNIT, t.tally_unit(), Text(&unit_value)));
+            if multiplies.is_none() {
+                let target = Text(&target_value);
+                badges.push((icons::TALLY_TARGET, t.tally_target_badge(), target));
+            }
+            if multiplies.is_some() || !tally.multipliable(Some(&field.id)).is_empty() {
+                let value = multiplies.map_or(t.tally_multiplies_nothing(), |m| m.name.as_str());
+                badges.push((icons::TALLY_MULTIPLIES, t.tally_multiplies(), Text(value)));
             }
             if field.hidden {
-                parts.push(t.tally_field_hidden().to_string());
+                // Only while on: the switch's on, as the other switches.
+                let hidden = Icon(switch_icon(true), t.tally_field_hidden());
+                badges.push((icons::TALLY_HIDDEN, t.tally_hide_field(), hidden));
             }
-            let body = ui.vertical(|ui| {
-                ui.label(RichText::new(&field.name).color(text));
-                ui.label(RichText::new(parts.join(" · ")).small().color(weak));
-            });
-            if shown.changeable.contains(&field.id) {
-                let open = ui
-                    .interact(
-                        body.response.rect,
-                        Id::new(("tally field", &field.id)),
-                        Sense::click(),
-                    )
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
-                open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &field.name));
-                if open.clicked() {
-                    actions.push(TallyAction::OpenField(Some(field.id.clone())));
+            badge_row(ui, |ui| {
+                for (icon, setting, value) in badges {
+                    if badge(ui, (t, tones), (icon, None), setting, Some(value), changes).clicked()
+                    {
+                        actions.push(TallyAction::OpenField(Some(field.id.clone())));
+                    }
                 }
-            }
+            });
+            ui.add_space(8.0);
         }
-        ui.horizontal_wrapped(|ui| {
-            if shown.adds
-                && ui
-                    .button(RichText::new(t.add_tally_entry()).color(text))
-                    .clicked()
-            {
-                actions.push(TallyAction::AddEntry);
-            }
-            if shown.defines
-                && ui
-                    .button(RichText::new(t.tally_add_field()).color(text))
-                    .clicked()
-            {
+        if shown.defines {
+            let add = ui.horizontal(|ui| {
+                icons::show(ui, icons::ADD, 20.0, text);
+                ui.button(RichText::new(t.tally_add_field()).color(text))
+            });
+            if add.inner.clicked() {
                 actions.push(TallyAction::OpenField(None));
             }
-        });
+        }
     });
-    if shown.shared {
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.tally_show_entries()).strong().color(text));
+}
+
+/// A Tally on its Note's detailed card (#190): "Add entry" for who may
+/// add one; in a Shared Area the choice of whose entries show; the length
+/// of a bar; one chart per field shown but the multipliers, a multiplied
+/// field's of the products (#200); the entries, newest first, the
+/// older folded under the latest [`SHOWN_ENTRIES`]; and the folded
+/// "Removed entries" with Restore. The card leaves its own click out of
+/// where this lies, so its buttons take theirs.
+pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAction>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let tally = &shown.tally;
+    let system = shown.system;
+    let heading = |ui: &mut Ui, words: &str| {
+        ui.add_space(4.0);
+        ui.label(RichText::new(words).strong().color(text));
+    };
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 6.0;
+        if shown.adds {
+            let add = ui.horizontal(|ui| {
+                icons::show(ui, icons::ADD, 20.0, text);
+                ui.button(RichText::new(t.add_tally_entry()).color(text))
+            });
+            if add.inner.clicked() {
+                actions.push(TallyAction::AddEntry);
+            }
+        }
+        if shown.shared {
+            heading(ui, t.tally_show_entries());
             let mut options = vec![
                 (Whose::Mine, t.tally_entries_mine().to_string()),
                 (Whose::Everyone, t.tally_entries_everyone().to_string()),
@@ -368,10 +465,8 @@ pub fn section(
                     actions.push(TallyAction::Whose(whose));
                 }
             }
-        });
-    }
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_period()).strong().color(text));
+        }
+        heading(ui, t.tally_period());
         let mut period = shown.period;
         let options = [
             (TallyPeriod::Day, t.tally_period_day().to_string()),
@@ -379,47 +474,60 @@ pub fn section(
             (TallyPeriod::Month, t.tally_period_month().to_string()),
             (TallyPeriod::Year, t.tally_period_year().to_string()),
         ];
-        if radio_column(ui, &mut period, options) {
+        if chip_row(ui, &mut period, options) {
             actions.push(TallyAction::Period(period));
         }
-    });
-    for field in tally.shown() {
-        embossed(ui, tones, false, None, |ui| {
+        for field in tally.counting() {
             let unit = tally_units::shown_unit(&field.unit, system);
-            let heading = if unit.is_empty() {
+            let words = if unit.is_empty() {
                 field.name.clone()
             } else {
                 format!("{} ({unit})", field.name)
             };
-            ui.label(RichText::new(heading).strong().color(text));
+            heading(ui, &words);
             let bars = shown.charts.get(&field.id).map_or(&[][..], Vec::as_slice);
             chart(ui, t, field, bars, (shown.period, system));
-        });
-    }
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_entries()).strong().color(text));
+        }
+        heading(ui, t.tally_entries());
         if shown.entries.is_empty() {
             ui.label(RichText::new(t.tally_no_entries()).color(weak));
         }
+        let older = shown.entries.len().saturating_sub(SHOWN_ENTRIES);
+        let count = if shown.all_shown || older == 0 {
+            shown.entries.len()
+        } else {
+            SHOWN_ENTRIES
+        };
         for entry in shown.entries.iter().take(count) {
             entry_row(ui, t, (tally, system), entry, false, actions);
         }
-        if shown.entries.len() > count
-            && ui
-                .button(RichText::new(t.tally_more_entries()).color(text))
-                .clicked()
-        {
-            actions.push(TallyAction::More);
+        // The older ones folded under the latest (#190).
+        if older > 0 {
+            let icon = if shown.all_shown {
+                icons::EXPAND_LESS
+            } else {
+                icons::EXPAND_MORE
+            };
+            let said = t.tally_older_entries(older as i64);
+            let fold = ui.horizontal(|ui| {
+                icons::show(ui, icon, 20.0, weak);
+                ui.add(
+                    egui::Button::new(RichText::new(&said).color(weak))
+                        .frame(false)
+                        .selected(shown.all_shown),
+                )
+            });
+            if fold.inner.clicked() {
+                actions.push(TallyAction::AllShown(!shown.all_shown));
+            }
         }
-    });
-    if shown.removed.is_empty() {
-        return;
-    }
-    embossed(ui, tones, false, None, |ui| {
+        if shown.removed.is_empty() {
+            return;
+        }
         let open = shown.removed_open;
         let fold =
             egui::CollapsingHeader::new(RichText::new(t.tally_removed_entries()).color(text))
-                .id_salt("tally removed")
+                .id_salt(("tally removed", &tally.note_id))
                 .open(Some(open))
                 .show(ui, |ui| {
                     for entry in &shown.removed {
@@ -539,7 +647,9 @@ fn chart(
     }
     let width = ui.available_width().max(SLOT);
     let fit = ((width / SLOT).floor() as usize).max(1);
-    let shown = &buckets[buckets.len().saturating_sub(fit)..];
+    let shown = buckets
+        .get(buckets.len().saturating_sub(fit)..)
+        .unwrap_or(buckets);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, CHART_HEIGHT), Sense::hover());
     let label = t.tally_chart_label(&field.name, shown.len() as i64);
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, &label));
@@ -668,17 +778,13 @@ fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIn
     let mut intent = None;
     ui.label(RichText::new(heading).size(18.0).strong().color(text));
     ui.horizontal_wrapped(|ui| {
-        if ui.button(RichText::new(t.save()).color(text)).clicked() {
+        if theme::primary(ui, true, t.save()).clicked() {
             intent = Some(FormIntent::Save);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             intent = Some(FormIntent::Close);
         }
-        if delete
-            && ui
-                .button(RichText::new(t.delete()).color(ui.visuals().error_fg_color))
-                .clicked()
-        {
+        if delete && theme::destructive(ui, true, t.delete()).clicked() {
             intent = Some(FormIntent::Delete);
         }
     });
@@ -695,8 +801,11 @@ fn field_error(ui: &mut Ui, error: &str) {
 /// Device's system (#159), a known one or one as typed, only of its kind
 /// once entries hold values for it; its target, optional; and how a
 /// day with several entries counts, which follows the kind of unit until
-/// it is picked. A field that exists has "Hide field", or "Show field
-/// again", at the bottom. Leaving without Save changes nothing. For the
+/// it is picked. In a Tally with another field it may multiply (#200),
+/// "Multiplies" offers Nothing and those fields; a multiplier has no
+/// target and no rule, so they leave the page while one is picked. A
+/// field that exists has "Hide field", or "Show field again", at the
+/// bottom. Leaving without Save changes nothing. For the
 /// Note being captured (#113) Save hands the field back instead
 /// ([`FieldForm::choice`]), as the phone's `chooseTallyField`.
 #[derive(Debug, Clone)]
@@ -723,6 +832,10 @@ pub struct FieldForm {
     target_as_opened: String,
     pub rule: TallyRule,
     rule_picked: bool,
+    /// The fields this one may multiply, by id and name (#200).
+    multipliable: Vec<(String, String)>,
+    /// The id of the field it multiplies.
+    pub multiplies: Option<String>,
     system: UnitSystem,
     name_missing: bool,
     target_invalid: bool,
@@ -770,6 +883,8 @@ impl FieldForm {
             target,
             rule: field.as_ref().map_or(TallyRule::Sum, |f| f.rule),
             rule_picked: false,
+            multipliable: Vec::new(),
+            multiplies: field.as_ref().and_then(|f| f.multiplies.clone()),
             system,
             name_missing: false,
             target_invalid: false,
@@ -809,6 +924,17 @@ impl FieldForm {
         }
     }
 
+    /// The page with the fields of `tally` this one may multiply.
+    pub fn multiplying(mut self, tally: &Tally) -> FieldForm {
+        let id = self.field.as_ref().map(|f| f.id.as_str());
+        self.multipliable = tally
+            .multipliable(id)
+            .into_iter()
+            .map(|f| (f.id.clone(), f.name.clone()))
+            .collect();
+        self
+    }
+
     /// The page of the first field of the Note being captured.
     pub fn choose(system: UnitSystem, t: &L10n) -> FieldForm {
         FieldForm {
@@ -837,9 +963,17 @@ impl FieldForm {
         let target_text = self.target.trim().to_string();
         let tallies = Tallies::new(store);
         let note = &self.note_id;
+        let multiplies = self.multiplies.as_deref();
         match &self.field {
             None => {
-                tallies.add_field(note, &name, &unit, target, Some(self.rule))?;
+                tallies.add_field_multiplying(
+                    note,
+                    &name,
+                    &unit,
+                    target,
+                    Some(self.rule),
+                    multiplies,
+                )?;
             }
             Some(field) => {
                 if name != field.name {
@@ -849,12 +983,19 @@ impl FieldForm {
                 if unit_changed {
                     tallies.set_unit(note, &field.id, &unit)?;
                 }
-                // Read again in the unit now shown next to it.
-                if unit_changed || target_text != self.target_as_opened {
-                    tallies.set_target(note, &field.id, target)?;
+                if multiplies != field.multiplies.as_deref() {
+                    tallies.set_multiplies(note, &field.id, multiplies)?;
                 }
-                if self.rule != field.rule {
-                    tallies.set_rule(note, &field.id, self.rule)?;
+                // A multiplier's target and rule stay as they were, for
+                // when it is a field of its own again.
+                if multiplies.is_none() {
+                    // Read again in the unit now shown next to it.
+                    if unit_changed || target_text != self.target_as_opened {
+                        tallies.set_target(note, &field.id, target)?;
+                    }
+                    if self.rule != field.rule {
+                        tallies.set_rule(note, &field.id, self.rule)?;
+                    }
                 }
             }
         }
@@ -867,7 +1008,11 @@ impl FieldForm {
     fn checked(&mut self) -> Option<(String, String, Option<f64>)> {
         let name = self.name.trim().to_string();
         let unit = self.chosen_unit();
-        let target_text = self.target.trim().to_string();
+        // A multiplier has no target (#200).
+        let target_text = match self.multiplies {
+            None => self.target.trim().to_string(),
+            Some(_) => String::new(),
+        };
         let target = if target_text.is_empty() {
             None
         } else {
@@ -997,38 +1142,68 @@ impl FieldForm {
                         self.unit_changed();
                     }
                 });
-                embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
-                    ui.horizontal(|ui| {
-                        let unit = tally_units::shown_unit(&self.chosen_unit(), self.system);
-                        let field = ui
-                            .add(
-                                TextEdit::singleline(&mut self.target)
-                                    .id(Id::new(TARGET_FIELD))
-                                    .text_color(text)
-                                    .desired_width(120.0),
-                            )
-                            .labelled_by(label.id);
-                        if focus == Some(TARGET_FIELD) {
-                            field.request_focus();
+                let offered = !self.multipliable.is_empty()
+                    || self.field.as_ref().is_some_and(|f| f.multiplies.is_some());
+                if offered {
+                    embossed(ui, tones, false, None, |ui| {
+                        ui.label(RichText::new(t.tally_multiplies()).strong().color(text));
+                        let mut picked = self
+                            .multiplies
+                            .as_ref()
+                            .and_then(|id| self.multipliable.iter().position(|(o, _)| o == id));
+                        let options = std::iter::once((None, t.tally_multiplies_nothing().into()))
+                            .chain(
+                                self.multipliable
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, (_, name))| (Some(i), name.clone())),
+                            );
+                        if radio_column(ui, &mut picked, options) {
+                            self.multiplies = picked
+                                .and_then(|i| self.multipliable.get(i))
+                                .map(|(id, _)| id.clone());
                         }
-                        ui.label(RichText::new(unit).color(text));
+                        ui.label(
+                            RichText::new(t.tally_multiplies_detail())
+                                .small()
+                                .color(weak),
+                        );
                     });
-                    if self.target_invalid {
-                        field_error(ui, t.tally_not_a_number());
-                    }
-                    ui.label(RichText::new(t.tally_target_hint()).small().color(weak));
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.tally_rule()).strong().color(text));
-                    let options = [
-                        (TallyRule::Sum, t.tally_rule_sum().to_string()),
-                        (TallyRule::Max, t.tally_rule_max().to_string()),
-                    ];
-                    if radio_column(ui, &mut self.rule, options) {
-                        self.rule_picked = true;
-                    }
-                });
+                }
+                if self.multiplies.is_none() {
+                    embossed(ui, tones, false, None, |ui| {
+                        let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
+                        ui.horizontal(|ui| {
+                            let unit = tally_units::shown_unit(&self.chosen_unit(), self.system);
+                            let field = ui
+                                .add(
+                                    TextEdit::singleline(&mut self.target)
+                                        .id(Id::new(TARGET_FIELD))
+                                        .text_color(text)
+                                        .desired_width(120.0),
+                                )
+                                .labelled_by(label.id);
+                            if focus == Some(TARGET_FIELD) {
+                                field.request_focus();
+                            }
+                            ui.label(RichText::new(unit).color(text));
+                        });
+                        if self.target_invalid {
+                            field_error(ui, t.tally_not_a_number());
+                        }
+                        ui.label(RichText::new(t.tally_target_hint()).small().color(weak));
+                    });
+                    embossed(ui, tones, false, None, |ui| {
+                        ui.label(RichText::new(t.tally_rule()).strong().color(text));
+                        let options = [
+                            (TallyRule::Sum, t.tally_rule_sum().to_string()),
+                            (TallyRule::Max, t.tally_rule_max().to_string()),
+                        ];
+                        if chip_row(ui, &mut self.rule, options) {
+                            self.rule_picked = true;
+                        }
+                    });
+                }
                 // A secondary state change: a row at the bottom.
                 if let Some(field) = &self.field {
                     embossed(ui, tones, false, None, |ui| {

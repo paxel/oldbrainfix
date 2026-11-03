@@ -5,6 +5,7 @@
 library;
 
 import 'alarms.dart';
+import 'device_settings.dart';
 import 'entry.dart';
 import 'routines.dart';
 import 'schedule.dart';
@@ -108,11 +109,15 @@ class HistoryEntry {
     this.snoozedUntil,
   });
 
-  /// Whether it was Done early, on time or late; null unless Done.
+  /// Whether it was Done early, on time or late; null unless Done. An
+  /// all-day one is due all its day, before it rings too (#201), so it
+  /// is never early.
   DoneTiming? get timing {
     final done = doneAt;
     if (done == null) return null;
-    if (done.isBefore(start)) return DoneTiming.early;
+    if (occurrence.time != null && done.isBefore(start)) {
+      return DoneTiming.early;
+    }
     return done.isBefore(missedAt) ? DoneTiming.onTime : DoneTiming.late;
   }
 }
@@ -270,7 +275,8 @@ class RoutineHistory {
 /// until [snoozes], both by [Occurrence.key], with days as [wallClock]
 /// shows them. An Occurrence is Missed as the Missed Summary says: when
 /// the next one starts, unless the schedule changed or the Routine went
-/// to the trash before. Whatever was Done counts, asked for or not.
+/// to the trash before. Whatever was Done counts, asked for or not. An
+/// all-day Occurrence starts at [allDayFrom], as the alarm plan has it.
 RoutineHistory routineHistory({
   required List<ScheduleSpan> spans,
   required Map<String, DateTime> done,
@@ -278,7 +284,9 @@ RoutineHistory routineHistory({
   required DateTime now,
   required WallClock wallClock,
   int weekStart = DateTime.monday,
+  ClockTime? allDayFrom,
 }) {
+  final allDay = allDayFrom ?? DeviceSettings.defaultAllDayFrom;
   final today = Day.today(now, wallClock);
   final asked = <String, HistoryEntry>{};
   // Done, but outside every span: kept unless asked for elsewhere.
@@ -311,7 +319,7 @@ RoutineHistory routineHistory({
       final next = i + 1 < occurrences.length
           ? occurrences[i + 1]
           : after?.firstOrNull;
-      final wallStart = startOf(occurrence);
+      final wallStart = startOf(occurrence, allDay);
       final wallEnds = missedFrom(occurrence, next);
       final start = instantOf(wallStart.day, wallStart.time, wallClock);
       final missedAt = instantOf(wallEnds.day, wallEnds.time, wallClock);
@@ -355,7 +363,7 @@ RoutineHistory routineHistory({
     if (asked.containsKey(key)) continue;
     final occurrence = Occurrence.tryParse(key);
     if (occurrence == null || occurrence.day > today) continue;
-    final wallStart = startOf(occurrence);
+    final wallStart = startOf(occurrence, allDay);
     final wallEnds = missedFrom(occurrence, null);
     asked[key] = entry(
       occurrence,
@@ -390,6 +398,7 @@ extension RoutineHistories on Routines {
       now: store.clock(),
       wallClock: wallClock,
       weekStart: weekStart,
+      allDayFrom: store.allDayFrom,
     );
   }
 }

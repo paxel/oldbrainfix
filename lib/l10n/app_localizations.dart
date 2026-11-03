@@ -884,6 +884,30 @@ abstract class AppLocalizations {
   /// **'The Note is gone'**
   String get noteGone;
 
+  /// No description provided for @scheduleSentenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'When'**
+  String get scheduleSentenceLabel;
+
+  /// No description provided for @scheduleSentenceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day at 08:00'**
+  String get scheduleSentenceHint;
+
+  /// No description provided for @scheduleSentenceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked words are not understood and change nothing.'**
+  String get scheduleSentenceUnknown;
+
+  /// No description provided for @scheduleSentenceAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Simple to type.'**
+  String get scheduleSentenceAdvanced;
+
   /// No description provided for @scheduleSimple.
   ///
   /// In en, this message translates to:
@@ -1517,7 +1541,7 @@ abstract class AppLocalizations {
   /// No description provided for @nudgeSettingsExplain.
   ///
   /// In en, this message translates to:
-  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.'**
+  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time; only an all-day one waits until they end.'**
   String get nudgeSettingsExplain;
 
   /// No description provided for @nudgeRepeat.
@@ -2327,7 +2351,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntro.
   ///
   /// In en, this message translates to:
-  /// **'These settings belong to this phone and are never synced.'**
+  /// **'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.'**
   String get settingsIntro;
 
   /// No description provided for @settingsLook.
@@ -2354,6 +2378,18 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get themeDark;
 
+  /// The switch in Settings > Look that shows text, icons and tap targets 1.3 times their size on this Device (#224). The desktop calls it Bigger text and icons.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat fingers'**
+  String get fatFingers;
+
+  /// Under the switch fatFingers.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
+  String get fatFingersDetail;
+
   /// No description provided for @settingsAlarms.
   ///
   /// In en, this message translates to:
@@ -2371,6 +2407,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'How often an ignored alarm rings again, unless its Routine has its own interval.'**
   String get settingsRenagDetail;
+
+  /// No description provided for @allDayFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'All-day items remind from'**
+  String get allDayFrom;
+
+  /// No description provided for @allDayFromDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Before this time an all-day Routine or Reminder only shows on the Agenda. From it on it rings and Re-nags. Quiet Hours win.'**
+  String get allDayFromDetail;
 
   /// No description provided for @alarmSound.
   ///
@@ -2993,7 +3041,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncSettingsStay.
   ///
   /// In en, this message translates to:
-  /// **'Settings stay on each Device and are never synced.'**
+  /// **'Simple or Advanced and the Trash setting sync to your own Devices; other settings stay on each Device.'**
   String get syncSettingsStay;
 
   /// The switch per paired Device: it syncs on its own on the same network.
@@ -3662,7 +3710,7 @@ abstract class AppLocalizations {
   /// **'It becomes a Shopping List.'**
   String get sentItemMakesShoppingList;
 
-  /// Under a Line of a Shopping List in a Sent Item's preview; time is shoppingOnce or shoppingWeeks.
+  /// Under a Line of a Shopping List in a Sent Item's preview; time is shoppingReappearNone, shoppingOnce, shoppingDays, shoppingWeeks, shoppingMonths or shoppingYears.
   ///
   /// In en, this message translates to:
   /// **'Reappear time: {time}'**
@@ -4241,7 +4289,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileDeviceSettingsDetail.
   ///
   /// In en, this message translates to:
-  /// **'They belong to this Device and are never synced.'**
+  /// **'Most belong to this Device; Simple or Advanced and the Trash setting sync to your own Devices.'**
   String get profileDeviceSettingsDetail;
 
   /// No description provided for @profileWhichTitle.
@@ -4430,11 +4478,35 @@ abstract class AppLocalizations {
   /// **'Send report to the developer'**
   String get crashSendReport;
 
-  /// Announcement at the next start after the app died; tapping it opens a mail with the report.
+  /// Announcement at the next start after the app died; tapping it opens the dialog of what happened, with Close and Report.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.'**
+  /// **'Old Brain Fix stopped unexpectedly last time. Tap for details.'**
   String get crashLastRunBody;
+
+  /// Title of the dialog the announcement after an unexpected stop opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix stopped unexpectedly'**
+  String get crashLastRunTitle;
+
+  /// Cause in the dialog after an unexpected stop, when a crash log or the system's exit record says what happened.
+  ///
+  /// In en, this message translates to:
+  /// **'The last run ended with an error or was ended by the system; the text below says how.'**
+  String get crashLastRunErrorCause;
+
+  /// Cause in the dialog after an unexpected stop, when nothing recorded why the app ended.
+  ///
+  /// In en, this message translates to:
+  /// **'The last run was ended while on screen without leaving an error behind, most likely because the phone ran short of memory.'**
+  String get crashLastRunKilledCause;
+
+  /// Fix sentence in the dialog after an unexpected stop, after the cause.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved Notes are safe. “Report” sends this text to the developer by mail; “Close” sends nothing.'**
+  String get crashLastRunFix;
 
   /// No description provided for @sendToPerson.
   ///
@@ -5282,11 +5354,53 @@ abstract class AppLocalizations {
   /// **'Checklist'**
   String get checklistHeading;
 
-  /// A compact card of a Checklist: how many of its Lines are checked.
+  /// The compact view of a Checklist's card (#189): how many of its Lines are open.
   ///
   /// In en, this message translates to:
-  /// **'{checked} of {count} checked'**
-  String checklistCount(int checked, int count);
+  /// **'{open} of {count} open'**
+  String checklistOpenCount(int open, int count);
+
+  /// The detailed view of a Shopping List's card (#189): the folded struck Lines, how many; a tap shows or hides them.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} struck through'**
+  String shoppingStruckCount(int count);
+
+  /// The compact view of a Tally's card (#189): a field's name, its total today as a number and its target with the unit, such as 'Steps 7000 / 10000 steps'.
+  ///
+  /// In en, this message translates to:
+  /// **'{field} {total} / {target}'**
+  String tallyCardTotal(String field, String total, String target);
+
+  /// The compact view of a Tally's card (#189): a field without a target, its name and its total today with the unit, such as 'Books 1 books'.
+  ///
+  /// In en, this message translates to:
+  /// **'{field} {total}'**
+  String tallyCardTotalOnly(String field, String total);
+
+  /// The compact view of the card of a Note that runs a Session (#189): its next run, a date and a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {when}'**
+  String sessionCardNext(String when);
+
+  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many Missed since the week began.
+  ///
+  /// In en, this message translates to:
+  /// **'done {done} / skipped {skipped} this week'**
+  String sessionCardWeek(int done, int skipped);
+
+  /// The heading over a Session Note's history on its detailed card (#191): how often its Routines were Done and Missed in each of the last four weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 4 weeks'**
+  String get sessionHistory;
+
+  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many Missed in it.
+  ///
+  /// In en, this message translates to:
+  /// **'Week of {day}: done {done} / skipped {skipped}'**
+  String sessionHistoryWeek(String day, int done, int skipped);
 
   /// No description provided for @checklistRenameTitle.
   ///
@@ -5348,7 +5462,7 @@ abstract class AppLocalizations {
   /// **'back {day}'**
   String shoppingBack(String day);
 
-  /// Heading of the choices in a Shopping List Line's menu: how long the Line stays struck once checked (CONTEXT.md: Shopping List).
+  /// The setting a Shopping List Line's badge shows and the title of its dialog (#195): how long the Line stays struck once checked (CONTEXT.md: Shopping List).
   ///
   /// In en, this message translates to:
   /// **'Reappear time'**
@@ -5365,6 +5479,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 week} other{{count} weeks}}'**
   String shoppingWeeks(int count);
+
+  /// Reappear time of a Line without one (#195): once checked it stays struck through until a time is set. What a new Line has.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get shoppingReappearNone;
+
+  /// In the reappear time dialog of a Shopping List Line (#195), the choice whose number and unit follow below it: the Line comes back this long after it was checked.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get shoppingReappearAfter;
+
+  /// Reappear time of a Line: it comes back this many days after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String shoppingDays(int count);
+
+  /// Reappear time of a Line: it comes back on the same day of the month this many months after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 month} other{{count} months}}'**
+  String shoppingMonths(int count);
+
+  /// Reappear time of a Line: it comes back on the same day this many years after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 year} other{{count} years}}'**
+  String shoppingYears(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many days.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}d'**
+  String shoppingShortDays(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}w'**
+  String shoppingShortWeeks(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many months.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m'**
+  String shoppingShortMonths(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many years.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}y'**
+  String shoppingShortYears(int count);
 
   /// On the desktop, in a Shopping List Line's menu and on its confirm button: moves the Line to the trash, as a Checklist's Delete does (ADR 0030). The phone uses delete.
   ///
@@ -5684,6 +5852,30 @@ abstract class AppLocalizations {
   /// **'No target'**
   String get tallyNoTarget;
 
+  /// A Tally field's setting (#200), a badge in its setup and a heading on its page: the other field of the Tally it multiplies, such as Sets multiplying Reps.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiplies'**
+  String get tallyMultiplies;
+
+  /// The value of a Tally field's Multiplies badge and the first choice on its page (#200): the field multiplies no other field and counts values of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing'**
+  String get tallyMultipliesNothing;
+
+  /// Under the Multiplies choices on a Tally field's page (#200).
+  ///
+  /// In en, this message translates to:
+  /// **'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.'**
+  String get tallyMultipliesDetail;
+
+  /// An entry's value of a Tally field another field multiplies (#200): the multiplier's value, a bare number, before the value with its unit, such as '3 × 10 reps'.
+  ///
+  /// In en, this message translates to:
+  /// **'{factor} × {value}'**
+  String tallyTimes(String factor, String value);
+
   /// No description provided for @tallyFields.
   ///
   /// In en, this message translates to:
@@ -5804,17 +5996,11 @@ abstract class AppLocalizations {
   /// **'Chart of {field}, {bars} bars'**
   String tallyChartLabel(String field, int bars);
 
-  /// No description provided for @tallyTargetValue.
+  /// The detailed view of a Tally's card (#190): the older entries folded under the latest five, how many; a tap shows or hides them.
   ///
   /// In en, this message translates to:
-  /// **'Target {value}'**
-  String tallyTargetValue(String value);
-
-  /// No description provided for @tallyMoreEntries.
-  ///
-  /// In en, this message translates to:
-  /// **'Show more'**
-  String get tallyMoreEntries;
+  /// **'{count, plural, =1{1 older entry} other{{count} older entries}}'**
+  String tallyOlderEntries(int count);
 
   /// No description provided for @tallyRemovedEntries.
   ///
@@ -5876,7 +6062,7 @@ abstract class AppLocalizations {
   /// **'imperial'**
   String get unitSystemImperialName;
 
-  /// A Routine that picks Tallies from a pool for each Occurrence (CONTEXT.md: Session).
+  /// A Note that picks Tallies from its pool for each Occurrence of its Routines (CONTEXT.md: Session); also the kind's name in the kind badge (#191).
   ///
   /// In en, this message translates to:
   /// **'Session'**
@@ -5917,6 +6103,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose at least one Tally.'**
   String get sessionPoolMissing;
+
+  /// Under a Session's pool filtered by tags (#220): how many ticked Tallies the filter hides; they stay ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more ticked, hidden by the filter} other{{count} more ticked, hidden by the filter}}'**
+  String sessionPoolHidden(int count);
 
   /// No description provided for @sessionSchedule.
   ///
@@ -6110,16 +6302,16 @@ abstract class AppLocalizations {
   /// **'The Note being captured'**
   String get noteBeingCaptured;
 
-  /// Bar button of a Note list that shows each Note by its first line only.
+  /// Bar button of a Note list that shows every card in its compact view (#189).
   ///
   /// In en, this message translates to:
-  /// **'Show Notes compact'**
+  /// **'Show compact views'**
   String get showNotesCompact;
 
-  /// Bar button of a Note list that shows each Note whole, with its Sections.
+  /// Bar button of a Note list that shows every card in its detailed view (#189).
   ///
   /// In en, this message translates to:
-  /// **'Show Notes in full'**
+  /// **'Show detailed views'**
   String get showNotesFull;
 
   /// Small label above a Transcript on a Note card.
@@ -7022,19 +7214,19 @@ abstract class AppLocalizations {
   /// **'Private Checklist'**
   String get maskedChecklist;
 
-  /// Switch in the menu of a Checklist's card and editor: while on, the Checklist shows on today's Agenda while it has open Lines. The heading of the same choice of a Shopping List with three options, and the name of its badge in the Note editor. The person's own choice, kept on their own Devices.
+  /// The heading of the three choices in the menu of a Checklist's or a Shopping List's card, and the name of its badge in the Note editor: how the list shows on today's Agenda while it has open Lines. The person's own choice, kept on their own Devices.
   ///
   /// In en, this message translates to:
   /// **'Show on the Agenda'**
   String get checklistShowOnAgenda;
 
-  /// Radio choice under 'Show on the Agenda' of a Shopping List, the default: one Agenda row with the list's title and how many of its Lines are open, such as 'Groceries: 4 open'.
+  /// Radio choice under 'Show on the Agenda' of a Shopping List or a Checklist, a Shopping List's default: one Agenda row with the list's title and how many of its Lines are open, such as 'Groceries: 4 open' or 'Before the trip: 3 of 7 open'.
   ///
   /// In en, this message translates to:
   /// **'One row with the number of open Lines'**
   String get shoppingOnAgendaCount;
 
-  /// Radio choice under 'Show on the Agenda' of a Shopping List: every Line not struck through gets its own checkable row on the Agenda.
+  /// Radio choice under 'Show on the Agenda' of a Shopping List or a Checklist, a Checklist's default: every open Line gets its own checkable row on the Agenda, under the list's name.
   ///
   /// In en, this message translates to:
   /// **'Each open Line on its own row'**
@@ -7177,6 +7369,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Code'**
   String get formatCode;
+
+  /// Format bar button: puts the lines the selection touches into a fenced code block, shown in a fixed-width font with nothing in it read as a format; in a code block, takes its fences off.
+  ///
+  /// In en, this message translates to:
+  /// **'Code block'**
+  String get formatCodeBlock;
 
   /// Format bar button: moves a list item one level in.
   ///
@@ -7409,7 +7607,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -7430,10 +7628,10 @@ abstract class AppLocalizations {
   /// **'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.'**
   String get quickNoteNudgeButtonsDetail;
 
-  /// Switch in Settings ▸ Quick note: the buttons for a Routine, Reminder, Frog or Session and 'Make it a Tally' (Q481).
+  /// Switch in Settings ▸ Quick note, only in Advanced: adds Frog and Session to the alarm clock's menu, which offers a Routine or Reminder without it (#223), and 'Make it a Tally' (Q481).
   ///
   /// In en, this message translates to:
-  /// **'Routine, Reminder, Frog, Session or Tally'**
+  /// **'Frog, Session or Tally'**
   String get quickNoteSchedule;
 
   /// In the ⋮ of the phone's full-screen photo: puts the picture on the clipboard (#149).
@@ -7772,11 +7970,41 @@ abstract class AppLocalizations {
   /// **'Area and Topic'**
   String get badgePlace;
 
-  /// The name of the Note editor's badge that shows whether the Note is a Checklist, a Shopping List or a Tally (#160).
+  /// The name of the Note editor's badge that shows the Note's kind: a plain Note, a Checklist, a Shopping List or a Tally (#160, #188).
   ///
   /// In en, this message translates to:
   /// **'Kind'**
   String get badgeKind;
+
+  /// The kind of a Note of text alone (#188): the value of the kind badge and a choice in its dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain Note'**
+  String get kindPlain;
+
+  /// The label of the one-line field for the name of a Note of a kind, a Checklist, Shopping List or Tally (#188): the first line of its text, shown as its title.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get noteName;
+
+  /// The label of the field for the description of a Note of a kind (#188): the rest of its text after the name, shown small under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get noteDescription;
+
+  /// What a screen reader reads, and the tooltip, for the description of a Note of a kind folded to one line under its name (#188): a tap unfolds it.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the whole description'**
+  String get noteDescriptionUnfold;
+
+  /// What a screen reader reads, and the tooltip, for an unfolded description of a Note of a kind (#188): a tap folds it back to one line.
+  ///
+  /// In en, this message translates to:
+  /// **'Fold the description'**
+  String get noteDescriptionFold;
 
   /// The value of a Note editor's badge for a setting that is switched on, such as Show ticks (#160).
   ///
@@ -7789,6 +8017,900 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get settingOff;
+
+  /// The heading of the Agenda's section in Settings (#217).
+  ///
+  /// In en, this message translates to:
+  /// **'Agenda'**
+  String get settingsAgenda;
+
+  /// The switch in Settings > Agenda that hides what is checked on the Agenda instead of striking it through (#217).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide what\'s checked on the Agenda'**
+  String get hideCheckedOnAgenda;
+
+  /// Under the switch hideCheckedOnAgenda on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'A Done Occurrence, a checked Line and a Session\'s pick with its entry leave the Agenda and the widget at once instead of staying struck through; a group with nothing left goes with them.'**
+  String get hideCheckedOnAgendaDetail;
+
+  /// The switch in Settings > Agenda that moves a plain Note to the trash once its only Reminder is checked off (#211); a setting of the person, the same on all of their own Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Move a Note to the Trash when its one-time Reminder is done'**
+  String get trashDoneReminder;
+
+  /// Under the switch trashDoneReminder, on the phone and the desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Done on a one-time Reminder that is a plain Note\'s only Routine or Reminder moves the Note to the trash with it, wherever you check it off. Lists, Tallies and Sessions stay. The same on all your own Devices; unchecking doesn\'t bring the Note back, the trash does for 30 days.'**
+  String get trashDoneReminderDetail;
+
+  /// At the top of the Note editor (#215): an Occurrence of the Note's Routine or Reminder that is due now, with its time ("Due 15:00"), before the Done button.
+  ///
+  /// In en, this message translates to:
+  /// **'Due {when}'**
+  String occurrenceDue(String when);
+
+  /// At the top of the Note editor (#215): the latest Missed Occurrence of the Note's Routine or Reminder, with its day and time, before the Done button.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed {when}'**
+  String occurrenceMissedAt(String when);
+
+  /// At the top of the Note editor (#215), beside Done for a one-time Reminder: checks it off and moves the Note with it to the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Done and move to trash'**
+  String get doneAndTrash;
+
+  /// The name of the Note editor's badge that shows the format of a Plain Note's text (#213): plain, formatted or code.
+  ///
+  /// In en, this message translates to:
+  /// **'Text format'**
+  String get badgeTextFormat;
+
+  /// A value of the text format badge (#213): the text as typed, without formatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain text'**
+  String get textFormatPlain;
+
+  /// A value of the text format badge (#213): Markdown formatting, as the format bar applies it.
+  ///
+  /// In en, this message translates to:
+  /// **'Formatted text'**
+  String get textFormatFormatted;
+
+  /// A value of the text format badge (#213): the whole text as code, in a fixed-width font exactly as written, unwrapped, nothing in it read as a format, a box or a #tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get textFormatCode;
+
+  /// Under the Note's text in the Note editor after a paste that looks like a script or code (#213), before the button keepAsCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This looks like code.'**
+  String get codePasted;
+
+  /// The button under the Note's text in the Note editor after a paste that looks like code (#213): makes the whole text a Code text.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as code'**
+  String get keepAsCode;
+
+  /// Line under the title of a Note's History page (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'Every change of this Note, its Amends and its Lines, the newest first.'**
+  String get noteHistoryHint;
+
+  /// A Note's History: the Note was captured with the text shown under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get noteHistoryCaptured;
+
+  /// A Note's History: the Note's text was changed; the old and the new text show under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Text changed'**
+  String get noteHistoryText;
+
+  /// A Note's History: an Amend added a Section, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amended'**
+  String get noteHistoryAmended;
+
+  /// A Note's History: the text of an Amend (a Section) was changed; old and new text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amend changed'**
+  String get noteHistoryAmendEdited;
+
+  /// A Note's History: another Note was merged into this one, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Note merged in'**
+  String get noteHistoryMergedIn;
+
+  /// A Note's History: a Line of a Checklist or Shopping List was added, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line added'**
+  String get noteHistoryLineAdded;
+
+  /// A Note's History: a Line was renamed; old and new text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line renamed'**
+  String get noteHistoryLineRenamed;
+
+  /// A Note's History: a Line was checked, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line checked'**
+  String get noteHistoryLineChecked;
+
+  /// A Note's History: a Line was unchecked, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line unchecked'**
+  String get noteHistoryLineUnchecked;
+
+  /// A Note's History: a Line was deleted, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line deleted'**
+  String get noteHistoryLineRemoved;
+
+  /// A Note's History: a deleted Line came back, its text under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line restored'**
+  String get noteHistoryLineRestored;
+
+  /// A Note's History: the Note went to the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the trash'**
+  String get noteHistoryTrashed;
+
+  /// A Note's History: the Note came back from the trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored from the trash'**
+  String get noteHistoryRestored;
+
+  /// A Note's History: a photo was added.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo added'**
+  String get noteHistoryPhotoAdded;
+
+  /// A Note's History: a photo was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo removed'**
+  String get noteHistoryPhotoRemoved;
+
+  /// A Note's History: a voice recording was added.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording added'**
+  String get noteHistoryRecordingAdded;
+
+  /// A Note's History: a voice recording was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording removed'**
+  String get noteHistoryRecordingRemoved;
+
+  /// A Note's History: the Area or Topic the Note was filed into, deleted since.
+  ///
+  /// In en, this message translates to:
+  /// **'An Area or Topic that is gone'**
+  String get noteHistoryPlaceGone;
+
+  /// A Note's History: the Area or Topic the Note was filed into lies in a locked Area that is not open now, so its name is not shown.
+  ///
+  /// In en, this message translates to:
+  /// **'A locked Area'**
+  String get noteHistoryLocked;
+
+  /// A Note's History: the label of the text before a change.
+  ///
+  /// In en, this message translates to:
+  /// **'Before'**
+  String get noteHistoryBefore;
+
+  /// A Note's History: the label of the text after a change.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get noteHistoryAfter;
+
+  /// A Note's History: writes this old text as the Note's or the Amend's text again, as a new change; nothing is deleted (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'Use this version'**
+  String get useThisVersion;
+
+  /// Short message after Use this version (#193).
+  ///
+  /// In en, this message translates to:
+  /// **'The old text is back. The History keeps every version.'**
+  String get useThisVersionDone;
+
+  /// The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'What Old Brain Fix offers'**
+  String get features;
+
+  /// Under the heading features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'What you already made stays, either way. The same on all your own Devices; Settings changes it any time.'**
+  String get featuresDetail;
+
+  /// The Simple choice of features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'Simple'**
+  String get featuresSimple;
+
+  /// Under featuresSimple (#197): what Simple offers to make.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes, Checklists, Shopping Lists, Reminders and Routines.'**
+  String get featuresSimpleDetail;
+
+  /// The Advanced choice of features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get featuresAdvanced;
+
+  /// Under featuresAdvanced (#197): what Advanced adds.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.'**
+  String get featuresAdvancedDetail;
+
+  /// The name of the Area the app's own help Notes are filed into (#180); the app's name, the same in every language.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix'**
+  String get helpAreaName;
+
+  /// The name of the help Checklist of steps to try (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'Quick start'**
+  String get helpQuickStartTitle;
+
+  /// A Line of the Quick start Checklist (#180): one action, at most 12 words, no Tallies, Sessions or Frogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture a thought with +.'**
+  String get helpQuickStart1;
+
+  /// No description provided for @helpQuickStart2.
+  ///
+  /// In en, this message translates to:
+  /// **'File the new Note into an Area.'**
+  String get helpQuickStart2;
+
+  /// No description provided for @helpQuickStart3.
+  ///
+  /// In en, this message translates to:
+  /// **'Give a Note a Reminder.'**
+  String get helpQuickStart3;
+
+  /// No description provided for @helpQuickStart4.
+  ///
+  /// In en, this message translates to:
+  /// **'Give a Note a Routine that repeats.'**
+  String get helpQuickStart4;
+
+  /// No description provided for @helpQuickStart5.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick this Line: that is how a Checklist works.'**
+  String get helpQuickStart5;
+
+  /// No description provided for @helpQuickStart6.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a Note with Search and browse.'**
+  String get helpQuickStart6;
+
+  /// No description provided for @helpQuickStart7.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a Backup in Settings ▸ Backups.'**
+  String get helpQuickStart7;
+
+  /// No description provided for @helpQuickStart8.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with your other Device in Settings.'**
+  String get helpQuickStart8;
+
+  /// The name of the help Note listing the icons with their names and meanings (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'What the icons mean'**
+  String get helpIconsTitle;
+
+  /// A group heading of the help Note on icons, and of its picture (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'In a Note\'s badges'**
+  String get helpIconsBadges;
+
+  /// No description provided for @helpIconsAgenda.
+  ///
+  /// In en, this message translates to:
+  /// **'On the Agenda'**
+  String get helpIconsAgenda;
+
+  /// No description provided for @helpIconsCard.
+  ///
+  /// In en, this message translates to:
+  /// **'On a Note card'**
+  String get helpIconsCard;
+
+  /// An icon's name in the help Note on icons (#180); its meaning follows in helpIconKindMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get helpIconKind;
+
+  /// An icon's meaning in the help Note on icons (#180), after its name and a colon.
+  ///
+  /// In en, this message translates to:
+  /// **'what the Note is: a plain Note, a Checklist or a Shopping List.'**
+  String get helpIconKindMeans;
+
+  /// No description provided for @helpIconImportance.
+  ///
+  /// In en, this message translates to:
+  /// **'Importance'**
+  String get helpIconImportance;
+
+  /// No description provided for @helpIconImportanceMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'how important the Note is.'**
+  String get helpIconImportanceMeans;
+
+  /// No description provided for @helpIconPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Area and Topic'**
+  String get helpIconPlace;
+
+  /// No description provided for @helpIconPlaceMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'where the Note is filed.'**
+  String get helpIconPlaceMeans;
+
+  /// No description provided for @helpIconCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get helpIconCaptured;
+
+  /// No description provided for @helpIconCapturedMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'when you captured the Note.'**
+  String get helpIconCapturedMeans;
+
+  /// No description provided for @helpIconReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get helpIconReminder;
+
+  /// No description provided for @helpIconReminderMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'rings once at its time.'**
+  String get helpIconReminderMeans;
+
+  /// No description provided for @helpIconRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine'**
+  String get helpIconRoutine;
+
+  /// No description provided for @helpIconRoutineMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'rings again on its days.'**
+  String get helpIconRoutineMeans;
+
+  /// No description provided for @helpIconAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get helpIconAdd;
+
+  /// No description provided for @helpIconAddMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'gives the Note a Routine or Reminder.'**
+  String get helpIconAddMeans;
+
+  /// No description provided for @helpIconBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and browse'**
+  String get helpIconBrowse;
+
+  /// No description provided for @helpIconBrowseMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'opens your Areas and searches every Note.'**
+  String get helpIconBrowseMeans;
+
+  /// No description provided for @helpIconAllRoutines.
+  ///
+  /// In en, this message translates to:
+  /// **'All Routines and Reminders'**
+  String get helpIconAllRoutines;
+
+  /// No description provided for @helpIconAllRoutinesMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'lists every Routine and Reminder.'**
+  String get helpIconAllRoutinesMeans;
+
+  /// No description provided for @helpIconNewRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'New Routine or Reminder'**
+  String get helpIconNewRoutine;
+
+  /// No description provided for @helpIconNewRoutineMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'makes one with a new Note.'**
+  String get helpIconNewRoutineMeans;
+
+  /// The Agenda bar's New Session in the help Note on icons (#180, #246); its meaning follows in helpIconNewSessionMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'New Session'**
+  String get helpIconNewSession;
+
+  /// No description provided for @helpIconNewSessionMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'makes a Session with a new Note, in Advanced.'**
+  String get helpIconNewSessionMeans;
+
+  /// No description provided for @helpIconUnsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsorted'**
+  String get helpIconUnsorted;
+
+  /// No description provided for @helpIconUnsortedMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes still to file into an Area.'**
+  String get helpIconUnsortedMeans;
+
+  /// No description provided for @helpIconFileInto.
+  ///
+  /// In en, this message translates to:
+  /// **'File into…'**
+  String get helpIconFileInto;
+
+  /// No description provided for @helpIconFileIntoMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'moves the Note into an Area or Topic.'**
+  String get helpIconFileIntoMeans;
+
+  /// No description provided for @helpIconAlarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine or Reminder'**
+  String get helpIconAlarm;
+
+  /// No description provided for @helpIconAlarmMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'gives the card\'s Note one.'**
+  String get helpIconAlarmMeans;
+
+  /// No description provided for @helpIconMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge into…'**
+  String get helpIconMerge;
+
+  /// No description provided for @helpIconMergeMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'joins the Note with another one.'**
+  String get helpIconMergeMeans;
+
+  /// No description provided for @helpIconMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get helpIconMore;
+
+  /// No description provided for @helpIconMoreMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'the card\'s other actions.'**
+  String get helpIconMoreMeans;
+
+  /// The name of the help Note holding a release's Play notes (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new in {version}'**
+  String helpWhatsNewTitle(String version);
+
+  /// The entry in the menu of an Area, a Topic and a Note that opens the Pack's tree (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Pack…'**
+  String get exportAsPack;
+
+  /// Title of the page where the user ticks what goes into a Pack (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Pack'**
+  String get packExportTitle;
+
+  /// Ticks every item of a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick all'**
+  String get packTickAll;
+
+  /// Unticks every item of a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Untick all'**
+  String get packUntickAll;
+
+  /// The Pack's size with what is ticked now, shown live.
+  ///
+  /// In en, this message translates to:
+  /// **'Size: {size}'**
+  String packSize(String size);
+
+  /// Tick on the export page: the Pack carries the sender's Profile card and is signed with it (Q462).
+  ///
+  /// In en, this message translates to:
+  /// **'Add my Profile'**
+  String get packAddProfile;
+
+  /// Under 'Add my Profile'.
+  ///
+  /// In en, this message translates to:
+  /// **'The receiver sees your name and picture, and can tell nobody changed the Pack.'**
+  String get packAddProfileHint;
+
+  /// The button on the export page that writes the Pack and opens the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get packShare;
+
+  /// Under the export and import pages' button while no Note is ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick at least one Note.'**
+  String get packNothingTicked;
+
+  /// A photo in a Pack's tree, with its size.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo · {size}'**
+  String packPhoto(String size);
+
+  /// A voice recording in a Pack's tree, with its size.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording · {size}'**
+  String packRecording(String size);
+
+  /// A Photo Text in a Pack's tree, with the start of its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Text: {text}'**
+  String packPhotoText(String text);
+
+  /// A Transcript in a Pack's tree, with the start of its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript: {text}'**
+  String packTranscript(String text);
+
+  /// A Routine in a Pack's tree, with its schedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine: {when}'**
+  String packRoutine(String when);
+
+  /// A Reminder in a Pack's tree, with its day and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: {when}'**
+  String packReminder(String when);
+
+  /// A Note's open Frog in a Pack's tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog'**
+  String get packFrog;
+
+  /// Title of the page showing a Pack that was opened (#164).
+  ///
+  /// In en, this message translates to:
+  /// **'Pack'**
+  String get packTitle;
+
+  /// Who a Pack is from, and the badge of a Note added from it without 'Claim as mine' (Q463).
+  ///
+  /// In en, this message translates to:
+  /// **'From {name}'**
+  String packFrom(String name);
+
+  /// On an opened Pack with a Profile: keeps the person as a Profile card would.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} to People'**
+  String packAddPerson(String name);
+
+  /// Tick beside 'Add' on a Pack with a Profile (Q463), on by default.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim as mine'**
+  String get packClaim;
+
+  /// Under 'Claim as mine'.
+  ///
+  /// In en, this message translates to:
+  /// **'Unticked, each Note shows who it came from until you remove it.'**
+  String get packClaimHint;
+
+  /// The button that adds the ticked Notes of a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get packAdd;
+
+  /// Announced after 'Add' on a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note added} other{{count} Notes added}}'**
+  String packAdded(int count);
+
+  /// Put after the name of a new Area from a Pack when an Area has that name: 'Health (Pack)'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack'**
+  String get packSuffix;
+
+  /// The name of the new Area for the Notes of a Pack that were in no Area.
+  ///
+  /// In en, this message translates to:
+  /// **'From a Pack'**
+  String get packNoArea;
+
+  /// Announced when a Pack could not be written or no app took it.
+  ///
+  /// In en, this message translates to:
+  /// **'The Pack was not shared.'**
+  String get packNotSent;
+
+  /// Title of the dialog behind 'packNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack not shared'**
+  String get packNotSentTitle;
+
+  /// Why a Pack was not shared: its file could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for the Pack could not be written.'**
+  String get packNotWrittenCause;
+
+  /// Announced when a Pack is refused; the tap shows why.
+  ///
+  /// In en, this message translates to:
+  /// **'The Pack was not opened.'**
+  String get packNotOpened;
+
+  /// Title of the dialog behind 'packNotOpened'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack not opened'**
+  String get packNotOpenedTitle;
+
+  /// Why a Pack was not opened: it is damaged, or its signature does not hold.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no Pack, or it was changed after it was made.'**
+  String get packUnreadable;
+
+  /// Why a Pack was not opened (Q471).
+  ///
+  /// In en, this message translates to:
+  /// **'This Pack is from a person you blocked.'**
+  String get packFromBlocked;
+
+  /// The fix when a Pack could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the person to send it again.'**
+  String get packAskAgainFix;
+
+  /// In a Note's menu: removes the badge saying who the Note came from in a Pack.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “From {name}”'**
+  String removePackFrom(String name);
+
+  /// The page in Settings that sends feedback or a bug report to the developer (#214), and its entry there.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get feedbackTitle;
+
+  /// Under 'Send feedback' in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell the developer what happened or what could be better. You see everything before it is sent.'**
+  String get feedbackSettingsDetail;
+
+  /// The text field on the Send feedback page.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened / what could be better'**
+  String get feedbackTextLabel;
+
+  /// Heading over the ticks of what the feedback carries besides the text.
+  ///
+  /// In en, this message translates to:
+  /// **'What goes along'**
+  String get feedbackGoesAlong;
+
+  /// Tick: the app's version goes along, its value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get feedbackVersion;
+
+  /// Tick: the operating system and the device go along, their value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'OS and device'**
+  String get feedbackSystem;
+
+  /// Tick: where the app was installed from goes along (Play, F-Droid, APK, Flatpak, Homebrew, Scoop…), its value under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Install method'**
+  String get feedbackInstall;
+
+  /// Tick, off at first: the report of the app's last unexpected stop goes along.
+  ///
+  /// In en, this message translates to:
+  /// **'The last crash report'**
+  String get feedbackCrash;
+
+  /// Under 'The last crash report' when there is none; the tick is greyed.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone keeps none.'**
+  String get feedbackCrashNone;
+
+  /// Under 'The last crash report': when it was written.
+  ///
+  /// In en, this message translates to:
+  /// **'From {date}'**
+  String feedbackCrashFrom(String date);
+
+  /// Tick, off at first: copies of Notes picked in the Pack's tree go along as a Pack file.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes as a Pack'**
+  String get feedbackNotes;
+
+  /// Under 'Notes as a Pack' while no Note is picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick them in the Pack\'s tree.'**
+  String get feedbackNotesHint;
+
+  /// Under 'Notes as a Pack': how many Notes are picked and the Pack's size.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note} other{{count} Notes}}, {size}'**
+  String feedbackNotesPicked(int count, String size);
+
+  /// Button under 'Notes as a Pack' that opens the Pack's tree again.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the Notes…'**
+  String get feedbackPickNotes;
+
+  /// Title of the Pack's tree opened from Send feedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes for the feedback'**
+  String get feedbackNotesTitle;
+
+  /// Heading over the text the feedback sends, as it is sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview: exactly this is sent'**
+  String get feedbackPreview;
+
+  /// Under the preview while Notes go along.
+  ///
+  /// In en, this message translates to:
+  /// **'With it, as a file: a Pack of {notes}'**
+  String feedbackPackAlong(String notes);
+
+  /// Button on the Send feedback page: opens the mail app with the text to the developer.
+  ///
+  /// In en, this message translates to:
+  /// **'Mail'**
+  String get feedbackMail;
+
+  /// Button on the Send feedback page: hands the text and the Pack to the app picked in the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get feedbackShare;
+
+  /// Under the buttons of Send feedback while the text field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what happened first.'**
+  String get feedbackTextFirst;
+
+  /// Under the buttons of Send feedback on the phone when the text is longer than a mail link carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long for a mail link. Share sends all of it.'**
+  String get feedbackTooLongForMail;
+
+  /// Under the buttons of Send feedback on the phone while Notes go along.
+  ///
+  /// In en, this message translates to:
+  /// **'A mail link cannot carry the Pack. Share sends it along: pick your mail app there.'**
+  String get feedbackPackNotInMail;
+
+  /// Announced when the feedback's Pack could not be written or no app took it.
+  ///
+  /// In en, this message translates to:
+  /// **'The feedback was not shared.'**
+  String get feedbackNotSent;
+
+  /// Title of the dialog behind 'feedbackNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback not shared'**
+  String get feedbackNotSentTitle;
 }
 
 class _AppLocalizationsDelegate

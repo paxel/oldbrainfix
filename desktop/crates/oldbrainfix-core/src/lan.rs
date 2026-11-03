@@ -181,7 +181,7 @@ pub const PAIRED_PORT_KEY: &str = "lan:port";
 // ---------------------------------------------------------------- pair code
 
 /// Crockford base32, lowercase, no i/l/o/u, as the Dart core writes it.
-const ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
+const ALPHABET: &[u8; 32] = b"0123456789abcdefghjkmnpqrstvwxyz";
 
 /// What a pair code names.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -212,7 +212,7 @@ pub fn encode_pair_code(
     } else {
         fingerprint.len()
     };
-    bytes.extend_from_slice(&fingerprint[..take]);
+    bytes.extend_from_slice(fingerprint.get(..take).unwrap_or(fingerprint));
     to_base32(&bytes)
         .as_bytes()
         .chunks(5)
@@ -315,17 +315,24 @@ pub fn decode_pair_code(input: &str) -> Option<PairInfo> {
     if bytes.len() < address_length + 5 + fp_length {
         return None;
     }
-    let host = if address_length == 4 {
-        Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]).to_string()
-    } else {
-        let mut o = [0u8; 16];
-        o.copy_from_slice(&bytes[..16]);
-        std::net::Ipv6Addr::from(o).to_string()
+    let (address, rest) = bytes.split_at_checked(address_length)?;
+    let host = match *address {
+        [a, b, c, d] => Ipv4Addr::new(a, b, c, d).to_string(),
+        _ => std::net::Ipv6Addr::from(<[u8; 16]>::try_from(address).ok()?).to_string(),
     };
-    let port = u16::from_be_bytes([bytes[address_length], bytes[address_length + 1]]);
-    let pin = (u32::from(bytes[address_length + 2]) << 16)
-        | (u32::from(bytes[address_length + 3]) << 8)
-        | u32::from(bytes[address_length + 4]);
+    let [
+        port_high,
+        port_low,
+        pin_high,
+        pin_mid,
+        pin_low,
+        ref fingerprint @ ..,
+    ] = *rest
+    else {
+        return None;
+    };
+    let port = u16::from_be_bytes([port_high, port_low]);
+    let pin = (u32::from(pin_high) << 16) | (u32::from(pin_mid) << 8) | u32::from(pin_low);
     if port == 0 || pin > 999_999 {
         return None;
     }
@@ -333,7 +340,7 @@ pub fn decode_pair_code(input: &str) -> Option<PairInfo> {
         host,
         port,
         pin: format!("{pin:06}"),
-        fingerprint: bytes[address_length + 5..address_length + 5 + fp_length].to_vec(),
+        fingerprint: fingerprint.get(..fp_length)?.to_vec(),
     })
 }
 
@@ -345,13 +352,19 @@ fn to_base32(bytes: &[u8]) -> String {
         buffer = (buffer << 8) | u32::from(byte);
         bits += 8;
         while bits >= 5 {
-            out.push(ALPHABET[((buffer >> (bits - 5)) & 31) as usize] as char);
+            out.push(crate::base32_symbol(
+                ALPHABET,
+                u64::from(buffer >> (bits - 5)),
+            ));
             bits -= 5;
         }
         buffer &= (1 << bits) - 1;
     }
     if bits > 0 {
-        out.push(ALPHABET[((buffer << (5 - bits)) & 31) as usize] as char);
+        out.push(crate::base32_symbol(
+            ALPHABET,
+            u64::from(buffer << (5 - bits)),
+        ));
     }
     out
 }
@@ -1069,7 +1082,10 @@ pub(crate) fn read_chunked<R: BufRead>(
         }
         let start = body.len();
         body.resize(start + size, 0);
-        reader.read_exact(&mut body[start..])?;
+        let chunk = body
+            .get_mut(start..)
+            .ok_or_else(|| std::io::Error::other("chunk past the body"))?;
+        reader.read_exact(chunk)?;
         let mut crlf = [0u8; 2];
         reader.read_exact(&mut crlf)?;
     }

@@ -1,7 +1,16 @@
 //! The window's theme driven headless (#147): it follows the light or
 //! dark the system reports, View ▸ Theme shows System, Light or Dark at
 //! once and keeps the choice on this Device, and a new window starts in
-//! the one kept.
+//! the one kept; "Bigger text and icons" in the Settings zooms it to 1.3
+//! at once and a new window starts at the zoom kept (#224).
+
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use std::sync::Arc;
 
@@ -144,5 +153,42 @@ fn a_new_window_starts_in_the_theme_kept() -> TestResult {
     DeviceSettings::new(&store).set_theme(ThemeChoice::Light)?;
     let harness = window(&store, Theme::Dark);
     assert!(!dark(&harness));
+    Ok(())
+}
+
+/// Opens Edit ▸ Settings… over the window.
+fn open_settings(harness: &mut Harness<'_, App>) {
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+}
+
+#[test]
+fn bigger_text_and_icons_zooms_the_window_at_once_and_keeps_it_on_this_computer() -> TestResult {
+    let store = store()?;
+    let mut harness = window(&store, Theme::Light);
+    assert_eq!(harness.ctx.zoom_factor(), 1.0);
+    open_settings(&mut harness);
+    harness.get_by_label("Bigger text and icons").click();
+    harness.run();
+    assert_eq!(harness.ctx.zoom_factor(), 1.3);
+    assert!(DeviceSettings::new(&store).fat_fingers()?);
+    // Zoomed, the nodes' rects are no longer in the pointer's points.
+    harness
+        .get_by_label("Bigger text and icons")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(harness.ctx.zoom_factor(), 1.0);
+    assert!(!DeviceSettings::new(&store).fat_fingers()?);
+    Ok(())
+}
+
+#[test]
+fn a_new_window_starts_at_the_zoom_kept() -> TestResult {
+    let store = store()?;
+    DeviceSettings::new(&store).set_fat_fingers(true)?;
+    let harness = window(&store, Theme::Light);
+    assert_eq!(harness.ctx.zoom_factor(), 1.3);
     Ok(())
 }

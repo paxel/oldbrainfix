@@ -19,6 +19,9 @@ abstract final class TallyKeys {
   static const rule = 'rule';
   static const hidden = 'hidden';
 
+  /// The id of the other field a field multiplies (#200), as stored.
+  static const multiplies = 'multiplies';
+
   /// The key of [key] of the field [fieldId] on the Note.
   static String field(String fieldId, String key) =>
       '$fieldPrefix$fieldId:$key';
@@ -58,10 +61,18 @@ class TallyField {
   /// A known unit's code ([TallyUnits.known]) or the unit as typed.
   final String unit;
 
-  /// The target in the base unit, or null for none.
+  /// The target in the base unit, or null for none; a multiplier has
+  /// none.
   final double? target;
   final TallyRule rule;
   final bool hidden;
+
+  /// The id of the other field this one multiplies (#200), or null while
+  /// it is a field of its own: a multiplier counts as no value.
+  final String? multiplies;
+
+  /// The id of the field its setting names, read or not.
+  final String? _stored;
 
   /// Whether an entry holds a value for it, a removed one included: its
   /// kind of unit is fixed then.
@@ -80,9 +91,42 @@ class TallyField {
     required this.hidden,
     required this.hasEntries,
     required this.added,
+    this.multiplies,
+    this._stored,
   });
 
   UnitKind get kind => TallyUnits.kindOf(unit);
+
+  /// This field with [hasEntries] as read.
+  TallyField _counting(bool hasEntries) => TallyField(
+    id: id,
+    noteId: noteId,
+    name: name,
+    unit: unit,
+    target: target,
+    rule: rule,
+    hidden: hidden,
+    hasEntries: hasEntries,
+    added: added,
+    multiplies: multiplies,
+    stored: _stored,
+  );
+
+  /// This field with [multiplies] as read, without its target while it
+  /// multiplies.
+  TallyField _multiplying(String? multiplies) => TallyField(
+    id: id,
+    noteId: noteId,
+    name: name,
+    unit: unit,
+    target: multiplies == null ? target : null,
+    rule: rule,
+    hidden: hidden,
+    hasEntries: hasEntries,
+    added: added,
+    multiplies: multiplies,
+    stored: _stored,
+  );
 }
 
 /// A Note that records how much was done (CONTEXT.md).
@@ -108,11 +152,99 @@ class Tally {
     return null;
   }
 
+  /// The fields shown that count values of their own: all but the
+  /// multipliers (#200). Totals, targets and charts are theirs.
+  List<TallyField> get counting => [
+    for (final field in shown)
+      if (field.multiplies == null) field,
+  ];
+
   /// What the entry form starts with: the target of every field shown
-  /// that has one, by field id.
+  /// that has one, by field id; a multiplier has none.
   Map<String, double> get targets => {
     for (final field in shown) field.id: ?field.target,
   };
+
+  /// The fields that multiply the field [id], in their order.
+  List<TallyField> multipliersOf(String id) => [
+    for (final field in fields)
+      if (field.multiplies == id) field,
+  ];
+
+  /// The fields the field [id], or a new one when null, may multiply:
+  /// the other fields shown whose own setting names no other field shown;
+  /// none while it is hidden or another multiplies it.
+  List<TallyField> multipliable(String? id) {
+    if (id != null &&
+        (field(id)?.hidden == true || multipliersOf(id).isNotEmpty)) {
+      return const [];
+    }
+    return [
+      for (final field in shown)
+        if (field.id != id && !_wouldMultiply(field)) field,
+    ];
+  }
+
+  /// What [entry] counts for the field [id] (#200): its value times the
+  /// value of each multiplier of it the entry holds, one held none
+  /// counting as 1; null for a multiplier or a value it does not hold.
+  double? counted(TallyEntry entry, String id) {
+    final micro = countedMicro(entry, id);
+    return micro == null ? null : micro / 1000000;
+  }
+
+  /// [counted] in millionths: each product rounded half away from zero
+  /// and held at the 64-bit limits, as in both cores.
+  int? countedMicro(TallyEntry entry, String id) {
+    final field = this.field(id);
+    if (field == null || field.multiplies != null) return null;
+    final value = entry.values[id];
+    final held = value == null ? null : tallyMicro(value);
+    if (held == null) return null;
+    var micro = held;
+    for (final multiplier in multipliersOf(id)) {
+      final factor = entry.values[multiplier.id];
+      final factorMicro = factor == null ? null : tallyMicro(factor);
+      if (factorMicro == null) continue;
+      micro = _times(micro, factorMicro);
+    }
+    return micro;
+  }
+
+  /// Whether the setting of [field] names a shown field other than it:
+  /// such a field is never multiplied, so no chain forms.
+  bool _wouldMultiply(TallyField field) => _named(field) != null;
+
+  /// The shown field other than [field] its setting names, if any.
+  TallyField? _named(TallyField field) {
+    final other = switch (field._stored) {
+      final id? => this.field(id),
+      null => null,
+    };
+    return !field.hidden &&
+            other != null &&
+            other.id != field.id &&
+            !other.hidden
+        ? other
+        : null;
+  }
+
+  /// [micro] × [factor] millionths, rounded half away from zero and held
+  /// at the largest and smallest 64-bit numbers.
+  static int _times(int micro, int factor) {
+    final million = BigInt.from(1000000);
+    final product = BigInt.from(micro) * BigInt.from(factor);
+    var whole = product ~/ million;
+    final rest = product.remainder(million).abs();
+    if (rest * BigInt.two >= million) {
+      whole += product.isNegative ? -BigInt.one : BigInt.one;
+    }
+    final max = BigInt.from(0x7fffffffffffffff);
+    final min = -max - BigInt.one;
+    if (whole > max) return max.toInt();
+    if (whole < min) return min.toInt();
+    return whole.toInt();
+  }
 }
 
 /// One record of a Tally: values for its fields, a date, a text line and
@@ -185,25 +317,31 @@ class Tallies {
   /// The Tally of the Note [noteId], with the fields of the Notes merged
   /// into it, or null while it has no field.
   Tally? byNote(String noteId) {
-    final holders = [
-      for (final MapEntry(:key, :value) in _shownUnder().entries)
-        if (value == noteId) key,
-    ]..sort();
-    if (holders.isEmpty) return null;
-    final counted = _counted(noteId);
-    final fields = [
-      for (final holder in holders) ..._fieldsOn(holder, counted),
-    ];
-    if (fields.isEmpty) return null;
-    fields.sort((a, b) {
-      final byAdded = a.added.compareTo(b.added);
-      return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
-    });
-    return Tally(noteId, fields);
+    final shape = _shapes()[noteId];
+    if (shape == null) return null;
+    final counted = _counted()[noteId] ?? const <String>{};
+    return _multiplied(
+      Tally(noteId, [
+        for (final field in shape) field._counting(counted.contains(field.id)),
+      ]),
+    );
   }
 
-  /// Whether the Note [noteId] is a Tally.
-  bool isTally(String noteId) => byNote(noteId) != null;
+  /// [tally] with the multipliers its settings make (#200): a field
+  /// whose setting names a shown other field multiplies it, unless that
+  /// field's own setting names a shown other field too. A hidden field
+  /// multiplies nothing and is multiplied by nothing.
+  static Tally _multiplied(Tally tally) => Tally(tally.noteId, [
+    for (final field in tally.fields)
+      field._multiplying(switch (tally._named(field)) {
+        final other? when !tally._wouldMultiply(other) => other.id,
+        _ => null,
+      }),
+  ]);
+
+  /// Whether the Note [noteId] is a Tally: told by its fields alone,
+  /// without reading its entries (#216).
+  bool isTally(String noteId) => _shapes().containsKey(noteId);
 
   /// Every Tally whose Note is in the lists, newest capture first.
   List<Tally> all() {
@@ -216,14 +354,17 @@ class Tallies {
 
   /// Adds a field to the Note [noteId], which makes it a Tally the first
   /// time and takes it out of Unsorted; returns the field's id. [target]
-  /// is in the base unit; [rule] defaults by the kind of [unit]. A Note
-  /// that is a list, such as a Checklist, is never a Tally too.
+  /// is in the base unit; [rule] defaults by the kind of [unit]; it
+  /// multiplies the field [multiplies] when given, as [setMultiplies]
+  /// allows. A Note that is a list, such as a Checklist, is never a
+  /// Tally too.
   String addField(
     String noteId, {
     required String name,
     String unit = '',
     double? target,
     TallyRule? rule,
+    String? multiplies,
   }) {
     final note = Notes(store).byId(noteId);
     if (note == null || note.isTrashed || note.isMerged) {
@@ -238,6 +379,7 @@ class Tallies {
     final named = _name(name);
     final typed = unit.trim();
     final goal = target == null ? null : encodeTallyNumber(target);
+    if (multiplies != null) _requireMultipliable(noteId, null, multiplies);
     final id = Store.newId();
     store.batch(() {
       store.append(noteId, TallyKeys.field(id, TallyKeys.name), named);
@@ -249,6 +391,13 @@ class Tallies {
       );
       if (goal != null) {
         store.append(noteId, TallyKeys.field(id, TallyKeys.target), goal);
+      }
+      if (multiplies != null) {
+        store.append(
+          noteId,
+          TallyKeys.field(id, TallyKeys.multiplies),
+          multiplies,
+        );
       }
       if (!note.spawned) {
         store.append(
@@ -288,6 +437,24 @@ class Tallies {
   /// Sets how the field [fieldId] counts a day with several entries.
   void setRule(String noteId, String fieldId, TallyRule rule) =>
       _set(noteId, fieldId, TallyKeys.rule, rule.name);
+
+  /// Makes the field [fieldId] multiply the field [other] of the same
+  /// Tally (#200), or a field of its own again when null. [other] is a
+  /// field shown, not [fieldId], that multiplies nothing; [fieldId] is
+  /// multiplied by none.
+  void setMultiplies(String noteId, String fieldId, String? other) {
+    if (other != null) _requireMultipliable(noteId, fieldId, other);
+    _set(noteId, fieldId, TallyKeys.multiplies, other);
+  }
+
+  /// Refuses [other] as what the field [fieldId], or a new one when
+  /// null, of the Tally of [noteId] multiplies.
+  void _requireMultipliable(String noteId, String? fieldId, String other) {
+    final allowed = byNote(noteId)?.multipliable(fieldId) ?? const [];
+    if (!allowed.any((f) => f.id == other)) {
+      throw ArgumentError.value(other, 'other', 'not a field it may multiply');
+    }
+  }
 
   /// Hides the field [fieldId]: its values stay stored and return when
   /// it is restored.
@@ -343,7 +510,8 @@ class Tallies {
       }
       within?.call(id);
     });
-    return entryById(id)!;
+    return entryById(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Changes the entry [id]: the values given (null takes one away), the
@@ -396,8 +564,18 @@ class Tallies {
   }
 
   /// The entry [id], removed or not, or null.
-  TallyEntry? entryById(String id) {
-    final fields = store.currentFields(id);
+  TallyEntry? entryById(String id) => _entryFrom(id, store.currentFields(id));
+
+  /// The entries of [ids], removed or not, by id, read in one query
+  /// (#204); what is no entry is left out.
+  Map<String, TallyEntry> entriesById(Iterable<String> ids) => {
+    for (final MapEntry(key: id, value: fields)
+        in store.currentFieldsOf(ids).entries)
+      id: ?_entryFrom(id, fields),
+  };
+
+  /// The entry [id] its current [fields] hold, or null.
+  static TallyEntry? _entryFrom(String id, Map<String, String?> fields) {
     if (fields[TallyKeys.type] != TallyKeys.typeEntry) return null;
     final noteId = fields[TallyKeys.note];
     final at = DateTime.tryParse(fields[TallyKeys.at] ?? '');
@@ -456,7 +634,8 @@ class Tallies {
   /// per [period] on [wallClock], weeks from Monday, from the first with
   /// a value to today's, at most [maxBuckets] of the latest. Each bar
   /// holds the sum or the largest of the values in it, by the field's
-  /// rule; entries after today stay out.
+  /// rule, a multiplied field's values multiplied (#200); a multiplier
+  /// has none. Entries after today stay out.
   List<TallyBucket> chart(
     String noteId,
     String fieldId,
@@ -464,14 +643,14 @@ class Tallies {
     WallClock wallClock, {
     PersonFilter filter = PersonFilter.everyone,
   }) {
-    final field = byNote(noteId)?.field(fieldId);
-    if (field == null) return const [];
+    final tally = byNote(noteId);
+    final field = tally?.field(fieldId);
+    if (tally == null || field == null) return const [];
     final today = Day.today(store.clock(), wallClock);
     final last = _bucketStart(today, period);
     final micros = <Day, List<int>>{};
     for (final entry in entries(noteId, filter: filter)) {
-      final value = entry.values[fieldId];
-      final micro = value == null ? null : tallyMicro(value);
+      final micro = tally.countedMicro(entry, fieldId);
       if (micro == null) continue;
       final day = Day.today(entry.at, wallClock);
       if (day > today) continue;
@@ -596,9 +775,33 @@ class Tallies {
     };
   }
 
-  /// The fields lying on the Note [holder], with whether [counted] holds
-  /// a value for each.
-  List<TallyField> _fieldsOn(String holder, Set<String> counted) {
+  /// The fields of every Tally, by its Note, in the order they were
+  /// added, each as if it had no entries: read from the Notes alone, not
+  /// from the entries, and kept until the log changes (#216). Shared by
+  /// every caller, so nobody changes it.
+  Map<String, List<TallyField>> _shapes() => store.workedOut(
+    (Tallies, #shapes),
+    () {
+      final holders = <String, List<String>>{};
+      for (final MapEntry(key: holder, value: note) in _shownUnder().entries) {
+        (holders[note] ??= []).add(holder);
+      }
+      final shapes = <String, List<TallyField>>{};
+      for (final MapEntry(key: note, value: on) in holders.entries) {
+        final fields = [for (final holder in on..sort()) ..._fieldsOn(holder)];
+        if (fields.isEmpty) continue;
+        fields.sort((a, b) {
+          final byAdded = a.added.compareTo(b.added);
+          return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
+        });
+        shapes[note] = fields;
+      }
+      return shapes;
+    },
+  );
+
+  /// The fields lying on the Note [holder], as if none had entries.
+  List<TallyField> _fieldsOn(String holder) {
     final fields = store.currentFields(holder);
     final added = <String, DateTime>{};
     for (final e in store.history(holder)) {
@@ -625,8 +828,9 @@ class Tallies {
                 )]] ??
                 TallyRule.sum,
             hidden: fields[TallyKeys.field(id, TallyKeys.hidden)] == 'true',
-            hasEntries: counted.contains(id),
+            hasEntries: false,
             added: date.toUtc(),
+            stored: fields[TallyKeys.field(id, TallyKeys.multiplies)],
           ),
     ];
   }
@@ -645,29 +849,41 @@ class Tallies {
     return id.isEmpty || id.contains(':') ? null : id;
   }
 
-  /// The ids of the fields some entry of the Tally of [noteId] holds a
-  /// value for, removed entries included.
-  Set<String> _counted(String noteId) {
-    final shownUnder = _shownUnder();
-    return {
-      for (final entry in _entries())
-        if ((shownUnder[entry.noteId] ?? entry.noteId) == noteId)
-          ...entry.values.keys,
-    };
-  }
+  /// The ids of the fields some entry holds a value for, removed entries
+  /// included, by the Note of the Tally the entry shows under: every
+  /// entry read in one query, kept until the log changes (#216). Shared
+  /// by every caller, so nobody changes it.
+  Map<String, Set<String>> _counted() =>
+      store.workedOut((Tallies, #counted), () {
+        final shownUnder = _shownUnder();
+        final counted = <String, Set<String>>{};
+        for (final MapEntry(key: id, value: fields)
+            in store.currentFieldsOfType(TallyKeys.typeEntry).entries) {
+          if (_entryFrom(id, fields) case final entry?) {
+            (counted[shownUnder[entry.noteId] ?? entry.noteId] ??= {}).addAll(
+              entry.values.keys,
+            );
+          }
+        }
+        return counted;
+      });
 
   /// Every Note with a field of a Tally on it, by the Note it shows
-  /// under: itself, or the one it was merged into.
-  Map<String, String> _shownUnder() {
-    final notes = Notes(store);
-    final under = <String, String>{};
-    for (final (entity, _) in store.fieldsWithPrefix(TallyKeys.fieldPrefix)) {
-      if (under.containsKey(entity)) continue;
-      final note = notes.byId(entity);
-      if (note != null) under[entity] = note.mergedInto ?? entity;
-    }
-    return under;
-  }
+  /// under: itself, or the one it was merged into. Kept until the log
+  /// changes (#216) and shared by every caller, so nobody changes it.
+  Map<String, String> _shownUnder() => store.workedOut(
+    (Tallies, #shownUnder),
+    () {
+      final notes = Notes(store);
+      final under = <String, String>{};
+      for (final (entity, _) in store.fieldsWithPrefix(TallyKeys.fieldPrefix)) {
+        if (under.containsKey(entity)) continue;
+        final note = notes.byId(entity);
+        if (note != null) under[entity] = note.mergedInto ?? entity;
+      }
+      return under;
+    },
+  );
 
   /// Newest first, by id on the same moment.
   static int _newestFirst(TallyEntry a, TallyEntry b) {

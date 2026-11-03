@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -14,6 +16,7 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'notes_screen.dart';
+import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -160,9 +163,13 @@ class _AreasScreenState extends State<AreasScreen>
         areaId: area.id,
       ),
     );
-    route.popped.then((_) {
-      if (mounted) _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (mounted) _reload();
+      }),
+    );
     return route;
   }
 
@@ -175,8 +182,8 @@ class _AreasScreenState extends State<AreasScreen>
     return closed ? null : _areaRoute(area);
   }
 
-  void _forward() {
-    if (widget.trail.area(widget.places) case final area?) _open(area);
+  Future<void> _forward() async {
+    if (widget.trail.area(widget.places) case final area?) await _open(area);
   }
 
   Future<void> _openAllNotes() async {
@@ -268,6 +275,9 @@ class _AreasScreenState extends State<AreasScreen>
           ),
         );
         if (!mounted) return;
+      case _AreaAction.pack:
+        await exportPack(context, widget.places.store, area.id);
+        if (!mounted) return;
       case _AreaAction.people:
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -305,7 +315,8 @@ class _AreasScreenState extends State<AreasScreen>
   }
 
   /// What may be done to [area] here: everything by its owner or a
-  /// Manager, only seeing who is in by anyone else.
+  /// Manager; by anyone else exporting it as a Pack (#164) and seeing who
+  /// is in.
   Widget _areaMenu(AppLocalizations t, Area area) {
     final access = _access[area.id] ?? AreaAccess.owner;
     final manages = access == AreaAccess.owner || access == AreaAccess.manager;
@@ -319,6 +330,12 @@ class _AreasScreenState extends State<AreasScreen>
           PopupMenuItem(value: _AreaAction.look, child: Text(t.areaLook)),
           PopupMenuItem(value: _AreaAction.share, child: Text(t.shareArea)),
         ],
+        // Copies of what anyone may read (#164).
+        PopupMenuItem(
+          key: ValueKey('area-pack-${area.id}'),
+          value: _AreaAction.pack,
+          child: Text(t.exportAsPack),
+        ),
         if (shared)
           PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
         if (manages)
@@ -401,8 +418,8 @@ class _AreasScreenState extends State<AreasScreen>
                           // Hits from every Area.
                           (_) => true,
                           compact: compact,
-                          unfolded: unfolded,
-                          onUnfold: unfold,
+                          switched: switched,
+                          onSwitch: switchView,
                         )
                       : _areaRows(t),
                 ),
@@ -420,9 +437,9 @@ class _AreasScreenState extends State<AreasScreen>
   }
 }
 
-enum _AreaAction { rename, look, share, people, delete }
+enum _AreaAction { rename, look, share, pack, people, delete }
 
-enum _TopicAction { rename, delete }
+enum _TopicAction { rename, pack, delete }
 
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
@@ -572,9 +589,13 @@ class _AreaScreenState extends State<AreaScreen>
         topicId: topic.id,
       ),
     );
-    route.popped.then((_) {
-      if (mounted) _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (mounted) _reload();
+      }),
+    );
     return route;
   }
 
@@ -624,6 +645,9 @@ class _AreaScreenState extends State<AreaScreen>
         final name = await askName(context, title: t.rename, initial: shown);
         if (!mounted || name == null || name == shown) return;
         widget.places.rename(topic.id, name);
+      case _TopicAction.pack:
+        await exportPack(context, widget.places.store, topic.id);
+        if (!mounted) return;
       case _TopicAction.delete:
         final go = await confirmDeleteTopic(
           context,
@@ -649,21 +673,29 @@ class _AreaScreenState extends State<AreaScreen>
           title: topicName(t, topic),
           highlighted: topic.id == last,
           onTap: () => _open(topic),
-          menu: !_manages
-              ? null
-              : PopupMenuButton<_TopicAction>(
-                  onSelected: (action) => _act(area, topic, action),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: _TopicAction.rename,
-                      child: Text(t.rename),
-                    ),
-                    PopupMenuItem(
-                      value: _TopicAction.delete,
-                      child: Text(t.delete),
-                    ),
-                  ],
+          // Anyone may export copies (#164); renaming and deleting are a
+          // Manager's.
+          menu: PopupMenuButton<_TopicAction>(
+            key: ValueKey('topic-menu-${topic.id}'),
+            onSelected: (action) => _act(area, topic, action),
+            itemBuilder: (_) => [
+              if (_manages)
+                PopupMenuItem(
+                  value: _TopicAction.rename,
+                  child: Text(t.rename),
                 ),
+              PopupMenuItem(
+                key: ValueKey('topic-pack-${topic.id}'),
+                value: _TopicAction.pack,
+                child: Text(t.exportAsPack),
+              ),
+              if (_manages)
+                PopupMenuItem(
+                  value: _TopicAction.delete,
+                  child: Text(t.delete),
+                ),
+            ],
+          ),
         ),
       ...diaryCards(
         context,
@@ -677,8 +709,8 @@ class _AreaScreenState extends State<AreaScreen>
         showPlace: (_) => false,
         onSchedule: _schedule,
         compact: compact,
-        unfolded: unfolded,
-        onUnfold: unfold,
+        switched: switched,
+        onSwitch: switchView,
       ),
     ];
   }
@@ -754,8 +786,8 @@ class _AreaScreenState extends State<AreaScreen>
                         // A hit in one of the Topics names it.
                         (placed) => placed.note.place != widget.areaId,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       )
                     : _browsing(t, area),
               ),
@@ -974,8 +1006,8 @@ class _TopicScreenState extends State<TopicScreen>
                         // Every hit is in the Topic of the title.
                         (_) => false,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       )
                     : _diary.isEmpty
                     ? [
@@ -996,8 +1028,8 @@ class _TopicScreenState extends State<TopicScreen>
                         showPlace: (_) => false,
                         onSchedule: _schedule,
                         compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
+                        switched: switched,
+                        onSwitch: switchView,
                       ),
               ),
             ),
@@ -1052,8 +1084,8 @@ List<Widget> _hitCards(
   VoidCallback onChanged,
   bool Function(PlacedNote placed) showPlace, {
   required bool compact,
-  required Set<String> unfolded,
-  required void Function(Note note) onUnfold,
+  required Set<String> switched,
+  required void Function(Note note) onSwitch,
 }) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -1067,8 +1099,8 @@ List<Widget> _hitCards(
         showPlace: showPlace,
         onSchedule: onSchedule,
         compact: compact,
-        unfolded: unfolded,
-        onUnfold: onUnfold,
+        switched: switched,
+        onSwitch: onSwitch,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.

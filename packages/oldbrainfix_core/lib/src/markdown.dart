@@ -39,6 +39,15 @@
 /// the delimiter row under it, `| --- | :-: |`, with as many cells, and
 /// the rows under those; [MarkdownTables] reads and edits them, every
 /// line of one a [MarkdownBlockKind.table] block.
+///
+/// A fenced code block (#212) is CommonMark's: a line of up to three
+/// spaces and at least three backticks or tildes opens it, an info
+/// string after them, whose first word is the language; it runs to the
+/// first line of up to three spaces and at least as many of the same
+/// character with only spaces and tabs after them, or to the end of the
+/// text. Its lines are [MarkdownBlockKind.code] blocks, shown as
+/// written; nothing in them is read as a format, a table, a tag or a
+/// box.
 library;
 
 import 'text_tags.dart';
@@ -57,6 +66,51 @@ enum MarkdownBlockKind {
   /// A line of a table: its header row, its delimiter row, one of its
   /// rows, or the line marking its first column as headings.
   table,
+
+  /// A line of a fenced code block: one of its fences or a line between
+  /// them, shown as written.
+  code,
+}
+
+/// A fenced code block: where it lies in the text from [start] to [end],
+/// its fences included, on the lines from [firstLine], its opening
+/// fence, to [lastLine], its closing fence when [closed], else the
+/// text's last line. Its [fence] is the run of backticks or tildes that
+/// opened it, its [info] the info string after that without the spaces
+/// and tabs around it, as written, and its [language] the first word of
+/// that. Offsets are UTF-16 code units.
+class MarkdownCodeBlock {
+  final int start;
+  final int end;
+  final int firstLine;
+  final int lastLine;
+  final String fence;
+  final String info;
+  final bool closed;
+
+  const MarkdownCodeBlock._({
+    required this.start,
+    required this.end,
+    required this.firstLine,
+    required this.lastLine,
+    required this.fence,
+    required this.info,
+    required this.closed,
+  });
+
+  /// The first word of [info], what a highlighter would go by; empty
+  /// when there is none.
+  String get language {
+    var end = 0;
+    while (end < info.length && !Markdown._blank(info.codeUnitAt(end))) {
+      end++;
+    }
+    return info.substring(0, end);
+  }
+
+  /// Whether the line [line] is one of its fences rather than a line of
+  /// its content.
+  bool isFence(int line) => line == firstLine || (closed && line == lastLine);
 }
 
 /// What a part of a line is: [text] and [code] hold what shows, the
@@ -117,6 +171,9 @@ class MarkdownSpan {
 /// its [row] there, the header row 0; its [spans] are those of its cells,
 /// left to right. The delimiter row and the line marking the first
 /// column as headings have no [row].
+///
+/// A line of a fenced code block holds the [code] block it belongs to;
+/// a line of its content is one part shown as written, a fence none.
 class MarkdownBlock {
   final MarkdownBlockKind kind;
   final int line;
@@ -132,6 +189,7 @@ class MarkdownBlock {
   final List<MarkdownSpan> spans;
   final MarkdownTable? table;
   final int? row;
+  final MarkdownCodeBlock? code;
 
   const MarkdownBlock(
     this.kind, {
@@ -144,16 +202,24 @@ class MarkdownBlock {
     required this.spans,
     this.table,
     this.row,
+    this.code,
   });
 
   /// The text this line shows, without its marks: a table's row its
   /// cells that show something, a space between them, its other lines
-  /// nothing.
+  /// nothing; a code block's fence nothing.
   String get visible => switch ((table, row)) {
     (final table?, final row?) => table.rows[row].visible,
     (_?, null) => '',
+    _ when code?.isFence(line) ?? false => '',
     _ => spans.map((s) => s.visible).join(),
   };
+
+  /// Whether it shows nothing and goes with a line break: a table's
+  /// delimiter row and the line marking its first column as headings,
+  /// and a code block's fence.
+  bool get _hidden =>
+      (table != null && row == null) || (code?.isFence(line) ?? false);
 }
 
 /// A text after an edit and the selection in it, in UTF-16 code units;
@@ -167,6 +233,36 @@ abstract final class Markdown {
     final blocks = <MarkdownBlock>[];
     final lines = _lines(text);
     for (var i = 0; i < lines.length; i++) {
+      if (_codeAt(text, lines, i) case final code?) {
+        for (; i <= code.lastLine; i++) {
+          final (start, end) = lines[i];
+          blocks.add(
+            MarkdownBlock(
+              MarkdownBlockKind.code,
+              line: i,
+              level: 0,
+              number: 0,
+              start: start,
+              end: end,
+              contentStart: start,
+              spans: [
+                if (!code.isFence(i) && start < end)
+                  MarkdownSpan(
+                    MarkdownSpanKind.text,
+                    start: start,
+                    end: end,
+                    contentStart: start,
+                    contentEnd: end,
+                    text: text.substring(start, end),
+                  ),
+              ],
+              code: code,
+            ),
+          );
+        }
+        i--;
+        continue;
+      }
       if (_tableAt(text, lines, i) case final table?) {
         final header = table.rows.first.line;
         for (; i <= table.lastLine; i++) {
@@ -220,16 +316,17 @@ abstract final class Markdown {
   /// what search looks in and what a preview shows. A table's delimiter
   /// row and the line marking its first column as headings go with a
   /// line break; each of its rows reads as its cells that show
-  /// something, a space between them.
+  /// something, a space between them. So does a code block's fence, its
+  /// other lines reading as written.
   static String plain(String text) {
     final out = StringBuffer();
     var at = 0;
     final blocks = parse(text);
     for (final (i, block) in blocks.indexed) {
-      if (block.table != null && block.row == null) {
+      if (block._hidden) {
         // The line break before it goes, or the one after the first
-        // line, which is followed by its table's header row.
-        at = i == 0 ? blocks[1].start : block.end;
+        // line.
+        at = i == 0 && blocks.length > 1 ? blocks[1].start : block.end;
         continue;
       }
       out
@@ -250,7 +347,9 @@ abstract final class Markdown {
   /// kind of item starts a list of its own. A table is a `<table>`, its
   /// header row in `<thead>` with `<th>` cells, the first cell of each
   /// other row a `<th>` too when its first column holds headings, a
-  /// column's alignment as `align`. Bold is `<strong>`, italic `<em>`,
+  /// column's alignment as `align`. A code block is a `<pre><code>`,
+  /// `class="language-…"` its language when it has one, each line of its
+  /// content followed by a line break. Bold is `<strong>`, italic `<em>`,
   /// strike-through `<del>`, code `<code>`; a link is an `<a>` only when
   /// [mayOpen] allows its destination, else its label alone. Every
   /// character of the text is escaped, so nothing in it is markup;
@@ -288,8 +387,27 @@ abstract final class Markdown {
       }
     }
 
-    for (final block in parse(text)) {
+    final blocks = parse(text);
+    for (final block in blocks) {
       switch (block.kind) {
+        case MarkdownBlockKind.code:
+          final code = block.code;
+          if (code == null || block.line != code.firstLine) continue;
+          close();
+          out.write(
+            code.language.isEmpty
+                ? '<pre><code>'
+                : '<pre><code class="language-${_htmlEscape(code.language)}">',
+          );
+          for (var l = code.firstLine + 1; l <= code.lastLine; l++) {
+            if (code.isFence(l)) continue;
+            out
+              ..write(
+                _htmlEscape(text.substring(blocks[l].start, blocks[l].end)),
+              )
+              ..write('\n');
+          }
+          out.write('</code></pre>\n');
         case MarkdownBlockKind.table:
           final table = block.table;
           if (table == null || block.line != table.firstLine) continue;
@@ -453,10 +571,155 @@ abstract final class Markdown {
     return out.toString();
   }
 
-  /// The tags of [text] as [TextTags.find] finds them, but those in code
-  /// or in a link's destination.
-  static List<FoundTag> tags(String text) {
-    final hidden = <(int, int)>[];
+  /// The tags of [text] as [TextTags.find] finds them, but those in code,
+  /// in a code block, in a link's destination or in a web address
+  /// ([autolinks]).
+  static List<FoundTag> tags(String text) =>
+      _outside(literalRanges(text), text);
+
+  /// The tags of the plain text [text] as [TextTags.find] finds them, but
+  /// those in a web address ([plainAutolinks]).
+  static List<FoundTag> plainTags(String text) =>
+      _outside(plainAutolinks(text), text);
+
+  static List<FoundTag> _outside(List<(int, int)> hidden, String text) => [
+    for (final tag in TextTags.find(text))
+      if (!hidden.any((h) => tag.start < h.$2 && h.$1 < tag.end)) tag,
+  ];
+
+  /// The bare web addresses of the plain text [text], each drawn as a
+  /// link and opened as one (#222), as (start, end) in UTF-16 code
+  /// units; nothing about them is stored. One starts with `http://` or
+  /// `https://`, in any case of ASCII letters, not right after an ASCII
+  /// letter or digit, and an ASCII letter or digit or a character beyond
+  /// ASCII must follow. It runs up to a space of any kind (Unicode's
+  /// White_Space), a `<`, a `>` or the end, then, as GitHub's autolinks
+  /// do, loses its last character while that is one of `.,:;!?`, or a
+  /// `)` with more `)` than `(` in it.
+  static List<(int, int)> plainAutolinks(String text) {
+    final found = <(int, int)>[];
+    _addresses(text, 0, text.length, found);
+    return found;
+  }
+
+  /// The bare web addresses of the formatted [text] as [plainAutolinks]
+  /// finds them, each within the characters a part shows as written:
+  /// none in code, in a code block or in a link, its label included.
+  static List<(int, int)> autolinks(String text) {
+    final found = <(int, int)>[];
+    void walk(List<MarkdownSpan> spans) {
+      for (final s in spans) {
+        switch (s.kind) {
+          // An escaped character starts none.
+          case MarkdownSpanKind.text:
+            _addresses(text, s.start, s.end, found);
+          case MarkdownSpanKind.bold ||
+              MarkdownSpanKind.italic ||
+              MarkdownSpanKind.strike:
+            walk(s.children);
+          case MarkdownSpanKind.code || MarkdownSpanKind.link:
+            break;
+        }
+      }
+    }
+
+    for (final block in parse(text)) {
+      if (block.code == null) walk(block.spans);
+    }
+    return found;
+  }
+
+  /// Adds the web addresses between [from] and [to] of [text] to [found].
+  static void _addresses(
+    String text,
+    int from,
+    int to,
+    List<(int, int)> found,
+  ) {
+    var i = from;
+    while (i < to) {
+      final after = _scheme(text, i, to);
+      if (after == null ||
+          (i > 0 && _asciiWord(text.codeUnitAt(i - 1))) ||
+          after >= to ||
+          !_hostStart(text.codeUnitAt(after))) {
+        i++;
+        continue;
+      }
+      var end = after;
+      while (end < to && !_endsAddress(text.codeUnitAt(end))) {
+        end++;
+      }
+      while (true) {
+        final last = text.codeUnitAt(end - 1);
+        if ('.,:;!?'.codeUnits.contains(last)) {
+          end--;
+        } else if (last == 0x29 &&
+            _count(text, i, end, 0x29) > _count(text, i, end, 0x28)) {
+          end--;
+        } else {
+          break;
+        }
+      }
+      found.add((i, end));
+      i = end;
+    }
+  }
+
+  /// Where the address after `http://` or `https://` at [at] of [text]
+  /// starts, or null when none starts there.
+  static int? _scheme(String text, int at, int to) {
+    for (final scheme in const ['https://', 'http://']) {
+      if (at + scheme.length > to) continue;
+      var k = 0;
+      while (k < scheme.length) {
+        final c = text.codeUnitAt(at + k);
+        final lower = c >= 0x41 && c <= 0x5A ? c | 0x20 : c;
+        if (lower != scheme.codeUnitAt(k)) break;
+        k++;
+      }
+      if (k == scheme.length) return at + k;
+    }
+    return null;
+  }
+
+  static int _count(String text, int from, int to, int c) {
+    var n = 0;
+    for (var i = from; i < to; i++) {
+      if (text.codeUnitAt(i) == c) n++;
+    }
+    return n;
+  }
+
+  static bool _asciiWord(int c) =>
+      (c >= 0x30 && c <= 0x39) || ((c | 0x20) >= 0x61 && (c | 0x20) <= 0x7A);
+
+  static bool _hostStart(int c) =>
+      _asciiWord(c) || (c > 0x7F && !_whiteSpace(c));
+
+  static bool _endsAddress(int c) => c == 0x3C || c == 0x3E || _whiteSpace(c);
+
+  /// Whether [c] is a space of Unicode's White_Space property, as Rust's
+  /// `char::is_whitespace` takes it.
+  static bool _whiteSpace(int c) =>
+      (c >= 0x09 && c <= 0x0D) ||
+      c == 0x20 ||
+      c == 0x85 ||
+      c == 0xA0 ||
+      c == 0x1680 ||
+      (c >= 0x2000 && c <= 0x200A) ||
+      c == 0x2028 ||
+      c == 0x2029 ||
+      c == 0x202F ||
+      c == 0x205F ||
+      c == 0x3000;
+
+  /// Where [text] holds characters taken as written, so no tag and no
+  /// box: code, a code block, its fences included, a link's destination
+  /// and a web address ([autolinks]), as (start, end) in UTF-16 code
+  /// units.
+  static List<(int, int)> literalRanges(String text) {
+    final hidden = <(int, int)>[...autolinks(text)];
     void hide(List<MarkdownSpan> spans) {
       for (final s in spans) {
         if (s.kind == MarkdownSpanKind.code) hidden.add((s.start, s.end));
@@ -466,12 +729,13 @@ abstract final class Markdown {
     }
 
     for (final block in parse(text)) {
+      if (block.code case final code?) {
+        if (block.line == code.firstLine) hidden.add((code.start, code.end));
+        continue;
+      }
       hide(block.spans);
     }
-    return [
-      for (final tag in TextTags.find(text))
-        if (!hidden.any((h) => tag.start < h.$2 && h.$1 < tag.end)) tag,
-    ];
+    return hidden;
   }
 
   /// Whether a link to [url] may be opened: a web address, `http://` or
@@ -546,7 +810,8 @@ abstract final class Markdown {
   /// in a part of that kind, marks included, those parts lose their
   /// marks; otherwise every piece that does not gets them. Code gets more
   /// backticks than any run inside it, and a space inside when it starts
-  /// or ends with one. The selection keeps what it selected.
+  /// or ends with one. The selection keeps what it selected. The lines
+  /// of a code block stay as they are.
   static MarkdownChange toggle(
     String text,
     int start,
@@ -564,6 +829,7 @@ abstract final class Markdown {
     final blocks = parse(text);
     if (s == e) {
       final block = blocks[lineAt(text, s)];
+      if (block.code != null) return (text: text, start: s, end: e);
       final inside = _deepest(
         block.spans,
         kind,
@@ -581,7 +847,10 @@ abstract final class Markdown {
       }
       return _apply(text, _wrap(text, from, to, kind), s, e);
     }
-    final pieces = _pieces(text, blocks, s, e);
+    final pieces = [
+      for (final piece in _pieces(text, blocks, s, e))
+        if (piece.$1.code == null) piece,
+    ];
     if (pieces.isEmpty) return (text: text, start: s, end: e);
     final within = [
       for (final (block, from, to) in pieces)
@@ -591,8 +860,9 @@ abstract final class Markdown {
           (span) => span.start <= from && to <= span.end,
         ),
     ];
-    if (within.every((span) => span != null)) {
-      return _apply(text, [for (final span in within) ..._unwrap(span!)], s, e);
+    final found = within.nonNulls.toList();
+    if (found.length == within.length) {
+      return _apply(text, [for (final span in found) ..._unwrap(span)], s, e);
     }
     return _apply(
       text,
@@ -610,10 +880,12 @@ abstract final class Markdown {
   /// its destination becomes [url], and a blank [url] takes the link
   /// off. Without a word, the link is put at the cursor with [url] as
   /// its label, selected. Spaces and control characters in [url] are
-  /// written %-encoded, `(`, `)` and `\` escaped.
+  /// written %-encoded, `(`, `)` and `\` escaped. A code block's lines
+  /// stay as they are.
   static MarkdownChange link(String text, int start, int end, String url) {
     var (s, e) = _ordered(text, start, end);
     final block = parse(text)[lineAt(text, s)];
+    if (block.code != null) return (text: text, start: s, end: e);
     if (e > block.end) e = block.end;
     final address = _trimmedUrl(url);
     final destination = _destination(address);
@@ -662,8 +934,9 @@ abstract final class Markdown {
   /// line out. The old mark goes and the new one comes at the line's
   /// start, an item keeping how far in it is; numbered items count on
   /// from one of their level right above, or from 1. A cursor in a
-  /// line's mark goes after the new one. A table's lines stay as they
-  /// are, and [MarkdownBlockKind.table] changes nothing.
+  /// line's mark goes after the new one. A table's and a code block's
+  /// lines stay as they are, and [MarkdownBlockKind.table] and
+  /// [MarkdownBlockKind.code] change nothing; [codeBlock] makes one.
   static MarkdownChange toggleLine(
     String text,
     int start,
@@ -671,13 +944,17 @@ abstract final class Markdown {
     MarkdownBlockKind kind,
   ) {
     final (s, e) = _ordered(text, start, end);
-    if (kind == MarkdownBlockKind.table) return (text: text, start: s, end: e);
+    if (kind == MarkdownBlockKind.table || kind == MarkdownBlockKind.code) {
+      return (text: text, start: s, end: e);
+    }
     final blocks = parse(text);
     final (first, last) = _touched(text, blocks, s, e);
-    // A table's lines stay its own.
+    // A table's and a code block's lines stay their own.
     final lines = [
       for (final b in blocks.sublist(first, last + 1))
-        if (b.kind != MarkdownBlockKind.table) b,
+        if (b.kind != MarkdownBlockKind.table &&
+            b.kind != MarkdownBlockKind.code)
+          b,
     ];
     final target =
         kind != MarkdownBlockKind.paragraph &&
@@ -699,7 +976,9 @@ abstract final class Markdown {
           ? text.substring(b.start, _skipBlank(text, b.start, b.end))
           : '';
       final prefix = switch (target) {
-        MarkdownBlockKind.paragraph || MarkdownBlockKind.table => '',
+        MarkdownBlockKind.paragraph ||
+        MarkdownBlockKind.table ||
+        MarkdownBlockKind.code => '',
         MarkdownBlockKind.heading1 => '# ',
         MarkdownBlockKind.heading2 => '## ',
         MarkdownBlockKind.quote => '> ',
@@ -745,14 +1024,93 @@ abstract final class Markdown {
     return _apply(text, edits, s, e);
   }
 
+  /// [text] with the lines the selection from [start] to [end] touches
+  /// put into a fenced code block, or, when they all are lines of one
+  /// block, that block's fences taken off. A selection ending at a
+  /// line's start leaves that line out; a code block or a table it
+  /// touches goes in whole. The fences are backticks, more than any run
+  /// of them inside and at least three, on lines of their own with the
+  /// text's first kind of line break, `\n` when there is none. At an
+  /// empty line the block is empty, the cursor in it. The selection keeps
+  /// what it selected.
+  static MarkdownChange codeBlock(String text, int start, int end) {
+    final (s, e) = _ordered(text, start, end);
+    final blocks = parse(text);
+    var (first, last) = _touched(text, blocks, s, e);
+    final code = blocks[first].code;
+    if (code != null && blocks[last].code == code) {
+      return _unfence(text, blocks, code, s, e);
+    }
+    first = blocks[first].table?.firstLine ?? code?.firstLine ?? first;
+    last = blocks[last].table?.lastLine ?? blocks[last].code?.lastLine ?? last;
+    final from = blocks[first].start;
+    final to = blocks[last].end;
+    final br = MarkdownTables._firstBreak(text);
+    var longest = 0;
+    var run = 0;
+    for (final c in text.substring(from, to).codeUnits) {
+      run = c == _backtick ? run + 1 : 0;
+      if (run > longest) longest = run;
+    }
+    final fence = '`' * (longest < 3 ? 3 : longest + 1);
+    if (from == to) {
+      return (
+        text: text.replaceRange(from, from, '$fence$br$br$fence'),
+        start: from + fence.length + br.length,
+        end: from + fence.length + br.length,
+      );
+    }
+    return _apply(
+      text,
+      [_Edit(from, 0, '$fence$br', after: true), _Edit(to, 0, '$br$fence')],
+      s,
+      e,
+    );
+  }
+
+  /// [text] with the fences of [code] taken off, each with the line break
+  /// between it and the content; a block without content goes whole.
+  static MarkdownChange _unfence(
+    String text,
+    List<MarkdownBlock> blocks,
+    MarkdownCodeBlock code,
+    int s,
+    int e,
+  ) {
+    final last = code.closed ? code.lastLine - 1 : code.lastLine;
+    if (last <= code.firstLine) {
+      return _apply(text, [_Edit(code.start, code.end - code.start, '')], s, e);
+    }
+    final contentStart = blocks[code.firstLine + 1].start;
+    final contentEnd = blocks[last].end;
+    return _apply(
+      text,
+      [
+        _Edit(code.start, contentStart - code.start, '', after: true),
+        if (code.end > contentEnd) _Edit(contentEnd, code.end - contentEnd, ''),
+      ],
+      s,
+      e,
+    );
+  }
+
   /// Whether a shortcut ends at the UTF-16 offset [cursor] of [text]: a
   /// line's mark with its space typed just before it, such as "# ",
   /// "- " or "1. ", or the closing mark of bold, italic,
-  /// strike-through, code or a link. A plain text becomes formatted
-  /// when one is typed.
+  /// strike-through, code or a link, or a code block's closing fence. A
+  /// plain text becomes formatted when one is typed.
   static bool shortcutAt(String text, int cursor) {
     final at = cursor.clamp(0, text.length);
     final block = parse(text)[lineAt(text, at)];
+    if (block.code case final code?) {
+      if (!code.closed || block.line != code.lastLine) return false;
+      var end = _skipBlank(text, block.start, block.end);
+      while (end < block.end &&
+          text.codeUnitAt(end) == code.fence.codeUnitAt(0)) {
+        end++;
+      }
+      return at == end;
+    }
     if (block.kind != MarkdownBlockKind.paragraph &&
         at == block.contentStart &&
         at > block.start &&
@@ -835,6 +1193,69 @@ abstract final class Markdown {
       at++;
     }
     return at;
+  }
+
+  /// The run of backticks or tildes a fence from [start] to [end] is
+  /// written with, and where it ends: up to three spaces, at least three
+  /// of one of them; a run of backticks with no backtick after it. Null
+  /// when the line is no fence.
+  static (String, int)? _fence(String text, int start, int end) {
+    var at = start;
+    while (at < end && at - start < 4 && text.codeUnitAt(at) == _space) {
+      at++;
+    }
+    if (at - start > 3 || at == end) return null;
+    final c = text.codeUnitAt(at);
+    if (c != _backtick && c != _tilde) return null;
+    var to = at;
+    while (to < end && text.codeUnitAt(to) == c) {
+      to++;
+    }
+    if (to - at < 3) return null;
+    if (c == _backtick && text.substring(to, end).contains('`')) return null;
+    return (text.substring(at, to), to);
+  }
+
+  /// The code block whose opening fence is the line [first] of [lines],
+  /// or null: up to the first line that closes it, a fence of its
+  /// character at least as long with only spaces and tabs after it, or to
+  /// the last line.
+  static MarkdownCodeBlock? _codeAt(
+    String text,
+    List<(int, int)> lines,
+    int first,
+  ) {
+    final (start, end) = lines[first];
+    final opening = _fence(text, start, end);
+    if (opening == null) return null;
+    final (fence, after) = opening;
+    var last = first + 1;
+    var closed = false;
+    for (; last < lines.length; last++) {
+      final (s, e) = lines[last];
+      if (_fence(text, s, e) case (final f, final to)
+          when f.codeUnitAt(0) == fence.codeUnitAt(0) &&
+              f.length >= fence.length &&
+              _skipBlank(text, to, e) == e) {
+        closed = true;
+        break;
+      }
+    }
+    if (!closed) last = lines.length - 1;
+    final infoStart = _skipBlank(text, after, end);
+    var infoEnd = end;
+    while (infoEnd > infoStart && _blank(text.codeUnitAt(infoEnd - 1))) {
+      infoEnd--;
+    }
+    return MarkdownCodeBlock._(
+      start: start,
+      end: lines[last].$2,
+      firstLine: first,
+      lastLine: last,
+      fence: fence,
+      info: text.substring(infoStart, infoEnd),
+      closed: closed,
+    );
   }
 
   /// A line's kind, level, the number written for a numbered item and

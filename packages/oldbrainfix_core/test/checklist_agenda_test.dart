@@ -34,11 +34,12 @@ void main() {
           .id;
 
   /// Today's Agenda rows of the Checklists of [store], as "title: open of
-  /// all".
+  /// all", with " as count" for one that shows only its count (#219).
   List<String> rows(Store store) => [
-    for (final list in Checklists(store).agenda())
+    for (final (:list, :shows) in Checklists(store).agendaRows())
       '${Notes(store).byId(list.noteId)!.text}: '
-          '${list.openCount} of ${list.count}',
+          '${list.openCount} of ${list.count}'
+          '${shows == ListOnAgenda.count ? ' as count' : ''}',
   ];
 
   /// Every entry of a "Show on the Agenda" choice [store] holds.
@@ -62,24 +63,43 @@ void main() {
         'every Line is checked', () {
       final trip = checklist(ann, 'Before the trip\nTent\nTorch\n  Batteries');
       final lists = Checklists(ann);
-      expect(lists.showsOnAgenda(trip), isTrue);
+      expect(lists.onAgenda(trip), ListOnAgenda.lines);
       expect(lists.mayShowOnAgenda(trip), isTrue);
       expect(rows(ann), ['Before the trip: 3 of 3']);
       lists.check(idOf(ann, trip, 'Batteries'));
       expect(rows(ann), ['Before the trip: 1 of 3']);
-      lists.setShowOnAgenda(trip, false);
-      expect(lists.showsOnAgenda(trip), isFalse);
+      lists.setOnAgenda(trip, ListOnAgenda.off);
+      expect(lists.onAgenda(trip), ListOnAgenda.off);
       expect(rows(ann), isEmpty);
       final count = ann.allEntries().length;
-      lists.setShowOnAgenda(trip, false);
+      lists.setOnAgenda(trip, ListOnAgenda.off);
       expect(ann.allEntries(), hasLength(count), reason: 'the same again');
-      lists.setShowOnAgenda(trip, true);
+      lists.setOnAgenda(trip, ListOnAgenda.count);
+      expect(lists.onAgenda(trip), ListOnAgenda.count);
+      expect(rows(ann), ['Before the trip: 1 of 3 as count']);
+      lists.setOnAgenda(trip, ListOnAgenda.lines);
       expect(rows(ann), ['Before the trip: 1 of 3']);
-      expect(choices(ann).map((e) => e.value), ['off', null]);
+      expect(choices(ann).map((e) => e.value), ['off', 'count', 'lines']);
       lists.check(idOf(ann, trip, 'Tent'));
       expect(rows(ann), isEmpty, reason: 'every Line checked');
       lists.uncheck(idOf(ann, trip, 'Tent'));
       expect(rows(ann), ['Before the trip: 1 of 3']);
+    });
+
+    test('one shown as its count never shows without an open Line', () {
+      final trip = checklist(ann, 'Trip\nTent');
+      final lists = Checklists(ann)..setOnAgenda(trip, ListOnAgenda.count);
+      expect(rows(ann), ['Trip: 1 of 1 as count']);
+      lists.check(idOf(ann, trip, 'Tent'));
+      expect(rows(ann), isEmpty);
+    });
+
+    test('a list nobody chose for shows every open Line, writing nothing', () {
+      final trip = checklist(ann, 'Trip\nTent');
+      final count = ann.allEntries().length;
+      Checklists(ann).setOnAgenda(trip, ListOnAgenda.lines);
+      expect(ann.allEntries(), hasLength(count));
+      expect(rows(ann), ['Trip: 1 of 1']);
     });
 
     test('a Checklist with a Routine shows only as its Occurrence', () {
@@ -129,20 +149,30 @@ void main() {
       }
       expect(lists.mayShowOnAgenda(first), isTrue);
       expect(lists.mayShowOnAgenda(second), isTrue);
-      expect(() => lists.setShowOnAgenda(shop, false), throwsArgumentError);
-      expect(() => lists.setShowOnAgenda(into, false), throwsArgumentError);
+      expect(
+        () => lists.setOnAgenda(shop, ListOnAgenda.off),
+        throwsArgumentError,
+      );
+      expect(
+        () => lists.setOnAgenda(into, ListOnAgenda.off),
+        throwsArgumentError,
+      );
       expect(choices(ann), isEmpty);
     });
 
-    test('a value no app writes reads as on', () {
+    test('a value no app writes, or none, reads as every open Line', () {
       final trip = checklist(ann, 'Trip\nTent');
-      for (final value in ['OFF', 'off ', 'false', '']) {
+      for (final value in ['OFF', 'off ', 'false', '', 'Count', 'on', null]) {
         ann.append(
           '${ChecklistKeys.agendaPrefix}$trip',
           ChecklistKeys.agenda,
           value,
         );
-        expect(Checklists(ann).showsOnAgenda(trip), isTrue, reason: value);
+        expect(
+          Checklists(ann).onAgenda(trip),
+          ListOnAgenda.lines,
+          reason: value,
+        );
       }
       expect(rows(ann), ['Trip: 1 of 1']);
     });
@@ -150,7 +180,7 @@ void main() {
     test('reading writes nothing', () {
       checklist(ann, 'Trip\nTent');
       final count = ann.allEntries().length;
-      Checklists(ann).agenda();
+      Checklists(ann).agendaRows();
       expect(ann.allEntries(), hasLength(count));
     });
   });
@@ -162,14 +192,14 @@ void main() {
       exchange(ben, ann);
       expect(rows(ben), ['Trip: 2 of 2']);
       // Ben, a Member, may switch off a list he did not write.
-      Checklists(ben).setShowOnAgenda(trip, false);
+      Checklists(ben).setOnAgenda(trip, ListOnAgenda.off);
       expect(rows(ben), isEmpty);
       exchange(ben, ann);
       expect(rows(ann), ['Trip: 2 of 2']);
       expect(choices(ann), isEmpty);
-      // And Ann hers: Ben's stays on.
-      Checklists(ann).setShowOnAgenda(trip, false);
-      Checklists(ben).setShowOnAgenda(trip, true);
+      // And Ann hers: Ben's shows its count.
+      Checklists(ann).setOnAgenda(trip, ListOnAgenda.off);
+      Checklists(ben).setOnAgenda(trip, ListOnAgenda.count);
       final joined = exchange(ben, ann);
       final hosted = exchange(ann, ben);
       for (final wire in [
@@ -181,7 +211,7 @@ void main() {
         expect(jsonEncode(wire), isNot(contains(ChecklistKeys.agendaPrefix)));
       }
       expect(rows(ann), isEmpty);
-      expect(rows(ben), ['Trip: 2 of 2']);
+      expect(rows(ben), ['Trip: 2 of 2 as count']);
       expect(choices(ann).map((e) => e.device).toSet(), {ann.deviceId});
       expect(choices(ben).map((e) => e.device).toSet(), {ben.deviceId});
     });
@@ -189,18 +219,18 @@ void main() {
     test('one\'s own Devices carry it', () {
       household();
       final trip = checklist(ann, 'Trip\nTent');
-      Checklists(ann).setShowOnAgenda(trip, false);
+      Checklists(ann).setOnAgenda(trip, ListOnAgenda.off);
       exchange(annDesk, ann);
       expect(rows(annDesk), isEmpty);
-      Checklists(annDesk).setShowOnAgenda(trip, true);
+      Checklists(annDesk).setOnAgenda(trip, ListOnAgenda.count);
       exchange(annDesk, ann);
-      expect(rows(ann), ['Trip: 1 of 1']);
+      expect(rows(ann), ['Trip: 1 of 1 as count']);
     });
 
     test('the shared folder holds none another person can open', () async {
       final area = household();
       final trip = checklist(ann, 'Trip\nTent', place: area);
-      Checklists(ann).setShowOnAgenda(trip, false);
+      Checklists(ann).setOnAgenda(trip, ListOnAgenda.off);
       final folder = MemorySyncFolder();
       await folderSync(ann, folder);
       await folderSync(ben, folder);
@@ -223,10 +253,10 @@ void main() {
       );
       ann.applyEntries([forged], verifiedDevice: ben.deviceId);
       expect(ann.allEntries().map((e) => e.id), contains(forged.id));
-      expect(Checklists(ann).showsOnAgenda(trip), isTrue);
+      expect(Checklists(ann).onAgenda(trip), ListOnAgenda.lines);
       expect(rows(ann), ['Trip: 1 of 1']);
       // Nor does it stop her switching it off and on herself.
-      Checklists(ann).setShowOnAgenda(trip, false);
+      Checklists(ann).setOnAgenda(trip, ListOnAgenda.off);
       expect(rows(ann), isEmpty);
     });
   });

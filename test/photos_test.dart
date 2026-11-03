@@ -254,13 +254,12 @@ void main() {
       expect(find.byType(NotePhoto), findsOneWidget);
     });
 
-    testWidgets('a card shows three thumbnails and counts the rest', (
-      tester,
-    ) async {
+    testWidgets('a compact card of a Note without words shows three '
+        'thumbnails and counts the rest (#189)', (tester) async {
       final more = [
         for (var i = 0; i < 5; i++) Uint8List.fromList([...onePixelPng, i]),
       ];
-      final note = notes.capture('lots', photos: more);
+      final note = notes.capture('', photos: more);
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

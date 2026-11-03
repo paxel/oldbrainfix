@@ -73,10 +73,10 @@ void main() {
 
       expect(find.text('nees mor sauce'), findsOneWidget);
       expect(notes.all().single.context.location, isNull);
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · Home'), findsNothing);
 
       await arrive(tester, home);
-      expect(find.text('Home'), findsOneWidget);
+      expect(find.textContaining(' · Home'), findsOneWidget);
       expect(notes.all().single.context.location, home);
       expect(location.asked, 0);
     });
@@ -89,8 +89,8 @@ void main() {
       await start(tester);
       await capture(tester, 'nees mor sauce');
       await arrive(tester, faraway);
-      expect(find.text('48.1472, 11.5761'), findsOneWidget);
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · 48.1472, 11.5761'), findsOneWidget);
+      expect(find.textContaining(' · Home'), findsNothing);
     });
 
     testWidgets('with no position the Note stays, without a place', (
@@ -139,9 +139,13 @@ void main() {
         findsOneWidget,
         reason: 'the list does not wait for the position',
       );
-      expect(find.text('Home'), findsNothing);
+      expect(find.textContaining(' · Home'), findsNothing);
       await arrive(tester, home);
-      expect(find.text('Home'), findsOneWidget, reason: 'that Note too');
+      expect(
+        find.textContaining(' · Home'),
+        findsOneWidget,
+        reason: 'that Note too',
+      );
 
       location.fix = Completer()..complete(home);
       await capture(tester, 'second');
@@ -175,19 +179,20 @@ void main() {
   });
 
   group('editor', () {
-    testWidgets('shows the Named Place with its coordinates, and an Amend '
-        'gets its own place', (tester) async {
+    testWidgets('shows only the Named Place, and an Amend elsewhere gets '
+        'its own coordinates', (tester) async {
       named.add('Home', home, radius: 100);
       final note = notes.capture('nees mor sauce');
       notes.locate(note.id, home);
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.byTooltip('All Notes'));
       await tester.longPress(find.text('nees mor sauce'));
       await tester.pumpAndSettle();
       // In the Captured badge's editor.
       await tap(tester, find.byKey(const ValueKey('badge-captured')));
-      expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.textContaining('48.1372'), findsNothing);
       await tap(tester, find.byKey(const ValueKey('badge-close')));
 
       await reveal(tester, find.text('Add to Note'));
@@ -202,7 +207,8 @@ void main() {
       await tap(tester, find.text('Add'));
       expect(find.text('sauce bought'), findsOneWidget);
       await arrive(tester, faraway);
-      expect(find.text('48.1472, 11.5761'), findsOneWidget);
+      // In the Section's one line under its text (#170).
+      expect(find.textContaining(' · 48.1472, 11.5761'), findsOneWidget);
       expect(notes.sections(note.id).single.context.location, faraway);
     });
   });
@@ -267,9 +273,10 @@ void main() {
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byKey(const ValueKey('browse')));
       await tap(tester, find.byTooltip('All Notes'));
-      expect(find.text('48.1372, 11.5761'), findsOneWidget);
+      // In the full card's one line under the text (#170).
+      expect(find.textContaining(' · 48.1372, 11.5761'), findsOneWidget);
     });
 
     testWidgets('+ explains and asks when the location is not allowed', (

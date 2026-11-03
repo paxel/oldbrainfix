@@ -9,9 +9,18 @@
 //! editor changes it; "+" makes a Note, a Checklist, a Shopping List, a
 //! Tally, a Session or a Frog where the list is, and the last card of a
 //! list scrolls fully clear of the window's edge (#158); a captured
-//! detail of the Note, in its Captured badge, or of a Section, under it,
+//! detail of the Note, in its Captured badge, or of a Section, in the
+//! dialog its line under it opens (#170),
 //! goes with its Remove after one question while the time stays, and
 //! where this Device may change the Note only (#162).
+
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -25,8 +34,9 @@ use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync
 use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{
-    AreaRole, Checklists, Day, Frogs, Importance, Invite, Notes, OwnProfile, PairedDevice, Places,
-    Recurrence, Routines, Schedule, Sessions, ShoppingLists, SigningKey, Store, Tallies, TallyRule,
+    AreaRole, Checklists, Day, Frogs, Importance, Invite, ListOnAgenda, Notes, OwnProfile,
+    PairedDevice, PersonSettings, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists,
+    SigningKey, Store, Tallies, TallyRule,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -114,6 +124,14 @@ fn card<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> Node<'a> {
         Some(node) => node,
         None => panic!("no card {text}"),
     }
+}
+
+/// Picks the radio button `label` of the open small editor (#188).
+fn pick(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_by_role_and_label(Role::RadioButton, label)
+        .click_accesskit();
+    harness.run();
 }
 
 /// The Note dialog's text field.
@@ -271,19 +289,41 @@ fn each_setting_is_a_badge_read_as_setting_and_value() -> TestResult {
             .next()
             .is_some()
     );
-    // A plain Note has no kind, no Checklist's Show on the Agenda.
-    assert!(
-        harness
-            .query_all_by_label_contains("Kind: ")
-            .next()
-            .is_none()
-    );
+    // A plain Note has its kind too (#188), no Checklist's Show on the
+    // Agenda.
+    assert!(shows(&harness, "Kind: Plain Note"));
     assert!(
         harness
             .query_all_by_label_contains("Show on the Agenda")
             .next()
             .is_none()
     );
+    Ok(())
+}
+
+/// A badge whose setting has a fixed set of values shows its value as an
+/// icon, never with its word (#192): it is as wide for a long value as for
+/// a short one, and as wide as an icon; other values are text, wider.
+#[test]
+fn a_fixed_set_of_values_shows_as_an_icon_without_its_word() -> TestResult {
+    let (store, household) = store()?;
+    let notes = Notes::new(&store);
+    let tap = notes.capture("Fix the tap ☐", Some(&household), None)?.id;
+    notes.set_importance(&tap, Importance::Unimportant)?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let width = |label: &str| harness.get_by_label(label).rect().width();
+    // The setting's icon part, 38 points, then an 18-point icon padded by
+    // 10 on each side.
+    for label in [
+        "Kind: Plain Note",
+        "Importance: Unimportant",
+        "Show ticks: Off",
+    ] {
+        assert_eq!(width(label), 38.0 + 18.0 + 20.0, "{label}");
+    }
+    assert!(width("Area and Topic: Household") > 38.0 + 18.0 + 20.0);
     Ok(())
 }
 
@@ -355,30 +395,25 @@ fn a_lists_kind_badge_goes_back_to_a_plain_note_and_its_agenda_badge_switches() 
             .count(),
         0
     );
-    click(&mut harness, "Show on the Agenda: On");
-    harness
-        .get_by_role_and_label(Role::CheckBox, "Show on the Agenda")
-        .click_accesskit();
-    harness.run();
-    assert!(!Checklists::new(&store).shows_on_agenda(&list)?);
-    click(&mut harness, "Close");
+    // Its three ways, as a Shopping List's (#219); a pick closes it.
+    click(
+        &mut harness,
+        "Show on the Agenda: Each open Line on its own row",
+    );
+    pick(&mut harness, "Off");
+    assert_eq!(Checklists::new(&store).on_agenda(&list)?, ListOnAgenda::Off);
     assert!(shows(&harness, "Show on the Agenda: Off"));
     click(&mut harness, "Kind: Checklist");
-    click(&mut harness, "Back to a plain Note");
+    pick(&mut harness, "Plain Note");
     assert!(Checklists::new(&store).by_note(&list)?.is_none());
-    assert!(
-        harness
-            .query_all_by_label_contains("Kind: ")
-            .next()
-            .is_none()
-    );
+    assert!(shows(&harness, "Kind: Plain Note"));
     // A Shopping List's too.
     ShoppingLists::new(&store).make(&list)?;
     harness.state_mut().close_note();
     harness.state_mut().select_note(&list);
     harness.run();
     click(&mut harness, "Kind: Shopping List");
-    click(&mut harness, "Back to a plain Note");
+    pick(&mut harness, "Plain Note");
     let wall = |at: DateTime<Utc>| at.naive_utc();
     assert!(ShoppingLists::new(&store).by_note(&list, &wall)?.is_none());
     Ok(())
@@ -469,6 +504,25 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
 }
 
 #[test]
+fn in_simple_plus_offers_note_checklist_and_shopping_list_and_a_tally_stays() -> TestResult {
+    let (store, household) = store()?;
+    let push_ups = Notes::new(&store).capture("Push-ups", Some(&household), None)?;
+    Tallies::new(&store).add_field(&push_ups.id, "Push-ups", "times", None, None)?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let mut harness = window(&store, Selection::Place(household.clone()));
+    assert!(shows(&harness, "Push-ups"));
+    harness.get_by_label("Add here").click();
+    harness.run();
+    for label in ["Note", "Checklist", "Shopping List"] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    for label in ["Tally", "Session", "Frog", "Topic"] {
+        assert!(!shows(&harness, label), "{label}");
+    }
+    Ok(())
+}
+
+#[test]
 fn a_checklist_from_plus_is_named_then_typed_in_place_and_a_frog_only_named() -> TestResult {
     let (store, household) = store()?;
     let mut harness = window(&store, Selection::Place(household.clone()));
@@ -536,8 +590,18 @@ fn a_shopping_list_from_plus_starts_with_one_line_the_cursor_in_it() -> TestResu
     let focused = harness.get_by(|n| n.is_focused());
     assert_eq!(focused.accesskit_node().role(), Role::TextInput);
     assert_eq!(focused.value().as_deref(), Some(""));
+    // Under its name (#188).
+    assert_eq!(
+        harness
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .value()
+            .as_deref(),
+        Some("Market")
+    );
     let lines = harness.query_all_by(|n| {
-        n.role() == Role::TextInput && n.placeholder().unwrap_or_default().is_empty()
+        n.role() == Role::TextInput
+            && n.placeholder().unwrap_or_default().is_empty()
+            && n.label().as_deref() != Some("Name")
     });
     assert_eq!(lines.count(), 1);
     assert!(!shows(&harness, "Add"));
@@ -674,7 +738,7 @@ fn a_session_with_a_new_tally_made_inside_takes_one_page() -> TestResult {
     let session = Sessions::new(&store)
         .by_id(&routine.id)?
         .ok_or("the Session")?;
-    assert_eq!(session.pool, [tally.id]);
+    assert_eq!(session.setup.pool, [tally.id]);
     assert!(routine.schedule.times.is_empty());
     assert!(harness.state().routine_editor().is_none());
     Ok(())
@@ -756,15 +820,19 @@ fn captured_in(store: &Store, area: Option<&str>) -> Result<String, Box<dyn std:
     Ok(note.id)
 }
 
+/// The label of the first "Captured: …" button `joined` or not: a
+/// Section's line, its details joined by " · " (#170), or the Note's
+/// badge, its time alone.
+fn captured_label(harness: &Harness<'_, App>, joined: bool) -> Option<String> {
+    harness
+        .query_all_by_label_contains("Captured: ")
+        .filter_map(|n| n.accesskit_node().label())
+        .find(|label| label.contains(" · ") == joined)
+}
+
 /// Opens the Captured badge of the Note open: the time it shows.
 fn open_captured(harness: &mut Harness<'_, App>) -> Result<String, Box<dyn std::error::Error>> {
-    let badge = harness
-        .query_all_by_label_contains("Captured: ")
-        .next()
-        .ok_or("Captured")?
-        .accesskit_node()
-        .label()
-        .unwrap_or_default();
+    let badge = captured_label(harness, false).ok_or("Captured")?;
     click(harness, &badge);
     harness.run_steps(8);
     assert!(shows(harness, "Captured"));
@@ -789,7 +857,7 @@ fn each_captured_detail_but_the_time_goes_from_the_captured_badge() -> TestResul
     harness.run();
     let time = open_captured(&mut harness)?;
     let steps = [
-        ("place", "Home (52.5200, 13.4050)"),
+        ("place", "Home"),
         ("calendar events", "During: Team call"),
         ("Bluetooth devices", "Connected: Car kit, Headphones"),
         ("app", "Shared from WhatsApp"),
@@ -808,10 +876,10 @@ fn each_captured_detail_but_the_time_goes_from_the_captured_badge() -> TestResul
     assert!(context.location.is_none() && context.named_place.is_none());
     assert!(context.source_app.is_none());
     assert!(context.calendar_events.is_empty() && context.bluetooth_devices.is_empty());
-    // The time stays, with no Remove of its own; the two left are the
-    // Amend's, under it.
+    // The time stays, with no Remove of its own; the Amend's are behind
+    // its own line (#170).
     assert!(shows(&harness, &time), "{time}");
-    assert_eq!(harness.query_all_by_label_contains("Remove the").count(), 2);
+    assert_eq!(harness.query_all_by_label_contains("Remove the").count(), 0);
     Ok(())
 }
 
@@ -843,13 +911,21 @@ fn cancel_keeps_the_captured_detail() -> TestResult {
 }
 
 #[test]
-fn a_sections_captured_detail_goes_from_under_it() -> TestResult {
+fn a_sections_captured_detail_goes_from_the_dialog_its_line_opens() -> TestResult {
     let (store, _) = store()?;
     let tap = captured_in(&store, None)?;
     let mut harness = window(&store, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    // The Amend's own, under it in the Note dialog.
+    // The Amend's own as one line under it in the Note dialog (#170),
+    // with no Remove; its details in the dialog the line opens.
+    let line = captured_label(&harness, true).ok_or("the Amend's line")?;
+    assert!(line.contains(" · 48.1372, 11.5756 · Dentist"), "{line}");
+    assert!(!shows(&harness, "48.1372, 11.5756"));
+    assert!(!shows(&harness, "Remove the place"));
+    click(&mut harness, &line);
+    harness.run_steps(8);
+    assert!(shows(&harness, "Captured"));
     assert!(shows(&harness, "48.1372, 11.5756"));
     remove(
         &mut harness,
@@ -857,7 +933,9 @@ fn a_sections_captured_detail_goes_from_under_it() -> TestResult {
         "Remove the place from this Section?",
     );
     assert!(!shows(&harness, "48.1372, 11.5756"));
+    // The dialog stays open over the Note and shows what is left.
     assert!(shows(&harness, "During: Dentist"));
+    assert!(harness.state().note_open());
     let notes = Notes::new(&store);
     let amend = notes
         .sections(&tap)?
@@ -917,8 +995,9 @@ fn a_member_has_no_remove_on_another_persons_note() -> TestResult {
     let mut harness = window(&ben, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    // The Amend's details show, without a Remove.
-    assert!(shows(&harness, "48.1372, 11.5756"));
+    // The Amend's details show in its line, without a Remove.
+    let line = captured_label(&harness, true).ok_or("the Amend's line")?;
+    assert!(line.contains("48.1372, 11.5756"), "{line}");
     open_captured(&mut harness)?;
     // Ann's Named Place stays hers: Ben sees the coordinates.
     assert!(shows(&harness, "52.5200, 13.4050"));

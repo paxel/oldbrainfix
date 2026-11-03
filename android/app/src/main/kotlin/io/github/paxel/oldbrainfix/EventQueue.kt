@@ -34,8 +34,11 @@ object EventQueue {
     /** A Shopping List's Line checked in the Agenda widget. */
     const val KIND_SHOPPING = "shopping"
 
+    /** A Line of a Checklist without a Routine checked in the Agenda widget (#209). */
+    const val KIND_CHECKLIST = "checklist"
+
     /** The kinds of action this version applies. */
-    private val KINDS = setOf("done", "snooze", NudgePlan.KIND_SNOOZE, KIND_LINE, KIND_FROG, KIND_SHOPPING)
+    private val KINDS = setOf("done", "snooze", NudgePlan.KIND_SNOOZE, KIND_LINE, KIND_FROG, KIND_SHOPPING, KIND_CHECKLIST)
 
     @Synchronized
     fun add(context: Context, kind: String, alarm: Alarm, until: Long = 0, line: String = "") =

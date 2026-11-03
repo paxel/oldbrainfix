@@ -12,7 +12,9 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::checklists::{LineChecks, keys as checklist_keys};
 use crate::entry::{dart_iso, parse_time};
+use crate::note_kinds::NoteKind;
 use crate::notes::{Note, Notes, keys as note_keys};
+use crate::person_settings::PersonSettings;
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
 use crate::sessions::{SessionMarks, keys as session_keys};
 use crate::store::{Fields, Store, utf16_cmp};
@@ -379,6 +381,65 @@ impl<'a> Routines<'a> {
             .map(drop)
     }
 
+    /// Checks off `occurrence` of the Routine `id` as [`Routines::mark_done`]
+    /// does, the way the user's Done does it everywhere (#211): with "Move
+    /// a Note to the Trash when its one-time Reminder is done" on
+    /// ([`PersonSettings::trashes_done_reminder`]), a Reminder that is the
+    /// only Routine or Reminder of a plain Note this Device may change
+    /// moves the Note to the trash with it, as "Done and move to trash"
+    /// does (#215). Returns whether it did. Unchecking it later leaves the
+    /// Note there; it comes back from the trash.
+    pub fn check_off(
+        &self,
+        id: &str,
+        occurrence: &Occurrence,
+        at: Option<DateTime<Utc>>,
+    ) -> Result<bool> {
+        self.store.batch(|| {
+            self.mark_done(id, occurrence, at)?;
+            let Some(note) = self.trashed_when_done(&self.require(id)?)? else {
+                return Ok(false);
+            };
+            self.trash_note(&note.id, true)?;
+            Ok(true)
+        })
+    }
+
+    /// The id of the Note that Done on the Routine `id` would move to
+    /// the trash ([`Routines::check_off`]), so a dialog showing it can
+    /// close first; `None` when none would.
+    pub fn trashes_when_done(&self, id: &str) -> Result<Option<String>> {
+        let Some(routine) = self.by_id(id)?.filter(|r| !r.is_trashed()) else {
+            return Ok(None);
+        };
+        Ok(self.trashed_when_done(&routine)?.map(|n| n.id))
+    }
+
+    /// The Note Done on `routine` moves to the trash
+    /// ([`Routines::check_off`]); `None` when none does.
+    fn trashed_when_done(&self, routine: &Routine) -> Result<Option<Note>> {
+        if !PersonSettings::new(self.store).trashes_done_reminder()? || !routine.is_reminder() {
+            return Ok(None);
+        }
+        let Some(note) = self.note(routine)? else {
+            return Ok(None);
+        };
+        if note.is_trashed() || note.is_merged() {
+            return Ok(None);
+        }
+        if NoteKind::of(self.store, &note.id)? != NoteKind::Plain {
+            return Ok(None);
+        }
+        if !self.store.may_change(&note.id)? {
+            return Ok(None);
+        }
+        let linked = self.of_note(&note.id)?;
+        if !matches!(linked.as_slice(), [only] if only.id == routine.id) {
+            return Ok(None);
+        }
+        Ok(Some(note))
+    }
+
     /// Unchecks `occurrence` of the Routine `id` again.
     pub fn unmark_done(&self, id: &str, occurrence: &Occurrence) -> Result<()> {
         self.require(id)?;
@@ -421,10 +482,15 @@ impl<'a> Routines<'a> {
                 scheduled_at = Some(entry.date_at);
             }
         }
-        // A Session's Occurrence is Done too once every pick has an
-        // entry (ADR 0029); a check-off, written below, keeps its moment.
-        let mut done = if fields.get(session_keys::POOL).is_some() {
-            SessionMarks::read(self.store, id, &history)?.done_from_entries(self.store)?
+        // An Occurrence of a Routine that ran a Session is Done too once
+        // every pick has an entry (ADR 0029), whether the Note is still a
+        // Session or not (ADR 0039); a check-off, written below, keeps
+        // its moment.
+        let mut done = if fields
+            .iter()
+            .any(|(key, _)| key.starts_with(session_keys::PICK_PREFIX))
+        {
+            SessionMarks::of(self.store, id)?.done_from_entries(self.store)?
         } else {
             BTreeMap::new()
         };
@@ -644,6 +710,37 @@ impl<'a> Routines<'a> {
         })
     }
 
+    /// What the cards tick today (#215), by the id of the Note each
+    /// Routine and Reminder shows under, with days as `wall` shows them:
+    /// of each with an Occurrence today, in the order of today's Agenda,
+    /// its first one today not Done, else its last one today, Done. Read
+    /// once for all the cards of a list; the Notes in the order their
+    /// first Routine comes.
+    pub fn today_by_note(&self, wall: &WallClock) -> Result<Vec<(String, Vec<AgendaRow>)>> {
+        let mut by_routine: Vec<AgendaRow> = Vec::new();
+        for row in self.agenda(wall)?.today_rows {
+            match by_routine
+                .iter_mut()
+                .find(|held| held.routine.id == row.routine.id)
+            {
+                None => by_routine.push(row),
+                Some(held) if held.done().is_some() => *held = row,
+                Some(_) => {}
+            }
+        }
+        let mut by_note: Vec<(String, Vec<AgendaRow>)> = Vec::new();
+        for row in by_routine {
+            let Some(id) = row.note.as_ref().map(|n| n.id.clone()) else {
+                continue;
+            };
+            match by_note.iter_mut().find(|(held, _)| *held == id) {
+                Some((_, rows)) => rows.push(row),
+                None => by_note.push((id, vec![row])),
+            }
+        }
+        Ok(by_note)
+    }
+
     /// Writes the fields of `schedule` that differ from what is there.
     pub(crate) fn write_schedule(&self, id: &str, schedule: &Schedule) -> Result<()> {
         let current = self.store.current_fields(id)?;
@@ -823,6 +920,141 @@ mod tests {
         let before = store.all_entries()?.len();
         routines.reschedule(&routine.id, &daily_at_eight())?;
         assert_eq!(store.all_entries()?.len(), before);
+        Ok(())
+    }
+
+    #[test]
+    fn a_card_ticks_the_first_open_occurrence_today_else_the_last_done() -> Result<()> {
+        let store = crate::store::tests::store();
+        let routines = Routines::new(&store);
+        let wall = |utc: DateTime<Utc>| utc.naive_utc();
+        let times: Vec<ClockTime> = [ClockTime::new(8, 0), ClockTime::new(20, 0)]
+            .into_iter()
+            .flatten()
+            .collect();
+        let rule = Recurrence::every(Frequency::Daily, 1);
+        let Some(schedule) = Schedule::new(Day::new(2026, 1, 1), &times, Some(rule)) else {
+            panic!("a schedule");
+        };
+        let routine = routines.create("pills", &schedule)?;
+        let note = routine.note_id.clone();
+        let ticked = || -> Result<Vec<(String, bool)>> {
+            let by_note = routines.today_by_note(&wall)?;
+            let rows = by_note.iter().find(|(id, _)| *id == note);
+            Ok(rows
+                .map(|(_, rows)| rows.as_slice())
+                .unwrap_or_default()
+                .iter()
+                .map(|r| (r.occurrence.key(), r.done().is_some()))
+                .collect())
+        };
+        assert_eq!(ticked()?, [("2026-01-01T08:00".to_string(), false)]);
+        let at = |hour| Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(hour, 0));
+        routines.mark_done(&routine.id, &at(8), None)?;
+        assert_eq!(ticked()?, [("2026-01-01T20:00".to_string(), false)]);
+        routines.mark_done(&routine.id, &at(20), None)?;
+        assert_eq!(ticked()?, [("2026-01-01T20:00".to_string(), true)]);
+        Ok(())
+    }
+
+    /// A one-time Reminder at 08:00 on 2026-01-01 and its Occurrence.
+    fn once_at_eight() -> (Schedule, Occurrence) {
+        let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
+        let Some(schedule) = Schedule::new(Day::new(2026, 1, 1), &eight, None) else {
+            panic!("a schedule");
+        };
+        (
+            schedule,
+            Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(8, 0)),
+        )
+    }
+
+    fn trashed(store: &Store, routine: &Routine) -> Result<bool> {
+        Ok(Notes::new(store)
+            .by_id(&routine.note_id)?
+            .is_some_and(|n| n.is_trashed()))
+    }
+
+    #[test]
+    fn done_moves_nothing_by_default() -> Result<()> {
+        let store = crate::store::tests::store();
+        let routines = Routines::new(&store);
+        let (once, eight) = once_at_eight();
+        let dentist = routines.create("dentist", &once)?;
+        assert!(!PersonSettings::new(&store).trashes_done_reminder()?);
+        assert!(!routines.check_off(&dentist.id, &eight, None)?);
+        let done = routines.by_id(&dentist.id)?;
+        assert!(done.is_some_and(|r| r.done_at(&eight).is_some()));
+        assert!(!trashed(&store, &dentist)?);
+        Ok(())
+    }
+
+    #[test]
+    fn done_on_a_notes_only_reminder_trashes_it_when_chosen() -> Result<()> {
+        let store = crate::store::tests::store();
+        let routines = Routines::new(&store);
+        let (once, eight) = once_at_eight();
+        let dentist = routines.create("dentist", &once)?;
+        PersonSettings::new(&store).set_trashes_done_reminder(true)?;
+        assert!(routines.check_off(&dentist.id, &eight, None)?);
+        assert!(trashed(&store, &dentist)?);
+        let gone = routines
+            .by_id(&dentist.id)?
+            .ok_or(Error::Invalid("gone".into()))?;
+        assert!(gone.done_at(&eight).is_some());
+        assert_eq!(gone.trashed_with.as_deref(), Some(dentist.note_id.as_str()));
+        // No unchecking brings it back: it comes back from the trash, Done.
+        assert!(routines.unmark_done(&dentist.id, &eight).is_err());
+        routines.restore_note(&dentist.note_id)?;
+        assert!(!trashed(&store, &dentist)?);
+        let back = routines.by_id(&dentist.id)?;
+        assert!(back.is_some_and(|r| r.done_at(&eight).is_some()));
+        routines.unmark_done(&dentist.id, &eight)?;
+        assert!(!trashed(&store, &dentist)?);
+        // A notification's Done, applied later, trashes too.
+        let flyer = routines.create("flyer", &once)?;
+        let at = store.now();
+        assert!(crate::Alarms::new(&store).apply_done(&flyer.id, &eight.key(), at)?);
+        assert!(trashed(&store, &flyer)?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_routine_a_second_schedule_or_a_note_of_a_kind_never_go() -> Result<()> {
+        use crate::{Checklists, SessionRule, Sessions, ShoppingLists, Tallies};
+        let store = crate::store::tests::store();
+        let routines = Routines::new(&store);
+        let notes = Notes::new(&store);
+        let (once, eight) = once_at_eight();
+        PersonSettings::new(&store).set_trashes_done_reminder(true)?;
+        let pills = routines.create("pills", &daily_at_eight())?;
+        let twice = routines.create("passport", &once)?;
+        routines.spawn(&twice.note_id, &daily_at_eight())?;
+        let packing = routines.create("packing", &once)?;
+        Checklists::new(&store).make(&packing.note_id)?;
+        let groceries = routines.create("groceries", &once)?;
+        ShoppingLists::new(&store).make(&groceries.note_id)?;
+        let gym = routines.create("gym", &once)?;
+        Tallies::new(&store).add_field(&gym.note_id, "Push-ups", "times", None, None)?;
+        let squats = notes.capture("squats", None, None)?.id;
+        Tallies::new(&store).add_field(&squats, "Squats", "times", None, None)?;
+        let workout = routines.create("workout", &once)?;
+        Sessions::new(&store).make(&workout.note_id, &[squats], 1, SessionRule::Least)?;
+        for r in [&pills, &twice, &packing, &groceries, &gym, &workout] {
+            assert!(!routines.check_off(&r.id, &eight, None)?, "{}", r.note_id);
+            assert!(!trashed(&store, r)?, "{}", r.note_id);
+            let done = routines.by_id(&r.id)?;
+            assert!(
+                done.is_some_and(|d| d.done_at(&eight).is_some()),
+                "{}",
+                r.note_id
+            );
+        }
+        // Its other schedule in the trash, the Reminder is the only one.
+        let last = routines.create("last one", &once)?;
+        let other = routines.spawn(&last.note_id, &daily_at_eight())?;
+        routines.trash(&other.id)?;
+        assert!(routines.check_off(&last.id, &eight, None)?);
         Ok(())
     }
 

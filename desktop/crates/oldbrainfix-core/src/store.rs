@@ -56,6 +56,10 @@ pub type IdMaker = Box<dyn Fn() -> Result<String> + Send + Sync>;
 /// `_applied`: those of a later structure are only held and passed on.
 const APPLIED: &str = "(v IS NULL OR v <= 1)";
 
+/// How many entities one query of [`Store::current_fields_of`] names,
+/// well under SQLite's limit of bound values.
+const IN_CHUNK: usize = 500;
+
 /// The version of the tables this version keeps the log in, recorded as
 /// the database's `user_version` (ADR 0034), as the Dart core's
 /// `storeVersion`. 0, SQLite's own default, is a database from before the
@@ -105,6 +109,14 @@ const SCHEMA: &str = "
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
     ";
+
+/// What [`Store::worked_out`] keeps, by key, and the log's high-water
+/// mark it was worked out at.
+#[derive(Default)]
+struct WorkedOut {
+    seq: i64,
+    held: HashMap<&'static str, Arc<dyn std::any::Any + Send + Sync>>,
+}
 
 /// The current fields of one entity, in the order they were first
 /// written, as the Dart core's `currentFields` map keeps them.
@@ -250,6 +262,12 @@ pub struct Store {
     /// Counts the changes, so a judgement worked out while another
     /// thread wrote is not kept.
     generation: std::sync::atomic::AtomicU64,
+    /// What [`Store::worked_out`] keeps until the next change, by key.
+    worked_out: Mutex<WorkedOut>,
+    /// How often [`Store::history`] was read: what a test counts reads
+    /// by.
+    #[cfg(test)]
+    pub(crate) history_reads: std::sync::atomic::AtomicUsize,
     /// Other people's Profiles as read from the local settings, until
     /// one is kept ([`crate::people`]).
     pub(crate) people: Mutex<Option<Arc<crate::people::PeopleIndex>>>,
@@ -326,6 +344,9 @@ impl Store {
             audio,
             judged: Mutex::new(None),
             generation: std::sync::atomic::AtomicU64::new(0),
+            worked_out: Mutex::new(WorkedOut::default()),
+            #[cfg(test)]
+            history_reads: std::sync::atomic::AtomicUsize::new(0),
             people: Mutex::new(None),
             own_keys: Mutex::new(None),
             pending_files,
@@ -375,6 +396,16 @@ impl Store {
         Ok(out)
     }
 
+    /// Another connection to the same database wrote, such as the
+    /// automatic sync's on a thread of its own (#225): what was worked
+    /// out from the log and read from the local settings is forgotten, as
+    /// the Dart core's `changedElsewhere`, so the next read sees it.
+    pub fn changed_elsewhere(&self) {
+        self.changed();
+        *self.people.lock() = None;
+        *self.own_keys.lock() = None;
+    }
+
     /// Forgets what was worked out from the log.
     fn changed(&self) {
         let mut judged = self.judged.lock();
@@ -384,6 +415,50 @@ impl Store {
         let mut pending = self.pending.lock();
         pending.overlay = None;
         pending.judged = None;
+        self.worked_out.lock().held.clear();
+    }
+
+    /// What `build` works out from the reads, kept under `key` until what
+    /// they show changes, as the Dart core's `workedOut`: the log, or the
+    /// shown pending sets. An entry another store open on the same file
+    /// wrote counts too, by the log's high-water mark. Inside
+    /// [`Store::log_only`], which shows the log alone, it is worked out
+    /// anew and not kept.
+    pub(crate) fn worked_out<T: Send + Sync + 'static>(
+        &self,
+        key: &'static str,
+        build: impl FnOnce() -> Result<T>,
+    ) -> Result<Arc<T>> {
+        let log_only = self.reads_log_only();
+        // Read before the lock is taken: a write takes the connection
+        // first, then this lock.
+        let seq = self.current_seq()?;
+        if !log_only {
+            let mut worked = self.worked_out.lock();
+            if worked.seq != seq {
+                worked.seq = seq;
+                worked.held.clear();
+            }
+            if let Some(held) = worked.held.get(key).cloned()
+                && let Ok(held) = held.downcast::<T>()
+            {
+                return Ok(held);
+            }
+        }
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        let value = Arc::new(build()?);
+        if !log_only {
+            let after = self.current_seq()?;
+            let mut worked = self.worked_out.lock();
+            // Kept only when nothing changed while it was worked out.
+            if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation
+                && after == seq
+                && worked.seq == seq
+            {
+                worked.held.insert(key, value.clone());
+            }
+        }
+        Ok(value)
     }
 
     /// What the roles of the Shared Areas allow (ADR 0013), worked out
@@ -1171,6 +1246,9 @@ impl Store {
     /// the shown pending sets: what no role in a Shared Area allows is
     /// left out, judged with those sets too.
     pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let shown = self.shown()?;
         if shown.is_empty() {
             return self.logged_history(entity);
@@ -1265,8 +1343,98 @@ impl Store {
         ))
     }
 
+    /// What [`Store::current_fields`] gives for each of `entities`, read
+    /// in one query rather than one per entity (#204), as the Dart
+    /// core's `currentFieldsOf`; those without an entry that counts are
+    /// left out. It counts as one [`Store::history`] read.
+    pub fn current_fields_of<'a>(
+        &self,
+        entities: impl IntoIterator<Item = &'a str>,
+    ) -> Result<HashMap<String, Fields>> {
+        let mut ids: Vec<&str> = Vec::new();
+        let mut wanted = std::collections::HashSet::new();
+        for id in entities {
+            if wanted.insert(id) {
+                ids.push(id);
+            }
+        }
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        #[cfg(test)]
+        self.history_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let shown = self.shown()?;
+        let mut all = Vec::new();
+        for chunk in ids.chunks(IN_CHUNK) {
+            let marks = vec!["?"; chunk.len()].join(", ");
+            all.extend(self.entries(
+                &format!(
+                    "SELECT * FROM entries WHERE {APPLIED} AND entity IN ({marks}) ORDER BY seq"
+                ),
+                rusqlite::params_from_iter(chunk.iter()),
+            )?);
+        }
+        all.extend(
+            shown
+                .iter()
+                .filter(|e| wanted.contains(e.entity.as_str()))
+                .cloned(),
+        );
+        let judged = if shown.is_empty() {
+            self.judged()?
+        } else {
+            self.display_judged(&shown)?
+        };
+        let mut latest: HashMap<String, Vec<Entry>> = HashMap::new();
+        for e in all {
+            if judged.ignored.contains(&e.id()) {
+                continue;
+            }
+            let fields = latest.entry(e.entity.clone()).or_default();
+            match fields.iter_mut().find(|held| held.field == e.field) {
+                Some(held) => {
+                    if Self::latest_wins(&e, held) == Ordering::Greater {
+                        *held = e;
+                    }
+                }
+                None => fields.push(e),
+            }
+        }
+        Ok(latest
+            .into_iter()
+            .map(|(id, fields)| {
+                let fields = fields.into_iter().map(|e| (e.field, e.value)).collect();
+                (id, Fields(fields))
+            })
+            .collect())
+    }
+
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for id in self.ever_of_type(ty)? {
+            if self.current(&id, "$type")?.as_deref() == Some(ty) {
+                out.push(id);
+            }
+        }
+        Ok(out)
+    }
+
+    /// What [`Store::current_fields`] gives for each entity whose current
+    /// `$type` is `ty`, read in one [`Store::current_fields_of`] query
+    /// rather than one per entity (#216), as the Dart core's
+    /// `currentFieldsOfType`.
+    pub fn current_fields_of_type(&self, ty: &str) -> Result<HashMap<String, Fields>> {
+        let ids = self.ever_of_type(ty)?;
+        let mut out = self.current_fields_of(ids.iter().map(String::as_str))?;
+        out.retain(|_, fields| fields.get("$type") == Some(ty));
+        Ok(out)
+    }
+
+    /// Entities whose `$type` was `ty` at some time, the shown pending
+    /// sets included.
+    fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
@@ -1281,13 +1449,7 @@ impl Store {
                 ids.push(e.entity.clone());
             }
         }
-        let mut out = Vec::new();
-        for id in ids {
-            if self.current(&id, "$type")?.as_deref() == Some(ty) {
-                out.push(id);
-            }
-        }
-        Ok(out)
+        Ok(ids)
     }
 
     /// Latest-wins order: date, then recording time, then device, then
@@ -1624,6 +1786,83 @@ pub(crate) mod tests {
             Ok(s) => s,
             Err(e) => panic!("store: {e}"),
         }
+    }
+
+    #[test]
+    fn it_reads_the_fields_of_many_entities_in_one_query_as_one_by_one() -> Result<()> {
+        let store = store();
+        let on = |d: u32| Utc.with_ymd_and_hms(2026, 5, d, 0, 0, 0).single();
+        store.append("note:a", "text", Some("new"), on(2))?;
+        store.append("note:a", "text", Some("old"), on(1))?;
+        store.append("note:a", "place", Some("home"), None)?;
+        store.append("note:b", "text", Some("b"), None)?;
+        store.append("note:b", "text", None, None)?;
+        let ids: Vec<String> = (0..1200).map(|i| format!("note:x{i}")).collect();
+        for id in &ids {
+            store.append(id, "text", Some(id), None)?;
+        }
+        // Shown pending changes count as they do one by one.
+        let set = store.open_pending("ai-task", true, None)?;
+        store.draft_pending(&set, "note:a", "place", Some("work"), None)?;
+        store.draft_pending(&set, "note:c", "text", Some("drafted"), None)?;
+        let mut all = vec!["note:a", "note:b", "note:c", "note:none"];
+        all.extend(ids.iter().map(String::as_str));
+        let before = store.history_reads.load(AtomicOrdering::SeqCst);
+        let read = store.current_fields_of(all.iter().copied())?;
+        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
+        let mut one_by_one = HashMap::new();
+        for id in &all {
+            let fields = store.current_fields(id)?;
+            if fields.iter().next().is_some() {
+                one_by_one.insert(id.to_string(), fields);
+            }
+        }
+        assert!(!read.contains_key("note:none"));
+        assert_eq!(read, one_by_one);
+        assert_eq!(
+            read.get("note:a"),
+            Some(&Fields::new(vec![
+                ("text".into(), Some("new".into())),
+                ("place".into(), Some("work".into())),
+            ]))
+        );
+        assert!(store.current_fields_of([])?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn it_reads_the_fields_of_every_entity_of_a_type_in_one_query_as_one_by_one() -> Result<()> {
+        let store = store();
+        for i in 0..30 {
+            let id = format!("thing:{i}");
+            store.append(&id, "$type", Some("thing"), None)?;
+            store.append(&id, "text", Some(&format!("t{i}")), None)?;
+        }
+        store.append("thing:0", "$type", Some("other"), None)?;
+        store.append("other:a", "$type", Some("other"), None)?;
+        // Shown pending changes count as they do one by one.
+        let set = store.open_pending("ai-task", true, None)?;
+        store.draft_pending(&set, "thing:new", "$type", Some("thing"), None)?;
+        store.draft_pending(&set, "thing:1", "text", Some("drafted"), None)?;
+        let before = store.history_reads.load(AtomicOrdering::SeqCst);
+        let read = store.current_fields_of_type("thing")?;
+        assert_eq!(store.history_reads.load(AtomicOrdering::SeqCst) - before, 1);
+        let mut one_by_one = HashMap::new();
+        for id in store.entities_of_type("thing")? {
+            let fields = store.current_fields(&id)?;
+            one_by_one.insert(id, fields);
+        }
+        assert_eq!(read, one_by_one);
+        assert!(!read.contains_key("thing:0"));
+        assert!(read.contains_key("thing:new"));
+        assert_eq!(
+            read.get("thing:1"),
+            Some(&Fields::new(vec![
+                ("$type".into(), Some("thing".into())),
+                ("text".into(), Some("drafted".into())),
+            ]))
+        );
+        Ok(())
     }
 
     #[test]

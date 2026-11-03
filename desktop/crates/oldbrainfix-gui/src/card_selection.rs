@@ -43,7 +43,12 @@ impl CardSelection {
             return;
         };
         let (start, end) = (from.min(to), from.max(to));
-        self.ids = order[start..=end].to_vec();
+        self.ids = order
+            .iter()
+            .skip(start)
+            .take(end - start + 1)
+            .cloned()
+            .collect();
     }
 
     /// Esc, or another place shown: nothing selected.

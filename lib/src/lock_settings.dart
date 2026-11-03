@@ -177,7 +177,7 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
                   leading: const Icon(Icons.timer_outlined),
                   title: Text(t.relockAfter),
                   subtitle: Text(t.relockDetail),
-                  control: RadioColumn<int>(
+                  control: ChoiceChips<int>(
                     key: const ValueKey('relock'),
                     value: relock,
                     onChanged: _setRelock,
@@ -360,7 +360,7 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
                               children: [
                                 Text(t.areaAlarmsShow),
                                 const SizedBox(height: 8),
-                                RadioColumn<bool>(
+                                ChoiceChips<bool>(
                                   key: ValueKey('areaMasked-${area.id}'),
                                   value: _masked.contains(area.id),
                                   options: [

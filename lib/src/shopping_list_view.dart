@@ -9,8 +9,10 @@ import 'browser.dart';
 import 'checklist_view.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
+import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
+import 'setting_badges.dart';
 
 /// What a Note's card knows of its Shopping List (#122): [read] gives it
 /// as it shows now, or null for a Note that is none, read when the card
@@ -48,10 +50,14 @@ mixin _ReadsAtDayStart<T extends StatefulWidget> on State<T> {
   }
 }
 
-/// A Shopping List on a Note's card (#122): every Line with its checkbox
-/// on a [full] card, open ones first and struck ones at the end with the
-/// day they come back, checkable where this Device may; else how many
-/// are open. Nothing for a Note that is none. It reads the list whenever
+/// The setting of this Device that keeps the struck Lines of the Shopping
+/// List [noteId] unfolded on its card (#189); nothing kept means folded.
+String struckShownSetting(String noteId) => 'shoppingStruckShown:$noteId';
+
+/// A Shopping List on a Note's card (#122): on a [full] card the open
+/// Lines with their checkboxes, then the struck ones folded under how many
+/// they are, a tap showing them with the day they come back (#189),
+/// checkable where this Device may; else how many are open. Nothing for a Note that is none. It reads the list whenever
 /// the card is built anew, after a check and when a new day begins.
 class CardShoppingList extends StatefulWidget {
   final String noteId;
@@ -74,12 +80,28 @@ class _CardShoppingListState extends State<CardShoppingList>
   ShoppingList? _list;
   var _checks = false;
 
+  /// Whether the struck Lines show, unfolded by a tap (#189), kept per
+  /// Note in a setting of this Device; folded by default.
+  var _struckShown = false;
+
+  String get _struckSetting => struckShownSetting(widget.noteId);
+
+  void _toggleStruck() {
+    final store = widget.shopping.lists.store;
+    setState(() => _struckShown = !_struckShown);
+    _struckShown
+        ? store.setLocalSetting(_struckSetting, 'true')
+        : store.removeLocalSetting(_struckSetting);
+  }
+
   @override
   Store get dayStore => widget.shopping.lists.store;
 
   @override
   void initState() {
     super.initState();
+    _struckShown =
+        widget.shopping.lists.store.localSetting(_struckSetting) == 'true';
     _show(widget.shopping.read());
   }
 
@@ -125,12 +147,61 @@ class _CardShoppingListState extends State<CardShoppingList>
         ),
       );
     }
+    final lines = _shown(context, list);
+    final struck = [
+      for (final line in lines)
+        if (line.checked) line,
+    ];
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: ChecklistLines(
+      child: Column(
         key: const ValueKey('shopping-card'),
-        lines: _shown(context, list),
-        onCheck: _checks ? _check : null,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChecklistLines(
+            lines: [
+              for (final line in lines)
+                if (!line.checked) line,
+            ],
+            onCheck: _checks ? _check : null,
+          ),
+          // The struck ones folded under the open ones (#189).
+          if (struck.isNotEmpty) ...[
+            Semantics(
+              button: true,
+              expanded: _struckShown,
+              child: InkWell(
+                key: const ValueKey('shopping-struck'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: _toggleStruck,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _struckShown ? Icons.expand_less : Icons.expand_more,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        context.t.shoppingStruckCount(struck.length),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_struckShown)
+              ChecklistLines(
+                key: const ValueKey('shopping-card-struck'),
+                lines: struck,
+                onCheck: _checks ? _check : null,
+              ),
+          ],
+        ],
       ),
     );
   }
@@ -157,8 +228,157 @@ ShownLine _shownLine(AppLocalizations t, DateFormat day, ShoppingLine line) => (
   },
 );
 
-/// What the menu of a Shopping List's Line does besides setting its
-/// reappear time.
+/// A reappear time in words: "None", "Once", "3 months" (#195).
+String reappearWords(AppLocalizations t, Reappear reappear) =>
+    switch (reappear.unit) {
+      null => reappear.isOnce ? t.shoppingOnce : t.shoppingReappearNone,
+      ReappearUnit.day => t.shoppingDays(reappear.count),
+      ReappearUnit.week => t.shoppingWeeks(reappear.count),
+      ReappearUnit.month => t.shoppingMonths(reappear.count),
+      ReappearUnit.year => t.shoppingYears(reappear.count),
+    };
+
+/// A reappear time as its badge shows it, short text (#192, #195): "—"
+/// for none, "Once", "4w", "3m".
+String reappearShort(AppLocalizations t, Reappear reappear) =>
+    switch (reappear.unit) {
+      null => reappear.isOnce ? t.shoppingOnce : '—',
+      ReappearUnit.day => t.shoppingShortDays(reappear.count),
+      ReappearUnit.week => t.shoppingShortWeeks(reappear.count),
+      ReappearUnit.month => t.shoppingShortMonths(reappear.count),
+      ReappearUnit.year => t.shoppingShortYears(reappear.count),
+    };
+
+/// The icon of a Line's reappear time, on its badge and its dialog.
+const reappearIcon = Icons.autorenew;
+
+/// The badge at the end of a Shopping List's Line (#195): its reappear
+/// time as short text, read as "Reappear time: 4 weeks". With [onTap] it
+/// opens the reappear time dialog; without it only shows the time.
+Widget reappearBadge(
+  AppLocalizations t,
+  String lineId,
+  Reappear reappear, {
+  VoidCallback? onTap,
+}) => Padding(
+  padding: const EdgeInsetsDirectional.only(start: 4),
+  child: SettingBadge(
+    key: ValueKey('shopping-reappear-$lineId'),
+    setting: t.shoppingReappear,
+    value: reappearShort(t, reappear),
+    valueWords: reappearWords(t, reappear),
+    icon: reappearIcon,
+    onTap: onTap == null ? null : (_) => onTap(),
+  ),
+);
+
+/// The choices of the reappear time dialog.
+enum _Kind { none, once, after }
+
+/// The reappear time dialog of a Line whose time is [current] (#195): None,
+/// Once or After as radio buttons, After with its number from 1 to 99 and
+/// Day, Week, Month or Year under it. Each change goes to [pick] at once;
+/// Close closes it.
+class ReappearDialog extends StatefulWidget {
+  final Reappear current;
+  final ValueChanged<Reappear> pick;
+
+  const ReappearDialog({super.key, required this.current, required this.pick});
+
+  @override
+  State<ReappearDialog> createState() => _ReappearDialogState();
+}
+
+class _ReappearDialogState extends State<ReappearDialog> {
+  late var _kind = switch (widget.current) {
+    final r when r.isOnce => _Kind.once,
+    final r when r.isUnset => _Kind.none,
+    _ => _Kind.after,
+  };
+  late var _count = widget.current.unit == null ? 1 : widget.current.count;
+  late var _unit = widget.current.unit ?? ReappearUnit.week;
+
+  Reappear get _picked => switch (_kind) {
+    _Kind.none => Reappear.unset,
+    _Kind.once => Reappear.once,
+    _Kind.after => Reappear.after(_count, _unit),
+  };
+
+  void _change(void Function() change) {
+    setState(change);
+    widget.pick(_picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return BadgeDialog(
+      setting: t.shoppingReappear,
+      icon: reappearIcon,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ChoiceChips<_Kind>(
+            key: const ValueKey('reappear-kind'),
+            value: _kind,
+            // After starts at a week, as on the desktop.
+            onChanged: (kind) => _change(() {
+              _kind = kind;
+              _count = 1;
+              _unit = ReappearUnit.week;
+            }),
+            options: [
+              RadioOption(
+                key: const ValueKey('reappear-none'),
+                value: _Kind.none,
+                title: Text(t.shoppingReappearNone),
+              ),
+              RadioOption(
+                key: const ValueKey('reappear-once'),
+                value: _Kind.once,
+                title: Text(t.shoppingOnce),
+              ),
+              RadioOption(
+                key: const ValueKey('reappear-after'),
+                value: _Kind.after,
+                title: Text(t.shoppingReappearAfter),
+              ),
+            ],
+          ),
+          if (_kind == _Kind.after) ...[
+            CountStepper(
+              key: const ValueKey('reappear-count'),
+              value: _count,
+              max: Reappear.maxCount,
+              onChanged: (n) => _change(() => _count = n),
+            ),
+            ChoiceChips<ReappearUnit>(
+              key: const ValueKey('reappear-unit'),
+              value: _unit,
+              onChanged: (unit) => _change(() => _unit = unit),
+              options: [
+                for (final unit in ReappearUnit.values)
+                  RadioOption(
+                    key: ValueKey('reappear-unit-${unit.letter}'),
+                    value: unit,
+                    title: Text(switch (unit) {
+                      ReappearUnit.day => t.unitDays(_count),
+                      ReappearUnit.week => t.unitWeeks(_count),
+                      ReappearUnit.month => t.unitMonths(_count),
+                      ReappearUnit.year => t.unitYears(_count),
+                    }),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// What the menu of a Shopping List's Line does.
 enum _ShopStep { delete }
 
 /// The Shopping List part of a Note's editor (#122), nothing while the
@@ -167,8 +387,10 @@ enum _ShopStep { delete }
 /// starts with one empty Line. A Line stays where it was typed, also the
 /// next time; one checked while the editor is open stays in its row until
 /// the list is read anew, then it shows below the open ones. A name the
-/// list has already brings its Line back instead. ⋮ of a Line this Device may change has its reappear time
-/// as radio buttons and Delete. "Back to a plain Note" is in the editor's
+/// list has already brings its Line back instead. Each Line ends in the
+/// badge of its reappear time (#195), whose tap opens its dialog where
+/// this Device may change the Line; ⋮ of such a Line has Delete. "Back to
+/// a plain Note" is in the editor's
 /// kind badge (#160). What is typed is stored as the cursor leaves a Line
 /// and whenever [typed] says so; a Line left empty goes as the editor is
 /// left. It follows the log as it changes and reads again when a new day
@@ -328,12 +550,37 @@ class _ShoppingSectionState extends State<ShoppingSection>
     setState(_load);
   }
 
-  String _reappearLabel(Reappear reappear) => reappear == Reappear.once
-      ? context.t.shoppingOnce
-      : context.t.shoppingWeeks(reappear.weeks);
+  /// The reappear time dialog of the Line [shown], each pick written at
+  /// once.
+  Future<void> _reappear(String shown) async {
+    // A new Line is stored first, and what was typed, as for the menu.
+    final id = storedId(shown);
+    if (id == null) return;
+    keepTyped(leaving: false);
+    final line = _lists.byNote(widget.noteId, deviceWallClock)?.line(id);
+    if (line == null) return;
+    var current = line.reappear;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ReappearDialog(
+        current: current,
+        pick: (picked) {
+          // A sync while the dialog was open may have taken it away.
+          if (!mounted || !linesWritable || !showsLine(id)) return;
+          if (picked == current) return;
+          _lists.setReappear(id, picked);
+          current = picked;
+        },
+      ),
+    );
+    if (mounted) setState(_load);
+  }
 
-  Future<void> _menu(String id, Offset at) async {
-    // What was typed is stored first, so the menu sees the list as shown.
+  Future<void> _menu(String shown, Offset at) async {
+    // A new Line is stored first, and what was typed, so the menu sees
+    // the list as shown.
+    final id = storedId(shown);
+    if (id == null) return;
     keepTyped(leaving: false);
     final line = _lists.byNote(widget.noteId, deviceWallClock)?.line(id);
     if (line == null) return;
@@ -348,29 +595,6 @@ class _ShoppingSectionState extends State<ShoppingSection>
         Offset.zero & overlay.size,
       ),
       items: [
-        // The heading the choices continue: "Reappear time" "1 week".
-        PopupMenuItem(enabled: false, child: Text(t.shoppingReappear)),
-        for (final reappear in Reappear.values)
-          PopupMenuItem(
-            key: ValueKey('shopping-reappear-${reappear.code}'),
-            value: reappear,
-            child: Semantics(
-              checked: reappear == line.reappear,
-              inMutuallyExclusiveGroup: true,
-              child: Row(
-                children: [
-                  Icon(
-                    reappear == line.reappear
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(child: Text(_reappearLabel(reappear))),
-                ],
-              ),
-            ),
-          ),
-        const PopupMenuDivider(),
         PopupMenuItem(
           key: const ValueKey('shopping-delete'),
           value: _ShopStep.delete,
@@ -388,10 +612,6 @@ class _ShoppingSectionState extends State<ShoppingSection>
     // A sync while the menu was open may have taken it away.
     if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
-      case Reappear reappear:
-        // A tap on the one it has changes nothing.
-        if (reappear == line.reappear) return;
-        _lists.setReappear(id, reappear);
       case _ShopStep.delete:
         if (!await confirmLineDelete(context)) return;
         if (!mounted || !linesWritable || !showsLine(id)) return;
@@ -431,7 +651,24 @@ class _ShoppingSectionState extends State<ShoppingSection>
           lines: [for (final row in rows) shownRow(row)],
           onCheck: _checks ? _check : null,
           onMenu: _menu,
-          editable: _editable,
+          editable: withMenus(_editable),
+          trailing: (shown) => switch (list.line(shown.id)) {
+            final line? => reappearBadge(
+              t,
+              line.id,
+              line.reappear,
+              onTap: _editable.contains(line.id)
+                  ? () => _reappear(shown.id)
+                  : null,
+            ),
+            // A new Line has none yet; a tap stores it first.
+            null => reappearBadge(
+              t,
+              shown.id,
+              Reappear.unset,
+              onTap: _checks ? () => _reappear(shown.id) : null,
+            ),
+          },
           field: (shown) => typedField(
             shown,
             prefix: 'shopping',

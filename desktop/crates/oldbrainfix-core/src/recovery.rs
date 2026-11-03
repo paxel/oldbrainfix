@@ -17,7 +17,8 @@ const KEY_BYTES: usize = 32;
 /// The recovery key for the backup `key`: its bits, then the first four
 /// bits of its SHA-256, so a typo is told apart from a wrong key.
 pub fn encode_code(key: &[u8; KEY_BYTES]) -> String {
-    let check = Sha256::digest(key)[0] >> 4;
+    let [first, ..] = <[u8; 32]>::from(Sha256::digest(key));
+    let check = first >> 4;
     let mut out = String::new();
     let (mut held, mut bits, mut count) = (0u32, 0u32, 0usize);
     let mut put = |value: u32, width: u32, out: &mut String| {
@@ -28,7 +29,7 @@ pub fn encode_code(key: &[u8; KEY_BYTES]) -> String {
             if count > 0 && count.is_multiple_of(4) {
                 out.push('-');
             }
-            out.push(char::from(ALPHABET[((held >> bits) & 0x1f) as usize]));
+            out.push(crate::base32_symbol(ALPHABET, u64::from(held >> bits)));
             count += 1;
         }
         held &= (1 << bits) - 1;
@@ -63,14 +64,17 @@ pub fn decode_code(text: &str) -> Option<[u8; KEY_BYTES]> {
         let value = ALPHABET.iter().position(|a| *a == c)? as u32;
         held = (held << 5) | value;
         bits += 5;
-        if bits >= 8 && at < KEY_BYTES {
+        if bits >= 8
+            && let Some(slot) = out.get_mut(at)
+        {
             bits -= 8;
-            out[at] = ((held >> bits) & 0xff) as u8;
+            *slot = ((held >> bits) & 0xff) as u8;
             at += 1;
             held &= (1 << bits) - 1;
         }
     }
-    (bits == 4 && held == u32::from(Sha256::digest(out)[0] >> 4)).then_some(out)
+    let [first, ..] = <[u8; 32]>::from(Sha256::digest(out));
+    (bits == 4 && held == u32::from(first >> 4)).then_some(out)
 }
 
 /// The modules of the QR of `code`, rows from the top, dark as true.
@@ -119,8 +123,10 @@ pub fn sheet_pdf(sheet: &Sheet, code: &str) -> Vec<u8> {
     page.gap(4.0);
     let groups: Vec<&str> = code.split('-').collect();
     let half = groups.len().div_ceil(2);
-    page.text(&groups[..half].join("-"), "F3", 15.0);
-    page.text(&groups[half..].join("-"), "F3", 15.0);
+    // The first half is never more than all of them.
+    let (first, second) = groups.split_at_checked(half).unwrap_or((&groups, &[]));
+    page.text(&first.join("-"), "F3", 15.0);
+    page.text(&second.join("-"), "F3", 15.0);
     // The QR's quiet zone: four modules clear above it.
     page.gap(20.0);
     page.qr(&qr(code));

@@ -43,6 +43,7 @@ IconData? areaIconData(String? key) => switch (key) {
   'sport' => Icons.fitness_center,
   'travel' => Icons.flight,
   'star' => Icons.star,
+  'brain' => Icons.psychology,
   _ => null,
 };
 

@@ -5,6 +5,7 @@ import 'notes.dart';
 import 'profiles.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
+import 'sessions.dart';
 import 'store.dart';
 import 'tallies.dart';
 import 'text_format.dart';
@@ -31,35 +32,113 @@ abstract final class ShoppingKeys {
   static const agenda = 'shopping';
 }
 
+/// The unit of a [Reappear] time (#195), the letter its code ends in.
+enum ReappearUnit {
+  day('d'),
+  week('w'),
+  month('m'),
+  year('y');
+
+  const ReappearUnit(this.letter);
+
+  /// How its code ends.
+  final String letter;
+}
+
 /// How long a checked Line of a Shopping List stays struck through
-/// before it comes back (CONTEXT.md).
-enum Reappear {
+/// before it comes back (CONTEXT.md): none, so it stays struck until a
+/// time is set; Once, gone once checked; or a number of days, weeks,
+/// months or years (#195).
+final class Reappear {
+  /// The number of [unit]s; 0 for none and Once.
+  final int count;
+
+  /// Null for none and Once.
+  final ReappearUnit? unit;
+
+  final bool _once;
+
+  const Reappear._(this.count, this.unit, this._once);
+
+  /// [count] [unit]s, [count] from 1 to [maxCount].
+  factory Reappear.after(int count, ReappearUnit unit) {
+    RangeError.checkValueInInterval(count, 1, maxCount, 'count');
+    return Reappear._(count, unit, false);
+  }
+
+  /// None: a checked Line stays struck until a time is set. What a new
+  /// Line gets.
+  static const unset = Reappear._(0, null, false);
+
   /// Gone once checked.
-  once('once', 0),
-  week1('1w', 1),
-  week2('2w', 2),
-  week3('3w', 3),
-  week4('4w', 4);
+  static const once = Reappear._(0, null, true);
 
-  const Reappear(this.code, this.weeks);
+  /// What a Line without a reappear time, or with one not known here,
+  /// reads as: one week, as every version before #195 read it.
+  static const fallback = Reappear._(1, ReappearUnit.week, false);
 
-  /// How it is stored on the Line.
-  final String code;
+  /// The largest number a time holds, so its code stays short.
+  static const maxCount = 99;
 
-  /// The weeks it stays struck; none for [once].
-  final int weeks;
+  bool get isOnce => _once;
 
-  /// What a new Line gets.
-  static const standard = Reappear.week1;
+  /// Whether it is none.
+  bool get isUnset => unit == null && !_once;
 
-  /// The reappear time [code] names; [standard] for none, or a code not
+  /// How it is stored on the Line: `none`, `once`, or the number and the
+  /// unit's letter, such as `4w` or `3m`.
+  String get code => switch (unit) {
+    final unit? => '$count${unit.letter}',
+    null => _once ? 'once' : 'none',
+  };
+
+  /// A number from 1 to 99 without a leading zero, then a unit's letter.
+  static final _timed = RegExp(r'^([1-9][0-9]?)([dwmy])$');
+
+  /// The reappear time [code] names; [fallback] for none, or a code not
   /// known here.
   static Reappear read(String? code) {
-    for (final r in values) {
-      if (r.code == code) return r;
-    }
-    return standard;
+    if (code == 'none') return unset;
+    if (code == 'once') return once;
+    final match = _timed.firstMatch(code ?? '');
+    if (match == null) return fallback;
+    final count = int.tryParse(match[1] ?? '');
+    final letter = match[2];
+    if (count == null || letter == null) return fallback;
+    final unit = ReappearUnit.values.firstWhere((u) => u.letter == letter);
+    return Reappear._(count, unit, false);
   }
+
+  /// The day a Line checked on [checked] comes back on: as many days or
+  /// weeks on, or the same day of the month as many months or years on,
+  /// the month's last day where it has no such day. Null for none and
+  /// Once, which never come back by themselves.
+  Day? backFrom(Day checked) => switch (unit) {
+    null => null,
+    ReappearUnit.day => checked.addDays(count),
+    ReappearUnit.week => checked.addDays(7 * count),
+    ReappearUnit.month => _monthsOn(checked, count),
+    ReappearUnit.year => _monthsOn(checked, 12 * count),
+  };
+
+  static Day _monthsOn(Day day, int months) {
+    final first = Day(day.year, day.month + months, 1);
+    final last = Day(first.year, first.month + 1, 0).day;
+    return Day(first.year, first.month, day.day < last ? day.day : last);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is Reappear &&
+      other.count == count &&
+      other.unit == unit &&
+      other._once == _once;
+
+  @override
+  int get hashCode => Object.hash(count, unit, _once);
+
+  @override
+  String toString() => 'Reappear($code)';
 }
 
 /// How the Agenda of a Device showed Shopping Lists (#123), a setting of
@@ -86,14 +165,19 @@ enum ShoppingAgenda {
       values.asNameMap()[code] ?? standard;
 }
 
-/// How a Shopping List shows on today's Agenda (#186), each person's own
-/// choice for each list, kept as an Override is (ADR 0030).
-enum ShoppingOnAgenda {
+/// How a Shopping List shows on today's Agenda (#186), the name its code
+/// knows the shared [ListOnAgenda] by.
+typedef ShoppingOnAgenda = ListOnAgenda;
+
+/// How a Shopping List (#186) or a Checklist (#219) shows on today's
+/// Agenda, each person's own choice for each list, kept as an Override is
+/// (ADR 0030).
+enum ListOnAgenda {
   /// Never.
   off,
 
   /// One row with the number of its open Lines, such as "Groceries: 4
-  /// open".
+  /// open" or "Before the trip: 3 of 7 open".
   count,
 
   /// Each open Line on a row of its own, checkable there.
@@ -103,13 +187,13 @@ enum ShoppingOnAgenda {
   String get code => name;
 
   /// The choice [code] names; null for none known here.
-  static ShoppingOnAgenda? parse(String? code) => values.asNameMap()[code];
+  static ListOnAgenda? parse(String? code) => values.asNameMap()[code];
 
   /// What a list nobody chose for shows as on a Device whose Agenda
   /// showed Shopping Lists the way [old] before: off for "Not at all",
   /// each open Line for "Each Line that came back today", else one row
   /// with the count.
-  static ShoppingOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
+  static ListOnAgenda fromDevice(ShoppingAgenda old) => switch (old) {
     ShoppingAgenda.off => off,
     ShoppingAgenda.lines => lines,
     ShoppingAgenda.back || ShoppingAgenda.open => count,
@@ -143,7 +227,7 @@ class ShoppingLine {
   final DateTime? checkedAt;
 
   /// The day it comes back, at its start, while it is struck; null
-  /// while it is open.
+  /// while it is open, and while it is struck without a reappear time.
   final Day? backOn;
 
   /// The day it came back by itself, at its start, while it is open
@@ -398,23 +482,25 @@ class ShoppingLists {
   /// Whether the Line of [fields] is gone: checked, and Once.
   static bool isGone(Map<String, String?> fields) =>
       fields[ChecklistKeys.checked] != null &&
-      Reappear.read(fields[ShoppingKeys.reappear]) == Reappear.once;
+      Reappear.read(fields[ShoppingKeys.reappear]).isOnce;
 
   /// What a name is compared as when it is added: trimmed, in lower
   /// case.
   static String nameKey(String text) => text.trim().toLowerCase();
 
   /// Whether this Device may make the Note [noteId] a Shopping List: a
-  /// Note in the lists, of a text known here, neither a Tally nor a list
-  /// already, which it may change.
+  /// Note in the lists, of a text known here and not code, neither a
+  /// Tally nor a list already, which it may change.
   bool mayMake(String noteId) {
     final note = Notes(store).byId(noteId);
     return note != null &&
         !note.isTrashed &&
         !note.isMerged &&
         note.textEditable &&
+        note.textFormat != TextFormats.code &&
         parseListKind(store.current(noteId, ChecklistKeys.kind)) == null &&
         !Tallies(store).isTally(noteId) &&
+        !Sessions(store).isSessionNote(noteId) &&
         store.mayChange(noteId);
   }
 
@@ -496,6 +582,81 @@ class ShoppingLists {
     for (final line in list.lines)
       '${line.struck ? ChecklistKeys.checkMark : ''}${line.text}',
   ].join('\n');
+
+  /// Whether this Device may switch the list the Note [noteId] is, a
+  /// Checklist to a Shopping List or the other way ([switchList]): a
+  /// Note in the lists that is one of the two, which it may change.
+  bool maySwitch(String noteId) {
+    final note = Notes(store).byId(noteId);
+    return note != null &&
+        !note.isTrashed &&
+        !note.isMerged &&
+        (making(noteId) != null || Checklists(store).isChecklist(noteId)) &&
+        store.mayChange(noteId);
+  }
+
+  /// Switches the list the Note [noteId] is (#188): a Checklist becomes a
+  /// Shopping List and a Shopping List a Checklist, in a new making. The
+  /// Lines that show carry over, as Lines of the new making, in the order
+  /// they show, at one moment: a checked Line checked, a struck one
+  /// checked, each at the top with the reappear time a new Line gets on a
+  /// Shopping List. A Checklist's Lines show their own checks here, not
+  /// those of an Occurrence. The text is not touched; the Lines of the
+  /// old making stay in the log.
+  void switchList(String noteId, WallClock wallClock) {
+    if (!maySwitch(noteId)) {
+      throw StateError('the list of $noteId may not be switched here');
+    }
+    final shopping = byNote(noteId, wallClock);
+    final List<({String text, bool checked})> carried;
+    if (shopping != null) {
+      carried = [
+        for (final l in shopping.lines) (text: l.text, checked: l.struck),
+      ];
+    } else {
+      carried = [
+        // maySwitch made it a Checklist; none would carry no Lines.
+        for (final l
+            in Checklists(store).byNote(noteId)?.lines ?? const <Line>[])
+          (text: l.text, checked: l.checked),
+      ];
+    }
+    final making = Store.newId();
+    store.batch(() {
+      store.append(
+        noteId,
+        ChecklistKeys.kind,
+        shopping != null
+            ? ChecklistKeys.kindOf(making)
+            : ShoppingKeys.kindOf(making),
+      );
+      final now = store.clock().toUtc();
+      var key = '';
+      for (final line in carried) {
+        key = LineOrder.after(key);
+        if (shopping != null) {
+          writeLine(
+            store,
+            noteId,
+            making,
+            text: line.text,
+            order: key,
+            checked: line.checked,
+            date: now,
+          );
+        } else {
+          _writeLine(
+            noteId,
+            making,
+            line.text,
+            key,
+            checked: line.checked,
+            date: now,
+          );
+        }
+      }
+    });
+  }
 
   /// Whether this Device may add Lines to the Shopping List of [noteId]
   /// and check them: anywhere it holds a role.
@@ -626,9 +787,9 @@ class ShoppingLists {
   }
 
   /// Checks the Line [lineId]: it is struck through and goes to the end
-  /// until the start of the same weekday as many weeks on as its
-  /// reappear time says, by [wallClock]; a Line Once is gone. A struck
-  /// one stays as it is.
+  /// until the start of the day its reappear time brings it back on
+  /// ([Reappear.backFrom]), by [wallClock], or until a time is set for one
+  /// without; a Line Once is gone. A struck one stays as it is.
   void check(String lineId, WallClock wallClock) {
     final (list, line) = _requireShown(lineId, wallClock);
     if (!mayCheck(list.noteId)) {
@@ -720,7 +881,7 @@ class ShoppingLists {
       checked: checked,
       date: now,
     );
-    store.append(id, ShoppingKeys.reappear, Reappear.standard.code, date: now);
+    store.append(id, ShoppingKeys.reappear, Reappear.unset.code, date: now);
     return id;
   }
 
@@ -801,12 +962,13 @@ class _Read {
     var gone = false;
     final DateTime at;
     if (check != null && value != null) {
-      gone = reappear == Reappear.once;
-      final day = Day.of(wallClock(check.date)).addDays(7 * reappear.weeks);
-      struck = !gone && today < day;
+      gone = reappear.isOnce;
+      final day = reappear.backFrom(Day.of(wallClock(check.date)));
+      // Without a time it stays struck until one is set.
+      struck = !gone && (day == null || today < day);
       if (struck) back = day;
       if (!gone && !struck) came = day;
-      at = gone || struck
+      at = gone || struck || day == null
           ? check.date
           : DateTime.utc(day.year, day.month, day.day);
     } else {

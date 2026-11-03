@@ -183,6 +183,14 @@ void main() {
       expect(find.text('# not\n**kept**'), findsOneWidget);
     });
 
+    test('a compact card starts a text opening with a code block at its '
+        'first line', () {
+      const source = '```sh\n\n  echo hi\n```\nmore';
+      expect(NoteCard.firstLine(source), (0, 5));
+      final (start, end) = NoteCard.firstLine(source, formatted: true);
+      expect(source.substring(start, end), 'echo hi');
+    });
+
     testWidgets('a compact line keeps the size of the text', (tester) async {
       const source = '# Big title\nmore';
       final (start, end) = NoteCard.firstLine(source);
@@ -235,6 +243,48 @@ void main() {
       ]);
     });
 
+    testWidgets('a bare web address opens with a tap, in a plain and a '
+        'formatted text, never in code or a link (#222)', (tester) async {
+      List<String?> linked() => spansUnder(tester, text)
+          .whereType<TextSpan>()
+          .where((s) => s.recognizer != null)
+          .map((s) => s.text)
+          .toList();
+      final tags = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && '${w.key}'.contains("'tag-"),
+      );
+      await pump(
+        tester,
+        'see https://x.org/a?#b. ☐ #tag',
+        format: TextFormats.plain,
+        onSearch: (_, _) {},
+      );
+      expect(linked(), ['https://x.org/a?#b']);
+      expect(
+        styleOf(tester, text, 'https://x.org/a?#b')?.decoration,
+        TextDecoration.underline,
+      );
+      // The tag inside it is none.
+      expect(tags, findsOneWidget);
+      await tester.tapOnText(find.textRange.ofSubstring('x.org/a'));
+      await tester.pump();
+      expect(opened, [Uri.parse('https://x.org/a?#b')]);
+
+      await pump(
+        tester,
+        '`https://a.org` [l](https://b.org) **https://c.org**, #t\n'
+        '```\nhttps://d.org\n```\n| https://e.org | b |\n|---|---|',
+        onSearch: (_, _) {},
+      );
+      expect(linked(), ['l', 'https://c.org', 'https://e.org']);
+      await tester.tapOnText(find.textRange.ofSubstring('c.org'));
+      await tester.pump();
+      expect(opened, [Uri.parse('https://c.org')]);
+
+      await pump(tester, 'https://x.org', format: TextFormats.code);
+      expect(linked(), isEmpty);
+    });
+
     testWidgets('boxes stay buttons and tags stay links inside it', (
       tester,
     ) async {
@@ -281,6 +331,43 @@ void main() {
       await tester.tap(key('tag-7'));
       expect(searched, ['#Garten']);
     });
+
+    testWidgets('a code block shows its lines in monospace, read as '
+        'nothing, without its fences', (tester) async {
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes
+          .capture(
+            '#a\n```bash\n**x** #tag ☐\n# no\n```\nafter',
+            format: TextFormats.markdown,
+          )
+          .id;
+      final note = notes.byId(id)!;
+      expect(note.boxes, isEmpty);
+      await pump(
+        tester,
+        note.shownText,
+        boxes: note.boxes,
+        onSearch: (_, _) {},
+      );
+      expect(key('code-1'), findsOneWidget);
+      const content = '**x** #tag ☐\n# no';
+      expect(styleOf(tester, text, content)?.fontFamily, 'monospace');
+      final shown = shownUnder(tester, text);
+      expect(shown, endsWith('#a|$content|after'));
+      expect(shown, isNot(contains('`')));
+      expect(shown, isNot(contains('bash')));
+      final tags = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && '${w.key}'.contains("'tag-"),
+      );
+      expect(tags, findsOneWidget);
+
+      // A compact card shows its lines one by one.
+      await pump(tester, note.shownText, maxLines: 1);
+      expect(shownUnder(tester, text), '#a|**x** #tag ☐|# no|after');
+      expect(styleOf(tester, text, '# no')?.fontFamily, 'monospace');
+    });
   });
 
   group('on a card', () {
@@ -313,6 +400,58 @@ void main() {
       expect(shown, contains('plain **as is**'));
       expect(styleOf(tester, cards, 'milk')?.fontWeight, FontWeight.bold);
       expect(styleOf(tester, cards, 'later')?.fontStyle, FontStyle.italic);
+    });
+  });
+
+  group('a web address on a card (#222)', () {
+    testWidgets('opens with a tap; a tap beside it switches the card and a '
+        'long press opens the editor', (tester) async {
+      final opened = <Uri>[];
+      notes.capture('see https://x.org/a\nand more words here');
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        LinkOpenScope(
+          onOpen: (address) async => opened.add(address),
+          child: OldBrainFixApp(store: store),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+      final compact = find.byKey(const ValueKey('note-first-line'));
+      final link = find.textRange.ofSubstring('x.org/a');
+      expect(compact, findsNothing);
+
+      await tester.tapOnText(link);
+      await tester.pumpAndSettle();
+      expect(opened, [Uri.parse('https://x.org/a')]);
+      expect(compact, findsNothing);
+
+      await tester.tapOnText(find.textRange.ofSubstring('more words'));
+      await tester.pumpAndSettle();
+      expect(opened, hasLength(1));
+      expect(compact, findsOneWidget);
+
+      // The compact line shows it too.
+      final range = link.evaluate().single;
+      final box = range.renderObject
+          .getBoxesForSelection(
+            TextSelection(
+              baseOffset: range.textRange.start,
+              extentOffset: range.textRange.end,
+            ),
+          )
+          .first;
+      await tester.longPressAt(
+        range.renderObject.localToGlobal(box.toRect().center),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(opened, hasLength(1));
     });
   });
 
@@ -487,6 +626,39 @@ void main() {
       await tester.pump();
       await press(tester, 'format-code');
       expect(controller.text, '1. *one two*\n- `three`');
+      semantics.dispose();
+    });
+
+    testWidgets('Code block puts the lines touched into a fence, drawn as '
+        'code, and takes it off again', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final controller = await pumpField(tester, text: 'a\nb\nc');
+      controller.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 3,
+      );
+      await tester.pump();
+      await press(tester, 'format-code-block');
+      expect(controller.text, '```\na\nb\n```\nc');
+      expect(controller.markdown, isTrue);
+      expect(
+        tester.getSemantics(key('format-code-block')),
+        isSemantics(
+          label: 'Code block',
+          isButton: true,
+          hasToggledState: true,
+          isToggled: true,
+        ),
+      );
+      final field = find.byType(EditableText);
+      expect(fieldStyleOf(tester, field, 'a')?.fontFamily, 'monospace');
+      expect(fieldStyleOf(tester, field, 'c')?.fontFamily, isNull);
+      // Its fences are marks with the line break after them, drawn as
+      // nothing on top.
+      expect(fieldStyleOf(tester, field, '```\n')?.color, Colors.transparent);
+      expect(fieldStyleOf(tester, field, '```\n')?.fontSize, 0.01);
+      await press(tester, 'format-code-block');
+      expect(controller.text, 'a\nb\nc');
       semantics.dispose();
     });
 
@@ -686,6 +858,19 @@ void main() {
 
     TextEditingController field(WidgetTester tester) =>
         tester.widget<TextField>(find.byType(TextField).first).controller!;
+
+    testWidgets('in Simple the field has no format bar, and typed Markdown '
+        'still formats', (tester) async {
+      final id = notes.capture('buy milk').id;
+      store.advanced = false;
+      await openEditor(tester);
+      expect(key('format-bold'), findsNothing);
+      expect(key('two-row-insert-box'), findsNothing);
+      await tester.enterText(find.byType(TextField).first, 'buy **oat** milk');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(id)!.textFormat, TextFormats.markdown);
+    });
 
     testWidgets('a plain Note stays plain without a format', (tester) async {
       final id = notes.capture('buy milk').id;

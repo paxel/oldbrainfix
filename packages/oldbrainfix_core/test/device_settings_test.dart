@@ -26,6 +26,18 @@ void main() {
     expect(store.themeChoice, ThemeChoice.system);
   });
 
+  test('all-day items remind from 15:00 until this Device sets a time', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.allDayFrom, ClockTime(15, 0));
+    store.allDayFrom = ClockTime(11, 30);
+    expect(store.allDayFrom, ClockTime(11, 30));
+    expect(store.localSetting('allDayFrom'), '11:30');
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+    store.setLocalSetting('allDayFrom', 'noon');
+    expect(store.allDayFrom, ClockTime(15, 0), reason: 'unreadable: default');
+  });
+
   test('the Starter Set is offered until this Device has offered it', () {
     final store = Store.inMemory();
     addTearDown(store.close);
@@ -134,6 +146,36 @@ void main() {
     expect(store.streaksOn, isFalse);
     store.streaksOn = true;
     expect(store.streaksOn, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('the Agenda strikes through what is checked until this Device hides '
+      'it (#217)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.agendaHidesChecked, isFalse);
+    store.agendaHidesChecked = true;
+    expect(store.agendaHidesChecked, isTrue);
+    expect(store.localSetting('agendaHideChecked'), 'true');
+    store.agendaHidesChecked = false;
+    expect(store.agendaHidesChecked, isFalse);
+    store.setLocalSetting('agendaHideChecked', 'garbled');
+    expect(store.agendaHidesChecked, isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('text, icons and tap targets stay their size until this Device '
+      'switches on Fat fingers (#224)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.fatFingers, isFalse);
+    store.fatFingers = true;
+    expect(store.fatFingers, isTrue);
+    expect(store.localSetting('fatFingers'), 'true');
+    store.fatFingers = false;
+    expect(store.fatFingers, isFalse);
+    store.setLocalSetting('fatFingers', 'garbled');
+    expect(store.fatFingers, isFalse);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 

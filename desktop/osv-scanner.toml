@@ -1,8 +1,11 @@
-# OSV-Scanner's exceptions for desktop/Cargo.lock (the Security workflow,
-# .github/workflows/security.yml). Each one says why the desktop app is not
-# exposed and why no update removes the crate. When its date passes, the
-# weekly run fails again: that is the review. Check the advisory and the
-# parent crates again, then remove the entry or move the date with a reason.
+# OSV-Scanner's exceptions for desktop/Cargo.lock. CI, the release gate
+# and the weekly Security run (.github/workflows/) all read them. Each one
+# says why the desktop app is not exposed and why no update removes the
+# crate. CI and the release list a notice that a crate is unmaintained
+# without failing (tool/osv_gate.py); the weekly run fails on it. When an
+# entry's date passes, the weekly run fails again: that is the review.
+# Check the advisory and the parent crates again, then remove the entry or
+# move the date with a reason.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0192"
@@ -40,3 +43,12 @@ ignoreUntil = 2027-04-27
 reason = """zvariant_derive is unmaintained because it moved into zbus 6; no \
 vulnerability is described. A proc macro of zbus 5, run at compile time only. \
 Same as RUSTSEC-2026-0371."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+ignoreUntil = 2027-05-03
+reason = """paste is unmaintained; no vulnerability is described. A proc \
+macro, run at compile time only. It comes only through rusto-rs 0.3.2 -> \
+nalgebra 0.33 -> simba 0.9 (Photo Texts). rusto-rs 0.3.2, the latest, requires \
+nalgebra ^0.33, which requires simba ^0.9, and simba 0.9.1 requires paste; only \
+simba 0.10 drops it."""

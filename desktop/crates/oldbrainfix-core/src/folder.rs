@@ -691,7 +691,8 @@ fn segment_entries(
     if lines.len() < segment.lines {
         return None;
     }
-    lines[have..segment.lines]
+    lines
+        .get(have..segment.lines)?
         .iter()
         .map(|line| {
             let sealed = BASE64.decode(line).ok()?;
@@ -887,7 +888,12 @@ fn number(name: &str) -> usize {
     if parts.len() < 4 {
         return 0;
     }
-    parts[parts.len() - 2].parse().unwrap_or(0)
+    parts
+        .iter()
+        .rev()
+        .nth(1)
+        .and_then(|part| part.parse().ok())
+        .unwrap_or(0)
 }
 
 fn publish_entries(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<usize> {

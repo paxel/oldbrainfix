@@ -18,6 +18,7 @@ use oldbrainfix_core::{Error, Store};
 
 use crate::app::Wall;
 use crate::l10n::L10n;
+use crate::theme;
 
 /// The local setting saying the first start's view was answered.
 const RESTORE_OFFERED: &str = "restoreOffered";
@@ -181,9 +182,12 @@ fn own_backups(
         return;
     }
     let mut weekly = store.backups_weekly().unwrap_or(true);
-    if ui
-        .checkbox(&mut weekly, RichText::new(t.backup_weekly()).color(text))
-        .changed()
+    if theme::checkbox(
+        ui,
+        &mut weekly,
+        RichText::new(t.backup_weekly()).color(text),
+    )
+    .changed()
     {
         actions.push(BackupAction::Weekly(weekly));
     }
@@ -252,6 +256,9 @@ pub enum WelcomeAction {
 pub struct Welcome {
     /// The Starter Set's slugs ticked, while it shows.
     pub starter: Option<BTreeSet<String>>,
+    /// Whether Advanced is picked on the Starter Set (#197); Simple
+    /// until it is.
+    pub advanced: bool,
     /// Whether a Device of one's own is being added.
     pub adding: bool,
     pub file: Option<(PathBuf, Header)>,
@@ -292,7 +299,8 @@ pub fn welcome(
     actions: &mut Vec<WelcomeAction>,
 ) {
     if let Some(picked) = &mut state.starter {
-        crate::starter_set_view::starter_set(ui, t, picked, actions);
+        let advanced = &mut state.advanced;
+        crate::starter_set_view::starter_set(ui, t, (picked, advanced), actions);
         return;
     }
     let text = ui.visuals().text_color();
@@ -345,10 +353,7 @@ pub fn welcome(
         ui.label(RichText::new(t.restore_invalid_code()).color(error));
     }
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.restore_start()).color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.restore_start()).clicked() {
             actions.push(WelcomeAction::Restore);
         }
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {

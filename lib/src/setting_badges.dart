@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'look.dart';
 
 /// One setting of a Note in the editor's row of badges (#160), drawn like
-/// a shield: the setting's icon, then its current value. A screen reader
-/// reads it as "setting: value". [onTap] gets where the finger was,
+/// a shield: the setting's icon, the same for every value, then its
+/// current value (#192), as [valueIcon] where the setting has a fixed set
+/// of values, as short text otherwise, never both. A screen reader reads
+/// it as "setting: value" in words, [valueWords] where the short text is
+/// no words, such as "4w" for "4 weeks". [onTap] gets where the finger was,
 /// so a menu can open there; without it the badge only shows the value.
 class SettingBadge extends StatefulWidget {
   /// The setting's name in words, for the screen reader.
   final String setting;
 
-  /// The current value; none for a badge that only adds, such as "+".
+  /// The current value in words; none for a badge that only adds, such
+  /// as "+". It is shown unless [valueIcon] draws it.
   final String? value;
+
+  /// The value's icon, for a setting with a fixed set of values, such as
+  /// the kind or the Importance; the screen reader still reads [value].
+  final IconData? valueIcon;
+
+  /// The value in words for the screen reader, where [value] is short for
+  /// them.
+  final String? valueWords;
 
   /// The setting's icon, the same in the badge and its editor; [iconWidget]
   /// draws one that is no [IconData], such as the frog.
@@ -26,6 +39,8 @@ class SettingBadge extends StatefulWidget {
     super.key,
     required this.setting,
     required this.value,
+    this.valueIcon,
+    this.valueWords,
     this.icon,
     this.iconWidget,
     this.iconColour,
@@ -70,7 +85,10 @@ class _SettingBadgeState extends State<SettingBadge> {
       button: widget.onTap != null,
       label: value == null
           ? widget.setting
-          : context.t.settingBadgeLabel(widget.setting, value),
+          : context.t.settingBadgeLabel(
+              widget.setting,
+              widget.valueWords ?? value,
+            ),
       excludeSemantics: true,
       onTap: widget.onTap == null ? null : _tapped,
       child: Material(
@@ -106,7 +124,13 @@ class _SettingBadgeState extends State<SettingBadge> {
                         ),
                         child: Center(
                           widthFactor: 1,
-                          child: Text(value, style: theme.textTheme.labelLarge),
+                          child: switch (widget.valueIcon) {
+                            final valueIcon? => Icon(valueIcon, size: 18),
+                            null => Text(
+                              value,
+                              style: theme.textTheme.labelLarge,
+                            ),
+                          },
                         ),
                       ),
                     ),
@@ -119,6 +143,9 @@ class _SettingBadgeState extends State<SettingBadge> {
     );
   }
 }
+
+/// The value icon of an on-or-off setting's badge (#192).
+IconData switchIcon(bool on) => on ? Icons.toggle_on : Icons.toggle_off;
 
 /// The small editor a badge opens (#160): the setting's icon and its name
 /// in words as the title, then [content], then [actions] and Close.
@@ -197,13 +224,15 @@ class _BadgeSwitchState extends State<BadgeSwitch> {
         const SizedBox(height: 8),
         Semantics(
           label: widget.setting,
-          child: Switch(
-            key: const ValueKey('badge-switch'),
-            value: _on,
-            onChanged: (_) {
-              widget.toggle();
-              setState(() => _on = !_on);
-            },
+          child: LookGrown(
+            child: Switch(
+              key: const ValueKey('badge-switch'),
+              value: _on,
+              onChanged: (_) {
+                widget.toggle();
+                setState(() => _on = !_on);
+              },
+            ),
           ),
         ),
       ],

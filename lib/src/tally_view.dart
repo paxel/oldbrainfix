@@ -11,6 +11,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
+import 'setting_badges.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
 
@@ -20,6 +21,12 @@ import 'tally_field_screen.dart';
 UnitSystem deviceUnitSystem(Store store) => store.unitSystem(
   WidgetsBinding.instance.platformDispatcher.locale.countryCode,
 );
+
+/// The rule [rule] as the value icon of a field's rule badge (#192).
+IconData tallyRuleIcon(TallyRule rule) => switch (rule) {
+  TallyRule.sum => Icons.add_circle_outline,
+  TallyRule.max => Icons.vertical_align_top,
+};
 
 /// The decimal sign of the app's language, for showing numbers.
 String decimalSign(BuildContext context) =>
@@ -74,46 +81,50 @@ abstract final class _Whose {
 /// An entry with who wrote it: null for the user's own (ADR 0017).
 typedef _ShownEntry = ({TallyEntry entry, Profile? author, bool changes});
 
-/// The Tally part of a Note's editor (#103), nothing while the Note is no
-/// Tally: its fields, each opening the field page for who may change the
-/// Note, with "Add entry" and "Add field"; in a Shared Area the choice of
-/// whose entries show, the user's own by default; the length of a bar;
-/// one chart per field shown; the entries, newest first, each tapped to
-/// edit it and long-pressed for a menu at the finger; and a folded
-/// "Removed entries" with Restore, closed until opened, remembered on
-/// this Device. It follows the log as it changes.
-class TallySection extends StatefulWidget {
+/// The setting of this Device that keeps the length of a bar of the
+/// Tally of [noteId] (#190), the name of its [TallyPeriod]; nothing kept
+/// means a day.
+String tallyPeriodSetting(String noteId) => 'tallyPeriod:$noteId';
+
+/// The setting of this Device that keeps all entries of the Tally of
+/// [noteId] shown on its card (#190); nothing kept means folded after
+/// [CardTally.shownEntries].
+String tallyEntriesShownSetting(String noteId) => 'tallyEntriesShown:$noteId';
+
+/// The person filter a Tally of [noteId] counts by unless one is picked:
+/// the user's own entries in a Shared Area (ADR 0028), everyone's, which
+/// are the user's own too, elsewhere. The compact view's totals and the
+/// detailed view count alike (#190).
+PersonFilter tallyDefaultFilter(Store store, String noteId) {
+  final area = store.areaOf(noteId);
+  return area != null && store.isShared(area)
+      ? const PersonFilter(me: true)
+      : PersonFilter.everyone;
+}
+
+/// The setup of a Note's Tally in its editor (#190), nothing while the
+/// Note is no Tally: a row per field, its name and its settings as badges
+/// as on the New Tally page (#161), how a day with several entries counts,
+/// its unit and its target, the other field it multiplies (#200) while it
+/// does or may, a multiplier without a rule or a target, "Hidden" while
+/// it is hidden; a tap on the
+/// name or a badge opens the field's page for who may change the Note,
+/// and "Add field" the page of a new one. The chart and the entries show
+/// on the card, not here. It follows the log as it changes.
+class TallySetup extends StatefulWidget {
   final Notes notes;
   final String noteId;
 
-  const TallySection({super.key, required this.notes, required this.noteId});
+  const TallySetup({super.key, required this.notes, required this.noteId});
 
   @override
-  State<TallySection> createState() => _TallySectionState();
+  State<TallySetup> createState() => _TallySetupState();
 }
 
-class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
-  /// The local setting that keeps "Removed entries" open.
-  static const _removedOpenKey = 'tallyRemovedOpen';
-
-  /// How many entries show before "Show more".
-  static const _page = 30;
-
+class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
   late final _tallies = Tallies(widget.notes.store);
   late UnitSystem _system;
   Tally? _tally;
-  var _shared = false;
-  var _whose = _Whose.mine;
-  var _period = TallyPeriod.day;
-  var _shownCount = _page;
-  List<_ShownEntry> _entries = const [];
-  List<_ShownEntry> _removed = const [];
-
-  /// The other people who wrote entries, for "Show entries".
-  List<Profile> _authors = const [];
-  Map<String, List<TallyBucket>> _charts = const {};
-  late bool _removedOpen =
-      widget.notes.store.localSetting(_removedOpenKey) == 'true';
 
   @override
   Store get log => widget.notes.store;
@@ -124,16 +135,207 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
   @override
   void initState() {
     super.initState();
-    final store = widget.notes.store;
-    final area = store.areaOf(widget.noteId);
-    _shared = area != null && store.isShared(area);
-    // Outside a Shared Area every entry is the user's own.
-    _whose = _shared ? _Whose.mine : _Whose.everyone;
     _load();
   }
 
   void _load() {
-    final store = widget.notes.store;
+    _system = deviceUnitSystem(widget.notes.store);
+    _tally = _tallies.byNote(widget.noteId);
+  }
+
+  Future<void> _openField(String? fieldId) async {
+    await openTallyField(context, widget.notes, widget.noteId, fieldId);
+    if (!mounted) return;
+    setState(_load);
+  }
+
+  Widget _fieldRow(Tally tally, TallyField field, String decimal) {
+    final t = context.t;
+    final unit = shownUnit(field.unit, _system);
+    final target = field.target;
+    final multiplies = switch (field.multiplies) {
+      final id? => tally.field(id),
+      null => null,
+    };
+    final open = widget.notes.store.mayChange(field.noteId)
+        ? () => _openField(field.id)
+        : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            key: ValueKey('tally-field-${field.id}'),
+            onTap: open,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                field.name,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // A multiplier counts no value: no rule, no target (#200).
+              if (multiplies == null)
+                SettingBadge(
+                  key: ValueKey('tally-setup-rule-${field.id}'),
+                  setting: t.tallyRule,
+                  icon: Icons.functions,
+                  value: field.rule == TallyRule.sum
+                      ? t.tallyRuleSumShort
+                      : t.tallyRuleMaxShort,
+                  valueIcon: tallyRuleIcon(field.rule),
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              SettingBadge(
+                key: ValueKey('tally-setup-unit-${field.id}'),
+                setting: t.tallyUnit,
+                icon: Icons.straighten,
+                value: unit.isEmpty ? t.tallyNoUnit : unit,
+                onTap: open == null ? null : (_) => open(),
+              ),
+              if (multiplies == null)
+                SettingBadge(
+                  key: ValueKey('tally-setup-target-${field.id}'),
+                  setting: t.tallyTargetBadge,
+                  icon: Icons.flag_outlined,
+                  value: target == null
+                      ? t.tallyNoTarget
+                      : shownValue(target, field.unit, _system, decimal),
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              if (multiplies != null || tally.multipliable(field.id).isNotEmpty)
+                SettingBadge(
+                  key: ValueKey('tally-setup-multiplies-${field.id}'),
+                  setting: t.tallyMultiplies,
+                  icon: Icons.calculate_outlined,
+                  value: multiplies?.name ?? t.tallyMultipliesNothing,
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              if (field.hidden)
+                SettingBadge(
+                  key: ValueKey('tally-setup-hidden-${field.id}'),
+                  setting: t.tallyHideField,
+                  icon: Icons.visibility_off_outlined,
+                  value: t.tallyFieldHidden,
+                  valueIcon: switchIcon(true),
+                  onTap: open == null ? null : (_) => open(),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tally = _tally;
+    if (tally == null) return const SizedBox.shrink();
+    final t = context.t;
+    final decimal = decimalSign(context);
+    return EditorPanel(
+      key: const ValueKey('tally-fields'),
+      heading: t.tallyFields,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final field in tally.fields) _fieldRow(tally, field, decimal),
+            if (widget.notes.store.mayChange(widget.noteId))
+              FilledButton.tonalIcon(
+                key: const ValueKey('tally-add-field'),
+                onPressed: () => _openField(null),
+                icon: const Icon(Icons.playlist_add),
+                label: Text(t.tallyAddField),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A Tally on its Note's detailed card (#190), nothing while the Note is
+/// no Tally: "Add entry" for who may add one; in a Shared Area the choice
+/// of whose entries show, the user's own by default; the length of a bar,
+/// kept per Note on this Device; one chart per field shown but the
+/// multipliers, a multiplied field's of the products (#200); the entries,
+/// newest first, the latest [shownEntries] and the older folded under
+/// how many they are until a tap shows them, kept per Note on this
+/// Device; each tapped to edit it and long-pressed for a menu at the
+/// finger; and a folded "Removed entries" with Restore, closed until
+/// opened, remembered on this Device. It reads the Tally when the card is
+/// built anew and after a change of its own, never while building.
+class CardTally extends StatefulWidget {
+  final Notes notes;
+  final String noteId;
+
+  /// How many entries show before the older ones fold.
+  static const shownEntries = 5;
+
+  const CardTally({super.key, required this.notes, required this.noteId});
+
+  @override
+  State<CardTally> createState() => _CardTallyState();
+}
+
+class _CardTallyState extends State<CardTally> {
+  /// The local setting that keeps "Removed entries" open.
+  static const _removedOpenKey = 'tallyRemovedOpen';
+
+  late final _tallies = Tallies(widget.notes.store);
+  late UnitSystem _system;
+  Tally? _tally;
+  var _shared = false;
+  var _whose = _Whose.mine;
+  var _period = TallyPeriod.day;
+  var _allShown = false;
+  List<_ShownEntry> _entries = const [];
+  List<_ShownEntry> _removed = const [];
+
+  /// The other people who wrote entries, for "Show entries".
+  List<Profile> _authors = const [];
+  Map<String, List<TallyBucket>> _charts = const {};
+  late bool _removedOpen =
+      widget.notes.store.localSetting(_removedOpenKey) == 'true';
+
+  Store get _store => widget.notes.store;
+
+  @override
+  void initState() {
+    super.initState();
+    final store = _store;
+    final area = store.areaOf(widget.noteId);
+    _shared = area != null && store.isShared(area);
+    // Outside a Shared Area every entry is the user's own.
+    _whose = _shared ? _Whose.mine : _Whose.everyone;
+    _period = TallyPeriod.values.firstWhere(
+      (p) => p.name == store.localSetting(tallyPeriodSetting(widget.noteId)),
+      orElse: () => TallyPeriod.day,
+    );
+    _allShown =
+        store.localSetting(tallyEntriesShownSetting(widget.noteId)) == 'true';
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(CardTally old) {
+    super.didUpdateWidget(old);
+    // An entry changes no Note, so this reads every time the card is
+    // built anew.
+    _load();
+  }
+
+  void _load() {
+    final store = _store;
     _system = deviceUnitSystem(store);
     final tally = _tally = _tallies.byNote(widget.noteId);
     if (tally == null) return;
@@ -142,11 +344,6 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
       author: store.authorOf(entry.id),
       changes: store.mayChange(entry.id),
     );
-    final filter = _Whose.filter(_whose);
-    _entries = [
-      for (final entry in _tallies.entries(widget.noteId, filter: filter))
-        shown(entry),
-    ];
     if (_shared) {
       final authors = <String, Profile>{};
       for (final entry in _tallies.entries(widget.noteId)) {
@@ -160,12 +357,15 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
           _whose != _Whose.everyone &&
           !authors.containsKey(_whose)) {
         _whose = _Whose.mine;
-        _load();
-        return;
       }
     }
+    final filter = _Whose.filter(_whose);
+    _entries = [
+      for (final entry in _tallies.entries(widget.noteId, filter: filter))
+        shown(entry),
+    ];
     _charts = {
-      for (final field in tally.shown)
+      for (final field in tally.counting)
         field.id: _tallies.chart(
           widget.noteId,
           field.id,
@@ -191,14 +391,28 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
     _load();
   });
 
-  void _setPeriod(TallyPeriod period) => setState(() {
-    _period = period;
-    _load();
-  });
+  void _setPeriod(TallyPeriod period) {
+    final setting = tallyPeriodSetting(widget.noteId);
+    period == TallyPeriod.day
+        ? _store.removeLocalSetting(setting)
+        : _store.setLocalSetting(setting, period.name);
+    setState(() {
+      _period = period;
+      _load();
+    });
+  }
+
+  void _toggleAll() {
+    final setting = tallyEntriesShownSetting(widget.noteId);
+    setState(() => _allShown = !_allShown);
+    _allShown
+        ? _store.setLocalSetting(setting, 'true')
+        : _store.removeLocalSetting(setting);
+  }
 
   void _setRemovedOpen(bool open) {
     _removedOpen = open;
-    widget.notes.store.setLocalSetting(_removedOpenKey, '$open');
+    _store.setLocalSetting(_removedOpenKey, '$open');
   }
 
   Future<void> _addEntry() async {
@@ -221,12 +435,6 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
 
   void _restore(TallyEntry entry) {
     _tallies.restoreEntry(entry.id);
-    setState(_load);
-  }
-
-  Future<void> _openField(String? fieldId) async {
-    await openTallyField(context, widget.notes, widget.noteId, fieldId);
-    if (!mounted) return;
     setState(_load);
   }
 
@@ -272,12 +480,34 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
     await run();
   }
 
-  /// What [entry] holds for the fields shown, one after the other.
-  String _values(Tally tally, TallyEntry entry, String decimal) => [
-    for (final field in tally.shown)
-      if (entry.values[field.id] case final value?)
-        '${field.name} ${shownValue(value, field.unit, _system, decimal)}',
-  ].join(' · ');
+  /// What [entry] holds for the fields shown, one after the other; a
+  /// multiplied field's value after the values of its multipliers the
+  /// entry holds, as bare numbers ("Reps 3 × 10 reps"), and a multiplier
+  /// not on its own (#200).
+  String _values(Tally tally, TallyEntry entry, String decimal) {
+    final t = context.t;
+    String times(TallyField field, double value) {
+      var text = shownValue(value, field.unit, _system, decimal);
+      for (final multiplier in tally.multipliersOf(field.id).reversed) {
+        if (entry.values[multiplier.id] case final factor?) {
+          final number = TallyUnits.formatShown(
+            factor,
+            multiplier.unit,
+            _system,
+            decimal: decimal,
+          );
+          text = t.tallyTimes(number, text);
+        }
+      }
+      return text;
+    }
+
+    return [
+      for (final field in tally.counting)
+        if (entry.values[field.id] case final value?)
+          '${field.name} ${times(field, value)}',
+    ].join(' · ');
+  }
 
   Widget _entryRow(
     Tally tally,
@@ -325,78 +555,47 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
     );
   }
 
+  /// A heading of a part of the card, a setting's or a chart's.
+  Widget _heading(String text) => Padding(
+    padding: const EdgeInsets.only(top: 16, bottom: 4),
+    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+  );
+
   @override
   Widget build(BuildContext context) {
     final tally = _tally;
     if (tally == null) return const SizedBox.shrink();
     final t = context.t;
-    final store = widget.notes.store;
+    final scheme = Theme.of(context).colorScheme;
     final decimal = decimalSign(context);
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
-    final adds = store.mayWriteIn(widget.noteId);
-    final defines = store.mayChange(widget.noteId);
-    final entries = _entries.take(_shownCount).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        EditorPanel(
-          key: const ValueKey('tally-fields'),
-          heading: t.tallyHeading,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final field in tally.fields)
-                  ListTile(
-                    key: ValueKey('tally-field-${field.id}'),
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(field.name),
-                    subtitle: Text(
-                      [
-                        if (shownUnit(field.unit, _system) case final unit
-                            when unit.isNotEmpty)
-                          unit,
-                        if (field.target case final target?)
-                          t.tallyTargetValue(
-                            shownValue(target, field.unit, _system, decimal),
-                          ),
-                        if (field.hidden) t.tallyFieldHidden,
-                      ].join(' · '),
-                    ),
-                    onTap: store.mayChange(field.noteId)
-                        ? () => _openField(field.id)
-                        : null,
-                  ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (adds)
-                      FilledButton.tonalIcon(
-                        key: const ValueKey('tally-add-entry'),
-                        onPressed: _addEntry,
-                        icon: const Icon(Icons.add),
-                        label: Text(t.addTallyEntry),
-                      ),
-                    if (defines)
-                      FilledButton.tonalIcon(
-                        key: const ValueKey('tally-add-field'),
-                        onPressed: () => _openField(null),
-                        icon: const Icon(Icons.playlist_add),
-                        label: Text(t.tallyAddField),
-                      ),
-                  ],
+    final older = _entries.length - CardTally.shownEntries;
+    final entries = older > 0 && !_allShown
+        ? _entries.take(CardTally.shownEntries).toList()
+        : _entries;
+    return Material(
+      key: const ValueKey('tally-card'),
+      type: MaterialType.transparency,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_store.mayWriteIn(widget.noteId))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  key: const ValueKey('tally-add-entry'),
+                  onPressed: _addEntry,
+                  icon: const Icon(Icons.add),
+                  label: Text(t.addTallyEntry),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-        if (_shared)
-          EditorPanel(
-            heading: t.tallyShowEntries,
-            child: RadioColumn<String>(
+          if (_shared) ...[
+            _heading(t.tallyShowEntries),
+            RadioColumn<String>(
               key: const ValueKey('tally-whose'),
               value: _whose,
               onChanged: _setWhose,
@@ -420,10 +619,9 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
                   ),
               ],
             ),
-          ),
-        EditorPanel(
-          heading: t.tallyPeriod,
-          child: RadioColumn<TallyPeriod>(
+          ],
+          _heading(t.tallyPeriod),
+          ChoiceChips<TallyPeriod>(
             key: const ValueKey('tally-period'),
             value: _period,
             onChanged: _setPeriod,
@@ -441,67 +639,84 @@ class _TallySectionState extends State<TallySection> with ReloadsOnLogChange {
                 ),
             ],
           ),
-        ),
-        for (final field in tally.shown)
-          EditorPanel(
-            key: ValueKey('tally-chart-${field.id}'),
-            heading: switch (shownUnit(field.unit, _system)) {
-              '' => field.name,
-              final unit => '${field.name} ($unit)',
-            },
-            child: TallyChart(
-              name: field.name,
-              buckets: _charts[field.id] ?? const [],
-              target: field.target,
-              period: _period,
-              format: (value) =>
-                  shownValue(value, field.unit, _system, decimal),
-            ),
-          ),
-        EditorPanel(
-          key: const ValueKey('tally-entries'),
-          heading: t.tallyEntries,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          for (final field in tally.counting)
+            Column(
+              key: ValueKey('tally-chart-${field.id}'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (entries.isEmpty) Text(t.tallyNoEntries),
-                for (final shown in entries)
-                  _entryRow(tally, shown, when, decimal),
-                if (_entries.length > entries.length)
-                  TextButton(
-                    key: const ValueKey('tally-more'),
-                    onPressed: () => setState(() => _shownCount += _page),
-                    child: Text(t.tallyMoreEntries),
-                  ),
+                _heading(switch (shownUnit(field.unit, _system)) {
+                  '' => field.name,
+                  final unit => '${field.name} ($unit)',
+                }),
+                TallyChart(
+                  name: field.name,
+                  buckets: _charts[field.id] ?? const [],
+                  target: field.target,
+                  period: _period,
+                  format: (value) =>
+                      shownValue(value, field.unit, _system, decimal),
+                ),
               ],
             ),
+          Column(
+            key: const ValueKey('tally-entries'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _heading(t.tallyEntries),
+              if (entries.isEmpty) Text(t.tallyNoEntries),
+              for (final shown in entries)
+                _entryRow(tally, shown, when, decimal),
+              // The older ones folded under the latest (#190).
+              if (older > 0)
+                Semantics(
+                  button: true,
+                  expanded: _allShown,
+                  child: InkWell(
+                    key: const ValueKey('tally-older'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: _toggleAll,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _allShown ? Icons.expand_less : Icons.expand_more,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              t.tallyOlderEntries(older),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-        if (_removed.isNotEmpty)
-          EditorPanel(
-            child: Material(
-              type: MaterialType.transparency,
-              child: ExpansionTile(
-                key: const ValueKey('tally-removed'),
-                shape: const Border(),
-                collapsedShape: const Border(),
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                leading: const Icon(Icons.delete_outline),
-                title: Text(t.tallyRemovedEntries),
-                initiallyExpanded: _removedOpen,
-                onExpansionChanged: _setRemovedOpen,
-                children: [
-                  for (final shown in _removed)
-                    _entryRow(tally, shown, when, decimal, removed: true),
-                ],
-              ),
+          if (_removed.isNotEmpty)
+            ExpansionTile(
+              key: const ValueKey('tally-removed'),
+              shape: const Border(),
+              collapsedShape: const Border(),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: EdgeInsets.zero,
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              leading: const Icon(Icons.delete_outline),
+              title: Text(t.tallyRemovedEntries),
+              initiallyExpanded: _removedOpen,
+              onExpansionChanged: _setRemovedOpen,
+              children: [
+                for (final shown in _removed)
+                  _entryRow(tally, shown, when, decimal, removed: true),
+              ],
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

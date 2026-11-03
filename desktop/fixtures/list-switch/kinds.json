@@ -1,0 +1,27 @@
+{
+  "note:00000000000000000000000000000001": {
+    "kind": "shoppingList",
+    "name": "Trip",
+    "description": "for the weekend"
+  },
+  "note:0000000000000000000000000000000a": {
+    "kind": "checklist",
+    "name": "Shop",
+    "description": ""
+  },
+  "note:00000000000000000000000000000012": {
+    "kind": "shoppingList",
+    "name": "Hardware",
+    "description": ""
+  },
+  "note:0000000000000000000000000000001c": {
+    "kind": "tally",
+    "name": "Gym",
+    "description": "Mondays and Thursdays"
+  },
+  "note:0000000000000000000000000000001e": {
+    "kind": "plain",
+    "name": "Call Ben",
+    "description": "about the car"
+  }
+}

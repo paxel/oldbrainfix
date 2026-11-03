@@ -398,12 +398,16 @@ impl<S: rodio::Source> Stretch<S> {
         };
         // The silent piece's second half is the recording's start.
         stretch.hear(half as isize);
-        for i in 0..half {
-            for c in 0..channels {
-                stretch.tail[i * channels + c] =
-                    stretch.fade[half + i] * stretch.sample(i as isize, c);
+        // The tail holds `half` frames of `channels` samples; the fade's
+        // second half fades them out.
+        let mut tail = std::mem::take(&mut stretch.tail);
+        let fade_out = stretch.fade.iter().skip(half);
+        for (i, (frame, fade)) in tail.chunks_mut(channels).zip(fade_out).enumerate() {
+            for (c, slot) in frame.iter_mut().enumerate() {
+                *slot = fade * stretch.sample(i as isize, c);
             }
         }
+        stretch.tail = tail;
         stretch
     }
 
@@ -491,18 +495,22 @@ impl<S: rodio::Source> Stretch<S> {
             self.out.append(&mut self.tail);
             return !self.out.is_empty();
         }
-        for i in 0..self.half {
-            for c in 0..self.channels {
-                let rising = self.fade[i] * self.sample(start + i as isize, c);
-                self.out.push(self.tail[i * self.channels + c] + rising);
+        // The tail's `half` frames, each of `channels` samples, against
+        // the fade's first half rising and its second half falling.
+        let mut tail = std::mem::take(&mut self.tail);
+        for (i, (frame, fade)) in tail.chunks(self.channels).zip(&self.fade).enumerate() {
+            for (c, held) in frame.iter().enumerate() {
+                let rising = fade * self.sample(start + i as isize, c);
+                self.out.push(held + rising);
             }
         }
-        for i in 0..self.half {
-            for c in 0..self.channels {
-                let falling = self.fade[self.half + i] * self.sample(start + half + i as isize, c);
-                self.tail[i * self.channels + c] = falling;
+        let fade_out = self.fade.iter().skip(self.half);
+        for (i, (frame, fade)) in tail.chunks_mut(self.channels).zip(fade_out).enumerate() {
+            for (c, slot) in frame.iter_mut().enumerate() {
+                *slot = fade * self.sample(start + half + i as isize, c);
             }
         }
+        self.tail = tail;
         self.last = start;
         // Forgets what no later piece reaches back to.
         let needed = (self.last + half).min(self.nominal.floor() as isize - self.search as isize);
@@ -526,7 +534,8 @@ impl<S: rodio::Source> Iterator for Stretch<S> {
                 return None;
             }
         }
-        let sample = self.out[self.at];
+        // The loop above leaves `at` inside `out`.
+        let sample = self.out.get(self.at).copied()?;
         self.at += 1;
         Some(sample)
     }

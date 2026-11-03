@@ -128,14 +128,18 @@ fn of_keep<T>(entries: Vec<(String, T)>) -> Vec<(String, T, usize)> {
 /// of ASCII letters, as the core takes it.
 fn in_keep_folder(path: &str) -> bool {
     let folders: Vec<&str> = path.split(['/', '\\']).collect();
-    folders.len() > 1 && folders[folders.len() - 2].eq_ignore_ascii_case("keep")
+    folders
+        .iter()
+        .rev()
+        .nth(1)
+        .is_some_and(|folder| folder.eq_ignore_ascii_case("keep"))
 }
 
 /// Whether the entry `name` stays inside the export: no `..` among its
 /// folders, not from the root, not on a drive.
 fn inside(name: &str) -> bool {
     let bytes = name.as_bytes();
-    let drive = bytes.len() > 1 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+    let drive = matches!(bytes, [letter, b':', ..] if letter.is_ascii_alphabetic());
     !name.starts_with(['/', '\\'])
         && !drive
         && !name.contains('\0')

@@ -34,13 +34,18 @@ void main() {
           .firstWhere((l) => l.text == text)
           .id;
 
-  /// "Groceries": Milk and Eggs checked a week ago, back today; Tea
+  /// "Groceries", each Line a week: Milk and Eggs checked a week ago,
+  /// back today; Tea
   /// checked on Tuesday, struck still; Rice never checked. "Hardware":
   /// Nails, never checked.
   void seed() {
     now = DateTime(2026, 10, 17, 10);
     groceries = notes.capture('Groceries\nMilk\nEggs\nTea\nRice').id;
     lists.make(groceries);
+    // Each Line a week (#195).
+    for (final line in lists.byNote(groceries, deviceWallClock)!.lines) {
+      lists.setReappear(line.id, Reappear.after(1, ReappearUnit.week));
+    }
     lists.check(lineId(groceries, 'Milk'), deviceWallClock);
     lists.check(lineId(groceries, 'Eggs'), deviceWallClock);
     now = DateTime(2026, 10, 20, 18);
@@ -136,26 +141,34 @@ void main() {
     expect(key('shopping'), findsOneWidget);
   });
 
-  testWidgets('each open Line on its own row, checked off there', (
-    tester,
-  ) async {
+  testWidgets('each open Line indented under the list\'s name, each with '
+      'its box, checked off there (#208)', (tester) async {
     lists.setOnAgenda(groceries, ShoppingOnAgenda.lines);
     final milk = lineId(groceries, 'Milk');
     final eggs = lineId(groceries, 'Eggs');
     final rice = lineId(groceries, 'Rice');
     await start(tester);
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       'shopping-line-$milk',
       'shopping-line-$eggs',
       'shopping-line-$rice',
       'shopping-row-$hardware',
     ]);
+    Finder inList(Finder finder) =>
+        find.descendant(of: key('shopping-row-$groceries'), matching: finder);
+    // The heading is the list's name alone, without a box.
+    expect(inList(find.text('Groceries')), findsOneWidget);
+    expect(inList(find.byType(Checkbox)), findsNWidgets(3));
+    expect(inList(key('shopping-line-$milk')), findsOneWidget);
     expect(
-      find.descendant(
-        of: key('shopping-line-$milk'),
-        matching: find.text('Groceries'),
-      ),
-      findsOneWidget,
+      tester.getTopLeft(key('shopping-check-$milk')).dx,
+      greaterThanOrEqualTo(tester.getTopLeft(find.text('Groceries')).dx),
+      reason: 'indented under the heading',
+    );
+    expect(
+      tester.getTopLeft(key('shopping-check-$milk')).dy,
+      greaterThan(tester.getTopLeft(find.text('Groceries')).dy),
     );
     await tap(tester, key('shopping-check-$milk'));
     expect(
@@ -163,6 +176,7 @@ void main() {
       isTrue,
     );
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       'shopping-line-$eggs',
       'shopping-line-$rice',
       'shopping-row-$hardware',
@@ -204,6 +218,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await start(tester);
     expect(shoppingRows(tester), [
+      'shopping-row-$groceries',
       for (final line in ['Milk', 'Eggs', 'Rice'])
         'shopping-line-${lineId(groceries, line)}',
       'shopping-row-$hardware',
@@ -283,20 +298,23 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(shoppingRows(tester), [
+        'shopping-row-$hardware',
         'shopping-line-${lineId(hardware, 'Nails')}',
       ]);
     });
 
-    testWidgets('a Checklist keeps its switch, without the three ways', (
-      tester,
-    ) async {
+    testWidgets('a Checklist offers the same three ways, kept as its own '
+        'choice (#219)', (tester) async {
       notes.trash(hardware);
       final trip = notes.capture('Before the trip\nPassport').id;
-      Checklists(store).make(trip);
+      final checklists = Checklists(store)..make(trip);
       await startAtNotes(tester);
       await tap(tester, key('note-menu'));
-      expect(key('note-show-on-agenda'), findsOneWidget);
-      expect(key('note-show-on-agenda-count'), findsNothing);
+      expect(key('note-show-on-agenda'), findsNothing, reason: 'no switch');
+      expect(menuChosen(tester), [false, false, true]);
+      await tap(tester, key('note-show-on-agenda-count'));
+      expect(checklists.onAgenda(trip), ListOnAgenda.count);
+      expect(lists.mayShowOnAgenda(trip), isFalse, reason: 'no Shopping List');
     });
   });
 

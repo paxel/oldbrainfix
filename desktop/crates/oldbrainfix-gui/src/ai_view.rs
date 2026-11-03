@@ -21,8 +21,8 @@ use oldbrainfix_core::shopping_lists::{Reappear, keys as shopping_keys};
 use oldbrainfix_core::tallies::keys as tally_keys;
 use oldbrainfix_core::tally_units::{self, UnitSystem};
 use oldbrainfix_core::{
-    Checklists, DeviceSettings, Importance, Notes, Places, Routines, SessionRule, ShoppingOnAgenda,
-    Store, StoredText, parse_time,
+    Checklists, DeviceSettings, Importance, ListOnAgenda, Notes, Places, Routines, SessionRule,
+    ShoppingOnAgenda, Store, StoredText, parse_time,
 };
 
 use crate::app::{clickable_card, embossed, list_scroll, row_title, when};
@@ -30,7 +30,7 @@ use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::schedule_text::{schedule_text, weekday_long};
 use crate::shopping_view::on_agenda_label;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// What the user asked of the AI port's card or of the review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -313,13 +313,29 @@ fn change_line(
                 on_agenda_label(t, shows).to_string()
             }));
         }
+        // How a Checklist shows on the user's own Agenda (#219), on the
+        // same entity: none chosen or a value no app writes is every open
+        // Line.
+        (agenda, line_keys::AGENDA)
+            if line_keys::AGENDA_PREFIX.strip_suffix(':') == Some(agenda) =>
+        {
+            return Ok(words(t.checklist_show_on_agenda().to_string(), &|v| {
+                let shows = match v {
+                    Some(line_keys::AGENDA_OFF) => ListOnAgenda::Off,
+                    Some(code) if code == ListOnAgenda::Count.code() => ListOnAgenda::Count,
+                    _ => ListOnAgenda::Lines,
+                };
+                on_agenda_label(t, shows).to_string()
+            }));
+        }
         (line_keys::TYPE_LINE, line_keys::TRASHED) if change.after.is_some() => {
             return Ok(only(t.ai_deleted()));
         }
         (frog_keys::TYPE_FROG, frog_keys::TRASHED) if change.after.is_some() => {
             return Ok(only(t.checklist_to_plain()));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::POOL) => {
+        // The setup of a Session, on its Note (ADR 0039).
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::POOL) => {
             let pool = |v: Option<&str>| -> oldbrainfix_core::Result<String> {
                 let mut names = Vec::new();
                 for id in v.unwrap_or_default().split(',').filter(|id| !id.is_empty()) {
@@ -337,7 +353,7 @@ fn change_line(
                 mine_wins: change.mine_wins,
             }));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::RULE) => {
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::RULE) => {
             return Ok(words(t.session_rule().to_string(), &|v| {
                 match v.and_then(SessionRule::parse) {
                     Some(SessionRule::Random) => t.session_rule_random(),
@@ -347,14 +363,14 @@ fn change_line(
                 .to_string()
             }));
         }
-        (routine_keys::TYPE_ROUTINE, session_keys::COUNT) => {
+        (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::COUNT) => {
             return Ok(words(t.session_count().to_string(), &|v| {
                 v.unwrap_or("1").to_string()
             }));
         }
         _ => {}
     }
-    if ty == routine_keys::TYPE_ROUTINE
+    if (ty == routine_keys::TYPE_ROUTINE || ty == note_keys::TYPE_NOTE)
         && let Some(weekday) = (1..=7).find(|d| field == session_keys::count_on(*d))
     {
         let label = t.ai_session_weekday_count(weekday_long(t, weekday));
@@ -467,10 +483,7 @@ fn list_text(t: &L10n, kind: Option<&str>) -> &'static str {
 
 /// A Shopping List's reappear time in words.
 fn reappear_text(t: &L10n, code: Option<&str>) -> String {
-    match Reappear::read(code) {
-        Reappear::Once => t.shopping_once().to_string(),
-        weeks => t.shopping_weeks(weeks.weeks()),
-    }
+    crate::shopping_view::reappear_label(t, Reappear::read(code))
 }
 
 /// Where the Line `line` stands in its Checklist, from 1; `None` when it
@@ -638,10 +651,7 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
                 ui.label(RichText::new(t.ai_port_copied()).small().color(weak));
             }
         }
-        if ui
-            .button(RichText::new(t.ai_port_done()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.ai_port_done()).clicked() {
             asked = Some(AiAction::Done);
         }
     });
@@ -662,21 +672,14 @@ pub fn review_page(
 ) -> Option<String> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let error = ui.visuals().error_fg_color;
     ui.heading(RichText::new(t.ai_review_title()).color(text));
     ui.label(RichText::new(t.ai_review_intro()).color(weak));
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.ai_accept_all()).strong().color(text))
-            .clicked()
-        {
+        if theme::primary(ui, true, t.ai_accept_all()).clicked() {
             *asked = Some(AiAction::Accept);
         }
-        if ui
-            .button(RichText::new(t.ai_reject_all()).color(error))
-            .clicked()
-        {
+        if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
             *asked = Some(AiAction::AskReject);
         }
     });

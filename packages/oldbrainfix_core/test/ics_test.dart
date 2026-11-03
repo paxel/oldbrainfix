@@ -138,7 +138,7 @@ void main() {
       ]);
     });
 
-    test('an all-day Reminder is a date with its alarm at 09:00', () {
+    test('an all-day Reminder is a date with its alarm at 15:00', () {
       final ics = writeIcs(
         routineEvents(
           routine(schedule(null, start: Day(2026, 12, 31))),
@@ -149,8 +149,17 @@ void main() {
       final lines = event(ics, 'routine:r1@oldbrainfix');
       expect(lines, contains('DTSTART;VALUE=DATE:20261231'));
       expect(lines, contains('DTEND;VALUE=DATE:20270101'));
-      expect(lines, contains('TRIGGER:PT540M'));
+      expect(lines, contains('TRIGGER:PT900M'));
       expect(lines.where((l) => l.startsWith('RRULE')), isEmpty);
+    });
+
+    test('the alarm of an all-day event is the exporting Device\'s', () {
+      final events = routineEvents(
+        routine(schedule(null, start: Day(2026, 12, 31))),
+        'Party',
+      );
+      final ics = writeIcs(events, stamp: stamp, allDayFrom: at(11, 30));
+      expect(event(ics, 'routine:r1@oldbrainfix'), contains('TRIGGER:PT690M'));
     });
 
     test('several lines: the first is the summary, all is the description', () {
@@ -275,7 +284,7 @@ void main() {
       );
       expect(lines, contains('DTSTART;VALUE=DATE:20261024'));
       expect(lines, contains('RRULE:FREQ=DAILY;UNTIL=20261031'));
-      expect(lines, contains('TRIGGER:PT540M'));
+      expect(lines, contains('TRIGGER:PT900M'));
     });
 
     test('ordinals, month days and the week start are kept', () {

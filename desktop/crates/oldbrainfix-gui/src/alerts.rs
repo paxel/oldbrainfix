@@ -344,8 +344,21 @@ impl Alerts {
     ) -> oldbrainfix_core::Result<()> {
         let routines = Routines::new(store).all_with_notes()?;
         let alarms = Alarms::new(store);
-        let renag = DeviceSettings::new(store).renag_interval()?;
-        let then = alarm_plan(&routines, &alarms.snoozes()?, since, wall, renag);
+        let settings = DeviceSettings::new(store);
+        let quiet = if settings.quiet_hours_on()? {
+            Some(settings.quiet_hours()?)
+        } else {
+            None
+        };
+        let then = alarm_plan(
+            &routines,
+            &alarms.snoozes()?,
+            since,
+            wall,
+            settings.renag_interval()?,
+            settings.all_day_from()?,
+            quiet,
+        );
         let missed = catch_up(&then, since, now);
         if missed == 0 {
             return Ok(());

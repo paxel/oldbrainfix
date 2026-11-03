@@ -4,6 +4,14 @@
 //! closed by their button, Esc and back, and back to the one they were
 //! opened from; and the sidebar marking the place the list shows.
 
+// A test may unwrap, expect, panic and index, its helpers too (#229).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::Toggled;
@@ -130,7 +138,8 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     harness.run();
     assert!(!shows(&harness, "A folder…"));
 
-    // Save as Markdown… wants a Note.
+    // Open Pack… wants no Note (#165); Save as Markdown… wants one.
+    assert!(enabled(&mut harness, "File", "Open Pack…"));
     assert!(!enabled(&mut harness, "File", "Save as Markdown…"));
     assert!(!harness.state_mut().take_quit());
     pick(&mut harness, "File", "Quit");
@@ -189,14 +198,14 @@ fn the_view_menu_shows_the_places_and_switches_the_cards() -> TestResult {
         assert_eq!(harness.state().selection(), &place, "{entry}");
     }
     // The Agenda has no cards to switch.
-    assert!(!enabled(&mut harness, "View", "Compact cards"));
+    assert!(!enabled(&mut harness, "View", "Compact views"));
     pick(&mut harness, "View", "All Notes");
     harness.run();
     assert!(!harness.state().compact());
-    pick(&mut harness, "View", "Compact cards");
+    pick(&mut harness, "View", "Compact views");
     harness.run();
     assert!(harness.state().compact());
-    pick(&mut harness, "View", "Full cards");
+    pick(&mut harness, "View", "Detailed views");
     harness.run();
     assert!(!harness.state().compact());
     // The theme: the system's, light or dark (#147).
@@ -225,6 +234,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Reminder…",
         "Make it a Checklist",
         "Send to a person",
+        "Export as Pack…",
+        "History",
         "Delete",
     ] {
         assert!(!enabled(&mut harness, "Note", entry), "{entry}");
@@ -244,6 +255,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Make it a Tally",
         "Send to a person",
         "Copy as text",
+        "Export as Pack…",
+        "History",
         "Delete",
     ] {
         assert!(enabled(&mut harness, "Note", entry), "{entry}");

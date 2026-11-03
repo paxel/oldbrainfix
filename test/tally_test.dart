@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix/src/tally_field_screen.dart';
@@ -163,7 +164,15 @@ void main() {
       // Shown back in imperial.
       await tester.longPress(find.text('Lifting'));
       await tester.pumpAndSettle();
-      expect(find.text('lb · Target 100 lb'), findsOneWidget);
+      for (final (badge, value) in [('unit', 'lb'), ('target', '100 lb')]) {
+        expect(
+          find.descendant(
+            of: key('tally-setup-$badge-${field.id}'),
+            matching: find.text(value),
+          ),
+          findsOneWidget,
+        );
+      }
     });
 
     testWidgets('typing filters the known units, in English or German; a '
@@ -288,9 +297,10 @@ void main() {
       final id = tallies.addField(note.id, name: 'Distance', unit: 'km');
       tallies.add(note.id, values: {id: 5000});
       await startAtNotes(tester);
+      expect(key('tally-chart-$id'), findsOneWidget);
       await tester.longPress(find.text('Running'));
       await tester.pumpAndSettle();
-      expect(find.byType(TallySection), findsOneWidget);
+      expect(find.byType(TallySetup), findsOneWidget);
       await tap(tester, key('tally-field-$id'));
       // Entries hold values: only distances are left.
       expect(
@@ -305,15 +315,186 @@ void main() {
 
       await tap(tester, key('tally-field-hide'));
       expect(tallies.byNote(note.id)!.field(id)!.hidden, isTrue);
-      expect(key('tally-chart-$id'), findsNothing);
+      expect(key('tally-setup-hidden-$id'), findsOneWidget);
 
-      await tap(tester, key('tally-field-$id'));
+      await tap(tester, key('tally-setup-hidden-$id'));
       await reveal(tester, key('tally-field-hide'));
       expect(find.text('Show field again'), findsOneWidget);
       await tap(tester, key('tally-field-hide'));
       expect(tallies.byNote(note.id)!.field(id)!.hidden, isFalse);
       expect(tallies.entries(note.id).single.values[id], 5000);
-      expect(key('tally-chart-$id'), findsOneWidget);
+      expect(key('tally-setup-hidden-$id'), findsNothing);
+    });
+  });
+
+  group('the editor', () {
+    testWidgets('holds only the setup: each field\'s name with its rule, '
+        'unit and target as badges, and "Add field"; no chart, no entries', (
+      tester,
+    ) async {
+      final note = notes.capture('Push-ups');
+      final id = tallies.addField(
+        note.id,
+        name: 'Push-ups',
+        unit: 'times',
+        target: 20,
+      );
+      tallies.add(note.id, values: {id: 10});
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TallySetup), findsOneWidget);
+      expect(find.byType(CardTally), findsNothing);
+      expect(find.byType(TallyChart), findsNothing);
+      expect(key('tally-entries'), findsNothing);
+      expect(key('tally-period'), findsNothing);
+      expect(key('tally-add-entry'), findsNothing);
+      // The rule as its icon (#192), the others as text.
+      expect(
+        find.descendant(
+          of: key('tally-setup-rule-$id'),
+          matching: find.byIcon(Icons.add_circle_outline),
+        ),
+        findsOneWidget,
+      );
+      for (final (badge, value) in [
+        ('unit', 'times'),
+        ('target', '20 times'),
+      ]) {
+        expect(
+          find.descendant(
+            of: key('tally-setup-$badge-$id'),
+            matching: find.text(value),
+          ),
+          findsOneWidget,
+        );
+      }
+
+      // A badge opens the field's page.
+      await tap(tester, key('tally-setup-target-$id'));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      expect(find.text('Field'), findsOneWidget);
+      await enter(tester, key('tally-field-target'), '25');
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.field(id)!.target, 25);
+      expect(
+        find.descendant(
+          of: key('tally-setup-target-$id'),
+          matching: find.text('25 times'),
+        ),
+        findsOneWidget,
+      );
+
+      await tap(tester, key('tally-add-field'));
+      expect(find.text('New field'), findsOneWidget);
+      await enter(tester, key('tally-field-name'), 'Sets');
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.fields, hasLength(2));
+      expect(find.text('Sets'), findsOneWidget);
+    });
+  });
+
+  group('multipliers', () {
+    testWidgets('the field page makes a field multiply another; its badge '
+        'names it, and a multiplier has no rule and no target', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(
+        note.id,
+        name: 'Reps',
+        unit: 'reps',
+        target: 30,
+      );
+      final sets = tallies.addField(note.id, name: 'Sets', target: 4);
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
+
+      Finder badge(String setting, String field) =>
+          key('tally-setup-$setting-$field');
+      expect(
+        find.descendant(
+          of: badge('multiplies', sets),
+          matching: find.text('Nothing'),
+        ),
+        findsOneWidget,
+      );
+      await tap(tester, badge('multiplies', sets));
+      expect(find.byType(TallyFieldScreen), findsOneWidget);
+      expect(key('tally-multiplies-$sets'), findsNothing);
+      await tap(tester, key('tally-multiplies-$reps'));
+      // A multiplier has no target and no rule.
+      expect(key('tally-field-target'), findsNothing);
+      expect(key('tally-rule'), findsNothing);
+      await tap(tester, key('tally-field-save'));
+
+      expect(tallies.byNote(note.id)!.field(sets)!.multiplies, reps);
+      expect(
+        find.descendant(
+          of: badge('multiplies', sets),
+          matching: find.text('Reps'),
+        ),
+        findsOneWidget,
+      );
+      expect(badge('target', sets), findsNothing);
+      expect(badge('rule', sets), findsNothing);
+      // The field multiplied multiplies nothing itself.
+      expect(badge('multiplies', reps), findsNothing);
+      expect(badge('target', reps), findsOneWidget);
+
+      // Nothing again: a field of its own, with its target back.
+      await tap(tester, badge('multiplies', sets));
+      await tap(tester, key('tally-multiplies-nothing'));
+      expect(key('tally-field-target'), findsOneWidget);
+      await tap(tester, key('tally-field-save'));
+      expect(tallies.byNote(note.id)!.field(sets)!.multiplies, isNull);
+      expect(tallies.byNote(note.id)!.field(sets)!.target, 4);
+    });
+
+    testWidgets('a new field can multiply one already there', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(note.id, name: 'Reps', unit: 'reps');
+      await startAtNotes(tester);
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-add-field'));
+      await enter(tester, key('tally-field-name'), 'Sets');
+      await tap(tester, key('tally-multiplies-$reps'));
+      await tap(tester, key('tally-field-save'));
+      final tally = tallies.byNote(note.id)!;
+      expect(tally.multipliersOf(reps).map((f) => f.name), ['Sets']);
+    });
+
+    testWidgets('an entry shows "3 × 10 reps" and counts 30 in the chart and '
+        'the compact total, one without the multiplier as is; the multiplier '
+        'shows no value of its own', (tester) async {
+      final note = notes.capture('Push-ups');
+      final reps = tallies.addField(
+        note.id,
+        name: 'Reps',
+        unit: 'reps',
+        target: 50,
+      );
+      final sets = tallies.addField(note.id, name: 'Sets');
+      tallies.add(note.id, values: {reps: 10, sets: 3});
+      // Recorded before it multiplied: counted on read alike.
+      tallies.setMultiplies(note.id, sets, reps);
+      now = now.add(const Duration(hours: 1));
+      tallies.add(note.id, values: {reps: 5});
+      await startAtNotes(tester);
+
+      await reveal(tester, key('tally-entries'));
+      expect(find.text('Reps 3 × 10 reps'), findsOneWidget);
+      expect(find.text('Reps 5 reps'), findsOneWidget);
+      expect(find.textContaining('Sets'), findsNothing);
+      await reveal(tester, key('tally-chart-$reps'));
+      expect(find.text('Highest bar: 35 reps'), findsOneWidget);
+      expect(key('tally-chart-$sets'), findsNothing);
+
+      await tap(tester, find.text('Push-ups').first);
+      expect(find.byType(CardTally), findsNothing);
+      expect(find.text('Reps 35 / 50 reps'), findsOneWidget);
+      expect(find.textContaining('Sets'), findsNothing);
     });
   });
 
@@ -381,9 +562,9 @@ void main() {
       now = now.add(const Duration(hours: 2));
       tallies.add(note.id, values: {id: 15});
       await startAtNotes(tester);
-      await tester.longPress(find.text('Push-ups'));
-      await tester.pumpAndSettle();
 
+      // On the detailed card, as the list starts.
+      expect(find.byType(CardTally), findsOneWidget);
       await reveal(tester, key('tally-entries'));
       expect(find.text('Push-ups 10 times\nmorning'), findsOneWidget);
       expect(find.text('Push-ups 15 times'), findsOneWidget);
@@ -392,7 +573,7 @@ void main() {
       expect(
         find.descendant(
           of: key('tally-period'),
-          matching: find.byType(RadioListTile<TallyPeriod>),
+          matching: find.byType(ChoiceChip),
         ),
         findsNWidgets(4),
       );
@@ -400,6 +581,74 @@ void main() {
       expect(find.byType(SegmentedButton<TallyPeriod>), findsNothing);
       await tap(tester, key('tally-period-month'));
       expect(find.text('Highest bar: 25 times'), findsOneWidget);
+      // Kept per Note on this Device.
+      expect(store.localSetting(tallyPeriodSetting(note.id)), 'month');
+      // Compact and detailed again: the card reads it anew.
+      await tap(tester, find.text('Push-ups').first);
+      expect(find.byType(CardTally), findsNothing);
+      await tap(tester, find.text('Push-ups').first);
+      expect(
+        tester.widget<ChoiceChips<TallyPeriod>>(key('tally-period')).value,
+        TallyPeriod.month,
+      );
+      await tap(tester, key('tally-period-day'));
+      expect(store.localSetting(tallyPeriodSetting(note.id)), isNull);
+    });
+
+    testWidgets('"Add entry" on the card adds one, its total shows on the '
+        'compact card against the target', (tester) async {
+      final note = notes.capture('Steps');
+      final id = tallies.addField(
+        note.id,
+        name: 'Steps',
+        unit: 'steps',
+        target: 10000,
+      );
+      await startAtNotes(tester);
+      await tap(tester, key('tally-add-entry'));
+      expect(find.byType(TallyEntryScreen), findsOneWidget);
+      await enter(tester, key('tally-value-$id'), '7000');
+      await tap(tester, key('tally-entry-save'));
+      expect(tallies.entries(note.id).single.values[id], 7000);
+      expect(find.text('Steps 7000 steps'), findsOneWidget);
+
+      // A tap on the card shows it compact.
+      await tap(tester, find.text('Steps').first);
+      expect(find.byType(CardTally), findsNothing);
+      expect(find.text('Steps 7000 / 10000 steps'), findsOneWidget);
+    });
+
+    testWidgets('the card shows the latest five entries, newest first, the '
+        'older folded under how many until a tap, kept on this Device', (
+      tester,
+    ) async {
+      final note = notes.capture('Pages');
+      final id = tallies.addField(note.id, name: 'Pages');
+      final added = <TallyEntry>[];
+      for (var i = 1; i <= 7; i++) {
+        added.add(tallies.add(note.id, values: {id: i.toDouble()}));
+        now = now.add(const Duration(minutes: 1));
+      }
+      await startAtNotes(tester);
+      await reveal(tester, key('tally-older'));
+      for (final entry in added.skip(2)) {
+        expect(key('tally-entry-${entry.id}'), findsOneWidget);
+      }
+      for (final entry in added.take(2)) {
+        expect(key('tally-entry-${entry.id}'), findsNothing);
+      }
+      expect(
+        tester.getTopLeft(key('tally-entry-${added[6].id}')).dy,
+        lessThan(tester.getTopLeft(key('tally-entry-${added[2].id}')).dy),
+      );
+      expect(find.text('2 older entries'), findsOneWidget);
+
+      await tap(tester, key('tally-older'));
+      expect(key('tally-entry-${added[0].id}'), findsOneWidget);
+      expect(store.localSetting(tallyEntriesShownSetting(note.id)), 'true');
+      await tap(tester, key('tally-older'));
+      expect(key('tally-entry-${added[0].id}'), findsNothing);
+      expect(store.localSetting(tallyEntriesShownSetting(note.id)), isNull);
     });
 
     testWidgets('tapping an entry edits it; a long press deletes it after '
@@ -408,8 +657,6 @@ void main() {
       final id = tallies.addField(note.id, name: 'Pages');
       final entry = tallies.add(note.id, values: {id: 12});
       await startAtNotes(tester);
-      await tester.longPress(find.text('Pages'));
-      await tester.pumpAndSettle();
 
       await tap(tester, key('tally-entry-${entry.id}'));
       expect(find.byType(TallyEntryScreen), findsOneWidget);
@@ -532,7 +779,9 @@ void main() {
       tester,
     ) async {
       invite();
-      Tallies(ben).add(note, values: {field: 7}, line: 'Ben did some');
+      // Today on Ann's clock too.
+      Tallies(ben)
+          .add(note, values: {field: 7}, line: 'Ben did some', at: now.toUtc());
       final done = answerSync(
         store,
         wire(
@@ -550,8 +799,11 @@ void main() {
       expect(tallies.entries(note), hasLength(2));
 
       await startAtNotes(tester);
-      await tester.longPress(find.text('Push-ups'));
-      await tester.pumpAndSettle();
+      // The compact card counts the user's own entries, as the detailed
+      // view does by default.
+      await tap(tester, find.byKey(const ValueKey('compactNotes')));
+      expect(find.text('Push-ups 10 times'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('compactNotes')));
       await reveal(tester, key('tally-whose'));
       expect(
         tester

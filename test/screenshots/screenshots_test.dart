@@ -7,12 +7,14 @@
 //
 // The user guide's phone frames (#134) come from the same seeded data:
 // each screen in English and German, light and dark, 648 × 1152, under
-// site/assets/frames/phone/<language>/<theme>/. They are committed; a run
+// site/assets/frames/phone/<language>/<theme>/, a guide box's frame in
+// the folder of its page as <page>/<box>.png (#171). They are committed; a run
 // compares each frame with the committed one and fails when they differ,
 // and UPDATE_FRAMES=1 writes them instead (tool/guide-frames.sh):
 //
 //   flutter test test/screenshots --run-skipped --concurrency=1 \
 //     --plain-name 'guide frames'
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -22,21 +24,42 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
+import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
+import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
+import 'package:oldbrainfix/src/feedback_screen.dart';
+import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
+import 'package:oldbrainfix/src/frogs_screen.dart';
+import 'package:oldbrainfix/src/help_notes.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
+import 'package:oldbrainfix/src/look.dart';
+import 'package:oldbrainfix/src/missed_summary_card.dart';
+import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/note_history_screen.dart';
+import 'package:oldbrainfix/src/nudge_screen.dart';
+import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
+import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
+import 'package:oldbrainfix/src/sent_item_screen.dart';
+import 'package:oldbrainfix/src/settings_screen.dart';
+import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
+import 'package:oldbrainfix/src/speech_model_screen.dart';
+import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
+import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -44,9 +67,12 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../backup_test.dart' show DirFolders, quickKey;
 import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
+import '../fake_appointments.dart';
 import '../fake_photos.dart';
+import '../fake_speech.dart';
 import '../fake_voice.dart';
 import '../open_capture.dart';
+import '../reveal.dart';
 
 /// The frame in physical pixels and the density of a common phone:
 /// 432 × 768 logical pixels, which 2.5 scales to exactly 1080 × 1920.
@@ -99,6 +125,20 @@ typedef _Texts = ({
   String evening,
   String formatted,
   String meters,
+  String script,
+  String checks,
+  String spoken,
+  String receipt,
+  String tag,
+  String search,
+  String sent,
+  String boilerHere,
+  String boilerThere,
+  String packArea,
+  String packTopic,
+  String packTally,
+  String packList,
+  String packStretch,
 });
 
 const _en = (
@@ -163,6 +203,31 @@ const _en = (
       '| Electricity kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
       '| Water m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
       '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
+  script:
+      '#!/bin/sh\n'
+      '# Copy the photos to the USB disk every Sunday\n'
+      'rsync -a --delete ~/Pictures/ /media/usb/photos/\n'
+      'echo "Photos copied: \$(date +%F)"',
+  checks:
+      'Before the holiday\n'
+      '✅ Turn the heating down\n'
+      '✅ Give the spare key to the Müllers\n'
+      '❌ Cancel the newspaper\n'
+      '✅ Water the plants on Sunday',
+  spoken:
+      'Call the plumber about the boiler, Thursday morning between eight '
+      'and ten.',
+  receipt: 'Bakery receipt for the party',
+  tag: '#boiler',
+  search: 'boiler',
+  sent: 'Lena\'s birthday on Saturday: bring the cake at 3',
+  boilerHere: 'Boiler knocks in the mornings, plumber on Thursday',
+  boilerThere: 'Boiler knocks in the mornings and evenings',
+  packArea: 'Fitness',
+  packTopic: 'Running',
+  packTally: 'Laps',
+  packList: 'Race day\nShoes\nStart number\nWater',
+  packStretch: 'Stretch after running',
 );
 
 const _de = (
@@ -227,6 +292,31 @@ const _de = (
       '| Strom kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
       '| Wasser m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
       '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
+  script:
+      '#!/bin/sh\n'
+      '# Die Fotos jeden Sonntag auf die USB-Platte kopieren\n'
+      'rsync -a --delete ~/Bilder/ /media/usb/fotos/\n'
+      'echo "Fotos kopiert: \$(date +%F)"',
+  checks:
+      'Vor dem Urlaub\n'
+      '✅ Heizung herunterdrehen\n'
+      '✅ Ersatzschlüssel zu Müllers bringen\n'
+      '❌ Zeitung abbestellen\n'
+      '✅ Pflanzen am Sonntag gießen',
+  spoken:
+      'Den Installateur wegen der Therme anrufen, Donnerstag früh zwischen '
+      'acht und zehn.',
+  receipt: 'Beleg vom Bäcker für die Feier',
+  tag: '#Therme',
+  search: 'Therme',
+  sent: 'Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen',
+  boilerHere: 'Therme klopft morgens, Installateur am Donnerstag',
+  boilerThere: 'Therme klopft morgens und abends',
+  packArea: 'Fitness',
+  packTopic: 'Laufen',
+  packTally: 'Runden',
+  packList: 'Lauftag\nSchuhe\nStartnummer\nWasser',
+  packStretch: 'Nach dem Laufen dehnen',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -235,40 +325,83 @@ class _Seeded {
   final Store store;
   final Routine snack;
 
-  _Seeded._(this.store, this.snack);
+  /// The Sent Item Lena sent, with [sends].
+  final Uint8List? sent;
+
+  /// The Pack Lena made with her Profile, with [packs] (#164).
+  final Uint8List? pack;
+
+  _Seeded._(this.store, this.snack, [this.sent, this.pack]);
 
   /// With [lists], the Household also holds a Checklist, a Shopping List
   /// and a Tally with its entries, for the guide's frames of them.
   /// With [formatted], it holds a formatted Note and one with a table.
   /// With [people], the user's Profile is Sam's and Lena is in People;
-  /// with [shared] too, Work is shared with her from afar.
+  /// with [shared] too, Work is shared with her from afar. With [missed],
+  /// what the history Missed stays unseen, in the Missed Summary; with
+  /// [dueReminder], the boiler's Note has a Reminder due at 09:30.
+  /// With [sends], Lena sent a Note with a Reminder, not encrypted
+  /// ([sent]). With [packs], Lena made a Pack of her Fitness with her
+  /// Profile ([pack]). With [conflict], the Laptop is paired and it and this
+  /// Device changed the boiler's text before they synced.
   factory _Seeded(
     _Texts x, {
     bool lists = false,
     bool formatted = false,
     bool people = false,
     bool shared = false,
+    bool missed = false,
+    bool dueReminder = false,
+    bool sends = false,
+    bool packs = false,
+    bool conflict = false,
   }) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
-    final store = Store.inMemory(clock: () => clock)
-      ..starterSetOffered = true
-      ..alarmSetupDone = true;
-    final snack = _seed(store, x, (at) => clock = at);
+    // With People, the own key from a fixed seed: the same short code
+    // on the Profile page on every run.
+    final withPeople = people || shared || sends || packs;
+    final store =
+        Store.inMemory(
+            clock: () => clock,
+            newKey: withPeople
+                ? () => SigningKey.fromSeed(
+                    Uint8List.fromList([for (var i = 0; i < 32; i++) 44]),
+                  )
+                : SigningKey.generate,
+          )
+          ..starterSetOffered = true
+          ..alarmSetupDone = true;
+    final snack = _seed(store, x, (at) => clock = at, dueReminder: dueReminder);
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);
-    if (people || shared) _seedPeople(store, shared: shared);
+    Uint8List? sent;
+    Uint8List? pack;
+    if (withPeople) {
+      (sent, pack) = _seedPeople(
+        store,
+        x,
+        shared: shared,
+        sends: sends,
+        packs: packs,
+      );
+    }
     clock = _now;
+    if (conflict) _seedConflict(store, x);
     // What the history Missed was seen already: no Missed Summary.
-    Alarms(store).markSeen();
-    return _Seeded._(store, snack);
+    if (!missed) Alarms(store).markSeen();
+    // The screens show Tallies, Sessions, Frogs, Topics, the format bar
+    // and roles: Advanced, chosen (#197).
+    store.advanced = true;
+    return _Seeded._(store, snack, sent, pack);
   }
 
   static Routine _seed(
     Store store,
     _Texts x,
-    void Function(DateTime) setClock,
-  ) {
+    void Function(DateTime) setClock, {
+    bool dueReminder = false,
+  }) {
     final places = Places(store);
     final notes = Notes(store);
     final routines = Routines(store);
@@ -429,6 +562,9 @@ class _Seeded {
       atHome: true,
     );
     notes.setImportance(boiler.id, Importance.important);
+    if (dueReminder) {
+      routines.spawn(boiler.id, Schedule(start: day(27), times: [at(9, 30)]));
+    }
     setClock(DateTime(2026, 10, 23, 12, 40));
     notes.amend(boiler.id, x.boilerParts[0]);
     setClock(DateTime(2026, 10, 26, 10, 25));
@@ -502,8 +638,11 @@ class _Seeded {
   }
 }
 
-/// A formatted Note about the boiler's service and one with a table of
-/// meter readings, both in the Household, the newest of its Notes.
+/// The Household's texts, its newest Notes: the table of meter readings
+/// and the boiler's service, both formatted; the backup script as Code
+/// (#213); the holiday's boxes, written checked or failed, the first
+/// failed and checked again, so that it has a History; the receipt's
+/// photo with its Photo Text; and a voice note with its Transcript, the newest.
 void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
   final notes = Notes(store);
   final household = Places(store)
@@ -513,13 +652,62 @@ void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
   notes.capture(x.meters, format: TextFormats.markdown, place: household.id);
   setClock(DateTime(2026, 10, 27, 9, 10));
   notes.capture(x.formatted, format: TextFormats.markdown, place: household.id);
+  setClock(DateTime(2026, 10, 27, 9, 40));
+  notes.capture(x.script, format: TextFormats.code, place: household.id);
+  setClock(DateTime(2026, 10, 27, 10, 5));
+  final checks = notes.capture(x.checks, place: household.id);
+  final boxes = Boxes(store);
+  final shown = boxes.of(checks.id);
+  setClock(DateTime(2026, 10, 27, 18, 20));
+  boxes.tick(checks.id, shown[0].id, BoxState.failed);
+  setClock(DateTime(2026, 10, 27, 18, 25));
+  boxes.tick(checks.id, shown[0].id, BoxState.done);
+  setClock(DateTime(2026, 10, 27, 19, 30));
+  final receipt = notes.capture(
+    x.receipt,
+    place: household.id,
+    photos: [File(_receiptPhoto).readAsBytesSync()],
+  );
+  notes.setPhotoText(receipt.id, receipt.photos.single, _receiptText);
+  setClock(DateTime(2026, 10, 27, 20, 15));
+  final voice = notes.capture(
+    '',
+    place: household.id,
+    recordings: [
+      Uint8List.fromList([1, 2, 3]),
+    ],
+  );
+  notes.setTranscript(voice.id, voice.recordings.single, x.spoken);
 }
+
+/// The photo of a bakery's receipt the OCR tests read.
+const _receiptPhoto = 'android/ocr/testdata/german-receipt.jpg';
+
+/// The words read from [_receiptPhoto], line by line.
+const _receiptText =
+    'Bäckerei Müller GmbH\n'
+    'Hauptstraße 7, 80331 München\n'
+    'Brötchen 6x 2,40 €\n'
+    'Käsekuchen 3,90 €\n'
+    'Süßes Teilchen 1,85 €\n'
+    'Summe EUR 8,15\n'
+    'MwSt 7% 0,53\n'
+    'Vielen Dank für Ihren Einkauf';
 
 /// The user's own Profile as Sam's, and Lena in People from her Profile
 /// card, sent through a messenger, so not verified. With [shared], Work
 /// is shared with her from afar as a Member, its changes travelling by
-/// bundles.
-void _seedPeople(Store store, {required bool shared}) {
+/// bundles. With [sends], she sends a Note with a Reminder, not
+/// encrypted: its file. With [packs], she makes a Pack of her Fitness,
+/// a Tally, a Checklist and a Note with a Routine,
+/// with her Profile (#164): its file.
+(Uint8List?, Uint8List?) _seedPeople(
+  Store store,
+  _Texts x, {
+  required bool shared,
+  bool sends = false,
+  bool packs = false,
+}) {
   store
     ..applyProfileDefaults(name: 'Sam')
     ..renameOwnProfile('Sam');
@@ -535,9 +723,39 @@ void _seedPeople(Store store, {required bool shared}) {
         ..renameOwnProfile('Lena');
   final id = lena.ownProfile!.id;
   final card = lena.profileCard()!;
+  Uint8List? sent;
+  if (sends) {
+    final party = Notes(lena).capture(x.sent);
+    Routines(lena).spawn(
+      party.id,
+      Schedule(start: Day(2026, 10, 31), times: [ClockTime(14, 30)]),
+    );
+    sent = sendNote(lena, party.id);
+  }
+  Uint8List? pack;
+  if (packs) {
+    final fitness = Places(lena).addArea(x.packArea);
+    final running = Places(lena).addTopic(fitness.id, x.packTopic);
+    final notes = Notes(lena);
+    final laps = notes.capture(x.packTally, place: running.id);
+    Tallies(lena).addField(laps.id, name: x.packTally, target: 10);
+    final list = notes.capture(x.packList, place: running.id);
+    Checklists(lena).make(list.id);
+    final stretch = notes.capture(x.packStretch, place: fitness.id);
+    Routines(lena).spawn(
+      stretch.id,
+      Schedule(
+        start: Day(2026, 10, 1),
+        times: [ClockTime(19, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,WE,FR'),
+      ),
+    );
+    final whole = lena.packOf(fitness.id);
+    pack = lena.writePack(whole, whole.allKeys(), addProfile: true);
+  }
   lena.close();
   store.openProfileCard(card);
-  if (!shared) return;
+  if (!shared) return (sent, pack);
   final work = Places(store).areas().firstWhere((a) => a.starter == 'work');
   shareAreaWith(
     store,
@@ -546,6 +764,36 @@ void _seedPeople(Store store, {required bool shared}) {
     role: AreaRole.member,
     transport: Transport.bundle,
   );
+  return (sent, pack);
+}
+
+/// The Laptop, a Device of the user's own, paired, and a Conflict: it and
+/// this phone changed the boiler's text before they synced.
+void _seedConflict(Store store, _Texts x) {
+  final laptop = Store.inMemory(
+    clock: () => _now.subtract(const Duration(minutes: 25)),
+    newKey: () => SigningKey.fromSeed(
+      Uint8List.fromList([for (var i = 0; i < 32; i++) 46]),
+    ),
+  );
+  laptop.applyEntries(store.entriesSince(const {}), keys: [store.ownKeyRecord]);
+  final boiler = Notes(store).all().firstWhere((n) => n.text == x.boiler);
+  Notes(store).edit(boiler.id, x.boilerHere);
+  Notes(laptop).edit(boiler.id, x.boilerThere);
+  store
+    ..applyEntries(laptop.entriesSince(const {}), keys: [laptop.ownKeyRecord])
+    ..rememberDevice(
+      PairedDevice(
+        id: laptop.deviceId,
+        name: 'Laptop',
+        fingerprint: '',
+        host: null,
+        port: null,
+        lastSync: _now,
+        shared: false,
+      ),
+    );
+  laptop.close();
 }
 
 /// The Flutter SDK's root, from the test runner it started.
@@ -642,6 +890,8 @@ Future<AppLocalizations> _start(
   FakeAlarms? alarms,
   BundlePlatform bundles = const NoBundles(),
   FolderPlatform folders = const NoFolders(),
+  AppointmentSource appointments = const NoAppointments(),
+  SpeechPlatform speech = const NoSpeech(),
 }) async {
   tester.view
     ..physicalSize = _frame / _dpr * dpr
@@ -660,6 +910,8 @@ Future<AppLocalizations> _start(
         photos: FakePhotos(),
         bundles: bundles,
         folders: folders,
+        appointments: appointments,
+        speech: speech,
       ),
     ),
   );
@@ -733,9 +985,10 @@ Future<({int width, int height, Uint8List rgba})> _decode(
 Future<void> _matchFrame(
   WidgetTester tester,
   GlobalKey boundary,
-  String path,
-) async {
-  final shot = await _capture(tester, boundary, _guideDpr);
+  String path, {
+  double dpr = _guideDpr,
+}) async {
+  final shot = await _capture(tester, boundary, dpr);
   final file = File(path);
   if (Platform.environment['UPDATE_FRAMES'] == '1') {
     file.parent.createSync(recursive: true);
@@ -918,6 +1171,40 @@ void main() {
     () {
       setUpAll(_loadFonts);
 
+      // The pictures of "What the icons mean" (#180), one per group and
+      // language, light, written into the app's assets.
+      for (final language in ['en', 'de']) {
+        for (final group in helpIconGroups) {
+          _shot('$language help ${group.slug}', (tester) async {
+            final boundary = GlobalKey();
+            const dpr = 2.0;
+            tester.view
+              ..physicalSize = HelpIconsPicture.sizeOf(group) * dpr
+              ..devicePixelRatio = dpr;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(
+              MaterialApp(
+                debugShowCheckedModeBanner: false,
+                locale: Locale(language),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: lookTheme(Brightness.light),
+                home: RepaintBoundary(
+                  key: boundary,
+                  child: HelpIconsPicture(group: group),
+                ),
+              ),
+            );
+            await _matchFrame(
+              tester,
+              boundary,
+              group.asset(language),
+              dpr: dpr,
+            );
+          });
+        }
+      }
+
       for (final (language, texts) in [('en', _en), ('de', _de)]) {
         for (final (theme, choice) in [
           ('light', ThemeChoice.light),
@@ -954,24 +1241,94 @@ void main() {
             });
           }
 
+          /// The frame of the box [box] on the guide page [page] (#171),
+          /// as the site's box names it: <page>/<box>.png. A page's
+          /// ticket only adds its scenes here.
+          void boxFrame(
+            String page,
+            String box,
+            Future<void> Function(WidgetTester) body,
+          ) => frame('$page/$box', body);
+
           frame('agenda', (tester) async {
             await start(tester, seed());
             expect(find.byType(AgendaScreen), findsOneWidget);
           });
 
-          frame('first-start', (tester) async {
-            await firstStart(tester);
-            expect(find.byType(FirstStartScreen), findsOneWidget);
-            expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
-          });
-
-          frame('starter-set', (tester) async {
+          // Getting started: the first start's choices, the Import rows
+          // and the alarm setup.
+          boxFrame('getting-started', 'start-new', (tester) async {
             await firstStart(tester);
             await _tap(tester, find.byKey(const ValueKey('first-new')));
             expect(find.byType(StarterSetScreen), findsOneWidget);
           });
 
-          frame('capture-fan', (tester) async {
+          boxFrame('getting-started', 'add-device', (tester) async {
+            await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-device')));
+            expect(find.byType(SyncScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'restore', (tester) async {
+            await firstStart(tester);
+            expect(find.byType(FirstStartScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
+          });
+
+          /// The phone's Settings scrolled to its Import rows, a folder
+          /// pickable.
+          Future<void> importRows(WidgetTester tester) async {
+            final dir = Directory('build/guide-import')
+              ..createSync(recursive: true);
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              folders: DirFolders(dir.path),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            final keep = find.byKey(const ValueKey('importKeep'));
+            await tester.scrollUntilVisible(
+              keep,
+              300,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(SettingsScreen),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame('getting-started', 'import-folder', (tester) async {
+            await importRows(tester);
+            expect(find.byKey(const ValueKey('importFolder')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'import-keep', (tester) async {
+            await importRows(tester);
+            await _tap(tester, find.byKey(const ValueKey('importKeep')));
+            expect(find.byKey(const ValueKey('importKeepZip')), findsOneWidget);
+          });
+
+          boxFrame('getting-started', 'set-up', (tester) async {
+            final t = await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-new')));
+            await _tap(tester, find.text(t.starterSetDone));
+            expect(find.byType(SetupScreen), findsOneWidget);
+          });
+
+          // Capture and sort: the fan of "+", a thought typed as a quick
+          // entry opens it, the quick note filed into the Household, the
+          // Unsorted Notes, the Note editor and its History.
+          boxFrame('capture-and-sort', 'capture', (tester) async {
             await start(tester, seed());
             await _tap(tester, find.byIcon(Icons.add));
             for (final way in ['text', 'voice', 'photo', 'gallery', 'paste']) {
@@ -979,7 +1336,7 @@ void main() {
             }
           });
 
-          frame('capture', (tester) async {
+          boxFrame('capture-and-sort', 'capture-outside', (tester) async {
             await start(tester, seed());
             await openTextCapture(tester);
             await tester.enterText(find.byType(TextField), texts.captureText);
@@ -988,23 +1345,167 @@ void main() {
             expect(find.byType(NudgeButtons), findsOneWidget);
           });
 
-          frame('routine-editor', (tester) async {
-            await start(tester, seed());
-            await _tap(tester, find.text(texts.snack).first);
-            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+          boxFrame('capture-and-sort', 'sort-while-capturing', (tester) async {
+            final seeded = seed();
+            // Settings ▸ Quick note: File into…, the alarm clock and the
+            // Importance switched on (#142).
+            for (final control in [
+              QuickNoteControl.fileInto,
+              QuickNoteControl.schedule,
+              QuickNoteControl.importance,
+            ]) {
+              seeded.store.setQuickNoteShows(control, true);
+            }
+            final t = await start(tester, seeded);
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await _tap(
+              tester,
+              find.descendant(
+                of: find.byKey(const ValueKey('note-actions')),
+                matching: find.byTooltip(t.fileInto),
+              ),
+            );
+            // File into… over the quick note: "→" has no glyph in the
+            // frames' fonts, so the frame stops before the pick.
+            expect(find.byType(FileIntoScreen), findsOneWidget);
           });
 
-          frame('note-editor', (tester) async {
+          boxFrame('capture-and-sort', 'sort-later', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+            expect(find.byType(UnsortedScreen), findsOneWidget);
+          });
+
+          /// The boiler's Note, with its two Amends, in the Note editor.
+          Future<void> boilerEditor(WidgetTester tester) async {
             final t = await start(tester, seed());
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
             await tester.longPress(find.text(texts.boiler));
             await tester.pumpAndSettle();
             expect(find.byType(NoteEditorScreen), findsOneWidget);
+          }
+
+          boxFrame('capture-and-sort', 'edit', (tester) async {
+            await boilerEditor(tester);
             // The row of badges under the text (#160).
             expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
           });
 
+          boxFrame('capture-and-sort', 'history', (tester) async {
+            await boilerEditor(tester);
+            await _tap(tester, find.byKey(const ValueKey('note-history')));
+            expect(find.byType(NoteHistoryScreen), findsOneWidget);
+          });
+
+          // Routines and the Agenda (#173): a new Routine typed from the
+          // Agenda's bar, the snack's schedule on weekdays, its Re-nag
+          // and Escalation, a Reminder due now in its Note's editor, the
+          // Missed Summary, the snack's History, the Agenda with its
+          // groups, All Routines and Reminders and the Calendar page.
+          boxFrame('routines-and-agenda', 'set-up', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.newRoutineTooltip));
+            await tester.enterText(
+              find.byType(TextField).first,
+              texts.captureText,
+            );
+            await tester.pumpAndSettle();
+            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+          });
+
+          /// The snack's Routine in its editor.
+          Future<AppLocalizations> snackEditor(WidgetTester tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.text(texts.snack).first);
+            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+            return t;
+          }
+
+          boxFrame('routines-and-agenda', 'schedule', (tester) async {
+            final t = await snackEditor(tester);
+            await _tap(tester, find.text(t.repeatWeekdays));
+            // The weekdays under the kinds, the start and the end below.
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -170),
+            );
+            await tester.pumpAndSettle();
+          });
+
+          boxFrame('routines-and-agenda', 're-nag', (tester) async {
+            await snackEditor(tester);
+            for (final key in ['renag', 'escalation', 'escalationOn']) {
+              final control = find.byKey(ValueKey(key));
+              await reveal(tester, control);
+              await _tap(tester, control);
+            }
+            await reveal(tester, find.byKey(const ValueKey('escalationAfter')));
+          });
+
+          boxFrame('routines-and-agenda', 'check-off', (tester) async {
+            final t = await start(
+              tester,
+              _Seeded(texts, dueReminder: true)..store.themeChoice = choice,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+            await tester.longPress(find.text(texts.boiler));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('open-done')), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('open-done-trash')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame('routines-and-agenda', 'missed', (tester) async {
+            await start(
+              tester,
+              _Seeded(texts, missed: true)..store.themeChoice = choice,
+            );
+            expect(find.byType(MissedSummaryCard), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'history', (tester) async {
+            final t = await snackEditor(tester);
+            await _tap(tester, find.byTooltip(t.historyTitle));
+            expect(find.byType(RoutineHistoryScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'agenda', (tester) async {
+            await start(
+              tester,
+              _Seeded(texts, lists: true)..store.themeChoice = choice,
+            );
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'all-routines', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('allRoutines')));
+            expect(find.byType(AllRoutinesScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'calendar', (tester) async {
+            await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              appointments: FakeAppointments(),
+            );
+            await _tap(tester, find.byKey(const ValueKey('calendarPage')));
+            expect(find.byType(CalendarScreen), findsOneWidget);
+          });
+
+          // Lists, Tallies, Sessions and Frogs (#174): the fan of the
+          // Household's "+", its cards compact, a plain Note's kinds, the
+          // packing Checklist in the editor, the Shopping List's Agenda
+          // choices and its card, a new Tally, a Tally's card, a new
+          // Session and the Frog view.
           /// The Household with its Checklist, Shopping List and Tally.
           Future<void> household(WidgetTester tester) async {
             final t = await start(
@@ -1022,12 +1523,12 @@ void main() {
             await _tap(tester, find.byTooltip(t.addHere));
           }
 
-          frame('add-fan', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'make', (tester) async {
             await addFan(tester);
             expect(find.byKey(const ValueKey('addFan-tally')), findsOneWidget);
           });
 
-          frame('new-tally', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'tally', (tester) async {
             await addFan(tester);
             await _tap(tester, find.byKey(const ValueKey('addFan-tally')));
             Finder key(String k) => find.byKey(ValueKey(k));
@@ -1049,7 +1550,7 @@ void main() {
             expect(find.text(texts.squats), findsOneWidget);
           });
 
-          frame('new-session', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'session', (tester) async {
             await addFan(tester);
             await _tap(tester, find.byKey(const ValueKey('addFan-session')));
             await tester.enterText(
@@ -1070,7 +1571,9 @@ void main() {
             (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
           );
 
-          frame('lists', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'shopping-list', (
+            tester,
+          ) async {
             await household(tester);
             // The lower part of the Checklist above the Shopping List,
             // its struck Lines at the end.
@@ -1085,7 +1588,7 @@ void main() {
             expect(groceries, findsOneWidget);
           });
 
-          frame('list-editor', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'checklist', (tester) async {
             await household(tester);
             // The packing Checklist in the editor (#184): one block of
             // text with boxes, the group in a frame with its own Line.
@@ -1105,7 +1608,9 @@ void main() {
             expect(lines, findsOneWidget);
           });
 
-          frame('tally', (tester) async {
+          boxFrame('lists-tallies-sessions-frogs', 'tally-entry', (
+            tester,
+          ) async {
             await household(tester);
             final reading = find.text(texts.reading);
             await tester.scrollUntilVisible(
@@ -1114,45 +1619,108 @@ void main() {
               scrollable: notesList.first,
             );
             await tester.pumpAndSettle();
-            await tester.longPress(reading);
-            await tester.pumpAndSettle();
-            expect(find.byType(NoteEditorScreen), findsOneWidget);
-            // The length of a bar and the chart of the pages read, with the
-            // target as a line.
+            // The detailed card (#190): "Add entry", the length of a bar and
+            // the chart of the pages read, with the target as a line.
             expect(
               find.text('${texts.pagesRead} (${texts.pages})'),
               findsOneWidget,
             );
-            Scrollable.ensureVisible(
-              tester.element(find.byKey(const ValueKey('tally-period'))),
-              alignment: 0.12,
-            );
+            Scrollable.ensureVisible(tester.element(reading));
             await tester.pumpAndSettle();
           });
 
-          /// The Household with its formatted Notes, the newest on top.
-          Future<void> formattedNotes(WidgetTester tester) async {
-            final t = await start(
+          boxFrame('lists-tallies-sessions-frogs', 'views', (tester) async {
+            await household(tester);
+            // Every card of the Household in its compact view (#189).
+            await _tap(tester, find.byKey(const ValueKey('compactNotes')));
+            expect(find.byType(NoteCard), findsWidgets);
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'kind', (tester) async {
+            await boilerEditor(tester);
+            // The kind badge's choices for a plain Note (#188).
+            final kind = find.byKey(const ValueKey('badge-kind'));
+            await reveal(tester, kind);
+            await _tap(tester, kind);
+            expect(
+              find.byKey(const ValueKey('kind-checklist')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'list-on-agenda', (
+            tester,
+          ) async {
+            await household(tester);
+            // The weekly Shopping List's "Show on the Agenda" (#186).
+            final groceries = find.text(texts.groceries.split('\n').first);
+            await tester.scrollUntilVisible(
+              groceries,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            await tester.longPress(groceries);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final agenda = find.byKey(const ValueKey('badge-agenda'));
+            await reveal(tester, agenda);
+            await _tap(tester, agenda);
+          });
+
+          boxFrame('lists-tallies-sessions-frogs', 'frog', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byTooltip(t.frogsTitle));
+            expect(find.byType(FrogsScreen), findsOneWidget);
+          });
+
+          // Formatted text, Transcripts and Photo Texts (#175): the format
+          // bar, a script as Code, a table full screen, a box's menu, a
+          // #tag's and a word's search, the speech model, a receipt's
+          // Photo Text and a Transcript's buttons in the editor.
+          const texts175 = 'formatted-text-transcripts-photo-texts';
+
+          /// The Household with its texts, the newest on top, [speech]
+          /// running Whisper with the base model.
+          Future<AppLocalizations> formattedNotes(
+            WidgetTester tester, {
+            SpeechPlatform speech = const NoSpeech(),
+          }) async {
+            final t = await _start(
               tester,
-              _Seeded(texts, formatted: true)..store.themeChoice = choice,
+              boundary,
+              language,
+              (_Seeded(
+                texts,
+                formatted: true,
+              )..store.themeChoice = choice).store,
+              _guideDpr,
+              speech: speech,
             );
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
+            return t;
           }
 
           /// The card's text of [text], as drawn on the list.
           Finder cardText(String text) =>
               find.byWidgetPredicate((w) => w is MarkedText && w.text == text);
 
-          frame('formatted-text', (tester) async {
-            await formattedNotes(tester);
-            final boiler = cardText(texts.formatted);
+          /// Scrolls the Household's list to [finder].
+          Future<void> scrollTo(WidgetTester tester, Finder finder) async {
             await tester.scrollUntilVisible(
-              boiler,
+              finder,
               300,
               scrollable: notesList.first,
             );
             await tester.pumpAndSettle();
+          }
+
+          boxFrame(texts175, 'format', (tester) async {
+            await formattedNotes(tester);
+            final boiler = cardText(texts.formatted);
+            await scrollTo(tester, boiler);
             await tester.longPress(boiler.first);
             await tester.pumpAndSettle();
             expect(find.byType(NoteEditorScreen), findsOneWidget);
@@ -1170,15 +1738,23 @@ void main() {
             expect(find.byKey(const ValueKey('two-row-bar')), findsOneWidget);
           });
 
-          frame('table', (tester) async {
+          boxFrame(texts175, 'code', (tester) async {
+            await formattedNotes(tester);
+            // The backup script's Text format badge open (#213).
+            final script = find.textContaining(texts.script.split('\n')[1]);
+            await scrollTo(tester, script);
+            await tester.longPress(script.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final format = find.byKey(const ValueKey('badge-format'));
+            await reveal(tester, format);
+            await _tap(tester, format);
+          });
+
+          boxFrame(texts175, 'table', (tester) async {
             await formattedNotes(tester);
             final meters = cardText(texts.meters);
-            await tester.scrollUntilVisible(
-              meters,
-              300,
-              scrollable: notesList.first,
-            );
-            await tester.pumpAndSettle();
+            await scrollTo(tester, meters);
             final table = find.descendant(
               of: meters.first,
               matching: find.byWidgetPredicate(
@@ -1189,17 +1765,197 @@ void main() {
             expect(find.byType(TableScreen), findsOneWidget);
           });
 
-          frame('share-area', (tester) async {
-            final seeded = _Seeded(texts, people: true)
-              ..store.themeChoice = choice;
+          boxFrame(texts175, 'box', (tester) async {
+            await formattedNotes(tester);
+            // The History of the holiday's first box, failed and checked
+            // again; its menu offers ☐, which no font here draws.
+            final box = find.byWidgetPredicate((w) {
+              final key = w.key;
+              // A box's button is keyed by its id, four letters or
+              // digits; its menu's entries by their state.
+              return key is ValueKey<String> &&
+                  RegExp(r'^box-[0-9a-z]{4}$').hasMatch(key.value) &&
+                  !const {'box-open', 'box-done'}.contains(key.value);
+            });
+            final heading = texts.checks.split('\n').first;
+            final checks = find.byWidgetPredicate(
+              (w) => w is MarkedText && w.text.startsWith(heading),
+            );
+            await scrollTo(tester, checks);
+            await _tap(tester, box.first);
+            await _tap(tester, find.byKey(const ValueKey('box-history')));
+            expect(
+              find.byKey(const ValueKey('box-history-dialog')),
+              findsOneWidget,
+            );
+          });
+
+          /// The search of all Notes for [query], as typed.
+          Future<void> search(WidgetTester tester, String query) async {
             final t = await _start(
+              tester,
+              boundary,
+              language,
+              (_Seeded(
+                texts,
+                formatted: true,
+              )..store.themeChoice = choice).store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            final field = find.widgetWithText(TextField, t.searchAllHint);
+            await tester.enterText(field, query);
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame(texts175, 'tag', (tester) async {
+            await search(tester, texts.tag);
+          });
+
+          boxFrame(texts175, 'search', (tester) async {
+            await search(tester, texts.search);
+          });
+
+          /// The Speech model page, opened from Settings.
+          Future<void> speechModel(WidgetTester tester) async {
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              speech: FakeSpeech(installed: WhisperModel.base.sha256),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            final model = find.text(t.speechModelTitle);
+            await tester.scrollUntilVisible(
+              model,
+              300,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(SettingsScreen),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            await _tap(tester, model);
+            expect(find.byType(SpeechModelScreen), findsOneWidget);
+          }
+
+          boxFrame(texts175, 'transcript', speechModel);
+
+          boxFrame(texts175, 'photo-text', (tester) async {
+            await formattedNotes(tester);
+            // The receipt's card, its photo decoded, its Photo Text under
+            // it.
+            final receipt = cardText(texts.receipt);
+            await scrollTo(tester, receipt);
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 500)),
+            );
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(receipt.first);
+            await tester.pumpAndSettle();
+          });
+
+          boxFrame(texts175, 'generated', (tester) async {
+            await formattedNotes(
+              tester,
+              speech: FakeSpeech(installed: WhisperModel.base.sha256),
+            );
+            // The voice note's editor, its Transcript's buttons in view.
+            final spoken = find.textContaining(texts.spoken);
+            await scrollTo(tester, spoken);
+            await tester.longPress(spoken.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final t = AppLocalizations.of(
+              tester.element(find.byType(NoteEditorScreen)),
+            );
+            await reveal(tester, find.text(t.transcribeAgain));
+          });
+
+          // Sharing and sync (#176): the Profile page, Add a person,
+          // Lena's Profile, sharing the Household in person and from
+          // afar, Work's People, a card's ⋮ and Send this Note, Lena's
+          // Sent Item, Sync with its shared folder and bundles, the
+          // Changes Nudge's button, a Conflict and the paired Laptop.
+          const sharing176 = 'sharing-and-sync';
+
+          /// The app on [seeded] in this frame's theme, a bundle and a
+          /// folder pickable; [waiting] opens as a file handed over.
+          Future<AppLocalizations> sharingApp(
+            WidgetTester tester,
+            _Seeded seeded, {
+            List<int>? waiting,
+            String waitingName = 'lena.oldbrain',
+          }) {
+            final bundles = FakeBundles(Directory('build'));
+            if (waiting != null) {
+              final file = File('build/guide-sent/$waitingName')
+                ..parent.createSync(recursive: true)
+                ..writeAsBytesSync(waiting);
+              bundles.waiting.add(file.path);
+            }
+            final dir = Directory('build/guide-folder')
+              ..createSync(recursive: true);
+            seeded.store.themeChoice = choice;
+            return _start(
               tester,
               boundary,
               language,
               seeded.store,
               _guideDpr,
-              bundles: FakeBundles(Directory('build')),
+              bundles: bundles,
+              folders: DirFolders(dir.path),
             );
+          }
+
+          /// The Profile page scrolled to [finder], which is tapped with
+          /// [open].
+          Future<void> onProfile(
+            WidgetTester tester,
+            AppLocalizations t,
+            Finder finder, {
+            bool open = true,
+          }) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            await tester.scrollUntilVisible(
+              finder,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            if (open) await _tap(tester, finder);
+          }
+
+          /// Sync, opened from the Profile page, scrolled to [finder].
+          Future<void> openSync(
+            WidgetTester tester,
+            AppLocalizations t, [
+            Finder? finder,
+          ]) async {
+            await onProfile(tester, t, find.byKey(const ValueKey('sync')));
+            expect(find.byType(SyncScreen), findsOneWidget);
+            if (finder == null) return;
+            await tester.scrollUntilVisible(
+              finder,
+              300,
+              scrollable: notesList.last,
+            );
+            await tester.pumpAndSettle();
+          }
+
+          /// The share page of [slug]'s Area, opened from its ⋮.
+          Future<void> shareArea(
+            WidgetTester tester,
+            _Seeded seeded,
+            AppLocalizations t,
+          ) async {
             final household = Places(seeded.store)
                 .areas()
                 .firstWhere((a) => a.starter == 'household');
@@ -1210,40 +1966,230 @@ void main() {
             );
             await _tap(tester, find.text(t.shareArea));
             expect(find.byType(ShareAreaScreen), findsOneWidget);
+          }
+
+          /// The boiler's card in the Household with its ⋮ open.
+          Future<AppLocalizations> boilerMenu(WidgetTester tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+            final card = find.ancestor(
+              of: find.text(texts.boiler),
+              matching: find.byType(NoteCard),
+            );
+            await _tap(
+              tester,
+              find.descendant(
+                of: card.first,
+                matching: find.byKey(const ValueKey('note-menu')),
+              ),
+            );
+            return t;
+          }
+
+          boxFrame(sharing176, 'send-profile', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            expect(find.byKey(const ValueKey('sendProfile')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'add-person', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.byKey(const ValueKey('addPerson')));
+            expect(find.byType(AddPersonScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'verify', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.text('Lena'));
+            expect(find.byType(PersonScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('compare-codes')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-in-person', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
+            expect(find.byKey(const ValueKey('share-scan')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-afar', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
             // The role texts push "Share with…" below the screen's edge.
+            final afar = find.byKey(const ValueKey('share-afar'));
             await tester.scrollUntilVisible(
-              find.byKey(const ValueKey('share-afar')),
+              afar,
               100,
               scrollable: notesList.last,
             );
+            // Clear of the screen's edge for the tap.
+            await tester.drag(notesList.last, const Offset(0, -200));
             await tester.pumpAndSettle();
-            expect(find.byKey(const ValueKey('share-afar')), findsOneWidget);
+            await _tap(tester, afar);
+            expect(find.byType(SharePersonScreen), findsOneWidget);
           });
 
-          frame('person', (tester) async {
-            final seeded = _Seeded(texts, shared: true)
-              ..store.themeChoice = choice;
-            final t = await _start(
+          boxFrame(sharing176, 'roles', (tester) async {
+            final seeded = _Seeded(texts, shared: true);
+            final t = await sharingApp(tester, seeded);
+            final work = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'work');
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(ValueKey('area-menu-${work.id}')));
+            await _tap(tester, find.text(t.peopleTitle).last);
+            expect(find.byType(PeopleScreen), findsOneWidget);
+            await _tap(
               tester,
-              boundary,
-              language,
-              seeded.store,
-              _guideDpr,
-              bundles: FakeBundles(Directory('build')),
+              find
+                  .byWidgetPredicate((w) => '${w.key}'.contains('person-menu-'))
+                  .first,
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final lena = find.text('Lena');
-            await tester.scrollUntilVisible(
-              lena,
-              300,
-              scrollable: notesList.first,
+            expect(find.text(t.makeManager), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-to-app', (tester) async {
+            await boilerMenu(tester);
+            expect(find.byKey(const ValueKey('note-share')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'send-note', (tester) async {
+            await boilerMenu(tester);
+            await _tap(tester, find.byKey(const ValueKey('note-send')));
+            expect(find.byType(SendNoteDialog), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'receive-note', (tester) async {
+            final seeded = _Seeded(texts, sends: true);
+            await sharingApp(tester, seeded, waiting: seeded.sent);
+            expect(find.byType(SentItemScreen), findsOneWidget);
+          });
+
+          // Packs (#164): the Household's tree, and Lena's Pack opened.
+          boxFrame(sharing176, 'send-pack', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household');
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(
+              tester,
+              find.byKey(ValueKey('area-menu-${household.id}')),
             );
-            await _tap(tester, lena);
+            await _tap(tester, find.text(t.exportAsPack));
+            expect(find.byType(PackExportScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'open-pack', (tester) async {
+            final seeded = _Seeded(texts, packs: true);
+            await sharingApp(
+              tester,
+              seeded,
+              waiting: seeded.pack,
+              waitingName: 'lena.obfpack',
+            );
+            expect(find.byType(PackImportScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'pairing', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'shared-folder', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('pick-folder')),
+            );
+          });
+
+          boxFrame(sharing176, 'bundle', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('import-bundle')),
+            );
+          });
+
+          boxFrame(sharing176, 'send-changes', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, shared: true));
+            await onProfile(tester, t, find.text('Lena'));
             expect(find.byType(PersonScreen), findsOneWidget);
             expect(find.byKey(const ValueKey('sendChanges')), findsOneWidget);
           });
 
-          frame('backups', (tester) async {
+          boxFrame(sharing176, 'conflicts', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t);
+            await _tap(tester, find.byKey(const ValueKey('conflicts')));
+            expect(find.byType(ConflictsScreen), findsOneWidget);
+            expect(find.text(texts.boilerThere), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'ai-task', (tester) async {
+            // The phone's Sync with the Laptop paired: an AI Task's
+            // changes come from there once accepted.
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t, find.text('Laptop'));
+          });
+
+          // Backups, locks and privacy (#177): Backups before and after
+          // setting up, the App Lock and the Area Locks in Settings, the
+          // question before blocking Lena, and the top of Settings.
+          const privacy177 = 'backups-locks-and-privacy';
+
+          /// The Backups page opened from the Profile page.
+          Future<void> openBackups(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            await _tap(tester, find.byKey(const ValueKey('backups')));
+            expect(find.byType(BackupScreen), findsOneWidget);
+          }
+
+          /// Settings opened from the Profile page.
+          Future<void> openSettings(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            expect(find.byType(SettingsScreen), findsOneWidget);
+          }
+
+          /// Settings scrolled to Privacy, its heading on top.
+          Future<void> toPrivacy(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            final heading = find.text(t.settingsPrivacy);
+            await tester.scrollUntilVisible(
+              heading,
+              300,
+              scrollable: notesList.last,
+            );
+            await tester.pumpAndSettle();
+            await Scrollable.ensureVisible(tester.element(heading));
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame(privacy177, 'set-up', (tester) async {
+            final t = await start(tester, seed());
+            await openBackups(tester, t);
+            expect(find.byKey(const ValueKey('set-up')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'folder', (tester) async {
             final seeded = seed();
             await setUpBackups(seeded.store, 'correct horse', derive: quickKey);
             final dir = Directory('build/guide-backups')
@@ -1262,13 +2208,23 @@ void main() {
               _guideDpr,
               folders: DirFolders(dir.path),
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            await _tap(tester, find.byKey(const ValueKey('backups')));
-            expect(find.byType(BackupScreen), findsOneWidget);
+            await openBackups(tester, t);
             expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
           });
 
-          frame('area-locks', (tester) async {
+          boxFrame(privacy177, 'app-lock', (tester) async {
+            final seeded = seed();
+            final t = await start(tester, seeded);
+            // Switched on once the app shows, so it starts unlocked.
+            seeded.store
+              ..setPin('2468', iterations: 1)
+              ..appLockOn = true;
+            await openSettings(tester, t);
+            await toPrivacy(tester, t);
+            expect(find.byKey(const ValueKey('changePin')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'area-locks', (tester) async {
             final seeded = seed();
             final places = Places(seeded.store);
             String area(String slug) =>
@@ -1279,18 +2235,230 @@ void main() {
               ..setAreaLocked(area('work'), true)
               ..setAreaMasked(area('work'), false);
             final t = await start(tester, seeded);
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final settings = find.byKey(const ValueKey('deviceSettings'));
-            await tester.ensureVisible(settings);
-            await _tap(tester, settings);
-            final locks = find.byKey(const ValueKey('areaLocks'));
+            await openSettings(tester, t);
+            await toPrivacy(tester, t);
+            await _tap(tester, find.byKey(const ValueKey('areaLocks')));
+            expect(find.byType(AreaLocksScreen), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'block', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.text('Lena'));
+            await _tap(tester, find.byKey(const ValueKey('block-person')));
+            expect(find.byKey(const ValueKey('block-confirm')), findsOneWidget);
+          });
+
+          boxFrame(privacy177, 'privacy', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            expect(find.text(t.settingsIntro), findsOneWidget);
+          });
+
+          // Send feedback (#214), with words and the phone's facts held:
+          // the page as Settings opens it.
+          boxFrame(privacy177, 'feedback', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            final settings = tester.state<NavigatorState>(
+              find.byType(Navigator).first,
+            );
+            unawaited(
+              settings.push(
+                MaterialPageRoute<void>(
+                  builder: (_) => FeedbackScreen(
+                    store: tester
+                        .widget<SettingsScreen>(find.byType(SettingsScreen))
+                        .store,
+                    facts: () async => const FeedbackFacts(
+                      version: '0.4.0+57',
+                      system: 'Android 15 (SDK 35), Google Pixel 8',
+                      install: 'F-Droid',
+                    ),
+                    crash: () => null,
+                    mail: (_) async {},
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('feedback-text')),
+              language == 'de'
+                  ? 'Die Agenda zeigt die Routine von gestern als verpasst.'
+                  : "The Agenda shows yesterday's Routine as Missed.",
+            );
+            await tester.pumpAndSettle();
+            // The ticks' end and the preview with its buttons in view.
+            final preview = find.text(t.feedbackPreview);
             await tester.scrollUntilVisible(
-              locks,
-              300,
+              preview,
+              200,
+              scrollable: find.byType(Scrollable).last,
+            );
+            await tester.drag(
+              find.byType(Scrollable).last,
+              const Offset(0, -300),
+            );
+            await tester.pumpAndSettle();
+            expect(find.byType(FeedbackScreen), findsOneWidget);
+          });
+
+          // The desktop app (#178): the phone's own way where it has one,
+          // else the Agenda, as the box is the desktop's alone.
+          const desktop178 = 'desktop-app';
+
+          Future<void> agenda(WidgetTester tester) async {
+            await start(tester, seed());
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          }
+
+          boxFrame(desktop178, 'install', (tester) async {
+            await firstStart(tester);
+            expect(find.byType(FirstStartScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'window', (tester) async {
+            await addFan(tester);
+            expect(find.byKey(const ValueKey('addFan-tally')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'cards', household);
+
+          boxFrame(desktop178, 'note-dialog', (tester) async {
+            await boilerEditor(tester);
+            expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'menu-bar', (tester) async {
+            // A Profile of fixed keys: its short code is the same on
+            // every run.
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            expect(
+              find.byKey(const ValueKey('deviceSettings')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame(desktop178, 'dialogs', (tester) async {
+            final t = await start(tester, seed());
+            await openBackups(tester, t);
+          });
+
+          boxFrame(desktop178, 'keys', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            expect(find.text(t.starterHousehold), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'tray', agenda);
+
+          boxFrame(desktop178, 'hotkey', (tester) async {
+            await start(tester, seed());
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.pumpAndSettle();
+            expect(find.byType(CaptureScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'command-line', agenda);
+
+          boxFrame(desktop178, 'drop', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byIcon(Icons.add));
+            expect(fanEntry('gallery'), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'notifications', (tester) async {
+            final t = await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-new')));
+            await _tap(tester, find.text(t.starterSetDone));
+            expect(find.byType(SetupScreen), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'speech', speechModel);
+
+          boxFrame(desktop178, 'sync', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'ai-port', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t, find.text('Laptop'));
+          });
+
+          boxFrame(desktop178, 'look', (tester) async {
+            final t = await start(tester, seed());
+            await openSettings(tester, t);
+            expect(find.byKey(const ValueKey('fatFingers')), findsOneWidget);
+          });
+
+          boxFrame(desktop178, 'missing', agenda);
+
+          // Sync with family and friends (#198): Sync at its shared
+          // folder, where Syncthing's or Autosync's folder is chosen, and
+          // the question how changes travel with Lena, the folder picked.
+          const family198 = 'sync-with-family-and-friends';
+
+          Future<void> sharedFolder(WidgetTester tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('pick-folder')),
+            );
+          }
+
+          boxFrame(family198, 'syncthing-own', sharedFolder);
+
+          boxFrame(family198, 'syncthing-family', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
+            final afar = find.byKey(const ValueKey('share-afar'));
+            await tester.scrollUntilVisible(
+              afar,
+              100,
               scrollable: notesList.last,
             );
-            await _tap(tester, locks);
-            expect(find.byType(AreaLocksScreen), findsOneWidget);
+            await tester.drag(notesList.last, const Offset(0, -200));
+            await tester.pumpAndSettle();
+            await _tap(tester, afar);
+            await _tap(tester, find.text('Lena'));
+            expect(find.byType(TransportDialog), findsOneWidget);
+            await _tap(tester, find.byKey(const ValueKey('transport-folder')));
+          });
+
+          boxFrame(family198, 'autosync', sharedFolder);
+
+          boxFrame(family198, 'cloud-apps', sharedFolder);
+
+          // Calendar apps like FamilyWall (#199): the Calendar page, where
+          // the family calendar is picked for the Agenda, and All Routines
+          // and Reminders, whose Export makes the file to import there.
+          const calendar199 = 'calendar-apps';
+
+          boxFrame(calendar199, 'family-calendar-on-agenda', (tester) async {
+            await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              appointments: FakeAppointments(),
+            );
+            await _tap(tester, find.byKey(const ValueKey('calendarPage')));
+            expect(find.byType(CalendarScreen), findsOneWidget);
+          });
+
+          boxFrame(calendar199, 'routines-into-family-calendar', (
+            tester,
+          ) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('allRoutines')));
+            expect(find.byType(AllRoutinesScreen), findsOneWidget);
           });
         }
       }

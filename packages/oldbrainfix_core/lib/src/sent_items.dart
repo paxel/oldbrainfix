@@ -404,9 +404,9 @@ class SentItem {
 
   /// The Lines the note [json] carries, null in the record when it is no
   /// list; null when they are no Lines. Of two with one id, the first
-  /// counts. A Shopping List's Line has its reappear time, the one a new
-  /// Line gets when it says none or one not known here, is under none and
-  /// arrives open.
+  /// counts. A Shopping List's Line has its reappear time, one week
+  /// ([Reappear.fallback]) when it says none or one not known here, is
+  /// under none and arrives open.
   static (List<SentLine>?,)? _lines(Object? json, {required bool shopping}) {
     if (json is! Map || !json.containsKey('lines')) return (null,);
     final lines = json['lines'];
@@ -1617,7 +1617,7 @@ void _writeShoppingLines(
     store.append(
       id,
       ShoppingKeys.reappear,
-      (l.reappear ?? Reappear.standard).code,
+      (l.reappear ?? Reappear.fallback).code,
       date: date,
     );
   }

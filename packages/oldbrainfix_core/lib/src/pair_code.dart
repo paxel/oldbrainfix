@@ -52,9 +52,10 @@ const _laterVersions = '23456789';
 bool isPrivateHost(String host) {
   final parts = host.split('.');
   if (parts.length != 4) return false;
-  final o = parts.map(int.tryParse).toList();
-  if (o.any((n) => n == null || n < 0 || n > 255)) return false;
-  final a = o[0]!, b = o[1]!;
+  // A part that is no number reads as -1, out of range like any other.
+  final o = [for (final part in parts) int.tryParse(part) ?? -1];
+  if (o.any((n) => n < 0 || n > 255)) return false;
+  final a = o[0], b = o[1];
   return a == 10 ||
       (a == 172 && b >= 16 && b <= 31) ||
       (a == 192 && b == 168) ||

@@ -174,9 +174,36 @@ impl TypedLines {
         self.rows.iter().position(|r| r.key == key)
     }
 
+    /// The row at `at`: an error for a place no row is at, which the
+    /// callers, each with a place just looked up, rule out.
+    fn row_at(&self, at: usize) -> oldbrainfix_core::Result<&TypedLine> {
+        self.rows.get(at).ok_or_else(|| no_row(at))
+    }
+
+    /// [`TypedLines::row_at`], to change.
+    fn row_at_mut(&mut self, at: usize) -> oldbrainfix_core::Result<&mut TypedLine> {
+        self.rows.get_mut(at).ok_or_else(|| no_row(at))
+    }
+
     /// The row shown under `id`.
     pub fn shown(&self, id: &str) -> Option<&TypedLine> {
         self.rows.iter().find(|r| r.shown_id() == id)
+    }
+
+    /// The Lines with ⋮, by the id they show under: `editable`, and the
+    /// new ones that hold text, stored as an entry of their ⋮ is used
+    /// (#202). An empty new one has none.
+    pub fn with_menus(&self, editable: &HashSet<String>) -> HashSet<String> {
+        let mut menus = editable.clone();
+        if self.adds {
+            menus.extend(
+                self.rows
+                    .iter()
+                    .filter(|r| r.id.is_none() && !r.typed().is_empty())
+                    .map(TypedLine::shown_id),
+            );
+        }
+        menus
     }
 
     /// Takes the Lines of the Note `note` as they are read now, keeping
@@ -307,9 +334,9 @@ impl TypedLines {
     /// Line is added at: every stored one; on a Shopping List the open
     /// ones alone.
     fn places_among(&self, at: usize) -> bool {
-        self.rows[at]
-            .id
-            .as_ref()
+        self.rows
+            .get(at)
+            .and_then(|row| row.id.as_ref())
             .is_some_and(|id| !self.struck.contains(id))
     }
 
@@ -330,8 +357,8 @@ impl TypedLines {
         wall: &WallClock,
         at: usize,
     ) -> oldbrainfix_core::Result<u64> {
-        let row = &self.rows[at];
-        let key = row.key;
+        let row = self.row_at(at)?;
+        let (key, in_group) = (row.key, row.in_group);
         let Some(note) = self.note.clone() else {
             return Ok(key);
         };
@@ -349,8 +376,8 @@ impl TypedLines {
                     return Ok(key);
                 }
                 let place = self.stored_before(at);
-                let id = checklists.add(&note, &typed, Some(place), self.rows[at].in_group)?;
-                self.rows[at].id = Some(id);
+                let id = checklists.add(&note, &typed, Some(place), in_group)?;
+                self.row_at_mut(at)?.id = Some(id);
             }
             (FieldOf::Shopping, None) => {
                 let shopping = ShoppingLists::new(store);
@@ -369,7 +396,7 @@ impl TypedLines {
                     self.rows.remove(at);
                     return Ok(other);
                 }
-                self.rows[at].id = Some(id);
+                self.row_at_mut(at)?.id = Some(id);
             }
             (kind, Some(id)) => {
                 if !shows(store, wall, (&note, kind), &id)?
@@ -383,7 +410,7 @@ impl TypedLines {
                 }
             }
         }
-        self.rows[at].kept = typed;
+        self.row_at_mut(at)?.kept = typed;
         Ok(key)
     }
 
@@ -446,7 +473,7 @@ impl TypedLines {
         note: &str,
         at: usize,
     ) -> oldbrainfix_core::Result<bool> {
-        let Some(id) = &self.rows[at].id else {
+        let Some(id) = &self.row_at(at)?.id else {
             return Ok(true);
         };
         let Some(kind) = open_kind(store, note)? else {
@@ -476,11 +503,14 @@ impl TypedLines {
         let Some(at) = self.rows.iter().position(|r| r.shown_id() == shown) else {
             return Ok(Some(shown.to_string()));
         };
-        if self.rows[at].id.is_some() {
-            return Ok(self.rows[at].id.clone());
+        if let Some(id) = &self.row_at(at)?.id {
+            return Ok(Some(id.clone()));
         }
         let holder = self.store_row(store, wall, at)?;
-        Ok(self.at(holder).and_then(|at| self.rows[at].id.clone()))
+        Ok(self
+            .at(holder)
+            .and_then(|at| self.rows.get(at))
+            .and_then(|row| row.id.clone()))
     }
 
     /// Does what a field asked.
@@ -516,7 +546,7 @@ impl TypedLines {
         let (Some(at), Some(note)) = (self.at(key), self.note.clone()) else {
             return Ok(());
         };
-        let text = self.rows[at].text.clone();
+        let text = self.row_at(at)?.text.clone();
         let byte = (0..=byte.min(text.len()))
             .rev()
             .find(|b| text.is_char_boundary(*b))
@@ -527,7 +557,7 @@ impl TypedLines {
             if after.is_empty() {
                 return Ok(());
             }
-            let in_group = self.rows[at].in_group;
+            let in_group = self.row_at(at)?.in_group;
             let row = self.row(None, "", in_group);
             self.rows.insert(at, row);
             self.focus = Some((key, 0));
@@ -536,24 +566,25 @@ impl TypedLines {
         let Some(kind) = open_kind(store, &note)? else {
             return Ok(());
         };
+        let row = self.row_at(at)?;
         let group = kind == FieldOf::Checklist
-            && (self.rows[at].in_group || has_group(store, &note, self.rows[at].id.as_deref())?);
-        self.rows[at].text = before;
+            && (row.in_group || has_group(store, &note, row.id.as_deref())?);
+        self.row_at_mut(at)?.text = before;
         store.batch(|| {
             let holder = self.store_row(store, wall, at)?;
             let Some(held) = self.at(holder) else {
                 return Ok(());
             };
-            if self.rows[held].id.is_none() {
+            if self.row_at(held)?.id.is_none() {
                 // Not stored: the field keeps all that was typed.
-                self.rows[held].text = text.clone();
+                self.row_at_mut(held)?.text = text.clone();
                 return Ok(());
             }
             // Gone into a Line of the same name: the new one goes where
             // it was.
             let into = if holder == key { held + 1 } else { at };
             if holder != key {
-                self.focus = Some((holder, self.rows[held].text.len()));
+                self.focus = Some((holder, self.row_at(held)?.text.len()));
             }
             let row = if after.is_empty() {
                 self.row(None, "", group)
@@ -594,25 +625,25 @@ impl TypedLines {
             return Ok(());
         };
         let checklists = Checklists::new(store);
-        let text = self.rows[at].typed();
+        let text = self.row_at(at)?.typed();
         if text.is_empty() {
             return self.drop_row(store, wall, &note, at);
         }
         let Some(kind) = open_kind(store, &note)? else {
             return Ok(());
         };
-        if at == 0 {
+        let Some(above) = at.checked_sub(1) else {
             return Ok(());
-        }
-        if let Some(upper) = &self.rows[at - 1].id
+        };
+        if let Some(upper) = &self.row_at(above)?.id
             && !checklists.may_edit(upper)?
         {
             return Ok(());
         }
-        let head = self.rows[at - 1].typed();
+        let head = self.row_at(above)?.typed();
         let mut group = Vec::new();
         if kind == FieldOf::Checklist
-            && let Some(id) = &self.rows[at].id
+            && let Some(id) = &self.row_at(at)?.id
             && let Some(list) = checklists.by_note(&note)?
         {
             for line in list.group_of(id) {
@@ -621,10 +652,13 @@ impl TypedLines {
                 }
             }
         }
-        self.rows[at - 1].text = format!("{head}{text}");
+        self.row_at_mut(above)?.text = format!("{head}{text}");
         let holder = store.batch(|| {
-            let holder = self.store_row(store, wall, at - 1)?;
-            let joined = self.at(key).and_then(|at| self.rows[at].id.clone());
+            let holder = self.store_row(store, wall, above)?;
+            let joined = self
+                .at(key)
+                .and_then(|at| self.rows.get(at))
+                .and_then(|row| row.id.clone());
             if let Some(id) = joined
                 && shows(store, wall, (&note, kind), &id)?
                 && checklists.may_edit(&id)?
@@ -661,7 +695,7 @@ impl TypedLines {
         if !self.delete_row(store, wall, note, at)? {
             return Ok(());
         }
-        let key = self.rows[at].key;
+        let key = self.row_at(at)?.key;
         let checklists = Checklists::new(store);
         let mut others = false;
         for row in self.rows.iter().filter(|r| r.key != key) {
@@ -674,7 +708,7 @@ impl TypedLines {
             }
         }
         if self.adds && !others {
-            let row = &mut self.rows[at];
+            let row = self.row_at_mut(at)?;
             row.id = None;
             row.text.clear();
             row.kept.clear();
@@ -698,8 +732,8 @@ impl TypedLines {
         if open_kind(store, &note)? != Some(FieldOf::Checklist) {
             return Ok(());
         }
-        let Some(id) = self.rows[at].id.clone() else {
-            self.rows[at].in_group = under && at > 0;
+        let Some(id) = self.row_at(at)?.id.clone() else {
+            self.row_at_mut(at)?.in_group = under && at > 0;
             return Ok(());
         };
         let checklists = Checklists::new(store);
@@ -724,6 +758,11 @@ fn take_after(after: &mut Vec<(Option<String>, TypedLine)>, above: Option<&str>)
         .partition(|(a, _)| a.as_deref() == above);
     *after = rest;
     mine.into_iter().map(|(_, row)| row).collect()
+}
+
+/// The error for a row looked for at `at` and not found.
+fn no_row(at: usize) -> oldbrainfix_core::Error {
+    oldbrainfix_core::Error::Invalid(format!("no typed Line at {at}"))
 }
 
 /// What the Note `note` is to write Lines to: a Checklist or a Shopping
@@ -807,7 +846,11 @@ pub fn field(
         keys(ui, lines, (at, kind), (above, below), asked);
     }
     let pending = lines.focus.filter(|(k, _)| *k == key).map(|(_, at)| at);
-    let row = &mut lines.rows[at];
+    // The keys before do not take rows away; were it gone, it shows no
+    // more.
+    let Some(row) = lines.rows.get_mut(at) else {
+        return;
+    };
     if let Some(byte) = pending {
         let byte = byte.min(row.text.len());
         format_bar::select(ui, id, &row.text, (byte, byte));
@@ -847,13 +890,14 @@ pub fn field(
         if response.has_focus() {
             lines.focus = None;
         } else {
-            let row = &lines.rows[at];
-            format_bar::select(
-                ui,
-                id,
-                &row.text,
-                (byte.min(row.text.len()), byte.min(row.text.len())),
-            );
+            if let Some(row) = lines.rows.get(at) {
+                format_bar::select(
+                    ui,
+                    id,
+                    &row.text,
+                    (byte.min(row.text.len()), byte.min(row.text.len())),
+                );
+            }
             ui.ctx().request_repaint();
         }
     }
@@ -871,9 +915,12 @@ fn keys(
     (above, below): (Option<u64>, Option<u64>),
     asked: &mut Vec<Typing>,
 ) {
-    let key = lines.rows[at].key;
+    let Some(row) = lines.rows.get(at) else {
+        return;
+    };
+    let key = row.key;
     let id = field_id(key);
-    let text = &lines.rows[at].text;
+    let text = &row.text;
     let chars = text.chars().count();
     let [from, to] = TextEditState::load(ui.ctx(), id)
         .and_then(|s| s.cursor.char_range())
@@ -895,7 +942,9 @@ fn keys(
     };
     if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter)) {
         // Over a selection, Enter takes its place.
-        lines.rows[at].text.replace_range(from_byte..to_byte, "");
+        if let Some(row) = lines.rows.get_mut(at) {
+            row.text.replace_range(from_byte..to_byte, "");
+        }
         cursor_to(ui, from);
         asked.push(Typing::Split(key, from_byte));
         return;
@@ -916,7 +965,7 @@ fn keys(
     for (arrow, next) in [(Key::ArrowUp, above), (Key::ArrowDown, below)] {
         if let Some(next) = next
             && ui.input_mut(|i| i.consume_key(Modifiers::NONE, arrow))
-            && let Some(row) = lines.at(next).map(|n| &lines.rows[n])
+            && let Some(row) = lines.at(next).and_then(|n| lines.rows.get(n))
         {
             // As far along as here, as far as its text goes.
             let byte = row

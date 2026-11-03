@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -288,7 +290,9 @@ class _AgendaCalendarSwitchState extends State<AgendaCalendarSwitch> {
   @override
   void initState() {
     super.initState();
-    _look();
+    // Fire and forget: the platform answers false where it fails, and
+    // anything else reaches the crash guard.
+    unawaited(_look());
   }
 
   Future<void> _look() async {
