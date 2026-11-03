@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
@@ -14,6 +15,7 @@ import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/sync_platform.dart';
+import 'package:oldbrainfix/src/sync_line.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -127,6 +129,9 @@ void main() {
   final joined = <(String, int, String)>[];
   SyncFailure? failure;
 
+  /// Holds the join until the test lets it go.
+  Completer<void>? parked;
+
   /// One session between the phone and the desk, as LAN sync runs it.
   SyncSession session() {
     final done = answerSync(
@@ -146,6 +151,7 @@ void main() {
     required String name,
   }) async {
     joined.add((host, port, name));
+    if (parked case final held?) await held.future;
     if (failure case final failed?) throw SyncException(failed);
     return SyncResult(
       session: session(),
@@ -209,6 +215,7 @@ void main() {
     sync = FakeSync();
     joined.clear();
     failure = null;
+    parked = null;
   });
   tearDown(() {
     phone.close();
@@ -585,6 +592,107 @@ void main() {
             'it is.',
         fix: 'Install the latest Old Brain Fix on this Device.',
       );
+    });
+
+    testWidgets('while a sync runs, a line moves under the bar and goes when '
+        'it ends; a screen reader hears "Syncing" once (#225)', (tester) async {
+      final spoken = <String>[];
+      tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, (
+            message,
+          ) async {
+            final data = (message as Map)['data'] as Map?;
+            if (message['type'] == 'announce') {
+              spoken.add('${data?['message']}');
+            }
+            return null;
+          });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockDecodedMessageHandler<dynamic>(
+              SystemChannels.accessibility,
+              null,
+            ),
+      );
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(accessibleNavigation: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      pairDesk();
+      parked = Completer<void>();
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: phone,
+          announcements: announcements,
+          sync: sync,
+          autoJoin: join,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(joined, hasLength(1));
+      final moving = find.byKey(const Key('syncLineMoving'));
+      expect(moving, findsOneWidget);
+      // Under the Agenda's bar, across its width.
+      final bar = tester.getRect(find.byType(AppBar));
+      final line = tester.getRect(
+        find.ancestor(of: moving, matching: find.byType(SizedBox)).first,
+      );
+      expect(line.bottom, bar.bottom);
+      expect(line.width, bar.width);
+      // It moves while the app keeps drawing.
+      final before = tester.getRect(moving).left;
+      await tester.pump(syncLineSweep ~/ 2);
+      expect(tester.getRect(moving).left, isNot(before));
+      expect(spoken, ['Syncing…']);
+      parked!.complete();
+      parked = null;
+      await tester.pumpAndSettle();
+      expect(moving, findsNothing);
+      // The next sync shows the line again, but says nothing.
+      parked = Completer<void>();
+      sync.want();
+      await tester.pump();
+      await tester.pump();
+      expect(joined, hasLength(2));
+      expect(moving, findsOneWidget);
+      parked!.complete();
+      await tester.pumpAndSettle();
+      expect(moving, findsNothing);
+      expect(spoken, ['Syncing…']);
+    });
+
+    testWidgets('with "remove animations" the line stands still (#225)', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      pairDesk();
+      parked = Completer<void>();
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: phone,
+          announcements: announcements,
+          sync: sync,
+          autoJoin: join,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('syncLineMoving')), findsNothing);
+      final still = find.byKey(const Key('syncLineStill'));
+      expect(still, findsOneWidget);
+      expect(
+        tester.getRect(still).width,
+        tester.getRect(find.byType(AppBar)).width,
+      );
+      parked!.complete();
+      await tester.pumpAndSettle();
+      expect(still, findsNothing);
     });
 
     testWidgets('Conflicts a background sync brought are announced when the '

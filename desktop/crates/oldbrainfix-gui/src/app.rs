@@ -104,6 +104,7 @@ use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
 use crate::all_routines_view::{self, AllRoutinesAction};
+use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
@@ -153,6 +154,7 @@ use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
 use crate::starter_set_view;
+use crate::sync_line;
 use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
@@ -1602,6 +1604,9 @@ pub struct App {
     /// Tells the folder thread to sync now; without one, the window
     /// syncs itself.
     folder_wanted: Option<Arc<AtomicBool>>,
+    /// Whether a sync of this Device runs, for the line under the menu
+    /// bar (#225).
+    syncing: Option<Syncing>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -1939,6 +1944,7 @@ impl App {
             arrived: 0,
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
+            syncing: None,
             unsorted_wanted: None,
             changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
@@ -3456,6 +3462,11 @@ impl App {
     /// Leaves folder syncs to the thread that `wanted` wakes.
     pub fn set_folder_wanted(&mut self, wanted: Arc<AtomicBool>) {
         self.folder_wanted = Some(wanted);
+    }
+
+    /// Shows the line under the menu bar while `syncing` runs (#225).
+    pub fn set_syncing(&mut self, syncing: Syncing) {
+        self.syncing = Some(syncing);
     }
 
     /// Shows Unsorted, what the phone's Nudge screen shows, whenever a
@@ -7787,13 +7798,17 @@ impl App {
         );
         // The menu bar tops the window, over the announcements (#145).
         if self.welcome.is_none() {
-            egui::Panel::top("menu bar")
+            let bar = egui::Panel::top("menu bar")
                 .frame(
                     Frame::NONE
                         .inner_margin(Margin::symmetric(8, 4))
                         .fill(tones.card),
                 )
                 .show(ui, |ui| self.menu_bar(ui, &mut actions));
+            // Under it, while a sync of this Device runs (#225).
+            if self.syncing.as_ref().is_some_and(Syncing::running) {
+                sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
+            }
         }
         // What the Note dialog lies over: all but the menu bar, which
         // stays at hand for its Note (#146).

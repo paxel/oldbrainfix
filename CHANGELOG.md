@@ -43,6 +43,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- On the phone and the desktop the automatic sync with the other Devices and through the shared folder runs beside the app, on a connection of its own to the data, so the app stays usable while it merges what came in, where the phone did not answer for seconds after it started. While a sync of this Device runs, a thin line in the accent moves back and forth under the top bar, on the desktop under the menu bar; with "remove animations" on the phone it stands still, and a screen reader hears "Syncing…" once each time the app comes into view.
 - On the phone and the desktop, a Line just typed into a Checklist or a Shopping List in the Note editor shows its ⋮ as soon as it holds text, where it showed only after Return and Backspace. An entry of its ⋮ stores the Line first, then acts; an empty new Line has no ⋮.
 - On the phone the Agenda reads its rows once per change, so it opens and updates faster: a check-off, a sync, a calendar read or coming back to the app read them once, where each read them two or three times.
 - On the phone and the desktop, a Session's picks and entries are read once per change, so the Agenda loads faster: they were read again for every run so far, several times per load. On the phone the home-screen Agenda widget takes the Agenda's rows instead of reading them a second time. Whether a Note is a Tally, and which kind each Note is, are read without going through every Tally entry.

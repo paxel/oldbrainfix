@@ -86,6 +86,23 @@ class Store {
     }
   }
 
+  var _elsewhere = 0;
+
+  /// How often [changedElsewhere] was told: what is kept beside the
+  /// store from its local settings is read again after it.
+  @internal
+  int get elsewhere => _elsewhere;
+
+  /// Another connection to the same database wrote, such as the automatic
+  /// sync in an isolate of its own (#225): what was worked out or read is
+  /// forgotten and the listeners hear of it, as after a change here; with
+  /// [profile], the Profile listeners too.
+  void changedElsewhere({bool profile = false}) {
+    _elsewhere++;
+    _changed();
+    if (profile) profileChanged();
+  }
+
   void _changed() {
     _judged = null;
     _overlay = null;

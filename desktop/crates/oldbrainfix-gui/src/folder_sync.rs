@@ -6,6 +6,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+use crate::auto_sync::Syncing;
 use oldbrainfix_core::Store;
 use oldbrainfix_core::folder::{FolderSyncResult, LocalFolder, folder_round, random_nonce};
 use parking_lot::Mutex;
@@ -27,11 +28,13 @@ pub fn round(store: &Store) -> oldbrainfix_core::Result<Option<FolderSyncResult>
 }
 
 /// Syncs the chosen folder until `stop`, every [`EVERY`] and at once when
-/// `wanted` is set; `synced` hears of every round that went through.
+/// `wanted` is set, each round as a sync of `syncing`; `synced` hears of
+/// every round that went through.
 pub fn run(
     store: &Store,
     stop: &AtomicBool,
     wanted: &AtomicBool,
+    syncing: &Syncing,
     mut synced: impl FnMut(&FolderSyncResult),
 ) {
     let mut last: Option<Instant> = None;
@@ -41,7 +44,7 @@ pub fn run(
         let due = last.is_none_or(|at| at.elapsed() >= EVERY);
         if due || wanted.swap(false, Ordering::SeqCst) {
             last = Some(Instant::now());
-            match round(store) {
+            match syncing.during(|| round(store)) {
                 Ok(Some(result)) => {
                     if !result.conflicts.is_empty()
                         && let Err(e) = store.set_conflicts_arrived(true)

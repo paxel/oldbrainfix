@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'alarm_sync.dart';
 import 'folder_platform.dart';
 import 'sync_platform.dart';
+import 'sync_runner.dart';
 
 /// How an automatic sync with a paired Device is run; the app passes
 /// [quickPairedSync], tests a fake.
@@ -92,7 +93,9 @@ const retryEvery = Duration(seconds: 15);
 /// while the app shows and, when the periodic work comes due while the
 /// app is out of sight, for [hostWindow]. Tells its listeners when a sync brought
 /// Conflicts or needs an update, or a background sync did while the app
-/// was closed, for the announcement at the top.
+/// was closed, for the announcement at the top. The folder rounds and
+/// the joins run where [runner] runs them, in the app an isolate of their
+/// own (#225); [syncing] says while one does.
 class AutoSync extends ChangeNotifier {
   final Store store;
   final SyncPlatform platform;
@@ -116,6 +119,14 @@ class AutoSync extends ChangeNotifier {
 
   /// Starts the paired host; without one, this Device only joins.
   final StartPairedHost? host;
+
+  /// Where the folder rounds and the joins run; on [store] in its
+  /// isolate, with [folders] and [join], unless the app hands in another.
+  late final SyncRunner runner;
+
+  /// Whether a folder round or a join of this Device runs now (#225).
+  final syncing = ValueNotifier<bool>(false);
+  var _working = 0;
 
   final _schedule = AutoSyncSchedule();
 
@@ -155,7 +166,9 @@ class AutoSync extends ChangeNotifier {
     this.clock = DateTime.now,
     this.workDir,
     this.host,
+    SyncRunner? runner,
   }) {
+    this.runner = runner ?? InlineSyncRunner(folders: folders, joining: join);
     _own = _ownSeq();
     store.addListener(_changed);
     _subscriptions
@@ -179,7 +192,7 @@ class AutoSync extends ChangeNotifier {
     final setting = store.syncFolder;
     if (setting == null || _disposed) return Future.value();
     final run = _folderQueue.then(
-      (_) => folderRound(store, folders.open(setting)),
+      (_) => _work(() => runner.folder(store, setting)),
     );
     _folderQueue = run.then((_) {}, onError: (Object _) {});
     return run.then((result) {
@@ -450,12 +463,14 @@ class AutoSync extends ChangeNotifier {
           final port = found?.port ?? device.port;
           if (host == null || port == null) continue;
           try {
-            final result = await join(
-              store,
-              device,
-              host: host,
-              port: port,
-              name: name,
+            final result = await _work(
+              () => runner.join(
+                store,
+                device,
+                host: host,
+                port: port,
+                name: name,
+              ),
             );
             _schedule.succeeded(device.id, clock());
             _synced.add(device.id);
@@ -478,9 +493,22 @@ class AutoSync extends ChangeNotifier {
     }
   }
 
+  /// Runs [job], [syncing] meanwhile.
+  Future<T> _work<T>(Future<T> Function() job) async {
+    _working++;
+    if (!_disposed) syncing.value = true;
+    try {
+      return await job();
+    } finally {
+      _working--;
+      if (!_disposed && _working == 0) syncing.value = false;
+    }
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    syncing.dispose();
     _timer?.cancel();
     if (_hosting case final running?) {
       _hosting = null;

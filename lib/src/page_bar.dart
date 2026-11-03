@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 import 'look.dart';
+import 'sync_line.dart';
 
 /// Width from which a screen counts as wide (UI laws, "The bar"): below
 /// it, a phone in either orientation, the title has a line of its own.
@@ -98,7 +99,8 @@ class _BarMore extends StatelessWidget {
 /// wide screen it is the ordinary bar with the title beside them. A page
 /// with no button at all, neither a way back nor an action, keeps its
 /// title on the one row: an empty row above it would hold nothing.
-/// [titleIcon], at most 36 wide, stands before the title.
+/// [titleIcon], at most 36 wide, stands before the title. The [SyncLine]
+/// runs along its bottom while this Device syncs (#225).
 AppBar pageBar(
   BuildContext context, {
   required String title,
@@ -122,6 +124,7 @@ AppBar pageBar(
               ],
             ),
       actions: actions,
+      flexibleSpace: const SyncLine(),
     );
   }
   final theme = Theme.of(context);
@@ -164,6 +167,7 @@ AppBar pageBar(
   );
   return AppBar(
     actions: barActions(actions, (room / slot).floor()),
+    flexibleSpace: const SyncLine(),
     bottom: PreferredSize(
       preferredSize: Size.fromHeight(height),
       child: SizedBox(

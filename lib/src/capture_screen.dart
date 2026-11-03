@@ -23,6 +23,7 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'shopping_pick_screen.dart';
 import 'speech_platform.dart';
+import 'sync_line.dart';
 import 'tally_field_screen.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -1140,6 +1141,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           actions: recording
               ? null
               : [TextButton(onPressed: _save, child: Text(t.save))],
+          flexibleSpace: const SyncLine(),
         ),
         body: SafeArea(
           child: Padding(

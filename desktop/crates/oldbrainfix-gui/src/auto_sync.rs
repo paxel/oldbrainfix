@@ -7,7 +7,8 @@
 //! PIN stays for the first Pairing in the Sync dialogs.
 
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use oldbrainfix_core::Store;
@@ -16,6 +17,60 @@ use oldbrainfix_core::lan::{Host, Session};
 
 /// How often it looks whether a paired Device syncs on its own.
 pub const CHECK_EVERY: Duration = Duration::from_secs(5);
+
+/// Whether a sync of this Device runs now, on any of its threads (#225):
+/// what the line under the menu bar shows. Each start and end wakes the
+/// window, so the line comes and goes at once.
+#[derive(Clone, Default)]
+pub struct Syncing {
+    running: Arc<AtomicUsize>,
+    wake: Option<Arc<dyn Fn() + Send + Sync>>,
+}
+
+impl Syncing {
+    /// Tells `wake` whenever a sync starts or ends.
+    pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Syncing {
+        Syncing {
+            running: Arc::default(),
+            wake: Some(Arc::new(wake)),
+        }
+    }
+
+    /// Whether a sync runs now.
+    pub fn running(&self) -> bool {
+        self.running.load(Ordering::SeqCst) > 0
+    }
+
+    /// Runs `work` as a sync: [`Syncing::running`] meanwhile.
+    pub fn during<T>(&self, work: impl FnOnce() -> T) -> T {
+        let _running = Running::start(self);
+        work()
+    }
+
+    fn wake(&self) {
+        if let Some(wake) = &self.wake {
+            wake();
+        }
+    }
+}
+
+/// One sync running, until dropped, also when it panics.
+struct Running<'a>(&'a Syncing);
+
+impl<'a> Running<'a> {
+    fn start(syncing: &'a Syncing) -> Running<'a> {
+        syncing.running.fetch_add(1, Ordering::SeqCst);
+        syncing.wake();
+        Running(syncing)
+    }
+}
+
+impl Drop for Running<'_> {
+    fn drop(&mut self) {
+        self.0.running.fetch_sub(1, Ordering::SeqCst);
+        self.0.wake();
+    }
+}
 
 /// The paired host and its record, while wanted.
 pub struct PairedHosting {
@@ -96,8 +151,15 @@ impl PairedHosting {
 
     /// Answers what came in for up to `wait`, as this Device named
     /// `name`, looking again every [`CHECK_EVERY`] whether it is still
-    /// wanted. Returns the completed sessions.
-    pub fn step(&mut self, store: &Store, name: &str, wait: Duration) -> Vec<Session> {
+    /// wanted, each answer as a sync of `syncing`. Returns the completed
+    /// sessions.
+    pub fn step(
+        &mut self,
+        store: &Store,
+        name: &str,
+        wait: Duration,
+        syncing: &Syncing,
+    ) -> Vec<Session> {
         if self.checked.is_none_or(|at| at.elapsed() >= CHECK_EVERY) {
             self.check(store);
         }
@@ -108,7 +170,7 @@ impl PairedHosting {
         let mut sessions = Vec::new();
         let mut next = host.wait_request(wait);
         while let Some(request) = next {
-            match store.serve_paired(&request, name) {
+            match syncing.during(|| store.serve_paired(&request, name)) {
                 Ok((response, session)) => {
                     request.reply(response);
                     sessions.extend(session);
@@ -124,15 +186,22 @@ impl PairedHosting {
     }
 }
 
-/// Runs the paired host until `stop`, as this Device named `name`;
-/// `synced` hears of every completed session. Conflicts that came in
-/// are kept to be announced the next time the window looks.
-pub fn run(store: &Store, name: &str, stop: &AtomicBool, mut synced: impl FnMut(&Session)) {
+/// Runs the paired host until `stop`, as this Device named `name`, each
+/// answer as a sync of `syncing`; `synced` hears of every completed
+/// session. Conflicts that came in are kept to be announced the next
+/// time the window looks.
+pub fn run(
+    store: &Store,
+    name: &str,
+    stop: &AtomicBool,
+    syncing: &Syncing,
+    mut synced: impl FnMut(&Session),
+) {
     let mut hosting = PairedHosting::default();
     // Told once, not every few seconds while it lasts.
     let mut told: Option<String> = None;
     while !stop.load(Ordering::Relaxed) {
-        for session in hosting.step(store, name, Duration::from_millis(500)) {
+        for session in hosting.step(store, name, Duration::from_millis(500), syncing) {
             if !session.conflicts.is_empty()
                 && let Err(e) = store.set_conflicts_arrived(true)
             {

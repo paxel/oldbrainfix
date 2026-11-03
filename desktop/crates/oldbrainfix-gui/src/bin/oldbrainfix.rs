@@ -42,7 +42,7 @@ use oldbrainfix_core::{
 };
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::app::BIGGER_ZOOM;
-use oldbrainfix_gui::auto_sync;
+use oldbrainfix_gui::auto_sync::{self, Syncing};
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
@@ -277,6 +277,9 @@ struct Shell {
     reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
+    /// Whether a sync of this Device runs, for the line under the menu
+    /// bar (#225).
+    syncing: Syncing,
     /// Raised by a click on the Nudge, for the window to show Unsorted.
     unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge, for the window to save the
@@ -334,6 +337,7 @@ impl Shell {
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
+        app.set_syncing(self.syncing.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_handed_files(self.handed.clone());
@@ -423,6 +427,19 @@ fn open_store(dir: &Path) -> Result<Store, Error> {
         Box::new(chrono::Utc::now),
         SigningKey::generate,
     )
+}
+
+/// A store of its own on the database in `dir`, for a sync thread
+/// (#225): its merge never holds the window's connection. The window's
+/// `shared` one when it does not open.
+fn own_store(dir: &Path, shared: &Arc<Store>) -> Arc<Store> {
+    match open_store(dir) {
+        Ok(store) => Arc::new(store),
+        Err(e) => {
+            eprintln!("oldbrainfix: {e}");
+            shared.clone()
+        }
+    }
 }
 
 /// What the command line says when the store does not open.
@@ -609,16 +626,30 @@ fn run() -> Result<i32, String> {
             );
         });
     }
+    // While a sync of this Device runs, the line under the menu bar
+    // moves (#225).
+    let syncing = {
+        let window = window.clone();
+        Syncing::new(move || wake(&window))
+    };
     // Paired Devices sync on their own while the app runs, in the tray
-    // too: the alerts plan again after it (a Done elsewhere closes the
-    // notification here), the window reads the log again.
+    // too, on a connection of their own, so a merge never holds the
+    // window's (#225): the alerts plan again after it (a Done elsewhere
+    // closes the notification here), the window reads the log again.
     let auto_stop = Arc::new(AtomicBool::new(false));
     let auto_sync = {
-        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
-        let (stop, wake_window) = (auto_stop.clone(), waker(&window));
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let store = own_store(&dir, &store);
+        let (stop, wake_window, syncing) = (auto_stop.clone(), waker(&window), syncing.clone());
         std::thread::spawn(move || {
-            auto_sync::run(&store, &device_name(), &stop, |session| {
-                if !session.applied.is_empty() || session.profile.changed() {
+            auto_sync::run(&store, &device_name(), &stop, &syncing, |session| {
+                // Another person's Profile alone counts too: the window's
+                // People were read on its own connection.
+                if !session.applied.is_empty()
+                    || session.profile.changed()
+                    || session.people_changed
+                {
+                    shown.changed_elsewhere();
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }
@@ -631,14 +662,20 @@ fn run() -> Result<i32, String> {
     // and the window reads the log and the status again.
     let folder_wanted = Arc::new(AtomicBool::new(false));
     let folder_sync = {
-        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
-        let (stop, wanted, wake_window) =
-            (auto_stop.clone(), folder_wanted.clone(), waker(&window));
+        let (shown, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let store = own_store(&dir, &store);
+        let (stop, wanted, wake_window, syncing) = (
+            auto_stop.clone(),
+            folder_wanted.clone(),
+            waker(&window),
+            syncing.clone(),
+        );
         std::thread::spawn(move || {
-            folder_sync::run(&store, &stop, &wanted, |result| {
+            folder_sync::run(&store, &stop, &wanted, &syncing, |result| {
                 // Photos and recordings come on their own too, after
                 // the entries naming them.
                 if !result.applied.is_empty() || result.blobs_in > 0 || result.profile_changed {
+                    shown.changed_elsewhere();
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }
@@ -796,6 +833,7 @@ fn run() -> Result<i32, String> {
         reader,
         speech,
         folder_wanted,
+        syncing,
         unsorted_wanted,
         changes_wanted,
         handed,

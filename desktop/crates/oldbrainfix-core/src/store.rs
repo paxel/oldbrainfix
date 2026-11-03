@@ -396,6 +396,16 @@ impl Store {
         Ok(out)
     }
 
+    /// Another connection to the same database wrote, such as the
+    /// automatic sync's on a thread of its own (#225): what was worked
+    /// out from the log and read from the local settings is forgotten, as
+    /// the Dart core's `changedElsewhere`, so the next read sees it.
+    pub fn changed_elsewhere(&self) {
+        self.changed();
+        *self.people.lock() = None;
+        *self.own_keys.lock() = None;
+    }
+
     /// Forgets what was worked out from the log.
     fn changed(&self) {
         let mut judged = self.judged.lock();

@@ -4,6 +4,8 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
+import 'shared_areas_test.dart' show exchange, ticking;
+
 void main() {
   test('own entries are signed and verify under the Device key', () {
     final store = Store.inMemory();
@@ -155,6 +157,43 @@ void main() {
     addTearDown(second.close);
     expect(second.deviceId, device);
     expect(second.current('note:a', 'text'), 'kept');
+  });
+
+  test('a sync through another connection to the same file shows once '
+      'that one says so (#225)', () {
+    final dir = Directory.systemTemp.createTempSync('obf');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/oldbrainfix.db';
+    final clock = ticking();
+    final ui = Store.open(path, clock: clock)
+      ..applyProfileDefaults(name: 'Ann');
+    addTearDown(ui.close);
+    var told = 0;
+    var profile = 0;
+    ui.addListener(() => told++);
+    ui.addProfileListener(() => profile++);
+    // The sync's own connection, as its isolate opens it.
+    final sync = Store.open(path, clock: clock);
+    addTearDown(sync.close);
+    expect(sync.deviceId, ui.deviceId);
+    final ben = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ben');
+    addTearDown(ben.close);
+    final house = ui.share(Places(ui).addArea('Household').id);
+    told = 0;
+    expect(ui.keptPeople, isEmpty);
+    exchange(ben, sync, inviting: Invite(house, role: AreaRole.member));
+    Notes(ben).capture('From Ben', place: house);
+    exchange(ben, sync);
+    expect(told, 0, reason: 'the other connection told only its own');
+    expect(ui.keptPeople, isEmpty, reason: 'what was read stays until told');
+    ui.changedElsewhere(profile: true);
+    expect(told, 1);
+    expect(profile, 1);
+    expect(ui.keptPeople.map((p) => p.name), ['Ben']);
+    expect([for (final n in Notes(ui).all()) n.text], contains('From Ben'));
+    ui.changedElsewhere();
+    expect(told, 2);
+    expect(profile, 1, reason: 'only when the Profiles changed');
   });
 
   group('the database version', () {

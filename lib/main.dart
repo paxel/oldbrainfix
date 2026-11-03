@@ -32,6 +32,7 @@ import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
 import 'src/store_needs_update_screen.dart';
 import 'src/sync_platform.dart';
+import 'src/sync_runner.dart';
 import 'src/voice_platform.dart';
 
 /// The store the running app writes to; closed before Restart opens it
@@ -86,8 +87,9 @@ Future<void> main() async {
 Future<void> _openAndRun(Directory dir) async {
   final work = await getTemporaryDirectory();
   final Store store;
+  final path = '${dir.path}/oldbrainfix.db';
   try {
-    store = Store.open('${dir.path}/oldbrainfix.db');
+    store = Store.open(path);
   } on StoreNeedsUpdate {
     runApp(const StoreNeedsUpdateApp());
     return;
@@ -115,6 +117,13 @@ Future<void> _openAndRun(Directory dir) async {
       sync: AndroidSync(),
       pairedHost: startPairedHosting,
       folders: const AndroidFolders(),
+      // The automatic sync in an isolate of its own, so the app keeps
+      // drawing while it merges (#225).
+      syncRunner: IsolateSyncRunner(
+        path: path,
+        open: openSafFolder,
+        token: RootIsolateToken.instance,
+      ),
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,

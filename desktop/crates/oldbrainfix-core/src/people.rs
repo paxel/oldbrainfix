@@ -1058,6 +1058,30 @@ mod tests {
     }
 
     #[test]
+    fn a_sync_through_another_connection_shows_once_it_says_so() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("oldbrainfix.db");
+        let ann = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        OwnProfile::new(&ann).apply_defaults("Device", None)?;
+        OwnProfile::new(&ann).rename("Ann")?;
+        // The sync's own connection, as its thread opens it.
+        let sync = Store::open(&path, ticking(), || {
+            Err(crate::Error::Invalid("the same Device".into()))
+        })?;
+        let ben = device(2, "Ben")?;
+        assert!(ann.kept_people()?.is_empty());
+        household(&sync, &ben)?;
+        assert!(
+            ann.kept_people()?.is_empty(),
+            "what was read stays until told"
+        );
+        ann.changed_elsewhere();
+        let names: Vec<String> = ann.kept_people()?.into_iter().map(|p| p.name).collect();
+        assert_eq!(names, ["Ben"]);
+        Ok(())
+    }
+
+    #[test]
     fn an_invite_carries_both_profiles() -> TestResult {
         let ann = device(1, "Ann")?;
         let ben = device(2, "Ben")?;

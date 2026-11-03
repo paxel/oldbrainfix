@@ -505,6 +505,24 @@ replace a law of Both apps where they say so. A desktop law marked
   factor, and the widget's text with them. On the desktop it is egui's
   zoom at 1.3.
 
+### The sync line
+
+- **While a sync of this Device runs, a thin line moves under the bar**
+  (#225): 3 px in the accent along the bottom edge of the phone's top
+  bar (`pageBar`, Capture's bar too) and of the desktop's menu bar, a
+  quarter of its width moving back and forth (Knight Rider), taking no
+  room, so nothing else on the screen moves. It shows only while a
+  folder round or a join of this Device runs, on the desktop also while
+  its paired host answers, and the app is in view; every sync shows it,
+  also the one each minute. The sync runs beside the app (an isolate on
+  the phone, a thread with its own connection on the desktop): the app
+  stays usable and draws on. With the system's "remove animations" the
+  phone's line stands still across the whole width; the desktop reads
+  no such setting, so its line always moves. On the phone a screen
+  reader hears "Syncing…" once each time the app comes into view, not
+  with every sync; on the desktop the line is a progress indicator named
+  "Syncing…".
+
 ### Alarms and notifications
 
 - An Occurrence's notification offers **Done** and **Snooze** (10 min,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
@@ -52,6 +53,7 @@ import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
+import 'sync_runner.dart';
 import 'sync_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
@@ -127,6 +129,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// How an automatic sync is run; tests hand in a fake.
   final PairedJoin autoJoin;
 
+  /// Where the automatic sync's folder rounds and joins run: the app
+  /// hands in an isolate of their own (#225); without one, on [store]
+  /// with [folders] and [autoJoin].
+  final SyncRunner? syncRunner;
+
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
@@ -172,6 +179,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.pairing = const NoPairing(),
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
+    this.syncRunner,
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -219,6 +227,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     folders: widget.folders,
     workDir: widget.workDir,
     host: widget.pairedHost,
+    runner: widget.syncRunner,
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
@@ -562,6 +571,7 @@ class _HomeState extends State<_Home> {
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
     widget.autoSync.addListener(_updatesNeeded);
+    widget.autoSync.syncing.addListener(_syncing);
     // Paired Devices sync while the app shows, from the first frame on:
     // what it brings is announced.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -593,7 +603,28 @@ class _HomeState extends State<_Home> {
     SpeechScope.of(context)?.transcriber.setTexts(context.t);
   }
 
+  /// Whether "Syncing" was said since the app came into view.
+  var _syncingSaid = false;
+
+  /// A sync of this Device started: a screen reader hears so once each
+  /// time the app comes into view, not with every sync while it shows;
+  /// the line under the bar shows every one (#225).
+  void _syncing() {
+    if (!mounted || _syncingSaid || !widget.autoSync.syncing.value) return;
+    if (!MediaQuery.accessibleNavigationOf(context)) return;
+    _syncingSaid = true;
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        context.t.syncSyncing,
+        Directionality.of(context),
+      ),
+    );
+  }
+
   void _hidden() {
+    // A sync out of sight is not announced; one after coming back is.
+    _syncingSaid = true;
     widget.lock.hidden();
     unawaited(widget.alarms.refresh());
     widget.autoSync.hidden();
@@ -603,6 +634,7 @@ class _HomeState extends State<_Home> {
   /// in step with what other Devices synced meanwhile, and a sync with
   /// the paired Devices.
   void _resumed() {
+    _syncingSaid = false;
     unawaited(widget.alarms.refresh());
     unawaited(widget.mirror.sync());
     widget.autoSync.shown();
@@ -673,6 +705,7 @@ class _HomeState extends State<_Home> {
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
+    widget.autoSync.syncing.removeListener(_syncing);
     unawaited(_bundlesOpened.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
