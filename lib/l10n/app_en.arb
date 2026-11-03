@@ -1096,7 +1096,7 @@
     }
   },
   "forgetDevice": "Forget",
-  "syncSettingsStay": "Settings stay on each Device and are never synced.",
+  "syncSettingsStay": "Simple or Advanced and the Trash setting sync to your own Devices; other settings stay on each Device.",
   "syncAutomatically": "Sync automatically",
   "@syncAutomatically": {"description": "The switch per paired Device: it syncs on its own on the same network."},
   "syncAutoIntro": "Paired Devices on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.",

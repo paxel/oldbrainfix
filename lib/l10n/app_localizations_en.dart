@@ -1851,7 +1851,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncSettingsStay =>
-      'Settings stay on each Device and are never synced.';
+      'Simple or Advanced and the Trash setting sync to your own Devices; other settings stay on each Device.';
 
   @override
   String get syncAutomatically => 'Sync automatically';

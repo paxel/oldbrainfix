@@ -495,7 +495,7 @@
   "pairedNone": "Noch keine gekoppelten Geräte.",
   "pairedLastSync": "Zuletzt synchronisiert {when}",
   "forgetDevice": "Vergessen",
-  "syncSettingsStay": "Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.",
+  "syncSettingsStay": "Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; andere Einstellungen bleiben auf jedem Gerät.",
   "syncAutomatically": "Automatisch synchronisieren",
   "syncAutoIntro": "Gekoppelte Geräte im selben WLAN synchronisieren sich von selbst: während die App offen ist und im Hintergrund jede Viertelstunde.",
   "conflictsTitle": "Konflikte",

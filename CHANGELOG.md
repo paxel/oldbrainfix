@@ -49,6 +49,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a Session's picks and entries are read once per change, so the Agenda loads faster: they were read again for every run so far, several times per load. On the phone the home-screen Agenda widget takes the Agenda's rows instead of reading them a second time. Whether a Note is a Tally, and which kind each Note is, are read without going through every Tally entry.
 - On the phone the announcement after an unexpected stop opens a dialog that says what happened, with Close and Report, where its tap opened the mail at once. Closed, it does not come back before the next unexpected stop. A freeze while the app was in the background, which the phone's energy management ends, no longer counts as an unexpected stop.
 - On the phone a quick, short swipe between the Agenda and the levels of the browser switches as soon as the finger lets go, where a flick that passed the touch threshold only with its last move did nothing, and the pages start where the finger is. The browser comes in without the Agenda under it being built again, so the change no longer stutters as it starts.
+- On the phone and the desktop the Sync page says that Simple or Advanced and the Trash setting sync to your own Devices and other settings stay on each Device, where it said that no settings are synced.
 
 ---
 

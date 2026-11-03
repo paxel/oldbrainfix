@@ -1867,7 +1867,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncSettingsStay =>
-      'Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.';
+      'Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; andere Einstellungen bleiben auf jedem Gerät.';
 
   @override
   String get syncAutomatically => 'Automatisch synchronisieren';

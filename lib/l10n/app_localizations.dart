@@ -3017,7 +3017,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncSettingsStay.
   ///
   /// In en, this message translates to:
-  /// **'Settings stay on each Device and are never synced.'**
+  /// **'Simple or Advanced and the Trash setting sync to your own Devices; other settings stay on each Device.'**
   String get syncSettingsStay;
 
   /// The switch per paired Device: it syncs on its own on the same network.
