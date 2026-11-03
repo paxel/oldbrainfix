@@ -11,6 +11,7 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'routine_history_screen.dart';
+import 'schedule_sentence_field.dart';
 import 'schedule_text.dart';
 import 'session_editor.dart';
 import 'system_bars.dart';
@@ -326,29 +327,29 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// An end day not chosen yet: a month after the start.
   Day get _untilDay => _until ?? Day(_start.year, _start.month + 1, _start.day);
 
-  /// The rule the simple editor shows.
-  Recurrence? _simpleRule() {
+  /// The repeat the simple editor shows.
+  SimpleRepeat _simpleRepeat() {
     final count = _end == RepeatEnd.count ? _count : null;
     final until = _end == RepeatEnd.until ? _untilDay : null;
     return switch (_kind) {
-      RepeatKind.once => null,
+      RepeatKind.once => const SimpleRepeat.once(),
       RepeatKind.every => SimpleRepeat.every(
         _every,
         _unit,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.weekdays => SimpleRepeat.weekdays(
         _weekdays,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.monthDay => SimpleRepeat.monthDay(
         _monthDay ?? _start.day,
         every: _months,
         count: count,
         until: until,
-      ).toRule(),
+      ),
       RepeatKind.monthWeekday => SimpleRepeat.monthWeekday(
         WeekdayRule(
           _nthWeekday ?? _start.weekday,
@@ -357,9 +358,19 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         every: _months,
         count: count,
         until: until,
-      ).toRule(),
+      ),
     };
   }
+
+  /// The rule the simple editor shows.
+  Recurrence? _simpleRule() => _simpleRepeat().toRule();
+
+  /// Takes what the schedule's sentence read (#227).
+  void _takeSentence(SimpleSchedule read) => _change(() {
+    _start = read.start;
+    _times = [...read.times];
+    _takeSimple(read.repeat);
+  });
 
   /// Reads the edit into [_schedule] and its coming Occurrences.
   void _update() {
@@ -698,6 +709,18 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ScheduleSentenceField(
+                schedule: _advanced
+                    ? null
+                    : SimpleSchedule(_simpleRepeat(), _start, _times),
+                summary: switch (_schedule) {
+                  final schedule? => scheduleText(t, locale, schedule),
+                  null => '',
+                },
+                today: _today,
+                onRead: _takeSentence,
+              ),
+              const SizedBox(height: 16),
               ChoiceChips<bool>(
                 value: _advanced,
                 options: [

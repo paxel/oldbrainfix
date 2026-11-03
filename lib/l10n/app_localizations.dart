@@ -884,6 +884,30 @@ abstract class AppLocalizations {
   /// **'The Note is gone'**
   String get noteGone;
 
+  /// No description provided for @scheduleSentenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'When'**
+  String get scheduleSentenceLabel;
+
+  /// No description provided for @scheduleSentenceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day at 08:00'**
+  String get scheduleSentenceHint;
+
+  /// No description provided for @scheduleSentenceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked words are not understood and change nothing.'**
+  String get scheduleSentenceUnknown;
+
+  /// No description provided for @scheduleSentenceAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Simple to type.'**
+  String get scheduleSentenceAdvanced;
+
   /// No description provided for @scheduleSimple.
   ///
   /// In en, this message translates to:

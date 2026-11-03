@@ -831,6 +831,19 @@ const CALENDAR_APPS: &str = "calendar-apps";
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
+    // The Routine editor's sentence line (#227) lays out deeper than a
+    // test thread's 2 MiB stack allows in a debug build; the app's main
+    // thread has 8 MiB.
+    let frames = std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| all_guide_frames().map_err(|e| e.to_string()))?;
+    match frames.join() {
+        Ok(result) => result.map_err(Into::into),
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
+}
+
+fn all_guide_frames() -> TestResult {
     let mut problems = Vec::new();
     for (language, texts) in [("en", &EN), ("de", &DE)] {
         for (theme, name) in [(egui::Theme::Light, "light"), (egui::Theme::Dark, "dark")] {

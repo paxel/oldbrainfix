@@ -485,7 +485,16 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('Schedule'), findsWidgets);
       final allDay = find.widgetWithText(Chip, 'All day');
-      await tester.scrollUntilVisible(allDay, 200);
+      await tester.scrollUntilVisible(
+        allDay,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(allDay, findsOneWidget);
       await tap(tester, find.text('Save'));
       expect(find.byType(SessionFormScreen), findsOneWidget);

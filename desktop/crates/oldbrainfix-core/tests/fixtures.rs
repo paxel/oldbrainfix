@@ -6624,6 +6624,167 @@ fn tags_are_found_as_the_dart_core_finds_them() -> TestResult {
     Ok(())
 }
 
+// --------------------------------------------------- Schedule sentences
+
+/// `repeat` as the generator writes it.
+fn sentence_repeat_json(repeat: &oldbrainfix_core::SimpleRepeat) -> Value {
+    use oldbrainfix_core::RepeatUnit;
+    json!({
+        "count": repeat.count,
+        "every": repeat.every,
+        "kind": match repeat.kind {
+            RepeatKind::Once => "once",
+            RepeatKind::Every => "every",
+            RepeatKind::Weekdays => "weekdays",
+            RepeatKind::MonthDay => "monthDay",
+            RepeatKind::MonthWeekday => "monthWeekday",
+        },
+        "monthDay": repeat.month_day,
+        "nth": repeat.nth.map(|n| n.to_string()),
+        "unit": match repeat.unit {
+            RepeatUnit::Days => "days",
+            RepeatUnit::Weeks => "weeks",
+            RepeatUnit::Months => "months",
+            RepeatUnit::Years => "years",
+        },
+        "until": repeat.until.map(|d| d.to_string()),
+        "weekdays": repeat.weekdays,
+    })
+}
+
+fn sentence_schedule_json(
+    schedule: Option<&oldbrainfix_core::schedule_sentence::SimpleSchedule>,
+) -> Value {
+    schedule.map_or(Value::Null, |s| {
+        json!({
+            "repeat": sentence_repeat_json(&s.repeat),
+            "start": s.start.to_string(),
+            "times": s.times.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        })
+    })
+}
+
+/// The JSON of a repeat back as the core's.
+fn sentence_repeat(value: &Value) -> Option<oldbrainfix_core::SimpleRepeat> {
+    use oldbrainfix_core::RepeatUnit;
+    use oldbrainfix_core::schedule::WeekdayRule;
+    let every = value["every"].as_i64()?;
+    let unit = match value["unit"].as_str()? {
+        "days" => RepeatUnit::Days,
+        "weeks" => RepeatUnit::Weeks,
+        "months" => RepeatUnit::Months,
+        _ => RepeatUnit::Years,
+    };
+    let repeat = match value["kind"].as_str()? {
+        "once" => return Some(SimpleRepeat::once()),
+        "every" => SimpleRepeat::every(every, unit),
+        "weekdays" => SimpleRepeat::weekdays(
+            value["weekdays"]
+                .as_array()?
+                .iter()
+                .filter_map(|d| d.as_u64().and_then(|d| u32::try_from(d).ok()))
+                .collect(),
+        ),
+        "monthDay" => SimpleRepeat::month_day(value["monthDay"].as_i64()?, every),
+        _ => {
+            let nth = value["nth"].as_str()?;
+            let code = nth.get(nth.len() - 2..)?;
+            let weekday = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+                .iter()
+                .position(|c| *c == code)?;
+            let ordinal = nth.get(..nth.len() - 2)?.parse().ok();
+            SimpleRepeat::month_weekday(
+                WeekdayRule {
+                    weekday: u32::try_from(weekday).ok()? + 1,
+                    ordinal,
+                },
+                every,
+            )
+        }
+    };
+    let until = value["until"].as_str().and_then(Day::parse);
+    Some(repeat.ending(value["count"].as_i64(), until))
+}
+
+#[test]
+fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::schedule_sentence::{SimpleSchedule, read, sentence, suggest};
+    let fixture = read_json(&fixtures().join("schedule_sentences.json"))?;
+    let today = Day::parse(fixture["today"].as_str().ok_or("today")?).ok_or("day")?;
+    // Byte offsets in `text` as the generator counts them: in code points.
+    let points = |text: &str, at: usize| text.get(..at).map(|t| t.chars().count());
+    let read_json = |locale: &str, text: &str| {
+        let read = read(text, locale, today);
+        json!({
+            "locale": locale,
+            "schedule": sentence_schedule_json(read.schedule.as_ref()),
+            "text": text,
+            "unknown": read
+                .unknown
+                .iter()
+                .map(|r| json!({"end": points(text, r.end), "start": points(text, r.start)}))
+                .collect::<Vec<_>>(),
+        })
+    };
+    let written = fixture["written"].as_array().ok_or("written")?;
+    assert!(written.len() >= 40);
+    for case in written {
+        let locale = case["locale"].as_str().ok_or("locale")?;
+        let value = &case["schedule"];
+        let times: Vec<ClockTime> = value["times"]
+            .as_array()
+            .ok_or("times")?
+            .iter()
+            .filter_map(|t| t.as_str().and_then(ClockTime::parse))
+            .collect();
+        let schedule = SimpleSchedule::new(
+            sentence_repeat(&value["repeat"]).ok_or("repeat")?,
+            Day::parse(value["start"].as_str().ok_or("start")?).ok_or("start")?,
+            &times,
+        );
+        assert_eq!(&sentence_schedule_json(Some(&schedule)), value, "{case}");
+        let text = sentence(&schedule, locale, today);
+        assert_eq!(text, case["sentence"], "{case}");
+        assert_eq!(read_json(locale, &text), case["read"], "{case}");
+        // The round trip.
+        assert_eq!(
+            read(&text, locale, today).schedule,
+            Some(schedule),
+            "{text}"
+        );
+    }
+    let typed = fixture["read"].as_array().ok_or("read")?;
+    assert!(typed.len() >= 40);
+    for case in typed {
+        let locale = case["locale"].as_str().ok_or("locale")?;
+        let text = case["text"].as_str().ok_or("text")?;
+        assert_eq!(&read_json(locale, text), case, "{text:?}");
+    }
+    let suggested = fixture["suggested"].as_array().ok_or("suggested")?;
+    assert!(suggested.len() >= 30);
+    for case in suggested {
+        let locale = case["locale"].as_str().ok_or("locale")?;
+        let text = case["text"].as_str().ok_or("text")?;
+        let points_cursor = case["cursor"].as_u64().ok_or("cursor")?;
+        let cursor = text
+            .char_indices()
+            .nth(usize::try_from(points_cursor)?)
+            .map_or(text.len(), |(i, _)| i);
+        let ours: Vec<Value> = suggest(text, cursor, locale)
+            .into_iter()
+            .map(|s| {
+                json!({
+                    "end": points(text, s.range.end),
+                    "start": points(text, s.range.start),
+                    "text": s.text,
+                })
+            })
+            .collect();
+        assert_eq!(&Value::Array(ours), &case["suggestions"], "{text:?}");
+    }
+    Ok(())
+}
+
 // ------------------------------------------------------- Formatted text
 
 /// `spans` as the generator writes them, offsets in code points.

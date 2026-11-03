@@ -535,7 +535,7 @@ void main() {
         isNull,
         reason: 'nothing typed yet',
       );
-      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.enterText(find.byType(TextField).first, 'pills');
       await tester.pumpAndSettle();
       await tap(tester, find.text('Save'));
 
@@ -552,7 +552,7 @@ void main() {
       tall(tester);
       await start(tester);
       await tap(tester, find.byTooltip('New Routine or Reminder'));
-      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.enterText(find.byType(TextField).first, 'pills');
       await tester.pumpAndSettle();
     }
 

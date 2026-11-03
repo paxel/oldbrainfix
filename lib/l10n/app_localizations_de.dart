@@ -452,6 +452,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noteGone => 'Die Notiz gibt es nicht mehr';
 
   @override
+  String get scheduleSentenceLabel => 'Wann';
+
+  @override
+  String get scheduleSentenceHint => 'Jeden Tag um 08:00';
+
+  @override
+  String get scheduleSentenceUnknown =>
+      'Markierte Wörter werden nicht verstanden und ändern nichts.';
+
+  @override
+  String get scheduleSentenceAdvanced => 'Wechsle zu Einfach, um zu tippen.';
+
+  @override
   String get scheduleSimple => 'Einfach';
 
   @override

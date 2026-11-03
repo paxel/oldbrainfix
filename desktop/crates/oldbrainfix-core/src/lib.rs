@@ -56,6 +56,7 @@ pub mod question_marks;
 pub mod recovery;
 pub mod routines;
 pub mod schedule;
+pub mod schedule_sentence;
 pub mod search;
 pub mod sent;
 pub mod sessions;

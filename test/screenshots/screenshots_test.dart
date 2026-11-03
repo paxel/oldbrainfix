@@ -1405,7 +1405,10 @@ void main() {
           boxFrame('routines-and-agenda', 'set-up', (tester) async {
             final t = await start(tester, seed());
             await _tap(tester, find.byTooltip(t.newRoutineTooltip));
-            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.enterText(
+              find.byType(TextField).first,
+              texts.captureText,
+            );
             await tester.pumpAndSettle();
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
           });

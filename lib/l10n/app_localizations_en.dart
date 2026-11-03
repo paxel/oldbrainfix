@@ -448,6 +448,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteGone => 'The Note is gone';
 
   @override
+  String get scheduleSentenceLabel => 'When';
+
+  @override
+  String get scheduleSentenceHint => 'Every day at 08:00';
+
+  @override
+  String get scheduleSentenceUnknown =>
+      'Marked words are not understood and change nothing.';
+
+  @override
+  String get scheduleSentenceAdvanced => 'Switch to Simple to type.';
+
+  @override
   String get scheduleSimple => 'Simple';
 
   @override

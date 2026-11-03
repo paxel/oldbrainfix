@@ -1,0 +1,5240 @@
+{
+  "read": [
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "   ",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "every week",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "once",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-24",
+        "times": [
+          "07:30"
+        ]
+      },
+      "text": "Once 12/24 at 7:30",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": "2027-12-31",
+          "weekdays": [
+            1,
+            4
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Every mon and thursday at 8:00, until 12/31/27",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "monthDay",
+          "monthDay": 3,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "every 2 month on day 3",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-24",
+        "times": []
+      },
+      "text": "Every day from 24.12.",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": 1,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00",
+          "09:00"
+        ]
+      },
+      "text": "EVERY DAY AT 08:00 AND 09:00, 3 TIMES, 1 time",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Every day at 08:00 please",
+      "unknown": [
+        {
+          "end": 25,
+          "start": 19
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day, until",
+      "unknown": [
+        {
+          "end": 16,
+          "start": 11
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day at 25:00",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 18,
+          "start": 13
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "Every 2 wekks at 08:00",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 7,
+          "start": 6
+        },
+        {
+          "end": 13,
+          "start": 8
+        },
+        {
+          "end": 16,
+          "start": 14
+        },
+        {
+          "end": 22,
+          "start": 17
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "Every 2 wekks",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 7,
+          "start": 6
+        },
+        {
+          "end": 13,
+          "start": 8
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every month on day 32",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 18,
+          "start": 15
+        },
+        {
+          "end": 21,
+          "start": 19
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every month on the fifth Monday",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 18,
+          "start": 15
+        },
+        {
+          "end": 24,
+          "start": 19
+        },
+        {
+          "end": 31,
+          "start": 25
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every month on the last",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 18,
+          "start": 15
+        },
+        {
+          "end": 23,
+          "start": 19
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Once at 08:00, 09:00, until 12/1",
+      "unknown": [
+        {
+          "end": 20,
+          "start": 15
+        },
+        {
+          "end": 27,
+          "start": 22
+        },
+        {
+          "end": 32,
+          "start": 28
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Once, 3 times, once",
+      "unknown": [
+        {
+          "end": 7,
+          "start": 6
+        },
+        {
+          "end": 13,
+          "start": 8
+        },
+        {
+          "end": 19,
+          "start": 15
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2028-02-29",
+        "times": []
+      },
+      "text": "Weekdays, from 2/29/2028",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            4
+          ]
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Weekdays Mon, Thu, until 2/29/2027",
+      "unknown": [
+        {
+          "end": 24,
+          "start": 19
+        },
+        {
+          "end": 34,
+          "start": 25
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Weekdays Mon,, Thu;at 08:00",
+      "unknown": [
+        {
+          "end": 18,
+          "start": 15
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "Every 0 days",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 7,
+          "start": 6
+        },
+        {
+          "end": 12,
+          "start": 8
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "Every 123456 days",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 12,
+          "start": 6
+        },
+        {
+          "end": 17,
+          "start": 13
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day at 8:5, 008:00, 08:000",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 16,
+          "start": 13
+        },
+        {
+          "end": 24,
+          "start": 18
+        },
+        {
+          "end": 32,
+          "start": 26
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Every day, from 13/1, until 1/1/202",
+      "unknown": [
+        {
+          "end": 15,
+          "start": 11
+        },
+        {
+          "end": 20,
+          "start": 16
+        },
+        {
+          "end": 27,
+          "start": 22
+        },
+        {
+          "end": 35,
+          "start": 28
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": "2026-03-05",
+          "weekdays": []
+        },
+        "start": "2026-02-05",
+        "times": []
+      },
+      "text": "Every day, from 1/5, from 2/5, 3 times, until 3/5",
+      "unknown": []
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "hello every day",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Every day 🧠 at 08:00",
+      "unknown": [
+        {
+          "end": 11,
+          "start": 10
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Every day at 08:00 Mon",
+      "unknown": [
+        {
+          "end": 22,
+          "start": 19
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "schedule": null,
+      "text": "Jeden Tag",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 9,
+          "start": 6
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Einmal",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-24",
+        "times": [
+          "07:30"
+        ]
+      },
+      "text": "Einmal am 24.12. um 7:30",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": "2027-12-31",
+          "weekdays": [
+            1,
+            4
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "immer Mo Do um 08:00 bis 31.12.2027",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": 10,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "alle 2 wochen, 10mal",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            5
+          ]
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Montag und Freitag",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2027-01-01",
+        "times": []
+      },
+      "text": "Jedes Jahr ab 1.1.27",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-24",
+        "times": []
+      },
+      "text": "Jeden Tag ab 12/24",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Tag ab 31.2.",
+      "unknown": [
+        {
+          "end": 12,
+          "start": 10
+        },
+        {
+          "end": 18,
+          "start": 13
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Tag 0-mal",
+      "unknown": [
+        {
+          "end": 11,
+          "start": 10
+        },
+        {
+          "end": 15,
+          "start": 12
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": 1,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Tag, einmal",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 15,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Monat am 15",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Jeden Monat am 32.",
+      "unknown": [
+        {
+          "end": 14,
+          "start": 12
+        },
+        {
+          "end": 18,
+          "start": 15
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00",
+          "09:00"
+        ]
+      },
+      "text": "Alle 2 Monate am zweiten Mittwoch um 08:00 und 09:00",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            3,
+            7
+          ]
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Wochentags Mo., Mi., So.",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            3
+          ]
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "text": "Wochentags Montag, mittwoch",
+      "unknown": []
+    },
+    {
+      "locale": "de",
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00"
+        ]
+      },
+      "text": "Jede Woche um 08:00, bis",
+      "unknown": [
+        {
+          "end": 24,
+          "start": 21
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": null,
+      "text": "Täglich um 08:00",
+      "unknown": [
+        {
+          "end": 7,
+          "start": 0
+        },
+        {
+          "end": 10,
+          "start": 8
+        },
+        {
+          "end": 16,
+          "start": 11
+        }
+      ]
+    },
+    {
+      "locale": "de",
+      "schedule": null,
+      "text": "Every day",
+      "unknown": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 9,
+          "start": 6
+        }
+      ]
+    }
+  ],
+  "suggested": [
+    {
+      "cursor": 0,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Once"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Every"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Weekdays"
+        }
+      ],
+      "text": ""
+    },
+    {
+      "cursor": 2,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 2,
+          "start": 0,
+          "text": "Every"
+        }
+      ],
+      "text": "Ev"
+    },
+    {
+      "cursor": 6,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 6,
+          "start": 6,
+          "text": "day"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "week"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "month"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "year"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Mon"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Tue"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Wed"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Thu"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Fri"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Sat"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Sun"
+        }
+      ],
+      "text": "Every "
+    },
+    {
+      "cursor": 9,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 9,
+          "start": 8,
+          "text": "weeks"
+        }
+      ],
+      "text": "Every 2 w"
+    },
+    {
+      "cursor": 10,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 10,
+          "start": 10,
+          "text": "at"
+        },
+        {
+          "end": 10,
+          "start": 10,
+          "text": "from"
+        },
+        {
+          "end": 10,
+          "start": 10,
+          "text": "until"
+        }
+      ],
+      "text": "Every day "
+    },
+    {
+      "cursor": 13,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 13,
+          "start": 12,
+          "text": "on"
+        }
+      ],
+      "text": "Every month o"
+    },
+    {
+      "cursor": 15,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 15,
+          "start": 15,
+          "text": "day"
+        },
+        {
+          "end": 15,
+          "start": 15,
+          "text": "the"
+        }
+      ],
+      "text": "Every month on "
+    },
+    {
+      "cursor": 19,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 19,
+          "start": 19,
+          "text": "first"
+        },
+        {
+          "end": 19,
+          "start": 19,
+          "text": "second"
+        },
+        {
+          "end": 19,
+          "start": 19,
+          "text": "third"
+        },
+        {
+          "end": 19,
+          "start": 19,
+          "text": "fourth"
+        },
+        {
+          "end": 19,
+          "start": 19,
+          "text": "last"
+        }
+      ],
+      "text": "Every month on the "
+    },
+    {
+      "cursor": 25,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Monday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Tuesday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Wednesday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Thursday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Friday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Saturday"
+        },
+        {
+          "end": 25,
+          "start": 25,
+          "text": "Sunday"
+        }
+      ],
+      "text": "Every month on the first "
+    },
+    {
+      "cursor": 15,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 15,
+          "start": 14,
+          "text": "Thu"
+        }
+      ],
+      "text": "Weekdays Tue, T"
+    },
+    {
+      "cursor": 9,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Mon"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Tue"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Wed"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Thu"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Fri"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Sat"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "Sun"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "at"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "from"
+        },
+        {
+          "end": 9,
+          "start": 9,
+          "text": "until"
+        }
+      ],
+      "text": "Weekdays "
+    },
+    {
+      "cursor": 13,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 13,
+          "start": 13,
+          "text": "08:00"
+        },
+        {
+          "end": 13,
+          "start": 13,
+          "text": "12:00"
+        },
+        {
+          "end": 13,
+          "start": 13,
+          "text": "18:00"
+        }
+      ],
+      "text": "Every day at "
+    },
+    {
+      "cursor": 14,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 14,
+          "start": 13,
+          "text": "08:00"
+        },
+        {
+          "end": 14,
+          "start": 13,
+          "text": "08:30"
+        }
+      ],
+      "text": "Every day at 8"
+    },
+    {
+      "cursor": 16,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 16,
+          "start": 13,
+          "text": "08:30"
+        }
+      ],
+      "text": "Every day at 8:3"
+    },
+    {
+      "cursor": 15,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Every day at 24"
+    },
+    {
+      "cursor": 20,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 20,
+          "start": 20,
+          "text": "08:00"
+        },
+        {
+          "end": 20,
+          "start": 20,
+          "text": "12:00"
+        },
+        {
+          "end": 20,
+          "start": 20,
+          "text": "18:00"
+        },
+        {
+          "end": 20,
+          "start": 20,
+          "text": "from"
+        },
+        {
+          "end": 20,
+          "start": 20,
+          "text": "until"
+        }
+      ],
+      "text": "Every day at 08:00, "
+    },
+    {
+      "cursor": 13,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 13,
+          "start": 13,
+          "text": "times"
+        }
+      ],
+      "text": "Every day, 3 "
+    },
+    {
+      "cursor": 17,
+      "locale": "en",
+      "suggestions": [],
+      "text": "Every day, until "
+    },
+    {
+      "cursor": 5,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 5,
+          "start": 5,
+          "text": "on"
+        },
+        {
+          "end": 5,
+          "start": 5,
+          "text": "at"
+        }
+      ],
+      "text": "Once "
+    },
+    {
+      "cursor": 12,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 12,
+          "start": 12,
+          "text": "at"
+        }
+      ],
+      "text": "Once on 1/1 "
+    },
+    {
+      "cursor": 7,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 7,
+          "start": 6,
+          "text": "day"
+        }
+      ],
+      "text": "every d"
+    },
+    {
+      "cursor": 23,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 23,
+          "start": 23,
+          "text": "08:00"
+        },
+        {
+          "end": 23,
+          "start": 23,
+          "text": "12:00"
+        },
+        {
+          "end": 23,
+          "start": 23,
+          "text": "18:00"
+        }
+      ],
+      "text": "Every day at 08:00 and "
+    },
+    {
+      "cursor": 4,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Once"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Every"
+        },
+        {
+          "end": 4,
+          "start": 4,
+          "text": "Weekdays"
+        }
+      ],
+      "text": "zzz "
+    },
+    {
+      "cursor": 0,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Einmal"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Jeden"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Jede"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Jedes"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Alle"
+        },
+        {
+          "end": 0,
+          "start": 0,
+          "text": "Wochentags"
+        }
+      ],
+      "text": ""
+    },
+    {
+      "cursor": 1,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Jeden"
+        },
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Jede"
+        },
+        {
+          "end": 1,
+          "start": 0,
+          "text": "Jedes"
+        }
+      ],
+      "text": "J"
+    },
+    {
+      "cursor": 6,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Tag"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Woche"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Monat"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Jahr"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Mo"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Di"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Mi"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Do"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Fr"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "Sa"
+        },
+        {
+          "end": 6,
+          "start": 6,
+          "text": "So"
+        }
+      ],
+      "text": "Jeden "
+    },
+    {
+      "cursor": 8,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 8,
+          "start": 7,
+          "text": "Wochen"
+        }
+      ],
+      "text": "Alle 3 W"
+    },
+    {
+      "cursor": 16,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 16,
+          "start": 15,
+          "text": "letzten"
+        }
+      ],
+      "text": "Jeden Monat am l"
+    },
+    {
+      "cursor": 23,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 23,
+          "start": 22,
+          "text": "Montag"
+        },
+        {
+          "end": 23,
+          "start": 22,
+          "text": "Mittwoch"
+        }
+      ],
+      "text": "Jeden Monat am ersten M"
+    },
+    {
+      "cursor": 13,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 13,
+          "start": 13,
+          "text": "mal"
+        }
+      ],
+      "text": "Jeden Tag, 3 "
+    },
+    {
+      "cursor": 17,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 17,
+          "start": 16,
+          "text": "Di"
+        },
+        {
+          "end": 17,
+          "start": 16,
+          "text": "Do"
+        }
+      ],
+      "text": "Wochentags Mo., D"
+    },
+    {
+      "cursor": 14,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 14,
+          "start": 14,
+          "text": "Di"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "Mi"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "Do"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "Fr"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "Sa"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "So"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "um"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "ab"
+        },
+        {
+          "end": 14,
+          "start": 14,
+          "text": "bis"
+        }
+      ],
+      "text": "Wochentags Mo "
+    },
+    {
+      "cursor": 24,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 24,
+          "start": 20,
+          "text": "13:30"
+        }
+      ],
+      "text": "Jeden Tag um 08:00, 13:3"
+    },
+    {
+      "cursor": 7,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 7,
+          "start": 7,
+          "text": "am"
+        },
+        {
+          "end": 7,
+          "start": 7,
+          "text": "um"
+        }
+      ],
+      "text": "Einmal "
+    },
+    {
+      "cursor": 10,
+      "locale": "de",
+      "suggestions": [
+        {
+          "end": 10,
+          "start": 10,
+          "text": "um"
+        },
+        {
+          "end": 10,
+          "start": 10,
+          "text": "ab"
+        },
+        {
+          "end": 10,
+          "start": 10,
+          "text": "bis"
+        }
+      ],
+      "text": "Jeden Tag "
+    },
+    {
+      "cursor": 10,
+      "locale": "en",
+      "suggestions": [
+        {
+          "end": 10,
+          "start": 8,
+          "text": "weeks"
+        }
+      ],
+      "text": "Every 2 we at 08:00"
+    }
+  ],
+  "today": "2026-11-03",
+  "written": [
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "09:00"
+          ]
+        },
+        "text": "Once on 11/3 at 09:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "09:00"
+        ]
+      },
+      "sentence": "Once on 11/3 at 09:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2027-01-05",
+          "times": []
+        },
+        "text": "Once on 1/5/2027",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2027-01-05",
+        "times": []
+      },
+      "sentence": "Once on 1/5/2027"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2025-12-31",
+          "times": [
+            "23:05"
+          ]
+        },
+        "text": "Once on 12/31/2025 at 23:05",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2025-12-31",
+        "times": [
+          "23:05"
+        ]
+      },
+      "sentence": "Once on 12/31/2025 at 23:05"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every day",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every day"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Every 2 days, from 12/1",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Every 2 days, from 12/1"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Every 12 days at 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Every 12 days at 07:15, 19:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every week",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every week"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Every 2 weeks, from 12/1",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Every 2 weeks, from 12/1"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Every 12 weeks at 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Every 12 weeks at 07:15, 19:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Every 2 months, from 12/1",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Every 2 months, from 12/1"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Every 12 months at 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Every 12 months at 07:15, 19:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every year",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every year"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Every 2 years, from 12/1",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Every 2 years, from 12/1"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Every 12 years at 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Every 12 years at 07:15, 19:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": "2026-12-31",
+            "weekdays": [
+              1,
+              4
+            ]
+          },
+          "start": "2026-11-03",
+          "times": [
+            "08:00",
+            "15:00"
+          ]
+        },
+        "text": "Weekdays Mon, Thu at 08:00, 15:00, until 12/31",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": "2026-12-31",
+          "weekdays": [
+            1,
+            4
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00",
+          "15:00"
+        ]
+      },
+      "sentence": "Weekdays Mon, Thu at 08:00, 15:00, until 12/31"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Weekdays",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Weekdays"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": [
+              7
+            ]
+          },
+          "start": "2026-11-03",
+          "times": [
+            "00:00"
+          ]
+        },
+        "text": "Weekdays Sun at 00:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            7
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "00:00"
+        ]
+      },
+      "sentence": "Weekdays Sun at 00:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": 10,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "start": "2026-03-02",
+          "times": []
+        },
+        "text": "Weekdays Mon, Tue, Wed, Thu, Fri, Sat, Sun, from 3/2, 10 times",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 10,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "start": "2026-03-02",
+        "times": []
+      },
+      "sentence": "Weekdays Mon, Tue, Wed, Thu, Fri, Sat, Sun, from 3/2, 10 times"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 1,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Every month on day 1 at 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 1,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Every month on day 1 at 10:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 15,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Every month on day 15 at 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 15,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Every month on day 15 at 10:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 29,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Every month on day 29 at 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 29,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Every month on day 29 at 10:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 31,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Every month on day 31 at 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 31,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Every month on day 31 at 10:00"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "monthDay",
+            "monthDay": 31,
+            "nth": null,
+            "unit": "months",
+            "until": "2027-06-30",
+            "weekdays": []
+          },
+          "start": "2026-01-31",
+          "times": []
+        },
+        "text": "Every 2 months on day 31, from 1/31, until 6/30/2027",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "monthDay",
+          "monthDay": 31,
+          "nth": null,
+          "unit": "months",
+          "until": "2027-06-30",
+          "weekdays": []
+        },
+        "start": "2026-01-31",
+        "times": []
+      },
+      "sentence": "Every 2 months on day 31, from 1/31, until 6/30/2027"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the first Monday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the first Monday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the first Wednesday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the first Wednesday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the first Sunday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the first Sunday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the second Monday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the second Monday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the second Wednesday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the second Wednesday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the second Sunday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the second Sunday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the third Monday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the third Monday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the third Wednesday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the third Wednesday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the third Sunday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the third Sunday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the fourth Monday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the fourth Monday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the fourth Wednesday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the fourth Wednesday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the fourth Sunday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the fourth Sunday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the last Monday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the last Monday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the last Wednesday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the last Wednesday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every month on the last Sunday",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every month on the last Sunday"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": 1,
+            "every": 3,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1FR",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "18:00"
+          ]
+        },
+        "text": "Every 3 months on the last Friday at 18:00, once",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 1,
+          "every": 3,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1FR",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "18:00"
+        ]
+      },
+      "sentence": "Every 3 months on the last Friday at 18:00, once"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": 4,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-10",
+          "times": [
+            "00:00",
+            "23:59"
+          ]
+        },
+        "text": "Every week at 00:00, 23:59, from 11/10, 4 times",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 4,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-10",
+        "times": [
+          "00:00",
+          "23:59"
+        ]
+      },
+      "sentence": "Every week at 00:00, 23:59, from 11/10, 4 times"
+    },
+    {
+      "locale": "en",
+      "read": {
+        "locale": "en",
+        "schedule": {
+          "repeat": {
+            "count": 99999,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Every day, 99999 times",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 99999,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Every day, 99999 times"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "09:00"
+          ]
+        },
+        "text": "Einmal am 3.11. um 09:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "09:00"
+        ]
+      },
+      "sentence": "Einmal am 3.11. um 09:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2027-01-05",
+          "times": []
+        },
+        "text": "Einmal am 5.1.2027",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2027-01-05",
+        "times": []
+      },
+      "sentence": "Einmal am 5.1.2027"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "once",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2025-12-31",
+          "times": [
+            "23:05"
+          ]
+        },
+        "text": "Einmal am 31.12.2025 um 23:05",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "once",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2025-12-31",
+        "times": [
+          "23:05"
+        ]
+      },
+      "sentence": "Einmal am 31.12.2025 um 23:05"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Tag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Tag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Alle 2 Tage, ab 1.12.",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Alle 2 Tage, ab 1.12."
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Alle 12 Tage um 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Alle 12 Tage um 07:15, 19:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jede Woche",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jede Woche"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Alle 2 Wochen, ab 1.12.",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Alle 2 Wochen, ab 1.12."
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Alle 12 Wochen um 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Alle 12 Wochen um 07:15, 19:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Alle 2 Monate, ab 1.12.",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Alle 2 Monate, ab 1.12."
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Alle 12 Monate um 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Alle 12 Monate um 07:15, 19:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jedes Jahr",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jedes Jahr"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-12-01",
+          "times": []
+        },
+        "text": "Alle 2 Jahre, ab 1.12.",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-12-01",
+        "times": []
+      },
+      "sentence": "Alle 2 Jahre, ab 1.12."
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 12,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "years",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "07:15",
+            "19:00"
+          ]
+        },
+        "text": "Alle 12 Jahre um 07:15, 19:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 12,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "years",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "07:15",
+          "19:00"
+        ]
+      },
+      "sentence": "Alle 12 Jahre um 07:15, 19:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": "2026-12-31",
+            "weekdays": [
+              1,
+              4
+            ]
+          },
+          "start": "2026-11-03",
+          "times": [
+            "08:00",
+            "15:00"
+          ]
+        },
+        "text": "Wochentags Mo, Do um 08:00, 15:00, bis 31.12.",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": "2026-12-31",
+          "weekdays": [
+            1,
+            4
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "08:00",
+          "15:00"
+        ]
+      },
+      "sentence": "Wochentags Mo, Do um 08:00, 15:00, bis 31.12."
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Wochentags",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Wochentags"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": [
+              7
+            ]
+          },
+          "start": "2026-11-03",
+          "times": [
+            "00:00"
+          ]
+        },
+        "text": "Wochentags So um 00:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            7
+          ]
+        },
+        "start": "2026-11-03",
+        "times": [
+          "00:00"
+        ]
+      },
+      "sentence": "Wochentags So um 00:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": 10,
+            "every": 1,
+            "kind": "weekdays",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "start": "2026-03-02",
+          "times": []
+        },
+        "text": "Wochentags Mo, Di, Mi, Do, Fr, Sa, So, ab 2.3., 10-mal",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 10,
+          "every": 1,
+          "kind": "weekdays",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "start": "2026-03-02",
+        "times": []
+      },
+      "sentence": "Wochentags Mo, Di, Mi, Do, Fr, Sa, So, ab 2.3., 10-mal"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 1,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Jeden Monat am 1. um 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 1,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Jeden Monat am 1. um 10:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 15,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Jeden Monat am 15. um 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 15,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Jeden Monat am 15. um 10:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 29,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Jeden Monat am 29. um 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 29,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Jeden Monat am 29. um 10:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthDay",
+            "monthDay": 31,
+            "nth": null,
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "10:00"
+          ]
+        },
+        "text": "Jeden Monat am 31. um 10:00",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthDay",
+          "monthDay": 31,
+          "nth": null,
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "10:00"
+        ]
+      },
+      "sentence": "Jeden Monat am 31. um 10:00"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 2,
+            "kind": "monthDay",
+            "monthDay": 31,
+            "nth": null,
+            "unit": "months",
+            "until": "2027-06-30",
+            "weekdays": []
+          },
+          "start": "2026-01-31",
+          "times": []
+        },
+        "text": "Alle 2 Monate am 31., ab 31.1., bis 30.6.2027",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 2,
+          "kind": "monthDay",
+          "monthDay": 31,
+          "nth": null,
+          "unit": "months",
+          "until": "2027-06-30",
+          "weekdays": []
+        },
+        "start": "2026-01-31",
+        "times": []
+      },
+      "sentence": "Alle 2 Monate am 31., ab 31.1., bis 30.6.2027"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am ersten Montag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am ersten Montag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am ersten Mittwoch",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am ersten Mittwoch"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "1SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am ersten Sonntag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "1SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am ersten Sonntag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am zweiten Montag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am zweiten Montag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am zweiten Mittwoch",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am zweiten Mittwoch"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "2SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am zweiten Sonntag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "2SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am zweiten Sonntag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am dritten Montag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am dritten Montag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am dritten Mittwoch",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am dritten Mittwoch"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "3SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am dritten Sonntag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "3SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am dritten Sonntag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am vierten Montag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am vierten Montag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am vierten Mittwoch",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am vierten Mittwoch"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "4SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am vierten Sonntag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "4SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am vierten Sonntag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1MO",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am letzten Montag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1MO",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am letzten Montag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1WE",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am letzten Mittwoch",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1WE",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am letzten Mittwoch"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": null,
+            "every": 1,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1SU",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Monat am letzten Sonntag",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": null,
+          "every": 1,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1SU",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Monat am letzten Sonntag"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": 1,
+            "every": 3,
+            "kind": "monthWeekday",
+            "monthDay": null,
+            "nth": "-1FR",
+            "unit": "months",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": [
+            "18:00"
+          ]
+        },
+        "text": "Alle 3 Monate am letzten Freitag um 18:00, einmal",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 1,
+          "every": 3,
+          "kind": "monthWeekday",
+          "monthDay": null,
+          "nth": "-1FR",
+          "unit": "months",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": [
+          "18:00"
+        ]
+      },
+      "sentence": "Alle 3 Monate am letzten Freitag um 18:00, einmal"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": 4,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "weeks",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-10",
+          "times": [
+            "00:00",
+            "23:59"
+          ]
+        },
+        "text": "Jede Woche um 00:00, 23:59, ab 10.11., 4-mal",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 4,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "weeks",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-10",
+        "times": [
+          "00:00",
+          "23:59"
+        ]
+      },
+      "sentence": "Jede Woche um 00:00, 23:59, ab 10.11., 4-mal"
+    },
+    {
+      "locale": "de",
+      "read": {
+        "locale": "de",
+        "schedule": {
+          "repeat": {
+            "count": 99999,
+            "every": 1,
+            "kind": "every",
+            "monthDay": null,
+            "nth": null,
+            "unit": "days",
+            "until": null,
+            "weekdays": []
+          },
+          "start": "2026-11-03",
+          "times": []
+        },
+        "text": "Jeden Tag, 99999-mal",
+        "unknown": []
+      },
+      "schedule": {
+        "repeat": {
+          "count": 99999,
+          "every": 1,
+          "kind": "every",
+          "monthDay": null,
+          "nth": null,
+          "unit": "days",
+          "until": null,
+          "weekdays": []
+        },
+        "start": "2026-11-03",
+        "times": []
+      },
+      "sentence": "Jeden Tag, 99999-mal"
+    }
+  ]
+}

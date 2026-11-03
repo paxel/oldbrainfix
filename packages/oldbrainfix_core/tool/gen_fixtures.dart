@@ -7610,6 +7610,239 @@ Map<String, Object?> _textTags() {
   };
 }
 
+/// Schedules as sentences (ADR 0044), on a held day: each schedule of
+/// the simple editor written in English and German and read back, more
+/// texts read as typed with the parts not understood, and the words
+/// suggested at a cursor. Offsets are counted in code points.
+Map<String, Object?> _scheduleSentences() {
+  final today = Day(2026, 11, 3);
+  ClockTime at(int hour, [int minute = 0]) => ClockTime(hour, minute);
+  final schedules = [
+    SimpleSchedule(const SimpleRepeat.once(), today, [at(9)]),
+    SimpleSchedule(const SimpleRepeat.once(), Day(2027, 1, 5), const []),
+    SimpleSchedule(const SimpleRepeat.once(), Day(2025, 12, 31), [at(23, 5)]),
+    for (final unit in RepeatUnit.values)
+      for (final n in [1, 2, 12])
+        SimpleSchedule(
+          SimpleRepeat.every(n, unit),
+          n == 2 ? Day(2026, 12, 1) : today,
+          n == 12 ? [at(7, 15), at(19)] : const [],
+        ),
+    SimpleSchedule(
+      SimpleRepeat.weekdays(const {1, 4}, until: Day(2026, 12, 31)),
+      today,
+      [at(8), at(15)],
+    ),
+    SimpleSchedule(const SimpleRepeat.weekdays({}), today, const []),
+    SimpleSchedule(const SimpleRepeat.weekdays({7}), today, [at(0)]),
+    SimpleSchedule(
+      const SimpleRepeat.weekdays({1, 2, 3, 4, 5, 6, 7}, count: 10),
+      Day(2026, 3, 2),
+      const [],
+    ),
+    for (final day in [1, 15, 29, 31])
+      SimpleSchedule(SimpleRepeat.monthDay(day), today, [at(10)]),
+    SimpleSchedule(
+      SimpleRepeat.monthDay(31, every: 2, until: Day(2027, 6, 30)),
+      Day(2026, 1, 31),
+      const [],
+    ),
+    for (final ordinal in [1, 2, 3, 4, -1])
+      for (final weekday in [1, 3, 7])
+        SimpleSchedule(
+          SimpleRepeat.monthWeekday(WeekdayRule(weekday, ordinal)),
+          today,
+          const [],
+        ),
+    SimpleSchedule(
+      const SimpleRepeat.monthWeekday(WeekdayRule(5, -1), every: 3, count: 1),
+      today,
+      [at(18)],
+    ),
+    SimpleSchedule(
+      const SimpleRepeat.every(1, RepeatUnit.weeks, count: 4),
+      Day(2026, 11, 10),
+      [at(0), at(23, 59)],
+    ),
+    SimpleSchedule(
+      const SimpleRepeat.every(1, RepeatUnit.days, count: 99999),
+      today,
+      const [],
+    ),
+  ];
+  const typed = {
+    'en': [
+      '',
+      '   ',
+      'every week',
+      'once',
+      'Once 12/24 at 7:30',
+      'Every mon and thursday at 8:00, until 12/31/27',
+      'every 2 month on day 3',
+      'Every day from 24.12.',
+      'EVERY DAY AT 08:00 AND 09:00, 3 TIMES, 1 time',
+      'Every day at 08:00 please',
+      'Every day, until',
+      'Every day at 25:00',
+      'Every 2 wekks at 08:00',
+      'Every 2 wekks',
+      'Every month on day 32',
+      'Every month on the fifth Monday',
+      'Every month on the last',
+      'Once at 08:00, 09:00, until 12/1',
+      'Once, 3 times, once',
+      'Weekdays, from 2/29/2028',
+      'Weekdays Mon, Thu, until 2/29/2027',
+      'Weekdays Mon,, Thu;at 08:00',
+      'Every 0 days',
+      'Every 123456 days',
+      'Every day at 8:5, 008:00, 08:000',
+      'Every day, from 13/1, until 1/1/202',
+      'Every day, from 1/5, from 2/5, 3 times, until 3/5',
+      'hello every day',
+      'Every day 🧠 at 08:00',
+      'Every day at 08:00 Mon',
+      'Jeden Tag',
+    ],
+    'de': [
+      'Einmal',
+      'Einmal am 24.12. um 7:30',
+      'immer Mo Do um 08:00 bis 31.12.2027',
+      'alle 2 wochen, 10mal',
+      'Jeden Montag und Freitag',
+      'Jedes Jahr ab 1.1.27',
+      'Jeden Tag ab 12/24',
+      'Jeden Tag ab 31.2.',
+      'Jeden Tag 0-mal',
+      'Jeden Tag, einmal',
+      'Jeden Monat am 15',
+      'Jeden Monat am 32.',
+      'Alle 2 Monate am zweiten Mittwoch um 08:00 und 09:00',
+      'Wochentags Mo., Mi., So.',
+      'Wochentags Montag, mittwoch',
+      'Jede Woche um 08:00, bis',
+      'Täglich um 08:00',
+      'Every day',
+    ],
+  };
+  const cursors = {
+    'en': [
+      '',
+      'Ev',
+      'Every ',
+      'Every 2 w',
+      'Every day ',
+      'Every month o',
+      'Every month on ',
+      'Every month on the ',
+      'Every month on the first ',
+      'Weekdays Tue, T',
+      'Weekdays ',
+      'Every day at ',
+      'Every day at 8',
+      'Every day at 8:3',
+      'Every day at 24',
+      'Every day at 08:00, ',
+      'Every day, 3 ',
+      'Every day, until ',
+      'Once ',
+      'Once on 1/1 ',
+      'every d',
+      'Every day at 08:00 and ',
+      'zzz ',
+    ],
+    'de': [
+      '',
+      'J',
+      'Jeden ',
+      'Alle 3 W',
+      'Jeden Monat am l',
+      'Jeden Monat am ersten M',
+      'Jeden Tag, 3 ',
+      'Wochentags Mo., D',
+      'Wochentags Mo ',
+      'Jeden Tag um 08:00, 13:3',
+      'Einmal ',
+      'Jeden Tag ',
+    ],
+  };
+  int points(String text, int at) => text.substring(0, at).runes.length;
+  Object? repeatJson(SimpleRepeat r) => {
+    'count': r.count,
+    'every': r.every,
+    'kind': r.kind.name,
+    'monthDay': r.monthDay,
+    'nth': r.nth?.toString(),
+    'unit': r.unit.name,
+    'until': r.until?.toString(),
+    'weekdays': r.weekdays.toList()..sort(),
+  };
+  Object? scheduleJson(SimpleSchedule? s) => s == null
+      ? null
+      : {
+          'repeat': repeatJson(s.repeat),
+          'start': s.start.toString(),
+          'times': [for (final t in s.times) t.toString()],
+        };
+  Object? readJson(String locale, String text) {
+    final read = readSchedule(text, locale, today);
+    return {
+      'locale': locale,
+      'schedule': scheduleJson(read.schedule),
+      'text': text,
+      'unknown': [
+        for (final r in read.unknown)
+          {'end': points(text, r.end), 'start': points(text, r.start)},
+      ],
+    };
+  }
+
+  return {
+    'read': [
+      for (final MapEntry(key: locale, value: texts) in typed.entries)
+        for (final text in texts) readJson(locale, text),
+    ],
+    'suggested': [
+      for (final MapEntry(key: locale, value: texts) in cursors.entries)
+        for (final text in texts)
+          {
+            'cursor': points(text, text.length),
+            'locale': locale,
+            'suggestions': [
+              for (final s in suggestSchedule(text, text.length, locale))
+                {
+                  'end': points(text, s.end),
+                  'start': points(text, s.start),
+                  'text': s.text,
+                },
+            ],
+            'text': text,
+          },
+      // A word in the middle, the cursor in it.
+      {
+        'cursor': 10,
+        'locale': 'en',
+        'suggestions': [
+          for (final s in suggestSchedule('Every 2 we at 08:00', 10, 'en'))
+            {'end': s.end, 'start': s.start, 'text': s.text},
+        ],
+        'text': 'Every 2 we at 08:00',
+      },
+    ],
+    'today': today.toString(),
+    'written': [
+      for (final locale in ['en', 'de'])
+        for (final schedule in schedules)
+          {
+            'locale': locale,
+            'read': readJson(locale, scheduleSentence(schedule, locale, today)),
+            'schedule': scheduleJson(schedule),
+            'sentence': scheduleSentence(schedule, locale, today),
+          },
+    ],
+  };
+}
+
 /// Formatted text (ADR 0033): for each text its lines and their parts,
 /// what it reads as, whether it uses a format, how it is escaped, its
 /// tags, where a typed shortcut ends and the word at every offset; then
@@ -8752,6 +8985,11 @@ Future<void> main(List<String> args) async {
     'marks, with a `-` inside and at the end, and those that are none: '
     'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
     '`\\` or `&`, as in "C#" and web addresses.\n'
+    '- `schedule_sentences.json`: schedules as sentences (ADR 0044) on a '
+    'held day: each schedule of the simple editor written in English and '
+    'German and read back, texts read as typed with the parts not '
+    'understood, and the words suggested at a cursor, offsets counted in '
+    'code points.\n'
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
     'marks, whether it uses a format, the text escaped, as HTML, its '
@@ -8981,6 +9219,10 @@ Future<void> main(List<String> args) async {
     '${_json.convert(_textTags())}\n',
   );
   _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
+  _write(
+    File('${root.path}/schedule_sentences.json'),
+    '${_json.convert(_scheduleSentences())}\n',
+  );
   _sync(root);
   _conflictsFixture(root);
   await _folder(root);

@@ -46,6 +46,7 @@ export 'src/question_marks.dart';
 export 'src/recovery_sheet.dart';
 export 'src/routines.dart';
 export 'src/schedule.dart';
+export 'src/schedule_sentence.dart';
 export 'src/search.dart';
 export 'src/sent_items.dart';
 export 'src/sessions.dart';

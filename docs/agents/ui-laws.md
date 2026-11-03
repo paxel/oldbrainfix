@@ -404,6 +404,16 @@ replace a law of Both apps where they say so. A desktop law marked
   are chips that fill in what is typed, such as the known units under a
   Tally field's unit (#159): the value is the text, so they are not a
   choice.
+- **The Routine editor's schedule starts with its sentence** (#227, ADR
+  0044): a line, "When", that always shows the schedule as a sentence
+  in the app's language ("Weekdays Mon, Thu at 08:00, until 12/31").
+  Typing in it fills the chips and times as it is typed, with the next
+  word, the weekday names and times as suggestion chips under it; the
+  words it does not understand are marked in the error colour, said
+  under it, and change nothing. Left, or when a chip changes, it shows
+  the schedule again. On an Advanced schedule it is read-only, the
+  schedule's summary with "Switch to Simple to type". The sentence is
+  never stored.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error

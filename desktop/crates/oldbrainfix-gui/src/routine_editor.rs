@@ -23,6 +23,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
 use oldbrainfix_core::schedule::WeekdayRule;
+use oldbrainfix_core::schedule_sentence::{self, SimpleSchedule};
 use oldbrainfix_core::{
     ClockTime, Day, Note, Notes, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit,
     Routine, Routines, Schedule, SimpleRepeat, Store,
@@ -32,7 +33,9 @@ use crate::app::{chip_row, embossed, icon_button, pill};
 use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_long, weekday_text};
+use crate::schedule_text::{
+    clock_text, day_text, occurrence_time, schedule_text, weekday_long, weekday_text,
+};
 use crate::session_editor::{SessionDraft, SessionIntent};
 use crate::theme::{self, Tones};
 
@@ -119,6 +122,15 @@ pub struct RoutineEditor {
     schedule: Option<Schedule>,
     rule_error: Option<String>,
     next: Vec<Occurrence>,
+    /// The schedule as a sentence, as typed or as written (#227).
+    pub sentence: String,
+    /// The byte ranges of `sentence` not understood.
+    sentence_unknown: Vec<std::ops::Range<usize>>,
+    /// The schedule `sentence` is of; `None` on an Advanced schedule.
+    sentence_shown: Option<SimpleSchedule>,
+    /// Whether the sentence is being typed: its line has the keyboard,
+    /// or had it when a click began, which may be on a suggestion.
+    sentence_typing: bool,
     /// A new Session's part.
     session: Option<SessionDraft>,
     /// Whether it makes its plain Note a Session, its setup alone,
@@ -195,6 +207,10 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            sentence: String::new(),
+            sentence_unknown: Vec::new(),
+            sentence_shown: None,
+            sentence_typing: false,
             session: None,
             makes: false,
             history: false,
@@ -338,6 +354,10 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            sentence: String::new(),
+            sentence_unknown: Vec::new(),
+            sentence_shown: None,
+            sentence_typing: false,
             session: None,
             makes: false,
             history: !routine.is_reminder(),
@@ -402,12 +422,12 @@ impl RoutineEditor {
         })
     }
 
-    /// The rule the simple editor shows.
-    fn simple_rule(&self) -> Option<Recurrence> {
+    /// The repeat the simple editor shows.
+    fn simple_repeat(&self) -> SimpleRepeat {
         let count = (self.end == RepeatEnd::Count).then_some(self.count);
         let until = (self.end == RepeatEnd::Until).then(|| self.until_day());
         let simple = match self.kind {
-            RepeatKind::Once => return None,
+            RepeatKind::Once => return SimpleRepeat::once(),
             RepeatKind::Every => SimpleRepeat::every(self.every, self.unit),
             RepeatKind::Weekdays => SimpleRepeat::weekdays(self.weekdays.clone()),
             RepeatKind::MonthDay => SimpleRepeat::month_day(
@@ -422,7 +442,56 @@ impl RoutineEditor {
                 self.months,
             ),
         };
-        simple.ending(count, until).to_rule()
+        simple.ending(count, until)
+    }
+
+    /// The rule the simple editor shows.
+    fn simple_rule(&self) -> Option<Recurrence> {
+        self.simple_repeat().to_rule()
+    }
+
+    /// The schedule as the simple editor holds it; `None` in the advanced
+    /// mode.
+    pub fn simple_schedule(&self) -> Option<SimpleSchedule> {
+        (!self.advanced).then(|| SimpleSchedule::new(self.simple_repeat(), self.start, &self.times))
+    }
+
+    /// Reads `text` typed into the schedule's sentence in the language
+    /// of `t`: a schedule it reads fills the chips and times, the parts
+    /// not understood are marked and change nothing (#227).
+    pub fn type_sentence(&mut self, t: &L10n, text: &str) {
+        self.sentence = text.to_string();
+        let read = schedule_sentence::read(text, t.locale(), self.today);
+        self.sentence_unknown = read.unknown;
+        if let Some(schedule) = read.schedule {
+            self.start = schedule.start;
+            self.start_text = schedule.start.to_string();
+            self.times.clone_from(&schedule.times);
+            self.take_simple(&schedule.repeat);
+            self.sentence_shown = Some(schedule);
+            self.update();
+        }
+    }
+
+    /// The parts of the sentence not understood, as byte ranges.
+    pub fn sentence_unknown(&self) -> &[std::ops::Range<usize>] {
+        &self.sentence_unknown
+    }
+
+    /// Writes the sentence of the schedule, unless the one being typed
+    /// (`typing`) is of it; on an Advanced schedule its summary.
+    fn show_sentence(&mut self, t: &L10n, typing: bool) {
+        let simple = self.simple_schedule();
+        if typing && simple.is_some() && simple == self.sentence_shown {
+            return;
+        }
+        self.sentence = match (&simple, &self.schedule) {
+            (Some(simple), _) => schedule_sentence::sentence(simple, t.locale(), self.today),
+            (None, Some(schedule)) => schedule_text(t, schedule),
+            (None, None) => String::new(),
+        };
+        self.sentence_unknown.clear();
+        self.sentence_shown = simple;
     }
 
     /// Whether what is edited happens once.
@@ -728,6 +797,7 @@ impl RoutineEditor {
         let text = ui.visuals().text_color();
         let mut changed = false;
         embossed(ui, tones, false, None, |ui| {
+            changed |= self.sentence_line(ui, t);
             let mut advanced = self.advanced;
             let modes = [
                 (false, t.schedule_simple().to_string()),
@@ -762,6 +832,130 @@ impl RoutineEditor {
         });
         embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
         embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+        changed
+    }
+
+    /// The line at the top of the schedule (#227): the schedule as a
+    /// sentence, typed to fill the chips and times, with the next words
+    /// as suggestions under it and the words not understood marked; on
+    /// an Advanced schedule a summary, read-only. Whether it changed the
+    /// schedule.
+    fn sentence_line(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let error = ui.visuals().error_fg_color;
+        let id = Id::new("schedule sentence");
+        // A click takes the keyboard from the line as it begins; one on a
+        // suggestion ends a frame later.
+        let clicking = ui.input(|i| i.pointer.any_down() || i.pointer.any_released());
+        let typing = ui.memory(|m| m.has_focus(id)) || (self.sentence_typing && clicking);
+        self.sentence_typing = typing;
+        self.show_sentence(t, typing);
+        let simple = !self.advanced;
+        let label = ui.label(
+            RichText::new(t.schedule_sentence_label())
+                .strong()
+                .color(text),
+        );
+        let unknown = self.sentence_unknown.clone();
+        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, wrap: f32| {
+            let typed = typed.as_str();
+            let plain = egui::TextFormat {
+                font_id: egui::FontId::proportional(14.0),
+                color: text,
+                ..Default::default()
+            };
+            let wrong = egui::TextFormat {
+                color: error,
+                underline: egui::Stroke::new(1.0, error),
+                ..plain.clone()
+            };
+            let mut job = egui::text::LayoutJob::default();
+            let mut at = 0;
+            for range in unknown.iter().filter(|r| r.end <= typed.len()) {
+                if range.start > at {
+                    job.append(&typed[at..range.start], 0.0, plain.clone());
+                }
+                job.append(&typed[range.clone()], 0.0, wrong.clone());
+                at = range.end;
+            }
+            job.append(&typed[at..], 0.0, plain);
+            job.wrap.max_width = wrap;
+            ui.fonts_mut(|f| f.layout_job(job))
+        };
+        let mut typed = self.sentence.clone();
+        let field = ui
+            .add(
+                TextEdit::multiline(&mut typed)
+                    .id(id)
+                    .hint_text(t.schedule_sentence_hint())
+                    .interactive(simple)
+                    .return_key(None)
+                    .desired_rows(1)
+                    .desired_width(f32::INFINITY)
+                    .layouter(&mut layouter),
+            )
+            .labelled_by(label.id);
+        let mut changed = false;
+        if simple && field.changed() {
+            self.type_sentence(t, &typed);
+            changed = true;
+        }
+        if !simple {
+            ui.label(
+                RichText::new(t.schedule_sentence_advanced())
+                    .small()
+                    .color(weak),
+            );
+            return changed;
+        }
+        if !self.sentence_unknown.is_empty() {
+            ui.label(
+                RichText::new(t.schedule_sentence_unknown())
+                    .small()
+                    .color(error),
+            );
+        }
+        self.sentence_typing |= field.has_focus();
+        if self.sentence_typing {
+            let (cursor, end) = crate::format_bar::selection(ui, id, &self.sentence);
+            let suggestions = if cursor == end {
+                schedule_sentence::suggest(&self.sentence, cursor, t.locale())
+            } else {
+                Vec::new()
+            };
+            let mut picked = None;
+            if !suggestions.is_empty() {
+                // Suggestions that fill in the line, not a choice of
+                // their own.
+                ui.horizontal_wrapped(|ui| {
+                    for suggestion in &suggestions {
+                        if ui
+                            .small_button(RichText::new(&suggestion.text).color(text))
+                            .clicked()
+                        {
+                            picked = Some(suggestion.clone());
+                        }
+                    }
+                });
+            }
+            if let Some(suggestion) = picked {
+                let mut typed = self.sentence.clone();
+                let space = if typed[suggestion.range.end..].starts_with(' ') {
+                    ""
+                } else {
+                    " "
+                };
+                typed.replace_range(
+                    suggestion.range.clone(),
+                    &format!("{}{space}", suggestion.text),
+                );
+                let at = suggestion.range.start + suggestion.text.len() + 1;
+                self.type_sentence(t, &typed);
+                crate::format_bar::select(ui, id, &self.sentence, (at, at));
+                changed = true;
+            }
+        }
         changed
     }
 
