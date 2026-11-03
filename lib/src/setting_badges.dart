@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'look.dart';
 
 /// One setting of a Note in the editor's row of badges (#160), drawn like
 /// a shield: the setting's icon, the same for every value, then its
@@ -223,13 +224,15 @@ class _BadgeSwitchState extends State<BadgeSwitch> {
         const SizedBox(height: 8),
         Semantics(
           label: widget.setting,
-          child: Switch(
-            key: const ValueKey('badge-switch'),
-            value: _on,
-            onChanged: (_) {
-              widget.toggle();
-              setState(() => _on = !_on);
-            },
+          child: LookGrown(
+            child: Switch(
+              key: const ValueKey('badge-switch'),
+              value: _on,
+              onChanged: (_) {
+                widget.toggle();
+                setState(() => _on = !_on);
+              },
+            ),
           ),
         ),
       ],

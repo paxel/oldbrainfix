@@ -15,6 +15,7 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -196,6 +197,7 @@ class AgendaWidget : AppWidgetProvider() {
         fun rowViews(context: Context, snapshot: AgendaSnapshot?, row: WidgetRow): RemoteViews = when (layoutOf(row.kind)) {
             R.layout.widget_agenda_unsorted -> RemoteViews(context.packageName, R.layout.widget_agenda_unsorted).apply {
                 setTextViewText(R.id.agenda_unsorted, row.title)
+                textSize(this, R.id.agenda_unsorted, 14f, snapshot)
                 setOnClickFillInIntent(R.id.agenda_unsorted, fillIn(AgendaTap.Unsorted))
             }
             R.layout.widget_agenda_text ->
@@ -206,6 +208,7 @@ class AgendaWidget : AppWidgetProvider() {
                     }
                     if (row.done) strike(text)
                     setTextViewText(R.id.agenda_text, text)
+                    textSize(this, R.id.agenda_text, 14f, snapshot)
                     setTextColor(
                         R.id.agenda_text,
                         context.getColor(if (row.kind == WidgetRow.HEADING) R.color.agenda_widget_text else R.color.agenda_widget_text_dim),
@@ -218,6 +221,8 @@ class AgendaWidget : AppWidgetProvider() {
             else -> RemoteViews(context.packageName, R.layout.widget_agenda_row).apply {
                 setViewPadding(R.id.agenda_row, dp(context, AgendaWidgetPlan.indentDp(row.indent)), 0, 0, dp(context, 4))
                 setTextViewText(R.id.agenda_time, row.time)
+                textSize(this, R.id.agenda_time, 13f, snapshot)
+                textSize(this, R.id.agenda_title, 14f, snapshot)
                 setViewVisibility(R.id.agenda_time, if (row.time.isEmpty()) View.GONE else View.VISIBLE)
                 setOnClickFillInIntent(R.id.agenda_row, fillIn(row.onRow))
                 if (row.kind == WidgetRow.APPOINTMENT) {
@@ -250,6 +255,13 @@ class AgendaWidget : AppWidgetProvider() {
                 setOnClickFillInIntent(R.id.agenda_check, fillIn(row.onBox))
             }
         }
+
+        /**
+         * The text of [id] at [sp], the size its layout gives it, grown
+         * by the snapshot's [AgendaSnapshot.textScale] (#224).
+         */
+        private fun textSize(views: RemoteViews, id: Int, sp: Float, snapshot: AgendaSnapshot?) =
+            views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, sp * (snapshot?.textScale ?: 1f))
 
         /** The fill-in intent that tells [AgendaTapActivity] to do [tap]. */
         private fun fillIn(tap: AgendaTap): Intent =

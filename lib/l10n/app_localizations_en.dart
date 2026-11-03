@@ -1453,6 +1453,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeDark => 'Dark';
 
   @override
+  String get fatFingers => 'Fat fingers';
+
+  @override
+  String get fatFingersDetail =>
+      'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
+
+  @override
   String get settingsAlarms => 'Alarms';
 
   @override

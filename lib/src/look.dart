@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
@@ -49,27 +50,228 @@ class LookTones {
       brightness == Brightness.dark ? dark : light;
 }
 
+/// How much "Fat fingers" grows text, icons and tap targets (#224).
+const fatFingersScale = 1.3;
+
+/// How much this Device grows text, icons and tap targets (#224): 1, or
+/// [fatFingersScale] with "Fat fingers" on. The theme carries it, so
+/// the measures of the Agenda's rows follow it with the icons.
+class LookScale extends ThemeExtension<LookScale> {
+  final double factor;
+
+  const LookScale(this.factor);
+
+  /// The factor of the theme around [context]; 1 without one.
+  static double of(BuildContext context) =>
+      Theme.of(context).extension<LookScale>()?.factor ?? 1;
+
+  @override
+  LookScale copyWith({double? factor}) => LookScale(factor ?? this.factor);
+
+  @override
+  LookScale lerp(LookScale? other, double t) =>
+      other == null ? this : LookScale(factor + (other.factor - factor) * t);
+}
+
+/// The text scaler of [base], the system's font size, times [factor]
+/// (#224): "Fat fingers" grows the text on top of what the system set.
+class TimesTextScaler extends TextScaler {
+  final TextScaler base;
+  final double factor;
+
+  const TimesTextScaler(this.base, this.factor);
+
+  @override
+  double scale(double fontSize) => base.scale(fontSize) * factor;
+
+  @override
+  double get textScaleFactor => scale(14) / 14;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TimesTextScaler && other.base == base && other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(base, factor);
+}
+
+/// Grows the text of everything under it by [fatFingersScale] while [on]
+/// (#224), on top of the system's font size.
+class FatFingersText extends StatelessWidget {
+  final bool on;
+  final Widget child;
+
+  const FatFingersText({super.key, required this.on, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!on) return child;
+    final media = MediaQuery.of(context);
+    return MediaQuery(
+      data: media.copyWith(
+        textScaler: TimesTextScaler(media.textScaler, fatFingersScale),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// [child] grown by the [LookScale] of the theme, in its room and on the
+/// screen alike, for a control whose size the density does not reach:
+/// the switch (#224).
+class LookGrown extends SingleChildRenderObjectWidget {
+  const LookGrown({super.key, required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      RenderGrown(LookScale.of(context));
+
+  @override
+  void updateRenderObject(BuildContext context, RenderGrown renderObject) =>
+      renderObject.factor = LookScale.of(context);
+}
+
+class RenderGrown extends RenderProxyBox {
+  double _factor;
+
+  RenderGrown(this._factor);
+
+  set factor(double factor) {
+    if (factor == _factor) return;
+    _factor = factor;
+    markNeedsLayout();
+  }
+
+  Matrix4 get _transform => Matrix4.diagonal3Values(_factor, _factor, 1);
+
+  BoxConstraints _shrunk(BoxConstraints constraints) => BoxConstraints(
+    minWidth: constraints.minWidth / _factor,
+    maxWidth: constraints.maxWidth / _factor,
+    minHeight: constraints.minHeight / _factor,
+    maxHeight: constraints.maxHeight / _factor,
+  );
+
+  @override
+  void performLayout() {
+    final child = this.child!;
+    child.layout(_shrunk(constraints), parentUsesSize: true);
+    size = constraints.constrain(child.size * _factor);
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.constrain(
+    child!.getDryLayout(_shrunk(constraints)) * _factor,
+  );
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      child!.getMinIntrinsicWidth(height / _factor) * _factor;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      child!.getMaxIntrinsicWidth(height / _factor) * _factor;
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      child!.getMinIntrinsicHeight(width / _factor) * _factor;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      child!.getMaxIntrinsicHeight(width / _factor) * _factor;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (_factor == 1) return context.paintChild(child!, offset);
+    layer = context.pushTransform(
+      needsCompositing,
+      offset,
+      _transform,
+      (context, offset) => context.paintChild(child!, offset),
+      oldLayer: layer as TransformLayer?,
+    );
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      result.addWithPaintTransform(
+        transform: _transform,
+        position: position,
+        hitTest: (result, position) =>
+            child!.hitTest(result, position: position),
+      );
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) =>
+      transform.multiply(_transform);
+}
+
 /// The app's theme for [brightness]. Pages are transparent: the
-/// question-mark background under them is the ground.
-ThemeData lookTheme(Brightness brightness) {
+/// question-mark background under them is the ground. With [fatFingers]
+/// (#224) icons and tap targets are [fatFingersScale] times their size:
+/// the icons through the icon themes, the targets through the density,
+/// whose largest step adds 4 dp a side to a 48 dp target.
+ThemeData lookTheme(Brightness brightness, {bool fatFingers = false}) {
   final tones = LookTones.of(brightness);
   final scheme = ColorScheme.fromSeed(
     seedColor: tones.accent,
     brightness: brightness,
   ).copyWith(primary: tones.accent, surface: tones.card);
+  final scale = fatFingers ? fatFingersScale : 1.0;
+  // Material's own sizes, grown: 24 for an icon, 18 for a button's.
+  final icon = 24 * scale;
+  final buttonIcon = WidgetStatePropertyAll(18 * scale);
+  final density = kMinInteractiveDimension * (scale - 1) / 4;
+  final grown = VisualDensity(horizontal: density, vertical: density);
   return ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
+    extensions: [LookScale(scale)],
+    visualDensity: fatFingers ? grown : null,
+    iconTheme: fatFingers ? IconThemeData(size: icon) : null,
+    // Material 3's icon buttons take no density: their target is set
+    // as their least size, 48 grown.
+    iconButtonTheme: fatFingers
+        ? IconButtonThemeData(
+            style: ButtonStyle(
+              iconSize: WidgetStatePropertyAll(icon),
+              minimumSize: WidgetStatePropertyAll(
+                Size.square(kMinInteractiveDimension * scale),
+              ),
+            ),
+          )
+        : null,
+    textButtonTheme: fatFingers
+        ? TextButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
+        : null,
+    filledButtonTheme: fatFingers
+        ? FilledButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
+        : null,
+    outlinedButtonTheme: fatFingers
+        ? OutlinedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
+        : null,
+    elevatedButtonTheme: fatFingers
+        ? ElevatedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
+        : null,
     // The bar is plain ground: titles stay readable over scrolled cards.
     appBarTheme: AppBarTheme(
       backgroundColor: tones.background,
       scrolledUnderElevation: 0,
+      toolbarHeight: fatFingers ? kToolbarHeight * scale : null,
+      leadingWidth: fatFingers ? kToolbarHeight * scale : null,
+      // Material's colours of the bar's icons, with their size.
+      iconTheme: fatFingers
+          ? IconThemeData(color: scheme.onSurface, size: icon)
+          : null,
+      actionsIconTheme: fatFingers
+          ? IconThemeData(color: scheme.onSurfaceVariant, size: icon)
+          : null,
     ),
     // The "+" is a control over the question marks: the full accent,
     // not a pale container that melts into the light teal ground.
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
+      iconSize: fatFingers ? icon : null,
     ),
     // Text fields sit on the question marks too and must stand out.
     inputDecorationTheme: InputDecorationThemeData(
@@ -233,7 +435,9 @@ class SwitchBelow extends StatelessWidget {
       subtitle: subtitle,
       padding: padding,
       onTap: onTap,
-      control: Switch(key: switchKey, value: value, onChanged: onChanged),
+      control: LookGrown(
+        child: Switch(key: switchKey, value: value, onChanged: onChanged),
+      ),
     ),
   );
 }

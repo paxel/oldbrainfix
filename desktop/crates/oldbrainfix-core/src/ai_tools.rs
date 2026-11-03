@@ -205,7 +205,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), and who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1337,6 +1337,7 @@ impl Store {
                     "aiReach": self.ai_reach()?.name(),
                     "alertsOn": settings.alerts_on()?,
                     "allDayFrom": settings.all_day_from()?.to_string(),
+                    "fatFingers": settings.fat_fingers()?,
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
                     "quickNote": {
                         "fileInto": shows(QuickNoteControl::FileInto)?,
@@ -2424,6 +2425,7 @@ mod tests {
         assert_eq!(store.all_entries()?.len(), logged);
         DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
         DeviceSettings::new(&store).set_agenda_hides_checked(true)?;
+        DeviceSettings::new(&store).set_fat_fingers(true)?;
         PersonSettings::new(&store).set_trashes_done_reminder(true)?;
         let settings = call(&store, &task, "read_settings", &json!({}))?;
         assert!(!settings.is_error);
@@ -2438,6 +2440,7 @@ mod tests {
         assert_eq!(read.pointer("/aiReach"), Some(&json!("local")));
         assert_eq!(read.pointer("/allDayFrom"), Some(&json!("15:00")));
         assert_eq!(read.pointer("/agendaHidesChecked"), Some(&json!(true)));
+        assert_eq!(read.pointer("/fatFingers"), Some(&json!(true)));
         assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
         assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
         PersonSettings::new(&store).set_advanced(false)?;

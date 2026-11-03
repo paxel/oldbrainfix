@@ -164,6 +164,21 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('text, icons and tap targets stay their size until this Device '
+      'switches on Fat fingers (#224)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.fatFingers, isFalse);
+    store.fatFingers = true;
+    expect(store.fatFingers, isTrue);
+    expect(store.localSetting('fatFingers'), 'true');
+    store.fatFingers = false;
+    expect(store.fatFingers, isFalse);
+    store.setLocalSetting('fatFingers', 'garbled');
+    expect(store.fatFingers, isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the Agenda showed a row per Shopping List with Lines back unless '
       'this Device chose another way', () {
     final store = Store.inMemory();

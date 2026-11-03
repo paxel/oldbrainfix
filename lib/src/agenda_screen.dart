@@ -853,7 +853,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         // The control goes below its text.
         if (swaps && !pick.done)
           Padding(
-            padding: const EdgeInsets.only(left: AgendaSizes.indent),
+            padding: EdgeInsets.only(left: AgendaSizes.of(context).indent),
             child: Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
@@ -1530,11 +1530,9 @@ class _AppointmentRow extends StatelessWidget {
     final location = appointment.location.trim();
     final description = appointment.description.trim();
     final dim = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final sizes = AgendaSizes.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: AgendaSizes.gap,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -1594,9 +1592,7 @@ class _AppointmentRow extends StatelessWidget {
                           key: ValueKey('appointment-menu-${piece.key}'),
                           tooltip: t.more,
                           // 40 by 40, as the boxes (#208).
-                          style: IconButton.styleFrom(
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
+                          style: sizes.button,
                           icon: const Icon(Icons.more_vert),
                           onPressed: () {
                             final box = button.findRenderObject() as RenderBox?;

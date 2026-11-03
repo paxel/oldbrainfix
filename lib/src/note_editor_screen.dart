@@ -2170,43 +2170,43 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           context,
           title: t.noteTitle,
           actions: [
-            IconButton(
+            BarAction(
               key: const ValueKey('send-note-file'),
-              tooltip: t.sendToPerson,
+              label: t.sendToPerson,
               onPressed: () {
                 _saveText();
                 unawaited(
                   sendNoteFile(context, widget.notes.store, widget.noteId),
                 );
               },
-              icon: const Icon(Icons.send_outlined),
+              icon: Icons.send_outlined,
             ),
-            IconButton(
+            BarAction(
               key: const ValueKey('share-note'),
-              tooltip: t.shareToApp,
+              label: t.shareToApp,
               onPressed: () {
                 _saveText();
                 unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
               },
-              icon: const Icon(Icons.share_outlined),
+              icon: Icons.share_outlined,
             ),
             CalendarButton(choices: _calendarChoices),
-            IconButton(
+            BarAction(
               key: const ValueKey('note-history'),
-              tooltip: t.historyTitle,
+              label: t.historyTitle,
               onPressed: _openHistory,
-              icon: const Icon(Icons.history),
+              icon: Icons.history,
             ),
             if (changes) ...[
-              IconButton(
-                tooltip: t.mergeInto,
+              BarAction(
+                label: t.mergeInto,
                 onPressed: _merge,
-                icon: const Icon(Icons.call_merge),
+                icon: Icons.call_merge,
               ),
-              IconButton(
-                tooltip: t.moveToTrash,
+              BarAction(
+                label: t.moveToTrash,
                 onPressed: _trash,
-                icon: const Icon(Icons.delete_outline),
+                icon: Icons.delete_outline,
               ),
             ],
           ],

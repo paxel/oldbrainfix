@@ -385,6 +385,8 @@
   "themeSystem": "Wie das System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
+  "fatFingers": "Dicke Finger",
+  "fatFingersDetail": "Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.",
   "settingsAlarms": "Alarme",
   "settingsAlarmSetupDetail": "Die Berechtigungen, die Alarme brauchen, um pünktlich zu klingeln.",
   "settingsRenagDetail": "Wie oft ein unbeachteter Alarm erneut klingelt, wenn seine Routine keinen eigenen Abstand hat.",

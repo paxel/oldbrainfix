@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
@@ -438,10 +439,12 @@ class _TableScreenState extends State<TableScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(t.tableHeadingColumn),
-                      Switch(
-                        value: table.headingColumn,
-                        onChanged: (_) =>
-                            Navigator.of(context).pop(_Op.headings),
+                      LookGrown(
+                        child: Switch(
+                          value: table.headingColumn,
+                          onChanged: (_) =>
+                              Navigator.of(context).pop(_Op.headings),
+                        ),
                       ),
                     ],
                   ),

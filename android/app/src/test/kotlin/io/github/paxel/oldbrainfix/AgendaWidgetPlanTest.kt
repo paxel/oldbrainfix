@@ -523,6 +523,10 @@ class AgendaWidgetPlanTest {
         )
         assertEquals("Morgen", read?.tomorrow)
         assertEquals("Nichts geplant", read?.planned)
+        // Without "Fat fingers" the text keeps its size (#224).
+        assertEquals(1f, read?.textScale)
+        val fat = AgendaWidgetPlan.snapshotOf(snapshot.put("fatFingers", true).toString())
+        assertEquals(1.3f, fat?.textScale)
         val view = AgendaWidgetPlan.view(read, "2026-10-24", emptyList(), emptyMap(), "")
         assertEquals(listOf("Heute", "Sport", "Morgen", "dentist", "Monday, 26 Oct", "Nichts geplant"), titles(view))
     }

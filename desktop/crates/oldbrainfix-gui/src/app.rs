@@ -1364,6 +1364,10 @@ enum Action {
     Ai(AiAction),
 }
 
+/// How far "Bigger text and icons" zooms the window (#224), as "Fat
+/// fingers" grows the phone's.
+pub const BIGGER_ZOOM: f32 = 1.3;
+
 /// A change in the Settings.
 #[derive(Debug, Clone, PartialEq)]
 enum Setting {
@@ -1388,6 +1392,9 @@ enum Setting {
     /// Whether the Agenda hides what is checked instead of striking it
     /// through (#217).
     HideChecked(bool),
+    /// Whether text and icons show bigger, egui's zoom at
+    /// [`BIGGER_ZOOM`] (#224).
+    Bigger(bool),
     /// Whether Done on a plain Note's only Reminder moves the Note to the
     /// trash: the person's, on all of their own Devices (#211).
     TrashDoneReminder(bool),
@@ -1453,6 +1460,8 @@ pub struct App {
     /// it yet.
     theme: ThemeChoice,
     theme_shown: bool,
+    /// Whether the window shows the zoom this Device chose yet (#224).
+    zoom_shown: bool,
     /// The address the browser is to open, and who opens it; egui's
     /// `open_url` when none.
     open_url: Option<String>,
@@ -1865,6 +1874,7 @@ impl App {
             quick_note_wanted: false,
             theme,
             theme_shown: false,
+            zoom_shown: false,
             open_url: None,
             url_opener: None,
             capture: String::new(),
@@ -3755,6 +3765,15 @@ impl App {
     fn show_theme(&mut self, ctx: &egui::Context) {
         if !std::mem::replace(&mut self.theme_shown, true) {
             theme::prefer(ctx, self.theme);
+            ctx.request_repaint();
+        }
+        // The same for the zoom (#224): set every frame it would undo
+        // Ctrl+Plus and Ctrl+Minus.
+        if !std::mem::replace(&mut self.zoom_shown, true) {
+            let bigger = DeviceSettings::new(&self.store)
+                .fat_fingers()
+                .unwrap_or(false);
+            ctx.set_zoom_factor(if bigger { BIGGER_ZOOM } else { 1.0 });
             ctx.request_repaint();
         }
     }
@@ -7066,6 +7085,10 @@ impl App {
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
             Setting::HideChecked(on) => settings.set_agenda_hides_checked(on)?,
+            Setting::Bigger(on) => {
+                settings.set_fat_fingers(on)?;
+                self.zoom_shown = false;
+            }
             Setting::TrashDoneReminder(on) => {
                 PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
             }
@@ -11421,6 +11444,7 @@ impl App {
         let settings = DeviceSettings::new(&self.store);
         let alerts = settings.alerts_on().unwrap_or(true);
         let autostart = settings.autostart_on().unwrap_or(true);
+        let bigger = settings.fat_fingers().unwrap_or(false);
         let renag = settings
             .renag_interval()
             .map(|d| d.num_minutes())
@@ -11502,6 +11526,13 @@ impl App {
                         actions.push(Action::Setting(Setting::Autostart(on)));
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
+                    let mut on = bigger;
+                    if theme::checkbox(ui, &mut on, RichText::new(t.bigger_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::Bigger(on)));
+                    }
+                    ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                 });
                 let ai_shown = ai_view::PortShown {
                     url: ai_url.as_deref(),

@@ -58,6 +58,7 @@ extension DeviceSettings on Store {
   static const _agendaCalendars = 'agendaCalendars';
   static const _streaksOff = 'streaksOff';
   static const _agendaHideChecked = 'agendaHideChecked';
+  static const _fatFingers = 'fatFingers';
   static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
@@ -236,6 +237,13 @@ extension DeviceSettings on Store {
   bool get agendaHidesChecked => localSetting(_agendaHideChecked) == 'true';
 
   set agendaHidesChecked(bool on) => setLocalSetting(_agendaHideChecked, '$on');
+
+  /// Whether this Device shows text, icons and tap targets 1.3 times
+  /// their size, "Fat fingers" on the phone and "Bigger text and icons"
+  /// on the desktop (#224); off until switched on.
+  bool get fatFingers => localSetting(_fatFingers) == 'true';
+
+  set fatFingers(bool on) => setLocalSetting(_fatFingers, '$on');
 
   /// Whether the Note editor and Amend on this Device type in two rows,
   /// the bottom one above the keyboard; on unless switched off, which

@@ -143,11 +143,9 @@ class FrogRow extends StatelessWidget {
     final done = frog.isDone;
     final subtitle = this.subtitle;
     final onAnother = this.onAnother;
+    final sizes = AgendaSizes.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: AgendaSizes.gap,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -166,11 +164,11 @@ class FrogRow extends StatelessWidget {
                             left: BorderSide(color: colour, width: 6),
                           ),
                         ),
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     4,
-                    AgendaSizes.inside,
+                    sizes.inside,
                     16,
-                    AgendaSizes.inside,
+                    sizes.inside,
                   ),
                   child: Row(
                     children: [
@@ -179,6 +177,7 @@ class FrogRow extends StatelessWidget {
                         semanticLabel: t.markDone,
                         // 40 by 40, as on the Agenda's rows (#208).
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: sizes.density,
                         onChanged: switch (onToggle) {
                           null => null,
                           final onToggle => (_) => onToggle(),

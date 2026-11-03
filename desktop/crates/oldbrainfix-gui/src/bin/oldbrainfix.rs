@@ -41,6 +41,7 @@ use oldbrainfix_core::{
     APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
 };
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
+use oldbrainfix_gui::app::BIGGER_ZOOM;
 use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::backups;
@@ -211,6 +212,8 @@ struct PopupWindow {
     edit: Rc<RefCell<Option<String>>>,
     /// The theme this Device chose, until it is shown.
     theme: Option<ThemeChoice>,
+    /// The zoom this Device chose (#224), until it is set.
+    zoom: Option<f32>,
     system_theme: SystemTheme,
 }
 
@@ -220,6 +223,9 @@ impl eframe::App for PopupWindow {
         self.system_theme.hand_to(ui.ctx());
         if let Some(choice) = self.theme.take() {
             theme::prefer(ui.ctx(), choice);
+        }
+        if let Some(zoom) = self.zoom.take() {
+            ui.ctx().set_zoom_factor(zoom);
         }
         let mut outcome = Outcome::Open;
         for command in waiting(&self.commands) {
@@ -375,7 +381,15 @@ impl Shell {
     fn popup(&self) -> Result<Option<Command>, String> {
         let popup = (self.new_popup)();
         let next = Rc::new(Cell::new(None));
-        let viewport = popup.viewport();
+        // "Bigger text and icons" (#224): its own window opens unzoomed,
+        // so it is opened as large as the zoom set on its first frame
+        // needs.
+        let bigger = DeviceSettings::new(&self.store)
+            .fat_fingers()
+            .unwrap_or(false);
+        let zoom = if bigger { BIGGER_ZOOM } else { 1.0 };
+        let mut viewport = popup.viewport();
+        viewport.inner_size = viewport.inner_size.map(|size| size * zoom);
         let window = PopupWindow {
             popup,
             commands: self.commands.clone(),
@@ -383,6 +397,7 @@ impl Shell {
             edit: self.edit.clone(),
             // The system's when it cannot be read.
             theme: Some(DeviceSettings::new(&self.store).theme().unwrap_or_default()),
+            zoom: Some(zoom),
             system_theme: self.system_theme.clone(),
         };
         self.run(viewport, Box::new(window))?;

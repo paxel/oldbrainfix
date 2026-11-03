@@ -39,7 +39,7 @@ enum _UnitChoice { region, metric, imperial }
 enum _Importing { folder, keep }
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme; the units of Tallies; the alarm setup, the default Re-nag interval and the
+/// page: the theme and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; what the quick note shows; the way to the Calendar page; the App Lock and
@@ -50,7 +50,8 @@ class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
 
-  /// Called after the theme was changed, to show it at once.
+  /// Called after the theme or "Fat fingers" was changed, to show it at
+  /// once.
   final VoidCallback? onThemeChanged;
 
   /// The notes browser's way back in, which the Area an Import made
@@ -71,6 +72,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late ThemeChoice _theme = widget.store.themeChoice;
+  late bool _fatFingers = widget.store.fatFingers;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
   late bool _hidesChecked = widget.store.agendaHidesChecked;
@@ -94,6 +96,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.store.themeChoice = choice;
     setState(() => _theme = choice);
     widget.onThemeChanged?.call();
+  }
+
+  void _setFatFingers(bool on) {
+    widget.store.fatFingers = on;
+    setState(() => _fatFingers = on);
+    widget.onThemeChanged?.call();
+    // The widget's text grows with it.
+    unawaited(widget.alarms.refresh());
   }
 
   void _setRenag(Duration interval) {
@@ -516,6 +526,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 onChanged: _setTheme,
               ),
+            ),
+            SettingsSection(
+              children: [
+                SwitchBelow(
+                  switchKey: const ValueKey('fatFingers'),
+                  leading: const Icon(Icons.touch_app_outlined),
+                  value: _fatFingers,
+                  onChanged: _setFatFingers,
+                  title: Text(t.fatFingers),
+                  subtitle: Text(t.fatFingersDetail),
+                ),
+              ],
             ),
             SettingsHeading(t.settingsUnits),
             Padding(

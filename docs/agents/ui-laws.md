@@ -495,6 +495,15 @@ replace a law of Both apps where they say so. A desktop law marked
   animations" setting is on.
 - Cards and controls must always stand out clearly from the question
   marks.
+- **Fat fingers** (#224): one switch of the Device, off at first, on the
+  phone in Settings ▸ Look, on the desktop "Bigger text and icons" in
+  Settings ▸ This computer. On the phone it grows text 1.3 times on top
+  of the system's font size, and icons and tap targets 1.3 times, in one
+  place: the theme (`lookTheme`, its `LookScale`) and the text scaler at
+  the app's root; a switch, which no density reaches, through
+  `LookGrown`. The Agenda's measures (`AgendaSizes`) grow by the same
+  factor, and the widget's text with them. On the desktop it is egui's
+  zoom at 1.3.
 
 ### Alarms and notifications
 
@@ -628,7 +637,8 @@ replace a law of Both apps where they say so. A desktop law marked
   cards, entries indented 48; an Occurrence's card is 48 high and the
   next starts 54 below it, where 0.3.1 had 56 and 68. The "Eat a frog"
   rows and the appointments' rows are as tight. Not as tight as the
-  widget, whose rows lie 4 apart.
+  widget, whose rows lie 4 apart. With Fat fingers every one of these
+  measures is 1.3 times (#224).
 - **A calendar appointment's row is read only**: no checkbox, the
   calendar's colour down its side, the calendar icon and the calendar's
   name. A tap unfolds its place and description and folds them again;
@@ -743,7 +753,9 @@ replace a law of Both apps where they say so. A desktop law marked
   actions in a fixed order; the bar shows as many as fit at the width it
   has, the rest overflow into ⋮, and ⋮ exists only when it holds
   something. ⋮ is last. Nothing adapts to use. Settings, Backups and
-  Sync never go into ⋮; they stay behind the Profile picture.
+  Sync never go into ⋮; they stay behind the Profile picture. A page
+  gives such an action as a `BarAction`; the bar counts a button 48
+  wide, 1.3 times with Fat fingers (#224).
 - A destructive action has no special place: last in the order, on the
   bar when there is room; its confirm dialog is the guard.
 - An action in ⋮ shows its icon and its words, as it does on the bar.

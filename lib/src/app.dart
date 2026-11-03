@@ -187,8 +187,9 @@ class OldBrainFixApp extends StatefulWidget {
 
 class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _scroll = ParallaxScroll();
-  final _light = lookTheme(Brightness.light);
-  final _dark = lookTheme(Brightness.dark);
+  late var _fatFingers = widget.store.fatFingers;
+  late var _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
+  late var _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
   late var _themeMode = themeModeOf(widget.store.themeChoice);
@@ -293,54 +294,57 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     darkTheme: _dark,
     themeMode: _themeMode,
     navigatorObservers: [_scroll, _routes],
-    builder: (context, child) => QuestionMarkBackground(
-      scroll: _scroll,
-      child: AnnouncementStrip(
-        announcements: _announcements,
-        child: AnnouncementsScope(
+    builder: (context, child) => FatFingersText(
+      on: _fatFingers,
+      child: QuestionMarkBackground(
+        scroll: _scroll,
+        child: AnnouncementStrip(
           announcements: _announcements,
-          child: LocationScope(
-            location: widget.location,
-            child: ContextScope(
-              source: widget.context,
-              child: PhotoScope(
-                photos: widget.photos,
-                bytes: _notes.photoBytes,
-                child: VoiceScope(
-                  voice: widget.voice,
-                  playback: _playback,
-                  child: SpeechScope(
-                    model: _speechModel,
-                    transcriber: _transcriber,
-                    child: PhotoReaderScope(
-                      reader: _photoReader,
-                      child: CalendarScope(
-                        calendar: widget.calendar,
-                        child: CalendarMirrorScope(
-                          mirror: _mirror,
-                          child: AppointmentScope(
-                            source: widget.appointments,
-                            child: DraftsScope(
-                              drafts: _drafts,
-                              child: LockScope(
-                                lock: _lock,
-                                child: PairingScope(
-                                  pairing: widget.pairing,
-                                  child: AutoSyncScope(
-                                    sync: _autoSync,
-                                    child: FolderScope(
-                                      folders: widget.folders,
-                                      child: BundleScope(
-                                        bundles: widget.bundles,
-                                        child: PersonScope(
-                                          store: widget.store,
-                                          platform: widget.profile,
-                                          onChangesSent: _alarms.replan,
-                                          child: TagSearchScope(
-                                            onSearch: _searchTag,
-                                            child:
-                                                child ??
-                                                const SizedBox.shrink(),
+          child: AnnouncementsScope(
+            announcements: _announcements,
+            child: LocationScope(
+              location: widget.location,
+              child: ContextScope(
+                source: widget.context,
+                child: PhotoScope(
+                  photos: widget.photos,
+                  bytes: _notes.photoBytes,
+                  child: VoiceScope(
+                    voice: widget.voice,
+                    playback: _playback,
+                    child: SpeechScope(
+                      model: _speechModel,
+                      transcriber: _transcriber,
+                      child: PhotoReaderScope(
+                        reader: _photoReader,
+                        child: CalendarScope(
+                          calendar: widget.calendar,
+                          child: CalendarMirrorScope(
+                            mirror: _mirror,
+                            child: AppointmentScope(
+                              source: widget.appointments,
+                              child: DraftsScope(
+                                drafts: _drafts,
+                                child: LockScope(
+                                  lock: _lock,
+                                  child: PairingScope(
+                                    pairing: widget.pairing,
+                                    child: AutoSyncScope(
+                                      sync: _autoSync,
+                                      child: FolderScope(
+                                        folders: widget.folders,
+                                        child: BundleScope(
+                                          bundles: widget.bundles,
+                                          child: PersonScope(
+                                            store: widget.store,
+                                            platform: widget.profile,
+                                            onChangesSent: _alarms.replan,
+                                            child: TagSearchScope(
+                                              onSearch: _searchTag,
+                                              child:
+                                                  child ??
+                                                  const SizedBox.shrink(),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -391,9 +395,14 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     onThemeChanged: _themeChanged,
   );
 
-  /// Shows the theme this Device chose in Settings at once.
-  void _themeChanged() =>
-      setState(() => _themeMode = themeModeOf(widget.store.themeChoice));
+  /// Shows the theme this Device chose in Settings at once, and its
+  /// "Fat fingers" (#224).
+  void _themeChanged() => setState(() {
+    _themeMode = themeModeOf(widget.store.themeChoice);
+    _fatFingers = widget.store.fatFingers;
+    _light = lookTheme(Brightness.light, fatFingers: _fatFingers);
+    _dark = lookTheme(Brightness.dark, fatFingers: _fatFingers);
+  });
 }
 
 /// Keeps track of the routes on the app's navigator, bottom first, so

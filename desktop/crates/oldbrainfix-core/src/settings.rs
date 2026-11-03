@@ -28,6 +28,7 @@ const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
+const FAT_FINGERS: &str = "fatFingers";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const THEME: &str = "theme";
 
@@ -294,6 +295,17 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(AGENDA_HIDE_CHECKED, &on.to_string())
     }
 
+    /// Whether this Device shows text, icons and tap targets 1.3 times
+    /// their size (#224): "Bigger text and icons" on the desktop, egui's
+    /// zoom, as "Fat fingers" on the phone; off until switched on.
+    pub fn fat_fingers(&self) -> Result<bool> {
+        Ok(self.store.local_setting(FAT_FINGERS)?.as_deref() == Some("true"))
+    }
+
+    pub fn set_fat_fingers(&self, on: bool) -> Result<()> {
+        self.store.set_local_setting(FAT_FINGERS, &on.to_string())
+    }
+
     /// Whether the quick note on this Device shows `control`; off until
     /// switched on.
     pub fn quick_note_shows(&self, control: QuickNoteControl) -> Result<bool> {
@@ -457,6 +469,7 @@ mod tests {
         assert!(settings.autostart_on()?);
         assert!(settings.streaks_on()?);
         assert!(!settings.agenda_hides_checked()?);
+        assert!(!settings.fat_fingers()?);
         for control in QuickNoteControl::ALL {
             assert!(!settings.quick_note_shows(control)?, "{control:?}");
         }
@@ -526,6 +539,15 @@ mod tests {
         assert!(!settings.agenda_hides_checked()?);
         store.set_local_setting(AGENDA_HIDE_CHECKED, "garbled")?;
         assert!(!settings.agenda_hides_checked()?);
+        // Text and icons keep their size until this Device makes them
+        // bigger (#224), under the Dart core's key.
+        settings.set_fat_fingers(true)?;
+        assert!(settings.fat_fingers()?);
+        assert_eq!(store.local_setting(FAT_FINGERS)?.as_deref(), Some("true"));
+        settings.set_fat_fingers(false)?;
+        assert!(!settings.fat_fingers()?);
+        store.set_local_setting(FAT_FINGERS, "garbled")?;
+        assert!(!settings.fat_fingers()?);
         for control in QuickNoteControl::ALL {
             settings.set_quick_note_shows(control, true)?;
             assert!(settings.quick_note_shows(control)?, "{control:?}");

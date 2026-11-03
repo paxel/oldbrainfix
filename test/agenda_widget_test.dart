@@ -637,6 +637,15 @@ void main() {
       expect(snapshot().toMap()['calendars'], ['3', '9']);
     });
 
+    test("grows its text with the Device's Fat fingers (#224)", () {
+      expect(snapshot().fatFingers, isFalse);
+      expect(snapshot().toMap().containsKey('fatFingers'), isFalse);
+
+      store.fatFingers = true;
+      expect(snapshot().fatFingers, isTrue);
+      expect(snapshot().toMap()['fatFingers'], isTrue);
+    });
+
     test('a Masked Area tells nothing on the widget either', () {
       final doctor = Places(store).addArea('Doctor');
       packing(place: doctor.id);

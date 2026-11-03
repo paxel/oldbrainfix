@@ -1462,6 +1462,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get themeDark => 'Dunkel';
 
   @override
+  String get fatFingers => 'Dicke Finger';
+
+  @override
+  String get fatFingersDetail =>
+      'Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.';
+
+  @override
   String get settingsAlarms => 'Alarme';
 
   @override

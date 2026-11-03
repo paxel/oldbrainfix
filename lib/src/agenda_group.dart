@@ -7,23 +7,50 @@ import 'look.dart';
 
 /// How the Agenda's rows are measured (#208): tighter than 0.3.1's, not
 /// as tight as the widget's, every box and button still [box] wide and
-/// high to tap.
-abstract final class AgendaSizes {
+/// high to tap. All of it grows by the [LookScale] of the theme, with
+/// "Fat fingers" (#224).
+class AgendaSizes {
+  /// [LookScale]'s factor.
+  final double factor;
+
+  const AgendaSizes(this.factor);
+
+  /// The measures for the theme around [context].
+  factory AgendaSizes.of(BuildContext context) =>
+      AgendaSizes(LookScale.of(context));
+
   /// A box's and a button's side, the tap target included.
-  static const box = 40.0;
+  double get box => 40 * factor;
 
   /// The room above and below a row's card; twice this between two rows.
-  static const gap = 3.0;
+  double get gap => 3 * factor;
 
   /// The room above and below a heading's words inside its card.
-  static const inside = 2.0;
+  double get inside => 2 * factor;
 
   /// How far an entry is indented: its box stands where the heading's
   /// words begin.
-  static const indent = 4.0 + box + 4.0;
+  double get indent => 4 + box + 4;
 
   /// How much further a Line under another Line is indented.
-  static const step = 24.0;
+  double get step => 24 * factor;
+
+  /// The size of an Area's icon on a heading.
+  double get areaIcon => 20 * factor;
+
+  /// The density that makes a shrink-wrapped box, 40 wide, [box] wide;
+  /// the theme's own at the usual size.
+  VisualDensity? get density {
+    if (factor == 1) return null;
+    final grown = (box - 40) / 4;
+    return VisualDensity(horizontal: grown, vertical: grown);
+  }
+
+  /// The style of an icon button on a row, ⋮: [box] wide and high.
+  ButtonStyle get button => IconButton.styleFrom(
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    minimumSize: factor == 1 ? null : Size.square(box),
+  );
 }
 
 /// The box of a heading or an entry on the Agenda, [AgendaSizes.box]
@@ -51,6 +78,7 @@ class AgendaBox extends StatelessWidget {
       semanticLabel: label,
       // 40 by 40, not 48, so the rows lie closer (#208).
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: AgendaSizes.of(context).density,
       onChanged: changed == null ? null : (on) => changed(on ?? false),
       fillColor: changed == null
           ? WidgetStateProperty.resolveWith(
@@ -126,7 +154,7 @@ class AgendaGroup extends StatelessWidget {
 
   /// The icon that leads a heading without a box, in a box's room.
   static Widget icon(BuildContext context, IconData icon) => SizedBox.square(
-    dimension: AgendaSizes.box,
+    dimension: AgendaSizes.of(context).box,
     child: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
   );
 
@@ -137,15 +165,16 @@ class AgendaGroup extends StatelessWidget {
     final colour = areaColour(area?.colour);
     final time = this.time;
     final onMenu = this.onMenu;
+    final sizes = AgendaSizes.of(context);
     final heading = Padding(
       padding: EdgeInsets.fromLTRB(
         4,
-        AgendaSizes.inside,
+        sizes.inside,
         onMenu == null ? 12 : 0,
-        AgendaSizes.inside,
+        sizes.inside,
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: AgendaSizes.box),
+        constraints: BoxConstraints(minHeight: sizes.box),
         child: Row(
           children: [
             lead,
@@ -172,7 +201,7 @@ class AgendaGroup extends StatelessWidget {
             if (areaIconData(area?.icon) case final icon?)
               Padding(
                 padding: const EdgeInsets.only(left: 8),
-                child: Icon(icon, size: 20, color: colour),
+                child: Icon(icon, size: sizes.areaIcon, color: colour),
               ),
             if (onMenu != null)
               // The same menu as the long press, at the button.
@@ -181,9 +210,7 @@ class AgendaGroup extends StatelessWidget {
                   key: menuKey,
                   tooltip: t.more,
                   // 40 by 40, as the boxes.
-                  style: IconButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                  style: sizes.button,
                   icon: const Icon(Icons.more_vert),
                   onPressed: () {
                     final box = button.findRenderObject() as RenderBox?;
@@ -197,10 +224,7 @@ class AgendaGroup extends StatelessWidget {
       ),
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: AgendaSizes.gap,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
       child: Embossed(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -223,8 +247,7 @@ class AgendaGroup extends StatelessWidget {
                     child: InkWell(onTap: onTap, child: heading),
                   ),
                   ...entries,
-                  if (entries.isNotEmpty)
-                    const SizedBox(height: AgendaSizes.inside),
+                  if (entries.isNotEmpty) SizedBox(height: sizes.inside),
                 ],
               ),
             ),
@@ -269,15 +292,16 @@ class AgendaEntry extends StatelessWidget {
     final theme = Theme.of(context);
     final struck = this.struck ?? checked;
     final onBox = this.onBox;
+    final sizes = AgendaSizes.of(context);
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: EdgeInsets.only(
-          left: AgendaSizes.indent + depth * AgendaSizes.step,
+          left: sizes.indent + depth * sizes.step,
           right: 12,
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: AgendaSizes.box),
+          constraints: BoxConstraints(minHeight: sizes.box),
           child: Row(
             children: [
               Checkbox(
@@ -285,6 +309,7 @@ class AgendaEntry extends StatelessWidget {
                 value: checked,
                 semanticLabel: text,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: sizes.density,
                 onChanged: onBox == null ? null : (_) => onBox(),
               ),
               const SizedBox(width: 4),

@@ -173,6 +173,11 @@ data class AgendaSnapshot(
     val tomorrow: String = "",
     /** What a coming day with nothing due says, "Nothing planned". */
     val planned: String = "",
+    /**
+     * How much bigger the widget's text shows: [AgendaWidgetPlan.FAT_FINGERS]
+     * while the Device has "Fat fingers" on (#224), else 1.
+     */
+    val textScale: Float = 1f,
 )
 
 /**
@@ -211,6 +216,12 @@ object AgendaWidgetPlan {
     const val STEP_DP = 24
 
     /**
+     * How much bigger "Fat fingers" shows the text (#224), as in the app;
+     * the boxes keep their size, which a widget's layout sets.
+     */
+    const val FAT_FINGERS = 1.3f
+
+    /**
      * How far a row of [indent] moves in, in dp: an entry of any group
      * by a box's width, so its box stands where its heading's words
      * begin, as on the Agenda (#208), and a Line under another one step
@@ -243,6 +254,7 @@ object AgendaWidgetPlan {
                         .toMap(),
                     tomorrow = labels.optString("tomorrow"),
                     planned = labels.optString("planned"),
+                    textScale = if (json.optBoolean("fatFingers")) FAT_FINGERS else 1f,
                 )
             }.getOrNull()
             else -> null

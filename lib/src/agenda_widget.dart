@@ -204,6 +204,10 @@ class AgendaSnapshot {
   /// "x Unsorted", with the number in.
   final String unsortedText;
 
+  /// Whether this Device has "Fat fingers" on (#224): the widget's text
+  /// grows with the app's.
+  final bool fatFingers;
+
   /// What the checkbox says to a screen reader.
   final String done;
 
@@ -230,6 +234,7 @@ class AgendaSnapshot {
     required this.noTitle,
     required this.since,
     required this.until,
+    this.fatFingers = false,
   });
 
   /// How many times a snapshot read the log itself ([AgendaSnapshot.of]),
@@ -321,6 +326,7 @@ class AgendaSnapshot {
       noTitle: t.appointmentNoTitle,
       since: t.appointmentSince('{time}'),
       until: t.appointmentUntil('{time}'),
+      fatFingers: store.fatFingers,
     );
   }
 
@@ -334,6 +340,7 @@ class AgendaSnapshot {
     'missed': [for (final row in missed) row.toMap()],
     'unsorted': unsorted,
     'calendars': calendars,
+    if (fatFingers) 'fatFingers': true,
     'labels': {
       'today': today,
       'tomorrow': tomorrow,

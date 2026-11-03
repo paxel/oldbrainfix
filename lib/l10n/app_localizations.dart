@@ -2354,6 +2354,18 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get themeDark;
 
+  /// The switch in Settings > Look that shows text, icons and tap targets 1.3 times their size on this Device (#224). The desktop calls it Bigger text and icons.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat fingers'**
+  String get fatFingers;
+
+  /// Under the switch fatFingers.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
+  String get fatFingersDetail;
+
   /// No description provided for @settingsAlarms.
   ///
   /// In en, this message translates to:
