@@ -30,6 +30,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
@@ -42,9 +43,11 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
+import 'package:oldbrainfix/src/profile_card.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
+import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
@@ -123,6 +126,9 @@ typedef _Texts = ({
   String receipt,
   String tag,
   String search,
+  String sent,
+  String boilerHere,
+  String boilerThere,
 });
 
 const _en = (
@@ -204,6 +210,9 @@ const _en = (
   receipt: 'Bakery receipt for the party',
   tag: '#boiler',
   search: 'boiler',
+  sent: 'Lena\'s birthday on Saturday: bring the cake at 3',
+  boilerHere: 'Boiler knocks in the mornings, plumber on Thursday',
+  boilerThere: 'Boiler knocks in the mornings and evenings',
 );
 
 const _de = (
@@ -285,6 +294,9 @@ const _de = (
   receipt: 'Beleg vom Bäcker für die Feier',
   tag: '#Therme',
   search: 'Therme',
+  sent: 'Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen',
+  boilerHere: 'Therme klopft morgens, Installateur am Donnerstag',
+  boilerThere: 'Therme klopft morgens und abends',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -293,7 +305,10 @@ class _Seeded {
   final Store store;
   final Routine snack;
 
-  _Seeded._(this.store, this.snack);
+  /// The Sent Item Lena sent, with [sends].
+  final Uint8List? sent;
+
+  _Seeded._(this.store, this.snack, [this.sent]);
 
   /// With [lists], the Household also holds a Checklist, a Shopping List
   /// and a Tally with its entries, for the guide's frames of them.
@@ -302,6 +317,9 @@ class _Seeded {
   /// with [shared] too, Work is shared with her from afar. With [missed],
   /// what the history Missed stays unseen, in the Missed Summary; with
   /// [dueReminder], the boiler's Note has a Reminder due at 09:30.
+  /// With [sends], Lena sent a Note with a Reminder, not encrypted
+  /// ([sent]). With [conflict], the Laptop is paired and it and this
+  /// Device changed the boiler's text before they synced.
   factory _Seeded(
     _Texts x, {
     bool lists = false,
@@ -310,23 +328,40 @@ class _Seeded {
     bool shared = false,
     bool missed = false,
     bool dueReminder = false,
+    bool sends = false,
+    bool conflict = false,
   }) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
-    final store = Store.inMemory(clock: () => clock)
-      ..starterSetOffered = true
-      ..alarmSetupDone = true;
+    // With People, the own key from a fixed seed: the same short code
+    // on the Profile page on every run.
+    final withPeople = people || shared || sends;
+    final store =
+        Store.inMemory(
+            clock: () => clock,
+            newKey: withPeople
+                ? () => SigningKey.fromSeed(
+                    Uint8List.fromList([for (var i = 0; i < 32; i++) 44]),
+                  )
+                : SigningKey.generate,
+          )
+          ..starterSetOffered = true
+          ..alarmSetupDone = true;
     final snack = _seed(store, x, (at) => clock = at, dueReminder: dueReminder);
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);
-    if (people || shared) _seedPeople(store, shared: shared);
+    Uint8List? sent;
+    if (withPeople) {
+      sent = _seedPeople(store, x, shared: shared, sends: sends);
+    }
     clock = _now;
+    if (conflict) _seedConflict(store, x);
     // What the history Missed was seen already: no Missed Summary.
     if (!missed) Alarms(store).markSeen();
     // The screens show Tallies, Sessions, Frogs, Topics, the format bar
     // and roles: Advanced, chosen (#197).
     store.advanced = true;
-    return _Seeded._(store, snack);
+    return _Seeded._(store, snack, sent);
   }
 
   static Routine _seed(
@@ -630,8 +665,14 @@ const _receiptText =
 /// The user's own Profile as Sam's, and Lena in People from her Profile
 /// card, sent through a messenger, so not verified. With [shared], Work
 /// is shared with her from afar as a Member, its changes travelling by
-/// bundles.
-void _seedPeople(Store store, {required bool shared}) {
+/// bundles. With [sends], she sends a Note with a Reminder, not
+/// encrypted: its file.
+Uint8List? _seedPeople(
+  Store store,
+  _Texts x, {
+  required bool shared,
+  bool sends = false,
+}) {
   store
     ..applyProfileDefaults(name: 'Sam')
     ..renameOwnProfile('Sam');
@@ -647,9 +688,18 @@ void _seedPeople(Store store, {required bool shared}) {
         ..renameOwnProfile('Lena');
   final id = lena.ownProfile!.id;
   final card = lena.profileCard()!;
+  Uint8List? sent;
+  if (sends) {
+    final party = Notes(lena).capture(x.sent);
+    Routines(lena).spawn(
+      party.id,
+      Schedule(start: Day(2026, 10, 31), times: [ClockTime(14, 30)]),
+    );
+    sent = sendNote(lena, party.id);
+  }
   lena.close();
   store.openProfileCard(card);
-  if (!shared) return;
+  if (!shared) return sent;
   final work = Places(store).areas().firstWhere((a) => a.starter == 'work');
   shareAreaWith(
     store,
@@ -658,6 +708,36 @@ void _seedPeople(Store store, {required bool shared}) {
     role: AreaRole.member,
     transport: Transport.bundle,
   );
+  return sent;
+}
+
+/// The Laptop, a Device of the user's own, paired, and a Conflict: it and
+/// this phone changed the boiler's text before they synced.
+void _seedConflict(Store store, _Texts x) {
+  final laptop = Store.inMemory(
+    clock: () => _now.subtract(const Duration(minutes: 25)),
+    newKey: () => SigningKey.fromSeed(
+      Uint8List.fromList([for (var i = 0; i < 32; i++) 46]),
+    ),
+  );
+  laptop.applyEntries(store.entriesSince(const {}), keys: [store.ownKeyRecord]);
+  final boiler = Notes(store).all().firstWhere((n) => n.text == x.boiler);
+  Notes(store).edit(boiler.id, x.boilerHere);
+  Notes(laptop).edit(boiler.id, x.boilerThere);
+  store
+    ..applyEntries(laptop.entriesSince(const {}), keys: [laptop.ownKeyRecord])
+    ..rememberDevice(
+      PairedDevice(
+        id: laptop.deviceId,
+        name: 'Laptop',
+        fingerprint: '',
+        host: null,
+        port: null,
+        lastSync: _now,
+        shared: false,
+      ),
+    );
+  laptop.close();
 }
 
 /// The Flutter SDK's root, from the test runner it started.
@@ -1702,17 +1782,82 @@ void main() {
             await reveal(tester, find.text(t.transcribeAgain));
           });
 
-          frame('share-area', (tester) async {
-            final seeded = _Seeded(texts, people: true)
-              ..store.themeChoice = choice;
-            final t = await _start(
+          // Sharing and sync (#176): the Profile page, Add a person,
+          // Lena's Profile, sharing the Household in person and from
+          // afar, Work's People, a card's ⋮ and Send this Note, Lena's
+          // Sent Item, Sync with its shared folder and bundles, the
+          // Changes Nudge's button, a Conflict and the paired Laptop.
+          const sharing176 = 'sharing-and-sync';
+
+          /// The app on [seeded] in this frame's theme, a bundle and a
+          /// folder pickable; [waiting] opens as a file handed over.
+          Future<AppLocalizations> sharingApp(
+            WidgetTester tester,
+            _Seeded seeded, {
+            List<int>? waiting,
+          }) {
+            final bundles = FakeBundles(Directory('build'));
+            if (waiting != null) {
+              final file = File('build/guide-sent/lena.oldbrain')
+                ..parent.createSync(recursive: true)
+                ..writeAsBytesSync(waiting);
+              bundles.waiting.add(file.path);
+            }
+            final dir = Directory('build/guide-folder')
+              ..createSync(recursive: true);
+            seeded.store.themeChoice = choice;
+            return _start(
               tester,
               boundary,
               language,
               seeded.store,
               _guideDpr,
-              bundles: FakeBundles(Directory('build')),
+              bundles: bundles,
+              folders: DirFolders(dir.path),
             );
+          }
+
+          /// The Profile page scrolled to [finder], which is tapped with
+          /// [open].
+          Future<void> onProfile(
+            WidgetTester tester,
+            AppLocalizations t,
+            Finder finder, {
+            bool open = true,
+          }) async {
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            await tester.scrollUntilVisible(
+              finder,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            if (open) await _tap(tester, finder);
+          }
+
+          /// Sync, opened from the Profile page, scrolled to [finder].
+          Future<void> openSync(
+            WidgetTester tester,
+            AppLocalizations t, [
+            Finder? finder,
+          ]) async {
+            await onProfile(tester, t, find.byKey(const ValueKey('sync')));
+            expect(find.byType(SyncScreen), findsOneWidget);
+            if (finder == null) return;
+            await tester.scrollUntilVisible(
+              finder,
+              300,
+              scrollable: notesList.last,
+            );
+            await tester.pumpAndSettle();
+          }
+
+          /// The share page of [slug]'s Area, opened from its ⋮.
+          Future<void> shareArea(
+            WidgetTester tester,
+            _Seeded seeded,
+            AppLocalizations t,
+          ) async {
             final household = Places(seeded.store)
                 .areas()
                 .firstWhere((a) => a.starter == 'household');
@@ -1723,37 +1868,151 @@ void main() {
             );
             await _tap(tester, find.text(t.shareArea));
             expect(find.byType(ShareAreaScreen), findsOneWidget);
+          }
+
+          /// The boiler's card in the Household with its ⋮ open.
+          Future<AppLocalizations> boilerMenu(WidgetTester tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+            final card = find.ancestor(
+              of: find.text(texts.boiler),
+              matching: find.byType(NoteCard),
+            );
+            await _tap(
+              tester,
+              find.descendant(
+                of: card.first,
+                matching: find.byKey(const ValueKey('note-menu')),
+              ),
+            );
+            return t;
+          }
+
+          boxFrame(sharing176, 'send-profile', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            expect(find.byKey(const ValueKey('sendProfile')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'add-person', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.byKey(const ValueKey('addPerson')));
+            expect(find.byType(AddPersonScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'verify', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, people: true));
+            await onProfile(tester, t, find.text('Lena'));
+            expect(find.byType(PersonScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('compare-codes')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-in-person', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
+            expect(find.byKey(const ValueKey('share-scan')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-afar', (tester) async {
+            final seeded = _Seeded(texts, people: true);
+            final t = await sharingApp(tester, seeded);
+            await shareArea(tester, seeded, t);
             // The role texts push "Share with…" below the screen's edge.
+            final afar = find.byKey(const ValueKey('share-afar'));
             await tester.scrollUntilVisible(
-              find.byKey(const ValueKey('share-afar')),
+              afar,
               100,
               scrollable: notesList.last,
             );
+            // Clear of the screen's edge for the tap.
+            await tester.drag(notesList.last, const Offset(0, -200));
             await tester.pumpAndSettle();
-            expect(find.byKey(const ValueKey('share-afar')), findsOneWidget);
+            await _tap(tester, afar);
+            expect(find.byType(SharePersonScreen), findsOneWidget);
           });
 
-          frame('person', (tester) async {
-            final seeded = _Seeded(texts, shared: true)
-              ..store.themeChoice = choice;
-            final t = await _start(
+          boxFrame(sharing176, 'roles', (tester) async {
+            final seeded = _Seeded(texts, shared: true);
+            final t = await sharingApp(tester, seeded);
+            final work = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'work');
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(ValueKey('area-menu-${work.id}')));
+            await _tap(tester, find.text(t.peopleTitle).last);
+            expect(find.byType(PeopleScreen), findsOneWidget);
+            await _tap(
               tester,
-              boundary,
-              language,
-              seeded.store,
-              _guideDpr,
-              bundles: FakeBundles(Directory('build')),
+              find
+                  .byWidgetPredicate((w) => '${w.key}'.contains('person-menu-'))
+                  .first,
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final lena = find.text('Lena');
-            await tester.scrollUntilVisible(
-              lena,
-              300,
-              scrollable: notesList.first,
+            expect(find.text(t.makeManager), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'share-to-app', (tester) async {
+            await boilerMenu(tester);
+            expect(find.byKey(const ValueKey('note-share')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'send-note', (tester) async {
+            await boilerMenu(tester);
+            await _tap(tester, find.byKey(const ValueKey('note-send')));
+            expect(find.byType(SendNoteDialog), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'receive-note', (tester) async {
+            final seeded = _Seeded(texts, sends: true);
+            await sharingApp(tester, seeded, waiting: seeded.sent);
+            expect(find.byType(SentItemScreen), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'pairing', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(tester, t);
+            expect(find.byKey(const ValueKey('show-code')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'shared-folder', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('pick-folder')),
             );
-            await _tap(tester, lena);
+          });
+
+          boxFrame(sharing176, 'bundle', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts));
+            await openSync(
+              tester,
+              t,
+              find.byKey(const ValueKey('import-bundle')),
+            );
+          });
+
+          boxFrame(sharing176, 'send-changes', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, shared: true));
+            await onProfile(tester, t, find.text('Lena'));
             expect(find.byType(PersonScreen), findsOneWidget);
             expect(find.byKey(const ValueKey('sendChanges')), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'conflicts', (tester) async {
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t);
+            await _tap(tester, find.byKey(const ValueKey('conflicts')));
+            expect(find.byType(ConflictsScreen), findsOneWidget);
+            expect(find.text(texts.boilerThere), findsOneWidget);
+          });
+
+          boxFrame(sharing176, 'ai-task', (tester) async {
+            // The phone's Sync with the Laptop paired: an AI Task's
+            // changes come from there once accepted.
+            final t = await sharingApp(tester, _Seeded(texts, conflict: true));
+            await openSync(tester, t, find.text('Laptop'));
           });
 
           frame('backups', (tester) async {

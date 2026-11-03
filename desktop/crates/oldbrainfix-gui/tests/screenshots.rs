@@ -30,10 +30,11 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
-    BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, Importance, Notes,
-    PersonSettings, Places, QuickNoteControl, Routines, Schedule, ShoppingLists, SigningKey, Store,
-    Tallies, parse_time, text_format,
+    AreaRole, BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, ImportReport,
+    Importance, Notes, OwnProfile, PairedDevice, PersonSettings, Places, QuickNoteControl,
+    Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time, text_format,
 };
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
@@ -121,6 +122,11 @@ struct Texts {
     receipt: &'static str,
     tag: &'static str,
     search: &'static str,
+    /// Sharing and sync (#176): the Note Lena sends, and the bike lock's
+    /// text as this computer and the Laptop changed it before they synced.
+    sent: &'static str,
+    lock_here: &'static str,
+    lock_there: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -175,6 +181,9 @@ const EN: Texts = Texts {
     receipt: "Bakery receipt for the party",
     tag: "#boiler",
     search: "boiler",
+    sent: "Lena's birthday on Saturday: bring the cake at 3",
+    lock_here: "Bike lock code changed to 4-7-1-9, the blue lock",
+    lock_there: "Bike lock code changed to 4-7-2-9",
 };
 
 const DE: Texts = Texts {
@@ -229,6 +238,9 @@ const DE: Texts = Texts {
     receipt: "Beleg vom Bäcker für die Feier",
     tag: "#Therme",
     search: "Therme",
+    sent: "Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen",
+    lock_here: "Code vom Fahrradschloss geändert auf 4-7-1-9, das blaue Schloss",
+    lock_there: "Code vom Fahrradschloss geändert auf 4-7-2-9",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -922,7 +934,10 @@ fn guide_frames() -> TestResult {
                     notes.file(&ids[5], &household)
                 })
             })?;
-            problems.extend(match_frame(&mut harness, &frame("ai-review"))?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("sharing-and-sync", "ai-task"),
+            )?);
             // The Household's Notes under the kitchen tap's, filed into
             // Repairs, open in the Note dialog with its badges (#146,
             // #160).
@@ -1171,6 +1186,10 @@ fn guide_frames() -> TestResult {
             problems.extend(texts_frames(texts, language, theme, |name| {
                 box_frame("formatted-text-transcripts-photo-texts", name)
             })?);
+            // Sharing and sync (#176).
+            problems.extend(sharing_frames(texts, language, theme, |name| {
+                box_frame("sharing-and-sync", name)
+            })?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;
@@ -1364,4 +1383,336 @@ fn speech_model_frame(
     drop(harness);
     models.close()?;
     Ok(problem)
+}
+
+/// What [`window_with_people`] seeded: Lena's Profile id, the bike
+/// lock's Note in the Household, and the file of the Note she sent,
+/// while its folder lasts.
+struct People {
+    lena: String,
+    note: String,
+    sent: Option<(tempfile::TempDir, PathBuf)>,
+}
+
+/// How a scene of the page "Sharing and sync" starts: Lena in People;
+/// with `shared`, Work shared with her from afar as a Member, its
+/// changes travelling by bundles; with `sends`, a Note she sent, not
+/// encrypted; with `conflict`, the Laptop paired, and it and this
+/// computer changed the bike lock's code before they synced.
+/// With `devices`, five Devices are paired, one of them Lena's; with
+/// `folder`, a shared folder is chosen. Both push the Sync dialog's code
+/// out of view, which differs on every run.
+#[derive(Clone, Copy, Default)]
+struct PeopleSeed {
+    shared: bool,
+    sends: bool,
+    conflict: bool,
+    devices: bool,
+    folder: bool,
+}
+
+/// Lena's store, on a clock of its own and with counted ids: the same
+/// Profile id and short code on every run.
+fn lena_store() -> oldbrainfix_core::Result<Store> {
+    let at = parse_time("2026-10-20T18:00:00.000Z")?;
+    let mut lena = Store::in_memory(Box::new(move || at), || Ok(SigningKey::from_seed([47; 32])))?;
+    let next = AtomicU64::new(0);
+    lena.set_id_maker(Box::new(move || {
+        Ok(format!(
+            "{:032x}",
+            0x1000 + next.fetch_add(1, Ordering::SeqCst)
+        ))
+    }));
+    OwnProfile::new(&lena).apply_defaults("Lena", None)?;
+    Ok(lena)
+}
+
+/// Everything `from` holds that `to` lacks, taken in as a sync would.
+fn send_entries(from: &Store, to: &Store) -> oldbrainfix_core::Result<()> {
+    to.apply_entries(
+        &oldbrainfix_core::sync::wire(&from.entries_since(&to.version_vector()?)?),
+        &from.key_records()?,
+        None,
+        &mut ImportReport::default(),
+    )?;
+    Ok(())
+}
+
+/// The window over the demo store as Sam's, seeded as `seed` says.
+fn window_with_people(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    seed: PeopleSeed,
+) -> Result<(Harness<'static, App>, People), Box<dyn std::error::Error>> {
+    let mut people = People {
+        lena: String::new(),
+        note: String::new(),
+        sent: None,
+    };
+    let harness = window_with_clock(texts, language, theme, |store, ids, now| {
+        OwnProfile::new(store).apply_defaults("Sam", None)?;
+        people.note = ids[1].clone();
+        let lena = lena_store()?;
+        let card = lena.profile_card(false)?.unwrap_or_default();
+        people.lena = OwnProfile::new(&lena)
+            .get()?
+            .map(|p| p.id)
+            .unwrap_or_default();
+        if seed.sends {
+            let party = Notes::new(&lena).capture(texts.sent, None, None)?;
+            let at = ClockTime::new(14, 30).into_iter().collect::<Vec<_>>();
+            if let Some(saturday) = Schedule::new(Day::new(2026, 10, 31), &at, None) {
+                Routines::new(&lena).spawn(&party.id, &saturday)?;
+            }
+            let bytes = lena.send_note(&party.id, None, false)?;
+            let dir =
+                tempfile::tempdir().map_err(|e| oldbrainfix_core::Error::Invalid(e.to_string()))?;
+            let path = dir.path().join("lena.oldbrain");
+            std::fs::write(&path, bytes)
+                .map_err(|e| oldbrainfix_core::Error::Invalid(e.to_string()))?;
+            people.sent = Some((dir, path));
+        }
+        store.open_profile_card(&card, false)?;
+        if seed.shared {
+            let work = Places::new(store)
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.work)
+                .map(|a| a.id)
+                .unwrap_or_default();
+            store.share_area_with(&work, &people.lena, AreaRole::Member, Transport::Bundle)?;
+        }
+        if seed.devices {
+            let at = parse_time("2026-10-26T07:55:00.000Z")?;
+            for (n, (name, shared)) in [
+                ("Laptop", false),
+                ("Phone", false),
+                ("Tablet", false),
+                ("Work laptop", false),
+                ("Lena", true),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                store.remember_device(&PairedDevice {
+                    id: format!("{:032x}", 0x2000 + n),
+                    name: name.into(),
+                    fingerprint: String::new(),
+                    host: None,
+                    port: None,
+                    last_sync: at - Duration::minutes(n as i64 * 40),
+                    shared,
+                })?;
+            }
+        }
+        if seed.folder {
+            store.choose_sync_folder("/home/sam/Sync/Old Brain Fix")?;
+        }
+        if seed.conflict {
+            let then = parse_time("2026-10-26T08:00:00.000Z")?;
+            let laptop = Store::in_memory(Box::new(move || then), || {
+                Ok(SigningKey::from_seed([48; 32]))
+            })?;
+            send_entries(store, &laptop)?;
+            let lock = &ids[1];
+            *now.lock() = parse_time("2026-10-26T08:05:00.000Z")?;
+            Notes::new(&laptop).edit(lock, texts.lock_there)?;
+            Notes::new(store).edit(lock, texts.lock_here)?;
+            send_entries(&laptop, store)?;
+            store.remember_device(&PairedDevice {
+                id: laptop.device_id()?,
+                name: "Laptop".into(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: *now.lock(),
+                shared: false,
+            })?;
+            store.set_conflicts_arrived(true)?;
+            *now.lock() = parse_time("2026-10-26T08:30:00.000Z")?;
+        }
+        Ok(())
+    })?;
+    Ok((harness, people))
+}
+
+/// The window of [`window_with_people`], held on the heap: a page of
+/// scenes keeps the test's stack small.
+type PeopleWindow = Box<Harness<'static, App>>;
+
+/// A scene of the page "Sharing and sync", given its window, what was
+/// seeded and the words.
+type PeopleScene = fn(&mut PeopleWindow, &People, &Texts) -> TestResult;
+
+/// Clicks the first button labelled `label`, by its accessibility
+/// action, and lets the window settle.
+fn click_first(harness: &mut Harness<'static, App>, label: &str) -> TestResult {
+    harness
+        .query_all_by_label(label)
+        .next()
+        .ok_or_else(|| format!("no {label}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
+/// Opens the context menu of the left pane's Area `name` and clicks its
+/// entry `entry`.
+fn area_menu(harness: &mut Harness<'static, App>, name: &str, entry: &str) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::Button, name)
+        .next()
+        .ok_or_else(|| format!("the Area {name}"))?
+        .click_secondary();
+    harness.run();
+    harness
+        .query_all_by_label(entry)
+        .last()
+        .ok_or_else(|| format!("the entry {entry}"))?
+        .click();
+    harness.run();
+    Ok(())
+}
+
+/// Opens Lena's Profile from Sync ▸ People.
+fn lena_profile(harness: &mut Harness<'static, App>) -> TestResult {
+    harness.state_mut().open(Page::People);
+    harness.run();
+    let open = harness.state().t().person_open("Lena");
+    click_first(harness, &open)
+}
+
+/// Opens the Sync dialog and scrolls `label` into view. The dialog hosts
+/// while it shows and keeps repainting: a few steps, not a settled run.
+fn sync_to(harness: &mut Harness<'static, App>, label: &str) -> TestResult {
+    harness.state_mut().open(Page::Sync);
+    harness.run_steps(4);
+    harness
+        .query_all_by_label(label)
+        .last()
+        .ok_or_else(|| format!("no {label}"))?
+        .scroll_to_me();
+    harness.run_steps(4);
+    Ok(())
+}
+
+/// The frames of the page "Sharing and sync" (#176), in `texts`' words,
+/// `language` and `theme`, but the AI Task's review, which
+/// [`guide_frames`] draws: the own Profile, People, Lena's Profile, the
+/// Household's Share dialog and its "Share with…", Work's People, a
+/// Note's dialog with Send…, the Sent Item Lena sent, the Sync menu,
+/// the Sync dialog's shared folder and bundles, Lena's Profile with
+/// "Send changes to Lena", and the announcement of a Conflict.
+fn sharing_frames(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    box_frame: impl Fn(&str) -> String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let plain = PeopleSeed::default();
+    let shared = PeopleSeed {
+        shared: true,
+        ..plain
+    };
+    let synced = PeopleSeed {
+        devices: true,
+        ..plain
+    };
+    let scenes: [(&str, PeopleSeed, PeopleScene); 14] = [
+        ("send-profile", plain, |harness, _, _| {
+            harness.state_mut().open(Page::Profile);
+            harness.run();
+            Ok(())
+        }),
+        ("add-person", plain, |harness, _, _| {
+            harness.state_mut().open(Page::People);
+            harness.run();
+            Ok(())
+        }),
+        ("verify", plain, |harness, _, _| lena_profile(harness)),
+        ("share-in-person", plain, |harness, _, texts| {
+            let share = harness.state().t().share_area().to_string();
+            area_menu(harness, texts.household, &share)
+        }),
+        ("share-afar", plain, |harness, _, texts| {
+            let (share, afar) = {
+                let t = harness.state().t();
+                (t.share_area().to_string(), t.share_afar_pick().to_string())
+            };
+            area_menu(harness, texts.household, &share)?;
+            click_first(harness, &afar)
+        }),
+        ("roles", shared, |harness, _, texts| {
+            let people = harness.state().t().people_title().to_string();
+            area_menu(harness, texts.work, &people)
+        }),
+        ("share-to-app", plain, |harness, people, _| {
+            harness.state_mut().select_note(&people.note);
+            harness.run();
+            let copy = harness.state().t().copy_as_text().to_string();
+            harness
+                .query_all_by_label(&copy)
+                .last()
+                .ok_or("Copy as text")?
+                .scroll_to_me();
+            harness.run();
+            Ok(())
+        }),
+        ("send-note", plain, |harness, people, _| {
+            harness.state_mut().select_note(&people.note);
+            harness.run();
+            let send = harness.state().t().send_button().to_string();
+            click_first(harness, &send)
+        }),
+        ("receive-note", plain, |harness, people, _| {
+            let (_, path) = people.sent.as_ref().ok_or("Lena's Sent Item")?;
+            harness.input_mut().dropped_files = vec![egui::DroppedFile {
+                path: Some(path.clone()),
+                ..Default::default()
+            }];
+            harness.run();
+            Ok(())
+        }),
+        ("pairing", plain, |harness, _, _| {
+            let sync = harness.state().t().menu_sync().to_string();
+            harness
+                .query_all_by_label(&sync)
+                .next()
+                .ok_or("the Sync menu")?
+                .click();
+            harness.run();
+            Ok(())
+        }),
+        ("shared-folder", synced, |harness, _, _| {
+            let stay = harness.state().t().sync_settings_stay().to_string();
+            sync_to(harness, &stay)
+        }),
+        ("bundle", synced, |harness, _, _| {
+            let stay = harness.state().t().sync_settings_stay().to_string();
+            sync_to(harness, &stay)
+        }),
+        ("send-changes", shared, |harness, _, _| {
+            lena_profile(harness)
+        }),
+        ("conflicts", plain, |_, _, _| Ok(())),
+    ];
+    let mut problems = Vec::new();
+    for (name, seed, scene) in scenes {
+        let seed = PeopleSeed {
+            sends: name == "receive-note",
+            conflict: name == "conflicts",
+            folder: name == "shared-folder",
+            ..seed
+        };
+        let (harness, people) = window_with_people(texts, language, theme, seed)?;
+        let mut harness = Box::new(harness);
+        scene(&mut harness, &people, texts)?;
+        problems.extend(match_frame(&mut harness, &box_frame(name))?);
+        drop(harness);
+        if let Some((dir, _)) = people.sent {
+            dir.close()?;
+        }
+    }
+    Ok(problems)
 }
