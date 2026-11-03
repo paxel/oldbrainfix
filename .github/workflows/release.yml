@@ -3,7 +3,8 @@
 #
 #   gate           — analyze fatal-infos, all Dart tests, the OCR library's
 #                    tests, the desktop's format, lint and tests,
-#                    tag = pubspec version = desktop Cargo version
+#                    tag = pubspec version = desktop Cargo version,
+#                    no open high or critical CodeQL alert
 #   build-android  — signed per-ABI + universal APKs and the Play bundle,
 #                    the Kotlin unit tests,
 #                    refused when signed with the debug key; the bundle
@@ -69,8 +70,15 @@ jobs:
   gate:
     name: Gate (tests)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: read
     steps:
+      # The full history, so the code-scanning step finds the branches
+      # that hold the tagged commit.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Tag, pubspec version and desktop Cargo version agree
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
@@ -78,6 +86,39 @@ jobs:
           tag=${RELEASE_TAG#v}
           [ "$ver" = "$tag" ] || { echo "tag v$tag != pubspec version $ver" >&2; exit 1; }
           [ "$cargo_ver" = "$tag" ] || { echo "tag v$tag != desktop Cargo version $cargo_ver" >&2; exit 1; }
+      # CodeQL (#233) analyses branches, not tags: every open alert on a
+      # branch that holds this commit is listed, and one of severity high
+      # or critical (security severity, or rule severity error) stops the
+      # release. A branch CodeQL never analysed is skipped; none analysed
+      # at all stops it too.
+      - name: No open high or critical code-scanning alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          branches=$(git branch -r --contains "$sha" --format='%(refname:lstrip=3)' | grep -vx HEAD || true)
+          analysed=0
+          blocking=0
+          for b in $branches; do
+            if ! gh api --paginate "repos/$GITHUB_REPOSITORY/code-scanning/alerts?ref=refs/heads/$b&state=open&per_page=100" \
+              --jq '.[] | [(.rule.security_severity_level // "-"), .rule.severity, .rule.id, .most_recent_instance.location.path, .html_url] | @tsv' \
+              > "$RUNNER_TEMP/alerts.tsv" 2> "$RUNNER_TEMP/error.txt"; then
+              if grep -q 'no analysis found' "$RUNNER_TEMP/error.txt"; then
+                echo "$b: not analysed by CodeQL, skipped"
+                continue
+              fi
+              cat "$RUNNER_TEMP/error.txt" >&2
+              exit 1
+            fi
+            analysed=$((analysed + 1))
+            echo "Open code-scanning alerts on $b (security severity, severity, rule, file, link):"
+            cat "$RUNNER_TEMP/alerts.tsv"
+            n=$(awk -F'\t' '$1 == "high" || $1 == "critical" || $2 == "error"' "$RUNNER_TEMP/alerts.tsv" | wc -l)
+            echo "$n of them high or critical"
+            blocking=$((blocking + n))
+          done
+          [ "$analysed" -gt 0 ] || { echo "no CodeQL analysis on any branch that holds $sha" >&2; exit 1; }
+          [ "$blocking" -eq 0 ] || { echo "$blocking open high or critical code-scanning alerts" >&2; exit 1; }
       # Play and F-Droid take What's new from the store kit's record; a
       # tag without it would ship with none.
       - name: What's new for Play and F-Droid exists

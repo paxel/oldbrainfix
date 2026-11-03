@@ -7,6 +7,8 @@
 <p align="center">
   <a href="https://github.com/paxel/oldbrainfix/actions/workflows/ci.yml"><img src="https://github.com/paxel/oldbrainfix/actions/workflows/ci.yml/badge.svg?branch=summer" alt="CI"/></a>
   <a href="https://github.com/paxel/oldbrainfix/actions/workflows/security.yml"><img src="https://github.com/paxel/oldbrainfix/actions/workflows/security.yml/badge.svg?branch=summer" alt="Security"/></a>
+  <a href="https://github.com/paxel/oldbrainfix/actions/workflows/codeql.yml"><img src="https://github.com/paxel/oldbrainfix/actions/workflows/codeql.yml/badge.svg?branch=summer" alt="CodeQL"/></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=paxel_oldbrainfix"><img src="https://sonarcloud.io/api/project_badges/measure?project=paxel_oldbrainfix&metric=alert_status" alt="Quality gate"/></a>
   <a href="https://github.com/paxel/oldbrainfix/releases/latest"><img src="https://img.shields.io/github/v/release/paxel/oldbrainfix" alt="Release"/></a>
   <a href="https://paxel.github.io/fdroid/"><img src="https://img.shields.io/badge/F--Droid-paxel.github.io-1976D2?logo=f-droid" alt="F-Droid repository"/></a>
   <a href="https://paxel.github.io/oldbrainfix/"><img src="https://img.shields.io/badge/docs-paxel.github.io-informational" alt="Documentation"/></a>

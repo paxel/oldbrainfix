@@ -1,0 +1,82 @@
+# CodeQL code scanning (#233), advanced setup so it is versioned here:
+# Rust, Kotlin (android/) and the workflows themselves, on every push and
+# pull request and weekly, because new queries appear without any change in
+# this repo. The alerts show under Security ▸ Code scanning; the release
+# workflow refuses a tag while a high or critical one is open on its branch.
+# Settings ▸ Code security ▸ Code scanning ▸ Default setup stays off: it
+# cannot run beside this workflow.
+#
+# Third-party actions are pinned to full commit SHAs (Sonar's
+# githubactions:S7637); the comment names the version.
+name: CodeQL
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    - cron: "41 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: rust
+            build-mode: none
+          - language: actions
+            build-mode: none
+          # Kotlin is only extracted while kotlinc compiles it; with
+          # build-mode none CodeQL skips it with a warning.
+          - language: java-kotlin
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # The Rust extractor may run build scripts: ALSA for the microphone,
+      # cmake and g++ for whisper.cpp, as in CI's Desktop job.
+      - name: System libraries for the Rust build scripts
+        if: matrix.language == 'rust'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++
+
+      # The Gradle project needs the Flutter SDK and android/local.properties,
+      # which `flutter pub get` writes, as in CI's Debug APK job.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: matrix.language == 'java-kotlin'
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter packages and the Gradle project's local.properties
+        if: matrix.language == 'java-kotlin'
+        run: flutter pub get
+
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Only the Kotlin compile: the native libraries (whisper.cpp, RustO)
+      # are not Kotlin and are left out. No daemon, so every compilation
+      # runs under CodeQL's tracer.
+      - name: Compile the app's Kotlin
+        if: matrix.language == 'java-kotlin'
+        working-directory: android
+        run: ./gradlew --no-daemon :app:compileDebugKotlin
+
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}
