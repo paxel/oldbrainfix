@@ -379,14 +379,12 @@ void main() {
       expect(Tallies(store).byNote(notes.all().single.id), isNull);
     });
 
-    testWidgets('without the Routine switch no Tally is offered (Q481)', (
-      tester,
-    ) async {
+    testWidgets('without the Frog, Session or Tally switch no Tally is offered '
+        '(Q481)', (tester) async {
       store.setQuickNoteShows(QuickNoteControl.schedule, false);
       await start(tester);
       await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'push-ups');
-      expect(spawnMenu, findsNothing);
       await tap(tester, more);
       expect(find.byKey(const ValueKey('importance-important')), findsWidgets);
       expect(find.byKey(const ValueKey('note-make-tally')), findsNothing);

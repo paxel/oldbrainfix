@@ -7571,7 +7571,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.'**
+  /// **'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -7592,10 +7592,10 @@ abstract class AppLocalizations {
   /// **'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.'**
   String get quickNoteNudgeButtonsDetail;
 
-  /// Switch in Settings ▸ Quick note: the buttons for a Routine, Reminder, Frog or Session and 'Make it a Tally' (Q481).
+  /// Switch in Settings ▸ Quick note, only in Advanced: adds Frog and Session to the alarm clock's menu, which offers a Routine or Reminder without it (#223), and 'Make it a Tally' (Q481).
   ///
   /// In en, this message translates to:
-  /// **'Routine, Reminder, Frog, Session or Tally'**
+  /// **'Frog, Session or Tally'**
   String get quickNoteSchedule;
 
   /// In the ⋮ of the phone's full-screen photo: puts the picture on the clipboard (#149).

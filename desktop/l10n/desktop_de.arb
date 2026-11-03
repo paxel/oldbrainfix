@@ -249,7 +249,7 @@
   "sectionTextFieldName": "Text des Abschnitts",
   "showStreaksDevice": "Serien auf diesem Computer zeigen",
   "snoozesHereDevice": "Verschobenes ist nur auf diesem Computer festgehalten, und nur für etwa den letzten Monat.",
-  "settingsQuickNoteDetailDevice": "Die Schnellnotiz im Fenster und das Fenster „Notiz erfassen“ zeigen den Text, Sprache aufnehmen, Einfügen, „Zum vollen Editor“ und, im Fenster, Aus Datei…; schalte hier ein, was sie zusätzlich zeigen. Alles davon gibt es auch an der Notiz.",
+  "settingsQuickNoteDetailDevice": "Die Schnellnotiz im Fenster und das Fenster „Notiz erfassen“ zeigen den Text, Sprache aufnehmen, Einfügen, „Zum vollen Editor“, den Wecker für eine Routine oder Erinnerung und, im Fenster, Aus Datei…; schalte hier ein, was sie zusätzlich zeigen. Alles davon gibt es auch an der Notiz.",
   "saveImageAs": "Bild speichern unter …",
   "copyImage": "Bild kopieren",
   "openInAnotherProgram": "In anderem Programm öffnen",

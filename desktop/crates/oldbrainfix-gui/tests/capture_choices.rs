@@ -61,6 +61,17 @@ fn click<S>(harness: &mut Harness<'_, S>, label: &str) {
     harness.run();
 }
 
+/// The quick note's alarm clock, whose menu offers a Routine or Reminder
+/// and, switched on, a Frog and Session (#223).
+const CLOCK: &str = "Routine, Reminder, Frog or Session";
+
+/// Sets up `kind` from the alarm clock's menu.
+fn spawn<S>(harness: &mut Harness<'_, S>, kind: &str) {
+    harness.get_by_role_and_label(Role::Button, CLOCK).click();
+    harness.run();
+    click(harness, kind);
+}
+
 struct Popup {
     popup: CapturePopup,
     closed: bool,
@@ -107,14 +118,7 @@ fn choose_session<S>(harness: &mut Harness<'_, S>) {
 fn the_popup_files_the_note_and_saves_it_without_a_nudge() -> TestResult {
     let (store, household, _) = store()?;
     let mut harness = popup(&store);
-    for label in [
-        "File into…",
-        "Routine",
-        "Reminder",
-        "Frog",
-        "Session",
-        "More",
-    ] {
+    for label in ["File into…", CLOCK, "More"] {
         assert!(shows(&harness, label), "{label}");
     }
     assert!(shows(&harness, "10 min"));
@@ -150,7 +154,7 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     let (store, _, _) = store()?;
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Call the dentist");
-    click(&mut harness, "Reminder");
+    spawn(&mut harness, "Reminder");
     assert!(harness.state().popup.page_open());
     assert!(shows(&harness, "New Reminder"));
     // The Note it is for, by the text typed so far.
@@ -176,19 +180,19 @@ fn a_reminder_set_up_in_the_popup_is_written_with_the_note() -> TestResult {
     harness.run();
     assert!(harness.state().popup.choices().schedules.is_empty());
     assert!(shows(&harness, "10 min"));
-    click(&mut harness, "Reminder");
+    spawn(&mut harness, "Reminder");
     harness.key_press(Key::Escape);
     harness.run();
     assert!(!harness.state().popup.page_open());
     assert!(!harness.state().closed);
     assert!(harness.state().popup.choices().schedules.is_empty());
     // Alt+Left goes back from the page the same way.
-    click(&mut harness, "Reminder");
+    spawn(&mut harness, "Reminder");
     harness.key_press_modifiers(egui::Modifiers::ALT, Key::ArrowLeft);
     harness.run();
     assert!(!harness.state().popup.page_open());
     assert!(harness.state().popup.choices().schedules.is_empty());
-    click(&mut harness, "Reminder");
+    spawn(&mut harness, "Reminder");
     click(&mut harness, "Save");
     click(&mut harness, "Save");
     assert!(harness.state().closed);
@@ -205,7 +209,7 @@ fn an_empty_note_writes_nothing_and_drops_its_choices() -> TestResult {
     let (store, _, _) = store()?;
     let entries = store.all_entries()?.len();
     let mut harness = popup(&store);
-    click(&mut harness, "Frog");
+    spawn(&mut harness, "Frog");
     assert!(shows(&harness, "Frog"));
     assert!(harness.state().popup.choices().frog);
     // Nothing typed: the Save rests.
@@ -228,7 +232,7 @@ fn a_write_failing_in_the_popup_leaves_nothing_written() -> TestResult {
     let (store, _, tally) = store()?;
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Workout");
-    click(&mut harness, "Session");
+    spawn(&mut harness, "Session");
     choose_session(&mut harness);
     assert!(
         harness
@@ -299,18 +303,11 @@ fn the_windows_capture_holds_its_choices_until_saved() -> TestResult {
     // The buttons show once something is typed.
     assert!(!shows(&harness, "Frog"));
     type_in_window(&mut harness, "Water the plants");
-    for label in [
-        "File into…",
-        "Routine",
-        "Reminder",
-        "Frog",
-        "Session",
-        "More",
-    ] {
+    for label in ["File into…", CLOCK, "More"] {
         assert!(shows(&harness, label), "{label}");
     }
     assert!(shows(&harness, "10 min"));
-    click(&mut harness, "Frog");
+    spawn(&mut harness, "Frog");
     click(&mut harness, "More");
     harness.get_by_label("Important").click_accesskit();
     harness.run();
@@ -363,7 +360,7 @@ fn a_write_failing_in_the_window_leaves_nothing_written() -> TestResult {
     let (store, _, tally) = store()?;
     let mut harness = window(&store);
     type_in_window(&mut harness, "Workout");
-    click(&mut harness, "Session");
+    spawn(&mut harness, "Session");
     choose_session(&mut harness);
     assert!(
         harness

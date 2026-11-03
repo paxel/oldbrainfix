@@ -4717,7 +4717,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen und „Zum vollen Editor“. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen, „Zum vollen Editor“ und den Wecker für eine Routine oder Erinnerung. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -4730,8 +4730,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite.';
 
   @override
-  String get quickNoteSchedule =>
-      'Routine, Erinnerung, Frosch, Einheit oder Strichliste';
+  String get quickNoteSchedule => 'Frosch, Einheit oder Strichliste';
 
   @override
   String get copyPhoto => 'Kopieren';

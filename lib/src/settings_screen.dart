@@ -950,11 +950,14 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
           Icons.drive_file_move_outline,
           t.fileInto,
         ),
-        shows(
-          QuickNoteControl.schedule,
-          Icons.alarm_add_outlined,
-          t.quickNoteSchedule,
-        ),
+        // The alarm clock offers a Routine or Reminder without it (#223);
+        // Frogs, Sessions and Tallies are made only in Advanced (#197).
+        if (widget.advanced)
+          shows(
+            QuickNoteControl.schedule,
+            Icons.alarm_add_outlined,
+            t.quickNoteSchedule,
+          ),
         shows(
           QuickNoteControl.shopping,
           Icons.add_shopping_cart,

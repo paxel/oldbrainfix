@@ -4656,7 +4656,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, Photo, Voice, Gallery, Paste and \"To full editor\". Switch on here what it shows besides; all of it is in the full editor as well.';
+      'The quick note shows the text, Photo, Voice, Gallery, Paste, \"To full editor\" and the alarm clock for a Routine or Reminder. Switch on here what it shows besides; all of it is in the full editor as well.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -4669,7 +4669,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.';
 
   @override
-  String get quickNoteSchedule => 'Routine, Reminder, Frog, Session or Tally';
+  String get quickNoteSchedule => 'Frog, Session or Tally';
 
   @override
   String get copyPhoto => 'Copy';

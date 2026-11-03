@@ -37,7 +37,7 @@ Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widge
 _Avoid_: Schnell hinzufügen, Aufnehmen
 
 **Schnellnotiz** [Quick note]:
-Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie und Einfügen (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe und „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog. Was die Notiz einsortiert (Ablegen in …, Routine, Erinnerung, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
+Der Bildschirm zum Erfassen von Text, auf dem Desktop der Schnellnotiz-Dialog des Fensters (Datei ▸ Neue Notiz, Strg+N, „+“) und das Fenster „Notiz erfassen“: der Text, Foto, Sprache, Galerie und Einfügen (auf dem Desktop Sprache aufnehmen, Einfügen und Aus Datei…), die Stupser-Knöpfe, „Zum vollen Editor“, das die Notiz unsortiert speichert und im Notiz-Editor öffnet, auf dem Desktop im Notiz-Dialog, und der Wecker, dessen Menü eine Routine oder Erinnerung anlegt, die mit der Notiz gespeichert wird (#223). Was die Notiz sonst einsortiert (Ablegen in …, Frosch, Einheit oder Strichliste, Zu einer Einkaufsliste hinzufügen, die Wichtigkeit), und die Formatleiste erscheinen nur, wo die Einstellungen des Geräts sie einschalten; die Stupser-Knöpfe lassen sich für ein einziges Speichern ausschalten.
 _Avoid_: Schnell hinzufügen
 
 **Erfassungskontext** [Capture Context]:

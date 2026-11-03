@@ -10,13 +10,15 @@ import 'tally_units.dart';
 enum ThemeChoice { system, light, dark }
 
 /// What the quick note (the text capture screen) shows beyond its text
-/// field, its Photo, Voice, Gallery and Paste, its Nudge buttons and "To
-/// full editor", each once this Device switched it on (#142).
+/// field, its Photo, Voice, Gallery and Paste, its Nudge buttons, "To
+/// full editor" and the alarm clock for a Routine or Reminder (#223), each
+/// once this Device switched it on (#142).
 enum QuickNoteControl {
   /// "File into…".
   fileInto('quickNoteFileInto'),
 
-  /// The Routine, Reminder, Frog or Session menu.
+  /// Frog and Session in the alarm clock's menu, and "Make it a Tally"
+  /// (Q481); the clock offers a Routine or Reminder without it (#223).
   schedule('quickNoteSchedule'),
 
   /// "Add to a Shopping List".

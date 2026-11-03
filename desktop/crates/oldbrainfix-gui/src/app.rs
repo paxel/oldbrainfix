@@ -13338,8 +13338,14 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
         ),
     ];
     for (control, shows, label) in switches {
-        // The format bar is offered only in Advanced (#197).
-        if control == QuickNoteControl::FormatBar && !quick.advanced {
+        // The format bar, Frogs, Sessions and Tallies are offered only in
+        // Advanced (#197); the alarm clock offers a Routine or Reminder
+        // without the switch (#223).
+        if matches!(
+            control,
+            QuickNoteControl::FormatBar | QuickNoteControl::Schedule
+        ) && !quick.advanced
+        {
             continue;
         }
         let mut on = shows;

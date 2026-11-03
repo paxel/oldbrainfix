@@ -574,23 +574,28 @@ replace a law of Both apps where they say so. A desktop law marked
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
 - **The quick note is uncluttered** (#142): by default it shows the
-  text field, Photo, Voice, Gallery and Paste, the Nudge buttons and
-  **To full editor**, nothing that sorts and no chips. To full editor
+  text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
+  **To full editor** and the alarm clock beside it (#223), whose menu
+  offers Routine and Reminder as the Note editor's "+" does, in Simple
+  too; nothing else that sorts and no chips. The Routine or Reminder
+  editor opens over the quick note and comes back to it with the choice
+  at the top, written only with the Note. To full editor
   saves the Note at once, Unsorted with the default Nudge, and opens the
   Note editor on it in place of the capture screen; leaving the editor
   returns to where Capture was opened from. It waits while there is
   nothing to save and is not offered behind the App Lock or while a
   Shopping List is picked.
 - **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
-  all off by default, for File into…, Routine, Reminder, Frog, Session
-  or Tally, Add to a Shopping List, the Importance and the format bar
-  (only in Advanced, #197),
+  all off by default, for File into…, Frog, Session or Tally (only in
+  Advanced, #197), Add to a Shopping List, the Importance and the format
+  bar (only in Advanced),
   and the switch Nudge buttons, on by default. What is switched on shows
   in the Note card's action row beside To full editor, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts): File into… and the
-  alarm clock, and ⋮ with the Importance, Make it a Tally (with the
-  Routine switch) and Add to a Shopping List. Each opens its usual
+  shortcut, also one a phone key or gesture starts): File into…, Frog
+  and Session in the alarm clock's menu, and ⋮ with the Importance, Make
+  it a Tally (with the Frog, Session or Tally switch) and Add to a
+  Shopping List. Each opens its usual
   page and comes back to the capture screen with the choice shown at the
   top ("→ Household"), not saved yet; the user can keep typing or add
   more. All of it is optional. With the format bar on, it rides on the
@@ -891,8 +896,10 @@ replace a law of Both apps where they say so. A desktop law marked
   dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
   quick note and follow the same switches (desktop Settings ▸ Quick
   note, beside Quick capture): by default the text, Record voice, Paste
-  (the dialog also From file…), the Nudge buttons and To full editor;
-  switched on, File into…, Routine, Reminder, Frog and Session, and
+  (the dialog also From file…), the Nudge buttons, To full editor and
+  the alarm clock, whose menu offers Routine and Reminder (#223), its
+  editor a dialog over the quick note dialog or a page of the popup;
+  switched on, File into…, Frog and Session in the clock's menu, and
   More with the Importance, Make it a Tally and Add to a Shopping List,
   and the format bar over the field, without ☐, link and table. Files
   dropped onto the window open the dialog and wait in it. Leaving the

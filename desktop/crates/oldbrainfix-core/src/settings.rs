@@ -65,13 +65,15 @@ impl ThemeChoice {
 
 /// What the quick note (the capture field and popup on the desktop)
 /// shows beyond its text, its buttons that add a recording, a picture or
-/// a file, its Nudge buttons and "To full editor", each once this Device
-/// switched it on (#142), as the Dart core's `QuickNoteControl`.
+/// a file, its Nudge buttons, "To full editor" and the alarm clock for a
+/// Routine or Reminder (#223), each once this Device switched it on
+/// (#142), as the Dart core's `QuickNoteControl`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuickNoteControl {
     /// "File into…".
     FileInto,
-    /// Routine, Reminder, Frog, Session and "Make it a Tally" (Q481).
+    /// Frog and Session in the alarm clock's menu, and "Make it a Tally"
+    /// (Q481); the clock offers a Routine or Reminder without it (#223).
     Schedule,
     /// "Add to a Shopping List".
     Shopping,

@@ -9,8 +9,9 @@
 //! The capture popup and the window's quick note dialog share it, with
 //! "To full editor" and the Note card's buttons ([`action_row`]) and the
 //! choices shown at the top ([`chips`]), each with a button that drops it
-//! again. Of the buttons only what this Device switched on in Settings ▸
-//! Quick note shows ([`QuickNote`], #142). Merging, sending and the trash
+//! again. Of the buttons the alarm clock for a Routine or Reminder always
+//! shows (#223), the rest only once this Device switched it on in
+//! Settings ▸ Quick note ([`QuickNote`], #142). Merging, sending and the trash
 //! need a saved Note and are not offered here.
 //!
 //! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
@@ -42,6 +43,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::schedule_text::schedule_text;
+use crate::setting_badges::menu_entry;
 
 /// A Session's pool, count, weekdays' own counts and rule as plain
 /// values, kept after its editor is gone.
@@ -642,6 +644,8 @@ fn shopping_picker(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QuickNote {
     pub file_into: bool,
+    /// Frog and Session in the alarm clock's menu, which offers a
+    /// Routine or Reminder without it (#223), and "Make it a Tally".
     pub schedule: bool,
     pub shopping: bool,
     pub importance: bool,
@@ -696,11 +700,12 @@ pub enum RowAsk {
 }
 
 /// The capture's action row: "To full editor", waiting until `ready`,
-/// then of the Note card's buttons what `quick` switched on: "File
-/// into…" over `areas`, Routine, Reminder, Frog and Session while
-/// `spawns`, else why not, and "More" with the Importance, "Make it a
-/// Tally", which goes with Routine and the rest (Q481), and "Add to a
-/// Shopping List" over `lists`, offered while there is one. While a
+/// "File into…" over `areas` once `quick` switched it on, the alarm
+/// clock while `spawns`, else why not, its menu a Routine or Reminder
+/// (#223) and, switched on, a Frog and Session, and "More" with what
+/// `quick` switched on: the Importance, "Make it a Tally", which goes
+/// with the Frog and Session (Q481), and "Add to a Shopping List" over
+/// `lists`, offered while there is one. While a
 /// Shopping List is picked, only "More" with the lists shows, and no
 /// "To full editor", as the lines make no Note.
 pub fn action_row(
@@ -736,25 +741,36 @@ pub fn action_row(
         {
             asked = Some(RowAsk::Choice(Ask::FileInto(place)));
         }
-        if quick.schedule && spawns {
-            let offered = [
-                (Spawn::Routine, t.routine()),
-                (Spawn::Reminder, t.reminder()),
-                (Spawn::Frog, t.frog()),
-                (Spawn::Session, t.session()),
-            ];
-            for (spawn, label) in offered {
-                // A Note has one open Frog at a time; Frogs and Sessions
-                // are made only in Advanced (#197).
-                if (spawn == Spawn::Frog && choices.frog)
-                    || (!quick.advanced && matches!(spawn, Spawn::Frog | Spawn::Session))
-                {
-                    continue;
+        // The alarm clock is always there for a Routine or Reminder
+        // (#223), its menu as the Note's "+"; the switch adds Frog and
+        // Session.
+        if spawns {
+            let clock = icon_button(ui, icons::ADD_ALARM, t.routine_or_reminder(), text);
+            egui::Popup::menu(&clock).show(|ui| {
+                let offered = [
+                    (Spawn::Routine, icons::REPEAT, t.routine()),
+                    (Spawn::Reminder, icons::REMINDER, t.reminder()),
+                    (Spawn::Frog, icons::FROG, t.frog()),
+                    (Spawn::Session, icons::SESSION, t.session()),
+                ];
+                for (spawn, icon, label) in offered {
+                    // A Note has one open Frog at a time; Frogs and
+                    // Sessions are made only in Advanced (#197), once
+                    // switched on.
+                    let extra = matches!(spawn, Spawn::Frog | Spawn::Session);
+                    if (spawn == Spawn::Frog && choices.frog)
+                        || (extra && !(quick.schedule && quick.advanced))
+                    {
+                        continue;
+                    }
+                    if menu_entry(ui, (icon, text), label).clicked() {
+                        asked = Some(RowAsk::Choice(Ask::Spawn(spawn)));
+                        // A pick closes the menu, also one by keyboard or
+                        // screen reader.
+                        ui.close();
+                    }
                 }
-                if ui.button(RichText::new(label).color(text)).clicked() {
-                    asked = Some(RowAsk::Choice(Ask::Spawn(spawn)));
-                }
-            }
+            });
         }
         let tally = quick.schedule && quick.advanced && choices.tally.is_none();
         if !quick.importance && !tally && lists.is_empty() {
@@ -796,7 +812,7 @@ pub fn action_row(
             }
         });
     });
-    if quick.schedule && !spawns {
+    if !spawns {
         ui.label(RichText::new(t.only_managers()).small().color(weak));
     }
     asked
