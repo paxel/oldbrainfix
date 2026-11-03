@@ -34,7 +34,7 @@
   "timeHint": "HH:MM",
   "dayBefore": "Tag davor",
   "dayAfter": "Tag danach",
-  "settingsIntro": "Diese Einstellungen gelten nur für diesen Computer und werden nie synchronisiert.",
+  "settingsIntro": "Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; die anderen Einstellungen gelten nur für diesen Computer.",
   "renagDevice": "Standard auf diesem Computer",
   "catchUpTitle": "Verpasst, während Old Brain Fix nicht lief",
   "nudgeBody": "Klicke, um sie einzusortieren.",

@@ -25,3 +25,5 @@ Amended by #201: from when on an all-day Occurrence rings is a setting of each D
 ## Settings of the person (ADR 0040)
 
 Amended by #211: "Move a Note to the Trash when its one-time Reminder is done" belongs to the person, not the Device. It lies in the log as an Override does and is the same on all of their own Devices (ADR 0040).
+
+Amended by #197: Simple or Advanced is the second setting of the person, kept the same way and the same on all of their own Devices (ADR 0041).

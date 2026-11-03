@@ -1447,7 +1447,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsIntro =>
-      'Diese Einstellungen gelten nur für dieses Handy und werden nie synchronisiert.';
+      'Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; die anderen Einstellungen gelten nur für dieses Handy.';
 
   @override
   String get settingsLook => 'Aussehen';
@@ -2667,7 +2667,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDeviceSettingsDetail =>
-      'Sie gelten nur für dieses Gerät und werden nie synchronisiert.';
+      'Die meisten gelten nur für dieses Gerät; Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert.';
 
   @override
   String get profileWhichTitle => 'Welches Profil bist du?';

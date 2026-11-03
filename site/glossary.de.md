@@ -220,7 +220,7 @@ _Avoid_: Punkt, Aufgabe, To-do, Eintrag (das ist einer Strichliste)
 ## Menschen und Geräte
 
 **Gerät** [Device]:
-Eine Installation der App, auf einem Handy oder einem Computer. Einstellungen gehören zu einem Gerät und werden nie abgeglichen.
+Eine Installation der App, auf einem Handy oder einem Computer. Die meisten Einstellungen gehören zu einem Gerät und werden nie abgeglichen; die Einstellungen der Person, Einfach oder Erweitert und „Notiz in den Papierkorb legen, wenn ihre einmalige Erinnerung erledigt ist“, werden mit ihren eigenen Geräten abgeglichen.
 
 **Koppeln** [Pairing]:
 Zwei Geräte oder eine Person miteinander bekannt machen, persönlich oder per Code, wobei sie die Schlüssel bekommen, die sie brauchen.

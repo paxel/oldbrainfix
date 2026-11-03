@@ -744,7 +744,7 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     assert!(shows(
         &harness,
-        "These settings belong to this computer and are never synced."
+        "Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this computer."
     ));
     harness
         .get_by_label("Notifications on this computer")

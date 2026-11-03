@@ -900,7 +900,7 @@
     }
   },
   "settingsTitle": "Settings",
-  "settingsIntro": "These settings belong to this phone and are never synced.",
+  "settingsIntro": "Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.",
   "settingsLook": "Look",
   "themeSystem": "System",
   "themeLight": "Light",
@@ -1480,7 +1480,7 @@
   "profileBackups": "Backups and recovery",
   "profileDevices": "Your Devices",
   "profileDeviceSettings": "Settings of this Device",
-  "profileDeviceSettingsDetail": "They belong to this Device and are never synced.",
+  "profileDeviceSettingsDetail": "Most belong to this Device; Simple or Advanced and the Trash setting sync to your own Devices.",
   "profileWhichTitle": "Which one is you?",
   "profileWhichText": "Both Devices had a Profile of their own. The one you pick is kept on all of your Devices.",
   "profileWhichThisDevice": "On this Device",

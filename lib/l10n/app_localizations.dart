@@ -2327,7 +2327,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntro.
   ///
   /// In en, this message translates to:
-  /// **'These settings belong to this phone and are never synced.'**
+  /// **'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.'**
   String get settingsIntro;
 
   /// No description provided for @settingsLook.
@@ -4265,7 +4265,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileDeviceSettingsDetail.
   ///
   /// In en, this message translates to:
-  /// **'They belong to this Device and are never synced.'**
+  /// **'Most belong to this Device; Simple or Advanced and the Trash setting sync to your own Devices.'**
   String get profileDeviceSettingsDetail;
 
   /// No description provided for @profileWhichTitle.

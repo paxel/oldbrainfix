@@ -1438,7 +1438,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsIntro =>
-      'These settings belong to this phone and are never synced.';
+      'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.';
 
   @override
   String get settingsLook => 'Look';
@@ -2640,7 +2640,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDeviceSettingsDetail =>
-      'They belong to this Device and are never synced.';
+      'Most belong to this Device; Simple or Advanced and the Trash setting sync to your own Devices.';
 
   @override
   String get profileWhichTitle => 'Which one is you?';

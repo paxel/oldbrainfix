@@ -222,7 +222,7 @@ _Avoid_: item, task, to-do, entry (that is a Tally's)
 ### People and devices
 
 **Device**:
-One installation of the app, on a phone or a desktop. Settings belong to a Device and are never synced.
+One installation of the app, on a phone or a desktop. Most settings belong to a Device and are never synced; the settings of the person, Simple or Advanced and "Move a Note to the Trash when its one-time Reminder is done", sync to the person's own Devices (ADRs 0040, 0041).
 
 **Pairing**:
 Introducing two Devices, or a person, to each other in person or by code, which hands over the keys they need.

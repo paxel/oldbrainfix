@@ -101,7 +101,10 @@ void main() {
       await openDeviceSettings(tester);
       expect(find.byType(SettingsScreen), findsOneWidget);
       expect(
-        find.text('These settings belong to this phone and are never synced.'),
+        find.text(
+          'Simple or Advanced and the Trash setting sync to your own Devices; '
+          'the other settings belong to this phone.',
+        ),
         findsOneWidget,
       );
     });

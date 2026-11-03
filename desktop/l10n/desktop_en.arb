@@ -45,7 +45,7 @@
   "@dayBefore": {"description": "Moves the start of a Routine one day back."},
   "dayAfter": "Day after",
   "@dayAfter": {"description": "Moves the start of a Routine one day on."},
-  "settingsIntro": "These settings belong to this computer and are never synced.",
+  "settingsIntro": "Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this computer.",
   "@settingsIntro": {"description": "Desktop wording of the phone's text."},
   "renagDevice": "Default on this computer",
   "@renagDevice": {"description": "Desktop wording of the phone's text."},
