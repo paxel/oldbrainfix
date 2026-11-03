@@ -458,6 +458,17 @@ class AlarmSync extends ChangeNotifier {
     return next;
   }
 
+  /// Hands the Agenda widget the snapshot still waiting for the Agenda's
+  /// read, now: a background run has no Agenda and may end before
+  /// [showDelay] is over.
+  Future<void> settle() {
+    final force = _showWaiting;
+    _showTimer?.cancel();
+    _showWaiting = null;
+    if (force == null || _disposed) return _serial(() async {});
+    return _serial(() => _showNow(force: force));
+  }
+
   @override
   void dispose() {
     _disposed = true;

@@ -556,6 +556,7 @@ Future<void> backgroundSync({
     }
   }
   await alarms.refresh();
+  await alarms.settle();
 }
 
 Future<void> _lanInBackground(
