@@ -4,6 +4,7 @@ import 'checklists.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'profiles.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'text_format.dart';
 
@@ -189,7 +190,8 @@ class HelpNotes {
   }
 
   /// Writes the Quick start: a Checklist whose Lines are the steps to try,
-  /// under ids fixed by the person and the Line's place.
+  /// under ids fixed by the person and the Line's place, shown on the
+  /// Agenda as one row with its count.
   void _quickStart(String person, String area, HelpTexts texts) {
     final id = quickStartId(person);
     final making = quickStartMaking(person);
@@ -215,6 +217,14 @@ class HelpNotes {
         id: quickStartLineId(person, i),
       );
     }
+    // One row on the Agenda with its count (Q549), the person's own
+    // choice as "Show on the Agenda" writes it.
+    store.append(
+      '${ChecklistKeys.agendaPrefix}$id',
+      ChecklistKeys.agenda,
+      ListOnAgenda.count.code,
+      date: now,
+    );
   }
 }
 

@@ -37,7 +37,7 @@
   "agenda": [],
   "onAgenda": {
     "note:help-00000000000000000000000000000001-icons": "lines",
-    "note:help-00000000000000000000000000000001-quick-start": "lines",
+    "note:help-00000000000000000000000000000001-quick-start": "count",
     "note:help-00000000000000000000000000000001-whats-new-0.4.0": "lines",
     "note:help-00000000000000000000000000000001-whats-new-0.4.1": "lines",
     "note:help-00000000000000000000000000000001-whats-new-0.5.0": "lines"

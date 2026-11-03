@@ -30,7 +30,7 @@ The Notes are written in the language of the Device that makes them; a What's ne
 
 ## The Area
 
-It is made with the first help Note that goes into it: "Old Brain Fix", the app's teal `00796B` and the icon `brain` (a new key of `areaIcons`, drawn as Material `psychology`, pickable for any Area). A renamed or recoloured one stays as the user left it. When the user deleted it and a help Note is due, it is made again under its id with the look it had, so no help Note is ever Unsorted. The Quick start is a Checklist without a Routine, so its open Lines show on the Agenda as any Checklist's do until the user ticks them or takes it off.
+It is made with the first help Note that goes into it: "Old Brain Fix", the app's teal `00796B` and the icon `brain` (a new key of `areaIcons`, drawn as Material `psychology`, pickable for any Area). A renamed or recoloured one stays as the user left it. When the user deleted it and a help Note is due, it is made again under its id with the look it had, so no help Note is ever Unsorted. The Quick start is a Checklist without a Routine, so it shows on the Agenda. The user chose (Q549 (a)) one row with its count, "Quick start: 8 of 8 open", rather than a row per Line: making it also writes the person's own "Show on the Agenda" choice for it, `agenda:<quick start id>` = `count` (#219), in the same batch, so both cores write the same entries and the person may change it as for any Checklist.
 
 ## What's new is bundled from the release notes
 

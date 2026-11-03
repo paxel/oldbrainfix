@@ -99,6 +99,15 @@ void main() {
         [for (final l in list.lines) l.id],
         [HelpNotes.quickStartLineId(p, 0), HelpNotes.quickStartLineId(p, 1)],
       );
+      // On the Agenda as one row with its count, not a row per Line.
+      final checklists = Checklists(ann);
+      expect(
+        checklists.onAgenda(HelpNotes.quickStartId(p)),
+        ListOnAgenda.count,
+      );
+      final rows = checklists.agendaRows();
+      expect(rows, hasLength(1));
+      expect(rows.single.shows, ListOnAgenda.count);
       final icons = Notes(ann).byId(HelpNotes.iconsId(p))!;
       expect(icons.text, english.iconsText);
       expect(icons.photos, hasLength(1));

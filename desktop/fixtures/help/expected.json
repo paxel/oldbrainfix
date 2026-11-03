@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:55.000Z",
+  "now": "2026-01-02T10:00:56.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [
     {
@@ -18,7 +18,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:00:24.000Z",
+      "captured": "2026-01-01T10:00:25.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -29,7 +29,7 @@
       },
       "place": "area:help-00000000000000000000000000000001",
       "importance": "normal",
-      "trashed": "2026-01-01T10:00:46.000Z",
+      "trashed": "2026-01-01T10:00:47.000Z",
       "mergedInto": null,
       "spawned": false,
       "photos": [
@@ -61,7 +61,7 @@
       },
       "place": "area:help-00000000000000000000000000000001",
       "importance": "normal",
-      "trashed": "2026-01-01T10:00:30.000Z",
+      "trashed": "2026-01-01T10:00:31.000Z",
       "mergedInto": null,
       "spawned": true,
       "photos": [],
@@ -80,7 +80,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:00:37.000Z",
+      "captured": "2026-01-01T10:00:38.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -91,7 +91,7 @@
       },
       "place": "area:help-00000000000000000000000000000001",
       "importance": "normal",
-      "trashed": "2026-01-01T10:00:42.000Z",
+      "trashed": "2026-01-01T10:00:43.000Z",
       "mergedInto": null,
       "spawned": false,
       "photos": [],
@@ -110,7 +110,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:00:32.000Z",
+      "captured": "2026-01-01T10:00:33.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -121,7 +121,7 @@
       },
       "place": "area:help-00000000000000000000000000000001",
       "importance": "normal",
-      "trashed": "2026-01-01T10:00:44.000Z",
+      "trashed": "2026-01-01T10:00:45.000Z",
       "mergedInto": null,
       "spawned": false,
       "photos": [],
@@ -140,7 +140,7 @@
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:00:51.000Z",
+      "captured": "2026-01-01T10:00:52.000Z",
       "context": {
         "location": null,
         "namedPlace": null,

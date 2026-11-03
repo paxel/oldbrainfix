@@ -15,6 +15,7 @@ use crate::entry::dart_iso;
 use crate::notes::keys as note_keys;
 use crate::places::{Places, keys as place_keys};
 use crate::profile::OwnProfile;
+use crate::shopping_lists::ListOnAgenda;
 use crate::store::Store;
 use crate::text_format::{self, StoredText};
 
@@ -286,7 +287,8 @@ impl<'a> HelpNotes<'a> {
     }
 
     /// Writes the Quick start: a Checklist whose Lines are the steps to
-    /// try, under ids fixed by the person and the Line's place.
+    /// try, under ids fixed by the person and the Line's place, shown on
+    /// the Agenda as one row with its count.
     fn quick_start(&self, person: &str, area: &str, texts: &HelpTexts) -> Result<()> {
         let s = self.store;
         let id = quick_start_id(person);
@@ -309,6 +311,11 @@ impl<'a> HelpNotes<'a> {
             };
             write_line_as(s, quick_start_line_id(person, i), &id, &making, &new)?;
         }
+        // One row on the Agenda with its count (Q549), the person's own
+        // choice as "Show on the Agenda" writes it.
+        let agenda = format!("{}{id}", checklists::keys::AGENDA_PREFIX);
+        let count = ListOnAgenda::Count.code();
+        s.append(&agenda, checklists::keys::AGENDA, Some(count), Some(now))?;
         Ok(())
     }
 }
@@ -318,7 +325,7 @@ mod tests {
     use super::*;
     use crate::lan::{answer_sync, apply_answer, sync_request};
     use crate::signing::SigningKey;
-    use crate::{Checklists, Notes, NotesGo, PairedDevice};
+    use crate::{Checklists, ListOnAgenda, Notes, NotesGo, PairedDevice};
     use chrono::Duration;
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
@@ -451,6 +458,15 @@ mod tests {
                 ),
             ]
         );
+        // On the Agenda as one row with its count, not a row per Line.
+        let checklists = Checklists::new(&ann);
+        assert_eq!(
+            checklists.on_agenda(&quick_start_id(&p))?,
+            ListOnAgenda::Count
+        );
+        let rows = checklists.agenda_rows()?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].shows, ListOnAgenda::Count);
         let icons = notes.by_id(&icons_id(&p))?.ok_or("the icons")?;
         assert_eq!(icons.photos.len(), 1);
         assert_eq!(icons.nudge, None);

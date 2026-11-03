@@ -145,6 +145,23 @@ void main() {
       expect(icons.photos, hasLength(helpIconGroups.length));
     });
 
+    testWidgets('a fresh install\'s Agenda shows the Quick start as one row '
+        'with its count, not a row per Line', (tester) async {
+      // Past the alarm setup, so the first start ends on the Agenda.
+      store.alarmSetupDone = true;
+      await start(tester);
+      await tester.tap(find.byKey(const ValueKey('first-new')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start'));
+      await tester.pumpAndSettle();
+      final id = HelpNotes.quickStartId(store.ownProfile!.id);
+      expect(find.byKey(ValueKey('checklist-row-$id')), findsOneWidget);
+      expect(find.text('Quick start: 8 of 8 open'), findsOneWidget);
+      for (final line in quickStartLines(en)) {
+        expect(find.text(line), findsNothing);
+      }
+    });
+
     testWidgets('an update gets that release\'s What\'s new and the two '
         'help Notes, in the Device\'s language', (tester) async {
       store

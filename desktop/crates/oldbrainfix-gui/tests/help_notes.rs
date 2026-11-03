@@ -88,6 +88,21 @@ fn the_first_start_files_quick_start_and_the_icons_and_no_whats_new() -> TestRes
         .by_id(&help_notes::icons_id(&person))?
         .ok_or("the icons")?;
     assert_eq!(icons.photos.len(), GROUPS.len());
+    // The Agenda shows the Quick start as one row with its count, not a
+    // row per Line (Q549).
+    harness.step();
+    assert!(
+        harness
+            .query_all_by_label_contains("Quick start: 8 of 8 open")
+            .next()
+            .is_some()
+    );
+    for line in quick_start_lines(&t) {
+        assert!(
+            harness.query_all_by_label_contains(&line).next().is_none(),
+            "{line}"
+        );
+    }
     Ok(())
 }
 
