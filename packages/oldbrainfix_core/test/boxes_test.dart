@@ -221,10 +221,15 @@ void main() {
     test('ticks of another shape are skipped', () {
       final note = Notes(store).capture('☐ pills');
       final id = note.boxes.single.id;
+      // The id in another case: an id of digits only has no upper case, so
+      // its first character is swapped for a capital letter instead.
+      final upper = id.toUpperCase() == id
+          ? 'A${id.substring(1)}'
+          : id.toUpperCase();
       for (final (field, value) in [
         ('box@', 'done'),
         ('box@${id}x', 'done'),
-        ('box@${id.toUpperCase()}', 'done'),
+        ('box@$upper', 'done'),
         ('box@@$id', 'done'),
         ('box@$id', 'Done'),
         ('box@$id', null),

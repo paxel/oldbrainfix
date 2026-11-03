@@ -319,10 +319,16 @@ mod tests {
         let store = device(3, "Ann")?;
         let note = Notes::new(&store).capture("☐ pills", None, None)?;
         let id = note.boxes[0].id.clone();
+        // The id in another case: an id of digits only has no upper case, so
+        // its first character is swapped for a capital letter instead.
+        let upper = match id.to_uppercase() {
+            same if same == id => format!("A{}", id.get(1..).unwrap_or_default()),
+            other => other,
+        };
         for (field, value) in [
             ("box@".to_string(), Some("done")),
             (format!("box@{id}x"), Some("done")),
-            (format!("box@{}", id.to_uppercase()), Some("done")),
+            (format!("box@{upper}"), Some("done")),
             (format!("box@@{id}"), Some("done")),
             (format!("box@{id}"), Some("Done")),
             (format!("box@{id}"), None),
