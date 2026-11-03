@@ -191,7 +191,7 @@ fn a_selected_note_shows_in_its_dialog_with_its_sections_and_merged_notes() -> T
     for section in [
         "Dentist on Tuesday",
         "Ask about the crown",
-        "Moved to Wednesday",
+        "Moved to Thursday",
         "Bring the old X-ray",
         "Called, all set",
     ] {
