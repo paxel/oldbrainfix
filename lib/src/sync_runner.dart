@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:isolate';
 
 import 'package:flutter/services.dart';
@@ -47,9 +48,9 @@ class InlineSyncRunner implements SyncRunner {
   }) => joining(store, device, host: host, port: port, name: name);
 }
 
-/// What a job in the isolate brought back: its result or what it threw,
-/// and whether it changed the log or the Profiles.
-typedef _Ran<T> = ({T? value, Object? error, bool log, bool profile});
+/// What a job in an isolate of its own brought back: its result or what
+/// it threw, and whether it changed the log or the Profiles.
+typedef IsolatedRun<T> = ({T? value, Object? error, bool log, bool profile});
 
 /// Runs the jobs in an isolate of their own, each on a connection of its
 /// own to the database at [path] (SQLite WAL), so the app keeps drawing
@@ -125,19 +126,33 @@ Future<SyncResult?> _join(
 
 /// Runs [ran] in an isolate, tells [store] what it changed, and hands
 /// back its result or throws what it threw.
-Future<T?> _isolated<T>(Store store, Future<_Ran<T>> Function() ran) async {
+Future<T?> _isolated<T>(
+  Store store,
+  Future<IsolatedRun<T>> Function() ran,
+) async {
   final out = await Isolate.run(ran);
   if (out.log || out.profile) store.changedElsewhere(profile: out.profile);
   if (out.error case final error?) throw error;
   return out.value;
 }
 
+/// Runs [work] in an isolate of its own on a store of its own on [path]
+/// (SQLite WAL), as the sync does (#225), and hands back what it brought
+/// and changed; the caller tells the store it reads. [work] crosses into
+/// the isolate: a top-level function, or a closure holding only what
+/// may.
+Future<IsolatedRun<T>> runIsolated<T>(
+  String path,
+  FutureOr<T> Function(Store store) work, {
+  RootIsolateToken? token,
+}) => Isolate.run(() => _inIsolate(path, token, work));
+
 /// Inside the isolate: [work] on a store of its own on [path], closed
 /// again afterwards.
-Future<_Ran<T>> _inIsolate<T>(
+Future<IsolatedRun<T>> _inIsolate<T>(
   String path,
   RootIsolateToken? token,
-  Future<T> Function(Store store) work,
+  FutureOr<T> Function(Store store) work,
 ) async {
   if (token != null) BackgroundIsolateBinaryMessenger.ensureInitialized(token);
   final store = Store.open(path);

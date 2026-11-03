@@ -374,6 +374,23 @@ struct AgendaView {
     hides_checked: bool,
 }
 
+/// The Agenda read on a thread of its own (#207): the window draws on
+/// while it reads, the last rows showing.
+struct AgendaReads {
+    /// Hands the thread its connection to the window's database as it
+    /// reads.
+    open: Arc<dyn Fn() -> Arc<Store> + Send + Sync>,
+    /// The rows read last, shown until the next read is in.
+    shown: Option<AgendaView>,
+    /// The read running, with whether it wrote today's picks.
+    running: Option<std::sync::mpsc::Receiver<AgendaRead>>,
+    /// A change asked for one more read meanwhile.
+    again: bool,
+}
+
+/// What the Agenda's thread read, at its mark, and whether it wrote.
+type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
+
 /// What this Device may do to the selected Note in a Shared Area
 /// (ADR 0013): change it (edit, file, merge, delete), give it Routines,
 /// and Amend it.
@@ -1647,6 +1664,9 @@ pub struct App {
     /// Whether a sync of this Device runs, for the line under the menu
     /// bar (#225).
     syncing: Option<Syncing>,
+    /// Where the Agenda is read off the window's thread (#207); without
+    /// it, the window reads it itself.
+    agenda_reads: Option<AgendaReads>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -2023,6 +2043,7 @@ impl App {
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
             syncing: None,
+            agenda_reads: None,
             unsorted_wanted: None,
             changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
@@ -3812,6 +3833,97 @@ impl App {
         self.syncing = Some(syncing);
     }
 
+    /// Reads the Agenda on a thread of its own from now on (#207), on the
+    /// store `open` hands it each time: a connection of its own to the
+    /// window's database. The window draws on meanwhile, the rows read
+    /// last showing; a read the log has changed since is dropped and read
+    /// again.
+    pub fn set_agenda_store(&mut self, open: impl Fn() -> Arc<Store> + Send + Sync + 'static) {
+        self.agenda_reads = Some(AgendaReads {
+            open: Arc::new(open),
+            shown: self.view.agenda.clone(),
+            running: None,
+            again: false,
+        });
+    }
+
+    /// Starts a read of the Agenda on its thread while it shows, or one
+    /// more after the read running.
+    fn read_agenda_aside(&mut self) {
+        if self.agenda_reads.is_none() || self.selection != Selection::Agenda {
+            return;
+        }
+        let system = match self.unit_system() {
+            Ok(system) => system,
+            Err(e) => {
+                self.error = Some(e.to_string());
+                return;
+            }
+        };
+        let (t, wall) = (self.t, self.wall.clone());
+        let Some(reads) = &mut self.agenda_reads else {
+            return;
+        };
+        if reads.running.is_some() {
+            reads.again = true;
+            return;
+        }
+        let (sent, arrives) = std::sync::mpsc::channel();
+        let open = reads.open.clone();
+        std::thread::spawn(move || {
+            let store = open();
+            let before = store.current_seq().ok();
+            let read = read_agenda(&store, &t, &*wall, system);
+            let wrote = read.as_ref().map_or(true, |(_, seq)| before != Some(*seq));
+            drop(sent.send((read, wrote)));
+        });
+        reads.running = Some(arrives);
+    }
+
+    /// Shows the Agenda's read from its thread once it is in, unless the
+    /// log changed since it was read: then it reads again (#207). The
+    /// window looks again shortly while it runs.
+    fn agenda_arrived(&mut self, ctx: &egui::Context) {
+        let Some(reads) = &mut self.agenda_reads else {
+            return;
+        };
+        let Some(running) = &reads.running else {
+            return;
+        };
+        let (read, wrote) = match running.try_recv() {
+            Ok(arrived) => arrived,
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(std::time::Duration::from_millis(30));
+                return;
+            }
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                reads.running = None;
+                return;
+            }
+        };
+        reads.running = None;
+        // Today's picks written there: this connection reads them anew,
+        // which is no reason to read the Agenda again.
+        if wrote {
+            self.store.changed_elsewhere();
+        }
+        match read {
+            Ok((view, seq)) if self.store.current_seq().ok() == Some(seq) => {
+                if self.selection == Selection::Agenda {
+                    self.view.agenda = Some(view.clone());
+                }
+                reads.shown = Some(view);
+            }
+            Ok(_) => reads.again = true,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        let again = std::mem::take(&mut reads.again);
+        if again {
+            self.read_agenda_aside();
+        }
+        ctx.request_repaint();
+    }
+
     /// Shows Unsorted, what the phone's Nudge screen shows, whenever a
     /// click on the Nudge raised `wanted`.
     pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
@@ -4377,6 +4489,8 @@ impl App {
             self.text_editing = true;
             self.text_focus = true;
         }
+        // The Agenda as it is now, on its thread where it has one (#207).
+        self.read_agenda_aside();
         self.kick();
     }
 
@@ -4506,51 +4620,9 @@ impl App {
             Selection::Trash => notes.trashed()?,
         };
         let store = &self.store;
-        let place = |note: Note| -> oldbrainfix_core::Result<Placed> {
-            let author = store.author_of(&note.id)?;
-            let pack_from = store.pack_from(&note.id)?;
-            let Some(id) = note.place.clone() else {
-                return Ok(Placed {
-                    note,
-                    area: None,
-                    topic: None,
-                    author,
-                    pack_from,
-                });
-            };
-            let topic = places.topic_by_id(&id)?;
-            let area_id = topic.as_ref().map_or(id, |t| t.area_id.clone());
-            Ok(Placed {
-                note,
-                area: places.area_by_id(&area_id)?,
-                topic,
-                author,
-                pack_from,
-            })
-        };
+        let place = |note: Note| place_note(store, &places, note);
         let frogs = Frogs::new(store);
-        let show_frog = |frog: Frog| -> oldbrainfix_core::Result<Option<FrogShown>> {
-            // A Frog whose Note is gone for good shows nowhere.
-            let Some(note) = frogs.note(&frog)? else {
-                return Ok(None);
-            };
-            let area = place(note.clone())?.area;
-            Ok(Some(FrogShown {
-                may_check: store.may_check_off(&frog.id)?,
-                manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
-                done_on: frog.done.map(|at| Day::of((self.wall)(at))),
-                frog,
-                note,
-                area,
-            }))
-        };
-        let shown_frogs = |list: Vec<Frog>| -> oldbrainfix_core::Result<Vec<FrogShown>> {
-            let mut out = Vec::new();
-            for frog in list {
-                out.extend(show_frog(frog)?);
-            }
-            Ok(out)
-        };
+        let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, &*self.wall, list);
         let detail = match &self.selected_note {
             Some(id) => match notes.by_id(id)? {
                 Some(note) if !note.is_merged() => Some((place(note)?, notes.sections(id)?)),
@@ -4831,185 +4903,12 @@ impl App {
             }
         }
         let agenda = match self.selection {
-            Selection::Agenda => {
-                let wall = &*self.wall;
-                // Read as the Agenda shows, never while it is drawn, and
-                // before the rows read their Done: today's picks are
-                // written for everyone the Session reaches when they are
-                // new (ADR 0029), and reading again writes nothing.
-                let sessions = Sessions::new(store);
-                let system = self.unit_system()?;
-                let mut picked = HashMap::new();
-                for today in sessions.pick_today(wall)? {
-                    let key = (today.session.id().to_string(), today.occurrence.key());
-                    picked.insert(key, PicksShown::read(store, &self.t, today, system)?);
-                }
-                let counts: HashMap<String, _> = sessions
-                    .all()?
-                    .into_iter()
-                    .map(|s| (s.id().to_string(), s))
-                    .collect();
-                let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
-                // The rows' Notes that are Checklists, read in one pass so
-                // only their rows read their Lines for the Occurrence.
-                let row_notes: Vec<String> = agenda
-                    .today_rows
-                    .iter()
-                    .chain(&agenda.tomorrow_rows)
-                    .chain(agenda.later_rows.iter().flatten())
-                    .filter_map(|row| row.note.as_ref().map(|n| n.id.clone()))
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect();
-                let list_notes: HashSet<String> = if row_notes.is_empty() {
-                    HashSet::new()
-                } else {
-                    lists.of_notes(&row_notes)?.into_keys().collect()
-                };
-                let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
-                    let area = match &row.note {
-                        Some(note) => place(note.clone())?.area,
-                        None => None,
-                    };
-                    let key = (row.routine.id.clone(), row.occurrence.key());
-                    let session = match picked.get(&key) {
-                        Some(shown) => Some(SessionPart::Today(Box::new(shown.clone()))),
-                        None => counts
-                            .get(&row.routine.id)
-                            .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
-                    };
-                    // A Session's picks win over Lines.
-                    let mut lines = None;
-                    if session.is_none()
-                        && row
-                            .note
-                            .as_ref()
-                            .is_some_and(|n| list_notes.contains(&n.id))
-                    {
-                        let on = RoutineOccurrence {
-                            routine_id: row.routine.id.clone(),
-                            occurrence: row.occurrence,
-                        };
-                        if let Some(list) = lists.for_occurrence(&on)?
-                            && list.count() > 0
-                        {
-                            lines = Some((list, store.may_check_off(&row.routine.id)?));
-                        }
-                    }
-                    Ok(Row {
-                        row,
-                        area,
-                        session,
-                        lines,
-                    })
-                };
-                // What shows as Done leaves where this Device hides it
-                // (#217).
-                let hides_checked = DeviceSettings::new(store).agenda_hides_checked()?;
-                let rows = |rows: Vec<AgendaRow>| -> oldbrainfix_core::Result<Vec<Row>> {
-                    let mut shown = Vec::new();
-                    for placed in rows.into_iter().map(row) {
-                        let placed = placed?;
-                        if !hides_checked || !shown_done(&placed) {
-                            shown.push(placed);
-                        }
-                    }
-                    Ok(shown)
-                };
-                let mut later = Vec::new();
-                for (i, day) in agenda.later_rows.iter().enumerate() {
-                    later.push((agenda.later(i), rows(day.clone())?));
-                }
-                // Read as the Agenda shows, never while it is drawn:
-                // today's pick is written for the user's own Devices when
-                // it is new, and reading again writes nothing.
-                let today = frogs.pick_today(wall)?;
-                let frog_rows = shown_frogs(today.shown.clone())?;
-                let mut shopping_rows = Vec::new();
-                for shown in shopping.agenda_rows(wall)? {
-                    let Some(note) = notes.by_id(&shown.list.note_id)? else {
-                        continue;
-                    };
-                    let title = match row_title(&self.t, Some(&note)).lines().next() {
-                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
-                        _ => self.t.shopping_heading().to_string(),
-                    };
-                    // As this person chose for the list (#186); one kept
-                    // off is not among them.
-                    let count = shown.lines.len() as i64;
-                    let (lines, text) = match shown.shows {
-                        ShoppingOnAgenda::Lines => (shown.lines, title),
-                        ShoppingOnAgenda::Count => {
-                            (Vec::new(), self.t.shopping_row_open(&title, count))
-                        }
-                        ShoppingOnAgenda::Off => continue,
-                    };
-                    shopping_rows.push(ShoppingRow {
-                        area: place(note.clone())?.area,
-                        checks: shopping.may_check(&note.id)?,
-                        note_id: note.id,
-                        text,
-                        lines,
-                    });
-                }
-                let mut checklist_rows = Vec::new();
-                for row in lists.agenda_rows()? {
-                    let Some(note) = notes.by_id(&row.list.note_id)? else {
-                        continue;
-                    };
-                    let title = match row_title(&self.t, Some(&note)).lines().next() {
-                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
-                        _ => self.t.checklist_heading().to_string(),
-                    };
-                    // As this person chose for the list (#219): every
-                    // open Line, or none, which leaves the count.
-                    let ChecklistAgendaRow { list, shows } = row;
-                    let lines = match shows {
-                        ListOnAgenda::Count => Vec::new(),
-                        // Its checked Lines never show (#143).
-                        _ => agenda_lines(&list, true),
-                    };
-                    let text = if lines.is_empty() {
-                        let (open, count) = (list.open_count() as i64, list.count() as i64);
-                        self.t.checklist_row_open(&title, open, count)
-                    } else {
-                        title
-                    };
-                    checklist_rows.push(ChecklistRow {
-                        area: place(note.clone())?.area,
-                        text,
-                        lines,
-                        checks: lists.may_check(&note.id)?,
-                        note_id: note.id,
-                    });
-                }
-                Some(AgendaView {
-                    later,
-                    shopping: shopping_rows,
-                    checklists: checklist_rows,
-                    today: rows(agenda.today_rows)?,
-                    tomorrow: rows(agenda.tomorrow_rows)?,
-                    missed: Alarms::new(&self.store).missed(wall)?,
-                    unsorted: notes.unsorted()?.len(),
-                    // Counted from the pending sets, without reading each
-                    // held file.
-                    waiting: self
-                        .store
-                        .pending_sets()?
-                        .iter()
-                        .filter(|s| s.kind == sent::PENDING_KIND)
-                        .count(),
-                    offers: self
-                        .store
-                        .pending_sets()?
-                        .iter()
-                        .filter(|s| s.kind == offers::PENDING_KIND)
-                        .count(),
-                    frogs: Some(today),
-                    frog_rows,
-                    hides_checked,
-                })
-            }
+            // Read on a thread of its own where the window has one, the
+            // last rows showing meanwhile (#207).
+            Selection::Agenda => match &self.agenda_reads {
+                Some(reads) => reads.shown.clone(),
+                None => Some(read_agenda(store, &self.t, &*self.wall, self.unit_system()?)?.0),
+            },
             _ => None,
         };
         let ai_task = self.store.ai_task()?;
@@ -7880,6 +7779,7 @@ impl App {
 
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
+        self.agenda_arrived(ui.ctx());
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
@@ -14041,6 +13941,253 @@ pub(crate) fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui:
     };
     icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+/// The Agenda of `store` on `wall`, its targets in `system`, as the
+/// window shows it, with the log's mark it was read at: today's picks
+/// written first when they are new, then everything read. It runs on the
+/// window's thread, or on one of its own with a connection of its own
+/// (#207).
+fn read_agenda(
+    store: &Store,
+    t: &L10n,
+    wall: &oldbrainfix_core::WallClock,
+    system: UnitSystem,
+) -> oldbrainfix_core::Result<(AgendaView, i64)> {
+    let notes = Notes::new(store);
+    let places = Places::new(store);
+    let routines = Routines::new(store);
+    let lists = Checklists::new(store);
+    let shopping = ShoppingLists::new(store);
+    let frogs = Frogs::new(store);
+    let place = |note: Note| place_note(store, &places, note);
+    let shown_frogs = |list: Vec<Frog>| frogs_shown(store, &places, wall, list);
+    // Read as the Agenda shows, never while it is drawn, and
+    // before the rows read their Done: today's picks are
+    // written for everyone the Session reaches when they are
+    // new (ADR 0029), and reading again writes nothing.
+    let sessions = Sessions::new(store);
+    let picks = sessions.pick_today(wall)?;
+    // Likewise today's Frog, written for the user's own Devices when it
+    // is new.
+    let today = frogs.pick_today(wall)?;
+    // What is read from here on is of this mark (#207).
+    let seq = store.current_seq()?;
+    let mut picked = HashMap::new();
+    for today in picks {
+        let key = (today.session.id().to_string(), today.occurrence.key());
+        picked.insert(key, PicksShown::read(store, t, today, system)?);
+    }
+    let counts: HashMap<String, _> = sessions
+        .all()?
+        .into_iter()
+        .map(|s| (s.id().to_string(), s))
+        .collect();
+    let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
+    // The rows' Notes that are Checklists, read in one pass so
+    // only their rows read their Lines for the Occurrence.
+    let row_notes: Vec<String> = agenda
+        .today_rows
+        .iter()
+        .chain(&agenda.tomorrow_rows)
+        .chain(agenda.later_rows.iter().flatten())
+        .filter_map(|row| row.note.as_ref().map(|n| n.id.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let list_notes: HashSet<String> = if row_notes.is_empty() {
+        HashSet::new()
+    } else {
+        lists.of_notes(&row_notes)?.into_keys().collect()
+    };
+    let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
+        let area = match &row.note {
+            Some(note) => place(note.clone())?.area,
+            None => None,
+        };
+        let key = (row.routine.id.clone(), row.occurrence.key());
+        let session = match picked.get(&key) {
+            Some(shown) => Some(SessionPart::Today(Box::new(shown.clone()))),
+            None => counts
+                .get(&row.routine.id)
+                .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
+        };
+        // A Session's picks win over Lines.
+        let mut lines = None;
+        if session.is_none()
+            && row
+                .note
+                .as_ref()
+                .is_some_and(|n| list_notes.contains(&n.id))
+        {
+            let on = RoutineOccurrence {
+                routine_id: row.routine.id.clone(),
+                occurrence: row.occurrence,
+            };
+            if let Some(list) = lists.for_occurrence(&on)?
+                && list.count() > 0
+            {
+                lines = Some((list, store.may_check_off(&row.routine.id)?));
+            }
+        }
+        Ok(Row {
+            row,
+            area,
+            session,
+            lines,
+        })
+    };
+    // What shows as Done leaves where this Device hides it
+    // (#217).
+    let hides_checked = DeviceSettings::new(store).agenda_hides_checked()?;
+    let rows = |rows: Vec<AgendaRow>| -> oldbrainfix_core::Result<Vec<Row>> {
+        let mut shown = Vec::new();
+        for placed in rows.into_iter().map(row) {
+            let placed = placed?;
+            if !hides_checked || !shown_done(&placed) {
+                shown.push(placed);
+            }
+        }
+        Ok(shown)
+    };
+    let mut later = Vec::new();
+    for (i, day) in agenda.later_rows.iter().enumerate() {
+        later.push((agenda.later(i), rows(day.clone())?));
+    }
+    let frog_rows = shown_frogs(today.shown.clone())?;
+    let mut shopping_rows = Vec::new();
+    for shown in shopping.agenda_rows(wall)? {
+        let Some(note) = notes.by_id(&shown.list.note_id)? else {
+            continue;
+        };
+        let title = match row_title(t, Some(&note)).lines().next() {
+            Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+            _ => t.shopping_heading().to_string(),
+        };
+        // As this person chose for the list (#186); one kept
+        // off is not among them.
+        let count = shown.lines.len() as i64;
+        let (lines, text) = match shown.shows {
+            ShoppingOnAgenda::Lines => (shown.lines, title),
+            ShoppingOnAgenda::Count => (Vec::new(), t.shopping_row_open(&title, count)),
+            ShoppingOnAgenda::Off => continue,
+        };
+        shopping_rows.push(ShoppingRow {
+            area: place(note.clone())?.area,
+            checks: shopping.may_check(&note.id)?,
+            note_id: note.id,
+            text,
+            lines,
+        });
+    }
+    let mut checklist_rows = Vec::new();
+    for row in lists.agenda_rows()? {
+        let Some(note) = notes.by_id(&row.list.note_id)? else {
+            continue;
+        };
+        let title = match row_title(t, Some(&note)).lines().next() {
+            Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+            _ => t.checklist_heading().to_string(),
+        };
+        // As this person chose for the list (#219): every
+        // open Line, or none, which leaves the count.
+        let ChecklistAgendaRow { list, shows } = row;
+        let lines = match shows {
+            ListOnAgenda::Count => Vec::new(),
+            // Its checked Lines never show (#143).
+            _ => agenda_lines(&list, true),
+        };
+        let text = if lines.is_empty() {
+            let (open, count) = (list.open_count() as i64, list.count() as i64);
+            t.checklist_row_open(&title, open, count)
+        } else {
+            title
+        };
+        checklist_rows.push(ChecklistRow {
+            area: place(note.clone())?.area,
+            text,
+            lines,
+            checks: lists.may_check(&note.id)?,
+            note_id: note.id,
+        });
+    }
+    Ok((
+        AgendaView {
+            later,
+            shopping: shopping_rows,
+            checklists: checklist_rows,
+            today: rows(agenda.today_rows)?,
+            tomorrow: rows(agenda.tomorrow_rows)?,
+            missed: Alarms::new(store).missed(wall)?,
+            unsorted: notes.unsorted()?.len(),
+            // Counted from the pending sets, without reading each
+            // held file.
+            waiting: store
+                .pending_sets()?
+                .iter()
+                .filter(|s| s.kind == sent::PENDING_KIND)
+                .count(),
+            offers: store
+                .pending_sets()?
+                .iter()
+                .filter(|s| s.kind == offers::PENDING_KIND)
+                .count(),
+            frogs: Some(today),
+            frog_rows,
+            hides_checked,
+        },
+        seq,
+    ))
+}
+
+/// `note` with where it is filed, who wrote it and the Pack it came from.
+fn place_note(store: &Store, places: &Places, note: Note) -> oldbrainfix_core::Result<Placed> {
+    let author = store.author_of(&note.id)?;
+    let pack_from = store.pack_from(&note.id)?;
+    let Some(id) = note.place.clone() else {
+        return Ok(Placed {
+            note,
+            area: None,
+            topic: None,
+            author,
+            pack_from,
+        });
+    };
+    let topic = places.topic_by_id(&id)?;
+    let area_id = topic.as_ref().map_or(id, |t| t.area_id.clone());
+    Ok(Placed {
+        note,
+        area: places.area_by_id(&area_id)?,
+        topic,
+        author,
+        pack_from,
+    })
+}
+
+/// The Frogs of `list` as they show, their Done on `wall`; one whose Note
+/// is gone for good shows nowhere.
+fn frogs_shown(
+    store: &Store,
+    places: &Places,
+    wall: &oldbrainfix_core::WallClock,
+    list: Vec<Frog>,
+) -> oldbrainfix_core::Result<Vec<FrogShown>> {
+    let frogs = Frogs::new(store);
+    let mut out = Vec::new();
+    for frog in list {
+        let Some(note) = frogs.note(&frog)? else {
+            continue;
+        };
+        let area = place_note(store, places, note.clone())?.area;
+        out.push(FrogShown {
+            may_check: store.may_check_off(&frog.id)?,
+            manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
+            done_on: frog.done.map(|at| Day::of(wall(at))),
+            frog,
+            note,
+            area,
+        });
+    }
+    Ok(out)
 }
 
 /// What an Occurrence of a Routine shows as: its Note's text, what the

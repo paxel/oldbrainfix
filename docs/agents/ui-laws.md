@@ -188,6 +188,13 @@ replace a law of Both apps where they say so. A desktop law marked
   unchecks it, and a tap on it does nothing, on every day. Tomorrow and
   later days show only the title and how many it picks: the picks are
   made on the day.
+- **The Agenda reads its rows beside the app** (#207): on the phone in
+  an isolate, on the desktop on a thread, each on a connection of its
+  own. While a read runs, the rows read last stay; nothing empties, no
+  spinner shows. Before the first read is in, no day shows, so no
+  "Nothing planned" that is not so. A read the log has changed since is
+  dropped and read again. On the phone a box tapped shows its new state
+  at once, and a second tap undoes the first, before the read is in.
 
 ### Cards
 

@@ -123,6 +123,10 @@ class FrogRow extends StatelessWidget {
   /// Swaps it for the next Frog; no button when null.
   final VoidCallback? onAnother;
 
+  /// Whether it shows Done, where that differs from the [frog] as read:
+  /// checked here while the Agenda reads again (#207).
+  final bool? done;
+
   const FrogRow({
     super.key,
     required this.frog,
@@ -133,6 +137,7 @@ class FrogRow extends StatelessWidget {
     required this.onTap,
     required this.onMenu,
     this.onAnother,
+    this.done,
   });
 
   @override
@@ -140,7 +145,7 @@ class FrogRow extends StatelessWidget {
     final t = context.t;
     final text = Theme.of(context).textTheme;
     final colour = areaColour(area?.colour);
-    final done = frog.isDone;
+    final done = this.done ?? frog.isDone;
     final subtitle = this.subtitle;
     final onAnother = this.onAnother;
     final sizes = AgendaSizes.of(context);

@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_reader.dart';
 import 'agenda_rows.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
 import 'missed_summary_card.dart';
 import 'session_view.dart';
+import 'tally_view.dart';
 import 'schedule_text.dart';
 
 /// One row of the home-screen Agenda widget, in the words it shows: an
@@ -156,6 +158,13 @@ class AgendaRead {
     required this.missed,
     required this.unsorted,
   });
+
+  /// What [load] read, on [wallClock] (#207).
+  AgendaRead.of(AgendaLoad load, this.wallClock)
+    : days = load.days,
+      frogs = load.frogs,
+      missed = load.missed,
+      unsorted = load.unsorted;
 }
 
 /// What the home-screen Agenda widget shows, handed to the platform
@@ -251,28 +260,25 @@ class AgendaSnapshot {
     WallClock wallClock,
     AppLocalizations t,
     String locale,
+  ) => AgendaSnapshot.from(
+    store,
+    AgendaRead.of(
+      readLog(store, wallClock, deviceUnitSystem(store)),
+      wallClock,
+    ),
+    t,
+    locale,
+  );
+
+  /// The log as a snapshot of its own reads it, writing nothing, counted
+  /// in [reads].
+  static AgendaLoad readLog(
+    Store store,
+    WallClock wallClock,
+    UnitSystem system,
   ) {
     reads++;
-    final frogs = Frogs(store).today(wallClock);
-    return AgendaSnapshot.from(
-      store,
-      AgendaRead(
-        wallClock: wallClock,
-        days: AgendaDays.read(
-          store: store,
-          places: Places(store),
-          wallClock: wallClock,
-          days: AgendaDays.shown,
-          sessions: Sessions(store).today(wallClock),
-          frogsToday: frogs,
-        ),
-        frogs: frogs,
-        missed: Alarms(store).missed(wallClock),
-        unsorted: Notes(store).unsorted().length,
-      ),
-      t,
-      locale,
-    );
+    return readAgenda(store, wallClock, system);
   }
 
   /// The snapshot of what [read] holds, as the Agenda read it (#204): no

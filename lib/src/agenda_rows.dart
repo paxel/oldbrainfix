@@ -168,9 +168,11 @@ class AgendaDays {
 
   /// Reads the [days] of the Agenda from [store] on [wallClock], with
   /// today's Session Occurrences [sessions], today's "Eat a frog" section
-  /// [frogsToday] and the calendar's [appointments]. It writes nothing:
-  /// the Agenda hands in the picks it writes as it shows, the widget's
-  /// snapshot those it reads.
+  /// [frogsToday] and the calendar's [appointments]; a Session's targets
+  /// in [system], else in this Device's ([deviceUnitSystem]), which an
+  /// isolate of its own cannot ask the platform for (#207). It writes
+  /// nothing: the Agenda hands in the picks it writes as it shows, the
+  /// widget's snapshot those it reads.
   factory AgendaDays.read({
     required Store store,
     required Places places,
@@ -179,6 +181,7 @@ class AgendaDays {
     required List<SessionOccurrence> sessions,
     required FrogsToday frogsToday,
     List<Appointment> appointments = const [],
+    UnitSystem? system,
   }) {
     final hidesChecked = store.agendaHidesChecked;
     final reader = _Reader(store, places, wallClock, sessions);
@@ -224,7 +227,7 @@ class AgendaDays {
           if (placeFrog(frogs, places, frog) case final placed?)
             (placed: placed, masked: reader.masksNote(placed.note)),
       ],
-      system: deviceUnitSystem(store),
+      system: system ?? deviceUnitSystem(store),
       hidesChecked: hidesChecked,
     );
   }

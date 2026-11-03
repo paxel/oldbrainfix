@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import 'agenda_group.dart';
 import 'agenda_rows.dart';
 import 'agenda_widget.dart';
+import 'agenda_reader.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
@@ -330,47 +331,109 @@ class _AgendaScreenState extends State<AgendaScreen> {
     });
   }
 
-  /// Set while [_load] runs, so the log's change by its own picks reads
-  /// nothing again (#205).
+  /// Set while [_load] writes today's picks, or the app's store hears
+  /// of those an isolate wrote, so the log's change by its own picks
+  /// reads nothing again (#205).
   var _loading = false;
 
+  /// Set while a read runs off the UI thread (#207); [_again] when a
+  /// change asked for one more meanwhile.
+  var _reading = false;
+  var _again = false;
+
+  /// What the boxes tapped here show until the next read is in, by
+  /// [_boxKey]: checked or not (#207). A tap shows at once, and a second
+  /// one undoes what the first did.
+  final _tapped = <String, bool>{};
+
+  /// The key of the box of a Routine's [occurrence], of one of its Lines
+  /// with [line], a Frog's with [frog], or a list's Line with [line]
+  /// alone.
+  static String _boxKey({
+    String? routine,
+    Occurrence? occurrence,
+    String? line,
+    String? frog,
+  }) => [routine, occurrence?.key, line, frog].join('|');
+
+  /// Reads the rows with the alarms' reader: at once on the store, or
+  /// off the UI thread, the last rows showing meanwhile (#207).
   void _load() {
     AgendaScreen.loads++;
+    final store = widget.notes.store;
+    final FutureOr<AgendaLoad> loading;
+    // Writes today's picks when they are new, before the rows read their
+    // Done; the log's change they make is no reason to read again.
     _loading = true;
     try {
-      _read();
+      loading = widget.alarms.reader.load(
+        store,
+        deviceWallClock,
+        deviceUnitSystem(store),
+      );
     } finally {
       _loading = false;
     }
+    switch (loading) {
+      case AgendaLoad():
+        _apply(loading);
+      case Future<AgendaLoad>():
+        unawaited(_loaded(loading));
+    }
   }
 
-  void _read() {
-    // Writes today's picks when they are new, before the rows read their
-    // Done; the log's change they make is no reason to read again.
-    final sessions = _sessions.pickToday(deviceWallClock);
-    final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
-    final days = AgendaDays.read(
-      store: widget.notes.store,
-      places: widget.places,
-      wallClock: deviceWallClock,
-      days: AgendaScreen.days,
-      sessions: sessions,
-      frogsToday: frogs,
-      appointments: _appointments,
+  /// Shows the read [loading] once it arrives, unless the log changed
+  /// since it was read: then it reads again (#207).
+  Future<void> _loaded(Future<AgendaLoad> loading) async {
+    _reading = true;
+    try {
+      final load = await loading;
+      if (!mounted) return;
+      final store = widget.notes.store;
+      if (load.wroteElsewhere) {
+        _loading = true;
+        try {
+          store.changedElsewhere();
+        } finally {
+          _loading = false;
+        }
+      }
+      if (load.seq == store.currentSeq()) {
+        setState(() => _apply(load));
+      } else {
+        _again = true;
+      }
+    } finally {
+      _reading = false;
+      if (_again && mounted) {
+        _again = false;
+        _reload();
+      }
+    }
+  }
+
+  /// Shows what [load] read.
+  void _apply(AgendaLoad load) {
+    _tapped.clear();
+    final frogs = _frogsToday = load.frogs;
+    _show(
+      _appointments.isEmpty
+          ? load.days
+          : load.days.withAppointments(_appointments),
     );
-    _show(days);
-    _missed = _alarms.missed(deviceWallClock);
-    _unsorted = widget.notes.unsorted().length;
+    _missed = load.missed;
+    _unsorted = load.unsorted;
     // The widget's snapshot is made of this read, not of one of its own
     // (#204); it reads the calendar itself.
     widget.alarms.agendaRead(
       AgendaRead(
         wallClock: deviceWallClock,
-        days: days.withAppointments(const []),
+        days: load.days,
         frogs: frogs,
         missed: _missed,
         unsorted: _unsorted,
       ),
+      seq: load.seq,
     );
     // Counted from the pending sets, without reading each held file.
     _waiting = widget.notes.store.pendingSets
@@ -438,7 +501,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reloadQueued = true;
     scheduleMicrotask(() {
       _reloadQueued = false;
-      if (mounted) setState(_load);
+      if (!mounted) return;
+      // Once the read running off the UI thread is in (#207).
+      if (_reading) {
+        // What was tapped meanwhile shows at once.
+        setState(() => _again = true);
+      } else {
+        setState(_load);
+      }
     });
   }
 
@@ -634,20 +704,31 @@ class _AgendaScreenState extends State<AgendaScreen> {
     checked
         ? _checklists.check(lineId, on: on)
         : _checklists.uncheck(lineId, on: on);
+    _tapped[_boxKey(
+          routine: row.routine.id,
+          occurrence: row.occurrence,
+          line: lineId,
+        )] =
+        checked;
     _reload();
   }
 
   /// Checks the Line [lineId] of a Checklist without a Routine from its
   /// group today: it leaves the Agenda, and the list with its last.
   void _checkListLine(String lineId) {
+    // Checked already, its box shown so until the read is in.
+    if (_tapped[_boxKey(line: lineId)] ?? false) return;
     _checklists.check(lineId);
+    _tapped[_boxKey(line: lineId)] = true;
     _reload();
   }
 
   /// Checks the Line [lineId] of a Shopping List from its row today: it
   /// is struck through and leaves the Agenda until it comes back.
   void _checkShopping(String lineId) {
+    if (_tapped[_boxKey(line: lineId)] ?? false) return;
     _shopping.check(lineId, deviceWallClock);
+    _tapped[_boxKey(line: lineId)] = true;
     _reload();
   }
 
@@ -662,12 +743,15 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   void _toggle(AgendaRow row) {
-    if (row.done == null) {
+    final key = _boxKey(routine: row.routine.id, occurrence: row.occurrence);
+    final done = _tapped[key] ?? row.done != null;
+    if (!done) {
       // Its Note may go to the trash with it (#211).
       _routines.checkOff(row.routine.id, row.occurrence);
     } else {
       _routines.unmarkDone(row.routine.id, row.occurrence);
     }
+    _tapped[key] = !done;
     _reload();
   }
 
@@ -774,7 +858,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
     // stays checked.
     final complete =
         (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
-    final done = row.done != null || complete;
+    // As tapped here while the Agenda reads again (#207).
+    final tapped =
+        _tapped[_boxKey(routine: row.routine.id, occurrence: row.occurrence)];
+    final done = tapped ?? (row.done != null || complete);
     // A Session's box only shows Done: its picks make it (#208).
     final checks = !complete && session == null;
     return AgendaGroup(
@@ -792,7 +879,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
           : note == null
           ? t.noteGone
           : noteText(t, note),
-      struck: row.done != null,
+      struck: tapped ?? row.done != null,
       under: _sessionUnder(t, placed),
       marks: [
         if (row.routine.isReminder)
@@ -883,13 +970,21 @@ class _AgendaScreenState extends State<AgendaScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final line in agendaLines(list, hidesChecked: _hidesChecked))
-              _lineEntry(
-                line,
-                onBox: checks
-                    ? () => _checkLine(row, line.id, !line.checked)
-                    : null,
-                onTap: () => _openRow(row),
-              ),
+              if (_tapped[_boxKey(
+                        routine: row.routine.id,
+                        occurrence: row.occurrence,
+                        line: line.id,
+                      )] ??
+                      line.checked
+                  case final checked)
+                _lineEntry(
+                  line,
+                  checked: checked,
+                  onBox: checks
+                      ? () => _checkLine(row, line.id, !checked)
+                      : null,
+                  onTap: () => _openRow(row),
+                ),
           ],
         ),
       ),
@@ -900,13 +995,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// further in.
   Widget _lineEntry(
     Line line, {
+    required bool checked,
     required VoidCallback? onBox,
     required VoidCallback onTap,
   }) => AgendaEntry(
     boxKey: ValueKey('checklist-check-${line.id}'),
     textKey: ValueKey('checklist-line-${line.id}'),
     text: line.text,
-    checked: line.checked,
+    checked: checked,
     depth: line.inGroup ? 1 : 0,
     onBox: onBox,
     onTap: onTap,
@@ -940,7 +1036,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
             key: ValueKey('shopping-line-${line.id}'),
             boxKey: ValueKey('shopping-check-${line.id}'),
             text: line.text,
-            checked: false,
+            checked: _tapped[_boxKey(line: line.id)] ?? false,
             onBox: checks ? () => _checkShopping(line.id) : null,
             onTap: () => _openList(note),
           ),
@@ -971,6 +1067,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         for (final line in lines)
           _lineEntry(
             line,
+            checked: _tapped[_boxKey(line: line.id)] ?? line.checked,
             onBox: checks ? () => _checkListLine(line.id) : null,
             onTap: () => _openList(note),
           ),
@@ -1047,11 +1144,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   void _toggleFrog(Frog frog) {
-    if (frog.isDone) {
+    final key = _boxKey(frog: frog.id);
+    final done = _tapped[key] ?? frog.isDone;
+    if (done) {
       _frogs.unmarkDone(frog.id);
     } else {
       _frogs.markDone(frog.id);
     }
+    _tapped[key] = !done;
     _reload();
   }
 
@@ -1263,63 +1363,69 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   onEdit: () => _open(captured.note),
                 ),
               ],
-              _Heading(t.agendaToday),
-              if (_today.isEmpty)
-                BrowserEmpty(text: t.nothingToday)
-              else
-                ...rows(_today),
-              // Under what is due, never above it (#101).
-              if (_frogsToday case final frogs?
-                  when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
-                _FrogsHeading(onTap: _openFrogs),
-                for (final (:placed, :masked) in _frogRows)
-                  FrogRow(
-                    key: ValueKey('frog-${placed.frog.id}'),
-                    frog: placed.frog,
-                    // A Masked row tells nothing of its Area either.
-                    area: masked ? null : placed.area,
-                    title: masked ? t.maskedFrog : noteText(t, placed.note),
-                    onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
-                        ? () => _toggleFrog(placed.frog)
-                        : null,
-                    onTap: () => _openFrogNote(placed.note),
-                    onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
-                    onAnother: frogs.canSwap && !frogs.eaten
-                        ? () => _anotherFrog(placed.frog)
-                        : null,
-                  ),
-              ],
-              // The visible gap between today and tomorrow.
-              const SizedBox(height: 32),
-              Opacity(
-                opacity: AgendaScreen.tomorrowOpacity,
-                child: Column(
-                  children: [
-                    _Heading(t.agendaTomorrow),
-                    // Only today's empty day tells how to capture.
-                    if (_tomorrow.isEmpty)
-                      _NothingPlanned(t.nothingPlanned)
-                    else
-                      ...rows(_tomorrow),
-                  ],
-                ),
-              ),
-              // The days after, each under its weekday and date; one with
-              // nothing due still shows.
-              for (final (:day, rows: later) in _later) ...[
-                const SizedBox(height: 16),
+              // Nothing of the days before their first read is in (#207):
+              // no "Nothing planned" that is not so.
+              if (_days != null) ...[
+                _Heading(t.agendaToday),
+                if (_today.isEmpty)
+                  BrowserEmpty(text: t.nothingToday)
+                else
+                  ...rows(_today),
+                // Under what is due, never above it (#101).
+                if (_frogsToday case final frogs?
+                    when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
+                  _FrogsHeading(onTap: _openFrogs),
+                  for (final (:placed, :masked) in _frogRows)
+                    FrogRow(
+                      key: ValueKey('frog-${placed.frog.id}'),
+                      frog: placed.frog,
+                      // A Masked row tells nothing of its Area either.
+                      area: masked ? null : placed.area,
+                      title: masked ? t.maskedFrog : noteText(t, placed.note),
+                      done: _tapped[_boxKey(frog: placed.frog.id)],
+                      onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
+                          ? () => _toggleFrog(placed.frog)
+                          : null,
+                      onTap: () => _openFrogNote(placed.note),
+                      onMenu: (at) =>
+                          frogMenu(context, _frogs, placed.frog, at),
+                      onAnother: frogs.canSwap && !frogs.eaten
+                          ? () => _anotherFrog(placed.frog)
+                          : null,
+                    ),
+                ],
+                // The visible gap between today and tomorrow.
+                const SizedBox(height: 32),
                 Opacity(
                   opacity: AgendaScreen.tomorrowOpacity,
                   child: Column(
                     children: [
-                      _Heading(t.agendaDay(day.wall)),
-                      if (later.isEmpty)
+                      _Heading(t.agendaTomorrow),
+                      // Only today's empty day tells how to capture.
+                      if (_tomorrow.isEmpty)
                         _NothingPlanned(t.nothingPlanned)
                       else
-                        ...rows(later),
+                        ...rows(_tomorrow),
                     ],
                   ),
                 ),
+                // The days after, each under its weekday and date; one with
+                // nothing due still shows.
+                for (final (:day, rows: later) in _later) ...[
+                  const SizedBox(height: 16),
+                  Opacity(
+                    opacity: AgendaScreen.tomorrowOpacity,
+                    child: Column(
+                      children: [
+                        _Heading(t.agendaDay(day.wall)),
+                        if (later.isEmpty)
+                          _NothingPlanned(t.nothingPlanned)
+                        else
+                          ...rows(later),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ],
           ),

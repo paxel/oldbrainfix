@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
 import 'src/about_screen.dart';
+import 'src/agenda_reader.dart';
 import 'src/alarm_platform.dart';
 import 'src/alarm_sync.dart';
 import 'src/announcements.dart';
@@ -134,6 +135,9 @@ Future<void> _openAndRun(Directory dir) async {
         open: openSafFolder,
         token: RootIsolateToken.instance,
       ),
+      // The Agenda's reads and the alarms' plan there too, so the app
+      // draws on while they read (#207).
+      agendaReader: IsolateAgendaReader(path),
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,

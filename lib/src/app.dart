@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_reader.dart';
 import 'agenda_screen.dart';
 import 'alarm_platform.dart';
 import 'alarm_sync.dart';
@@ -135,6 +136,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// with [folders] and [autoJoin].
   final SyncRunner? syncRunner;
 
+  /// Where the Agenda's reads and the alarms' plan run: the app hands in
+  /// an isolate of their own (#207); without one, on [store] at once.
+  final AgendaReader agendaReader;
+
   /// Starts this Device's paired host for automatic sync; while none is
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
@@ -186,6 +191,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
     this.syncRunner,
+    this.agendaReader = const InlineAgendaReader(),
     this.pairedHost,
     this.join = lanSync,
     this.hosting = startPairingHost,
@@ -253,6 +259,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       store: widget.store,
       platform: widget.alarms,
       wallClock: deviceWallClock,
+      reader: widget.agendaReader,
     );
     // Transcripts come in the background once the model is checked.
     _transcriber = Transcriber(

@@ -265,6 +265,9 @@ fn focus(ctx: &egui::Context) {
 /// Everything the windows share while the app runs.
 struct Shell {
     store: Arc<Store>,
+    /// The Agenda's own connection, which reads it beside the window
+    /// (#207).
+    agenda_store: Arc<Store>,
     locale: &'static str,
     changes: Arc<AtomicU64>,
     events: Sender<Event>,
@@ -338,6 +341,8 @@ impl Shell {
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_syncing(self.syncing.clone());
+        let agenda = self.agenda_store.clone();
+        app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_handed_files(self.handed.clone());
@@ -825,6 +830,7 @@ fn run() -> Result<i32, String> {
 
     let system_theme = SystemTheme::follow(waker(&window));
     let shell = Shell {
+        agenda_store: own_store(&dir, &store),
         store,
         locale,
         changes,
