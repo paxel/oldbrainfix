@@ -306,5 +306,12 @@
   "fileSomeStayedCause": "In einem geteilten Bereich verschiebt nur ein Verwalter Notizen, die andere geschrieben haben, und in einen Bereich, aus dem dieser Computer herausgenommen wurde, kommt nichts hinein.",
   "fileSomeStayedFix": "Nichts ging verloren: Diese Notizen bleiben, wo sie waren. Ein Verwalter ihres Bereichs kann sie verschieben.",
   "fileSomeStayedDetails": "Abgelegt: {filed}. Geblieben, wo sie waren: {stayed}.",
-  "hideCheckedOnAgendaDetailDevice": "Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen."
+  "hideCheckedOnAgendaDetailDevice": "Eine erledigte Fälligkeit, eine abgehakte Zeile und eine Auswahl einer Einheit mit ihrem Eintrag verschwinden sofort von der Agenda, statt durchgestrichen stehen zu bleiben; eine Gruppe, in der nichts übrig ist, mit ihnen.",
+  "menuOpenPack": "Paket öffnen …",
+  "packOpenTitle": "Ein Paket öffnen",
+  "packSave": "Speichern …",
+  "packSaveTitle": "Das Paket zum Senden speichern",
+  "packNotSaved": "Das Paket wurde nicht gespeichert.",
+  "packNotSavedTitle": "Paket nicht gespeichert",
+  "packPersonAdded": "{name} wurde zu Menschen hinzugefügt."
 }

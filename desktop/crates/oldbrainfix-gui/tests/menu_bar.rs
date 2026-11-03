@@ -130,7 +130,8 @@ fn the_file_menu_reaches_new_note_quick_note_import_and_quit() -> TestResult {
     harness.run();
     assert!(!shows(&harness, "A folder…"));
 
-    // Save as Markdown… wants a Note.
+    // Open Pack… wants no Note (#165); Save as Markdown… wants one.
+    assert!(enabled(&mut harness, "File", "Open Pack…"));
     assert!(!enabled(&mut harness, "File", "Save as Markdown…"));
     assert!(!harness.state_mut().take_quit());
     pick(&mut harness, "File", "Quit");
@@ -225,6 +226,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Reminder…",
         "Make it a Checklist",
         "Send to a person",
+        "Export as Pack…",
         "History",
         "Delete",
     ] {
@@ -245,6 +247,7 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
         "Make it a Tally",
         "Send to a person",
         "Copy as text",
+        "Export as Pack…",
         "History",
         "Delete",
     ] {

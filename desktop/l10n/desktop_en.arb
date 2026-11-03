@@ -566,5 +566,19 @@
   "fileSomeStayedDetails": "Filed: {filed}. Stayed where they were: {stayed}.",
   "@fileSomeStayedDetails": {"description": "The details in the dialog behind 'fileSomeStayed': how many of the cards filed together moved and how many stayed.", "placeholders": {"filed": {"type": "int"}, "stayed": {"type": "int"}}},
   "hideCheckedOnAgendaDetailDevice": "A Done Occurrence, a checked Line and a Session's pick with its entry leave the Agenda at once instead of staying struck through; a group with nothing left goes with them.",
-  "@hideCheckedOnAgendaDetailDevice": {"description": "Under the switch hideCheckedOnAgenda in the desktop's settings (#217)."}
+  "@hideCheckedOnAgendaDetailDevice": {"description": "Under the switch hideCheckedOnAgenda in the desktop's settings (#217)."},
+  "menuOpenPack": "Open Pack…",
+  "@menuOpenPack": {"description": "In the desktop's File menu: opens a Pack file (#165)."},
+  "packOpenTitle": "Open a Pack",
+  "@packOpenTitle": {"description": "Title of the desktop's open dialog after File ▸ Open Pack… (#165)."},
+  "packSave": "Save…",
+  "@packSave": {"description": "The main button of the desktop's Export as Pack dialog, where the phone has Share…: asks where to save the Pack (#165)."},
+  "packSaveTitle": "Save the Pack to send",
+  "@packSaveTitle": {"description": "Title of the desktop's save dialog after Save… in the Export as Pack dialog (#165)."},
+  "packNotSaved": "The Pack was not saved.",
+  "@packNotSaved": {"description": "Announced at the top of the desktop when the Pack could not be written; the click opens the dialog with the cause and the fix (#165)."},
+  "packNotSavedTitle": "Pack not saved",
+  "@packNotSavedTitle": {"description": "Title of the dialog behind 'packNotSaved'."},
+  "packPersonAdded": "{name} was added to People.",
+  "@packPersonAdded": {"description": "Announced in the desktop's Pack dialog after 'Add {name} to People' (#165).", "placeholders": {"name": {"type": "String"}}}
 }

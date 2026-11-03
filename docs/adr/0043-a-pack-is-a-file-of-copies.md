@@ -55,7 +55,7 @@ A Pack has no AI port tool to make or open one (ADR 0026): like an Import (ADR 0
 
 ## The desktop
 
-The desktop core reads and writes the same bytes now (`packs.rs`). The desktop's screens follow in their own ticket (#165); until then the desktop makes and opens no Pack.
+The desktop core reads and writes the same bytes (`packs.rs`), and the desktop shows the same tree as a dialog (#165): "Export as Pack…" in the menu of an Area, a Topic and a card, in the Note menu and the Note dialog, "Save…" saving the file where the user says in place of the share sheet; "File ▸ Open Pack…" and a Pack dropped onto the window open one. It has no Area Locks, so no Area is closed to `packOf` there.
 
 ## Considered
 

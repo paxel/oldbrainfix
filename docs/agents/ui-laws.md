@@ -928,6 +928,12 @@ replace a law of Both apps where they say so. A desktop law marked
   Both apps (#226); the Sync dialog's "Bundle for",
   a dropdown beside its words (`sync_view.rs`), does not follow that
   yet.
+- **A Pack's tree is a dialog on the desktop** (#165): "Tick all" and
+  "Untick all" stand over the tree under its size, in place of the
+  phone's bar; every box, "Add my Profile" and "Claim as mine" too,
+  stands beside its words; Save… saves the file where the user says, in
+  place of Share…; "Add … to People" takes the person in and keeps the
+  dialog open.
 
 ### Cards and selection
 

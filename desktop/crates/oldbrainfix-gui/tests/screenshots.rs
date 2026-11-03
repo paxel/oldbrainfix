@@ -128,6 +128,13 @@ struct Texts {
     sent: &'static str,
     lock_here: &'static str,
     lock_there: &'static str,
+    /// The Pack Lena makes of her Fitness (#164, #165): its Topic, a
+    /// Tally, a Checklist and a Note with a Routine.
+    pack_area: &'static str,
+    pack_topic: &'static str,
+    pack_tally: &'static str,
+    pack_list: &'static str,
+    pack_stretch: &'static str,
     /// The desktop app (#178): a text kept from the command line.
     typed: &'static str,
 }
@@ -187,6 +194,11 @@ const EN: Texts = Texts {
     sent: "Lena's birthday on Saturday: bring the cake at 3",
     lock_here: "Bike lock code changed to 4-7-1-9, the blue lock",
     lock_there: "Bike lock code changed to 4-7-2-9",
+    pack_area: "Fitness",
+    pack_topic: "Running",
+    pack_tally: "Laps",
+    pack_list: "Race day\nShoes\nStart number\nWater",
+    pack_stretch: "Stretch after running",
     typed: "buy milk",
 };
 
@@ -245,6 +257,11 @@ const DE: Texts = Texts {
     sent: "Lenas Geburtstag am Samstag: den Kuchen um 3 mitbringen",
     lock_here: "Code vom Fahrradschloss geändert auf 4-7-1-9, das blaue Schloss",
     lock_there: "Code vom Fahrradschloss geändert auf 4-7-2-9",
+    pack_area: "Fitness",
+    pack_topic: "Laufen",
+    pack_tally: "Runden",
+    pack_list: "Lauftag\nSchuhe\nStartnummer\nWasser",
+    pack_stretch: "Nach dem Laufen dehnen",
     typed: "Milch kaufen",
 };
 
@@ -1247,14 +1264,6 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame(CALENDAR_APPS, "family-calendar-on-agenda"),
             )?);
-            // Packs (#164): the desktop makes and opens none yet (#165),
-            // so their boxes show its Agenda.
-            for name in ["send-pack", "open-pack"] {
-                problems.extend(match_frame(
-                    &mut harness,
-                    &box_frame("sharing-and-sync", name),
-                )?);
-            }
             harness.state_mut().select(Selection::AllRoutines);
             harness.run();
             problems.extend(match_frame(
@@ -1459,12 +1468,13 @@ fn speech_model_frame(
 }
 
 /// What [`window_with_people`] seeded: Lena's Profile id, the bike
-/// lock's Note in the Household, and the file of the Note she sent,
-/// while its folder lasts.
+/// lock's Note in the Household, and the files of the Note she sent and
+/// of the Pack she made, while their folders last.
 struct People {
     lena: String,
     note: String,
     sent: Option<(tempfile::TempDir, PathBuf)>,
+    pack: Option<(tempfile::TempDir, PathBuf)>,
 }
 
 /// How a scene of the page "Sharing and sync" starts: Lena in People;
@@ -1474,11 +1484,13 @@ struct People {
 /// computer changed the bike lock's code before they synced.
 /// With `devices`, five Devices are paired, one of them Lena's; with
 /// `folder`, a shared folder is chosen. Both push the Sync dialog's code
-/// out of view, which differs on every run.
+/// out of view, which differs on every run. With `packs`, Lena made a
+/// Pack of her Fitness with her Profile (#165): its file.
 #[derive(Clone, Copy, Default)]
 struct PeopleSeed {
     shared: bool,
     sends: bool,
+    packs: bool,
     conflict: bool,
     devices: bool,
     folder: bool,
@@ -1522,6 +1534,7 @@ fn window_with_people(
         lena: String::new(),
         note: String::new(),
         sent: None,
+        pack: None,
     };
     let harness = window_with_clock(texts, language, theme, |store, ids, now| {
         OwnProfile::new(store).apply_defaults("Sam", None)?;
@@ -1545,6 +1558,30 @@ fn window_with_people(
             std::fs::write(&path, bytes)
                 .map_err(|e| oldbrainfix_core::Error::Invalid(e.to_string()))?;
             people.sent = Some((dir, path));
+        }
+        if seed.packs {
+            let places = Places::new(&lena);
+            let fitness = places.add_area(texts.pack_area)?;
+            let running = places.add_topic(&fitness.id, texts.pack_topic)?;
+            let notes = Notes::new(&lena);
+            let laps = notes.capture(texts.pack_tally, Some(&running.id), None)?;
+            Tallies::new(&lena).add_field(&laps.id, texts.pack_tally, "", Some(10.0), None)?;
+            let list = notes.capture(texts.pack_list, Some(&running.id), None)?;
+            Checklists::new(&lena).make(&list.id)?;
+            let stretch = notes.capture(texts.pack_stretch, Some(&fitness.id), None)?;
+            let at = ClockTime::new(19, 0).into_iter().collect::<Vec<_>>();
+            let weekly = oldbrainfix_core::Recurrence::parse("FREQ=WEEKLY;BYDAY=MO,WE,FR").ok();
+            if let Some(schedule) = Schedule::new(Day::new(2026, 10, 1), &at, weekly) {
+                Routines::new(&lena).spawn(&stretch.id, &schedule)?;
+            }
+            let whole = lena.pack_of(&fitness.id, &Default::default())?;
+            let bytes = lena.write_pack(&whole, &whole.all_keys(), true)?;
+            let dir =
+                tempfile::tempdir().map_err(|e| oldbrainfix_core::Error::Invalid(e.to_string()))?;
+            let path = dir.path().join("lena.obfpack");
+            std::fs::write(&path, bytes)
+                .map_err(|e| oldbrainfix_core::Error::Invalid(e.to_string()))?;
+            people.pack = Some((dir, path));
         }
         store.open_profile_card(&card, false)?;
         if seed.shared {
@@ -1674,9 +1711,10 @@ fn sync_to(harness: &mut Harness<'static, App>, label: &str) -> TestResult {
 /// `language` and `theme`, but the AI Task's review, which
 /// [`guide_frames`] draws: the own Profile, People, Lena's Profile, the
 /// Household's Share dialog and its "Share with…", Work's People, a
-/// Note's dialog with Send…, the Sent Item Lena sent, the Sync menu,
-/// the Sync dialog's shared folder and bundles, Lena's Profile with
-/// "Send changes to Lena", and the announcement of a Conflict.
+/// Note's dialog with Send…, the Sent Item Lena sent, the Household's
+/// Export as Pack and the Pack Lena made opened, the Sync menu, the Sync
+/// dialog's shared folder and bundles, Lena's Profile with "Send changes
+/// to Lena", and the announcement of a Conflict.
 fn sharing_frames(
     texts: &Texts,
     language: &str,
@@ -1692,7 +1730,7 @@ fn sharing_frames(
         devices: true,
         ..plain
     };
-    let scenes: [(&str, PeopleSeed, PeopleScene); 14] = [
+    let scenes: [(&str, PeopleSeed, PeopleScene); 16] = [
         ("send-profile", plain, |harness, _, _| {
             harness.state_mut().open(Page::Profile);
             harness.run();
@@ -1747,6 +1785,20 @@ fn sharing_frames(
             harness.run();
             Ok(())
         }),
+        // Packs (#165): the Household's tree, and Lena's Pack opened.
+        ("send-pack", plain, |harness, _, texts| {
+            let pack = harness.state().t().export_as_pack().to_string();
+            area_menu(harness, texts.household, &pack)
+        }),
+        ("open-pack", plain, |harness, people, _| {
+            let (_, path) = people.pack.as_ref().ok_or("Lena's Pack")?;
+            harness.input_mut().dropped_files = vec![egui::DroppedFile {
+                path: Some(path.clone()),
+                ..Default::default()
+            }];
+            harness.run();
+            Ok(())
+        }),
         ("pairing", plain, |harness, _, _| {
             let sync = harness.state().t().menu_sync().to_string();
             harness
@@ -1774,6 +1826,7 @@ fn sharing_frames(
     for (name, seed, scene) in scenes {
         let seed = PeopleSeed {
             sends: name == "receive-note",
+            packs: name == "open-pack",
             conflict: name == "conflicts",
             folder: name == "shared-folder",
             ..seed
@@ -1783,7 +1836,7 @@ fn sharing_frames(
         scene(&mut harness, &people, texts)?;
         problems.extend(match_frame(&mut harness, &box_frame(name))?);
         drop(harness);
-        if let Some((dir, _)) = people.sent {
+        for (dir, _) in [people.sent, people.pack].into_iter().flatten() {
             dir.close()?;
         }
     }

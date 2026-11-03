@@ -82,6 +82,7 @@ use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
+use oldbrainfix_core::packs::{self, OpenedPack, Pack, PackError, PackFrom, PackTicks};
 use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::sent::{
@@ -139,6 +140,7 @@ use crate::media_view::{
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::pack_view::{self, PackAsk};
 use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
@@ -262,6 +264,8 @@ struct Placed {
     area: Option<Area>,
     topic: Option<Topic>,
     author: Option<Profile>,
+    /// Who the Pack it came from unclaimed is from (#164), until removed.
+    pack_from: Option<PackFrom>,
 }
 
 /// What a Note is made: a Checklist, a Shopping List or a plain Note
@@ -735,6 +739,25 @@ enum Dialog {
         may_block: bool,
         blocking: Option<Vec<String>>,
         held: Option<String>,
+    },
+    /// Export as Pack… (#165): the tree of everything `pack` may hold,
+    /// the items `ticks` ticks, and whether "Add my Profile" is ticked.
+    PackExport {
+        pack: Box<Pack>,
+        ticks: PackTicks,
+        profile: bool,
+    },
+    /// A Pack opened here (#165): its tree, the items `ticks` ticks, and
+    /// whether "Claim as mine" is ticked.
+    PackOpened {
+        opened: Box<OpenedPack>,
+        ticks: PackTicks,
+        claim: bool,
+    },
+    /// Whether the "From `name`" badge of the Note `note` goes (#165).
+    RemovePackFrom {
+        note: String,
+        name: String,
     },
     /// A stranger's Sent Item held until "Show" (#91): only who it is
     /// from, and, while "Decline and block" asks, the Shared Areas
@@ -1242,6 +1265,16 @@ enum Action {
     /// Saves the Note as a Markdown file with its photos and recordings
     /// beside it, where the user says (#129).
     SaveAsMarkdown(String),
+    /// Export as Pack… on the Area, Topic or Note (#165): its tree.
+    ExportPack(String),
+    /// Save…, Add, "Add … to People" or Cancel in a Pack's dialog.
+    Pack(PackAsk),
+    /// File ▸ Open Pack…: asks for the file and opens it (#165).
+    OpenPack,
+    /// Asks whether the "From …" badge of the Note goes (#165).
+    AskRemovePackFrom(String),
+    /// Removes the "From …" badge of the Note (#165).
+    RemovePackFrom(String),
     /// Saves the Note of the send dialog as a Sent Item.
     SendNote,
     /// Accepts the Sent Item previewed, or declines it.
@@ -1628,6 +1661,9 @@ pub struct App {
     item_saver: FileSaver,
     /// Asks where to save the own Profile card file (#144).
     card_saver: FileSaver,
+    /// Asks where to save a Pack and which one to open (#165).
+    pack_saver: FileSaver,
+    pack_opener: FolderPicker,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
     /// Asks where to save a Note as Markdown (#129).
@@ -1748,6 +1784,32 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
         oldbrainfix_core::APP_NAME,
         &[bundle::EXTENSION, sent::EXTENSION, cards::EXTENSION],
     )
+}
+
+/// The bytes of the file at `path` when it is a Pack (#165), read whole:
+/// a Pack has no size limit. None for any other file, read only as far as
+/// its first byte that is no blank when that opens no JSON object.
+fn pack_file_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut head = [0u8; 64];
+    let read = std::fs::File::open(path)
+        .and_then(|mut file| file.read(&mut head))
+        .ok()?;
+    let first = head[..read]
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))?;
+    if *first != b'{' {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    packs::looks_like_pack(&bytes).then_some(bytes)
+}
+
+/// The dialogs' filter for Pack files (#165).
+fn pack_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(oldbrainfix_core::APP_NAME, &[packs::EXTENSION])
 }
 
 /// The open dialog's filter for the zip of a Google Takeout export.
@@ -1960,6 +2022,8 @@ impl App {
             import: FolderImport::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
+            pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
+            pack_opener: Box::new(|title| pack_dialog(title).pick_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
             }),
@@ -2360,6 +2424,16 @@ impl App {
     /// file (#144).
     pub fn set_card_saver(&mut self, saver: FileSaver) {
         self.card_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save a Pack (#165).
+    pub fn set_pack_saver(&mut self, saver: FileSaver) {
+        self.pack_saver = saver;
+    }
+
+    /// Hands in the dialog asking which Pack to open (#165).
+    pub fn set_pack_opener(&mut self, opener: FolderPicker) {
+        self.pack_opener = opener;
     }
 
     /// Hands in the dialog asking where to save a calendar file.
@@ -2800,12 +2874,17 @@ impl App {
         Ok(())
     }
 
-    /// Opens the file at `path`: a Profile card file (#144) opens the
-    /// person's Profile or says why nobody was added, a Sent Item shows
-    /// its preview, a stranger's held and hidden until "Show" (#91);
-    /// anything else is imported as a bundle. A card file is JSON as a
-    /// Sent Item is, so it is asked for first.
+    /// Opens the file at `path`: a Pack (#165) shows its tree, a Profile
+    /// card file (#144) opens the person's Profile or says why nobody was
+    /// added, a Sent Item shows its preview, a stranger's held and hidden
+    /// until "Show" (#91); anything else is imported as a bundle. A Pack
+    /// and a card file are JSON as a Sent Item is, so they are asked for
+    /// first, a Pack read whole, as it has no size limit.
     fn open_file(&mut self, path: &std::path::Path) {
+        if let Some(bytes) = pack_file_bytes(path) {
+            self.open_pack(&bytes);
+            return;
+        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
         let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= most);
         let bytes = if small {
@@ -2846,6 +2925,150 @@ impl App {
                 );
             }
         }
+    }
+
+    /// Opens the Pack `bytes` (#165): its tree, everything ticked, "Claim
+    /// as mine" ticked; or why it did not open, behind the click.
+    fn open_pack(&mut self, bytes: &[u8]) {
+        let t = self.t;
+        let (why, details) = match self.store.open_pack(bytes) {
+            Ok(Ok(opened)) => {
+                let ticks = opened.pack.all_keys();
+                self.dialog = Some(Dialog::PackOpened {
+                    opened: Box::new(opened),
+                    ticks,
+                    claim: true,
+                });
+                return;
+            }
+            Ok(Err(e)) => {
+                let why = match e {
+                    PackError::NeedsUpdate => {
+                        (t.sent_item_needs_update(), t.update_open_again_fix())
+                    }
+                    PackError::FromBlocked => (t.pack_from_blocked(), t.blocked_fix()),
+                    PackError::NotAPack => (t.pack_unreadable(), t.pack_ask_again_fix()),
+                };
+                (why, format!("pack: {}", e.name()))
+            }
+            Err(e) => (
+                (t.pack_unreadable(), t.pack_ask_again_fix()),
+                format!("pack: {e}"),
+            ),
+        };
+        self.announce_failure(t.pack_not_opened(), t.pack_not_opened_title(), why, details);
+    }
+
+    /// Export as Pack… on the Area, Topic or Note `from` (#165): the tree
+    /// of what it holds, ticked as an export starts. The desktop has no
+    /// Area Locks, so no Area is closed.
+    fn export_pack(&mut self, from: &str) -> oldbrainfix_core::Result<()> {
+        let pack = self.store.pack_of(from, &HashSet::new())?;
+        let ticks = pack.export_ticks();
+        self.dialog = Some(Dialog::PackExport {
+            pack: Box::new(pack),
+            ticks,
+            profile: false,
+        });
+        Ok(())
+    }
+
+    /// What was asked in a Pack's dialog (#165).
+    fn pack_action(&mut self, asked: PackAsk) -> oldbrainfix_core::Result<()> {
+        match asked {
+            PackAsk::Cancel => self.dialog = None,
+            PackAsk::Save => self.save_pack(),
+            PackAsk::Add => self.add_pack()?,
+            PackAsk::AddPerson => self.add_pack_person()?,
+        }
+        Ok(())
+    }
+
+    /// Save… in the export: the Pack as ticked, saved where the user
+    /// says, and the dialog closed; saved says nothing, a failure is
+    /// announced and the dialog stays.
+    fn save_pack(&mut self) {
+        let Some(Dialog::PackExport {
+            pack,
+            ticks,
+            profile,
+        }) = &self.dialog
+        else {
+            return;
+        };
+        let t = self.t;
+        let day = Day::today(self.store.now(), &*self.wall);
+        let Some(mut path) = (self.pack_saver)(t.pack_save_title(), &packs::file_name(day)) else {
+            return;
+        };
+        if path.extension().is_none_or(|e| e != packs::EXTENSION) {
+            path.set_extension(packs::EXTENSION);
+        }
+        let written = match self.store.write_pack(pack, ticks, *profile) {
+            Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
+            Err(e) => Err(e.to_string()),
+        };
+        match written {
+            Ok(()) => self.dialog = None,
+            Err(e) => self.announce_failure(
+                t.pack_not_saved(),
+                t.pack_not_saved_title(),
+                (t.pack_not_written_cause(), t.nothing_lost_fix()),
+                format!("pack: {e}"),
+            ),
+        }
+    }
+
+    /// Add on a Pack opened: the ticked Notes into new Areas, the dialog
+    /// closed, how many announced.
+    fn add_pack(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::PackOpened {
+            opened,
+            ticks,
+            claim,
+        }) = &self.dialog
+        else {
+            return Ok(());
+        };
+        let t = self.t;
+        let added = self.store.add_pack(
+            opened,
+            ticks,
+            *claim,
+            &*self.wall,
+            t.pack_suffix(),
+            t.pack_no_area(),
+        )?;
+        self.dialog = None;
+        self.notice = Some(t.pack_added(added.notes as i64));
+        Ok(())
+    }
+
+    /// "Add … to People" on a Pack opened: its Profile card taken in, the
+    /// dialog kept with the person in People now; a card that adds
+    /// nobody says why.
+    fn add_pack_person(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::PackOpened { opened, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        let (Some(card), Some(from)) = (opened.pack.card.clone(), opened.from.clone()) else {
+            return Ok(());
+        };
+        let taken = self.store.open_profile_card(&card, false)?.taken;
+        if !matches!(
+            taken,
+            CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged
+        ) {
+            self.announce_card_not_added(taken, format!("pack card: {}", taken.name()));
+            return Ok(());
+        }
+        if let Some(Dialog::PackOpened { opened, .. }) = &mut self.dialog {
+            opened.from_kept = true;
+        }
+        let t = self.t;
+        let name = profile_view::display_name(&t, &from.name);
+        self.notice = Some(t.pack_person_added(name));
+        Ok(())
     }
 
     /// Shows what opening a Profile card file came to: the person's
@@ -4196,12 +4419,14 @@ impl App {
         let store = &self.store;
         let place = |note: Note| -> oldbrainfix_core::Result<Placed> {
             let author = store.author_of(&note.id)?;
+            let pack_from = store.pack_from(&note.id)?;
             let Some(id) = note.place.clone() else {
                 return Ok(Placed {
                     note,
                     area: None,
                     topic: None,
                     author,
+                    pack_from,
                 });
             };
             let topic = places.topic_by_id(&id)?;
@@ -4211,6 +4436,7 @@ impl App {
                 area: places.area_by_id(&area_id)?,
                 topic,
                 author,
+                pack_from,
             })
         };
         let frogs = Frogs::new(store);
@@ -5770,6 +5996,28 @@ impl App {
             Action::SaveAsMarkdown(id) => {
                 self.save_text()?;
                 self.save_as_markdown(&id)?;
+            }
+            Action::ExportPack(from) => {
+                self.save_text()?;
+                self.export_pack(&from)?;
+            }
+            Action::Pack(asked) => self.pack_action(asked)?,
+            Action::OpenPack => {
+                if let Some(path) = (self.pack_opener)(self.t.pack_open_title()) {
+                    self.open_file(&path);
+                }
+            }
+            Action::AskRemovePackFrom(note) => {
+                if let Some(from) = self.store.pack_from(&note)? {
+                    let name = profile_view::display_name(&self.t, &from.name).to_string();
+                    self.dialog = Some(Dialog::RemovePackFrom { note, name });
+                }
+            }
+            Action::RemovePackFrom(note) => {
+                if matches!(self.dialog, Some(Dialog::RemovePackFrom { .. })) {
+                    self.dialog = None;
+                }
+                self.store.remove_pack_from(&note)?;
             }
             Action::AcceptSent => match self.dialog.take() {
                 Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
@@ -7679,13 +7927,16 @@ impl App {
         }
         // Pictures and sound files dropped onto the window become a
         // Note; a bundle file is imported, a Sent Item previewed, a
-        // Profile card file opened, as are the files handed over from
-        // outside.
+        // Profile card file and a Pack opened, as are the files handed
+        // over from outside.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
         let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
             file.path.as_ref().is_some_and(|p| {
                 p.extension().is_some_and(|e| {
-                    e == bundle::EXTENSION || e == sent::EXTENSION || e == cards::EXTENSION
+                    e == bundle::EXTENSION
+                        || e == sent::EXTENSION
+                        || e == cards::EXTENSION
+                        || e == packs::EXTENSION
                 })
             })
         });
@@ -8000,6 +8251,8 @@ impl App {
                                 (t.share_area(), Action::Share(area.id.clone())),
                             ]);
                         }
+                        // Copies of what anyone may read (#165).
+                        items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
                         if people.is_some() {
                             items.push((t.people_title(), Action::People(area.id.clone())));
                         }
@@ -8018,14 +8271,17 @@ impl App {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
-                        if !manages {
-                            continue;
-                        }
+                        // Export as Pack… for anyone who may read it
+                        // (#165), the rest for who manages the Area.
                         resp.context_menu(|ui| {
-                            let items = [
-                                (t.rename(), Action::Rename(topic.id.clone())),
-                                (t.delete(), Action::Delete(topic.id.clone())),
-                            ];
+                            let mut items = Vec::new();
+                            if manages {
+                                items.push((t.rename(), Action::Rename(topic.id.clone())));
+                            }
+                            items.push((t.export_as_pack(), Action::ExportPack(topic.id.clone())));
+                            if manages {
+                                items.push((t.delete(), Action::Delete(topic.id.clone())));
+                            }
                             for (label, action) in items {
                                 if ui.button(RichText::new(label).color(text)).clicked() {
                                     actions.push(action);
@@ -8292,6 +8548,7 @@ impl App {
                     (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
+                    (t.menu_open_pack(), None, true, Action::OpenPack),
                     (
                         t.save_as_markdown(),
                         None,
@@ -8451,6 +8708,13 @@ impl App {
                         None,
                         may(|n| n.amends),
                         Action::CopyAsText(id.clone()),
+                    ),
+                    // Copies of what anyone may read (#165).
+                    (
+                        t.export_as_pack(),
+                        None,
+                        note.is_some(),
+                        Action::ExportPack(id.clone()),
                     ),
                 ];
                 menu_entries(ui, items, actions);
@@ -10151,6 +10415,13 @@ impl App {
                     {
                         actions.push(Action::SaveAsMarkdown(note.id.clone()));
                     }
+                    // Copies of it for another person (#165).
+                    if ui
+                        .button(RichText::new(t.export_as_pack()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::ExportPack(note.id.clone()));
+                    }
                 });
                 if !may.changes {
                     return;
@@ -10433,6 +10704,34 @@ impl App {
                         cancel,
                         ..
                     } => send_form(ui, &t, recipients, (picked, *update, cancel), actions),
+                    Dialog::PackExport {
+                        pack,
+                        ticks,
+                        profile,
+                    } => {
+                        let mut asked = None;
+                        pack_view::export_form(ui, &t, pack, (ticks, profile), &mut asked);
+                        actions.extend(asked.map(Action::Pack));
+                    }
+                    Dialog::PackOpened {
+                        opened,
+                        ticks,
+                        claim,
+                    } => {
+                        let mut asked = None;
+                        let shown = (opened.as_ref(), &mut *pictures);
+                        pack_view::import_form(ui, &t, shown, (ticks, claim), &mut asked);
+                        actions.extend(asked.map(Action::Pack));
+                    }
+                    Dialog::RemovePackFrom { note, name } => {
+                        title(ui, &t.remove_pack_from(name));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove()) {
+                                actions.push(Action::RemovePackFrom(note.clone()));
+                            }
+                        });
+                    }
                     Dialog::SentItem {
                         opened,
                         blocking: Some(areas),
@@ -14658,6 +14957,15 @@ fn note_badges(
         if badge(ui, look, icon, t.captured_heading(), value, true).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Captured)));
         }
+        // Who the Pack it came from is from, until removed (#165).
+        if let Some(from) = &placed.pack_from {
+            let said = t.pack_from(profile_view::display_name(t, &from.name));
+            let icon = (pack_view::PACK_ICON, None);
+            let value = Some(BadgeValue::Text(&said));
+            if badge(ui, look, icon, t.pack_title(), value, changes).clicked() {
+                actions.push(Action::AskRemovePackFrom(note.id.clone()));
+            }
+        }
         for routine in shown.routines {
             let (icon, setting) = if routine.is_reminder() {
                 (icons::REMINDER, t.reminder())
@@ -15981,6 +16289,15 @@ fn note_card(
                     }
                 });
             });
+            // Who the Pack it came from unclaimed is from, until
+            // removed (#165).
+            if let Some(from) = &placed.pack_from {
+                ui.horizontal(|ui| {
+                    icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
+                    let said = t.pack_from(profile_view::display_name(t, &from.name));
+                    ui.label(RichText::new(said).size(13.0).color(weak));
+                });
+            }
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.
             let place = match place_line(t, placed) {
@@ -16324,6 +16641,22 @@ fn note_card(
             .clicked()
         {
             picked = Some(Action::SaveAsMarkdown(note.id.clone()));
+        }
+        // Copies for another person (#165), and who they came from.
+        if ui
+            .button(RichText::new(t.export_as_pack()).color(text))
+            .clicked()
+        {
+            picked = Some(Action::ExportPack(note.id.clone()));
+        }
+        if let Some(from) = placed.pack_from.as_ref().filter(|_| look.changes) {
+            let name = profile_view::display_name(t, &from.name);
+            if ui
+                .button(RichText::new(t.remove_pack_from(name)).color(text))
+                .clicked()
+            {
+                picked = Some(Action::RemovePackFrom(note.id.clone()));
+            }
         }
         // Who ticked each box last and when (ADR 0035), where it has any.
         if has_boxes {

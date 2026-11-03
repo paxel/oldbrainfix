@@ -51,6 +51,7 @@ pub mod names;
 pub mod navigation;
 pub mod note_history_view;
 pub mod notify;
+pub mod pack_view;
 pub mod paste;
 pub mod person_view;
 pub mod photo_out;
