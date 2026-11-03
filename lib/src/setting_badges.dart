@@ -6,7 +6,8 @@ import 'l10n.dart';
 /// a shield: the setting's icon, the same for every value, then its
 /// current value (#192), as [valueIcon] where the setting has a fixed set
 /// of values, as short text otherwise, never both. A screen reader reads
-/// it as "setting: value" in words. [onTap] gets where the finger was,
+/// it as "setting: value" in words, [valueWords] where the short text is
+/// no words, such as "4w" for "4 weeks". [onTap] gets where the finger was,
 /// so a menu can open there; without it the badge only shows the value.
 class SettingBadge extends StatefulWidget {
   /// The setting's name in words, for the screen reader.
@@ -19,6 +20,10 @@ class SettingBadge extends StatefulWidget {
   /// The value's icon, for a setting with a fixed set of values, such as
   /// the kind or the Importance; the screen reader still reads [value].
   final IconData? valueIcon;
+
+  /// The value in words for the screen reader, where [value] is short for
+  /// them.
+  final String? valueWords;
 
   /// The setting's icon, the same in the badge and its editor; [iconWidget]
   /// draws one that is no [IconData], such as the frog.
@@ -34,6 +39,7 @@ class SettingBadge extends StatefulWidget {
     required this.setting,
     required this.value,
     this.valueIcon,
+    this.valueWords,
     this.icon,
     this.iconWidget,
     this.iconColour,
@@ -78,7 +84,10 @@ class _SettingBadgeState extends State<SettingBadge> {
       button: widget.onTap != null,
       label: value == null
           ? widget.setting
-          : context.t.settingBadgeLabel(widget.setting, value),
+          : context.t.settingBadgeLabel(
+              widget.setting,
+              widget.valueWords ?? value,
+            ),
       excludeSemantics: true,
       onTap: widget.onTap == null ? null : _tapped,
       child: Material(

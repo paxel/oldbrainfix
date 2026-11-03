@@ -33,9 +33,21 @@ void main() {
   });
 
   /// A Shopping List made from a new Note with [text]; returns the Note.
-  String shopping(Store store, String text, {String? place}) {
+  /// With [weekly] each of its Lines comes back a week after its check.
+  String shopping(
+    Store store,
+    String text, {
+    String? place,
+    bool weekly = false,
+  }) {
     final id = Notes(store).capture(text, place: place).id;
-    ShoppingLists(store).make(id);
+    final lists = ShoppingLists(store);
+    lists.make(id);
+    if (weekly) {
+      for (final line in lists.byNote(id, _wall)!.lines) {
+        lists.setReappear(line.id, Reappear.after(1, ReappearUnit.week));
+      }
+    }
     return id;
   }
 
@@ -72,9 +84,9 @@ void main() {
       expect(list.count, 5);
       expect(list.openCount, 4);
       expect(list.struckCount, 1);
-      expect(list.lines.map((l) => l.reappear).toSet(), {Reappear.week1});
+      expect(list.lines.map((l) => l.reappear).toSet(), {Reappear.unset});
       for (final l in list.lines) {
-        expect(ann.current(l.id, ShoppingKeys.reappear), '1w');
+        expect(ann.current(l.id, ShoppingKeys.reappear), 'none');
         expect(ann.current(l.id, ChecklistKeys.indent), isNull);
       }
       expect(lists.isShoppingList(note.id), isTrue);
@@ -134,17 +146,21 @@ void main() {
       final one = idOf(ann, note, 'One');
       for (final code in ['0', '5', 'x', '', '1W', null]) {
         ann.append(one, ShoppingKeys.reappear, code);
-        expect(lineOf(ann, note, 'One').reappear, Reappear.week1, reason: code);
+        expect(
+          lineOf(ann, note, 'One').reappear,
+          Reappear.after(1, ReappearUnit.week),
+          reason: code,
+        );
       }
       expect(Reappear.read('once'), Reappear.once);
-      expect(Reappear.read('4w'), Reappear.week4);
+      expect(Reappear.read('4w'), Reappear.after(4, ReappearUnit.week));
     });
   });
 
   group('checking', () {
     test('a checked Line goes to the end struck with its day back, and is '
         'open at the top from the start of that day, nothing written', () {
-      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea');
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea', weekly: true);
       final lists = ShoppingLists(ann);
       lists.check(idOf(ann, note, 'Milk'), _wall);
       expect(shown(ann, note), ['Eggs', 'Tea', '~Milk']);
@@ -164,7 +180,7 @@ void main() {
     });
 
     test('the day back follows the wall clock, not UTC', () {
-      final note = shopping(ann, 'Shop\nMilk');
+      final note = shopping(ann, 'Shop\nMilk', weekly: true);
       // 22:30 UTC on Wednesday is 00:30 on Thursday two hours ahead.
       DateTime twoAhead(DateTime utc) => utc.add(const Duration(hours: 2));
       clock.set(DateTime.utc(2026, 3, 4, 22, 30));
@@ -181,12 +197,25 @@ void main() {
     });
 
     test('each reappear time, and Once is gone', () {
-      final note = shopping(ann, 'Shop\nOnce\nOne\nTwo\nThree\nFour');
+      final note = shopping(
+        ann,
+        'Shop\nOnce\nOne\nTwo\nThree\nFour',
+        weekly: true,
+      );
       final lists = ShoppingLists(ann);
       lists.setReappear(idOf(ann, note, 'Once'), Reappear.once);
-      lists.setReappear(idOf(ann, note, 'Two'), Reappear.week2);
-      lists.setReappear(idOf(ann, note, 'Three'), Reappear.week3);
-      lists.setReappear(idOf(ann, note, 'Four'), Reappear.week4);
+      lists.setReappear(
+        idOf(ann, note, 'Two'),
+        Reappear.after(2, ReappearUnit.week),
+      );
+      lists.setReappear(
+        idOf(ann, note, 'Three'),
+        Reappear.after(3, ReappearUnit.week),
+      );
+      lists.setReappear(
+        idOf(ann, note, 'Four'),
+        Reappear.after(4, ReappearUnit.week),
+      );
       for (final text in ['Once', 'One', 'Two', 'Three', 'Four']) {
         lists.check(idOf(ann, note, text), _wall);
       }
@@ -210,7 +239,7 @@ void main() {
 
     test('the open Lines keep their order, the struck one checked last at '
         'the end; unchecking brings one back now, in its place', () {
-      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice');
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice', weekly: true);
       final lists = ShoppingLists(ann);
       lists.check(idOf(ann, note, 'Eggs'), _wall);
       lists.check(idOf(ann, note, 'Milk'), _wall);
@@ -250,7 +279,7 @@ void main() {
       final desk = own.device(clock.call);
       addTearDown(phone.close);
       addTearDown(desk.close);
-      final note = shopping(phone, 'Shop\nMilk\nEggs\nTea');
+      final note = shopping(phone, 'Shop\nMilk\nEggs\nTea', weekly: true);
       ShoppingLists(phone).check(idOf(phone, note, 'Tea'), _wall);
       own.exchange(phone, desk);
       ShoppingLists(desk).check(idOf(desk, note, 'Milk'), _wall);
@@ -265,7 +294,7 @@ void main() {
   group('on the Agenda', () {
     test('a Line came back on the day its check runs out, not when brought '
         'back by hand or by its name', () {
-      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice');
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice', weekly: true);
       final lists = ShoppingLists(ann);
       for (final text in ['Milk', 'Eggs', 'Tea']) {
         lists.check(idOf(ann, note, text), _wall);
@@ -292,19 +321,23 @@ void main() {
   });
 
   group('adding', () {
-    test('a new name comes in at the end with a week', () {
+    test('a new name comes in at the end without a reappear time', () {
       final note = shopping(ann, 'Shop\nMilk');
       final lists = ShoppingLists(ann);
       final tea = lists.add(note, '  Tea\n', _wall);
       expect(shown(ann, note), ['Milk', 'Tea']);
       expect(lineOf(ann, note, 'Tea').id, tea);
-      expect(lineOf(ann, note, 'Tea').reappear, Reappear.week1);
+      expect(lineOf(ann, note, 'Tea').reappear, Reappear.unset);
       expect(() => lists.add(note, '  ', _wall), throwsArgumentError);
     });
 
     test('a new name comes in where it is told among the open Lines, before '
         'the struck ones after the Line above as they come back', () {
-      final note = shopping(ann, 'Shop\nMilk\nEggs\nHam\nJam\nTea');
+      final note = shopping(
+        ann,
+        'Shop\nMilk\nEggs\nHam\nJam\nTea',
+        weekly: true,
+      );
       final lists = ShoppingLists(ann);
       for (final text in ['Eggs', 'Ham', 'Jam']) {
         lists.check(idOf(ann, note, text), _wall);
@@ -414,6 +447,145 @@ void main() {
     });
   });
 
+  group('reappear times (#195)', () {
+    Reappear after(int count, ReappearUnit unit) => Reappear.after(count, unit);
+
+    test('a new Line has none: once checked it stays struck, with no day '
+        'back, until a time is set, which counts from its check', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs');
+      final lists = ShoppingLists(ann);
+      final milk = idOf(ann, note, 'Milk');
+      expect(lineOf(ann, note, 'Milk').reappear, Reappear.unset);
+      lists.check(milk, _wall);
+      expect(lineOf(ann, note, 'Milk').struck, isTrue);
+      expect(lineOf(ann, note, 'Milk').backOn, isNull);
+      // A year on, still struck.
+      clock.set(DateTime.utc(2027, 3, 5, 10));
+      expect(shown(ann, note), ['Eggs', '~Milk']);
+      // Ten days after the check, a week makes it back since the 12th.
+      clock.set(DateTime.utc(2026, 3, 15, 10));
+      lists.setReappear(milk, after(1, ReappearUnit.week));
+      expect(shown(ann, note), ['Milk', 'Eggs']);
+      expect(lineOf(ann, note, 'Milk').cameBackOn, Day(2026, 3, 12));
+      // A month instead: struck again until the 5th of April.
+      lists.setReappear(milk, after(1, ReappearUnit.month));
+      expect(shown(ann, note), ['Eggs', '~Milk']);
+      expect(lineOf(ann, note, 'Milk').backOn, Day(2026, 4, 5));
+      lists.setReappear(milk, Reappear.unset);
+      expect(ann.current(milk, ShoppingKeys.reappear), 'none');
+      expect(lineOf(ann, note, 'Milk').backOn, isNull);
+    });
+
+    test('days and weeks count on, months and years go by the calendar, to '
+        'the last day of a shorter month', () {
+      // Saturday the 31st of January on the wall.
+      clock.set(DateTime.utc(2026, 1, 31, 10));
+      final note = shopping(ann, 'Shop\nA\nB\nC\nD\nE\nF');
+      final lists = ShoppingLists(ann);
+      final times = {
+        'A': after(1, ReappearUnit.day),
+        'B': after(6, ReappearUnit.week),
+        'C': after(1, ReappearUnit.month),
+        'D': after(13, ReappearUnit.month),
+        'E': after(1, ReappearUnit.year),
+        'F': after(99, ReappearUnit.day),
+      };
+      for (final MapEntry(key: text, value: time) in times.entries) {
+        lists.setReappear(idOf(ann, note, text), time);
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      expect(
+        {for (final t in times.keys) t: lineOf(ann, note, t).backOn},
+        {
+          'A': Day(2026, 2, 1),
+          'B': Day(2026, 3, 14),
+          'C': Day(2026, 2, 28),
+          'D': Day(2027, 2, 28),
+          'E': Day(2027, 1, 31),
+          'F': Day(2026, 5, 10),
+        },
+      );
+      // At the start of the 28th of February on the wall, C is back.
+      clock.set(DateTime.utc(2026, 2, 27, 23));
+      expect(lineOf(ann, note, 'C').struck, isFalse);
+      expect(lineOf(ann, note, 'C').cameBackOn, Day(2026, 2, 28));
+      expect(lineOf(ann, note, 'B').struck, isTrue);
+      // A leap day a year on is the 28th, four years on the 29th.
+      final leap = Day(2028, 2, 29);
+      expect(after(1, ReappearUnit.year).backFrom(leap), Day(2029, 2, 28));
+      expect(after(4, ReappearUnit.year).backFrom(leap), Day(2032, 2, 29));
+      expect(after(1, ReappearUnit.month).backFrom(leap), Day(2028, 3, 29));
+      expect(
+        after(11, ReappearUnit.month).backFrom(Day(2026, 3, 31)),
+        Day(2027, 2, 28),
+      );
+      expect(Reappear.unset.backFrom(leap), isNull);
+      expect(Reappear.once.backFrom(leap), isNull);
+    });
+
+    test('the week values of before are kept and read as weeks, and reading '
+        'writes nothing', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea');
+      final lists = ShoppingLists(ann);
+      // As a version before #195 wrote them.
+      for (final (text, code) in [('Milk', '1w'), ('Eggs', '4w')]) {
+        ann.append(idOf(ann, note, text), ShoppingKeys.reappear, code);
+      }
+      ann.append(idOf(ann, note, 'Tea'), ShoppingKeys.reappear, null);
+      for (final text in ['Milk', 'Eggs', 'Tea']) {
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      final before = ann.allEntries().length;
+      expect(lineOf(ann, note, 'Milk').reappear, after(1, ReappearUnit.week));
+      expect(lineOf(ann, note, 'Eggs').reappear, after(4, ReappearUnit.week));
+      expect(lineOf(ann, note, 'Tea').reappear, Reappear.fallback);
+      expect(lineOf(ann, note, 'Milk').backOn, Day(2026, 3, 12));
+      expect(lineOf(ann, note, 'Eggs').backOn, Day(2026, 4, 2));
+      expect(lineOf(ann, note, 'Tea').backOn, Day(2026, 3, 12));
+      expect(ann.allEntries().length, before);
+      expect(ann.current(idOf(ann, note, 'Eggs'), ShoppingKeys.reappear), '4w');
+    });
+
+    test('codes as stored, and those no app writes read as a week', () {
+      final codes = {
+        'none': Reappear.unset,
+        'once': Reappear.once,
+        '1d': after(1, ReappearUnit.day),
+        '20w': after(20, ReappearUnit.week),
+        '3m': after(3, ReappearUnit.month),
+        '99y': after(99, ReappearUnit.year),
+      };
+      for (final MapEntry(key: code, value: time) in codes.entries) {
+        expect(Reappear.read(code), time, reason: code);
+        expect(time.code, code);
+      }
+      for (final code in [
+        null,
+        '',
+        '0w',
+        '01w',
+        '100d',
+        '1W',
+        ' 1w',
+        '1w ',
+        'w1',
+        '1 w',
+        '5',
+        '1x',
+        '٣w',
+        'None',
+      ]) {
+        expect(Reappear.read(code), Reappear.fallback, reason: code);
+      }
+      expect(Reappear.fallback, after(1, ReappearUnit.week));
+      expect(() => after(0, ReappearUnit.day), throwsRangeError);
+      expect(() => after(100, ReappearUnit.day), throwsRangeError);
+      expect(Reappear.unset.isUnset, isTrue);
+      expect(Reappear.once.isUnset, isFalse);
+      expect(Reappear.once.isOnce, isTrue);
+    });
+  });
+
   group('editing', () {
     test('Lines are renamed, deleted and restored, and their reappear time '
         'set', () {
@@ -424,10 +596,13 @@ void main() {
       expect(shown(ann, note), ['Oat milk', 'Eggs']);
       final before = ann.allEntries().length;
       lists.rename(milk, ' Oat milk ');
-      lists.setReappear(milk, Reappear.week1);
+      lists.setReappear(milk, Reappear.unset);
       expect(ann.allEntries().length, before);
-      lists.setReappear(milk, Reappear.week3);
-      expect(lineOf(ann, note, 'Oat milk').reappear, Reappear.week3);
+      lists.setReappear(milk, Reappear.after(3, ReappearUnit.week));
+      expect(
+        lineOf(ann, note, 'Oat milk').reappear,
+        Reappear.after(3, ReappearUnit.week),
+      );
       lists.delete(milk);
       expect(shown(ann, note), ['Eggs']);
       expect(() => lists.rename(milk, 'x'), throwsArgumentError);
@@ -447,7 +622,7 @@ void main() {
       expect(Notes(ann).byId(note)!.text, 'Shop\nEggs\n✓ Milk');
       lists.make(note);
       expect(shown(ann, note), ['Eggs', '~Milk']);
-      expect(lineOf(ann, note, 'Milk').reappear, Reappear.week1);
+      expect(lineOf(ann, note, 'Milk').reappear, Reappear.unset);
     });
 
     test('search finds a Note by its Lines, not by those gone', () {
@@ -500,7 +675,7 @@ void main() {
       exchange(ben, ann);
       final held = ann.allEntries().map((e) => e.id).toSet();
       expect(held.containsAll([for (final e in forged) e.id]), isTrue);
-      expect(lineOf(ann, note, 'Milk').reappear, Reappear.week1);
+      expect(lineOf(ann, note, 'Milk').reappear, Reappear.unset);
       expect(shown(ann, note), ['Milk', 'Bread', '~Eggs']);
       ann.setRole(
         area,
@@ -508,9 +683,12 @@ void main() {
         AreaRole.manager,
       );
       exchange(ben, ann);
-      lists.setReappear(milk, Reappear.week2);
+      lists.setReappear(milk, Reappear.after(2, ReappearUnit.week));
       exchange(ben, ann);
-      expect(lineOf(ann, note, 'Milk').reappear, Reappear.week2);
+      expect(
+        lineOf(ann, note, 'Milk').reappear,
+        Reappear.after(2, ReappearUnit.week),
+      );
     });
   });
 
@@ -562,7 +740,7 @@ void main() {
       ShoppingLists(ann).switchList(note, _wall);
       expect(Checklists(ann).byNote(note), isNull);
       expect(shown(ann, note), ['Passport', 'Socks', '~Tickets']);
-      expect(lineOf(ann, note, 'Socks').reappear, Reappear.week1);
+      expect(lineOf(ann, note, 'Socks').reappear, Reappear.unset);
       expect(writes(ann, note, NoteKeys.text), texts, reason: 'no text');
       expect(Notes(ann).byId(note)!.text, 'Trip');
     });
@@ -662,7 +840,10 @@ void main() {
     test('carries the Lines that show with their reappear times, in format '
         '2, and they all arrive open in a Shopping List in Unsorted', () {
       final note = shopping(ann, 'Shop\nMilk\nBread\nEggs');
-      ShoppingLists(ann).setReappear(idOf(ann, note, 'Eggs'), Reappear.week2);
+      ShoppingLists(ann).setReappear(
+        idOf(ann, note, 'Eggs'),
+        Reappear.after(2, ReappearUnit.week),
+      );
       ShoppingLists(ann).setReappear(idOf(ann, note, 'Bread'), Reappear.once);
       ShoppingLists(ann).check(idOf(ann, note, 'Bread'), _wall);
       ShoppingLists(ann).check(idOf(ann, note, 'Milk'), _wall);
@@ -672,12 +853,15 @@ void main() {
       expect(opened.item.shopping, isTrue);
       expect(
         [for (final l in opened.item.lines!) '${l.text} ${l.reappear!.code}'],
-        ['Eggs 2w', 'Milk 1w'],
+        ['Eggs 2w', 'Milk none'],
       );
       final got = acceptSentItem(ben, opened.item)!;
       expect(shown(ben, got), ['Eggs', 'Milk']);
-      expect(lineOf(ben, got, 'Eggs').reappear, Reappear.week2);
-      expect(lineOf(ben, got, 'Milk').reappear, Reappear.week1);
+      expect(
+        lineOf(ben, got, 'Eggs').reappear,
+        Reappear.after(2, ReappearUnit.week),
+      );
+      expect(lineOf(ben, got, 'Milk').reappear, Reappear.unset);
       expect(Checklists(ben).byNote(got), isNull);
       expect(Notes(ben).byId(got)!.isUnsorted, isTrue);
     });

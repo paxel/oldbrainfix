@@ -124,6 +124,9 @@ void main() {
       shopping(ann, 'Title only');
       lists.setOnAgenda(week, ShoppingOnAgenda.lines);
       lists.setReappear(idOf(ann, week, 'Eggs'), Reappear.once);
+      final weekly = Reappear.after(1, ReappearUnit.week);
+      lists.setReappear(idOf(ann, week, 'Milk'), weekly);
+      lists.setReappear(idOf(ann, hardware, 'Nails'), weekly);
       for (final text in ['Milk', 'Eggs']) {
         lists.check(idOf(ann, week, text), _wall);
       }

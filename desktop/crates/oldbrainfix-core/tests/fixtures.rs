@@ -31,11 +31,11 @@ use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, CapturedDetail, Checklist, Checklists, ClockTime,
     Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, ListOnAgenda, Note,
-    Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, Recurrence, RepeatKind, Routine,
-    RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
-    ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, SimpleRepeat,
-    Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso,
-    parse_time,
+    Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, ReappearUnit, Recurrence,
+    RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section,
+    SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda,
+    SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule,
+    UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -3503,11 +3503,26 @@ fn write_shopping_lists(store: &Store) -> Built {
         )?
         .id;
     lists.make(&week)?;
+    for text in ["Milk", "Tea", "Bread"] {
+        lists.set_reappear(&line(&week, text)?, Reappear::FALLBACK)?;
+    }
     lists.set_reappear(&line(&week, "Eggs")?, Reappear::Once)?;
-    lists.set_reappear(&line(&week, "Apples")?, Reappear::Week2)?;
-    lists.set_reappear(&line(&week, "Coffee")?, Reappear::Week3)?;
-    lists.set_reappear(&line(&week, "Rice")?, Reappear::Week4)?;
-    lists.set_reappear(&line(&week, "Rice")?, Reappear::Week4)?;
+    lists.set_reappear(
+        &line(&week, "Apples")?,
+        Reappear::After(2, ReappearUnit::Week),
+    )?;
+    lists.set_reappear(
+        &line(&week, "Coffee")?,
+        Reappear::After(3, ReappearUnit::Week),
+    )?;
+    lists.set_reappear(
+        &line(&week, "Rice")?,
+        Reappear::After(4, ReappearUnit::Week),
+    )?;
+    lists.set_reappear(
+        &line(&week, "Rice")?,
+        Reappear::After(4, ReappearUnit::Week),
+    )?;
     for text in ["Milk", "Eggs", "Apples", "Coffee", "Rice"] {
         lists.check(&line(&week, text)?, &wall)?;
     }
@@ -3588,6 +3603,32 @@ fn write_shopping_lists(store: &Store) -> Built {
     )?;
     let odd = notes.capture("Odd kind\nOne", None, None)?.id;
     store.append(&odd, keys::KIND, Some("shopping:a:b"), None)?;
+    // On the 31st of January (#195): days, weeks, a month to the last of
+    // February, a year, none, and none given a day after its check.
+    jump(Duration::days(23));
+    let pantry = notes
+        .capture(
+            "Pantry\nYeast\nFlour\nHoney\nSoap\nWax\nMatches",
+            None,
+            None,
+        )?
+        .id;
+    lists.make(&pantry)?;
+    for (text, time) in [
+        ("Yeast", Reappear::After(3, ReappearUnit::Day)),
+        ("Flour", Reappear::After(6, ReappearUnit::Week)),
+        ("Honey", Reappear::After(1, ReappearUnit::Month)),
+        ("Soap", Reappear::After(1, ReappearUnit::Year)),
+    ] {
+        lists.set_reappear(&line(&pantry, text)?, time)?;
+    }
+    for text in ["Yeast", "Flour", "Honey", "Soap", "Wax", "Matches"] {
+        lists.check(&line(&pantry, text)?, &wall)?;
+    }
+    lists.set_reappear(
+        &line(&pantry, "Matches")?,
+        Reappear::After(1, ReappearUnit::Day),
+    )?;
     let errand = Routines::new(store).spawn(&week, &schedule(Day::new(2026, 1, 9), &[], None)?)?;
     let check = keys::check_for(
         &Occurrence::new(Day::new(2026, 1, 9), None),

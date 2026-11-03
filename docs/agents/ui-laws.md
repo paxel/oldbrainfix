@@ -654,8 +654,15 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   also the next time; a Line checked while the editor is open stays in
   its row, and shows below the open ones the next time. A name the list
   has already brings its Line back instead of a second.
-- ⋮ of a Line holds the rest (moving it, its reappear time, Delete); a
-  long press in a Line's text selects, as in any field.
+- ⋮ of a Line holds the rest (moving it, Delete); a long press in a
+  Line's text selects, as in any field.
+- **A Shopping List's Line ends in its reappear time badge** (#195),
+  before ⋮, in the editor: short text, "—" for none, "Once", "4w",
+  "3m", read as "Reappear time: 4 weeks". A tap opens its dialog: None,
+  Once or After as radio buttons, After with a number from 1 to 99 (−
+  and +) and Day, Week, Month or Year under it, each change written at
+  once, then Close. Where this Device may not change the Line, the badge
+  only shows it; a new Line's badge stores it first.
 
 ## The bar
 

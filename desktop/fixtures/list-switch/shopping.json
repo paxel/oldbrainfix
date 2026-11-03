@@ -9,7 +9,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -19,7 +19,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -29,10 +29,10 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
-              "backOn": "2026-01-08",
+              "backOn": null,
               "cameBackOn": null,
               "order": "X"
             }
@@ -47,7 +47,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -57,7 +57,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -177,7 +177,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -187,7 +187,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -197,17 +197,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -215,7 +215,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -225,7 +225,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -239,7 +239,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -249,8 +249,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -268,8 +267,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -287,8 +285,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -306,8 +303,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -326,8 +322,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -350,7 +345,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -360,7 +355,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -370,17 +365,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -388,7 +383,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -398,7 +393,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -412,7 +407,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -422,8 +417,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -441,8 +435,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -460,8 +453,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -479,8 +471,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -499,8 +490,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -523,7 +513,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -533,7 +523,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -543,17 +533,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -561,7 +551,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -571,7 +561,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -585,7 +575,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -595,8 +585,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -614,8 +603,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -633,8 +621,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -652,8 +639,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -672,8 +658,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -696,7 +681,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -706,7 +691,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -716,17 +701,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -734,7 +719,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -744,7 +729,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -758,7 +743,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -768,8 +753,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -787,8 +771,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -806,8 +789,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -825,8 +807,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -845,8 +826,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -869,7 +849,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -879,7 +859,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -889,17 +869,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -907,7 +887,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -917,7 +897,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -931,7 +911,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -941,8 +921,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -960,8 +939,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -979,8 +957,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -998,8 +975,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1018,8 +994,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1042,7 +1017,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1052,7 +1027,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1062,17 +1037,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -1080,7 +1055,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1090,7 +1065,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1104,7 +1079,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -1114,8 +1089,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1133,8 +1107,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1152,8 +1125,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1171,8 +1143,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1191,8 +1162,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1215,7 +1185,7 @@
             {
               "id": "line:00000000000000000000000000000007",
               "text": "Passport",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1225,7 +1195,7 @@
             {
               "id": "line:00000000000000000000000000000008",
               "text": "Socks",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1235,17 +1205,17 @@
             {
               "id": "line:00000000000000000000000000000009",
               "text": "Tickets",
-              "reappear": "1w",
-              "struck": false,
+              "reappear": "none",
+              "struck": true,
               "checkedAt": "2026-01-01T10:00:31.000Z",
               "backOn": null,
-              "cameBackOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "X"
             }
           ],
           "count": 3,
-          "openCount": 3,
-          "struckCount": 0
+          "openCount": 2,
+          "struckCount": 1
         },
         "note:00000000000000000000000000000012": {
           "making": "00000000000000000000000000000019",
@@ -1253,7 +1223,7 @@
             {
               "id": "line:0000000000000000000000000000001a",
               "text": "Nails",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1263,7 +1233,7 @@
             {
               "id": "line:0000000000000000000000000000001b",
               "text": "Glue",
-              "reappear": "1w",
+              "reappear": "none",
               "struck": false,
               "checkedAt": null,
               "backOn": null,
@@ -1277,7 +1247,7 @@
         }
       },
       "plain": {
-        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\nTickets",
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
         "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
       },
       "agenda": {
@@ -1287,8 +1257,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1306,8 +1275,7 @@
             "shows": "lines",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1325,8 +1293,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1344,8 +1311,7 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1364,8 +1330,847 @@
             "shows": "count",
             "lines": [
               "line:00000000000000000000000000000007",
-              "line:00000000000000000000000000000008",
-              "line:00000000000000000000000000000009"
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-01-31T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-02-02T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-02-27T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2026-03-13T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "now": "2027-01-30T23:00:00.000Z",
+      "lists": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000006",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000007",
+              "text": "Passport",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000008",
+              "text": "Socks",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Tickets",
+              "reappear": "none",
+              "struck": true,
+              "checkedAt": "2026-01-01T10:00:31.000Z",
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "X"
+            }
+          ],
+          "count": 3,
+          "openCount": 2,
+          "struckCount": 1
+        },
+        "note:00000000000000000000000000000012": {
+          "making": "00000000000000000000000000000019",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000001a",
+              "text": "Nails",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000001b",
+              "text": "Glue",
+              "reappear": "none",
+              "struck": false,
+              "checkedAt": null,
+              "backOn": null,
+              "cameBackOn": null,
+              "order": "W"
+            }
+          ],
+          "count": 2,
+          "openCount": 2,
+          "struckCount": 0
+        }
+      },
+      "plain": {
+        "note:00000000000000000000000000000001": "Trip\nfor the weekend\nPassport\nSocks\n✓ Tickets",
+        "note:00000000000000000000000000000012": "Hardware\nNails\nGlue"
+      },
+      "agenda": {
+        "none": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "lines",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "lines",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
+            ]
+          },
+          {
+            "note": "note:00000000000000000000000000000012",
+            "shows": "count",
+            "lines": [
+              "line:0000000000000000000000000000001a",
+              "line:0000000000000000000000000000001b"
+            ]
+          }
+        ],
+        "off": [],
+        "sideways": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "shows": "count",
+            "lines": [
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000008"
             ]
           },
           {
@@ -1430,14 +2235,25 @@
   "routines": [],
   "reappear": {
     "once": "once",
+    "none": "none",
     "1w": "1w",
     "2w": "2w",
     "3w": "3w",
     "4w": "4w",
+    "1d": "1d",
+    "20w": "20w",
+    "3m": "3m",
+    "99y": "99y",
     "0": "1w",
     "5": "1w",
     "x": "1w",
-    "": "1w"
+    "": "1w",
+    "0w": "1w",
+    "01w": "1w",
+    "100d": "1w",
+    "1W": "1w",
+    "w1": "1w",
+    "1 w": "1w"
   },
   "names": {
     " Milk ": "milk",

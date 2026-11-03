@@ -1210,11 +1210,11 @@ impl Store {
                     at: Some(at),
                 },
             )?;
-            let reappear = l.reappear.unwrap_or(Reappear::STANDARD);
+            let reappear = l.reappear.unwrap_or(Reappear::FALLBACK);
             self.append(
                 &id,
                 shopping_keys::REAPPEAR,
-                Some(reappear.code()),
+                Some(&reappear.code()),
                 Some(at),
             )?;
         }

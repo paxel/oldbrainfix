@@ -3435,6 +3435,65 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get shoppingReappearNone => 'Keine';
+
+  @override
+  String get shoppingReappearAfter => 'Nach';
+
+  @override
+  String shoppingDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Tage',
+      one: '1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Monate',
+      one: '1 Monat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Jahre',
+      one: '1 Jahr',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingShortDays(int count) {
+    return '${count}T';
+  }
+
+  @override
+  String shoppingShortWeeks(int count) {
+    return '${count}W';
+  }
+
+  @override
+  String shoppingShortMonths(int count) {
+    return '${count}M';
+  }
+
+  @override
+  String shoppingShortYears(int count) {
+    return '${count}J';
+  }
+
+  @override
   String get shoppingDeleteForGood => 'Löschen';
 
   @override

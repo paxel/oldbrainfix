@@ -1098,8 +1098,8 @@ final _scenarios = <Scenario>[
     name: 'shopping-lists',
     about:
         'Shopping Lists made from Notes: every line not blank a Line, '
-        'indented or not, a marked one struck; reappear times of Once and one '
-        'to four weeks; Lines checked to the end and back in their places at '
+        'indented or not, a marked one struck, without a reappear time; reappear '
+        'times of Once and one to four weeks; Lines checked to the end and back in their places at '
         'the start of the same weekday as many weeks on on the European wall '
         'clock, one checked late on a UTC evening that is the next day there; '
         'names added again in another case bringing a struck and a gone Line '
@@ -1112,7 +1112,10 @@ final _scenarios = <Scenario>[
         'writes; how each shows on the Agenda (#186): one left to the '
         'Device\'s old setting, one each open Line and struck until a week '
         'on, one off after one row with the count, one with the count, one '
-        'with a choice no app writes; an Unsorted Note beside them.',
+        'with a choice no app writes; reappear times (#195) of days, weeks, '
+        'a month from the 31st of January to the last of February and a '
+        'year, none, which stays struck, and none given a day after its '
+        'check; an Unsorted Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1126,11 +1129,27 @@ final _scenarios = <Scenario>[
           )
           .id;
       lists.make(week);
+      final weekly = Reappear.after(1, ReappearUnit.week);
+      lists.setReappear(line(week, 'Milk'), weekly);
+      lists.setReappear(line(week, 'Tea'), weekly);
+      lists.setReappear(line(week, 'Bread'), weekly);
       lists.setReappear(line(week, 'Eggs'), Reappear.once);
-      lists.setReappear(line(week, 'Apples'), Reappear.week2);
-      lists.setReappear(line(week, 'Coffee'), Reappear.week3);
-      lists.setReappear(line(week, 'Rice'), Reappear.week4);
-      lists.setReappear(line(week, 'Rice'), Reappear.week4);
+      lists.setReappear(
+        line(week, 'Apples'),
+        Reappear.after(2, ReappearUnit.week),
+      );
+      lists.setReappear(
+        line(week, 'Coffee'),
+        Reappear.after(3, ReappearUnit.week),
+      );
+      lists.setReappear(
+        line(week, 'Rice'),
+        Reappear.after(4, ReappearUnit.week),
+      );
+      lists.setReappear(
+        line(week, 'Rice'),
+        Reappear.after(4, ReappearUnit.week),
+      );
       for (final text in ['Milk', 'Eggs', 'Apples', 'Coffee', 'Rice']) {
         lists.check(line(week, text), wall);
       }
@@ -1198,6 +1217,35 @@ final _scenarios = <Scenario>[
       );
       final odd = notes.capture('Odd kind\nOne').id;
       store.append(odd, ChecklistKeys.kind, 'shopping:a:b');
+      // On the 31st of January (#195): days, weeks, a month to the last
+      // of February, a year, none, and none given a day after its check.
+      _tick = _tick.add(const Duration(days: 23));
+      final pantry = notes
+          .capture('Pantry\nYeast\nFlour\nHoney\nSoap\nWax\nMatches')
+          .id;
+      lists.make(pantry);
+      for (final (text, time) in [
+        ('Yeast', Reappear.after(3, ReappearUnit.day)),
+        ('Flour', Reappear.after(6, ReappearUnit.week)),
+        ('Honey', Reappear.after(1, ReappearUnit.month)),
+        ('Soap', Reappear.after(1, ReappearUnit.year)),
+      ]) {
+        lists.setReappear(line(pantry, text), time);
+      }
+      for (final text in [
+        'Yeast',
+        'Flour',
+        'Honey',
+        'Soap',
+        'Wax',
+        'Matches',
+      ]) {
+        lists.check(line(pantry, text), wall);
+      }
+      lists.setReappear(
+        line(pantry, 'Matches'),
+        Reappear.after(1, ReappearUnit.day),
+      );
       final errand = Routines(store)
           .spawn(week, Schedule(start: Day(2026, 1, 9)));
       store.append(
@@ -2351,6 +2399,11 @@ final _shoppingMoments = [
   DateTime.utc(2026, 1, 14, 23),
   DateTime.utc(2026, 1, 21, 23),
   DateTime.utc(2026, 1, 28, 23),
+  DateTime.utc(2026, 1, 31, 23),
+  DateTime.utc(2026, 2, 2, 23),
+  DateTime.utc(2026, 2, 27, 23),
+  DateTime.utc(2026, 3, 13, 23),
+  DateTime.utc(2027, 1, 30, 23),
 ];
 
 /// The values of the Device setting before #186 the Shopping Lists'
@@ -2421,7 +2474,28 @@ Map<String, Object?> _shoppingLists(Store store) {
         if (Routines(store).byId(id) case final routine?) _routine(routine),
     ],
     'reappear': {
-      for (final code in ['once', '1w', '2w', '3w', '4w', '0', '5', 'x', ''])
+      for (final code in [
+        'once',
+        'none',
+        '1w',
+        '2w',
+        '3w',
+        '4w',
+        '1d',
+        '20w',
+        '3m',
+        '99y',
+        '0',
+        '5',
+        'x',
+        '',
+        '0w',
+        '01w',
+        '100d',
+        '1W',
+        'w1',
+        '1 w',
+      ])
         code: Reappear.read(code).code,
     },
     'names': {
@@ -4948,7 +5022,10 @@ void _sentShoppingFixture(Directory root) {
     final note = Notes(ada).capture('Groceries\nMilk\nBread\nEggs').id;
     final lists = ShoppingLists(ada);
     lists.make(note);
-    lists.setReappear(line(ada, note, 'Eggs'), Reappear.week2);
+    lists.setReappear(
+      line(ada, note, 'Eggs'),
+      Reappear.after(2, ReappearUnit.week),
+    );
     lists.setReappear(line(ada, note, 'Bread'), Reappear.once);
     lists.check(line(ada, note, 'Bread'), utc);
     lists.check(line(ada, note, 'Milk'), utc);

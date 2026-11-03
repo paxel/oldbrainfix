@@ -40,7 +40,7 @@ use crate::search::Search;
 use crate::sessions::{SessionMarks, SessionRule, SessionSetup, Sessions};
 use crate::settings::{DeviceSettings, QuickNoteControl};
 use crate::shopping_lists::{
-    ListOnAgenda, Reappear, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys,
+    ListOnAgenda, Reappear, ReappearUnit, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys,
 };
 use crate::store::Store;
 use crate::tallies::{Tallies, Tally};
@@ -566,9 +566,14 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "set_reappear",
-            "Sets how long a Line of a Shopping List stays struck through once checked: once (gone), or 1 to 4 weeks.",
+            "Sets how long a Line of a Shopping List stays struck through once checked: none (it stays struck until a time is set; what a new Line has), once (gone once checked), or after a count of days, weeks, months or years (months and years by the calendar, to the last day of a shorter month).",
             false,
-            json!({"id": id("Line"), "reappear": {"enum": ["once", "1w", "2w", "3w", "4w"], "type": "string"}}),
+            json!({
+                "id": id("Line"),
+                "reappear": {"enum": ["none", "once", "after"], "type": "string"},
+                "count": {"description": "for after: how many of the unit, 1 to 99", "maximum": Reappear::MAX_COUNT, "minimum": 1, "type": "integer"},
+                "unit": {"description": "for after", "enum": REAPPEAR_UNITS, "type": "string"}
+            }),
             &["id", "reappear"],
         ),
         tool(
@@ -873,6 +878,54 @@ fn picking_arg(args: &Value) -> Result<Option<SessionRule>> {
     }
 }
 
+/// The names of the units of a reappear time in the tools, in the order
+/// of [`ReappearUnit::ALL`].
+const REAPPEAR_UNITS: [&str; 4] = ["day", "week", "month", "year"];
+
+fn unit_name(unit: ReappearUnit) -> &'static str {
+    match unit {
+        ReappearUnit::Day => REAPPEAR_UNITS[0],
+        ReappearUnit::Week => REAPPEAR_UNITS[1],
+        ReappearUnit::Month => REAPPEAR_UNITS[2],
+        ReappearUnit::Year => REAPPEAR_UNITS[3],
+    }
+}
+
+/// A reappear time as the tools read it (#195): its kind, `none`,
+/// `once` or `after`, and for `after` its count and unit.
+fn reappear_json(reappear: Reappear) -> Value {
+    match reappear {
+        Reappear::Unset => json!({"kind": "none"}),
+        Reappear::Once => json!({"kind": "once"}),
+        Reappear::After(count, unit) => {
+            json!({"count": count, "kind": "after", "unit": unit_name(unit)})
+        }
+    }
+}
+
+/// The reappear time `set_reappear` asks for: `reappear` none, once or
+/// after, the last with `count` from 1 to 99 and `unit`.
+fn reappear_arg(args: &Value) -> Result<Reappear> {
+    match text_arg(args, "reappear")? {
+        "none" => Ok(Reappear::Unset),
+        "once" => Ok(Reappear::Once),
+        "after" => {
+            let name = text_arg(args, "unit")?;
+            let unit = ReappearUnit::ALL
+                .into_iter()
+                .find(|u| unit_name(*u) == name)
+                .ok_or_else(|| Error::Invalid(format!("no unit {name}")))?;
+            let count =
+                count_arg(args)?.ok_or_else(|| Error::Invalid("count is missing".into()))?;
+            u32::try_from(count)
+                .ok()
+                .and_then(|count| Reappear::after(count, unit))
+                .ok_or_else(|| Error::Invalid(format!("count {count} is not from 1 to 99")))
+        }
+        other => Err(Error::Invalid(format!("no reappear time {other}"))),
+    }
+}
+
 fn count_arg(args: &Value) -> Result<Option<i64>> {
     match args.get("count") {
         None => Ok(None),
@@ -1079,7 +1132,7 @@ impl Store {
                                 "backOn": l.back_on.map(|d| d.to_string()),
                                 "checkedAt": l.checked_at.map(dart_iso),
                                 "id": l.id,
-                                "reappear": l.reappear.code(),
+                                "reappear": reappear_json(l.reappear),
                                 "struck": l.struck,
                                 "text": l.text,
                             })
@@ -1970,12 +2023,7 @@ impl Store {
                         "not a Line of a Shopping List: {line}"
                     )));
                 }
-                let code = text_arg(args, "reappear")?;
-                let reappear = Reappear::ALL
-                    .into_iter()
-                    .find(|r| r.code() == code)
-                    .ok_or_else(|| Error::Invalid(format!("no reappear time {code}")))?;
-                shopping.set_reappear(line, reappear)?;
+                shopping.set_reappear(line, reappear_arg(args)?)?;
                 done(line)
             }
             "remove_line" => {
@@ -2708,11 +2756,15 @@ mod tests {
                 let list = ShoppingLists::new(s)
                     .by_note(&note, &utc)?
                     .ok_or("a list")?;
-                Ok(json!({"id": list.lines[0].id, "note": note, "reappear": "2w"}))
+                Ok(
+                    json!({"count": 3, "id": list.lines[0].id, "note": note, "reappear": "after", "unit": "month"}),
+                )
             },
             |s, a| {
                 let list = ShoppingLists::new(s).by_note(&arg(a, "note")?, &utc)?;
-                Ok(list.is_some_and(|l| l.lines[0].reappear == Reappear::Week2))
+                Ok(list.is_some_and(|l| {
+                    l.lines[0].reappear == Reappear::After(3, ReappearUnit::Month)
+                }))
             },
         )?;
         lands_as_pending(
@@ -2943,6 +2995,69 @@ mod tests {
     }
 
     #[test]
+    fn a_reappear_time_is_set_and_read_as_a_count_and_a_unit() -> TestResult {
+        let store = store();
+        let shop = shopping_list(&store, "Shop\nMilk")?;
+        let milk = ShoppingLists::new(&store)
+            .by_note(&shop, &|t: DateTime<Utc>| t.naive_utc())?
+            .ok_or("a list")?
+            .lines[0]
+            .id
+            .clone();
+        let task = store.open_ai_task()?;
+        let set = |args: Value| call(&store, &task, "set_reappear", &args);
+        let line = || -> Made<Value> {
+            let out = call(&store, &task, "read_note", &json!({"id": shop}))?;
+            let [ToolContent::Text(text)] = &out.content[..] else {
+                return Err("no text".into());
+            };
+            let read: Value = serde_json::from_str(text)?;
+            Ok(read
+                .pointer("/lines/0/reappear")
+                .cloned()
+                .unwrap_or_default())
+        };
+        assert_eq!(line()?, json!({"kind": "none"}));
+        for (args, read) in [
+            (
+                json!({"count": 20, "unit": "week"}),
+                json!({"count": 20, "kind": "after", "unit": "week"}),
+            ),
+            (
+                json!({"count": 1, "unit": "year"}),
+                json!({"count": 1, "kind": "after", "unit": "year"}),
+            ),
+            (
+                json!({"count": 99, "unit": "day"}),
+                json!({"count": 99, "kind": "after", "unit": "day"}),
+            ),
+        ] {
+            let mut args = args;
+            args["id"] = json!(milk);
+            args["reappear"] = json!("after");
+            assert!(!set(args)?.is_error);
+            assert_eq!(line()?, read);
+        }
+        assert!(!set(json!({"id": milk, "reappear": "once"}))?.is_error);
+        assert_eq!(line()?, json!({"kind": "once"}));
+        for refused in [
+            json!({"id": milk, "reappear": "after", "count": 0, "unit": "day"}),
+            json!({"id": milk, "reappear": "after", "count": 100, "unit": "day"}),
+            json!({"id": milk, "reappear": "after", "count": 3}),
+            json!({"id": milk, "reappear": "after", "unit": "month"}),
+            json!({"id": milk, "reappear": "after", "count": 3, "unit": "fortnight"}),
+            json!({"id": milk, "reappear": "3m"}),
+        ] {
+            let out = set(refused.clone());
+            assert!(out.is_err() || out.is_ok_and(|o| o.is_error), "{refused}");
+        }
+        assert_eq!(line()?, json!({"kind": "once"}));
+        assert!(!set(json!({"id": milk, "reappear": "none"}))?.is_error);
+        assert_eq!(line()?, json!({"kind": "none"}));
+        Ok(())
+    }
+
+    #[test]
     fn notes_name_their_kind_and_parts() -> TestResult {
         let store = store();
         let notes = Notes::new(&store);
@@ -2994,7 +3109,7 @@ mod tests {
         );
         assert_eq!(
             read(&shop)?.pointer("/lines/0/reappear"),
-            Some(&json!("1w"))
+            Some(&json!({"kind": "none"}))
         );
         assert_eq!(read(&shop)?.pointer("/agenda"), Some(&json!("count")));
         assert_eq!(read(&trip)?.pointer("/name"), Some(&json!("Trip")));

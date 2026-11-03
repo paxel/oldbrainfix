@@ -248,13 +248,16 @@ void main() {
       );
     }
 
-    /// "Groceries" with Milk and Eggs checked a week ago, back today, and
-    /// Rice open.
+    /// "Groceries", each Line a week, with Milk and Eggs checked a week
+    /// ago, back today, and Rice open.
     String groceries({String? place}) {
       final lists = ShoppingLists(store);
       now = DateTime(2026, 10, 17, 10);
       final id = notes.capture('Groceries\nMilk\nEggs\nRice', place: place).id;
       lists.make(id);
+      for (final line in lists.byNote(id, deviceWallClock)!.lines) {
+        lists.setReappear(line.id, Reappear.after(1, ReappearUnit.week));
+      }
       for (final text in ['Milk', 'Eggs']) {
         lists.check(
           lists

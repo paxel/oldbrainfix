@@ -483,10 +483,7 @@ fn list_text(t: &L10n, kind: Option<&str>) -> &'static str {
 
 /// A Shopping List's reappear time in words.
 fn reappear_text(t: &L10n, code: Option<&str>) -> String {
-    match Reappear::read(code) {
-        Reappear::Once => t.shopping_once().to_string(),
-        weeks => t.shopping_weeks(weeks.weeks()),
-    }
+    crate::shopping_view::reappear_label(t, Reappear::read(code))
 }
 
 /// Where the Line `line` stands in its Checklist, from 1; `None` when it

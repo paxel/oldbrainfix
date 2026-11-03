@@ -3674,7 +3674,7 @@ abstract class AppLocalizations {
   /// **'It becomes a Shopping List.'**
   String get sentItemMakesShoppingList;
 
-  /// Under a Line of a Shopping List in a Sent Item's preview; time is shoppingOnce or shoppingWeeks.
+  /// Under a Line of a Shopping List in a Sent Item's preview; time is shoppingReappearNone, shoppingOnce, shoppingDays, shoppingWeeks, shoppingMonths or shoppingYears.
   ///
   /// In en, this message translates to:
   /// **'Reappear time: {time}'**
@@ -5426,7 +5426,7 @@ abstract class AppLocalizations {
   /// **'back {day}'**
   String shoppingBack(String day);
 
-  /// Heading of the choices in a Shopping List Line's menu: how long the Line stays struck once checked (CONTEXT.md: Shopping List).
+  /// The setting a Shopping List Line's badge shows and the title of its dialog (#195): how long the Line stays struck once checked (CONTEXT.md: Shopping List).
   ///
   /// In en, this message translates to:
   /// **'Reappear time'**
@@ -5443,6 +5443,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 week} other{{count} weeks}}'**
   String shoppingWeeks(int count);
+
+  /// Reappear time of a Line without one (#195): once checked it stays struck through until a time is set. What a new Line has.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get shoppingReappearNone;
+
+  /// In the reappear time dialog of a Shopping List Line (#195), the choice whose number and unit follow below it: the Line comes back this long after it was checked.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get shoppingReappearAfter;
+
+  /// Reappear time of a Line: it comes back this many days after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String shoppingDays(int count);
+
+  /// Reappear time of a Line: it comes back on the same day of the month this many months after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 month} other{{count} months}}'**
+  String shoppingMonths(int count);
+
+  /// Reappear time of a Line: it comes back on the same day this many years after it was checked (#195).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 year} other{{count} years}}'**
+  String shoppingYears(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many days.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}d'**
+  String shoppingShortDays(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}w'**
+  String shoppingShortWeeks(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many months.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m'**
+  String shoppingShortMonths(int count);
+
+  /// Short text on a Shopping List Line's badge (#195): a reappear time of this many years.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}y'**
+  String shoppingShortYears(int count);
 
   /// On the desktop, in a Shopping List Line's menu and on its confirm button: moves the Line to the trash, as a Checklist's Delete does (ADR 0030). The phone uses delete.
   ///

@@ -16,6 +16,7 @@ import 'person_screen.dart';
 import 'profile.dart';
 import 'profile_card.dart';
 import 'schedule_text.dart';
+import 'shopping_list_view.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
 
@@ -692,11 +693,8 @@ class _SentItemScreenState extends State<SentItemScreen> {
                             inGroup: l.indent,
                             below: switch (l.reappear) {
                               null => null,
-                              Reappear.once => t.sentItemLineReappear(
-                                t.shoppingOnce,
-                              ),
                               final r => t.sentItemLineReappear(
-                                t.shoppingWeeks(r.weeks),
+                                reappearWords(t, r),
                               ),
                             },
                             checked: l.checked,

@@ -13,7 +13,7 @@
       "text": "Milk",
       "indent": false,
       "checked": false,
-      "reappear": "1w"
+      "reappear": "none"
     }
   ],
   "accepted": "note:00000000000000000000000000000b01",
@@ -36,7 +36,7 @@
         {
           "id": "line:00000000000000000000000000000b04",
           "text": "Milk",
-          "reappear": "1w",
+          "reappear": "none",
           "struck": false,
           "checkedAt": null,
           "backOn": null,
@@ -57,7 +57,7 @@
       {
         "id": "line:00000000000000000000000000000d01",
         "text": "Tea",
-        "reappear": "1w"
+        "reappear": "none"
       }
     ],
     "linesRenamed": [
@@ -80,7 +80,7 @@
         {
           "id": "line:00000000000000000000000000000c01",
           "text": "Coffee",
-          "reappear": "1w",
+          "reappear": "none",
           "struck": false,
           "checkedAt": null,
           "backOn": null,
@@ -90,7 +90,7 @@
         {
           "id": "line:00000000000000000000000000000e01",
           "text": "Tea",
-          "reappear": "1w",
+          "reappear": "none",
           "struck": false,
           "checkedAt": null,
           "backOn": null,
@@ -133,7 +133,7 @@
         {
           "id": "line:00000000000000000000000000000c01",
           "text": "Coffee",
-          "reappear": "1w",
+          "reappear": "none",
           "struck": false,
           "checkedAt": null,
           "backOn": null,

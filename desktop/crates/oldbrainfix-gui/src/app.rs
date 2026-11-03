@@ -847,6 +847,9 @@ enum NoteBadge {
     /// A Session's rule and its weekdays' own counts (#191).
     SessionRule,
     SessionWeekdays,
+    /// The reappear time of the Shopping List's Line in `reappear_line`
+    /// (#195).
+    Reappear,
 }
 
 /// The dialogs back closes, or leads back from, on top of the others
@@ -1497,6 +1500,8 @@ pub struct App {
     quick_open: bool,
     /// The badge of the Note dialog whose small editor is open (#160).
     badge: Option<NoteBadge>,
+    /// The Shopping List Line whose reappear time dialog is open (#195).
+    reappear_line: Option<String>,
     /// The Note whose text took a paste that looks like code, while
     /// "Keep as code" waits under it (#213).
     code_offer: Option<String>,
@@ -1878,6 +1883,7 @@ impl App {
             session_draft: None,
             quick_open: false,
             badge: None,
+            reappear_line: None,
             code_offer: None,
             start_lines: false,
             tally_whose: HashMap::new(),
@@ -6238,6 +6244,10 @@ impl App {
                     return Ok(());
                 }
                 match step {
+                    ShopStep::PickReappear => {
+                        self.reappear_line = Some(id);
+                        self.badge = Some(NoteBadge::Reappear);
+                    }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
                     ShopStep::Delete => {
                         self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
@@ -8784,6 +8794,32 @@ impl App {
                 }
                 _ => true,
             },
+            // Each pick written at once, as on the phone; gone with its Line.
+            NoteBadge::Reappear => {
+                let line = self.reappear_line.clone();
+                let current = line.as_ref().and_then(|id| {
+                    let shopping = self.view.shopping.as_ref()?;
+                    shopping
+                        .editable
+                        .contains(id)
+                        .then(|| shopping.list.line(id).map(|l| l.reappear))
+                        .flatten()
+                });
+                match (line, current) {
+                    (Some(id), Some(current)) => {
+                        let icon = (icons::REAPPEAR, None);
+                        badge_dialog(ctx, shown, icon, t.shopping_reappear(), |ui| {
+                            if let Some(picked) = shopping_view::reappear_editor(ui, &t, current)
+                                && picked != current
+                            {
+                                let step = ShopStep::Reappear(picked);
+                                actions.push(Action::Shopping(ShoppingAction::Step(id, step)));
+                            }
+                        })
+                    }
+                    _ => true,
+                }
+            }
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();

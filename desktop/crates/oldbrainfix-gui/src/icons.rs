@@ -127,6 +127,8 @@ pub const FROG: char = '\u{1F438}';
 pub const IMPORTANCE: char = '\u{e362}';
 pub const ON_AGENDA: char = '\u{f44d}';
 pub const SHOW_TICKS: char = '\u{e316}';
+/// A Shopping List Line's reappear time, `autorenew` (#195).
+pub const REAPPEAR: char = '\u{e0c1}';
 pub const TALLY_RULE: char = '\u{e2cd}';
 pub const TALLY_UNIT: char = '\u{e60e}';
 pub const TALLY_TARGET: char = '\u{f07b}';

@@ -465,6 +465,14 @@ pub type LineField<'f> = dyn FnMut(&mut Ui, &ShownLine, f32) -> bool + 'f;
 /// A [`LineField`] lent to the rows that draw it.
 pub type FieldFor<'a> = &'a mut LineField<'a>;
 
+/// What draws something at the end of a Line, before its ⋮, such as a
+/// Shopping List Line's reappear time badge (#195): what was asked by a
+/// click on it.
+pub type Trailing<'a, P> = &'a dyn Fn(&mut Ui, &ShownLine) -> Option<P>;
+
+/// The room a [`Trailing`] badge takes at a Line's end.
+const TRAILING_ROOM: f32 = 112.0;
+
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
 /// and its text, or the field `field` draws for it; with `menus`, the
@@ -485,7 +493,7 @@ pub fn lines(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
         )
     });
-    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field)) {
+    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field, None)) {
         actions.push(match asked {
             LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),
             LineAsk::Menu(id, step) => ChecklistAction::Step(id, step),
@@ -503,14 +511,15 @@ const TO_MIDDLE: f32 = 5.0;
 /// The Lines `shown`, each with its checkbox, checkable with `checks`,
 /// its text, or the field `field` draws for it, and what shows under it;
 /// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
-/// takes the clicks, a right-click with the menu it draws. What is asked,
+/// takes the clicks, a right-click with the menu it draws; with
+/// `trailing`, what it draws at each Line's end, before ⋮. What is asked,
 /// in the order clicked.
 pub fn line_rows<P>(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     checks: bool,
-    (menus, mut field): (Option<MenuOf<P>>, Option<FieldFor>),
+    (menus, mut field, trailing): (Option<MenuOf<P>>, Option<FieldFor>, Option<Trailing<P>>),
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
@@ -528,11 +537,13 @@ pub fn line_rows<P>(
                     asked.push(LineAsk::Check(line.id.clone(), !line.checked));
                 }
                 let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
-                let room = if editable.is_some() {
-                    (ui.available_width() - 32.0).max(40.0)
-                } else {
-                    ui.available_width()
-                };
+                let reserved = if editable.is_some() { 32.0 } else { 0.0 }
+                    + if trailing.is_some() {
+                        TRAILING_ROOM
+                    } else {
+                        0.0
+                    };
+                let room = (ui.available_width() - reserved).max(40.0);
                 // Its words take the right-click where it has a menu.
                 let sense = if editable.is_some() {
                     Sense::click()
@@ -547,6 +558,17 @@ pub fn line_rows<P>(
                     })
                     .inner;
                 let Some((_, menu)) = editable else {
+                    // The badge at the right edge, where no ⋮ is.
+                    if let Some(trailing) = trailing {
+                        let asked_here = ui
+                            .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                trailing(ui, line)
+                            })
+                            .inner;
+                        if let Some(step) = asked_here {
+                            asked.push(LineAsk::Menu(line.id.clone(), step));
+                        }
+                    }
                     return;
                 };
                 let mut picked = None;
@@ -562,12 +584,18 @@ pub fn line_rows<P>(
                 if let Some(words) = words {
                     words.context_menu(&mut entries);
                 }
-                // ⋮ at the right edge, as on an Agenda row.
-                let more = ui
+                // ⋮ at the right edge, as on an Agenda row, what `trailing`
+                // draws before it.
+                let (more, asked_here) = ui
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak)
+                        let more =
+                            icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak);
+                        (more, trailing.and_then(|trailing| trailing(ui, line)))
                     })
                     .inner;
+                if let Some(step) = asked_here {
+                    asked.push(LineAsk::Menu(line.id.clone(), step));
+                }
                 egui::Popup::menu(&more).show(&mut entries);
                 if let Some(step) = picked {
                     asked.push(LineAsk::Menu(line.id.clone(), step));

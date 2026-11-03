@@ -34,13 +34,18 @@ void main() {
           .firstWhere((l) => l.text == text)
           .id;
 
-  /// "Groceries": Milk and Eggs checked a week ago, back today; Tea
+  /// "Groceries", each Line a week: Milk and Eggs checked a week ago,
+  /// back today; Tea
   /// checked on Tuesday, struck still; Rice never checked. "Hardware":
   /// Nails, never checked.
   void seed() {
     now = DateTime(2026, 10, 17, 10);
     groceries = notes.capture('Groceries\nMilk\nEggs\nTea\nRice').id;
     lists.make(groceries);
+    // Each Line a week (#195).
+    for (final line in lists.byNote(groceries, deviceWallClock)!.lines) {
+      lists.setReappear(line.id, Reappear.after(1, ReappearUnit.week));
+    }
     lists.check(lineId(groceries, 'Milk'), deviceWallClock);
     lists.check(lineId(groceries, 'Eggs'), deviceWallClock);
     now = DateTime(2026, 10, 20, 18);

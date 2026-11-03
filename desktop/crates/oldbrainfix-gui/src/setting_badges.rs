@@ -22,6 +22,9 @@ use crate::theme::{self, Tones};
 pub enum BadgeValue<'a> {
     /// Short text, for a setting without a fixed set of values.
     Text(&'a str),
+    /// Short text that is no words, such as "4w", and the value in words
+    /// for the screen reader, "4 weeks" (#195).
+    Short(&'a str, &'a str),
     /// An icon, for a setting with a fixed set of values, and the value
     /// in words for the screen reader.
     Icon(char, &'a str),
@@ -31,7 +34,9 @@ impl<'a> BadgeValue<'a> {
     /// The value in words.
     pub fn words(self) -> &'a str {
         match self {
-            BadgeValue::Text(words) | BadgeValue::Icon(_, words) => words,
+            BadgeValue::Text(words) | BadgeValue::Short(_, words) | BadgeValue::Icon(_, words) => {
+                words
+            }
         }
     }
 }
@@ -60,7 +65,7 @@ pub fn badge(
     let text = ui.visuals().text_color();
     let font = FontId::proportional(14.0);
     let galley = match value {
-        Some(BadgeValue::Text(v)) => Some(ui.painter().layout_no_wrap(
+        Some(BadgeValue::Text(v) | BadgeValue::Short(v, _)) => Some(ui.painter().layout_no_wrap(
             v.to_string(),
             font.clone(),
             text,

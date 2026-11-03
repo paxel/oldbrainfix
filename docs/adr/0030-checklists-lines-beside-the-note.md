@@ -44,7 +44,7 @@ The Occurrence the Checklist shows on its card and in its editor is the one it i
 
 A Shopping List is a Note whose Lines come back a while after they are checked. Its kind is `shopping:<making id>`, made and turned back into a plain Note as a Checklist's is, with the same Lines: the same entity, sealed and filed with its Note, the same roles, Conflicts on their text and latest wins on their checks. The kind holds one list, so a Note is at most one of a Tally, a Checklist and a Shopping List; one that holds a Tally's fields too shows as the Tally. Its Lines have no indent: making one turns every line but the first that is not blank into a Line at the top, indented or not, one marked "✓ " struck. The Lines made at once are all written at one moment, with keys in the order of the text. Turning it back into a plain Note writes the Lines that show into its text, the struck ones marked "✓ ".
 
-Each Line holds its reappear time under `reappear`: `once`, `1w`, `2w`, `3w` or `4w`. A new Line gets `1w`; a value not known here reads as `1w`, so no Line goes away by a value this version cannot read. It is set as a Line is renamed, by the author of the Note or of the Line and the Managers.
+Each Line holds its reappear time under `reappear`: `once`, `1w`, `2w`, `3w` or `4w`. A new Line gets `1w`; a value not known here reads as `1w`, so no Line goes away by a value this version cannot read. It is set as a Line is renamed, by the author of the Note or of the Line and the Managers. Since #195 a time is a number and a unit and a new Line has none; see "Reappear times of a number and a unit" below.
 
 Checking a Line writes `checked` as on a Checklist. A Line Once is then gone: it shows nowhere and search does not find it, but it is not deleted, since a Member may check any Line and may not delete another person's. Any other Line is struck through until the start of its day back: the day of its check on the reading Device's wall clock, as many weeks on as its reappear time says, so the same weekday. Nothing is written when it comes back. It is open again from the start of that day on every Device whose wall clock shows that day, so two Devices in different time zones may differ for the hours between them, and agree again after. The moment of a check is its entry's `date`, the same on every Device and in both cores whatever its value says.
 
@@ -144,3 +144,22 @@ A Checklist without a Routine or Reminder has the same three choices as a Shoppi
 ## A Note is its kind (ADR 0038)
 
 Amended by ADR 0038 (#188): the text no longer stays above the list as a block of its own. Its first line is the list's name, heading the page and the card, the rest its description, folded under it, and the Lines follow. A Checklist becomes a Shopping List, and a Shopping List a Checklist, on its kind badge, with a new making: the Lines that show carry over in their order, checked ones checked, all at the top with the reappear time of a new Line; the text is not touched (`ShoppingLists.switchList`, `switch_list`).
+
+## Reappear times of a number and a unit (#195)
+
+Amended by #195 (Q520 (a)): a Line's reappear time is none, Once, or a number from 1 to 99 of days, weeks, months or years. It stays in the field `reappear`, as a code of the number and the unit's letter: `1d`, `20w`, `3m`, `1y`; `once` stays, and none is `none`. The codes `1w` to `4w` of before are spelled as they were, so every Line keeps its time, a Device of this version reads them as weeks, and nothing is rewritten. A code is the number without a leading zero, then `d`, `w`, `m` or `y`, in lower case, nothing around it; anything else, and a Line without the field, still reads as one week, as before (`Reappear.read`, `Reappear::read`).
+
+A new Line gets `none`, a Line made by switching a Checklist too: checked, it is struck through until a time is set, with no day back. Once a time is set, it counts from the check: the Line comes back on the day the time names after the day of its check, which may lie in the past, so it shows open at once. Days and weeks count on; a month or a year on is the same day of the month that many months on, or the month's last day when it is shorter, so a Line checked on 31 January with a month comes back on 28 February, and one checked on 29 February with a year on 28 February (`Reappear.backFrom`, `back_from`). A Sent Item carries the code as it stands; one without a code, which no version sends, gives the receiver's Line a week.
+
+What a Device of an earlier version makes of the new codes: it reads `none`, `1d`, `6w`, `3m` and every other code it does not know as one week, as it reads any value not known there. It shows such a Line as "1 week", brings it back a week after its check and writes nothing over it unless the user picks another time there. Nothing breaks and nothing is lost; the Line only comes back earlier on that Device until it is updated.
+
+The AI port reads a Line's time as `{"kind": "none"}`, `{"kind": "once"}` or `{"kind": "after", "count": 3, "unit": "month"}`, and `set_reappear` takes `reappear` none, once or after, the last with `count` and `unit` (`day`, `week`, `month`, `year`).
+
+Considered Options:
+
+- A version marker on the Line, as ADR 0034 gives schedules (rejected: an earlier version looks for none on a Line, so a marker would change nothing there, and this version reads every code it writes).
+- The number and the unit in two fields of their own (rejected: an earlier version would keep reading the old field, and two fields written apart could disagree).
+- None as the field written empty (rejected: a Line without the field reads as a week today, and taking that meaning away would change Lines of before).
+- A code no version knows read as none, struck until set (rejected: an earlier version reads it as a week, so two Devices would show the Line differently).
+- A month as 30 days, or a month on from the 31st running into the next month (rejected: "a month" means the same day of the month; the last day of a shorter month is the nearest one).
+- A Sent Item of a later format for the new codes (rejected: an earlier receiver reads them as a week, as any code it does not know, so the file need not be refused).

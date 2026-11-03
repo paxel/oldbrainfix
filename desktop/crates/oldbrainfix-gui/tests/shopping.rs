@@ -29,7 +29,8 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
     AreaRole, ClockTime, Day, ImportReport, Invite, Notes, OwnProfile, PairedDevice, Places,
-    Reappear, Routines, Schedule, ShoppingList, ShoppingLists, ShoppingOnAgenda, SigningKey, Store,
+    Reappear, ReappearUnit, Routines, Schedule, ShoppingList, ShoppingLists, ShoppingOnAgenda,
+    SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Page, Selection};
@@ -309,6 +310,7 @@ fn make_it_a_shopping_list_in_the_editor_turns_the_lines_into_lines() -> TestRes
 fn a_checked_line_goes_to_the_end_with_its_day_back_and_unchecked_into_its_place() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
     let mut harness = window(&store, Some(&note));
     tick(&mut harness, "Milk")?;
     assert!(checked(&harness, "Milk")?);
@@ -327,6 +329,7 @@ fn a_struck_line_is_open_again_in_its_place_from_the_start_of_its_day() -> TestR
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
+    weekly(&store, &note)?;
     let bread = line_id(&store, &note, "Bread")?;
     lists.check(&bread, &utc)?;
     let mut harness = window(&store, None);
@@ -498,58 +501,90 @@ fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
     Ok(())
 }
 
+/// Gives each Line of the Shopping List of `note` a week (#195).
+fn weekly(store: &Store, note: &str) -> TestResult {
+    let lists = ShoppingLists::new(store);
+    for line in list_of(store, note)?.lines {
+        lists.set_reappear(&line.id, Reappear::FALLBACK)?;
+    }
+    Ok(())
+}
+
+/// The reappear time badges of the Lines in the editor, in the order of
+/// their rows (#195).
+fn badges(harness: &Harness<'_, App>) -> Vec<String> {
+    harness
+        .query_all_by_label_contains("Reappear time: ")
+        .filter(|n| n.accesskit_node().role() == Role::Button)
+        .map(|n| n.accesskit_node().label().unwrap_or_default())
+        .collect()
+}
+
+/// Clicks the reappear time badge of the row `row` of the editor.
+fn click_badge(harness: &mut Harness<'_, App>, row: usize) -> TestResult {
+    harness
+        .query_all_by_label_contains("Reappear time: ")
+        .filter(|n| n.accesskit_node().role() == Role::Button)
+        .nth(row)
+        .ok_or(format!("badge {row}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
 #[test]
-fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
+fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
-    // A new Line comes back after a week.
-    click(&mut harness, "More: Milk")?;
+    // A new Line has none (#195).
+    assert_eq!(badges(&harness), ["Reappear time: None"; 3]);
+    click_badge(&mut harness, 0)?;
     assert!(shows(&harness, "Reappear time"));
-    let radios: Vec<(String, bool)> = harness
-        .query_all_by_role(Role::RadioButton)
-        .filter(|n| {
-            let label = n.accesskit_node().label().unwrap_or_default();
-            label == "Once" || label.ends_with("week") || label.ends_with("weeks")
-        })
-        .map(|n| {
-            let label = n.accesskit_node().label().unwrap_or_default();
-            (label, n.accesskit_node().toggled() == Some(Toggled::True))
-        })
-        .collect();
-    let want = [
-        ("Once", false),
-        ("1 week", true),
-        ("2 weeks", false),
-        ("3 weeks", false),
-        ("4 weeks", false),
-    ];
-    assert_eq!(
-        radios,
-        want.map(|(l, on)| (l.to_string(), on)).to_vec(),
-        "the reappear times"
-    );
-    assert!(!shows(&harness, "Move up"));
-    assert!(!shows(&harness, "Put under the Line above"));
-    click(&mut harness, "3 weeks")?;
+    for label in ["None", "Once", "After"] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    assert!(!shows(&harness, "week"), "units only for After");
     let milk = line_id(&store, &note, "Milk")?;
     let reappear = |harness: &Harness<'_, App>| -> Result<Reappear, Box<dyn std::error::Error>> {
         Ok(list(harness, &note)?.line(&milk).ok_or("Milk")?.reappear)
     };
-    // The pick closed the menu; Esc now would close the Note dialog.
-    assert_eq!(reappear(&harness)?, Reappear::Week3);
+    // After starts at a week, each pick written at once.
+    click(&mut harness, "After")?;
+    assert_eq!(reappear(&harness)?, Reappear::FALLBACK);
+    for unit in ["day", "week", "month", "year"] {
+        assert!(shows(&harness, unit), "{unit}");
+    }
+    click(&mut harness, "More")?;
+    click(&mut harness, "More")?;
+    assert_eq!(reappear(&harness)?, Reappear::After(3, ReappearUnit::Week));
+    click(&mut harness, "months")?;
+    assert_eq!(reappear(&harness)?, Reappear::After(3, ReappearUnit::Month));
+    click(&mut harness, "Close")?;
+    assert!(!shows(&harness, "After"));
+    assert_eq!(badges(&harness)[0], "Reappear time: 3 months");
     tick(&mut harness, "Milk")?;
-    assert!(shows(&harness, "back Sat, Nov 14"));
+    assert!(shows(&harness, "back Sun, Jan 24"));
+    // Back to none: struck until a time is set.
+    click_badge(&mut harness, 0)?;
+    click(&mut harness, "None")?;
+    assert_eq!(reappear(&harness)?, Reappear::Unset);
+    click(&mut harness, "Close")?;
+    assert!(list(&harness, &note)?.line(&milk).ok_or("Milk")?.struck);
+    assert!(!shows_part(&harness, "back "));
 
     // Once: gone when checked.
-    click(&mut harness, "More: Apples")?;
+    click_badge(&mut harness, 2)?;
     click(&mut harness, "Once")?;
+    click(&mut harness, "Close")?;
     tick(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
 
-    // Renaming is typing in place: the menu has no Rename.
+    // Renaming is typing in place, the reappear time is the badge's: the
+    // menu has neither.
     click(&mut harness, "More: Bread")?;
     assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Once"));
     harness.key_press(egui::Key::Escape);
     harness.run();
 
@@ -579,12 +614,13 @@ fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_entry_stores_it_fi
     assert!(!shows(&harness, "More: "));
     type_line(&mut harness, "Tea");
     assert_eq!(list(&harness, &note)?.count(), 3);
-    click(&mut harness, "More: Tea")?;
-    click(&mut harness, "2 weeks")?;
+    click_badge(&mut harness, 3)?;
+    click(&mut harness, "Once")?;
+    click(&mut harness, "Close")?;
     let tea = line_id(&store, &note, "Tea")?;
     assert_eq!(
         list(&harness, &note)?.line(&tea).ok_or("Tea")?.reappear,
-        Reappear::Week2
+        Reappear::Once
     );
 
     to_end_of(&mut harness, "Tea")?;
@@ -651,6 +687,7 @@ fn the_cards_menu_makes_a_shopping_list_and_turns_it_back() -> TestResult {
 fn full_cards_check_lines_and_compact_cards_count_the_open_ones() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
+    weekly(&store, &note)?;
     let mut harness = window(&store, None);
     assert!(!checked(&harness, "Bread")?);
     tick(&mut harness, "Bread")?;
@@ -733,10 +770,12 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     // His own Line is his to change, in place too.
     assert!(shows(&harness, "More: Water"));
     assert!(line_field(&harness, "Water").is_ok());
-    click(&mut harness, "More: Water")?;
-    assert!(shows(&harness, "Reappear time"));
-    harness.key_press(egui::Key::Escape);
-    harness.run();
+    // His badge of Ann's Lines only shows; his own opens its dialog.
+    assert_eq!(badges(&harness), ["Reappear time: None"]);
+    assert!(harness.query_all_by_label("Reappear time: None").count() > 3);
+    click_badge(&mut harness, 0)?;
+    assert!(shows(&harness, "After"));
+    click(&mut harness, "Close")?;
     // His card's menu offers nothing of the kind.
     harness.state_mut().select(Selection::All);
     harness.run();
@@ -849,7 +888,7 @@ fn an_update_that_makes_a_shopping_list_says_so_and_shows_each_reappear_time() -
     assert!(shows_part(&harness, "Reappear time: Once"));
     assert_eq!(
         harness
-            .query_all_by_label_contains("Reappear time: 1 week")
+            .query_all_by_label_contains("Reappear time: None")
             .count(),
         2
     );
@@ -861,10 +900,40 @@ fn the_reappear_time_reads_in_both_languages() {
     use oldbrainfix_gui::shopping_view::reappear_label;
     let en = L10n::new("en");
     let de = L10n::new("de");
+    use oldbrainfix_gui::shopping_view::reappear_short;
     assert_eq!(reappear_label(&en, Reappear::Once), "Once");
-    assert_eq!(reappear_label(&en, Reappear::Week1), "1 week");
-    assert_eq!(reappear_label(&de, Reappear::Week4), "4 Wochen");
+    assert_eq!(reappear_label(&en, Reappear::Unset), "None");
+    assert_eq!(
+        reappear_label(&en, Reappear::After(1, ReappearUnit::Week)),
+        "1 week"
+    );
+    assert_eq!(
+        reappear_label(&en, Reappear::After(3, ReappearUnit::Month)),
+        "3 months"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(4, ReappearUnit::Week)),
+        "4 Wochen"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(2, ReappearUnit::Day)),
+        "2 Tage"
+    );
+    assert_eq!(
+        reappear_label(&de, Reappear::After(1, ReappearUnit::Year)),
+        "1 Jahr"
+    );
     assert_eq!(reappear_label(&de, Reappear::Once), "Einmal");
+    assert_eq!(reappear_label(&de, Reappear::Unset), "Keine");
+    let short = |t: &L10n, r| reappear_short(t, r);
+    assert_eq!(short(&en, Reappear::Unset), "—");
+    assert_eq!(short(&en, Reappear::After(4, ReappearUnit::Week)), "4w");
+    assert_eq!(short(&en, Reappear::After(3, ReappearUnit::Month)), "3m");
+    assert_eq!(short(&en, Reappear::After(1, ReappearUnit::Day)), "1d");
+    assert_eq!(short(&en, Reappear::After(20, ReappearUnit::Year)), "20y");
+    assert_eq!(short(&de, Reappear::After(4, ReappearUnit::Week)), "4W");
+    assert_eq!(short(&de, Reappear::After(1, ReappearUnit::Year)), "1J");
+    assert_eq!(short(&de, Reappear::Once), "Einmal");
 }
 
 /// The start of Saturday, 31 October 2026, on UTC: the day a Line
@@ -881,6 +950,7 @@ fn agenda_with(
     let (store, note, moment) = with_note()?;
     let lists = ShoppingLists::new(&store);
     lists.make(&note)?;
+    weekly(&store, &note)?;
     lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
     moment.store(
         DateTime::parse_from_rfc3339(BACK)?.timestamp(),
