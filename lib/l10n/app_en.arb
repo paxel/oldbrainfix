@@ -2675,5 +2675,17 @@
   "useThisVersion": "Use this version",
   "@useThisVersion": {"description": "A Note's History: writes this old text as the Note's or the Amend's text again, as a new change; nothing is deleted (#193)."},
   "useThisVersionDone": "The old text is back. The History keeps every version.",
-  "@useThisVersionDone": {"description": "Short message after Use this version (#193)."}
+  "@useThisVersionDone": {"description": "Short message after Use this version (#193)."},
+  "features": "What Old Brain Fix offers",
+  "@features": {"description": "The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices."},
+  "featuresDetail": "What you already made stays, either way. The same on all your own Devices; Settings changes it any time.",
+  "@featuresDetail": {"description": "Under the heading features (#197)."},
+  "featuresSimple": "Simple",
+  "@featuresSimple": {"description": "The Simple choice of features (#197)."},
+  "featuresSimpleDetail": "Notes, Checklists, Shopping Lists, Reminders and Routines.",
+  "@featuresSimpleDetail": {"description": "Under featuresSimple (#197): what Simple offers to make."},
+  "featuresAdvanced": "Advanced",
+  "@featuresAdvanced": {"description": "The Advanced choice of features (#197)."},
+  "featuresAdvancedDetail": "Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.",
+  "@featuresAdvancedDetail": {"description": "Under featuresAdvanced (#197): what Advanced adds."}
 }

@@ -8209,6 +8209,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The old text is back. The History keeps every version.'**
   String get useThisVersionDone;
+
+  /// The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'What Old Brain Fix offers'**
+  String get features;
+
+  /// Under the heading features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'What you already made stays, either way. The same on all your own Devices; Settings changes it any time.'**
+  String get featuresDetail;
+
+  /// The Simple choice of features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'Simple'**
+  String get featuresSimple;
+
+  /// Under featuresSimple (#197): what Simple offers to make.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes, Checklists, Shopping Lists, Reminders and Routines.'**
+  String get featuresSimpleDetail;
+
+  /// The Advanced choice of features (#197).
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get featuresAdvanced;
+
+  /// Under featuresAdvanced (#197): what Advanced adds.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.'**
+  String get featuresAdvancedDetail;
 }
 
 class _AppLocalizationsDelegate

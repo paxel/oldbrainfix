@@ -13,6 +13,14 @@ abstract final class PersonSettingKeys {
   static const trashDoneReminder = 'trashDoneReminder';
 
   static const on = 'on';
+
+  /// Simple or Advanced (#197): [simple] or [advanced] once chosen;
+  /// absent, null or any other value reads as Advanced, so nothing is
+  /// hidden from someone who never chose.
+  static const features = 'features';
+
+  static const simple = 'simple';
+  static const advanced = 'advanced';
 }
 
 /// The settings of the person rather than of this Device (#211): kept in
@@ -41,5 +49,25 @@ extension PersonSettings on Store {
       PersonSettingKeys.trashDoneReminder,
       on ? PersonSettingKeys.on : null,
     );
+  }
+
+  /// Whether making Tallies, Sessions, Frogs and Topics, the format bar
+  /// and Shared Area roles are offered (#197). Only [PersonSettingKeys.simple]
+  /// hides them; never chosen, or a value no app writes, reads as
+  /// Advanced. What exists stays visible and usable either way.
+  bool get advanced =>
+      currentByOwn(PersonSettingKeys.entity, PersonSettingKeys.features) !=
+      PersonSettingKeys.simple;
+
+  /// Chooses Simple or Advanced for all of the user's own Devices; the
+  /// same value stored again writes nothing, while Advanced chosen where
+  /// none was stored is written, so the choice is recorded.
+  set advanced(bool on) {
+    final value = on ? PersonSettingKeys.advanced : PersonSettingKeys.simple;
+    if (currentByOwn(PersonSettingKeys.entity, PersonSettingKeys.features) ==
+        value) {
+      return;
+    }
+    append(PersonSettingKeys.entity, PersonSettingKeys.features, value);
   }
 }

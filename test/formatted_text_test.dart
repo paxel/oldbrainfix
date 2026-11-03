@@ -765,6 +765,19 @@ void main() {
     TextEditingController field(WidgetTester tester) =>
         tester.widget<TextField>(find.byType(TextField).first).controller!;
 
+    testWidgets('in Simple the field has no format bar, and typed Markdown '
+        'still formats', (tester) async {
+      final id = notes.capture('buy milk').id;
+      store.advanced = false;
+      await openEditor(tester);
+      expect(key('format-bold'), findsNothing);
+      expect(key('two-row-insert-box'), findsNothing);
+      await tester.enterText(find.byType(TextField).first, 'buy **oat** milk');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(notes.byId(id)!.textFormat, TextFormats.markdown);
+    });
+
     testWidgets('a plain Note stays plain without a format', (tester) async {
       final id = notes.capture('buy milk').id;
       await openEditor(tester);

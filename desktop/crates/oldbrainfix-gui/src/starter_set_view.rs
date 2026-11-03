@@ -54,11 +54,14 @@ pub fn tick_topic(picked: &mut BTreeSet<String>, area: &str, topic: &str, on: bo
 pub fn starter_set(
     ui: &mut Ui,
     t: &L10n,
-    picked: &mut BTreeSet<String>,
+    (picked, advanced): (&mut BTreeSet<String>, &mut bool),
     actions: &mut Vec<WelcomeAction>,
 ) {
     let text = ui.visuals().text_color();
     ui.heading(RichText::new(t.starter_set_title()).color(text));
+    ui.label(RichText::new(t.features()).strong().color(text));
+    features_choice(ui, t, advanced);
+    ui.add_space(8.0);
     ui.label(RichText::new(t.starter_set_intro()).color(text));
     for (area, topics) in STARTER_SET {
         ui.add_space(8.0);
@@ -87,6 +90,27 @@ pub fn starter_set(
             actions.push(WelcomeAction::Back);
         }
     });
+}
+
+/// Simple or Advanced (#197) as two radio buttons, each with what it
+/// means under it, under what the choice keeps: on the Starter Set and in
+/// Settings. True when a click picked the other one.
+pub fn features_choice(ui: &mut Ui, t: &L10n, advanced: &mut bool) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.features_detail()).small().color(weak));
+    let was = *advanced;
+    for (value, label, detail) in [
+        (false, t.features_simple(), t.features_simple_detail()),
+        (true, t.features_advanced(), t.features_advanced_detail()),
+    ] {
+        ui.radio_value(advanced, value, RichText::new(label).color(text));
+        ui.horizontal(|ui| {
+            ui.add_space(24.0);
+            ui.label(RichText::new(detail).small().color(weak));
+        });
+    }
+    *advanced != was
 }
 
 #[cfg(test)]

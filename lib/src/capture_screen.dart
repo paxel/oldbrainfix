@@ -318,11 +318,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// scroll instead.
   static const _textRoom = 56.0;
 
-  /// What this Device's quick note shows, read once (ADR 0008).
+  /// What this Device's quick note shows, read once (ADR 0008); the
+  /// format bar only in Advanced (#197).
   late final _shows = {
     for (final control in QuickNoteControl.values)
-      if (widget.notes.store.quickNoteShows(control)) control,
+      if (widget.notes.store.quickNoteShows(control) &&
+          (_advanced || control != QuickNoteControl.formatBar))
+        control,
   };
+
+  /// Whether Frogs, Sessions, Tallies and the format bar are offered,
+  /// read once (#197).
+  late final _advanced = widget.notes.store.advanced;
   late final _nudgeButtons = widget.notes.store.quickNoteNudgeButtonsOn;
 
   /// With the format bar, its tags highlighted and a formatted text
@@ -1235,8 +1242,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final onSchedule = schedule
         ? (_mayManage && !shopping ? _spawn : null)
         : null;
-    // "Make it a Tally" goes with the Routine and the rest (Q481).
-    final onMakeTally = schedule && !shopping ? _makeTally : null;
+    // "Make it a Tally" goes with the Routine and the rest (Q481), only
+    // in Advanced (#197).
+    final onMakeTally = schedule && !shopping && _advanced ? _makeTally : null;
     if (onFile == null &&
         onSchedule == null &&
         onMakeTally == null &&
@@ -1250,7 +1258,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
       onSchedule: onSchedule,
       spawns: [
         for (final spawn in Spawn.values)
-          if (!locked || spawn != Spawn.session) spawn,
+          if ((!locked || spawn != Spawn.session) &&
+              // Frogs and Sessions are made only in Advanced (#197).
+              (_advanced || spawn == Spawn.routine || spawn == Spawn.reminder))
+            spawn,
       ],
       actions: importance || toShopping || onMakeTally != null
           ? NoteActions(

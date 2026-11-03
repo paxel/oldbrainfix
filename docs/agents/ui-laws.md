@@ -38,7 +38,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Area, a Topic and All Notes "+" fans out Note, Checklist, Shopping
   List, Tally, Session and Frog** (#161), and in an Area Topic, each an
   icon with its words, upward from the button as the Agenda's fan does;
-  Session, Frog and Topic only for who may set them up. What it makes is
+  Session, Frog and Topic only for who may set them up, and Tally,
+  Session, Frog and Topic only in Advanced (#197). What it makes is
   filed into the Area or Topic shown, from All Notes into none: Note
   opens Capture; Checklist and Shopping List ask their name, then open
   the editor with the cursor in the first Line or the field at the top;
@@ -68,6 +69,14 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.
+- **Simple or Advanced** (#197, ADR 0041) is one switch of the
+  person, asked on the first start's Starter Set page above the Areas,
+  two radio buttons with Simple picked, and changed in Settings after
+  the settings of the Device. **Simple hides only making**:
+  Tally, Session, Frog and Topic in "+", Frog and Session in every
+  spawn menu, New Session, Tally and Session in the kind badge, "Make
+  it a Tally", the format bar, and roles when sharing and in People.
+  What exists shows and works as in Advanced. Never chosen is Advanced.
 
 ## Gestures
 
@@ -146,7 +155,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Shopping List is picked.
 - **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
   all off by default, for File into…, Routine, Reminder, Frog, Session
-  or Tally, Add to a Shopping List, the Importance and the format bar,
+  or Tally, Add to a Shopping List, the Importance and the format bar
+  (only in Advanced, #197),
   and the switch Nudge buttons, on by default. What is switched on shows
   in the Note card's action row beside To full editor, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
@@ -587,6 +597,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   On the desktop it sits above the field, which shows a formatted text's
   Markdown while it is edited and the text as it reads otherwise. Its ☐
   puts ☐ in at the cursor, also in the middle of a word.
+- **In Simple there is no format bar** (#197): no ☐ and no formats
+  over any field, while a field's own buttons, such as a Line's in and
+  out, stay. Typed and pasted Markdown still formats, a formatted text
+  shows formatted and a table still opens.
 - **A Code text has no format bar and no ☐** (#213): the field shows it
   in the fixed-width font on the grey ground of code, unwrapped, and it
   moves sideways. **A paste that looks like code** into a Plain Note's

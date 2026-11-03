@@ -13,10 +13,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::join::{SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{Host, PairInfo, decode_pair_code};
-use oldbrainfix_core::{Error, Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_core::person_settings::keys;
+use oldbrainfix_core::{Error, Notes, OwnProfile, PersonSettings, Places, SigningKey, Store};
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::backup_view::restore_due;
 
@@ -190,6 +191,40 @@ fn new_to_old_brain_fix_plants_what_is_left_ticked_of_the_starter_set() -> TestR
             ("Household".to_string(), names(&["Cleaning", "Kitchen"])),
             ("Work".to_string(), names(&["Meetings"])),
         ]
+    );
+    Ok(())
+}
+
+#[test]
+fn the_starter_set_asks_simple_or_advanced_with_simple_picked() -> TestResult {
+    let mut harness = first_start()?;
+    click(&mut harness, "New to Old Brain Fix");
+    assert!(shows(&harness, "What Old Brain Fix offers"));
+    assert_eq!(
+        harness.get_by_label("Simple").accesskit_node().toggled(),
+        Some(egui::accesskit::Toggled::True)
+    );
+    assert_eq!(
+        harness.get_by_label("Advanced").accesskit_node().toggled(),
+        Some(egui::accesskit::Toggled::False)
+    );
+    click(&mut harness, "Start");
+    let desk = harness.state().store();
+    assert!(!PersonSettings::new(desk).advanced()?);
+    Ok(())
+}
+
+#[test]
+fn advanced_picked_on_the_starter_set_is_kept() -> TestResult {
+    let mut harness = first_start()?;
+    click(&mut harness, "New to Old Brain Fix");
+    click(&mut harness, "Advanced");
+    click(&mut harness, "Start");
+    let desk = harness.state().store();
+    assert!(PersonSettings::new(desk).advanced()?);
+    assert_eq!(
+        desk.current(keys::ENTITY, keys::FEATURES)?.as_deref(),
+        Some(keys::ADVANCED)
     );
     Ok(())
 }

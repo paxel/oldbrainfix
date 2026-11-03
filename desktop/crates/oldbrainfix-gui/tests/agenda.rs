@@ -821,6 +821,27 @@ fn with_done_reminders_trashed_done_moves_the_note_to_the_trash() -> TestResult 
 }
 
 #[test]
+fn settings_switch_simple_or_advanced_for_the_person() -> TestResult {
+    let mut harness = window(dentist_store("2026-11-02T11:00:00.000Z")?, "en");
+    harness.get_by_label("Edit").click();
+    harness.run();
+    harness.get_by_label("Settings… Ctrl+,").click();
+    harness.run();
+    // Never chosen: Advanced, so nothing is hidden (#197).
+    assert!(radio(&harness, "Advanced").accesskit_node().toggled() == Some(Toggled::True));
+    assert!(shows(&harness, "Format bar"));
+    radio(&harness, "Simple").click_accesskit();
+    harness.run();
+    assert!(!PersonSettings::new(harness.state().store()).advanced()?);
+    assert!(radio(&harness, "Simple").accesskit_node().toggled() == Some(Toggled::True));
+    assert!(!shows(&harness, "Format bar"));
+    radio(&harness, "Advanced").click_accesskit();
+    harness.run();
+    assert!(PersonSettings::new(harness.state().store()).advanced()?);
+    Ok(())
+}
+
+#[test]
 fn with_checked_items_hidden_a_done_occurrence_leaves_the_agenda() -> TestResult {
     let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
     // Off, as by default: checked off, it strikes through and stays.

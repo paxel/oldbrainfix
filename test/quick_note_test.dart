@@ -199,6 +199,23 @@ void main() {
       expect(find.byKey(const ValueKey('note-add-to-shopping')), findsNothing);
     });
 
+    testWidgets('in Simple the menu offers Routine and Reminder only, no '
+        '"Make it a Tally" and no format bar (#197)', (tester) async {
+      store
+        ..setQuickNoteShows(QuickNoteControl.schedule, true)
+        ..setQuickNoteShows(QuickNoteControl.formatBar, true)
+        ..advanced = false;
+      await start(tester);
+      await openTextCapture(tester);
+      expect(more, findsNothing);
+      expect(find.byKey(const ValueKey('format-bold')), findsNothing);
+      await tap(tester, spawnMenu);
+      expect(find.text('Routine'), findsOneWidget);
+      expect(find.text('Reminder'), findsOneWidget);
+      expect(find.text('Frog'), findsNothing);
+      expect(find.text('Session'), findsNothing);
+    });
+
     testWidgets('the Importance brings back ⋮ with it alone', (tester) async {
       store.setQuickNoteShows(QuickNoteControl.importance, true);
       await start(tester);

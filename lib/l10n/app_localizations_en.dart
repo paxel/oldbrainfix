@@ -5056,4 +5056,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get useThisVersionDone =>
       'The old text is back. The History keeps every version.';
+
+  @override
+  String get features => 'What Old Brain Fix offers';
+
+  @override
+  String get featuresDetail =>
+      'What you already made stays, either way. The same on all your own Devices; Settings changes it any time.';
+
+  @override
+  String get featuresSimple => 'Simple';
+
+  @override
+  String get featuresSimpleDetail =>
+      'Notes, Checklists, Shopping Lists, Reminders and Routines.';
+
+  @override
+  String get featuresAdvanced => 'Advanced';
+
+  @override
+  String get featuresAdvancedDetail =>
+      'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.';
 }

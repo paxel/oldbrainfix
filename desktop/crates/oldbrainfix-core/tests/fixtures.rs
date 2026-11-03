@@ -42,13 +42,14 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 25] = [
+const SCENARIOS: [&str; 26] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
     "checklists",
     "done-trash",
     "edits",
+    "features",
     "formats",
     "frogs",
     "history",
@@ -1556,6 +1557,43 @@ fn write_done_trash(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `features` scenario (#197).
+fn write_features(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    use oldbrainfix_core::person_settings::keys;
+    Notes::new(store).capture("Milk", None, None)?;
+    let settings = PersonSettings::new(store);
+    settings.set_advanced(false)?;
+    settings.set_advanced(false)?;
+    store.append(keys::ENTITY, keys::FEATURES, Some("easy"), None)?;
+    settings.set_advanced(false)?;
+    settings.set_advanced(true)?;
+    settings.set_advanced(true)?;
+    Ok(())
+}
+
+#[test]
+fn simple_or_advanced_reads_as_the_dart_core_reads_it() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let expected = read_json(&fixtures().join("features").join("features.json"))?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("features")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        assert_eq!(
+            PersonSettings::new(&store).advanced()?,
+            read["advanced"].as_bool().ok_or("advanced")?,
+            "after {length} entries"
+        );
+    }
+    Ok(())
+}
+
 /// The generator's `edits` scenario: what the desktop writes beyond the
 /// others.
 fn write_edits(store: &Store) -> Built {
@@ -1927,13 +1965,14 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 25] = [
+    let writers: [(&str, Writer); 26] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("done-trash", write_done_trash),
         ("edits", write_edits),
+        ("features", write_features),
         ("formats", write_formats),
         ("frogs", write_frogs),
         ("history", write_history),

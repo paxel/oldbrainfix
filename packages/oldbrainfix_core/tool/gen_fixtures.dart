@@ -443,6 +443,39 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'features',
+    about:
+        'Simple or Advanced (#197): never chosen with Notes, read as '
+        'Advanced; Simple chosen, and chosen again, which writes nothing; a '
+        'value no app writes, read as Advanced; Simple again, then '
+        'Advanced, and Advanced again, which writes nothing. '
+        '`features.json` holds what each length of the log reads as.',
+    build: (store) {
+      void read() => _featureReads.add({
+        'entries': store.allEntries().length,
+        'advanced': store.advanced,
+      });
+      Notes(store).capture('Milk');
+      read();
+      store.advanced = false;
+      read();
+      store.advanced = false;
+      read();
+      store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.features,
+        'easy',
+      );
+      read();
+      store.advanced = false;
+      read();
+      store.advanced = true;
+      read();
+      store.advanced = true;
+      read();
+    },
+  ),
+  (
     name: 'edits',
     about:
         'What the desktop writes beyond the other scenarios: Areas and '
@@ -3815,6 +3848,9 @@ Map<String, Object?> _ics() {
 
 /// What the Imports of the `import` scenario came to.
 var _imported = <ImportSummary>[];
+
+/// What the `features` scenario read after each of its steps.
+final _featureReads = <Map<String, Object>>[];
 
 Map<String, Object?> _summary(ImportSummary s) => {
   'areaId': s.areaId,
@@ -8281,6 +8317,8 @@ Future<void> main(List<String> args) async {
     'Checklists on today\'s Agenda with their open and total Lines and '
     'how each shows there, how each Note shows there by the user\'s own '
     'choice (#219) and whether the choice applies to it.\n'
+    '- `features/features.json`: whether the first entries of the '
+    '`features` log, as many as each read gives, read as Advanced.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
     '`list-switch` log, with the name and description its text shows as; '
     'its `checklists.json` and `shopping.json` as for the logs above.\n'
@@ -8700,6 +8738,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
+        );
+      }
+      if (scenario.name == 'features') {
+        _write(
+          File('${out.path}/features.json'),
+          '${_json.convert({'reads': _featureReads})}\n',
         );
       }
       if (scenario.name == 'list-switch') {

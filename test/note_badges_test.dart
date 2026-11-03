@@ -377,6 +377,22 @@ void main() {
         line.text,
     ];
 
+    testWidgets('in Simple a plain Note offers no Tally nor Session, and '
+        '"+" only Routine and Reminder', (tester) async {
+      final id = notes.capture('Trip\nPassport').id;
+      store.advanced = false;
+      await edit(tester, id);
+      await tap(tester, key('badge-kind'));
+      expect(offered(tester), ['plain', 'checklist', 'shoppingList']);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await tap(tester, key('badge-add'));
+      expect(key('spawn-routine'), findsOneWidget);
+      expect(key('spawn-reminder'), findsOneWidget);
+      expect(key('spawn-frog'), findsNothing);
+      expect(key('spawn-session'), findsNothing);
+    });
+
     testWidgets('a plain Note offers every kind as radio buttons, its own '
         'marked; Checklist makes it one at once, its first line the name, '
         'the rest its Lines', (tester) async {

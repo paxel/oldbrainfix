@@ -1,0 +1,32 @@
+{
+  "reads": [
+    {
+      "entries": 3,
+      "advanced": true
+    },
+    {
+      "entries": 4,
+      "advanced": false
+    },
+    {
+      "entries": 4,
+      "advanced": false
+    },
+    {
+      "entries": 5,
+      "advanced": true
+    },
+    {
+      "entries": 6,
+      "advanced": false
+    },
+    {
+      "entries": 7,
+      "advanced": true
+    },
+    {
+      "entries": 7,
+      "advanced": true
+    }
+  ]
+}

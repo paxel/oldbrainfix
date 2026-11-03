@@ -14,6 +14,7 @@ import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
 import 'failure_dialog.dart';
+import 'features_choice.dart';
 import 'folder_import.dart';
 import 'folder_platform.dart';
 import 'keep_import.dart';
@@ -74,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _streaksOn = widget.store.streaksOn;
   late bool _hidesChecked = widget.store.agendaHidesChecked;
   late bool _trashesDone = widget.store.trashesDoneReminder;
+  late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
@@ -146,6 +148,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setTrashesDone(bool on) {
     widget.store.trashesDoneReminder = on;
     setState(() => _trashesDone = on);
+  }
+
+  /// Simple or Advanced (#197), the person's own, on all of their own
+  /// Devices.
+  void _setAdvanced(bool on) {
+    widget.store.advanced = on;
+    setState(() => _advanced = on);
   }
 
   void _setStreaks(bool on) {
@@ -653,7 +662,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             SettingsHeading(t.settingsQuickNote),
-            _QuickNoteSettings(store: widget.store),
+            _QuickNoteSettings(store: widget.store, advanced: _advanced),
             if (hasCalendarPage(context)) ...[
               SettingsHeading(t.settingsCalendar),
               SettingsSection(
@@ -727,6 +736,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ],
+            // The person's own, on all of their own Devices (#197): after
+            // the settings of this phone, before About.
+            SettingsHeading(t.features),
+            FeaturesChoice(advanced: _advanced, onChanged: _setAdvanced),
             const SizedBox(height: 16),
             SettingsSection(
               children: [
@@ -889,7 +902,10 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
 class _QuickNoteSettings extends StatefulWidget {
   final Store store;
 
-  const _QuickNoteSettings({required this.store});
+  /// Whether the format bar's switch shows: only in Advanced (#197).
+  final bool advanced;
+
+  const _QuickNoteSettings({required this.store, required this.advanced});
 
   @override
   State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
@@ -945,11 +961,12 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
           t.addToShoppingList,
         ),
         shows(QuickNoteControl.importance, Icons.priority_high, t.importance),
-        shows(
-          QuickNoteControl.formatBar,
-          Icons.format_bold,
-          t.quickNoteFormatBar,
-        ),
+        if (widget.advanced)
+          shows(
+            QuickNoteControl.formatBar,
+            Icons.format_bold,
+            t.quickNoteFormatBar,
+          ),
         SwitchBelow(
           switchKey: const ValueKey('quickNote-nudgeButtons'),
           leading: const Icon(Icons.snooze),

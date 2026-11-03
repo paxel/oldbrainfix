@@ -115,7 +115,10 @@ Future<bool> amendNote(
 }) async {
   final typed = await showDialog<({String text, bool markdown})>(
     context: context,
-    builder: (_) => _AmendDialog(twoRows: notes.store.twoRowEditorOn),
+    builder: (_) => _AmendDialog(
+      twoRows: notes.store.twoRowEditorOn,
+      bar: notes.store.advanced,
+    ),
   );
   final trimmed = typed?.text.trim();
   if (!context.mounted || typed == null || trimmed == null) return false;
@@ -282,6 +285,7 @@ NoteActions noteActions(
     }),
   );
   return NoteActions(
+    advanced: notes.store.advanced,
     onEdit: onEdit,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
@@ -307,9 +311,10 @@ NoteActions noteActions(
         : null,
     isTally: () => Tallies(notes.store).isTally(id),
     // Only a Note in the lists becomes a Tally (ADR 0028), and no Code
-    // text (#213).
+    // text (#213); only in Advanced (#197).
     onMakeTally:
-        placed.changes &&
+        notes.store.advanced &&
+            placed.changes &&
             !placed.note.isTrashed &&
             !placed.note.isMerged &&
             placed.note.textFormat != TextFormats.code
@@ -802,6 +807,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final plainable = changes && (note?.textEditable ?? false);
     // As the card's "Make it a Tally": only a Note in the lists.
     final listed = changes && note != null && !note.isTrashed && !note.isMerged;
+    final advanced = widget.notes.store.advanced;
     final setup = _setup = _kind == NoteKind.session
         ? Sessions(widget.notes.store).setupOf(widget.noteId)
         : null;
@@ -820,8 +826,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       NoteKind.plain => {
         if (lists.mayMake(widget.noteId)) NoteKind.checklist,
         if (shopping.mayMake(widget.noteId)) NoteKind.shoppingList,
-        if (listed) NoteKind.tally,
-        if (listed) NoteKind.session,
+        // Made only in Advanced (#197).
+        if (listed && advanced) NoteKind.tally,
+        if (listed && advanced) NoteKind.session,
       },
       NoteKind.checklist => {
         if (plainable) NoteKind.plain,
@@ -1472,9 +1479,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
-  /// Session, as a Routine of it runs it already (#191).
+  /// Session, as a Routine of it runs it already (#191); in Simple only
+  /// Routine and Reminder (#197).
   Future<void> _addMenu(Offset at) async {
     final t = context.t;
+    final advanced = widget.notes.store.advanced;
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
@@ -1492,9 +1501,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             const Icon(Icons.notifications_outlined),
             t.reminder,
           ),
-          (Spawn.frog, const FrogIcon(), t.frog),
+          // Frogs and Sessions are made only in Advanced (#197).
+          if (advanced) (Spawn.frog, const FrogIcon(), t.frog),
           // A Code text becomes no Session (#213).
-          if (_kind != NoteKind.session &&
+          if (advanced &&
+              _kind != NoteKind.session &&
               _placed?.note.textFormat != TextFormats.code)
             (Spawn.session, const Icon(Icons.event_repeat), t.session),
         ])
@@ -1972,6 +1983,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               twoRows: _twoRows,
               readOnly: !editable,
               boxes: true,
+              bar: widget.notes.store.advanced,
               onBox: _tapBox,
               formats: true,
               onFormatted: () => setState(_saveText),
@@ -2039,6 +2051,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           twoRows: _twoRows,
           readOnly: !editable,
           boxes: true,
+          bar: widget.notes.store.advanced,
           onBox: (start, at) => _tapBox(start, at, name: true),
           style: theme.textTheme.titleLarge,
           decoration: InputDecoration(
@@ -2220,6 +2233,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         // ☐ goes in at the cursor; a tap on a box ticks it,
                         // also where the text is only read (ADR 0035).
                         boxes: true,
+                        bar: widget.notes.store.advanced,
                         onBox: _tapBox,
                         // The first format is written at once (ADR 0033).
                         formats: true,
@@ -2363,6 +2377,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         controller: field,
                         twoRows: _twoRows,
                         boxes: true,
+                        bar: widget.notes.store.advanced,
                         onBox: (start, at) =>
                             _tapBox(start, at, section: section.id),
                         formats: true,
@@ -2675,7 +2690,10 @@ class _AmendDialog extends StatefulWidget {
   /// Whether the text is typed in two rows (UI laws, "Text editor").
   final bool twoRows;
 
-  const _AmendDialog({required this.twoRows});
+  /// Whether the format bar shows: only in Advanced (#197).
+  final bool bar;
+
+  const _AmendDialog({required this.twoRows, required this.bar});
 
   @override
   State<_AmendDialog> createState() => _AmendDialogState();
@@ -2698,7 +2716,8 @@ class _AmendDialogState extends State<_AmendDialog> {
     final keyboard = media.viewInsets.bottom;
     // The dialog stays clear of what rides on the keyboard.
     final below = keyboard > 0
-        ? keyboard + TwoRowTextField.above(twoRows: widget.twoRows, bar: true)
+        ? keyboard +
+              TwoRowTextField.above(twoRows: widget.twoRows, bar: widget.bar)
         : keyboard;
     return MediaQuery(
       data: media.copyWith(
@@ -2711,6 +2730,7 @@ class _AmendDialogState extends State<_AmendDialog> {
           twoRows: widget.twoRows,
           autofocus: true,
           formats: true,
+          bar: widget.bar,
           decoration: InputDecoration(hintText: t.amendHint),
         ),
         actions: [

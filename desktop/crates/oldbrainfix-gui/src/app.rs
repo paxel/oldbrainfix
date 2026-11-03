@@ -500,6 +500,9 @@ struct View {
     /// Whether this Device may set up Sessions and Frogs where the list
     /// shows, for what "+" offers (#161).
     list_manages: bool,
+    /// Whether the person chose Advanced (#197): only then are Tallies,
+    /// Sessions, Frogs and Topics made, the format bar and roles offered.
+    advanced: bool,
     /// What this Device's quick note shows (#142).
     capture_quick: QuickNote,
     /// The Shopping Lists the Note being captured can go into, by their
@@ -1388,6 +1391,9 @@ enum Setting {
     /// Whether Done on a plain Note's only Reminder moves the Note to the
     /// trash: the person's, on all of their own Devices (#211).
     TrashDoneReminder(bool),
+    /// Simple or Advanced: the person's, on all of their own Devices
+    /// (#197).
+    Advanced(bool),
     /// Whether the quick note shows this control (#142).
     QuickNote(QuickNoteControl, bool),
     /// Whether the quick note shows the three Nudge buttons (#142).
@@ -2177,6 +2183,10 @@ impl App {
                     .and_then(|w| w.starter.clone())
                     .unwrap_or_default();
                 let picked: Vec<&str> = picked.iter().map(String::as_str).collect();
+                // Simple or Advanced, for all of the person's own Devices
+                // (#197).
+                let advanced = self.welcome.as_ref().is_some_and(|w| w.advanced);
+                PersonSettings::new(&self.store).set_advanced(advanced)?;
                 Places::new(&self.store).plant_starter_set(&picked)?;
                 self.welcomed()?;
             }
@@ -4739,6 +4749,7 @@ impl App {
                 self.capture_place().as_deref(),
             )?,
             list_manages: capture_choices::may_spawn(&self.store, self.list_place().as_deref())?,
+            advanced: PersonSettings::new(&self.store).advanced()?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
             capture_quick: QuickNote::read(&self.store)?,
             routines: note_routines,
@@ -7058,6 +7069,7 @@ impl App {
             Setting::TrashDoneReminder(on) => {
                 PersonSettings::new(&self.store).set_trashes_done_reminder(on)?;
             }
+            Setting::Advanced(on) => PersonSettings::new(&self.store).set_advanced(on)?,
             Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
             Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
         }
@@ -7851,6 +7863,7 @@ impl App {
 
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
+        let advanced = self.view.advanced;
         egui::ScrollArea::vertical()
             .id_salt("places")
             .show(ui, |ui| {
@@ -7907,9 +7920,12 @@ impl App {
                     }
                     resp.context_menu(|ui| {
                         let mut items = Vec::new();
+                        // Topics are made only in Advanced (#197).
+                        if manages && advanced {
+                            items.push((t.new_topic(), Action::NewTopic(area.id.clone())));
+                        }
                         if manages {
                             items.extend([
-                                (t.new_topic(), Action::NewTopic(area.id.clone())),
                                 (t.rename(), Action::Rename(area.id.clone())),
                                 (t.area_look(), Action::Look(area.id.clone())),
                                 (t.share_area(), Action::Share(area.id.clone())),
@@ -8306,20 +8322,28 @@ impl App {
                             reminder: true,
                         },
                     ),
-                    (
-                        t.frog(),
-                        None,
-                        may(|n| n.frog),
-                        Action::SpawnFrog(id.clone()),
-                    ),
-                    (
-                        t.session(),
-                        None,
-                        may(|n| n.session),
-                        Action::NewSession(Some(id.clone())),
-                    ),
                 ];
                 menu_entries(ui, items, actions);
+                // Frogs, Sessions and Tallies are made only in Advanced
+                // (#197).
+                let advanced = self.view.advanced;
+                if advanced {
+                    let items = [
+                        (
+                            t.frog(),
+                            None,
+                            may(|n| n.frog),
+                            Action::SpawnFrog(id.clone()),
+                        ),
+                        (
+                            t.session(),
+                            None,
+                            may(|n| n.session),
+                            Action::NewSession(Some(id.clone())),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                }
                 ui.separator();
                 let items = [
                     (
@@ -8334,14 +8358,17 @@ impl App {
                         may(|n| n.shopping),
                         Action::Shopping(ShoppingAction::Make(id.clone())),
                     ),
-                    (
+                ];
+                menu_entries(ui, items, actions);
+                if advanced {
+                    let items = [(
                         t.make_tally(),
                         None,
                         may(|n| n.tally),
                         Action::Tally(TallyAction::Make(id.clone())),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
+                    )];
+                    menu_entries(ui, items, actions);
+                }
                 ui.separator();
                 let items = [
                     (
@@ -9227,7 +9254,7 @@ impl App {
             Selection::AllRoutines => {
                 let mut asked = Vec::new();
                 let rows = (&self.view.all_routines[..], &self.view.all_newer[..]);
-                all_routines_view::page(ui, &self.t, tones, rows, &mut asked);
+                all_routines_view::page(ui, &self.t, tones, rows, self.view.advanced, &mut asked);
                 actions.extend(asked.into_iter().map(|asked| match asked {
                     AllRoutinesAction::Open(id) => Action::OpenRoutine(id),
                     AllRoutinesAction::OpenNote(id) => Action::SelectNote(id),
@@ -9459,7 +9486,8 @@ impl App {
     /// What "+" at the top of the list makes (#161), in the order its
     /// menu shows them: in All Notes, an Area and a Topic the six kinds,
     /// Session and Frog only for who may set them up there, in an Area
-    /// a Topic too for who may add one; in Unsorted a Note. Nothing among
+    /// a Topic too for who may add one; in Unsorted a Note. Tally,
+    /// Session, Frog and Topic only in Advanced (#197). Nothing among
     /// another person's Notes, nor in the trash.
     fn new_kinds(&self) -> Option<Vec<NewKind>> {
         if !self.people.is_everyone() {
@@ -9468,12 +9496,11 @@ impl App {
         match &self.selection {
             Selection::Unsorted => Some(vec![NewKind::Note]),
             Selection::All | Selection::Place(_) => {
-                let mut kinds = vec![
-                    NewKind::Note,
-                    NewKind::Checklist,
-                    NewKind::Shopping,
-                    NewKind::Tally,
-                ];
+                let mut kinds = vec![NewKind::Note, NewKind::Checklist, NewKind::Shopping];
+                if !self.view.advanced {
+                    return Some(kinds);
+                }
+                kinds.push(NewKind::Tally);
                 if self.view.list_manages {
                     kinds.extend([NewKind::Session, NewKind::Frog]);
                 }
@@ -9682,6 +9709,7 @@ impl App {
                         let shown = KindedText {
                             note,
                             writes,
+                            bar: self.view.advanced,
                             boxes,
                             ticks: (ticks, &ticked),
                         };
@@ -9748,6 +9776,7 @@ impl App {
                         code,
                         // A paste that looks like code offers it (#213).
                         offers_code: !code,
+                        bar: self.view.advanced,
                         boxes,
                         ticks: (ticks, &ticked),
                         name: t.note_text_field_name(),
@@ -9807,6 +9836,7 @@ impl App {
                     session: session_setup.map(|s| (s, makes_session)),
                     may,
                     frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
+                    advanced: self.view.advanced,
                 };
                 note_badges(ui, (&t, tones), &shown, actions);
                 let media = [
@@ -9856,6 +9886,7 @@ impl App {
                                 formatted: section.text_format == text_format::MARKDOWN,
                                 code: false,
                                 offers_code: false,
+                                bar: self.view.advanced,
                                 boxes: look,
                                 ticks: (section_ticks, &section_ticked),
                                 name: t.section_text_field_name(),
@@ -9971,7 +10002,11 @@ impl App {
                     let selected = format_bar::selection(ui, id, amend);
                     let at = format_bar::At::of(amend, selected, markdown::uses(amend));
                     let formats = &Format::ALL[1..];
-                    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), formats);
+                    // Only in Advanced (#197).
+                    let mut picked = match self.view.advanced {
+                        true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
+                        false => None,
+                    };
                     if focused {
                         ui.input_mut(|i| {
                             if i.consume_key(Modifiers::COMMAND, Key::B) {
@@ -10066,7 +10101,8 @@ impl App {
                 // that is adds entries in its Tally part above. A
                 // Checklist, a Shopping List or a Session is no Tally (ADR
                 // 0030, ADR 0039).
-                if tally.is_none()
+                if self.view.advanced
+                    && tally.is_none()
                     && checklist.is_none()
                     && shopping.is_none()
                     && session_setup.is_none()
@@ -10256,7 +10292,13 @@ impl App {
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(ui, &t, &shown, (role, !afar.is_empty()), actions);
+                        share_form(
+                            ui,
+                            &t,
+                            &shown,
+                            (role, !afar.is_empty(), view.advanced),
+                            actions,
+                        );
                     }
                     Dialog::ShareAfar {
                         area,
@@ -10357,7 +10399,15 @@ impl App {
                         let mine = view.mine.get(area).map(String::as_str);
                         let names = &view.names;
                         let shown = (&view.shown, &mut *pictures);
-                        people_form(ui, &t, area, (people, names, mine), shown, manages, actions);
+                        people_form(
+                            ui,
+                            &t,
+                            area,
+                            (people, names, mine),
+                            shown,
+                            (manages, view.advanced),
+                            actions,
+                        );
                     }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
@@ -11429,6 +11479,7 @@ impl App {
             .trashes_done_reminder()
             .unwrap_or(false);
         let quick = self.view.capture_quick;
+        let advanced = self.view.advanced;
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -11652,6 +11703,15 @@ impl App {
                         actions.push(Action::Setting(Setting::Streaks(on)));
                     }
                     ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
+                });
+                // Simple or Advanced, the person's (#197), last, so
+                // the settings of this computer come first.
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.features()).strong().color(text));
+                    let mut picked = advanced;
+                    if starter_set_view::features_choice(ui, &t, &mut picked) {
+                        actions.push(Action::Setting(Setting::Advanced(picked)));
+                    }
                 });
             });
     }
@@ -12238,20 +12298,26 @@ fn share_form(
     ui: &mut Ui,
     t: &L10n,
     area: &str,
-    (role, afar): (&mut AreaRole, bool),
+    (role, afar, advanced): (&mut AreaRole, bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     title(ui, &t.share_title(area));
     ui.label(RichText::new(t.share_host_intro()).color(weak));
-    ui.label(RichText::new(t.role_heading()).strong().color(text));
-    for (choice, label, detail) in [
-        (AreaRole::Member, t.role_member(), t.role_member_detail()),
-        (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
-    ] {
-        ui.radio_value(role, choice, RichText::new(label).color(text));
-        ui.label(RichText::new(detail).small().color(weak));
+    // Roles are chosen only in Advanced (#197); in Simple the person
+    // joins as a Member.
+    if advanced {
+        ui.label(RichText::new(t.role_heading()).strong().color(text));
+        for (choice, label, detail) in [
+            (AreaRole::Member, t.role_member(), t.role_member_detail()),
+            (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
+        ] {
+            ui.radio_value(role, choice, RichText::new(label).color(text));
+            ui.label(RichText::new(detail).small().color(weak));
+        }
+    } else {
+        *role = AreaRole::Member;
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
@@ -12947,7 +13013,7 @@ fn people_form(
         &std::collections::HashMap<String, Profile>,
         &mut profile_view::Pictures,
     ),
-    manages: bool,
+    (manages, advanced): (bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -12990,7 +13056,8 @@ fn people_form(
                 Some(AreaRole::Manager) => (t.make_member(), AreaRole::Member),
                 None => return,
             };
-            if ui.button(RichText::new(label).color(text)).clicked() {
+            // Roles are changed only in Advanced (#197).
+            if advanced && ui.button(RichText::new(label).color(text)).clicked() {
                 actions.push(Action::SetRole {
                     area: area.to_string(),
                     person: person.id.clone(),
@@ -13271,6 +13338,10 @@ fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<A
         ),
     ];
     for (control, shows, label) in switches {
+        // The format bar is offered only in Advanced (#197).
+        if control == QuickNoteControl::FormatBar && !quick.advanced {
+            continue;
+        }
         let mut on = shows;
         if theme::checkbox(ui, &mut on, RichText::new(label).color(text)).changed() {
             actions.push(Action::Setting(Setting::QuickNote(control, on)));
@@ -14287,6 +14358,9 @@ struct BadgesShown<'a> {
     session: Option<(&'a SessionSetup, bool)>,
     may: NoteMay,
     frog_open: bool,
+    /// Whether Frogs and Sessions are offered under "+": only in
+    /// Advanced (#197).
+    advanced: bool,
 }
 
 /// The kind of the Note open (#188), and the kinds this Device may make
@@ -14323,8 +14397,10 @@ impl KindShown {
                     let tally = may.amends && may.changes && !note.is_merged();
                     choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
                     choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));
-                    choices.extend(tally.then_some(NoteKind::Tally));
-                    choices.extend(view.makes_session.then_some(NoteKind::Session));
+                    // Made only in Advanced (#197).
+                    choices.extend((tally && view.advanced).then_some(NoteKind::Tally));
+                    choices
+                        .extend((view.makes_session && view.advanced).then_some(NoteKind::Session));
                 }
                 NoteKind::Checklist => {
                     choices.extend(plain(view.checklist.as_ref().is_some_and(|l| l.plain)));
@@ -14580,13 +14656,17 @@ fn note_badges(
                     },
                 ),
             ];
-            // A Note has one open Frog at a time.
-            if !shown.frog_open {
+            // A Note has one open Frog at a time; Frogs and Sessions are
+            // made only in Advanced (#197).
+            if shown.advanced && !shown.frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
             // Only a plain Note becomes a Session, and no Code text
             // (#213); a Routine of a Session Note runs it already (#191).
-            if shown.kind.kind == NoteKind::Plain && note.text_format != text_format::CODE {
+            if shown.advanced
+                && shown.kind.kind == NoteKind::Plain
+                && note.text_format != text_format::CODE
+            {
                 entries.push((
                     icons::SESSION,
                     t.session(),
@@ -14906,6 +14986,9 @@ struct EditedText<'a> {
     /// like code offers it.
     code: bool,
     offers_code: bool,
+    /// Whether the format bar shows above it: only in Advanced (#197);
+    /// typed Markdown and Ctrl+B and Ctrl+I format either way.
+    bar: bool,
     /// How its boxes show, whether this Device may tick them and which
     /// were ticked (ADR 0035).
     boxes: &'a BoxLook,
@@ -14957,7 +15040,7 @@ fn edited_text(
     let at = format_bar::At::of(edited, selected, formatted);
     // A Code text has none (#213).
     let as_code = edit.code;
-    let mut picked = match as_code {
+    let mut picked = match as_code || !edit.bar {
         true => None,
         false => format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL),
     };
@@ -15244,6 +15327,9 @@ const DESCRIPTION_SIZE: f32 = 14.0;
 struct KindedText<'a> {
     note: &'a Note,
     writes: bool,
+    /// Whether the description's format bar shows: only in Advanced
+    /// (#197).
+    bar: bool,
     boxes: &'a BoxLook,
     ticks: (bool, &'a dyn Fn(&str) -> bool),
 }
@@ -15348,6 +15434,7 @@ fn kinded_text(
             formatted,
             code: false,
             offers_code: false,
+            bar: shown.bar,
             boxes: shown.boxes,
             ticks: shown.ticks,
             name: t.note_description(),

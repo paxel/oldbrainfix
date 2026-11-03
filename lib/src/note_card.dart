@@ -165,6 +165,10 @@ class NoteActions {
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
+  /// Whether Frogs and Sessions are offered to spawn: only in Advanced
+  /// (#197).
+  final bool advanced;
+
   const NoteActions({
     this.onEdit,
     this.onImportance,
@@ -181,6 +185,7 @@ class NoteActions {
     this.addToShopping,
     this.showTicks,
     this.onDelete,
+    this.advanced = true,
   });
 }
 
@@ -679,15 +684,19 @@ class NoteActionRow extends StatelessWidget {
             onSelected: onSchedule,
             itemBuilder: (_) => [
               for (final spawn in spawnsNow?.call() ?? spawns)
-                PopupMenuItem(
-                  value: spawn,
-                  child: Text(switch (spawn) {
-                    Spawn.routine => t.routine,
-                    Spawn.reminder => t.reminder,
-                    Spawn.frog => t.frog,
-                    Spawn.session => t.session,
-                  }),
-                ),
+                // Frogs and Sessions are made only in Advanced (#197).
+                if ((actions?.advanced ?? true) ||
+                    spawn == Spawn.routine ||
+                    spawn == Spawn.reminder)
+                  PopupMenuItem(
+                    value: spawn,
+                    child: Text(switch (spawn) {
+                      Spawn.routine => t.routine,
+                      Spawn.reminder => t.reminder,
+                      Spawn.frog => t.frog,
+                      Spawn.session => t.session,
+                    }),
+                  ),
             ],
           ),
         if (onMerge != null)

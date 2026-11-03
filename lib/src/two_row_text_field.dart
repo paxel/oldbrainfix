@@ -297,6 +297,9 @@ typedef FieldAction = ({
 /// pasted text that looks like code ([TextFormats.looksLikeCode]) calls
 /// it, and the paste does not make the text formatted.
 ///
+/// Without [bar] (Simple, #197) the bar has neither ☐ nor the formats;
+/// typing, pasting and tapping a formatted text work as with it.
+///
 /// [actions] put buttons of the field's own on the same bar, first, such
 /// as a Line's "in" and "out" (#141). With [focusNode] the field takes
 /// the focus its owner moves; it stays the owner's to dispose.
@@ -325,6 +328,7 @@ class TwoRowTextField extends StatefulWidget {
   final void Function(int start, Offset at)? onBox;
   final bool formats;
   final bool lineFormats;
+  final bool bar;
   final VoidCallback? onFormatted;
   final VoidCallback? onCodePasted;
   final List<FieldAction> actions;
@@ -342,6 +346,7 @@ class TwoRowTextField extends StatefulWidget {
     this.onBox,
     this.formats = false,
     this.lineFormats = true,
+    this.bar = true,
     this.onFormatted,
     this.onCodePasted,
     this.actions = const [],
@@ -497,8 +502,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   /// Whether the field has the bar of formats, ☐ or its own buttons.
   bool get _hasBar =>
-      _formatting != null ||
-      _inserts ||
+      (widget.bar && (_formatting != null || _inserts)) ||
       (widget.actions.isNotEmpty && !widget.readOnly);
 
   bool get _barShown => _hasBar && _keyboardOpen;
@@ -1196,14 +1200,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           icon: (_) => Icon(action.icon),
           run: action.run,
         ),
-      if (_inserts)
+      if (_inserts && widget.bar)
         _Format(
           key: 'two-row-insert-box',
           label: t.boxInsert,
           icon: (_) => const Icon(Icons.check_box_outline_blank),
           run: _insertBox,
         ),
-      if (controller != null) ...[
+      if (controller != null && widget.bar) ...[
         _Format(
           key: 'format-bold',
           label: t.formatBold,

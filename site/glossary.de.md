@@ -133,6 +133,10 @@ Ein tägliches Zeitfenster, in dem Stupser warten. Routinen und Erinnerungen sin
 **Startauswahl** [Starter Set]:
 Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, welche du behältst.
 
+**Einfach und Erweitert** [Simple and Advanced]:
+Ein Schalter der Person, auf allen ihren eigenen Geräten gleich, beim ersten Start mit der Startauswahl gefragt, Einfach ausgewählt, und in den Einstellungen geändert. Einfach bietet an, Notizen, Checklisten, Einkaufslisten, Erinnerungen und Routinen anzulegen; Erweitert fügt Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen hinzu. Was es schon gibt, bleibt in Einfach sichtbar und nutzbar; nur Neues davon anzulegen ist verborgen. Nie gewählt zählt als Erweitert.
+_Avoid_: Modus, Stufe, Anfänger, Profi
+
 ## Routinen und Erinnerungen
 
 **Routine** [Routine]:

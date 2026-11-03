@@ -135,6 +135,10 @@ A daily window in which Nudges and the Changes Nudge wait. Routines and Reminder
 **Starter Set**:
 The Areas and Topics offered on first start; the user picks which ones to keep.
 
+**Simple and Advanced**:
+One switch of the person, the same on all of their own Devices, asked with the Starter Set on first start, Simple picked, and changed in Settings (#197). Simple offers making Notes, Checklists, Shopping Lists, Reminders and Routines; Advanced adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas. What exists stays visible and usable in Simple; only making new ones is hidden. Never chosen counts as Advanced. German: Einfach und Erweitert.
+_Avoid_: mode, level, beginner, expert
+
 ### Routines and Reminders
 
 **Routine**:

@@ -36,3 +36,7 @@ Once the Note is in the trash, its Reminder is too, so there is no row or box le
 Two of one's own Devices that check off the same Reminder apart, before they meet, each move the Note to the trash. The second trash moment wins after a sync, as for any field.
 
 The cross-core fixture `done-trash` writes the same log from both cores.
+
+## Simple or Advanced (ADR 0041)
+
+Amended by #197: the second setting of the person, Simple or Advanced, is the field `features` of the same entity, `simple` or `advanced`; never chosen and any other value read as Advanced (ADR 0041).

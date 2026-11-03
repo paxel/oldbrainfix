@@ -67,6 +67,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
   var _codeInvalid = false;
   var _role = AreaRole.member;
   var _busy = false;
+  late final _advanced = widget.store.advanced;
   late String _areaId = widget.areaId;
   late final Area? _area = Places(widget.store).areaById(widget.areaId);
 
@@ -316,31 +317,35 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
         children: [
           Text(t.shareIntro),
           const SizedBox(height: 16),
-          Text(t.roleHeading, style: Theme.of(context).textTheme.titleSmall),
-          RadioGroup<AreaRole>(
-            groupValue: _role,
-            onChanged: (role) {
-              if (role != null && !_busy) setState(() => _role = role);
-            },
-            child: Column(
-              children: [
-                RadioListTile<AreaRole>(
-                  key: const ValueKey('role-member'),
-                  contentPadding: EdgeInsets.zero,
-                  value: AreaRole.member,
-                  title: Text(t.roleMember),
-                  subtitle: Text(t.roleMemberDetail),
-                ),
-                RadioListTile<AreaRole>(
-                  key: const ValueKey('role-manager'),
-                  contentPadding: EdgeInsets.zero,
-                  value: AreaRole.manager,
-                  title: Text(t.roleManager),
-                  subtitle: Text(t.roleManagerDetail),
-                ),
-              ],
+          // Roles are chosen only in Advanced (#197); in Simple the
+          // person joins as a Member.
+          if (_advanced) ...[
+            Text(t.roleHeading, style: Theme.of(context).textTheme.titleSmall),
+            RadioGroup<AreaRole>(
+              groupValue: _role,
+              onChanged: (role) {
+                if (role != null && !_busy) setState(() => _role = role);
+              },
+              child: Column(
+                children: [
+                  RadioListTile<AreaRole>(
+                    key: const ValueKey('role-member'),
+                    contentPadding: EdgeInsets.zero,
+                    value: AreaRole.member,
+                    title: Text(t.roleMember),
+                    subtitle: Text(t.roleMemberDetail),
+                  ),
+                  RadioListTile<AreaRole>(
+                    key: const ValueKey('role-manager'),
+                    contentPadding: EdgeInsets.zero,
+                    value: AreaRole.manager,
+                    title: Text(t.roleManager),
+                    subtitle: Text(t.roleManagerDetail),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 16),
           if (canScan)
             FilledButton.icon(
@@ -752,16 +757,18 @@ class _PeopleScreenState extends State<PeopleScreen> {
                       key: ValueKey('person-menu-${person.id}'),
                       onSelected: (action) => _act(person, action),
                       itemBuilder: (_) => [
-                        if (person.role == AreaRole.member)
-                          PopupMenuItem(
-                            value: _PersonAction.manager,
-                            child: Text(t.makeManager),
-                          )
-                        else
-                          PopupMenuItem(
-                            value: _PersonAction.member,
-                            child: Text(t.makeMember),
-                          ),
+                        // Roles are changed only in Advanced (#197).
+                        if (widget.store.advanced)
+                          if (person.role == AreaRole.member)
+                            PopupMenuItem(
+                              value: _PersonAction.manager,
+                              child: Text(t.makeManager),
+                            )
+                          else
+                            PopupMenuItem(
+                              value: _PersonAction.member,
+                              child: Text(t.makeMember),
+                            ),
                         PopupMenuItem(
                           value: _PersonAction.remove,
                           child: Text(t.removePerson),

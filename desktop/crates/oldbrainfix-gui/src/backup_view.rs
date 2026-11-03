@@ -256,6 +256,9 @@ pub enum WelcomeAction {
 pub struct Welcome {
     /// The Starter Set's slugs ticked, while it shows.
     pub starter: Option<BTreeSet<String>>,
+    /// Whether Advanced is picked on the Starter Set (#197); Simple
+    /// until it is.
+    pub advanced: bool,
     /// Whether a Device of one's own is being added.
     pub adding: bool,
     pub file: Option<(PathBuf, Header)>,
@@ -296,7 +299,8 @@ pub fn welcome(
     actions: &mut Vec<WelcomeAction>,
 ) {
     if let Some(picked) = &mut state.starter {
-        crate::starter_set_view::starter_set(ui, t, picked, actions);
+        let advanced = &mut state.advanced;
+        crate::starter_set_view::starter_set(ui, t, (picked, advanced), actions);
         return;
     }
     let text = ui.visuals().text_color();

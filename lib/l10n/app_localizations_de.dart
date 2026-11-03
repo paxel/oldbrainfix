@@ -5119,4 +5119,25 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get useThisVersionDone =>
       'Der alte Text ist zurück. Der Verlauf behält jede Version.';
+
+  @override
+  String get features => 'Was Old Brain Fix anbietet';
+
+  @override
+  String get featuresDetail =>
+      'Was du schon angelegt hast, bleibt so oder so. Auf allen deinen eigenen Geräten gleich; die Einstellungen ändern es jederzeit.';
+
+  @override
+  String get featuresSimple => 'Einfach';
+
+  @override
+  String get featuresSimpleDetail =>
+      'Notizen, Checklisten, Einkaufslisten, Erinnerungen und Routinen.';
+
+  @override
+  String get featuresAdvanced => 'Erweitert';
+
+  @override
+  String get featuresAdvancedDetail =>
+      'Dazu Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen.';
 }

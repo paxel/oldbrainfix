@@ -27,8 +27,8 @@ use oldbrainfix_core::named_places::keys as place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::{
     AreaRole, Checklists, Day, Frogs, Importance, Invite, ListOnAgenda, Notes, OwnProfile,
-    PairedDevice, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists, SigningKey,
-    Store, Tallies, TallyRule,
+    PairedDevice, PersonSettings, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists,
+    SigningKey, Store, Tallies, TallyRule,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -492,6 +492,25 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     let mut harness = window(&store, Selection::Unsorted);
     click(&mut harness, "New Note");
     assert!(harness.state().quick_note_open());
+    Ok(())
+}
+
+#[test]
+fn in_simple_plus_offers_note_checklist_and_shopping_list_and_a_tally_stays() -> TestResult {
+    let (store, household) = store()?;
+    let push_ups = Notes::new(&store).capture("Push-ups", Some(&household), None)?;
+    Tallies::new(&store).add_field(&push_ups.id, "Push-ups", "times", None, None)?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let mut harness = window(&store, Selection::Place(household.clone()));
+    assert!(shows(&harness, "Push-ups"));
+    harness.get_by_label("Add here").click();
+    harness.run();
+    for label in ["Note", "Checklist", "Shopping List"] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    for label in ["Tally", "Session", "Frog", "Topic"] {
+        assert!(!shows(&harness, label), "{label}");
+    }
     Ok(())
 }
 

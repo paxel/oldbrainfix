@@ -1359,5 +1359,11 @@
   "noteHistoryBefore": "Vorher",
   "noteHistoryAfter": "Nachher",
   "useThisVersion": "Diese Version verwenden",
-  "useThisVersionDone": "Der alte Text ist zurück. Der Verlauf behält jede Version."
+  "useThisVersionDone": "Der alte Text ist zurück. Der Verlauf behält jede Version.",
+  "features": "Was Old Brain Fix anbietet",
+  "featuresDetail": "Was du schon angelegt hast, bleibt so oder so. Auf allen deinen eigenen Geräten gleich; die Einstellungen ändern es jederzeit.",
+  "featuresSimple": "Einfach",
+  "featuresSimpleDetail": "Notizen, Checklisten, Einkaufslisten, Erinnerungen und Routinen.",
+  "featuresAdvanced": "Erweitert",
+  "featuresAdvancedDetail": "Dazu Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen."
 }

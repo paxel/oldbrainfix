@@ -20,6 +20,12 @@ pub mod keys {
     /// [`ON`] while it is on; absent, null or any other value for off.
     pub const TRASH_DONE_REMINDER: &str = "trashDoneReminder";
     pub const ON: &str = "on";
+    /// Simple or Advanced (#197): [`SIMPLE`] or [`ADVANCED`] once
+    /// chosen; absent, null or any other value reads as Advanced, so
+    /// nothing is hidden from someone who never chose.
+    pub const FEATURES: &str = "features";
+    pub const SIMPLE: &str = "simple";
+    pub const ADVANCED: &str = "advanced";
 }
 
 /// The person's own settings in the log.
@@ -53,6 +59,32 @@ impl<'a> PersonSettings<'a> {
         self.store
             .append(keys::ENTITY, keys::TRASH_DONE_REMINDER, value, None)
             .map(drop)
+    }
+
+    /// Whether making Tallies, Sessions, Frogs and Topics, the format bar
+    /// and Shared Area roles are offered (#197). Only [`keys::SIMPLE`]
+    /// hides them; never chosen, or a value no app writes, reads as
+    /// Advanced. What exists stays visible and usable either way.
+    pub fn advanced(&self) -> Result<bool> {
+        Ok(self.features()?.as_deref() != Some(keys::SIMPLE))
+    }
+
+    /// Chooses Simple or Advanced for all of the user's own Devices; the
+    /// same value stored again writes nothing, while Advanced chosen
+    /// where none was stored is written, so the choice is recorded.
+    pub fn set_advanced(&self, on: bool) -> Result<()> {
+        let value = if on { keys::ADVANCED } else { keys::SIMPLE };
+        if self.features()?.as_deref() == Some(value) {
+            return Ok(());
+        }
+        self.store
+            .append(keys::ENTITY, keys::FEATURES, Some(value), None)
+            .map(drop)
+    }
+
+    fn features(&self) -> Result<Option<String>> {
+        self.store
+            .own_current(keys::ENTITY, keys::FEATURES, &mut HashMap::new())
     }
 }
 
@@ -211,6 +243,82 @@ mod tests {
         ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
         assert!(ann.all_entries()?.iter().any(|e| e.id() == forged.id()));
         assert!(!PersonSettings::new(&ann).trashes_done_reminder()?);
+        Ok(())
+    }
+
+    #[test]
+    fn advanced_until_simple_is_chosen_and_the_same_again_writes_nothing() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let settings = PersonSettings::new(&ann);
+        assert!(settings.advanced()?);
+        settings.set_advanced(false)?;
+        assert!(!settings.advanced()?);
+        assert_eq!(
+            ann.current(keys::ENTITY, keys::FEATURES)?.as_deref(),
+            Some(keys::SIMPLE)
+        );
+        let written = ann.all_entries()?.len();
+        settings.set_advanced(false)?;
+        assert_eq!(ann.all_entries()?.len(), written);
+        settings.set_advanced(true)?;
+        assert!(settings.advanced()?);
+        assert_eq!(
+            ann.current(keys::ENTITY, keys::FEATURES)?.as_deref(),
+            Some(keys::ADVANCED)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advanced_chosen_while_none_was_stored_is_written() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let settings = PersonSettings::new(&ann);
+        let written = ann.all_entries()?.len();
+        settings.set_advanced(true)?;
+        assert_eq!(ann.all_entries()?.len(), written + 1);
+        settings.set_advanced(true)?;
+        assert_eq!(ann.all_entries()?.len(), written + 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_features_value_no_app_writes_reads_as_advanced() -> TestResult {
+        let ann = device(1, "Ann")?;
+        ann.append(keys::ENTITY, keys::FEATURES, Some("easy"), None)?;
+        assert!(PersonSettings::new(&ann).advanced()?);
+        Ok(())
+    }
+
+    #[test]
+    fn simple_travels_between_own_devices_and_never_to_another_person() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let desk = device(3, "Ann at the desk")?;
+        exchange(&desk, &ann, false)?;
+        remember(&ann, &desk, false)?;
+        remember(&desk, &ann, false)?;
+        PersonSettings::new(&ann).set_advanced(false)?;
+        exchange(&desk, &ann, false)?;
+        assert!(!PersonSettings::new(&desk).advanced()?);
+        PersonSettings::new(&desk).set_advanced(true)?;
+        exchange(&desk, &ann, false)?;
+        assert!(PersonSettings::new(&ann).advanced()?);
+        let (ann, ben, area) = household()?;
+        PersonSettings::new(&ann).set_advanced(false)?;
+        Notes::new(&ann).capture("Milk", Some(&area), None)?;
+        exchange(&ben, &ann, true)?;
+        assert!(ben.logged_history(keys::ENTITY)?.is_empty());
+        assert!(PersonSettings::new(&ben).advanced()?);
+        Ok(())
+    }
+
+    #[test]
+    fn simple_another_persons_device_wrote_counts_for_nothing() -> TestResult {
+        let (ann, ben, _) = household()?;
+        exchange(&ben, &ann, true)?;
+        let forged = ben.append(keys::ENTITY, keys::FEATURES, Some(keys::SIMPLE), None)?;
+        let mut report = ImportReport::default();
+        ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
+        assert!(PersonSettings::new(&ann).advanced()?);
         Ok(())
     }
 

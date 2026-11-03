@@ -10,6 +10,7 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
@@ -51,6 +52,31 @@ void main() {
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
+
+  group('Simple or Advanced', () {
+    testWidgets('reads Advanced where nothing was chosen; Simple is kept for '
+        'the person and hides the quick note\'s format bar switch', (
+      tester,
+    ) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      final choice = find.byKey(const ValueKey('features'));
+      expect(tester.widget<RadioColumn<bool>>(choice).value, isTrue);
+      expect(
+        find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
+        findsOneWidget,
+      );
+      await tap(tester, find.byKey(const ValueKey('features-simple')));
+      expect(store.advanced, isFalse);
+      expect(tester.widget<RadioColumn<bool>>(choice).value, isFalse);
+      expect(
+        find.byKey(const ValueKey('quickNote-formatBar'), skipOffstage: false),
+        findsNothing,
+      );
+      await tap(tester, find.byKey(const ValueKey('features-advanced')));
+      expect(store.advanced, isTrue);
+    });
+  });
 
   group('the Profile picture', () {
     testWidgets('sits in the Agenda\'s top bar where the gear was and leads '

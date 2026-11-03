@@ -297,6 +297,43 @@ void main() {
     expect(find.text('Ben'), findsNothing);
   });
 
+  testWidgets('in Simple roles show but neither change nor are chosen '
+      '(#197)', (tester) async {
+    invite(AreaRole.manager);
+    ann.advanced = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PeopleScreen(store: ann, areaId: area),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Manager'), findsWidgets);
+    final person = ann.people(area).last.id;
+    await tester.tap(find.byKey(ValueKey('person-menu-$person')));
+    await tester.pumpAndSettle();
+    expect(find.text('Make Member'), findsNothing);
+    expect(find.text('Remove'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ShareAreaScreen(
+          store: ann,
+          areaId: Places(ann).addArea('Garden').id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('role-manager')), findsNothing);
+    expect(find.byKey(const ValueKey('role-member')), findsNothing);
+  });
+
   testWidgets('other people\'s Notes show their picture; one\'s own none', (
     tester,
   ) async {

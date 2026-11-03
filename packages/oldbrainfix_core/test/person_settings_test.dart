@@ -53,6 +53,51 @@ void main() {
     });
   });
 
+  group('Simple or Advanced', () {
+    test('Advanced until Simple is chosen; the same again writes nothing', () {
+      expect(ann.advanced, isTrue);
+      ann.advanced = false;
+      expect(ann.advanced, isFalse);
+      expect(
+        ann.current(PersonSettingKeys.entity, PersonSettingKeys.features),
+        PersonSettingKeys.simple,
+      );
+      final written = ann.allEntries().length;
+      ann.advanced = false;
+      expect(ann.allEntries().length, written);
+      ann.advanced = true;
+      expect(ann.advanced, isTrue);
+      expect(
+        ann.current(PersonSettingKeys.entity, PersonSettingKeys.features),
+        PersonSettingKeys.advanced,
+      );
+    });
+
+    test('Advanced chosen while none was stored is written', () {
+      final written = ann.allEntries().length;
+      ann.advanced = true;
+      expect(ann.allEntries().length, written + 1);
+      ann.advanced = true;
+      expect(ann.allEntries().length, written + 1);
+    });
+
+    test('a value no app writes reads as Advanced', () {
+      ann.append(PersonSettingKeys.entity, PersonSettingKeys.features, 'easy');
+      expect(ann.advanced, isTrue);
+    });
+
+    test("it travels between one's own Devices", () {
+      final desk = device(clock, 'Ann at the desk');
+      exchange(desk, ann);
+      ann.advanced = false;
+      exchange(desk, ann);
+      expect(desk.advanced, isFalse);
+      desk.advanced = true;
+      exchange(desk, ann);
+      expect(ann.advanced, isTrue);
+    });
+  });
+
   group('in a Shared Area', () {
     late Store ben;
     late String area;
@@ -69,6 +114,25 @@ void main() {
       exchange(ben, ann);
       expect(ben.loggedHistory(PersonSettingKeys.entity), isEmpty);
       expect(ben.trashesDoneReminder, isFalse);
+    });
+
+    test('Simple never reaches another person', () {
+      ann.advanced = false;
+      Notes(ann).capture('Milk', place: area);
+      exchange(ben, ann);
+      expect(ben.loggedHistory(PersonSettingKeys.entity), isEmpty);
+      expect(ben.advanced, isTrue);
+    });
+
+    test("Simple another person's Device wrote counts for nothing", () {
+      exchange(ben, ann);
+      final forged = ben.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.features,
+        PersonSettingKeys.simple,
+      );
+      ann.applyEntries([forged], verifiedDevice: ben.deviceId);
+      expect(ann.advanced, isTrue);
     });
 
     test("what another person's Device wrote counts for nothing", () {

@@ -161,6 +161,24 @@ void main() {
       });
     }
 
+    testWidgets('in Simple fans out Note, Checklist and Shopping List only, '
+        'and a Tally made before stays', (tester) async {
+      final pushUps = notes.capture('Push-ups', place: home.id);
+      Tallies(store).addField(pushUps.id, name: 'Push-ups', unit: 'times');
+      store.advanced = false;
+      await openPage(tester, _Page.area);
+      expect(find.text('Push-ups'), findsWidgets);
+      await tap(tester, find.byTooltip('Add here'));
+      for (final kind in NewKind.values) {
+        expect(key('addFan-${kind.name}'), switch (kind) {
+          NewKind.note ||
+          NewKind.checklist ||
+          NewKind.shopping => findsOneWidget,
+          _ => findsNothing,
+        }, reason: kind.name);
+      }
+    });
+
     testWidgets('a Topic still comes from the Area\'s fan', (tester) async {
       await openPage(tester, _Page.area);
       await pick(tester, NewKind.topic);

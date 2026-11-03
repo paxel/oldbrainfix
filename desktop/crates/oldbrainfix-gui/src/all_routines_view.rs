@@ -82,6 +82,7 @@ pub fn page(
     t: &L10n,
     tones: Tones,
     (rows, newer): (&[Row], &[NewerRow]),
+    advanced: bool,
     actions: &mut Vec<AllRoutinesAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -96,9 +97,11 @@ pub fn page(
             if export.inner.clicked() {
                 actions.push(AllRoutinesAction::Export);
             }
-            if ui
-                .button(RichText::new(t.new_session()).color(text))
-                .clicked()
+            // Sessions are made only in Advanced (#197).
+            if advanced
+                && ui
+                    .button(RichText::new(t.new_session()).color(text))
+                    .clicked()
             {
                 actions.push(AllRoutinesAction::NewSession);
             }

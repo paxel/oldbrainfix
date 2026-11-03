@@ -31,9 +31,9 @@ use std::sync::Arc;
 use chrono::Duration;
 use egui::{Frame, Margin, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, QuickNoteControl, Routines,
-    Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock,
-    markdown, text_format,
+    Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, PersonSettings, QuickNoteControl,
+    Routines, Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic,
+    WallClock, markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
@@ -647,6 +647,9 @@ pub struct QuickNote {
     pub importance: bool,
     pub format_bar: bool,
     pub nudge_buttons: bool,
+    /// Whether the person chose Advanced (#197): only then are Frog,
+    /// Session, "Make it a Tally" and the format bar offered.
+    pub advanced: bool,
 }
 
 impl Default for QuickNote {
@@ -659,21 +662,25 @@ impl Default for QuickNote {
             importance: false,
             format_bar: false,
             nudge_buttons: true,
+            advanced: true,
         }
     }
 }
 
 impl QuickNote {
-    /// What this Device's settings switched on.
+    /// What this Device's settings switched on; the format bar only in
+    /// Advanced (#197).
     pub fn read(store: &Store) -> oldbrainfix_core::Result<QuickNote> {
         let settings = DeviceSettings::new(store);
         let shows = |control| settings.quick_note_shows(control);
+        let advanced = PersonSettings::new(store).advanced()?;
         Ok(QuickNote {
+            advanced,
             file_into: shows(QuickNoteControl::FileInto)?,
             schedule: shows(QuickNoteControl::Schedule)?,
             shopping: shows(QuickNoteControl::Shopping)?,
             importance: shows(QuickNoteControl::Importance)?,
-            format_bar: shows(QuickNoteControl::FormatBar)?,
+            format_bar: advanced && shows(QuickNoteControl::FormatBar)?,
             nudge_buttons: settings.quick_note_nudge_buttons_on()?,
         })
     }
@@ -737,8 +744,11 @@ pub fn action_row(
                 (Spawn::Session, t.session()),
             ];
             for (spawn, label) in offered {
-                // A Note has one open Frog at a time.
-                if spawn == Spawn::Frog && choices.frog {
+                // A Note has one open Frog at a time; Frogs and Sessions
+                // are made only in Advanced (#197).
+                if (spawn == Spawn::Frog && choices.frog)
+                    || (!quick.advanced && matches!(spawn, Spawn::Frog | Spawn::Session))
+                {
                     continue;
                 }
                 if ui.button(RichText::new(label).color(text)).clicked() {
@@ -746,7 +756,7 @@ pub fn action_row(
                 }
             }
         }
-        let tally = quick.schedule && choices.tally.is_none();
+        let tally = quick.schedule && quick.advanced && choices.tally.is_none();
         if !quick.importance && !tally && lists.is_empty() {
             return;
         }

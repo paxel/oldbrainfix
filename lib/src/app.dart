@@ -901,9 +901,11 @@ class _HomeState extends State<_Home> {
     lock?.closeAreas();
   }
 
-  /// Plants what the user kept of the Starter Set; it is not offered
+  /// Plants what the user kept of the Starter Set and keeps Simple or
+  /// Advanced (#197) for all of their own Devices; it is not offered
   /// again on this Device.
-  void _plant(Set<String> picked) {
+  void _plant(Set<String> picked, bool advanced) {
+    widget.store.advanced = advanced;
     widget.places.plantStarterSet(picked);
     widget.store.starterSetOffered = true;
     unawaited(widget.profile.applyDefaults());

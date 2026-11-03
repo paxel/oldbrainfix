@@ -261,6 +261,9 @@ class _Seeded {
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
     Alarms(store).markSeen();
+    // The screens show Tallies, Sessions, Frogs, Topics, the format bar
+    // and roles: Advanced, chosen (#197).
+    store.advanced = true;
     return _Seeded._(store, snack);
   }
 

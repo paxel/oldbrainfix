@@ -28,7 +28,8 @@ use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
-    ClockTime, Day, Importance, Notes, Places, Routines, Schedule, SigningKey, Store, parse_time,
+    ClockTime, Day, Importance, Notes, PersonSettings, Places, Routines, Schedule, SigningKey,
+    Store, parse_time,
 };
 use oldbrainfix_gui::{App, Page, Selection};
 use parking_lot::Mutex;
@@ -201,6 +202,9 @@ fn demo(x: &Texts) -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
         let morning = oldbrainfix_core::Occurrence::new(monday, Some(at(8, 0)?));
         routines.mark_done(&routine.id, &morning, None)?;
     }
+    // The screens show Tallies, Sessions, Frogs, Topics, the format bar
+    // and roles: Advanced, chosen (#197).
+    PersonSettings::new(&store).set_advanced(true)?;
     Ok((store, ids))
 }
 
