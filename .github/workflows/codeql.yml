@@ -48,8 +48,10 @@ jobs:
         if: matrix.language == 'rust'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++
 
-      # The Gradle project needs the Flutter SDK and android/local.properties,
-      # which `flutter pub get` writes, as in CI's Debug APK job.
+      # The Gradle project needs the Flutter SDK, android/local.properties and
+      # the Gradle wrapper (android/gradlew is ignored by git): `flutter pub
+      # get` writes the properties, `flutter build apk --config-only` the
+      # wrapper and the rest of the build files, without building anything.
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         if: matrix.language == 'java-kotlin'
         with:
@@ -63,6 +65,9 @@ jobs:
       - name: Flutter packages and the Gradle project's local.properties
         if: matrix.language == 'java-kotlin'
         run: flutter pub get
+      - name: The Gradle wrapper and build files
+        if: matrix.language == 'java-kotlin'
+        run: flutter build apk --debug --config-only
 
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
