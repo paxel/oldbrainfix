@@ -23,15 +23,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
+import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
+import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
+import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
@@ -51,9 +55,11 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../backup_test.dart' show DirFolders, quickKey;
 import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
+import '../fake_appointments.dart';
 import '../fake_photos.dart';
 import '../fake_voice.dart';
 import '../open_capture.dart';
+import '../reveal.dart';
 
 /// The frame in physical pixels and the density of a common phone:
 /// 432 × 768 logical pixels, which 2.5 scales to exactly 1080 × 1920.
@@ -248,26 +254,30 @@ class _Seeded {
   /// and a Tally with its entries, for the guide's frames of them.
   /// With [formatted], it holds a formatted Note and one with a table.
   /// With [people], the user's Profile is Sam's and Lena is in People;
-  /// with [shared] too, Work is shared with her from afar.
+  /// with [shared] too, Work is shared with her from afar. With [missed],
+  /// what the history Missed stays unseen, in the Missed Summary; with
+  /// [dueReminder], the boiler's Note has a Reminder due at 09:30.
   factory _Seeded(
     _Texts x, {
     bool lists = false,
     bool formatted = false,
     bool people = false,
     bool shared = false,
+    bool missed = false,
+    bool dueReminder = false,
   }) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
     final store = Store.inMemory(clock: () => clock)
       ..starterSetOffered = true
       ..alarmSetupDone = true;
-    final snack = _seed(store, x, (at) => clock = at);
+    final snack = _seed(store, x, (at) => clock = at, dueReminder: dueReminder);
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);
     if (people || shared) _seedPeople(store, shared: shared);
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
-    Alarms(store).markSeen();
+    if (!missed) Alarms(store).markSeen();
     // The screens show Tallies, Sessions, Frogs, Topics, the format bar
     // and roles: Advanced, chosen (#197).
     store.advanced = true;
@@ -277,8 +287,9 @@ class _Seeded {
   static Routine _seed(
     Store store,
     _Texts x,
-    void Function(DateTime) setClock,
-  ) {
+    void Function(DateTime) setClock, {
+    bool dueReminder = false,
+  }) {
     final places = Places(store);
     final notes = Notes(store);
     final routines = Routines(store);
@@ -439,6 +450,9 @@ class _Seeded {
       atHome: true,
     );
     notes.setImportance(boiler.id, Importance.important);
+    if (dueReminder) {
+      routines.spawn(boiler.id, Schedule(start: day(27), times: [at(9, 30)]));
+    }
     setClock(DateTime(2026, 10, 23, 12, 40));
     notes.amend(boiler.id, x.boilerParts[0]);
     setClock(DateTime(2026, 10, 26, 10, 25));
@@ -652,6 +666,7 @@ Future<AppLocalizations> _start(
   FakeAlarms? alarms,
   BundlePlatform bundles = const NoBundles(),
   FolderPlatform folders = const NoFolders(),
+  AppointmentSource appointments = const NoAppointments(),
 }) async {
   tester.view
     ..physicalSize = _frame / _dpr * dpr
@@ -670,6 +685,7 @@ Future<AppLocalizations> _start(
         photos: FakePhotos(),
         bundles: bundles,
         folders: folders,
+        appointments: appointments,
       ),
     ),
   );
@@ -1100,12 +1116,6 @@ void main() {
             expect(find.byType(UnsortedScreen), findsOneWidget);
           });
 
-          frame('routine-editor', (tester) async {
-            await start(tester, seed());
-            await _tap(tester, find.text(texts.snack).first);
-            expect(find.byType(RoutineEditorScreen), findsOneWidget);
-          });
-
           /// The boiler's Note, with its two Amends, in the Note editor.
           Future<void> boilerEditor(WidgetTester tester) async {
             final t = await start(tester, seed());
@@ -1126,6 +1136,105 @@ void main() {
             await boilerEditor(tester);
             await _tap(tester, find.byKey(const ValueKey('note-history')));
             expect(find.byType(NoteHistoryScreen), findsOneWidget);
+          });
+
+          // Routines and the Agenda (#173): a new Routine typed from the
+          // Agenda's bar, the snack's schedule on weekdays, its Re-nag
+          // and Escalation, a Reminder due now in its Note's editor, the
+          // Missed Summary, the snack's History, the Agenda with its
+          // groups, All Routines and Reminders and the Calendar page.
+          boxFrame('routines-and-agenda', 'set-up', (tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.byTooltip(t.newRoutineTooltip));
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.pumpAndSettle();
+            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+          });
+
+          /// The snack's Routine in its editor.
+          Future<AppLocalizations> snackEditor(WidgetTester tester) async {
+            final t = await start(tester, seed());
+            await _tap(tester, find.text(texts.snack).first);
+            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+            return t;
+          }
+
+          boxFrame('routines-and-agenda', 'schedule', (tester) async {
+            final t = await snackEditor(tester);
+            await _tap(tester, find.text(t.repeatWeekdays));
+            // The weekdays under the kinds, the start and the end below.
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -260),
+            );
+            await tester.pumpAndSettle();
+          });
+
+          boxFrame('routines-and-agenda', 're-nag', (tester) async {
+            await snackEditor(tester);
+            for (final key in ['renag', 'escalation', 'escalationOn']) {
+              final control = find.byKey(ValueKey(key));
+              await reveal(tester, control);
+              await _tap(tester, control);
+            }
+            await reveal(tester, find.byKey(const ValueKey('escalationAfter')));
+          });
+
+          boxFrame('routines-and-agenda', 'check-off', (tester) async {
+            final t = await start(
+              tester,
+              _Seeded(texts, dueReminder: true)..store.themeChoice = choice,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+            await tester.longPress(find.text(texts.boiler));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('open-done')), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('open-done-trash')),
+              findsOneWidget,
+            );
+          });
+
+          boxFrame('routines-and-agenda', 'missed', (tester) async {
+            await start(
+              tester,
+              _Seeded(texts, missed: true)..store.themeChoice = choice,
+            );
+            expect(find.byType(MissedSummaryCard), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'history', (tester) async {
+            final t = await snackEditor(tester);
+            await _tap(tester, find.byTooltip(t.historyTitle));
+            expect(find.byType(RoutineHistoryScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'agenda', (tester) async {
+            await start(
+              tester,
+              _Seeded(texts, lists: true)..store.themeChoice = choice,
+            );
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'all-routines', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('allRoutines')));
+            expect(find.byType(AllRoutinesScreen), findsOneWidget);
+          });
+
+          boxFrame('routines-and-agenda', 'calendar', (tester) async {
+            await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              appointments: FakeAppointments(),
+            );
+            await _tap(tester, find.byKey(const ValueKey('calendarPage')));
+            expect(find.byType(CalendarScreen), findsOneWidget);
           });
 
           /// The Household with its Checklist, Shopping List and Tally.

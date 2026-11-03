@@ -86,6 +86,14 @@ struct Texts {
     keep: &'static str,
     /// The Note menu's History.
     history: &'static str,
+    /// The Agenda's "New Routine or Reminder", the hint of its text, the
+    /// schedule's Weekdays and the Escalation's switch.
+    new_routine: &'static str,
+    what_hint: &'static str,
+    weekdays: &'static str,
+    escalate: &'static str,
+    /// The start of an Agenda row's ⋮, "More for {title}".
+    more_for: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -117,6 +125,11 @@ const EN: Texts = Texts {
     import: "Import…",
     keep: "Google Keep…",
     history: "History",
+    new_routine: "New Routine or Reminder",
+    what_hint: "What is to be done?",
+    weekdays: "Weekdays",
+    escalate: "Escalate to an urgent alarm with sound",
+    more_for: "More for",
 };
 
 const DE: Texts = Texts {
@@ -148,11 +161,25 @@ const DE: Texts = Texts {
     import: "Importieren …",
     keep: "Google Keep …",
     history: "Verlauf",
+    new_routine: "Neue Routine oder Erinnerung",
+    what_hint: "Was ist zu tun?",
+    weekdays: "Wochentage",
+    escalate: "Zum dringenden Alarm mit Ton eskalieren",
+    more_for: "Mehr zu",
 };
 
 /// A store with a few days of a household's and a job's Notes and
 /// Routines in `x`'s words, its clock at Monday 26 October 2026, 08:30 UTC.
 fn demo(x: &Texts) -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
+    let (store, ids, _) = demo_with_clock(x)?;
+    Ok((store, ids))
+}
+
+/// The store's clock, which a scene may set back and forth.
+type Clock = Arc<Mutex<DateTime<Utc>>>;
+
+/// [`demo`] with the store's clock.
+fn demo_with_clock(x: &Texts) -> Result<(Store, Vec<String>, Clock), Box<dyn std::error::Error>> {
     let now = Arc::new(Mutex::new(parse_time("2026-10-22T17:40:00.000Z")?));
     let clock = now.clone();
     let mut store = Store::in_memory(Box::new(move || *clock.lock()), || {
@@ -226,7 +253,7 @@ fn demo(x: &Texts) -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
     // The screens show Tallies, Sessions, Frogs, Topics, the format bar
     // and roles: Advanced, chosen (#197).
     PersonSettings::new(&store).set_advanced(true)?;
-    Ok((store, ids))
+    Ok((store, ids, now))
 }
 
 fn utc(at: DateTime<Utc>) -> chrono::NaiveDateTime {
@@ -382,8 +409,19 @@ fn window_with(
     theme: egui::Theme,
     prepare: impl FnOnce(&Store, &[String]) -> oldbrainfix_core::Result<()>,
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
-    let (store, ids) = demo(x)?;
-    prepare(&store, &ids)?;
+    window_with_clock(x, locale, theme, |store, ids, _| prepare(store, ids))
+}
+
+/// [`window_with`], `prepare` also given the store's clock: what it sets
+/// it to holds while the window shows.
+fn window_with_clock(
+    x: &Texts,
+    locale: &str,
+    theme: egui::Theme,
+    prepare: impl FnOnce(&Store, &[String], &Clock) -> oldbrainfix_core::Result<()>,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    let (store, ids, now) = demo_with_clock(x)?;
+    prepare(&store, &ids, &now)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -404,6 +442,16 @@ fn window_with(
     harness.input_mut().system_theme = Some(theme);
     harness.run_steps(4);
     Ok(harness)
+}
+
+/// The id of the Routine whose Note says `text`.
+fn routine_of(store: &Store, text: &str) -> Result<String, Box<dyn std::error::Error>> {
+    Routines::new(store)
+        .all_with_notes()?
+        .into_iter()
+        .find(|(_, note)| note.as_ref().is_some_and(|n| n.text == text))
+        .map(|(routine, _)| routine.id)
+        .ok_or_else(|| format!("the Routine of {text}").into())
 }
 
 /// The capture popup's size, as its own window opens it.
@@ -646,6 +694,123 @@ fn guide_frames() -> TestResult {
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("capture-and-sort", "history"),
+            )?);
+            // Routines and the Agenda (#173): a new Routine typed from the
+            // Agenda's bar, the snack's schedule on weekdays, its Re-nag
+            // and Escalation, a Reminder due now in its Note's dialog, the
+            // Missed Summary, the snack's History, the Agenda, All Routines
+            // and Reminders, and an Occurrence's menu with Share.
+            let mut harness = window(texts, language, theme)?;
+            harness.get_by_label(texts.new_routine).click();
+            harness.run();
+            harness
+                .get_by(|n| n.placeholder() == Some(texts.what_hint))
+                .click();
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "set-up"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            let snack = routine_of(harness.state().store(), texts.snack)?;
+            harness.state_mut().open_routine(&snack);
+            harness.run();
+            harness.get_by_label(texts.weekdays).click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "schedule"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            harness.state_mut().open_routine(&snack);
+            harness.run();
+            harness
+                .get_all_by_label(texts.escalate)
+                .next()
+                .ok_or("the Escalation's switch")?
+                .scroll_to_me();
+            harness.run();
+            harness
+                .get_all_by_label(texts.escalate)
+                .next()
+                .ok_or("the Escalation's switch")?
+                .click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "re-nag"),
+            )?);
+            // The parking's Note with a Reminder due at 08:00, set up the
+            // evening before.
+            let mut parking = String::new();
+            let mut harness = window_with_clock(texts, language, theme, |store, ids, now| {
+                parking = ids[3].clone();
+                let due = ClockTime::new(8, 0)
+                    .and_then(|at| Schedule::new(Day::new(2026, 10, 26), &[at], None));
+                let back = *now.lock();
+                *now.lock() = back - Duration::hours(12);
+                if let Some(schedule) = due {
+                    Routines::new(store).spawn(&ids[3], &schedule)?;
+                }
+                *now.lock() = back;
+                Ok(())
+            })?;
+            harness.state_mut().select_note(&parking);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "check-off"),
+            )?);
+            // The tyres to be checked every evening since Tuesday, set up
+            // the day before and never Done: Missed.
+            let mut harness = window_with_clock(texts, language, theme, |store, ids, now| {
+                let daily = oldbrainfix_core::Recurrence::parse("FREQ=DAILY").ok();
+                let evenings = ClockTime::new(18, 0)
+                    .and_then(|at| Schedule::new(Day::new(2026, 10, 20), &[at], daily));
+                let back = *now.lock();
+                *now.lock() = back - Duration::days(7);
+                if let Some(schedule) = evenings {
+                    Routines::new(store).spawn(&ids[4], &schedule)?;
+                }
+                *now.lock() = back;
+                Ok(())
+            })?;
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "missed"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            harness
+                .state_mut()
+                .select(Selection::History(snack.clone()));
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "history"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "agenda"),
+            )?);
+            harness.state_mut().select(Selection::AllRoutines);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "all-routines"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            harness
+                .get_all_by_label(&format!("{} {}", texts.more_for, texts.snack))
+                .nth(1)
+                .ok_or("the snack's ⋮")?
+                .click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("routines-and-agenda", "calendar"),
             )?);
             // What "+" at the top of the Household's list makes (#161).
             let mut harness = window(texts, language, theme)?;
