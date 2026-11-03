@@ -846,6 +846,32 @@ fn with_done_reminders_trashed_done_moves_the_note_to_the_trash() -> TestResult 
 }
 
 #[test]
+fn new_session_on_the_agendas_bar_opens_the_new_session_page_in_advanced() -> TestResult {
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    // After New Routine, inside the window (#246).
+    let routine = harness.get_by_label("New Routine or Reminder").rect();
+    let session = harness.get_by_label("New Session").rect();
+    assert!(routine.right() <= session.left(), "{routine:?} {session:?}");
+    assert!((routine.center().y - session.center().y).abs() < 1.0);
+    assert!(session.right() <= 1280.0 - 8.0, "{session:?}");
+    harness.get_by_label("New Session").click();
+    harness.run();
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert!(editor.session().is_some());
+    Ok(())
+}
+
+#[test]
+fn the_agendas_bar_has_no_new_session_in_simple() -> TestResult {
+    let store = store("2026-10-25T11:00:00.000Z")?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let harness = window(store, "en");
+    assert!(shows(&harness, "New Routine or Reminder"));
+    assert!(!shows(&harness, "New Session"));
+    Ok(())
+}
+
+#[test]
 fn settings_switch_simple_or_advanced_for_the_person() -> TestResult {
     let mut harness = window(dentist_store("2026-11-02T11:00:00.000Z")?, "en");
     harness.get_by_label("Edit").click();

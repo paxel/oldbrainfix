@@ -24,6 +24,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - The guide has a page on syncing through Syncthing or Autosync.
 - The guide has a page on calendar apps such as FamilyWall: their appointments on the phone's Agenda through the phone's calendar, and Routines and Reminders exported into them as a calendar file.
 - On the phone and the desktop, Settings ▸ Send feedback writes to the developer: a field for what happened or what could be better, ticks for the version, the system and the device and the install method, ticked at first, and for the last crash report (phone) and Notes as a Pack picked in the Pack's tree, not ticked. A preview shows exactly what is sent; Mail opens the mail app with it, and Share hands it with the Pack to any app on the phone, while the desktop saves it as a file and the Pack to attach.
+- On the phone and the desktop, the Agenda's bar has New Session, after New Routine or Reminder, in Advanced. It makes a Session as New Session on All Routines and Reminders does. On a narrow phone, and with Fat fingers, the bar's last buttons move into ⋮.
 
 ### Changed
 

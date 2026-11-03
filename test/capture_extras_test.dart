@@ -350,17 +350,20 @@ void main() {
 
     testWidgets('the Agenda bar keeps its order', (tester) async {
       await start(tester);
+      // New Session after New Routine, in Advanced (#246).
       final xs = [
-        for (final key in ['browse', 'allRoutines', 'calendarPage', 'profile'])
+        for (final key in [
+          'browse',
+          'allRoutines',
+          'calendarPage',
+          'newRoutine',
+          'newSession',
+          'profile',
+        ])
           tester.getTopLeft(find.byKey(ValueKey(key))).dx,
       ];
-      final newRoutine = tester.getTopLeft(find.byIcon(Icons.add_alarm)).dx;
-      expect(
-        [xs[0], xs[1], xs[2], newRoutine, xs[3]],
-        [
-          ...[xs[0], xs[1], xs[2], newRoutine, xs[3]]..sort(),
-        ],
-      );
+      expect(xs, [...xs]..sort());
+      expect(xs.toSet(), hasLength(xs.length));
     });
 
     testWidgets('are not offered without a source', (tester) async {

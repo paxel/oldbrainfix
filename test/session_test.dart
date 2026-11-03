@@ -208,6 +208,45 @@ void main() {
       expect(find.byType(AllRoutinesScreen), findsOneWidget);
       expect(find.text('Morning sport'), findsOneWidget);
     });
+
+    testWidgets('"New Session" on the Agenda\'s bar opens the New Session '
+        'page and makes the Session (#246)', (tester) async {
+      final pushUps = tally('Push-ups');
+      await start(tester);
+      final button = key('newSession');
+      expect(
+        find.descendant(of: button, matching: find.byIcon(Icons.event_repeat)),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('New Session'), findsOneWidget);
+      await tap(tester, button);
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Session'), findsOneWidget);
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(TextField),
+            )
+            .first,
+        'Morning sport',
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, key('session-pool-$pushUps'));
+      await tap(tester, find.text('Save'));
+      expect(sessions.all().single.pool, [pushUps]);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('in Simple the Agenda\'s bar has no "New Session" (#197)', (
+      tester,
+    ) async {
+      store.advanced = false;
+      await start(tester);
+      expect(key('newSession'), findsNothing);
+      expect(find.byTooltip('New Session'), findsNothing);
+      expect(find.byTooltip('New Routine or Reminder'), findsOneWidget);
+    });
   });
 
   group('the Session editor', () {

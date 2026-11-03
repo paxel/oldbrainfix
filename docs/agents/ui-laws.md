@@ -696,7 +696,11 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Agenda
 
 - **The Agenda's bar**, in this order: All Routines and Reminders,
-  Calendar, new Routine, then the Profile picture in the corner. All
+  Calendar, new Routine, New Session (only in Advanced, #246), then the
+  Profile picture in the corner; the desktop's has the same without
+  Calendar. When the phone's bar is full, the last of All Routines,
+  Calendar, new Routine and New Session go into ⋮, after the Profile
+  picture (see The bar); the folder and the Profile picture never do. All
   Routines and Reminders lists every one alphabetically by name, also
   those beyond the week, and a tap opens its editor; its bar's New
   Session opens the editor of a new Session whose Note is the text typed

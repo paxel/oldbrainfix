@@ -23,6 +23,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Die Anleitung hat eine Seite zum Abgleich über Syncthing oder Autosync.
 - Die Anleitung hat eine Seite zu Kalender-Apps wie FamilyWall: ihre Termine in der Agenda des Handys über den Kalender des Handys, und Routinen und Erinnerungen, als Kalenderdatei in sie exportiert.
 - Auf dem Handy und am Desktop schreiben Einstellungen ▸ Feedback senden an den Entwickler: ein Feld für das, was passiert ist oder besser sein könnte, Haken für die Version, das System und das Gerät und die Installationsart, zuerst angehakt, und für den letzten Absturzbericht (Handy) und Notizen als Paket, im Baum des Pakets gewählt, nicht angehakt. Eine Vorschau zeigt genau, was gesendet wird; Mail öffnet die Mail-App damit, und Teilen gibt es mit dem Paket auf dem Handy an jede App, während der Desktop es als Datei speichert und das Paket zum Anhängen.
+- Auf dem Handy und am Desktop hat die Leiste der Agenda in Erweitert „Neue Einheit“, nach „Neue Routine oder Erinnerung“. Es legt eine Einheit an, wie „Neue Einheit“ in Alle Routinen und Erinnerungen. Auf einem schmalen Handy und mit Dicke Finger rücken die letzten Schaltflächen der Leiste in das ⋮.
 
 ### Geändert
 

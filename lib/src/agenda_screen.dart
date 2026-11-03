@@ -689,6 +689,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
     unawaited(_readCalendar());
   }
 
+  Future<void> _newSession() async {
+    await newSession(context, widget.notes, widget.places);
+  }
+
   Future<void> _newRoutine() async {
     await newRoutine(context, widget.notes, widget.places);
     if (!mounted) return;
@@ -1253,24 +1257,36 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 onPressed: _browse,
                 icon: const Icon(Icons.folder_outlined),
               ),
-              IconButton(
+              // What does not fit goes into ⋮ from the end, the folder
+              // and the Profile picture never (UI laws, "The bar").
+              BarAction(
                 key: const ValueKey('allRoutines'),
-                tooltip: t.allRoutinesTitle,
+                label: t.allRoutinesTitle,
                 onPressed: _openAllRoutines,
-                icon: const Icon(Icons.format_list_bulleted),
+                icon: Icons.format_list_bulleted,
               ),
               if (hasCalendarPage(context))
-                IconButton(
+                BarAction(
                   key: const ValueKey('calendarPage'),
-                  tooltip: t.calendarPageTitle,
+                  label: t.calendarPageTitle,
                   onPressed: _openCalendar,
-                  icon: const Icon(Icons.event_outlined),
+                  icon: Icons.event_outlined,
                 ),
-              IconButton(
-                tooltip: t.newRoutineTooltip,
+              BarAction(
+                key: const ValueKey('newRoutine'),
+                label: t.newRoutineTooltip,
                 onPressed: _newRoutine,
-                icon: const Icon(Icons.add_alarm),
+                icon: Icons.add_alarm,
               ),
+              // Sessions are made only in Advanced (#197, #246); filed
+              // into no Area, so this Device may always set one up.
+              if (widget.notes.store.advanced)
+                BarAction(
+                  key: const ValueKey('newSession'),
+                  label: t.newSession,
+                  onPressed: _newSession,
+                  icon: Icons.event_repeat,
+                ),
               // The Profile picture, where the settings gear was: Settings,
               // Sync and Backups are reached through the Profile page.
               IconButton(

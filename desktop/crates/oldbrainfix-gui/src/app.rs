@@ -11087,7 +11087,8 @@ impl App {
     /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. Its bar leads to All
-    /// Routines and Reminders and to a new Routine.
+    /// Routines and Reminders, to a new Routine and, in Advanced, to a
+    /// new Session (#246).
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -11099,7 +11100,11 @@ impl App {
             if add_button(ui, &t, &[NewKind::Note]).is_some() {
                 actions.push(Action::NewNote);
             }
-            ui.add_space((ui.available_width() - 60.0).max(0.0));
+            // Room for the buttons at the end: 24 wide and 8 apart, and
+            // New Session only in Advanced (#197, #246).
+            let advanced = self.view.advanced;
+            let room = if advanced { 92.0 } else { 60.0 };
+            ui.add_space((ui.available_width() - room).max(0.0));
             if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
                 actions.push(Action::Select(Selection::AllRoutines));
             }
@@ -11108,6 +11113,10 @@ impl App {
                     note: None,
                     reminder: false,
                 });
+            }
+            // Filed into no Area, so this Device may always set one up.
+            if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
+                actions.push(Action::NewSession(None));
             }
         });
         ui.add_space(8.0);
