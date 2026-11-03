@@ -139,6 +139,10 @@ The Areas and Topics offered on first start; the user picks which ones to keep.
 One switch of the person, the same on all of their own Devices, asked with the Starter Set on first start, Simple picked, and changed in Settings (#197). Simple offers making Notes, Checklists, Shopping Lists, Reminders and Routines; Advanced adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas. What exists stays visible and usable in Simple; only making new ones is hidden. Never chosen counts as Advanced. German: Einfach und Erweitert.
 _Avoid_: mode, level, beginner, expert
 
+**Help Note**:
+A Note the app makes to explain itself (#180, ADR 0042): "Quick start", a Checklist of steps to try, "What the icons mean", with pictures of the icons, and one "What's new in X.Y.Z" per release, holding its Play notes. They are filed into their own Area "Old Brain Fix", never Unsorted and never Nudged, in the language of the Device that makes them first. Each is made once per person: a new person gets the first two, an update that release's What's new and the two it never got. The user edits, moves and deletes them like any Note; a deleted one does not come back.
+_Avoid_: tutorial, onboarding, tip, changelog Note
+
 ### Routines and Reminders
 
 **Routine**:

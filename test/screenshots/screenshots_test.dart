@@ -36,7 +36,9 @@ import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/frogs_screen.dart';
+import 'package:oldbrainfix/src/help_notes.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -929,9 +931,10 @@ Future<({int width, int height, Uint8List rgba})> _decode(
 Future<void> _matchFrame(
   WidgetTester tester,
   GlobalKey boundary,
-  String path,
-) async {
-  final shot = await _capture(tester, boundary, _guideDpr);
+  String path, {
+  double dpr = _guideDpr,
+}) async {
+  final shot = await _capture(tester, boundary, dpr);
   final file = File(path);
   if (Platform.environment['UPDATE_FRAMES'] == '1') {
     file.parent.createSync(recursive: true);
@@ -1113,6 +1116,40 @@ void main() {
     skip: 'compares the frames; run with --run-skipped',
     () {
       setUpAll(_loadFonts);
+
+      // The pictures of "What the icons mean" (#180), one per group and
+      // language, light, written into the app's assets.
+      for (final language in ['en', 'de']) {
+        for (final group in helpIconGroups) {
+          _shot('$language help ${group.slug}', (tester) async {
+            final boundary = GlobalKey();
+            const dpr = 2.0;
+            tester.view
+              ..physicalSize = HelpIconsPicture.sizeOf(group) * dpr
+              ..devicePixelRatio = dpr;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(
+              MaterialApp(
+                debugShowCheckedModeBanner: false,
+                locale: Locale(language),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: lookTheme(Brightness.light),
+                home: RepaintBoundary(
+                  key: boundary,
+                  child: HelpIconsPicture(group: group),
+                ),
+              ),
+            );
+            await _matchFrame(
+              tester,
+              boundary,
+              group.asset(language),
+              dpr: dpr,
+            );
+          });
+        }
+      }
 
       for (final (language, texts) in [('en', _en), ('de', _de)]) {
         for (final (theme, choice) in [

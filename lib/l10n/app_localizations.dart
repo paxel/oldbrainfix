@@ -8257,6 +8257,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.'**
   String get featuresAdvancedDetail;
+
+  /// The name of the Area the app's own help Notes are filed into (#180); the app's name, the same in every language.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix'**
+  String get helpAreaName;
+
+  /// The name of the help Checklist of steps to try (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'Quick start'**
+  String get helpQuickStartTitle;
+
+  /// A Line of the Quick start Checklist (#180): one action, at most 12 words, no Tallies, Sessions or Frogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture a thought with +.'**
+  String get helpQuickStart1;
+
+  /// No description provided for @helpQuickStart2.
+  ///
+  /// In en, this message translates to:
+  /// **'File the new Note into an Area.'**
+  String get helpQuickStart2;
+
+  /// No description provided for @helpQuickStart3.
+  ///
+  /// In en, this message translates to:
+  /// **'Give a Note a Reminder.'**
+  String get helpQuickStart3;
+
+  /// No description provided for @helpQuickStart4.
+  ///
+  /// In en, this message translates to:
+  /// **'Give a Note a Routine that repeats.'**
+  String get helpQuickStart4;
+
+  /// No description provided for @helpQuickStart5.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick this Line: that is how a Checklist works.'**
+  String get helpQuickStart5;
+
+  /// No description provided for @helpQuickStart6.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a Note with Search and browse.'**
+  String get helpQuickStart6;
+
+  /// No description provided for @helpQuickStart7.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a Backup in Settings ▸ Backups.'**
+  String get helpQuickStart7;
+
+  /// No description provided for @helpQuickStart8.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with your other Device in Settings.'**
+  String get helpQuickStart8;
+
+  /// The name of the help Note listing the icons with their names and meanings (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'What the icons mean'**
+  String get helpIconsTitle;
+
+  /// A group heading of the help Note on icons, and of its picture (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'In a Note\'s badges'**
+  String get helpIconsBadges;
+
+  /// No description provided for @helpIconsAgenda.
+  ///
+  /// In en, this message translates to:
+  /// **'On the Agenda'**
+  String get helpIconsAgenda;
+
+  /// No description provided for @helpIconsCard.
+  ///
+  /// In en, this message translates to:
+  /// **'On a Note card'**
+  String get helpIconsCard;
+
+  /// An icon's name in the help Note on icons (#180); its meaning follows in helpIconKindMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get helpIconKind;
+
+  /// An icon's meaning in the help Note on icons (#180), after its name and a colon.
+  ///
+  /// In en, this message translates to:
+  /// **'what the Note is: a plain Note, a Checklist or a Shopping List.'**
+  String get helpIconKindMeans;
+
+  /// No description provided for @helpIconImportance.
+  ///
+  /// In en, this message translates to:
+  /// **'Importance'**
+  String get helpIconImportance;
+
+  /// No description provided for @helpIconImportanceMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'how important the Note is.'**
+  String get helpIconImportanceMeans;
+
+  /// No description provided for @helpIconPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Area and Topic'**
+  String get helpIconPlace;
+
+  /// No description provided for @helpIconPlaceMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'where the Note is filed.'**
+  String get helpIconPlaceMeans;
+
+  /// No description provided for @helpIconCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get helpIconCaptured;
+
+  /// No description provided for @helpIconCapturedMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'when you captured the Note.'**
+  String get helpIconCapturedMeans;
+
+  /// No description provided for @helpIconReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get helpIconReminder;
+
+  /// No description provided for @helpIconReminderMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'rings once at its time.'**
+  String get helpIconReminderMeans;
+
+  /// No description provided for @helpIconRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine'**
+  String get helpIconRoutine;
+
+  /// No description provided for @helpIconRoutineMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'rings again on its days.'**
+  String get helpIconRoutineMeans;
+
+  /// No description provided for @helpIconAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get helpIconAdd;
+
+  /// No description provided for @helpIconAddMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'gives the Note a Routine or Reminder.'**
+  String get helpIconAddMeans;
+
+  /// No description provided for @helpIconBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and browse'**
+  String get helpIconBrowse;
+
+  /// No description provided for @helpIconBrowseMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'opens your Areas and searches every Note.'**
+  String get helpIconBrowseMeans;
+
+  /// No description provided for @helpIconAllRoutines.
+  ///
+  /// In en, this message translates to:
+  /// **'All Routines and Reminders'**
+  String get helpIconAllRoutines;
+
+  /// No description provided for @helpIconAllRoutinesMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'lists every Routine and Reminder.'**
+  String get helpIconAllRoutinesMeans;
+
+  /// No description provided for @helpIconNewRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'New Routine or Reminder'**
+  String get helpIconNewRoutine;
+
+  /// No description provided for @helpIconNewRoutineMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'makes one with a new Note.'**
+  String get helpIconNewRoutineMeans;
+
+  /// No description provided for @helpIconUnsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsorted'**
+  String get helpIconUnsorted;
+
+  /// No description provided for @helpIconUnsortedMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes still to file into an Area.'**
+  String get helpIconUnsortedMeans;
+
+  /// No description provided for @helpIconFileInto.
+  ///
+  /// In en, this message translates to:
+  /// **'File into…'**
+  String get helpIconFileInto;
+
+  /// No description provided for @helpIconFileIntoMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'moves the Note into an Area or Topic.'**
+  String get helpIconFileIntoMeans;
+
+  /// No description provided for @helpIconAlarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine or Reminder'**
+  String get helpIconAlarm;
+
+  /// No description provided for @helpIconAlarmMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'gives the card\'s Note one.'**
+  String get helpIconAlarmMeans;
+
+  /// No description provided for @helpIconMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge into…'**
+  String get helpIconMerge;
+
+  /// No description provided for @helpIconMergeMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'joins the Note with another one.'**
+  String get helpIconMergeMeans;
+
+  /// No description provided for @helpIconMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get helpIconMore;
+
+  /// No description provided for @helpIconMoreMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'the card\'s other actions.'**
+  String get helpIconMoreMeans;
+
+  /// The name of the help Note holding a release's Play notes (#180).
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new in {version}'**
+  String helpWhatsNewTitle(String version);
 }
 
 class _AppLocalizationsDelegate

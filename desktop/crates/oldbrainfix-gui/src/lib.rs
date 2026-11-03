@@ -34,6 +34,7 @@ pub mod folder_import;
 pub mod folder_sync;
 pub mod format_bar;
 pub mod frogs_view;
+pub mod help_notes;
 pub mod history_view;
 pub mod hotkey;
 pub mod icons;

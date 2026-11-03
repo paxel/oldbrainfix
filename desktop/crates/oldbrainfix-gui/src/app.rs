@@ -121,6 +121,7 @@ use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
+use crate::help_notes;
 use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
@@ -1686,6 +1687,9 @@ pub struct App {
     /// Makes the own Profile from this computer's login, or fills in the
     /// defaults of one there (ADR 0017).
     profile_defaults: ProfileDefaults,
+    /// The version the help Notes are made for (#180); none in tests, so
+    /// no Area "Old Brain Fix" appears there unless a test asks.
+    help_version: Option<String>,
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
@@ -1996,6 +2000,7 @@ impl App {
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
             profile_defaults: Box::new(login::apply_system_defaults),
+            help_version: None,
             ai_port: None,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
@@ -2317,6 +2322,32 @@ impl App {
         backup_view::restore_answered(&self.store)?;
         self.welcome = None;
         (self.profile_defaults)(&self.store)?;
+        // Right after the first start: the help Notes never made for this
+        // person, and no What's new (#180). Without them the start goes
+        // on, as at launch.
+        if let Err(e) = self.help_due(true) {
+            eprintln!("help Notes: {e}");
+        }
+        Ok(())
+    }
+
+    /// Makes the help Notes of `version` (#180) from now on: at once
+    /// when the first start's view is not due, which is then an ordinary
+    /// start and owes an update's What's new, else once it is answered.
+    pub fn set_help(&mut self, version: &str) -> oldbrainfix_core::Result<()> {
+        self.help_version = Some(version.to_string());
+        if self.welcoming() {
+            return Ok(());
+        }
+        self.help_due(false)
+    }
+
+    /// The help Notes due now, once the own Profile exists; `fresh` right
+    /// after the first start.
+    fn help_due(&self, fresh: bool) -> oldbrainfix_core::Result<()> {
+        if let Some(version) = &self.help_version {
+            help_notes::make_due(&self.store, &self.t, version, fresh)?;
+        }
         Ok(())
     }
 

@@ -40,6 +40,7 @@ const areaIcons = [
   'sport',
   'travel',
   'star',
+  'brain',
 ];
 
 /// The top level Notes are filed under (CONTEXT.md).

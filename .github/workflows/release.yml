@@ -85,6 +85,12 @@ jobs:
           for lang in en de; do
             python3 tool/whats_new.py "docs/release-notes-${RELEASE_TAG#v}.md" "$lang" > /dev/null
           done
+      # The same notes are the apps' own What's new Note (#180): both
+      # bundle assets/help/whats_new.json, so it must hold this version.
+      - name: The apps bundle this version's What's new
+        run: |
+          python3 tool/whats_new.py --bundle --require "${RELEASE_TAG#v}"
+          git diff --exit-code -- assets/help/whats_new.json
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

@@ -344,6 +344,11 @@ impl Shell {
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
         app.offer_restore();
+        // The help Notes this version owes (#180); after the first start
+        // once it is answered.
+        if let Err(e) = app.set_help(env!("CARGO_PKG_VERSION")) {
+            eprintln!("help Notes: {e}");
+        }
         if let Some(id) = self.edit.borrow_mut().take() {
             app.edit_note(&id);
         }

@@ -29,6 +29,7 @@ pub mod entry;
 pub mod error;
 pub mod folder;
 pub mod frogs;
+pub mod help_notes;
 pub mod history;
 pub mod ics;
 pub mod imports;
@@ -81,6 +82,7 @@ pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
 pub use frogs::{Frog, Frogs, FrogsToday};
+pub use help_notes::{HelpNotes, HelpTexts, WhatsNew, compare_versions, parse_whats_new};
 pub use history::{
     Adherence, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory, ScheduleSpan,
 };

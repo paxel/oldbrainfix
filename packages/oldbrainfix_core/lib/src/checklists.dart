@@ -1129,7 +1129,7 @@ String _withoutItemMark(String row) => switch (Markdown.parse(row)) {
 };
 
 /// Writes a new Line of the Note [noteId] in its making [making], inside
-/// a batch, at [date] or now; returns its id.
+/// a batch, at [date] or now, under [id] or a new one; returns its id.
 String writeLine(
   Store store,
   String noteId,
@@ -1140,8 +1140,9 @@ String writeLine(
   bool checked = false,
   String? received,
   DateTime? date,
+  String? id,
 }) {
-  final id = '${ChecklistKeys.linePrefix}${Store.newId()}';
+  id ??= '${ChecklistKeys.linePrefix}${Store.newId()}';
   final now = (date ?? store.clock()).toUtc();
   store.append(id, ChecklistKeys.type, ChecklistKeys.typeLine, date: now);
   store.append(id, ChecklistKeys.note, noteId, date: now);

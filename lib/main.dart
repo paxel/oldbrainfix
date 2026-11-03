@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
@@ -22,6 +23,7 @@ import 'src/context_platform.dart';
 import 'src/crash_guard.dart';
 import 'src/drafts.dart';
 import 'src/folder_platform.dart';
+import 'src/help_notes.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -95,6 +97,14 @@ Future<void> _openAndRun(Directory dir) async {
     return;
   }
   _store = store;
+  // The version the help Notes are made for (#180); without it the app
+  // starts without them.
+  String? version;
+  try {
+    version = (await PackageInfo.fromPlatform()).version;
+  } on Exception {
+    version = null;
+  }
   runApp(
     OldBrainFixApp(
       store: store,
@@ -127,6 +137,9 @@ Future<void> _openAndRun(Directory dir) async {
       bundles: AndroidBundles(),
       profile: AndroidProfile(),
       workDir: work.path,
+      help: version == null
+          ? null
+          : HelpSetup(const BundledHelp(), version: version),
     ),
   );
 }

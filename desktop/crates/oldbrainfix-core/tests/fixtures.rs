@@ -42,7 +42,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 26] = [
+const SCENARIOS: [&str; 27] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -52,6 +52,7 @@ const SCENARIOS: [&str; 26] = [
     "features",
     "formats",
     "frogs",
+    "help",
     "history",
     "import",
     "keep",
@@ -174,6 +175,11 @@ fn load(scenario: &str, now: &str) -> Result<Store, Box<dyn std::error::Error>> 
     let store = Store::in_memory(Box::new(move || now), || Ok(writer_key()))?;
     for entry in log(scenario)? {
         store.insert(&entry)?;
+    }
+    // The help Notes are made only once the own Profile exists, so the
+    // generator's store held Ada's.
+    if scenario == "help" {
+        oldbrainfix_core::OwnProfile::new(&store).apply_defaults("Ada", None)?;
     }
     Ok(store)
 }
@@ -1594,6 +1600,86 @@ fn simple_or_advanced_reads_as_the_dart_core_reads_it() -> TestResult {
     Ok(())
 }
 
+/// The texts of the generator's `help` scenario, English or German.
+fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
+    const EN: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
+    const DE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2];
+    if german {
+        oldbrainfix_core::HelpTexts {
+            area_name: "Old Brain Fix".into(),
+            quick_start_title: "Schnellstart".into(),
+            quick_start_lines: vec![
+                "Einen Gedanken mit + erfassen".into(),
+                "Ihn in einen Bereich einsortieren".into(),
+            ],
+            icons_text: "Was die Symbole bedeuten\n\nArt: was die Notiz ist".into(),
+            icon_pictures: vec![DE],
+            whats_new_title: Box::new(|v| format!("Neu in {v}")),
+        }
+    } else {
+        oldbrainfix_core::HelpTexts {
+            area_name: "Old Brain Fix".into(),
+            quick_start_title: "Quick start".into(),
+            quick_start_lines: vec![
+                "Capture a thought with +".into(),
+                "File it into an Area".into(),
+            ],
+            icons_text: "What the icons mean\n\nKind: what the Note is".into(),
+            icon_pictures: vec![EN],
+            whats_new_title: Box::new(|v| format!("What's new in {v}")),
+        }
+    }
+}
+
+/// What the `help` scenario made at each step, as `help.json` holds it.
+fn write_help_steps(store: &Store) -> Result<Vec<Vec<String>>, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::OwnProfile;
+    use oldbrainfix_core::help_notes::{self, HelpNotes, WhatsNew};
+    let mut bundle = WhatsNew::new();
+    for (v, en, de) in [
+        ("0.5.0", "Added\n• More.", "Neu\n• Mehr."),
+        ("0.4.0", "Added\n• Help Notes.", "Neu\n• Hilfe-Notizen."),
+        ("0.4.1", "Fixed\n• A thing.", "Behoben\n• Eine Sache."),
+    ] {
+        let by_lang = [
+            ("en".to_string(), en.to_string()),
+            ("de".to_string(), de.to_string()),
+        ];
+        bundle.insert(v.into(), by_lang.into());
+    }
+    OwnProfile::new(store).apply_defaults("Ada", None)?;
+    let help = HelpNotes::new(store);
+    let mut made = Vec::new();
+    let mut make = |version: &str, fresh: bool, german: bool| -> Built {
+        let lang = if german { "de" } else { "en" };
+        made.push(help.make_due(version, fresh, lang, &help_texts(german), &bundle)?);
+        Ok(())
+    };
+    make("0.4.0", true, false)?;
+    make("0.4.0", true, false)?;
+    let person = OwnProfile::new(store).get()?.ok_or("a Profile")?.id;
+    Notes::new(store).trash(&help_notes::quick_start_id(&person))?;
+    make("0.4.1", false, true)?;
+    store.remove_local_setting(help_notes::VERSION_SETTING)?;
+    make("0.4.1", false, false)?;
+    Places::new(store).delete_area(&help_notes::area_id(&person), NotesGo::Trash)?;
+    make("0.5.0", false, false)?;
+    Ok(made)
+}
+
+/// The generator's `help` scenario (#180).
+fn write_help(store: &Store) -> Built {
+    write_help_steps(store).map(drop)
+}
+
+#[test]
+fn the_help_notes_made_are_the_dart_cores() -> TestResult {
+    let expected = read_json(&fixtures().join("help").join("help.json"))?;
+    let made = write_help_steps(&writer_store()?)?;
+    assert_eq!(json!({ "made": made }), expected);
+    Ok(())
+}
+
 /// The generator's `edits` scenario: what the desktop writes beyond the
 /// others.
 fn write_edits(store: &Store) -> Built {
@@ -1965,7 +2051,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 26] = [
+    let writers: [(&str, Writer); 27] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -1975,6 +2061,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("features", write_features),
         ("formats", write_formats),
         ("frogs", write_frogs),
+        ("help", write_help),
         ("history", write_history),
         ("import", write_import),
         ("keep", write_keep),

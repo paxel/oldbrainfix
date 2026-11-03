@@ -1,6 +1,8 @@
+import os
+import tempfile
 import unittest
 
-from whats_new import LIMIT, whats_new
+from whats_new import BUNDLE, LIMIT, ROOT, bundle, bundle_text, whats_new, write_bundle
 
 NOTES = """# Release notes 0.2.0
 
@@ -45,3 +47,48 @@ class WhatsNewTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BundleTest(unittest.TestCase):
+    """The What's new both apps bundle as Notes (#180)."""
+
+    def folder(self, files):
+        docs = tempfile.TemporaryDirectory()
+        self.addCleanup(docs.cleanup)
+        for name, text in files.items():
+            with open(os.path.join(docs.name, name), "w", encoding="utf-8") as f:
+                f.write(text)
+        return docs.name
+
+    def test_every_release_after_0_3_1_with_both_languages(self):
+        text = "".join(NOTES)
+        docs = self.folder({
+            "release-notes-0.3.1.md": text,
+            "release-notes-0.4.0.md": text,
+            "release-notes-0.10.0.md": text,
+            "hardware-buttons.md": "# Buttons",
+        })
+        notes = {"en": "Added\n• First thing.", "de": "Neu\n• Erstes Ding."}
+        self.assertEqual(bundle(docs), {"0.4.0": notes, "0.10.0": notes})
+
+    def test_a_release_without_a_language_fails(self):
+        english = "".join(NOTES).replace("play_notes_de", "play_notes_fr")
+        docs = self.folder({"release-notes-0.4.0.md": english})
+        with self.assertRaises(ValueError):
+            bundle(docs)
+
+    def test_a_required_version_without_notes_fails(self):
+        docs = self.folder({"release-notes-0.4.0.md": "".join(NOTES)})
+        out = os.path.join(docs, "out", "whats_new.json")
+        write_bundle("0.4.0", docs=docs, out=out)
+        with self.assertRaises(ValueError):
+            write_bundle("0.4.1", docs=docs, out=out)
+
+    def test_the_bundled_file_is_current(self):
+        with open(BUNDLE, encoding="utf-8") as f:
+            held = f.read()
+        self.assertEqual(
+            held,
+            bundle_text(bundle(os.path.join(ROOT, "docs"))),
+            "run python3 tool/whats_new.py --bundle",
+        )

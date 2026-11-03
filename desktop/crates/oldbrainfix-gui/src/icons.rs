@@ -186,6 +186,8 @@ pub fn area_icon(key: Option<&str>) -> Option<char> {
         "sport" => '\u{e28d}',
         "travel" => '\u{e297}',
         "star" => '\u{e5f9}',
+        // `psychology`, the phone's brain for the help Notes' Area (#180).
+        "brain" => '\u{e4ef}',
         _ => return None,
     })
 }

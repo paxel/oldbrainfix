@@ -5084,4 +5084,143 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get featuresAdvancedDetail =>
       'Adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas.';
+
+  @override
+  String get helpAreaName => 'Old Brain Fix';
+
+  @override
+  String get helpQuickStartTitle => 'Quick start';
+
+  @override
+  String get helpQuickStart1 => 'Capture a thought with +.';
+
+  @override
+  String get helpQuickStart2 => 'File the new Note into an Area.';
+
+  @override
+  String get helpQuickStart3 => 'Give a Note a Reminder.';
+
+  @override
+  String get helpQuickStart4 => 'Give a Note a Routine that repeats.';
+
+  @override
+  String get helpQuickStart5 =>
+      'Tick this Line: that is how a Checklist works.';
+
+  @override
+  String get helpQuickStart6 => 'Find a Note with Search and browse.';
+
+  @override
+  String get helpQuickStart7 => 'Make a Backup in Settings ▸ Backups.';
+
+  @override
+  String get helpQuickStart8 => 'Sync with your other Device in Settings.';
+
+  @override
+  String get helpIconsTitle => 'What the icons mean';
+
+  @override
+  String get helpIconsBadges => 'In a Note\'s badges';
+
+  @override
+  String get helpIconsAgenda => 'On the Agenda';
+
+  @override
+  String get helpIconsCard => 'On a Note card';
+
+  @override
+  String get helpIconKind => 'Kind';
+
+  @override
+  String get helpIconKindMeans =>
+      'what the Note is: a plain Note, a Checklist or a Shopping List.';
+
+  @override
+  String get helpIconImportance => 'Importance';
+
+  @override
+  String get helpIconImportanceMeans => 'how important the Note is.';
+
+  @override
+  String get helpIconPlace => 'Area and Topic';
+
+  @override
+  String get helpIconPlaceMeans => 'where the Note is filed.';
+
+  @override
+  String get helpIconCaptured => 'Captured';
+
+  @override
+  String get helpIconCapturedMeans => 'when you captured the Note.';
+
+  @override
+  String get helpIconReminder => 'Reminder';
+
+  @override
+  String get helpIconReminderMeans => 'rings once at its time.';
+
+  @override
+  String get helpIconRoutine => 'Routine';
+
+  @override
+  String get helpIconRoutineMeans => 'rings again on its days.';
+
+  @override
+  String get helpIconAdd => 'Add';
+
+  @override
+  String get helpIconAddMeans => 'gives the Note a Routine or Reminder.';
+
+  @override
+  String get helpIconBrowse => 'Search and browse';
+
+  @override
+  String get helpIconBrowseMeans => 'opens your Areas and searches every Note.';
+
+  @override
+  String get helpIconAllRoutines => 'All Routines and Reminders';
+
+  @override
+  String get helpIconAllRoutinesMeans => 'lists every Routine and Reminder.';
+
+  @override
+  String get helpIconNewRoutine => 'New Routine or Reminder';
+
+  @override
+  String get helpIconNewRoutineMeans => 'makes one with a new Note.';
+
+  @override
+  String get helpIconUnsorted => 'Unsorted';
+
+  @override
+  String get helpIconUnsortedMeans => 'Notes still to file into an Area.';
+
+  @override
+  String get helpIconFileInto => 'File into…';
+
+  @override
+  String get helpIconFileIntoMeans => 'moves the Note into an Area or Topic.';
+
+  @override
+  String get helpIconAlarm => 'Routine or Reminder';
+
+  @override
+  String get helpIconAlarmMeans => 'gives the card\'s Note one.';
+
+  @override
+  String get helpIconMerge => 'Merge into…';
+
+  @override
+  String get helpIconMergeMeans => 'joins the Note with another one.';
+
+  @override
+  String get helpIconMore => 'More';
+
+  @override
+  String get helpIconMoreMeans => 'the card\'s other actions.';
+
+  @override
+  String helpWhatsNewTitle(String version) {
+    return 'What\'s new in $version';
+  }
 }

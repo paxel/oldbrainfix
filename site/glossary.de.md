@@ -137,6 +137,10 @@ Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, wel
 Ein Schalter der Person, auf allen ihren eigenen Geräten gleich, beim ersten Start mit der Startauswahl gefragt, Einfach ausgewählt, und in den Einstellungen geändert. Einfach bietet an, Notizen, Checklisten, Einkaufslisten, Erinnerungen und Routinen anzulegen; Erweitert fügt Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen hinzu. Was es schon gibt, bleibt in Einfach sichtbar und nutzbar; nur Neues davon anzulegen ist verborgen. Nie gewählt zählt als Erweitert.
 _Avoid_: Modus, Stufe, Anfänger, Profi
 
+**Hilfe-Notiz** [Help Note]:
+Eine Notiz, mit der die App sich selbst erklärt: „Schnellstart“, eine Checkliste mit Schritten zum Ausprobieren, „Was die Symbole bedeuten“, mit Bildern der Symbole, und je Version ein „Neu in X.Y.Z“ mit ihren Versionshinweisen. Sie liegen in ihrem eigenen Bereich „Old Brain Fix“, nie unsortiert und ohne Stupser, in der Sprache des Geräts, das sie zuerst anlegt. Jede wird einmal je Person angelegt: Wer neu ist, bekommt die ersten beiden, ein Update das „Neu in“ seiner Version und die beiden, die noch nie angelegt wurden. Du bearbeitest, verschiebst und löschst sie wie jede Notiz; eine gelöschte kommt nicht wieder.
+_Avoid_: Tutorial, Einführung, Tipp, Änderungsnotiz
+
 ## Routinen und Erinnerungen
 
 **Routine** [Routine]:

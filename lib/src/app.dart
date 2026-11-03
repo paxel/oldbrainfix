@@ -27,6 +27,7 @@ import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
+import 'help_notes.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -157,6 +158,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// none is given, no Backup is written on its own while the app shows.
   final String? workDir;
 
+  /// The help Notes this version makes (#180) and what they are made
+  /// from; none in tests, so no Area "Old Brain Fix" appears there unless
+  /// a test hands one in.
+  final HelpSetup? help;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -187,6 +193,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.bundles = const NoBundles(),
     this.profile = const NoProfilePlatform(),
     this.workDir,
+    this.help,
   });
 
   @override
@@ -401,6 +408,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     speech: _speechModel,
     join: widget.join,
     hosting: widget.hosting,
+    help: widget.help,
     onThemeChanged: _themeChanged,
   );
 
@@ -478,6 +486,7 @@ class _Home extends StatefulWidget {
   final SpeechModel speech;
   final Join join;
   final StartHosting hosting;
+  final HelpSetup? help;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -496,6 +505,7 @@ class _Home extends StatefulWidget {
     required this.speech,
     required this.join,
     required this.hosting,
+    required this.help,
     required this.onThemeChanged,
   });
 
@@ -580,6 +590,9 @@ class _HomeState extends State<_Home> {
       // A bundle, Sent Item or Profile card file that opened the app.
       unawaited(_importOpened());
       unawaited(_autoBackupStart());
+      // Past the first start already: what this version's help Notes
+      // still owe (#180), an update's What's new among them.
+      if (_starterSetOffered) _helpDue(fresh: false);
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -951,6 +964,7 @@ class _HomeState extends State<_Home> {
     widget.places.plantStarterSet(picked);
     widget.store.starterSetOffered = true;
     unawaited(widget.profile.applyDefaults());
+    _helpDue(fresh: true);
     setState(() {
       _starterSetOffered = true;
       _speechOfferDue = _speechWanted;
@@ -1049,8 +1063,29 @@ class _HomeState extends State<_Home> {
       _speechOfferDue = _speechWanted;
     });
     unawaited(widget.profile.applyDefaults());
+    _helpDue(fresh: true);
     unawaited(widget.alarms.refresh());
     widget.autoSync.devicesChanged();
+  }
+
+  /// Makes the help Notes due (#180) once the own Profile exists, which
+  /// their ids are made from; [fresh] right after the first start, which
+  /// makes no What's new. Nothing without [_Home.help].
+  void _helpDue({required bool fresh}) {
+    final help = widget.help;
+    if (help == null) return;
+    final t = context.t;
+    unawaited(() async {
+      await widget.profile.applyDefaults();
+      if (!mounted) return;
+      await makeHelpNotes(
+        widget.store,
+        help.source,
+        t,
+        version: help.version,
+        fresh: fresh,
+      );
+    }());
   }
 
   /// The alarm setup was walked through; it is not offered again here.

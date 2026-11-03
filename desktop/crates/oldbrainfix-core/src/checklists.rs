@@ -577,6 +577,17 @@ pub(crate) fn write_line(
     line: &NewLine,
 ) -> Result<String> {
     let id = format!("{}{}", keys::LINE_PREFIX, store.new_id()?);
+    write_line_as(store, id, note_id, making, line)
+}
+
+/// Writes a new Line as [`write_line`] does, under the id `id`.
+pub(crate) fn write_line_as(
+    store: &Store,
+    id: String,
+    note_id: &str,
+    making: &str,
+    line: &NewLine,
+) -> Result<String> {
     let now = line.at.unwrap_or_else(|| store.now());
     store.append(&id, keys::TYPE, Some(keys::TYPE_LINE), Some(now))?;
     store.append(&id, keys::NOTE, Some(note_id), Some(now))?;

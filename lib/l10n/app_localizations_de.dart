@@ -5146,4 +5146,150 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get featuresAdvancedDetail =>
       'Dazu Strichlisten, Einheiten, Frösche, Themen, die Formatleiste und Rollen in geteilten Bereichen.';
+
+  @override
+  String get helpAreaName => 'Old Brain Fix';
+
+  @override
+  String get helpQuickStartTitle => 'Schnellstart';
+
+  @override
+  String get helpQuickStart1 => 'Erfasse einen Gedanken mit +.';
+
+  @override
+  String get helpQuickStart2 => 'Lege die neue Notiz in einem Bereich ab.';
+
+  @override
+  String get helpQuickStart3 => 'Gib einer Notiz eine Erinnerung.';
+
+  @override
+  String get helpQuickStart4 =>
+      'Gib einer Notiz eine Routine, die wiederkehrt.';
+
+  @override
+  String get helpQuickStart5 =>
+      'Hake diese Zeile ab: So funktioniert eine Checkliste.';
+
+  @override
+  String get helpQuickStart6 => 'Finde eine Notiz mit „Suchen und stöbern“.';
+
+  @override
+  String get helpQuickStart7 =>
+      'Lege unter Einstellungen ▸ Sicherungen eine Sicherung an.';
+
+  @override
+  String get helpQuickStart8 =>
+      'Synchronisiere in den Einstellungen mit deinem anderen Gerät.';
+
+  @override
+  String get helpIconsTitle => 'Was die Symbole bedeuten';
+
+  @override
+  String get helpIconsBadges => 'In den Abzeichen einer Notiz';
+
+  @override
+  String get helpIconsAgenda => 'In der Agenda';
+
+  @override
+  String get helpIconsCard => 'Auf der Karte einer Notiz';
+
+  @override
+  String get helpIconKind => 'Art';
+
+  @override
+  String get helpIconKindMeans =>
+      'was die Notiz ist: eine einfache Notiz, eine Checkliste oder eine Einkaufsliste.';
+
+  @override
+  String get helpIconImportance => 'Wichtigkeit';
+
+  @override
+  String get helpIconImportanceMeans => 'wie wichtig die Notiz ist.';
+
+  @override
+  String get helpIconPlace => 'Bereich und Thema';
+
+  @override
+  String get helpIconPlaceMeans => 'wo die Notiz abgelegt ist.';
+
+  @override
+  String get helpIconCaptured => 'Erfasst';
+
+  @override
+  String get helpIconCapturedMeans => 'wann du die Notiz erfasst hast.';
+
+  @override
+  String get helpIconReminder => 'Erinnerung';
+
+  @override
+  String get helpIconReminderMeans => 'klingelt einmal zu ihrer Zeit.';
+
+  @override
+  String get helpIconRoutine => 'Routine';
+
+  @override
+  String get helpIconRoutineMeans => 'klingelt an ihren Tagen immer wieder.';
+
+  @override
+  String get helpIconAdd => 'Hinzufügen';
+
+  @override
+  String get helpIconAddMeans => 'gibt der Notiz eine Routine oder Erinnerung.';
+
+  @override
+  String get helpIconBrowse => 'Suchen und stöbern';
+
+  @override
+  String get helpIconBrowseMeans =>
+      'öffnet deine Bereiche und durchsucht jede Notiz.';
+
+  @override
+  String get helpIconAllRoutines => 'Alle Routinen und Erinnerungen';
+
+  @override
+  String get helpIconAllRoutinesMeans =>
+      'listet jede Routine und Erinnerung auf.';
+
+  @override
+  String get helpIconNewRoutine => 'Neue Routine oder Erinnerung';
+
+  @override
+  String get helpIconNewRoutineMeans => 'legt eine mit einer neuen Notiz an.';
+
+  @override
+  String get helpIconUnsorted => 'Unsortiert';
+
+  @override
+  String get helpIconUnsortedMeans =>
+      'Notizen, die noch in einen Bereich gehören.';
+
+  @override
+  String get helpIconFileInto => 'Ablegen in …';
+
+  @override
+  String get helpIconFileIntoMeans =>
+      'legt die Notiz in einem Bereich oder Thema ab.';
+
+  @override
+  String get helpIconAlarm => 'Routine oder Erinnerung';
+
+  @override
+  String get helpIconAlarmMeans => 'gibt der Notiz der Karte eine.';
+
+  @override
+  String get helpIconMerge => 'Zusammenführen mit …';
+
+  @override
+  String get helpIconMergeMeans => 'fügt die Notiz mit einer anderen zusammen.';
+
+  @override
+  String get helpIconMore => 'Mehr';
+
+  @override
+  String get helpIconMoreMeans => 'die weiteren Aktionen der Karte.';
+
+  @override
+  String helpWhatsNewTitle(String version) {
+    return 'Neu in $version';
+  }
 }
