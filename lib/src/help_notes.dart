@@ -50,6 +50,8 @@ String _allRoutines(AppLocalizations t) => t.helpIconAllRoutines;
 String _allRoutinesMeans(AppLocalizations t) => t.helpIconAllRoutinesMeans;
 String _newRoutine(AppLocalizations t) => t.helpIconNewRoutine;
 String _newRoutineMeans(AppLocalizations t) => t.helpIconNewRoutineMeans;
+String _newSession(AppLocalizations t) => t.helpIconNewSession;
+String _newSessionMeans(AppLocalizations t) => t.helpIconNewSessionMeans;
 String _unsorted(AppLocalizations t) => t.helpIconUnsorted;
 String _unsortedMeans(AppLocalizations t) => t.helpIconUnsortedMeans;
 String _fileInto(AppLocalizations t) => t.helpIconFileInto;
@@ -81,6 +83,7 @@ const helpIconGroups = [
     HelpIcon(Icons.folder_outlined, _browse, _browseMeans),
     HelpIcon(Icons.format_list_bulleted, _allRoutines, _allRoutinesMeans),
     HelpIcon(Icons.add_alarm, _newRoutine, _newRoutineMeans),
+    HelpIcon(Icons.event_repeat, _newSession, _newSessionMeans),
     HelpIcon(Icons.move_to_inbox, _unsorted, _unsortedMeans),
   ]),
   HelpIconGroup('card', _card, [

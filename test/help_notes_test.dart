@@ -84,6 +84,34 @@ void main() {
       }
     });
 
+    test('the Agenda group shows the Agenda bar\'s icons in its order, New '
+        'Session after New Routine (#246), then the Unsorted banner', () {
+      final agenda = helpIconGroups.singleWhere((g) => g.slug == 'agenda');
+      expect(
+        [for (final icon in agenda.icons) icon.icon],
+        [
+          Icons.folder_outlined,
+          Icons.format_list_bulleted,
+          Icons.add_alarm,
+          Icons.event_repeat,
+          Icons.move_to_inbox,
+        ],
+      );
+      expect(
+        helpIconsText(en),
+        contains(
+          '\nNew Session: makes a Session with a new Note, in Advanced.',
+        ),
+      );
+      expect(
+        helpIconsText(de),
+        contains(
+          '\nNeue Einheit: legt in Erweitert eine Einheit mit einer neuen '
+          'Notiz an.',
+        ),
+      );
+    });
+
     test('the bundled What\'s new reads by version and language', () {
       expect(parseWhatsNew('{"0.4.0": {"de": "Neu", "en": "Added"}, "x": 1}'), {
         '0.4.0': {'de': 'Neu', 'en': 'Added'},

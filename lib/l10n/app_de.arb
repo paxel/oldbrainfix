@@ -1406,6 +1406,8 @@
   "helpIconAllRoutinesMeans": "listet jede Routine und Erinnerung auf.",
   "helpIconNewRoutine": "Neue Routine oder Erinnerung",
   "helpIconNewRoutineMeans": "legt eine mit einer neuen Notiz an.",
+  "helpIconNewSession": "Neue Einheit",
+  "helpIconNewSessionMeans": "legt in Erweitert eine Einheit mit einer neuen Notiz an.",
   "helpIconUnsorted": "Unsortiert",
   "helpIconUnsortedMeans": "Notizen, die noch in einen Bereich gehören.",
   "helpIconFileInto": "Ablegen in …",

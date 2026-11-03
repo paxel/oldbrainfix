@@ -5270,6 +5270,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpIconNewRoutineMeans => 'legt eine mit einer neuen Notiz an.';
 
   @override
+  String get helpIconNewSession => 'Neue Einheit';
+
+  @override
+  String get helpIconNewSessionMeans =>
+      'legt in Erweitert eine Einheit mit einer neuen Notiz an.';
+
+  @override
   String get helpIconUnsorted => 'Unsortiert';
 
   @override

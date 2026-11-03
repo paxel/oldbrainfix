@@ -141,3 +141,31 @@ fn an_app_not_handed_the_version_makes_none() -> TestResult {
     assert!(Places::new(harness.state().store()).areas()?.is_empty());
     Ok(())
 }
+
+#[test]
+fn the_agenda_group_names_new_session_after_new_routine_as_the_phone() -> TestResult {
+    let agenda = GROUPS
+        .iter()
+        .find(|g| g.slug == "agenda")
+        .ok_or("the Agenda group")?;
+    let t = L10n::new("en");
+    let names: Vec<&str> = agenda.icons.iter().map(|(name, _)| name(&t)).collect();
+    assert_eq!(
+        names,
+        [
+            "Search and browse",
+            "All Routines and Reminders",
+            "New Routine or Reminder",
+            "New Session",
+            "Unsorted",
+        ]
+    );
+    assert!(
+        icons_text(&t).contains("\nNew Session: makes a Session with a new Note, in Advanced.")
+    );
+    assert!(
+        icons_text(&L10n::new("de"))
+            .contains("\nNeue Einheit: legt in Erweitert eine Einheit mit einer neuen Notiz an.")
+    );
+    Ok(())
+}

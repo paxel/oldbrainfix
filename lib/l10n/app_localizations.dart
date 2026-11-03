@@ -8486,6 +8486,18 @@ abstract class AppLocalizations {
   /// **'makes one with a new Note.'**
   String get helpIconNewRoutineMeans;
 
+  /// The Agenda bar's New Session in the help Note on icons (#180, #246); its meaning follows in helpIconNewSessionMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'New Session'**
+  String get helpIconNewSession;
+
+  /// No description provided for @helpIconNewSessionMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'makes a Session with a new Note, in Advanced.'**
+  String get helpIconNewSessionMeans;
+
   /// No description provided for @helpIconUnsorted.
   ///
   /// In en, this message translates to:

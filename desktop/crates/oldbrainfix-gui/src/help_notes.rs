@@ -56,6 +56,10 @@ pub static GROUPS: [Group; 3] = [
                 L10n::help_icon_new_routine,
                 L10n::help_icon_new_routine_means,
             ),
+            (
+                L10n::help_icon_new_session,
+                L10n::help_icon_new_session_means,
+            ),
             (L10n::help_icon_unsorted, L10n::help_icon_unsorted_means),
         ],
         pictures: [

@@ -5203,6 +5203,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpIconNewRoutineMeans => 'makes one with a new Note.';
 
   @override
+  String get helpIconNewSession => 'New Session';
+
+  @override
+  String get helpIconNewSessionMeans =>
+      'makes a Session with a new Note, in Advanced.';
+
+  @override
   String get helpIconUnsorted => 'Unsorted';
 
   @override
