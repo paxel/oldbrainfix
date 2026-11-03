@@ -48,6 +48,8 @@ import 'package:oldbrainfix/src/routine_history_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
+import 'package:oldbrainfix/src/speech_model_screen.dart';
+import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
@@ -59,6 +61,7 @@ import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
 import '../fake_appointments.dart';
 import '../fake_photos.dart';
+import '../fake_speech.dart';
 import '../fake_voice.dart';
 import '../open_capture.dart';
 import '../reveal.dart';
@@ -114,6 +117,12 @@ typedef _Texts = ({
   String evening,
   String formatted,
   String meters,
+  String script,
+  String checks,
+  String spoken,
+  String receipt,
+  String tag,
+  String search,
 });
 
 const _en = (
@@ -178,6 +187,23 @@ const _en = (
       '| Electricity kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
       '| Water m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
       '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
+  script:
+      '#!/bin/sh\n'
+      '# Copy the photos to the USB disk every Sunday\n'
+      'rsync -a --delete ~/Pictures/ /media/usb/photos/\n'
+      'echo "Photos copied: \$(date +%F)"',
+  checks:
+      'Before the holiday\n'
+      '✅ Turn the heating down\n'
+      '✅ Give the spare key to the Müllers\n'
+      '❌ Cancel the newspaper\n'
+      '✅ Water the plants on Sunday',
+  spoken:
+      'Call the plumber about the boiler, Thursday morning between eight '
+      'and ten.',
+  receipt: 'Bakery receipt for the party',
+  tag: '#boiler',
+  search: 'boiler',
 );
 
 const _de = (
@@ -242,6 +268,23 @@ const _de = (
       '| Strom kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
       '| Wasser m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
       '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
+  script:
+      '#!/bin/sh\n'
+      '# Die Fotos jeden Sonntag auf die USB-Platte kopieren\n'
+      'rsync -a --delete ~/Bilder/ /media/usb/fotos/\n'
+      'echo "Fotos kopiert: \$(date +%F)"',
+  checks:
+      'Vor dem Urlaub\n'
+      '✅ Heizung herunterdrehen\n'
+      '✅ Ersatzschlüssel zu Müllers bringen\n'
+      '❌ Zeitung abbestellen\n'
+      '✅ Pflanzen am Sonntag gießen',
+  spoken:
+      'Den Installateur wegen der Therme anrufen, Donnerstag früh zwischen '
+      'acht und zehn.',
+  receipt: 'Beleg vom Bäcker für die Feier',
+  tag: '#Therme',
+  search: 'Therme',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -528,8 +571,11 @@ class _Seeded {
   }
 }
 
-/// A formatted Note about the boiler's service and one with a table of
-/// meter readings, both in the Household, the newest of its Notes.
+/// The Household's texts, its newest Notes: the table of meter readings
+/// and the boiler's service, both formatted; the backup script as Code
+/// (#213); the holiday's boxes, written checked or failed, the first
+/// failed and checked again, so that it has a History; the receipt's
+/// photo with its Photo Text; and a voice note with its Transcript, the newest.
 void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
   final notes = Notes(store);
   final household = Places(store)
@@ -539,7 +585,47 @@ void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
   notes.capture(x.meters, format: TextFormats.markdown, place: household.id);
   setClock(DateTime(2026, 10, 27, 9, 10));
   notes.capture(x.formatted, format: TextFormats.markdown, place: household.id);
+  setClock(DateTime(2026, 10, 27, 9, 40));
+  notes.capture(x.script, format: TextFormats.code, place: household.id);
+  setClock(DateTime(2026, 10, 27, 10, 5));
+  final checks = notes.capture(x.checks, place: household.id);
+  final boxes = Boxes(store);
+  final shown = boxes.of(checks.id);
+  setClock(DateTime(2026, 10, 27, 18, 20));
+  boxes.tick(checks.id, shown[0].id, BoxState.failed);
+  setClock(DateTime(2026, 10, 27, 18, 25));
+  boxes.tick(checks.id, shown[0].id, BoxState.done);
+  setClock(DateTime(2026, 10, 27, 19, 30));
+  final receipt = notes.capture(
+    x.receipt,
+    place: household.id,
+    photos: [File(_receiptPhoto).readAsBytesSync()],
+  );
+  notes.setPhotoText(receipt.id, receipt.photos.single, _receiptText);
+  setClock(DateTime(2026, 10, 27, 20, 15));
+  final voice = notes.capture(
+    '',
+    place: household.id,
+    recordings: [
+      Uint8List.fromList([1, 2, 3]),
+    ],
+  );
+  notes.setTranscript(voice.id, voice.recordings.single, x.spoken);
 }
+
+/// The photo of a bakery's receipt the OCR tests read.
+const _receiptPhoto = 'android/ocr/testdata/german-receipt.jpg';
+
+/// The words read from [_receiptPhoto], line by line.
+const _receiptText =
+    'Bäckerei Müller GmbH\n'
+    'Hauptstraße 7, 80331 München\n'
+    'Brötchen 6x 2,40 €\n'
+    'Käsekuchen 3,90 €\n'
+    'Süßes Teilchen 1,85 €\n'
+    'Summe EUR 8,15\n'
+    'MwSt 7% 0,53\n'
+    'Vielen Dank für Ihren Einkauf';
 
 /// The user's own Profile as Sam's, and Lena in People from her Profile
 /// card, sent through a messenger, so not verified. With [shared], Work
@@ -669,6 +755,7 @@ Future<AppLocalizations> _start(
   BundlePlatform bundles = const NoBundles(),
   FolderPlatform folders = const NoFolders(),
   AppointmentSource appointments = const NoAppointments(),
+  SpeechPlatform speech = const NoSpeech(),
 }) async {
   tester.view
     ..physicalSize = _frame / _dpr * dpr
@@ -688,6 +775,7 @@ Future<AppLocalizations> _start(
         bundles: bundles,
         folders: folders,
         appointments: appointments,
+        speech: speech,
       ),
     ),
   );
@@ -1413,29 +1501,52 @@ void main() {
             expect(find.byType(FrogsScreen), findsOneWidget);
           });
 
-          /// The Household with its formatted Notes, the newest on top.
-          Future<void> formattedNotes(WidgetTester tester) async {
-            final t = await start(
+          // Formatted text, Transcripts and Photo Texts (#175): the format
+          // bar, a script as Code, a table full screen, a box's menu, a
+          // #tag's and a word's search, the speech model, a receipt's
+          // Photo Text and a Transcript's buttons in the editor.
+          const texts175 = 'formatted-text-transcripts-photo-texts';
+
+          /// The Household with its texts, the newest on top, [speech]
+          /// running Whisper with the base model.
+          Future<AppLocalizations> formattedNotes(
+            WidgetTester tester, {
+            SpeechPlatform speech = const NoSpeech(),
+          }) async {
+            final t = await _start(
               tester,
-              _Seeded(texts, formatted: true)..store.themeChoice = choice,
+              boundary,
+              language,
+              (_Seeded(
+                texts,
+                formatted: true,
+              )..store.themeChoice = choice).store,
+              _guideDpr,
+              speech: speech,
             );
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
+            return t;
           }
 
           /// The card's text of [text], as drawn on the list.
           Finder cardText(String text) =>
               find.byWidgetPredicate((w) => w is MarkedText && w.text == text);
 
-          frame('formatted-text', (tester) async {
-            await formattedNotes(tester);
-            final boiler = cardText(texts.formatted);
+          /// Scrolls the Household's list to [finder].
+          Future<void> scrollTo(WidgetTester tester, Finder finder) async {
             await tester.scrollUntilVisible(
-              boiler,
+              finder,
               300,
               scrollable: notesList.first,
             );
             await tester.pumpAndSettle();
+          }
+
+          boxFrame(texts175, 'format', (tester) async {
+            await formattedNotes(tester);
+            final boiler = cardText(texts.formatted);
+            await scrollTo(tester, boiler);
             await tester.longPress(boiler.first);
             await tester.pumpAndSettle();
             expect(find.byType(NoteEditorScreen), findsOneWidget);
@@ -1453,15 +1564,23 @@ void main() {
             expect(find.byKey(const ValueKey('two-row-bar')), findsOneWidget);
           });
 
-          frame('table', (tester) async {
+          boxFrame(texts175, 'code', (tester) async {
+            await formattedNotes(tester);
+            // The backup script's Text format badge open (#213).
+            final script = find.textContaining(texts.script.split('\n')[1]);
+            await scrollTo(tester, script);
+            await tester.longPress(script.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final format = find.byKey(const ValueKey('badge-format'));
+            await reveal(tester, format);
+            await _tap(tester, format);
+          });
+
+          boxFrame(texts175, 'table', (tester) async {
             await formattedNotes(tester);
             final meters = cardText(texts.meters);
-            await tester.scrollUntilVisible(
-              meters,
-              300,
-              scrollable: notesList.first,
-            );
-            await tester.pumpAndSettle();
+            await scrollTo(tester, meters);
             final table = find.descendant(
               of: meters.first,
               matching: find.byWidgetPredicate(
@@ -1470,6 +1589,117 @@ void main() {
             );
             await _tap(tester, table.first);
             expect(find.byType(TableScreen), findsOneWidget);
+          });
+
+          boxFrame(texts175, 'box', (tester) async {
+            await formattedNotes(tester);
+            // The History of the holiday's first box, failed and checked
+            // again; its menu offers ☐, which no font here draws.
+            final box = find.byWidgetPredicate((w) {
+              final key = w.key;
+              // A box's button is keyed by its id, four letters or
+              // digits; its menu's entries by their state.
+              return key is ValueKey<String> &&
+                  RegExp(r'^box-[0-9a-z]{4}$').hasMatch(key.value) &&
+                  !const {'box-open', 'box-done'}.contains(key.value);
+            });
+            final heading = texts.checks.split('\n').first;
+            final checks = find.byWidgetPredicate(
+              (w) => w is MarkedText && w.text.startsWith(heading),
+            );
+            await scrollTo(tester, checks);
+            await _tap(tester, box.first);
+            await _tap(tester, find.byKey(const ValueKey('box-history')));
+            expect(
+              find.byKey(const ValueKey('box-history-dialog')),
+              findsOneWidget,
+            );
+          });
+
+          /// The search of all Notes for [query], as typed.
+          Future<void> search(WidgetTester tester, String query) async {
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              (_Seeded(
+                texts,
+                formatted: true,
+              )..store.themeChoice = choice).store,
+              _guideDpr,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            final field = find.widgetWithText(TextField, t.searchAllHint);
+            await tester.enterText(field, query);
+            await tester.pumpAndSettle();
+          }
+
+          boxFrame(texts175, 'tag', (tester) async {
+            await search(tester, texts.tag);
+          });
+
+          boxFrame(texts175, 'search', (tester) async {
+            await search(tester, texts.search);
+          });
+
+          boxFrame(texts175, 'transcript', (tester) async {
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              speech: FakeSpeech(installed: WhisperModel.base.sha256),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            final model = find.text(t.speechModelTitle);
+            await tester.scrollUntilVisible(
+              model,
+              300,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(SettingsScreen),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            await _tap(tester, model);
+            expect(find.byType(SpeechModelScreen), findsOneWidget);
+          });
+
+          boxFrame(texts175, 'photo-text', (tester) async {
+            await formattedNotes(tester);
+            // The receipt's card, its photo decoded, its Photo Text under
+            // it.
+            final receipt = cardText(texts.receipt);
+            await scrollTo(tester, receipt);
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 500)),
+            );
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(receipt.first);
+            await tester.pumpAndSettle();
+          });
+
+          boxFrame(texts175, 'generated', (tester) async {
+            await formattedNotes(
+              tester,
+              speech: FakeSpeech(installed: WhisperModel.base.sha256),
+            );
+            // The voice note's editor, its Transcript's buttons in view.
+            final spoken = find.textContaining(texts.spoken);
+            await scrollTo(tester, spoken);
+            await tester.longPress(spoken.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            final t = AppLocalizations.of(
+              tester.element(find.byType(NoteEditorScreen)),
+            );
+            await reveal(tester, find.text(t.transcribeAgain));
           });
 
           frame('share-area', (tester) async {

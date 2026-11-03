@@ -209,7 +209,7 @@ Future<void> openBoxMenu(
               value: _ToState(to),
               child: Row(
                 children: [
-                  Text(to.glyph),
+                  Text(to.glyph, style: _glyphStyle()),
                   const SizedBox(width: 12),
                   Flexible(
                     child: Text(switch (to) {
@@ -273,7 +273,7 @@ Future<void> showBoxHistory(
                 contentPadding: EdgeInsets.zero,
                 leading: Text(
                   tick.state.glyph,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: _glyphStyle(Theme.of(context).textTheme.titleLarge),
                 ),
                 title: Text(boxStateLabel(t, tick.state)),
                 subtitle: Text(
@@ -1576,7 +1576,9 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     final label = boxStateLabel(t, box.state);
     final ticked = ticking?.labelOf(context, box.id);
     if (ticking == null || (!ticking.mayTick && ticked == null)) {
-      return [TextSpan(text: glyph, semanticsLabel: label, style: style)];
+      return [
+        TextSpan(text: glyph, semanticsLabel: label, style: _glyphStyle(style)),
+      ];
     }
     return [
       WidgetSpan(
@@ -1661,7 +1663,7 @@ class _BoxWithTick extends StatelessWidget {
   Widget build(BuildContext context) => Text.rich(
     TextSpan(
       children: [
-        TextSpan(text: glyph),
+        TextSpan(text: glyph, style: _glyphStyle()),
         TextSpan(text: ' $label ', style: _tickStyle(context, style)),
       ],
     ),
@@ -1733,7 +1735,13 @@ class _BoxButton extends StatelessWidget {
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (details) => onTap(details.globalPosition),
-      child: Text(glyph, style: style),
+      child: Text(glyph, style: _glyphStyle(style)),
     ),
   );
 }
+
+/// [style] for a box's ✅ or ❌, with the emoji font by its name as well,
+/// where the text's own font has neither and nothing falls back on its
+/// own (the screenshots), as for the Frog.
+TextStyle _glyphStyle([TextStyle? style]) => (style ?? const TextStyle())
+    .copyWith(fontFamilyFallback: const ['Noto Color Emoji']);

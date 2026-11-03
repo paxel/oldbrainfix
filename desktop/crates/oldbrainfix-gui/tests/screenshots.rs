@@ -27,14 +27,18 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
-    Checklists, ClockTime, Day, DeviceSettings, Frogs, Importance, Notes, PersonSettings, Places,
-    QuickNoteControl, Routines, Schedule, ShoppingLists, SigningKey, Store, Tallies, parse_time,
+    BoxState, Boxes, Checklists, ClockTime, Day, DeviceSettings, Frogs, Importance, Notes,
+    PersonSettings, Places, QuickNoteControl, Routines, Schedule, ShoppingLists, SigningKey, Store,
+    Tallies, parse_time, text_format,
 };
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
+use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Page, Selection};
+use oldbrainfix_whisper::model::{ModelDir, Outcome as ModelOutcome};
 use parking_lot::Mutex;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -105,6 +109,18 @@ struct Texts {
     pages_read: &'static str,
     pages: &'static str,
     frogs: [&'static str; 3],
+    /// The Household's texts (#175): a formatted Note on the boiler's
+    /// service with a #tag, a table of meter readings, a script kept as
+    /// Code, a Note with boxes, a voice note's Transcript, a receipt's
+    /// Note, the #tag and a word the search finds.
+    formatted: &'static str,
+    meters: &'static str,
+    script: &'static str,
+    checks: &'static str,
+    spoken: &'static str,
+    receipt: &'static str,
+    tag: &'static str,
+    search: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -151,6 +167,14 @@ const EN: Texts = Texts {
         "Clear out the shelf in the cellar",
         "Cancel the old gym membership",
     ],
+    formatted: "## Boiler service\nBooked for **Thursday, 8 to 10**. Have the *service booklet* ready.\n- Pressure checked: 1.5 bar\n- Spare valve in stock\n- Bleed the radiators\nManual: [the maker's page](https://example.org/boiler)\nError `F28` means no ignition. #boiler",
+    meters: "Meter readings 2026\n\n<!-- first column headings -->\n| Meter | Jan | Feb | Mar | Apr | May | Jun |\n| --- | --: | --: | --: | --: | --: | --: |\n| Electricity kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n| Water m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |",
+    script: "#!/bin/sh\n# Copy the photos to the USB disk every Sunday\nrsync -a --delete ~/Pictures/ /media/usb/photos/\necho \"Photos copied: $(date +%F)\"",
+    checks: "Before the holiday\n✅ Turn the heating down\n✅ Give the spare key to the Müllers\n❌ Cancel the newspaper\n✅ Water the plants on Sunday",
+    spoken: "Call the plumber about the boiler, Thursday morning between eight and ten.",
+    receipt: "Bakery receipt for the party",
+    tag: "#boiler",
+    search: "boiler",
 };
 
 const DE: Texts = Texts {
@@ -197,6 +221,14 @@ const DE: Texts = Texts {
         "Das Regal im Keller ausmisten",
         "Den alten Fitnessstudio-Vertrag kündigen",
     ],
+    formatted: "## Wartung der Therme\nTermin am **Donnerstag, 8 bis 10 Uhr**. Das *Serviceheft* bereitlegen.\n- Druck geprüft: 1,5 bar\n- Ersatzventil vorrätig\n- Heizkörper entlüften\nAnleitung: [Seite des Herstellers](https://example.org/therme)\nFehler `F28` heißt: keine Zündung. #Therme",
+    meters: "Zählerstände 2026\n\n<!-- first column headings -->\n| Zähler | Jan | Feb | Mär | Apr | Mai | Jun |\n| --- | --: | --: | --: | --: | --: | --: |\n| Strom kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n| Wasser m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |",
+    script: "#!/bin/sh\n# Die Fotos jeden Sonntag auf die USB-Platte kopieren\nrsync -a --delete ~/Bilder/ /media/usb/fotos/\necho \"Fotos kopiert: $(date +%F)\"",
+    checks: "Vor dem Urlaub\n✅ Heizung herunterdrehen\n✅ Ersatzschlüssel zu Müllers bringen\n❌ Zeitung abbestellen\n✅ Pflanzen am Sonntag gießen",
+    spoken: "Den Installateur wegen der Therme anrufen, Donnerstag früh zwischen acht und zehn.",
+    receipt: "Beleg vom Bäcker für die Feier",
+    tag: "#Therme",
+    search: "Therme",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -382,6 +414,94 @@ fn window_with_lists(
         Ok(())
     })?;
     Ok((harness, lists))
+}
+
+/// The Notes of the Household's texts (#175), as [`seed_texts`] made them.
+#[derive(Default)]
+struct TextNotes {
+    formatted: String,
+    meters: String,
+    script: String,
+    voice: String,
+    receipt: String,
+}
+
+/// The photo of a bakery's receipt the OCR tests read.
+const RECEIPT: &[u8] = include_bytes!("../../../../android/ocr/testdata/german-receipt.jpg");
+
+/// The words read from [`RECEIPT`], line by line.
+const RECEIPT_TEXT: &str = "Bäckerei Müller GmbH\nHauptstraße 7, 80331 München\nBrötchen 6x 2,40 €\nKäsekuchen 3,90 €\nSüßes Teilchen 1,85 €\nSumme EUR 8,15\nMwSt 7% 0,53\nVielen Dank für Ihren Einkauf";
+
+/// Adds the Household's texts in `x`'s words to the demo store, each at
+/// its own moment on 25 October, the clock set back after: the table of
+/// meter readings and the boiler's service, both formatted; the backup
+/// script as Code; the holiday's boxes, written checked or failed, the
+/// first failed and checked again so that it has a History; the receipt's photo
+/// with its Photo Text; and a voice note with its Transcript, the newest.
+fn seed_texts(store: &Store, x: &Texts, now: &Clock) -> oldbrainfix_core::Result<TextNotes> {
+    let back = *now.lock();
+    let at = |h: u32, m: u32| {
+        *now.lock() = Utc
+            .with_ymd_and_hms(2026, 10, 25, h, m, 0)
+            .single()
+            .unwrap_or(back);
+    };
+    let household = Places::new(store)
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == x.household)
+        .map(|a| a.id);
+    let place = household.as_deref();
+    let notes = Notes::new(store);
+    at(8, 50);
+    let meters = notes.capture_as(x.meters, text_format::MARKDOWN, place, None)?;
+    at(9, 10);
+    let formatted = notes.capture_as(x.formatted, text_format::MARKDOWN, place, None)?;
+    at(9, 40);
+    let script = notes.capture_as(x.script, text_format::CODE, place, None)?;
+    at(10, 5);
+    let checks = notes.capture(x.checks, place, None)?;
+    let boxes = Boxes::new(store);
+    let shown = boxes.of(&checks.id)?;
+    if let Some(first) = shown.first() {
+        at(18, 20);
+        boxes.tick(&checks.id, &first.id, BoxState::Failed)?;
+        at(18, 25);
+        boxes.tick(&checks.id, &first.id, BoxState::Done)?;
+    }
+    at(19, 30);
+    let receipt = notes.capture_with(x.receipt, place, None, &[RECEIPT.to_vec()], &[])?;
+    if let Some(hash) = receipt.photos.first() {
+        notes.set_photo_text(&receipt.id, hash, RECEIPT_TEXT)?;
+    }
+    at(20, 15);
+    let voice = notes.capture_with("", place, None, &[], &[vec![1, 2, 3]])?;
+    if let Some(hash) = voice.recordings.first() {
+        notes.set_transcript(&voice.id, hash, x.spoken)?;
+    }
+    *now.lock() = back;
+    Ok(TextNotes {
+        formatted: formatted.id,
+        meters: meters.id,
+        script: script.id,
+        voice: voice.id,
+        receipt: receipt.id,
+    })
+}
+
+/// The window over the demo store with the Household's texts, in `x`'s
+/// words, `locale` and `theme`, on the Agenda; with the texts' Notes.
+fn window_with_texts(
+    x: &Texts,
+    locale: &str,
+    theme: egui::Theme,
+) -> Result<(Harness<'static, App>, TextNotes), Box<dyn std::error::Error>> {
+    let mut texts = TextNotes::default();
+    let harness = window_with_clock(x, locale, theme, |store, _, now| {
+        texts = seed_texts(store, x, now)?;
+        Ok(())
+    })?;
+    Ok((harness, texts))
 }
 
 /// Shows the Household's Notes in the window.
@@ -1047,6 +1167,10 @@ fn guide_frames() -> TestResult {
             harness.state_mut().select(Selection::Frogs);
             harness.run();
             problems.extend(match_frame(&mut harness, &box_frame(LISTS, "frog"))?);
+            // Formatted text, Transcripts and Photo Texts (#175).
+            problems.extend(texts_frames(texts, language, theme, |name| {
+                box_frame("formatted-text-transcripts-photo-texts", name)
+            })?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda.
             let mut harness = window(texts, language, theme)?;
@@ -1064,4 +1188,180 @@ fn guide_frames() -> TestResult {
         problems.join("\n")
     );
     Ok(())
+}
+
+/// The window of [`window_with_texts`], held on the heap: a page of
+/// scenes keeps the test's stack small.
+type TextsWindow = Box<Harness<'static, App>>;
+
+/// A scene over the Household's texts, given its window, the texts' Notes
+/// and the words.
+type TextsScene = fn(&mut TextsWindow, &TextNotes, &Texts) -> TestResult;
+
+/// The frame `path` of a scene over the Household's texts: `scene` brings
+/// a fresh window, given the texts' Notes, to its screen.
+fn texts_scene(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    path: &str,
+    scene: TextsScene,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let (harness, notes) = window_with_texts(texts, language, theme)?;
+    let mut harness = Box::new(harness);
+    scene(&mut harness, &notes, texts)?;
+    match_frame(&mut harness, path)
+}
+
+/// The frames of the page "Formatted text, Transcripts and Photo Texts"
+/// (#175), in `texts`' words, `language` and `theme`: the boiler's service
+/// being edited under the format bar, the script's Text format, the meter
+/// readings full screen, a box's History, a #tag's and a word's search,
+/// the receipt's Photo Text, the voice note's Transcript with its buttons
+/// and the speech model in the Settings.
+fn texts_frames(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    box_frame: impl Fn(&str) -> String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let scenes: [(&str, TextsScene); 8] = [
+        ("format", |harness, notes, _| {
+            harness.state_mut().edit_note(&notes.formatted);
+            harness.run();
+            Ok(())
+        }),
+        ("code", |harness, notes, _| {
+            harness.state_mut().select_note(&notes.script);
+            harness.run();
+            let format = {
+                let t = harness.state().t();
+                format!("{}: {}", t.badge_text_format(), t.text_format_code())
+            };
+            click_last(harness, &format)
+        }),
+        ("table", |harness, notes, _| {
+            harness.state_mut().select_note(&notes.meters);
+            harness.run();
+            let open = harness.state().t().table_open().to_string();
+            harness
+                .query_all_by_role_and_label(Role::Button, &open)
+                .last()
+                .ok_or("the table's Open the table")?
+                .click_accesskit();
+            harness.run();
+            Ok(())
+        }),
+        ("box", |harness, _, texts| {
+            show_household(harness, texts)?;
+            let (checked, history) = {
+                let t = harness.state().t();
+                (
+                    t.text_mark_checked().to_string(),
+                    t.history_title().to_string(),
+                )
+            };
+            harness
+                .query_all_by_role_and_label(Role::Button, &checked)
+                .next()
+                .ok_or("the holiday's first box")?
+                .click_accesskit();
+            harness.run();
+            click_last(harness, &history)
+        }),
+        ("tag", |harness, _, texts| {
+            show_household(harness, texts)?;
+            let tag = harness.state().t().search_for_tag(texts.tag);
+            harness
+                .query_all_by_label(&tag)
+                .next()
+                .ok_or("the boiler's #tag")?
+                .click_accesskit();
+            harness.run();
+            Ok(())
+        }),
+        ("search", |harness, _, texts| {
+            // Ctrl+F on the Agenda: All Notes, the cursor in its search.
+            harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::F);
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.search);
+            harness.run();
+            Ok(())
+        }),
+        ("photo-text", |harness, notes, _| {
+            harness.state_mut().select_note(&notes.receipt);
+            harness.run();
+            // The Photo Text under the photo in view, to its last line.
+            harness
+                .query_all_by_label_contains("Vielen Dank")
+                .last()
+                .ok_or("the receipt's Photo Text")?
+                .scroll_to_me();
+            harness.run();
+            Ok(())
+        }),
+        ("generated", |harness, notes, _| {
+            harness.state_mut().select_note(&notes.voice);
+            harness.run();
+            let replace = harness.state().t().replace_note_text().to_string();
+            harness.get_by_label(&replace).scroll_to_me();
+            harness.run();
+            Ok(())
+        }),
+    ];
+    let mut problems = Vec::new();
+    for (name, scene) in scenes {
+        problems.extend(texts_scene(
+            texts,
+            language,
+            theme,
+            &box_frame(name),
+            scene,
+        )?);
+    }
+    problems.extend(speech_model_frame(
+        texts,
+        language,
+        theme,
+        &box_frame("transcript"),
+    )?);
+    Ok(problems)
+}
+
+/// The frame `path` of the speech model's card in the Settings, none
+/// fetched yet.
+fn speech_model_frame(
+    texts: &Texts,
+    language: &str,
+    theme: egui::Theme,
+    path: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let models = tempfile::tempdir()?;
+    let none: Download = Arc::new(|_, _, _, _| ModelOutcome::Mismatch);
+    let speech = SpeechModel::with_download(
+        ModelDir::new(models.path().join("whisper")),
+        none,
+        Arc::new(|| {}),
+    );
+    for _ in 0..100 {
+        if speech.status() != Status::Checking {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let mut harness = Box::new(window(texts, language, theme)?);
+    harness.state_mut().set_enrichers(None, None, Some(speech));
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    let title = harness.state().t().speech_model_title().to_string();
+    harness
+        .query_all_by_label(&title)
+        .last()
+        .ok_or("the speech model's card")?
+        .scroll_to_me();
+    harness.run();
+    let problem = match_frame(&mut harness, path)?;
+    drop(harness);
+    models.close()?;
+    Ok(problem)
 }
