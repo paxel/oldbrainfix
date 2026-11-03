@@ -698,7 +698,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RadioColumn<bool>(
+              ChoiceChips<bool>(
                 value: _advanced,
                 options: [
                   RadioOption(value: false, title: Text(t.scheduleSimple)),
@@ -795,7 +795,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             padding: EdgeInsets.zero,
             title: Text(t.renagThis),
             // 0 stands for the Device default: no Re-nag lasts 0 min.
-            control: RadioColumn<int>(
+            control: ChoiceChips<int>(
               key: const ValueKey('renagThis'),
               value: own ?? 0,
               onChanged: (minutes) => setState(
@@ -845,7 +845,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ControlBelow(
               padding: EdgeInsets.zero,
               title: Text(t.escalationAfter),
-              control: RadioColumn<int>(
+              control: ChoiceChips<int>(
                 key: const ValueKey('escalationAfter'),
                 value: after,
                 onChanged: (count) => setState(() => _escalation = count),
@@ -867,7 +867,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   List<Widget> _simpleEditor(AppLocalizations t) {
     final locale = Localizations.localeOf(context).toString();
     return [
-      RadioColumn<RepeatKind>(
+      ChoiceChips<RepeatKind>(
         value: _kind,
         options: [
           RadioOption(value: RepeatKind.once, title: Text(t.repeatOnce)),
@@ -906,7 +906,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _stepper(_every, onChanged: (n) => _every = n),
-              RadioColumn<RepeatUnit>(
+              ChoiceChips<RepeatUnit>(
                 key: const ValueKey('everyUnit'),
                 value: _unit,
                 onChanged: (unit) => _change(() => _unit = unit),
@@ -975,7 +975,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   ) => ControlBelow(
     padding: const EdgeInsets.only(top: 8),
     title: Text(title),
-    control: RadioColumn<T>(
+    control: ChoiceChips<T>(
       value: value,
       options: options,
       onChanged: onChanged,

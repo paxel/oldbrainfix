@@ -28,7 +28,7 @@ use oldbrainfix_core::{
     Routine, Routines, Schedule, SimpleRepeat, Store,
 };
 
-use crate::app::{embossed, icon_button, pill, radio_column};
+use crate::app::{chip_row, embossed, icon_button, pill};
 use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
@@ -728,18 +728,15 @@ impl RoutineEditor {
         let text = ui.visuals().text_color();
         let mut changed = false;
         embossed(ui, tones, false, None, |ui| {
-            ui.horizontal(|ui| {
-                for (advanced, label) in
-                    [(false, t.schedule_simple()), (true, t.schedule_advanced())]
-                {
-                    if pill(ui, tones, self.advanced == advanced, label).clicked()
-                        && self.advanced != advanced
-                    {
-                        self.switch_mode(advanced);
-                        changed = true;
-                    }
-                }
-            });
+            let mut advanced = self.advanced;
+            let modes = [
+                (false, t.schedule_simple().to_string()),
+                (true, t.schedule_advanced().to_string()),
+            ];
+            if chip_row(ui, &mut advanced, modes) && advanced != self.advanced {
+                self.switch_mode(advanced);
+                changed = true;
+            }
             if self.advanced {
                 changed |= self.advanced_editor(ui, t);
             } else {
@@ -797,7 +794,7 @@ impl RoutineEditor {
             (RepeatKind::MonthDay, t.repeat_month_day()),
             (RepeatKind::MonthWeekday, t.repeat_month_weekday()),
         ];
-        radio_column(
+        chip_row(
             ui,
             &mut kind,
             kinds.map(|(k, label)| (k, label.to_string())),
@@ -835,7 +832,7 @@ impl RoutineEditor {
                 RepeatUnit::Months,
                 RepeatUnit::Years,
             ];
-            radio_column(ui, &mut unit, units.map(|u| (u, unit_text(u))));
+            chip_row(ui, &mut unit, units.map(|u| (u, unit_text(u))));
             if unit != self.unit {
                 self.unit = unit;
                 changed = true;
@@ -885,14 +882,14 @@ impl RoutineEditor {
         let mut ordinal = self.ordinal.unwrap_or(Self::ordinal_of(self.start));
         ui.label(RichText::new(t.which_in_month_label()).color(text));
         let ordinals = [1, 2, 3, 4, -1].map(|n| (n, t.nth_option(&n.to_string())));
-        if radio_column(ui, &mut ordinal, ordinals) {
+        if chip_row(ui, &mut ordinal, ordinals) {
             self.ordinal = Some(ordinal);
             changed = true;
         }
         let mut weekday = self.nth_weekday.unwrap_or(self.start.weekday());
         ui.label(RichText::new(t.weekday_label()).color(text));
         let weekdays = (1..=7).map(|day| (day, weekday_long(t, day).to_string()));
-        if radio_column(ui, &mut weekday, weekdays) {
+        if chip_row(ui, &mut weekday, weekdays) {
             self.nth_weekday = Some(weekday);
             changed = true;
         }
@@ -910,7 +907,7 @@ impl RoutineEditor {
             (RepeatEnd::Until, t.end_on_day()),
             (RepeatEnd::Count, t.end_after_count()),
         ];
-        radio_column(ui, &mut end, ends.map(|(e, label)| (e, label.to_string())));
+        chip_row(ui, &mut end, ends.map(|(e, label)| (e, label.to_string())));
         let mut changed = end != self.end;
         if changed {
             self.end = end;
@@ -1068,7 +1065,7 @@ impl RoutineEditor {
         let options = std::iter::once(None)
             .chain(choices.into_iter().map(Some))
             .map(|m| (m, label(m)));
-        radio_column(ui, &mut picked, options);
+        chip_row(ui, &mut picked, options);
         self.renag = picked;
     }
 
@@ -1097,7 +1094,7 @@ impl RoutineEditor {
             let mut choices: BTreeSet<i64> = ESCALATION_CHOICES.into_iter().collect();
             choices.insert(after);
             let mut picked = after;
-            radio_column(
+            chip_row(
                 ui,
                 &mut picked,
                 choices.into_iter().map(|n| (n, n.to_string())),

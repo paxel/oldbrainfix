@@ -439,7 +439,7 @@ fn a_new_reminder_starts_at_the_next_full_hour_and_its_field_holds_the_current_t
 }
 
 #[test]
-fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestResult {
+fn the_unit_of_every_n_is_a_row_of_choice_chips_below_the_stepper() -> TestResult {
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("New Routine or Reminder").click();
     harness.run();
@@ -452,10 +452,26 @@ fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestR
         .map(|u| radio(&harness, u).rect())
         .collect();
     assert!(more.bottom() <= units[0].top());
-    // One option per line.
-    assert!(units.windows(2).all(|w| w[0].bottom() <= w[1].top()));
-    radio(&harness, "weeks").click();
+    // A wrapping row of chips (#226): side by side, left to right.
+    assert!(units.windows(2).all(|w| w[0].top() == w[1].top()));
+    assert!(units.windows(2).all(|w| w[0].right() <= w[1].left()));
+    // A radio group a screen reader hears, the chosen one selected.
+    let group = radio(&harness, "days")
+        .parent()
+        .map(|g| g.accesskit_node().role());
+    assert_eq!(group, Some(Role::RadioGroup));
+    assert!(picked(&harness, "days"));
+    assert!(!picked(&harness, "weeks"));
+    // By keyboard: the arrow moves to the next chip, Space picks it.
+    radio(&harness, "days").focus();
     harness.run();
+    harness.key_press(egui::Key::ArrowRight);
+    harness.run();
+    assert!(radio(&harness, "weeks").is_focused());
+    harness.key_press(egui::Key::Space);
+    harness.run();
+    assert!(picked(&harness, "weeks"));
+    assert!(!picked(&harness, "days"));
     harness.get_by_label("Save").click();
     harness.run();
     let routine = routine_of(harness.state(), "Clean the bike chain")?;
@@ -486,7 +502,7 @@ fn the_simple_editor_repeats_on_the_last_weekday_of_a_month_a_number_of_times() 
     harness.get_by_label("New Routine or Reminder").click();
     harness.run();
     type_into(&mut harness, "What is to be done?", "Descale the kettle");
-    // The kinds are one column of radio buttons.
+    // The kinds are a row of choice chips, the first beside the next.
     let kinds: Vec<_> = [
         "Once",
         "Every …",
@@ -497,7 +513,8 @@ fn the_simple_editor_repeats_on_the_last_weekday_of_a_month_a_number_of_times() 
     .iter()
     .map(|k| radio(&harness, k).rect())
     .collect();
-    assert!(kinds.windows(2).all(|w| w[0].bottom() <= w[1].top()));
+    assert_eq!(kinds[0].top(), kinds[1].top());
+    assert!(kinds[0].right() <= kinds[1].left());
     radio(&harness, "Monthly on a weekday").click();
     harness.run();
     // The start's place in its month until another is chosen.

@@ -1194,7 +1194,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
-  /// The Importance badge's editor: the three as radio buttons, the one
+  /// The Importance badge's editor: the three as choice chips, the one
   /// it has marked; a tap on another writes it and closes.
   Future<void> _editImportance() async {
     final current = _placed?.note.importance;
@@ -1205,7 +1205,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       builder: (context) => BadgeDialog(
         setting: t.importance,
         icon: _importanceIcon,
-        content: RadioColumn<Importance>(
+        content: ChoiceChips<Importance>(
           value: current,
           options: [
             for (final (value, label) in [
@@ -1325,7 +1325,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// The kind badge's editor (#188): the kinds as radio buttons, the
+  /// The kind badge's editor (#188): the kinds as choice chips, the
   /// Note's marked, and those this Device may change it to; a tap on
   /// another changes it and closes.
   Future<void> _editKind() async {
@@ -1336,7 +1336,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       builder: (context) => BadgeDialog(
         setting: t.badgeKind,
         icon: kindBadgeIcon,
-        content: RadioColumn<NoteKind>(
+        content: ChoiceChips<NoteKind>(
           value: current,
           options: [
             for (final kind in NoteKind.values)
@@ -1366,7 +1366,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       builder: (context) => BadgeDialog(
         setting: t.badgeTextFormat,
         icon: textFormatBadgeIcon,
-        content: RadioColumn<String>(
+        content: ChoiceChips<String>(
           value: current,
           options: [
             for (final format in [

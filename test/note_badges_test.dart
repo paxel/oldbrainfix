@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/line_editing.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/tally_field_screen.dart';
@@ -59,7 +60,7 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
-  final radios = find.byWidgetPredicate((w) => w is RadioGroup<NoteKind>);
+  final kinds = find.byWidgetPredicate((w) => w is ChoiceChips<NoteKind>);
 
   Finder inDialog(Finder finder) =>
       find.descendant(of: find.byType(AlertDialog), matching: finder);
@@ -129,7 +130,12 @@ void main() {
         findsOneWidget,
       );
       expect(
-        inDialog(find.byType(RadioListTile<Importance>)),
+        inDialog(
+          find.descendant(
+            of: find.byType(ChoiceChips<Importance>),
+            matching: find.byType(ChoiceChip),
+          ),
+        ),
         findsNWidgets(3),
       );
       await tap(tester, key('importance-important'));
@@ -293,7 +299,7 @@ void main() {
       expect(dialogTitle('Kind'), findsOneWidget);
       expect(inDialog(find.byIcon(Icons.category_outlined)), findsOneWidget);
       expect(
-        tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
+        tester.widget<ChoiceChips<NoteKind>>(inDialog(kinds)).value,
         NoteKind.checklist,
       );
       await tap(tester, key('kind-plain'));
@@ -412,7 +418,7 @@ void main() {
         'session',
       ]);
       expect(
-        tester.widget<RadioGroup<NoteKind>>(inDialog(radios)).groupValue,
+        tester.widget<ChoiceChips<NoteKind>>(inDialog(kinds)).value,
         NoteKind.plain,
       );
       await tap(tester, key('kind-checklist'));

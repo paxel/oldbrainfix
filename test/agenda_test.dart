@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'chips.dart';
 import 'open_capture.dart';
 import 'reveal.dart';
 
@@ -581,29 +582,33 @@ void main() {
       expect(schedule.start, today);
     });
 
-    testWidgets('its choices are radio buttons, one per line', (tester) async {
+    testWidgets('its short choices are a wrapping row of choice chips', (
+      tester,
+    ) async {
       await openNew(tester);
       expect(find.byType(SegmentedButton<bool>), findsNothing);
       expect(find.byType(SegmentedButton<RepeatKind>), findsNothing);
-      expect(find.byType(RadioListTile<bool>), findsNWidgets(2));
-      expect(find.byType(RadioListTile<RepeatKind>), findsNWidgets(5));
-      // One option per line: each sits below the one before.
-      final tops = [
-        for (final tile in find.byType(RadioListTile<RepeatKind>).evaluate())
-          tester.getTopLeft(find.byWidget(tile.widget)),
-      ];
-      expect(tops.map((o) => o.dx).toSet(), hasLength(1));
-      expect(tops[1].dy, greaterThan(tops[0].dy));
-      expect(tops[2].dy, greaterThan(tops[1].dy));
-      expect(tops[4].dy, greaterThan(tops[3].dy));
+      expect(find.byType(RadioListTile<bool>), findsNothing);
+      expect(find.byType(RadioListTile<RepeatKind>), findsNothing);
+      expect(chipLabels(tester, find.byType(ChoiceChips<bool>)), [
+        'Simple',
+        'Advanced',
+      ]);
+      expect(pickedChip(tester, find.byType(ChoiceChips<bool>)), 'Simple');
+      expect(chipLabels(tester, find.byType(ChoiceChips<RepeatKind>)), [
+        'Once',
+        'Every …',
+        'Weekdays',
+        'Monthly on a day',
+        'Monthly on a weekday',
+      ]);
+      // A row: the second chip stands beside the first.
+      final first = tester.getTopLeft(chip('Once'));
+      final second = tester.getTopLeft(chip('Every …'));
+      expect(second.dy, first.dy);
+      expect(second.dx, greaterThan(first.dx));
 
-      await tap(
-        tester,
-        find.descendant(
-          of: find.widgetWithText(RadioListTile<RepeatKind>, 'Weekdays'),
-          matching: find.byType(Radio<RepeatKind>),
-        ),
-      );
+      await tap(tester, chip('Weekdays'));
       await tester.ensureVisible(find.text('Save'));
       await tap(tester, find.text('Save'));
       expect(
@@ -697,19 +702,7 @@ void main() {
       await tap(tester, find.text('Every month on the last Friday · All day'));
       // In the simple editor, as it was built.
       expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsNothing);
-      // Whether the option [text] is the one its radio group holds.
-      bool picked(String text) {
-        final tile = find.ancestor(
-          of: find.text(text),
-          matching: find.byWidgetPredicate((w) => w is RadioListTile),
-        );
-        final group = find.ancestor(
-          of: tile,
-          matching: find.byWidgetPredicate((w) => w is RadioGroup),
-        );
-        return (tester.widget(group.first) as RadioGroup).groupValue ==
-            (tester.widget(tile) as RadioListTile).value;
-      }
+      bool picked(String text) => chipPicked(tester, text);
 
       expect(picked('Monthly on a weekday'), isTrue);
       await reveal(tester, find.text('Friday'));

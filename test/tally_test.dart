@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix/src/tally_field_screen.dart';
@@ -572,7 +573,7 @@ void main() {
       expect(
         find.descendant(
           of: key('tally-period'),
-          matching: find.byType(RadioListTile<TallyPeriod>),
+          matching: find.byType(ChoiceChip),
         ),
         findsNWidgets(4),
       );
@@ -587,14 +588,7 @@ void main() {
       expect(find.byType(CardTally), findsNothing);
       await tap(tester, find.text('Push-ups').first);
       expect(
-        tester
-            .widget<RadioGroup<TallyPeriod>>(
-              find.descendant(
-                of: key('tally-period'),
-                matching: find.byType(RadioGroup<TallyPeriod>),
-              ),
-            )
-            .groupValue,
+        tester.widget<ChoiceChips<TallyPeriod>>(key('tally-period')).value,
         TallyPeriod.month,
       );
       await tap(tester, key('tally-period-day'));

@@ -319,7 +319,7 @@ class _ReappearDialogState extends State<ReappearDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          RadioColumn<_Kind>(
+          ChoiceChips<_Kind>(
             key: const ValueKey('reappear-kind'),
             value: _kind,
             // After starts at a week, as on the desktop.
@@ -353,7 +353,7 @@ class _ReappearDialogState extends State<ReappearDialog> {
               max: Reappear.maxCount,
               onChanged: (n) => _change(() => _count = n),
             ),
-            RadioColumn<ReappearUnit>(
+            ChoiceChips<ReappearUnit>(
               key: const ValueKey('reappear-unit'),
               value: _unit,
               onChanged: (unit) => _change(() => _unit = unit),

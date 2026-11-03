@@ -414,7 +414,7 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
               ),
               EditorPanel(
                 heading: t.tallyRule,
-                child: RadioColumn<TallyRule>(
+                child: ChoiceChips<TallyRule>(
                   key: const ValueKey('tally-rule'),
                   value: _rule,
                   onChanged: _pickRule,

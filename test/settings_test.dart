@@ -292,10 +292,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.descendant(
-            of: column,
-            matching: find.byType(RadioListTile<int>),
-          ),
+          find.descendant(of: column, matching: find.byType(ChoiceChip)),
           findsNWidgets(count),
           reason: key,
         );
@@ -305,14 +302,7 @@ void main() {
           reason: key,
         );
         expect(
-          tester
-              .widget<RadioGroup<int>>(
-                find.descendant(
-                  of: column,
-                  matching: find.byType(RadioGroup<int>),
-                ),
-              )
-              .groupValue,
+          tester.widget<ChoiceChips<int>>(column).value,
           chosen,
           reason: key,
         );

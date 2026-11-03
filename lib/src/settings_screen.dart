@@ -504,7 +504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsHeading(t.settingsLook),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: RadioColumn<ThemeChoice>(
+              child: ChoiceChips<ThemeChoice>(
                 key: const ValueKey('theme'),
                 value: _theme,
                 options: [
@@ -617,7 +617,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.repeat),
                   title: Text(t.renagDevice),
                   subtitle: Text(t.settingsRenagDetail),
-                  control: RadioColumn<int>(
+                  control: ChoiceChips<int>(
                     key: const ValueKey('renagDevice'),
                     value: renag,
                     onChanged: (minutes) =>
@@ -873,7 +873,7 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
         ControlBelow(
           leading: const Icon(Icons.notifications_paused_outlined),
           title: Text(t.nudgeRepeat),
-          control: RadioColumn<int>(
+          control: ChoiceChips<int>(
             key: const ValueKey('nudgeRepeat'),
             value: repeat,
             onChanged: (minutes) {

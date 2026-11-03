@@ -220,7 +220,7 @@ fn reappear_badge(
 }
 
 /// What a Line's reappear time dialog shows of `current` (#195): None,
-/// Once or After as radio buttons, After with its number from 1 to 99 and
+/// Once or After as choice chips, After with its number from 1 to 99 and
 /// Day, Week, Month or Year under it; the time picked, written at once by
 /// the caller. After starts at a week.
 pub fn reappear_editor(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<Reappear> {
@@ -240,7 +240,7 @@ pub fn reappear_editor(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<Reapp
         (Kind::Once, t.shopping_once().to_string()),
         (Kind::After, t.shopping_reappear_after().to_string()),
     ];
-    if crate::app::radio_column(ui, &mut kind, options) {
+    if crate::app::chip_row(ui, &mut kind, options) {
         return Some(match kind {
             Kind::None => Reappear::Unset,
             Kind::Once => Reappear::Once,
@@ -267,7 +267,7 @@ pub fn reappear_editor(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<Reapp
         };
         (u, words)
     });
-    (crate::app::radio_column(ui, &mut picked, units) && picked != unit)
+    (crate::app::chip_row(ui, &mut picked, units) && picked != unit)
         .then_some(Reappear::After(count, picked))
 }
 

@@ -168,7 +168,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
       builder: (context) => BadgeDialog(
         setting: t.tallyRule,
         icon: Icons.functions,
-        content: RadioColumn<TallyRule>(
+        content: ChoiceChips<TallyRule>(
           key: const ValueKey('tally-rule'),
           value: field.rule,
           onChanged: (rule) => Navigator.of(context).pop(rule),

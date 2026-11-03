@@ -442,7 +442,7 @@ class SwitchBelow extends StatelessWidget {
   );
 }
 
-/// One option of a [RadioColumn].
+/// One option of a [RadioColumn] or of [ChoiceChips].
 class RadioOption<T> {
   final T value;
   final Widget title;
@@ -463,9 +463,9 @@ class RadioOption<T> {
   });
 }
 
-/// A single choice: a column of radio buttons, one option per line, two
-/// options included (UI laws, "Dialogs and pages"). Without [onChanged]
-/// the options show but do not change.
+/// A long or wordy single choice: a column of radio buttons, one option
+/// per line (UI laws, "Dialogs and pages"); a short one is [ChoiceChips].
+/// Without [onChanged] the options show but do not change.
 class RadioColumn<T> extends StatelessWidget {
   final T value;
   final List<RadioOption<T>> options;
@@ -507,6 +507,64 @@ class RadioColumn<T> extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A short single choice (#226): a wrapping row of choice chips, the one
+/// [value] selected, as the Routine editor's weekday chips look (UI laws,
+/// "Dialogs and pages"). An option's [RadioOption.secondary] is its chip's
+/// icon; one with a subtitle belongs in a [RadioColumn]. A screen reader
+/// hears a radio group of buttons, the chosen one selected. Without
+/// [onChanged] the chips show but do not change.
+class ChoiceChips<T> extends StatelessWidget {
+  final T value;
+  final List<RadioOption<T>> options;
+  final ValueChanged<T>? onChanged;
+
+  const ChoiceChips({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    assert(
+      options.every((o) => o.subtitle == null),
+      'a choice with details is a RadioColumn',
+    );
+    final onChanged = this.onChanged;
+    return Semantics(
+      container: true,
+      role: SemanticsRole.radioGroup,
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: [
+          for (final option in options)
+            MergeSemantics(
+              child: Semantics(
+                inMutuallyExclusiveGroup: true,
+                child: ChoiceChip(
+                  key: option.key,
+                  avatar: option.secondary,
+                  // A check over the icon would hide it.
+                  showCheckmark: option.secondary == null,
+                  label: option.title,
+                  selected: option.value == value,
+                  // A tap on the chosen option changes nothing.
+                  onSelected: onChanged == null
+                      ? null
+                      : (_) {
+                          if (option.value != value) onChanged(option.value);
+                        },
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

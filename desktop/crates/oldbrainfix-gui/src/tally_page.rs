@@ -13,7 +13,7 @@ use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::tally_units;
 use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 
-use crate::app::{embossed, radio_column};
+use crate::app::{chip_row, embossed};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::setting_badges::{BadgeValue, badge, badge_dialog, badge_row};
@@ -361,7 +361,7 @@ impl TallyPage {
                         (TallyRule::Sum, t.tally_rule_sum().to_string()),
                         (TallyRule::Max, t.tally_rule_max().to_string()),
                     ];
-                    if radio_column(ui, &mut field.rule, options) {
+                    if chip_row(ui, &mut field.rule, options) {
                         field.rule_picked = true;
                         done = true;
                     }

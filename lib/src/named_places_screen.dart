@@ -245,7 +245,7 @@ class _NamedPlaceDialogState extends State<_NamedPlaceDialog> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            RadioColumn<double>(
+            ChoiceChips<double>(
               value: _radius,
               options: [
                 for (final radius in {...namedPlaceRadii, widget.radius})

@@ -86,7 +86,7 @@ replace a law of Both apps where they say so. A desktop law marked
 - Every capture screen shows three buttons at the bottom: remind me in
   **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
   The three are actions, not a choice of value: a tap saves the Note
-  with that Nudge time, so the radio-button law does not apply to them.
+  with that Nudge time, so the single-choice law does not apply to them.
   Where the Device switched the Nudge buttons off (Settings ▸ Quick
   note), one Save takes their place, and it nudges in 1 h as leaving does.
 - **Add to a Shopping List** makes each line of the capture a Line of
@@ -235,7 +235,7 @@ replace a law of Both apps where they say so. A desktop law marked
   detailed view is the Tally** (#190): under its name and description
   "Add entry", in a Shared Area "Show entries" (Mine at first,
   Everyone's, or one person's), "One bar per" Day, Week, Month or Year
-  as radio buttons, kept per Note on this Device, a chart per field
+  as choice chips, kept per Note on this Device, a chart per field
   shown but its multipliers (#200), then its entries (a multiplied
   field's value after its multipliers', "Reps 3 × 10 reps"), newest
   first, the latest five and the older
@@ -334,14 +334,14 @@ replace a law of Both apps where they say so. A desktop law marked
   counts as badges; each of its Routines is a Routine badge, and the
   Routine editor of one holds only its schedule. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same setting icon and the
-  setting's name, its values in words, which changes it at once: Importance as radio buttons (only
+  setting's name, its values in words, which changes it at once: Importance as choice chips (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the
   Agenda as radio buttons (here and in the card's ⋮), the switches,
-  the kind as radio buttons of the kinds it may become: from a Plain
+  the kind as choice chips of the kinds it may become: from a Plain
   Note a Checklist, a Shopping List, a Tally or a Session, from a list
   the other list, keeping its Lines, or a Plain Note, from a Session a
   Plain Note; a Tally's and a Code text's only show it; the text format
-  as radio buttons of Plain text, Formatted text and Code, a formatted
+  as choice chips of Plain text, Formatted text and Code, a formatted
   text never Plain text again;
   Captured only shows its details. Area and Topic opens File into…, a
   Routine or Reminder its editor. Where
@@ -383,15 +383,27 @@ replace a law of Both apps where they say so. A desktop law marked
 - A dialog has one question and at most two actions plus Cancel. More
   than that is a page. A list to choose from (Areas, Topics, People) is
   a menu at the finger or a page, never a sheet.
-- **Every single choice is radio buttons.** A choice of one value is a
-  column of radio buttons, one option per line, two options included:
-  never segmented buttons or a row of choice chips, which cramp and grow
-  ugly with every option added. Several options that can be picked
-  together are checkboxes or filter chips. A setting that is only on or
-  off is a switch, not a choice. Tabs that switch pages are not a
-  choice of value. Suggestions under a text field are chips that fill
-  in what is typed, such as the known units under a Tally field's
-  unit (#159): the value is the text, so they are not a choice.
+- **A short single choice is choice chips, a long one radio buttons**
+  (#226). A choice of one value whose options are fixed words of one to
+  about four, at most about seven of them, with no detail line under
+  any, is a wrapping row of choice chips, exactly one selected, as the
+  Routine editor's weekday chips look: the Routine editor's Simple or
+  Advanced, repeat kind and Ends, the reappear time, Day, Week, Month or
+  Year, the Importance, kind and text format badges, Re-nag minutes, the
+  theme. A choice whose options are long, carry a detail line or are
+  names the user made (people, a Tally's fields, Shopping Lists) is a
+  column of radio buttons, one option per line: Show on the Agenda, the
+  unit system, a Session's rule, the person's Simple or Advanced (#197),
+  the speech model, a role, whom a Note is sent to. Never segmented
+  buttons. The choices inside a menu stay the menu's own marked entries.
+  The chips are one radio group to a screen reader, each chip a
+  selectable button, the chosen one announced as selected. Several
+  options that can be picked together are checkboxes or filter chips. A
+  setting that is only on or off is a switch, not a choice. Tabs that
+  switch pages are not a choice of value. Suggestions under a text field
+  are chips that fill in what is typed, such as the known units under a
+  Tally field's unit (#159): the value is the text, so they are not a
+  choice.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error
@@ -473,7 +485,7 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A Shopping List's Line ends in its reappear time badge** (#195),
   before ⋮, in the editor: short text, "—" for none, "Once", "4w",
   "3m", read as "Reappear time: 4 weeks". A tap opens its dialog: None,
-  Once or After as radio buttons, After with a number from 1 to 99 (−
+  Once or After as choice chips, After with a number from 1 to 99 (−
   and +) and Day, Week, Month or Year under it, each change written at
   once, then Close. Where this Device may not change the Line, the badge
   only shows it; a new Line's badge stores it first.
@@ -898,8 +910,12 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The control may stand beside its text** (draft, #196): unlike the
   phone, an on-or-off setting is a square checkbox (`theme::checkbox`)
   with its words beside the box, its detail in a small weak line under
-  it, in place of the phone's switch on its own line. A single choice
-  is still a column of radio buttons; the Sync dialog's "Bundle for",
+  it, in place of the phone's switch on its own line. A short single
+  choice is a wrapping row of choice chips (`app::chip_row`, the weekday
+  pills' look), a radio group of radio buttons to a screen reader, Tab
+  and the arrows moving between them, Space or Enter picking one; a
+  long one is a column of radio buttons (`app::radio_column`), as in
+  Both apps (#226); the Sync dialog's "Bundle for",
   a dropdown beside its words (`sync_view.rs`), does not follow that
   yet.
 

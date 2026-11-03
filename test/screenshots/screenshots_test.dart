@@ -1424,7 +1424,7 @@ void main() {
             // The weekdays under the kinds, the start and the end below.
             await tester.drag(
               find.byType(Scrollable).first,
-              const Offset(0, -260),
+              const Offset(0, -170),
             );
             await tester.pumpAndSettle();
           });

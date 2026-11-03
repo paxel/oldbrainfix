@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -236,7 +237,7 @@ void main() {
       final column = find.byKey(const ValueKey('renagThis'));
       expect(find.byType(DropdownButton<int?>), findsNothing);
       expect(
-        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        find.descendant(of: column, matching: find.byType(ChoiceChip)),
         findsNWidgets(7),
         reason: 'the default, the five choices and 20 min',
       );
@@ -244,11 +245,7 @@ void main() {
         find.descendant(of: column, matching: find.text('20 min')),
         findsOneWidget,
       );
-      int? chosen() => tester
-          .widget<RadioGroup<int>>(
-            find.descendant(of: column, matching: find.byType(RadioGroup<int>)),
-          )
-          .groupValue;
+      int? chosen() => tester.widget<ChoiceChips<int>>(column).value;
       expect(chosen(), 20);
 
       await tap(

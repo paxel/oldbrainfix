@@ -8747,7 +8747,7 @@ impl App {
                         (Importance::Normal, t.importance_normal().to_string()),
                         (Importance::Important, t.importance_important().to_string()),
                     ];
-                    if radio_column(ui, &mut picked, options) {
+                    if chip_row(ui, &mut picked, options) {
                         if picked != note.importance {
                             actions.push(Action::Importance(picked));
                         }
@@ -8794,13 +8794,13 @@ impl App {
                 let shown_kind = KindShown::of(&self.view);
                 let current = shown_kind.kind;
                 badge_dialog(ctx, shown, (icons::KIND, None), t.badge_kind(), |ui| {
-                    // The kinds as radio buttons, the current one picked;
+                    // The kinds as choice chips, the current one picked;
                     // a pick changes it at once and closes (#188).
                     let mut picked = current;
                     let options = std::iter::once(current)
                         .chain(shown_kind.choices.iter().copied())
                         .map(|kind| (kind, kind_look(&t, kind).1.to_string()));
-                    if radio_column(ui, &mut picked, options) {
+                    if chip_row(ui, &mut picked, options) {
                         if picked != current {
                             actions.push(kind_action(&note.id, current, picked));
                         }
@@ -8823,7 +8823,7 @@ impl App {
                         .into_iter()
                         .filter(|f| *f != text_format::PLAIN || current != text_format::MARKDOWN)
                         .map(|f| (f, text_format_look(&t, f).1.to_string()));
-                    if radio_column(ui, &mut picked, options) {
+                    if chip_row(ui, &mut picked, options) {
                         if picked != current {
                             actions.push(Action::SetTextFormat(picked));
                         }
@@ -13498,7 +13498,7 @@ fn alarm_sound_choice(
 /// The Nudge repeats offered, in minutes (the phone's choices).
 pub const NUDGE_REPEAT_CHOICES: [i64; 3] = [10, 30, 60];
 
-/// `label`, and below it a column of radio buttons for `minutes`;
+/// `label`, and below it a row of choice chips for `minutes`;
 /// `picked` gets a new one.
 fn minutes_choice(
     ui: &mut Ui,
@@ -13512,13 +13512,14 @@ fn minutes_choice(
     ui.label(RichText::new(label).color(text));
     let mut chosen = minutes;
     let options = choices.iter().map(|m| (*m, t.renag_minutes(*m)));
-    if radio_column(ui, &mut chosen, options) && chosen != minutes {
+    if chip_row(ui, &mut chosen, options) && chosen != minutes {
         picked(chosen);
     }
 }
 
-/// A single choice: one radio button per line, the `current` one marked.
-/// True when a click picked one.
+/// A long or wordy single choice: one radio button per line, the
+/// `current` one marked; a short one is a [`chip_row`]. True when a click
+/// picked one.
 pub(crate) fn radio_column<T: PartialEq + Copy>(
     ui: &mut Ui,
     current: &mut T,
@@ -13534,15 +13535,48 @@ pub(crate) fn radio_column<T: PartialEq + Copy>(
     changed
 }
 
-/// A pill to pick one of a few choices: self-painted so its text reads in
-/// every state, with the accent while `on`.
+/// A short single choice (#226): a wrapping row of pills, the `current`
+/// one selected, as the Routine editor's weekday pills look. A screen
+/// reader hears a radio group of radio buttons; Tab and the arrows move
+/// between them, Space or Enter picks one. True when a click picked one.
+pub(crate) fn chip_row<T: PartialEq + Copy>(
+    ui: &mut Ui,
+    current: &mut T,
+    options: impl IntoIterator<Item = (T, String)>,
+) -> bool {
+    let tones = theme::tones(ui.visuals());
+    ui.horizontal_wrapped(|ui| {
+        ui.ctx().accesskit_node_builder(ui.unique_id(), |node| {
+            node.set_role(egui::accesskit::Role::RadioGroup);
+        });
+        let mut changed = false;
+        for (value, label) in options {
+            let on = *current == value;
+            if pill_as(ui, tones, on, &label, WidgetType::RadioButton).clicked() {
+                *current = value;
+                changed = true;
+            }
+        }
+        changed
+    })
+    .inner
+}
+
+/// A pill to pick one or several of a few choices: self-painted so its
+/// text reads in every state, with the accent while `on`.
 pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Response {
+    pill_as(ui, tones, on, label, WidgetType::Button)
+}
+
+/// A [`pill`] a screen reader hears as `typ`, with the focus ring while
+/// it has the keyboard.
+fn pill_as(ui: &mut Ui, tones: Tones, on: bool, label: &str, typ: WidgetType) -> egui::Response {
     let font = FontId::proportional(14.0);
     let fg = ui.visuals().text_color();
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, fg);
     let pad = egui::vec2(10.0, 5.0);
     let (rect, resp) = ui.allocate_exact_size(galley.size() + pad * 2.0, Sense::click());
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, on, label));
+    resp.widget_info(|| WidgetInfo::selected(typ, true, on, label));
     if ui.is_rect_visible(rect) {
         let fill = if on {
             tones.accent.gamma_multiply(0.3)
@@ -13567,6 +13601,11 @@ pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Re
             ),
             egui::StrokeKind::Inside,
         );
+        if resp.has_focus() {
+            let ring = ui.visuals().widgets.active.bg_stroke;
+            ui.painter()
+                .rect_stroke(rect.expand(2.0), 14.0, ring, egui::StrokeKind::Outside);
+        }
         ui.painter().galley(rect.min + pad, galley, fg);
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)

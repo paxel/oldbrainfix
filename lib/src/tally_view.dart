@@ -621,7 +621,7 @@ class _CardTallyState extends State<CardTally> {
             ),
           ],
           _heading(t.tallyPeriod),
-          RadioColumn<TallyPeriod>(
+          ChoiceChips<TallyPeriod>(
             key: const ValueKey('tally-period'),
             value: _period,
             onChanged: _setPeriod,

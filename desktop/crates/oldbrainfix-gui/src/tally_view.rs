@@ -25,7 +25,7 @@ use oldbrainfix_core::{
     TallyEntry, TallyField, TallyPeriod, TallyRule, UnitKind, UnitSystem, WallClock,
 };
 
-use crate::app::{embossed, icon_button, radio_column, when};
+use crate::app::{chip_row, embossed, icon_button, radio_column, when};
 use crate::capture_choices::TallyFieldChoice;
 use crate::icons;
 use crate::l10n::L10n;
@@ -474,7 +474,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAc
             (TallyPeriod::Month, t.tally_period_month().to_string()),
             (TallyPeriod::Year, t.tally_period_year().to_string()),
         ];
-        if radio_column(ui, &mut period, options) {
+        if chip_row(ui, &mut period, options) {
             actions.push(TallyAction::Period(period));
         }
         for field in tally.counting() {
@@ -1195,7 +1195,7 @@ impl FieldForm {
                             (TallyRule::Sum, t.tally_rule_sum().to_string()),
                             (TallyRule::Max, t.tally_rule_max().to_string()),
                         ];
-                        if radio_column(ui, &mut self.rule, options) {
+                        if chip_row(ui, &mut self.rule, options) {
                             self.rule_picked = true;
                         }
                     });
