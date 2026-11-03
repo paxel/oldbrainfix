@@ -553,7 +553,8 @@ class Notes {
         }
       }
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Adds the photo [bytes] to the Note [noteId], without their metadata;
@@ -888,7 +889,8 @@ class Notes {
         date: now,
       );
     });
-    return _section(id)!;
+    return _section(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Whether this Device may edit the text of the Section [id], an Amend

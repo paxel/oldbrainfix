@@ -491,7 +491,10 @@ class PackTreeView extends StatelessWidget {
   }
 
   Widget? _icon(PackItem item) => switch (item.kind) {
-    PackItemKind.note => Icon(kindIcon(pack.notes[item.note!].kind)),
+    PackItemKind.note => switch (item.note) {
+      final i? => Icon(kindIcon(pack.notes[i].kind)),
+      null => null,
+    },
     PackItemKind.photo => const Icon(Icons.photo_outlined),
     PackItemKind.photoText ||
     PackItemKind.transcript => const Icon(Icons.notes),
@@ -503,30 +506,35 @@ class PackTreeView extends StatelessWidget {
   };
 
   String _label(AppLocalizations t, String locale, PackItem item) {
-    final note = pack.notes[item.note!];
+    // An Area or a Topic has no Note, and the Pack's photos, recordings
+    // and Routines always come with their index: anything else is
+    // labelled nothing.
+    final at = item.note;
+    if (at == null) return '';
+    final note = pack.notes[at];
     String start(String? text) => (text ?? '').split('\n').first.trim();
-    return switch (item.kind) {
-      PackItemKind.note => _firstLine(note),
-      PackItemKind.photo => t.packPhoto(
-        packSizeText(locale, note.photos[item.index!].size),
+    return switch ((item.kind, item.index)) {
+      (PackItemKind.note, _) => _firstLine(note),
+      (PackItemKind.photo, final i?) => t.packPhoto(
+        packSizeText(locale, note.photos[i].size),
       ),
-      PackItemKind.photoText => t.packPhotoText(
-        start(note.photos[item.index!].text),
+      (PackItemKind.photoText, final i?) => t.packPhotoText(
+        start(note.photos[i].text),
       ),
-      PackItemKind.recording => t.packRecording(
-        packSizeText(locale, note.recordings[item.index!].size),
+      (PackItemKind.recording, final i?) => t.packRecording(
+        packSizeText(locale, note.recordings[i].size),
       ),
-      PackItemKind.transcript => t.packTranscript(
-        start(note.recordings[item.index!].text),
+      (PackItemKind.transcript, final i?) => t.packTranscript(
+        start(note.recordings[i].text),
       ),
-      PackItemKind.routine => t.packRoutine(
-        scheduleText(t, locale, note.routines[item.index!]),
+      (PackItemKind.routine, final i?) => t.packRoutine(
+        scheduleText(t, locale, note.routines[i]),
       ),
-      PackItemKind.reminder => t.packReminder(
-        scheduleText(t, locale, note.routines[item.index!]),
+      (PackItemKind.reminder, final i?) => t.packReminder(
+        scheduleText(t, locale, note.routines[i]),
       ),
-      PackItemKind.frog => t.packFrog,
-      PackItemKind.area || PackItemKind.topic => '',
+      (PackItemKind.frog, _) => t.packFrog,
+      _ => '',
     };
   }
 

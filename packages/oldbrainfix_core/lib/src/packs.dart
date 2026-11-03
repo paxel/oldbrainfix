@@ -507,7 +507,7 @@ extension PackTree on Pack {
   int? _noteOf(String key) {
     final match = RegExp(r'^n(\d+)$').firstMatch(key);
     if (match == null) return null;
-    final i = int.tryParse(match[1]!);
+    final i = int.tryParse(match[1] ?? '');
     return i != null && i < notes.length ? i : null;
   }
 
@@ -549,10 +549,10 @@ extension PackTree on Pack {
     // A Session with none of its pool ticked goes neither.
     kept.removeWhere(
       (i) =>
-          notes[i].session != null &&
-          !notes[i].session!.pool.any(
+          notes[i].session?.pool.any(
             (t) => ticks.contains(PackItemKeys.note(t)),
-          ),
+          ) ==
+          false,
     );
     final newIndex = {for (final (n, i) in kept.indexed) i: n};
     final areaIndex = <int, int>{};
@@ -592,9 +592,10 @@ extension PackTree on Pack {
         for (final i in kept)
           PackNote(
             area: notes[i].area == null ? null : areaIndex[notes[i].area],
-            topic: notes[i].topic == null
-                ? null
-                : topicIndex[(notes[i].area!, notes[i].topic!)],
+            topic: switch ((notes[i].area, notes[i].topic)) {
+              (final a?, final t?) => topicIndex[(a, t)],
+              _ => null,
+            },
             outside: notes[i].outside && pooled.contains(i),
             text: notes[i].text,
             format: notes[i].format,
@@ -755,15 +756,13 @@ Uint8List encodePack(
   Uint8List? Function(String kind, String hash)? bytesOf,
 }) {
   final payload = _payload(pack, bytesOf);
-  if (pack.card != null && key == null) {
-    throw ArgumentError('a Pack with a Profile is signed');
-  }
+  final sig = switch ((pack.card, key)) {
+    (null, _) => null,
+    (_, final key?) => key.sign(packBytes(payload)),
+    (_, null) => throw ArgumentError('a Pack with a Profile is signed'),
+  };
   return utf8.encode(
-    jsonEncode({
-      'pack': payload,
-      if (pack.card != null) 'sig': key!.sign(packBytes(payload)),
-      'type': _packType,
-    }),
+    jsonEncode({'pack': payload, 'sig': ?sig, 'type': _packType}),
   );
 }
 
@@ -1103,23 +1102,25 @@ extension PackExport on Store {
   Pack _packOfNotes(List<Note> picked, Set<String> closed) {
     final notes = Notes(this);
     final places = Places(this);
-    final order = [for (final n in picked) n.id];
+    final order = [...picked];
     final sessions = Sessions(this);
     // The Tallies the Sessions pick from that are not among them.
     for (var k = 0; k < order.length; k++) {
-      final setup = sessions.setupOf(order[k]);
+      final setup = sessions.setupOf(order[k].id);
       if (setup == null) continue;
       for (final t in sessions.pool(setup)) {
-        if (order.contains(t)) continue;
-        final place = notes.byId(t)?.place;
+        if (order.any((n) => n.id == t)) continue;
+        final tally = notes.byId(t);
+        if (tally == null) continue;
+        final place = tally.place;
         final area = place == null
             ? null
             : places.topicById(place)?.areaId ?? place;
         if (area != null && closed.contains(area)) continue;
-        order.add(t);
+        order.add(tally);
       }
     }
-    final index = {for (final (i, id) in order.indexed) id: i};
+    final index = {for (final (i, n) in order.indexed) n.id: i};
     final areas = <String, int>{};
     final areaNames = <({String name, List<String> topics})>[];
     final topics = <String, int>{};
@@ -1143,8 +1144,7 @@ extension PackExport on Store {
     }
 
     final out = <PackNote>[];
-    for (final (i, id) in order.indexed) {
-      final note = notes.byId(id)!;
+    for (final (i, note) in order.indexed) {
       final (area, topic) = placeOf(note);
       out.add(_packNote(note, area, topic, i >= picked.length, index));
     }
@@ -1217,7 +1217,10 @@ extension PackExport on Store {
             name: f.name,
             unit: f.unit,
             rule: f.rule,
-            target: f.target == null ? null : encodeTallyNumber(f.target!),
+            target: switch (f.target) {
+              final target? => encodeTallyNumber(target),
+              null => null,
+            },
             hidden: f.hidden,
             multiplies: f.multiplies == null ? null : fieldIndex[f.multiplies],
           ),
@@ -1383,11 +1386,17 @@ extension PackImport on Store {
         (
           photos: [
             for (final p in n.photos)
-              p.bytes == null ? p.hash : putPhoto(p.bytes!),
+              switch (p.bytes) {
+                final bytes? => putPhoto(bytes),
+                null => p.hash,
+              },
           ],
           recordings: [
             for (final a in n.recordings)
-              a.bytes == null ? a.hash : putAudio(a.bytes!),
+              switch (a.bytes) {
+                final bytes? => putAudio(bytes),
+                null => a.hash,
+              },
           ],
         ),
     ];
@@ -1420,11 +1429,17 @@ extension PackImport on Store {
         for (final (a, pa) in pack.areas.indexed)
           [for (final t in pa.topics) topic(areaIds[a], t)],
       ];
+      // The Area for the Notes the Pack files nowhere, made before the
+      // Notes as soon as one is unfiled.
       String? none;
-      if (pack.notes.any((n) => n.area == null)) {
-        none = area(noArea);
-        made.add(none);
+      String unfiled() {
+        if (none case final id?) return id;
+        final id = area(noArea);
+        made.add(id);
+        return none = id;
       }
+
+      if (pack.notes.any((n) => n.area == null)) unfiled();
       final noteIds = <String>[];
       for (final (i, n) in pack.notes.indexed) {
         final id = 'note:${Store.newId()}';
@@ -1432,7 +1447,7 @@ extension PackImport on Store {
         final place = switch ((n.area, n.topic)) {
           (final a?, final t?) => topicIds[a][t],
           (final a?, null) => areaIds[a],
-          _ => none!,
+          _ => unfiled(),
         };
         _writeNote(id, n, place, now, badge, hashes[i]);
         for (final s in n.routines) {

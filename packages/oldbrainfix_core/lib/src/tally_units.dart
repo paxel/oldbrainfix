@@ -155,13 +155,14 @@ abstract final class TallyUnits {
     if (kindOf(unit) == UnitKind.time && typed.contains(':')) {
       final match = _clock.firstMatch(typed);
       if (match == null) return null;
+      final sign = match[1] ?? '';
       final parts = [
-        for (final part in typed.substring(match[1]!.length).split(':'))
+        for (final part in typed.substring(sign.length).split(':'))
           int.parse(part),
       ];
       if (parts.skip(1).any((p) => p > 59)) return null;
       final seconds = parts.fold(0, (s, p) => s * 60 + p);
-      final base = (match[1]!.isEmpty ? seconds : -seconds).toDouble();
+      final base = (sign.isEmpty ? seconds : -seconds).toDouble();
       return base.abs() > maxValue ? null : base;
     }
     if (!_number.hasMatch(typed)) return null;
@@ -198,11 +199,12 @@ int? decodeTallyMicro(String? text) {
   if (text == null) return null;
   final match = _stored.firstMatch(text);
   if (match == null) return null;
-  final whole = int.parse(match[2]!);
+  final whole = int.tryParse(match[2] ?? '');
+  if (whole == null) return null;
   final fraction = int.parse((match[3] ?? '').padRight(6, '0'));
   final micro = whole * 1000000 + fraction;
   if (micro > _maxMicro) return null;
-  return match[1]!.isEmpty ? micro : -micro;
+  return (match[1] ?? '').isEmpty ? micro : -micro;
 }
 
 /// The number [text] holds, as [encodeTallyNumber] wrote it; null for

@@ -531,7 +531,7 @@ extension SharedAreas on Store {
         Person(id: key, role: grant.role, devices: devices),
     ]..sort((a, b) {
       if ((a.id == mine) != (b.id == mine)) return a.id == mine ? -1 : 1;
-      final byName = names[a.id]!.compareTo(names[b.id]!);
+      final byName = (names[a.id] ?? '').compareTo(names[b.id] ?? '');
       return byName != 0 ? byName : a.id.compareTo(b.id);
     });
   }

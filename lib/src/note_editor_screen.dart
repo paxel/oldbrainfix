@@ -666,7 +666,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ..addListener(_nameTyped);
     _descriptionFocus.addListener(_descriptionFocused);
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
-    _restoreDraft();
+    // Fire and forget: a draft cut off mid-write reads as none, and
+    // anything else reaches the crash guard.
+    unawaited(_restoreDraft());
   }
 
   @override

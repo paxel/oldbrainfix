@@ -172,8 +172,7 @@ Future<AgendaLoad> _load(
         ? loadAgenda(store, wallClock, system)
         : readAgenda(store, wallClock, system),
   );
-  if (run.error case final error?) throw error;
-  return run.value!._elsewhere(run.log);
+  return run.result._elsewhere(run.log);
 }
 
 Future<AlarmPlanRead> _plan(
@@ -188,8 +187,7 @@ Future<AlarmPlanRead> _plan(
     await initializeDateFormatting(locale);
     return planAlarms(store, wallClock, t, locale);
   });
-  if (run.error case final error?) throw error;
-  return run.value!;
+  return run.result;
 }
 
 /// The Agenda's load of [store]: today's Session and Frog picks written

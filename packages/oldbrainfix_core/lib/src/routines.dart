@@ -225,7 +225,8 @@ class Routines {
       }
       within?.call(id);
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Creates a Routine without a Note at hand: its Note, holding [text],

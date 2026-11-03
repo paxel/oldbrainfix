@@ -151,54 +151,68 @@ class RenderGrown extends RenderProxyBox {
     maxHeight: constraints.maxHeight / _factor,
   );
 
+  // Without a child it is what a RenderProxyBox without one is: as
+  // small as allowed, with nothing to paint or hit.
+
   @override
   void performLayout() {
-    final child = this.child!;
+    final child = this.child;
+    if (child == null) {
+      size = computeSizeForNoChild(constraints);
+      return;
+    }
     child.layout(_shrunk(constraints), parentUsesSize: true);
     size = constraints.constrain(child.size * _factor);
   }
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) => constraints.constrain(
-    child!.getDryLayout(_shrunk(constraints)) * _factor,
-  );
+  Size computeDryLayout(BoxConstraints constraints) => switch (child) {
+    final child? => constraints.constrain(
+      child.getDryLayout(_shrunk(constraints)) * _factor,
+    ),
+    null => computeSizeForNoChild(constraints),
+  };
 
   @override
   double computeMinIntrinsicWidth(double height) =>
-      child!.getMinIntrinsicWidth(height / _factor) * _factor;
+      (child?.getMinIntrinsicWidth(height / _factor) ?? 0) * _factor;
 
   @override
   double computeMaxIntrinsicWidth(double height) =>
-      child!.getMaxIntrinsicWidth(height / _factor) * _factor;
+      (child?.getMaxIntrinsicWidth(height / _factor) ?? 0) * _factor;
 
   @override
   double computeMinIntrinsicHeight(double width) =>
-      child!.getMinIntrinsicHeight(width / _factor) * _factor;
+      (child?.getMinIntrinsicHeight(width / _factor) ?? 0) * _factor;
 
   @override
   double computeMaxIntrinsicHeight(double width) =>
-      child!.getMaxIntrinsicHeight(width / _factor) * _factor;
+      (child?.getMaxIntrinsicHeight(width / _factor) ?? 0) * _factor;
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    if (_factor == 1) return context.paintChild(child!, offset);
+    final child = this.child;
+    if (child == null) return;
+    if (_factor == 1) return context.paintChild(child, offset);
     layer = context.pushTransform(
       needsCompositing,
       offset,
       _transform,
-      (context, offset) => context.paintChild(child!, offset),
+      (context, offset) => context.paintChild(child, offset),
       oldLayer: layer as TransformLayer?,
     );
   }
 
   @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
-      result.addWithPaintTransform(
-        transform: _transform,
-        position: position,
-        hitTest: (result, position) =>
-            child!.hitTest(result, position: position),
-      );
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    final child = this.child;
+    if (child == null) return false;
+    return result.addWithPaintTransform(
+      transform: _transform,
+      position: position,
+      hitTest: (result, position) => child.hitTest(result, position: position),
+    );
+  }
 
   @override
   void applyPaintTransform(RenderBox child, Matrix4 transform) =>

@@ -229,8 +229,11 @@ void main() {
         'https://x.org/a?b=1',
         'HTTP://y.de',
       ]);
-      expect(plain('www.x.org ftp://x.org mailto:a@x.org https:// x'), []);
-      expect(plain('xhttps://x.org 1https://x.org'), []);
+      expect(
+        plain('www.x.org ftp://x.org mailto:a@x.org https:// x'),
+        <String>[],
+      );
+      expect(plain('xhttps://x.org 1https://x.org'), <String>[]);
       expect(plain('(https://x.org)'), ['https://x.org']);
     });
 

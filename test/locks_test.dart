@@ -608,7 +608,9 @@ void main() {
       routines.create('Water plants', daily(12));
       final snapshot = AgendaSnapshot.of(store, deviceWallClock, en, 'en');
       expect(
-        [for (final row in snapshot.days['2026-10-24'] ?? []) row.title],
+        [
+          for (final row in [...?snapshot.days['2026-10-24']]) row.title,
+        ],
         [en.maskedRoutineAt('10:00'), 'Water plants'],
       );
     });

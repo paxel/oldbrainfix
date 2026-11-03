@@ -97,7 +97,7 @@ class SessionDraft {
       }
     }
     return counts.keys.toList()..sort(
-      (a, b) => switch (counts[b]!.compareTo(counts[a]!)) {
+      (a, b) => switch ((counts[b] ?? 0).compareTo(counts[a] ?? 0)) {
         0 => a.compareTo(b),
         final by => by,
       },

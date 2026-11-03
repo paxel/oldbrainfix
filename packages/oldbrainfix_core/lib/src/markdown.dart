@@ -860,8 +860,9 @@ abstract final class Markdown {
           (span) => span.start <= from && to <= span.end,
         ),
     ];
-    if (within.every((span) => span != null)) {
-      return _apply(text, [for (final span in within) ..._unwrap(span!)], s, e);
+    final found = within.nonNulls.toList();
+    if (found.length == within.length) {
+      return _apply(text, [for (final span in found) ..._unwrap(span)], s, e);
     }
     return _apply(
       text,

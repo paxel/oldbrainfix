@@ -20,6 +20,8 @@ jobs:
         run: |
           dart pub get
           dart analyze --fatal-infos
+          # No `!` null assertion outside tests, in the core or the app (#230).
+          dart run tool/no_null_assertions.dart lib ../../lib
           dart test
       - name: App — analyze and test
         run: |

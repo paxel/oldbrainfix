@@ -1340,9 +1340,10 @@ class _FoundIn {
 
   _FoundIn(this.text, this.given);
 
-  late final ShownText _shownText = given == null
-      ? TextBoxes.shown(text)
-      : (text: text, boxes: given!);
+  late final ShownText _shownText = switch (given) {
+    final boxes? => (text: text, boxes: boxes),
+    null => TextBoxes.shown(text),
+  };
 
   /// The text as it is drawn.
   late final String shown = _shownText.text;

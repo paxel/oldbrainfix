@@ -120,7 +120,8 @@ class HelpNotes {
       }
       for (final v in due) {
         if (_made(persons, (p) => whatsNewId(p, v))) continue;
-        final notes = whatsNew[v]!;
+        final notes = whatsNew[v];
+        if (notes == null) continue;
         final text = notes[language] ?? notes['en'];
         if (text == null) continue;
         _note(

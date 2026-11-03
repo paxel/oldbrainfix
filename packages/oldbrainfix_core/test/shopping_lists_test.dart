@@ -848,7 +848,10 @@ void main() {
       ShoppingLists(ann).check(idOf(ann, note, 'Bread'), _wall);
       ShoppingLists(ann).check(idOf(ann, note, 'Milk'), _wall);
       final file = sendNote(ann, note);
-      expect(jsonDecode(utf8.decode(file))['format'], sentItemListFormat);
+      expect(
+        (jsonDecode(utf8.decode(file)) as Map<String, Object?>)['format'],
+        sentItemListFormat,
+      );
       final opened = openSentItem(ben, file);
       expect(opened.item.shopping, isTrue);
       expect(

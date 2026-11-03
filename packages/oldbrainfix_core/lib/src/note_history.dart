@@ -283,14 +283,15 @@ class NoteHistory {
   /// [noteId] or its Section (#193): an edit like any other, nothing is
   /// deleted. Refused unless [mayUse].
   void use(String noteId, NoteChange change) {
-    if (!mayUse(noteId, change)) {
+    final after = change.after;
+    if (after == null || !mayUse(noteId, change)) {
       throw StateError('the text of ${change.entity} may not be used here');
     }
     final notes = Notes(store);
     if (change.entity == noteId) {
-      notes.edit(noteId, change.after!, format: change.format);
+      notes.edit(noteId, after, format: change.format);
     } else {
-      notes.editSection(change.entity, change.after!, format: change.format);
+      notes.editSection(change.entity, after, format: change.format);
     }
   }
 

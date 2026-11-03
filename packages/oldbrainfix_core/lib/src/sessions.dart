@@ -382,7 +382,7 @@ class Sessions {
     required int count,
     required SessionRule rule,
   }) {
-    _requireChangeable(noteId);
+    final note = _requireChangeable(noteId);
     if (NoteKinds(store).of(noteId) != NoteKind.plain) {
       throw ArgumentError.value(noteId, 'noteId', 'not a plain Note');
     }
@@ -390,7 +390,7 @@ class Sessions {
     _checkCount(count);
     store.batch(() {
       _writeSetup(noteId, chosen, count, rule);
-      if (!Notes(store).byId(noteId)!.spawned) {
+      if (!note.spawned) {
         store.append(
           noteId,
           NoteKeys.spawned,
@@ -445,7 +445,10 @@ class Sessions {
         }
       },
     );
-    return byId(routine.id)!;
+    return byId(routine.id) ??
+        (throw StateError(
+          '${routine.id} does not read back after it was written',
+        ));
   }
 
   /// Creates a Session without a Note at hand: its Note, holding [text],
@@ -955,7 +958,7 @@ class Sessions {
 
   /// Requires the Note [noteId] in the lists, which this Device may
   /// change.
-  void _requireChangeable(String noteId) {
+  Note _requireChangeable(String noteId) {
     final note = Notes(store).byId(noteId);
     if (note == null || note.isTrashed || note.isMerged) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
@@ -963,6 +966,7 @@ class Sessions {
     if (!store.mayChange(noteId)) {
       throw StateError('may not change $noteId');
     }
+    return note;
   }
 
   /// Writes a new setup on the Note [noteId], taking away the weekdays'

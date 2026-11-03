@@ -815,8 +815,8 @@ class _Parser {
   static List<String> _times(String typed) {
     final match = RegExp(r'^(\d{1,2})(:\d{0,2})?$').firstMatch(typed);
     if (match == null) return const ['08:00', '12:00', '18:00'];
-    final hour = int.parse(match[1]!);
-    if (hour > 23) return const [];
+    final hour = int.tryParse(match[1] ?? '');
+    if (hour == null || hour > 23) return const [];
     final hh = hour.toString().padLeft(2, '0');
     return ['$hh:00', '$hh:30'];
   }

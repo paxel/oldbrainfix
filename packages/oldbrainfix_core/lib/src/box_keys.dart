@@ -63,4 +63,10 @@ final _base = Uint8List(boxKeyBytes)..[0] = 9;
 
 /// The public X25519 key of [secret]. The base point has prime order and
 /// a clamped secret is never zero, so the result never is either.
-Uint8List boxPublicOf(List<int> secret) => x25519(secret, _base)!;
+Uint8List boxPublicOf(List<int> secret) =>
+    x25519(secret, _base) ??
+    // Only a secret of the wrong length makes none; its bytes stay out of
+    // the message.
+    (throw ArgumentError(
+      'a secret of ${secret.length} bytes has no public key',
+    ));

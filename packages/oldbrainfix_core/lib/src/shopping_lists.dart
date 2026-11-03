@@ -102,9 +102,11 @@ final class Reappear {
     if (code == 'once') return once;
     final match = _timed.firstMatch(code ?? '');
     if (match == null) return fallback;
-    final letter = match[2]!;
+    final count = int.tryParse(match[1] ?? '');
+    final letter = match[2];
+    if (count == null || letter == null) return fallback;
     final unit = ReappearUnit.values.firstWhere((u) => u.letter == letter);
-    return Reappear._(int.parse(match[1]!), unit, false);
+    return Reappear._(count, unit, false);
   }
 
   /// The day a Line checked on [checked] comes back on: as many days or
@@ -613,7 +615,9 @@ class ShoppingLists {
       ];
     } else {
       carried = [
-        for (final l in Checklists(store).byNote(noteId)!.lines)
+        // maySwitch made it a Checklist; none would carry no Lines.
+        for (final l
+            in Checklists(store).byNote(noteId)?.lines ?? const <Line>[])
           (text: l.text, checked: l.checked),
       ];
     }

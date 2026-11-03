@@ -610,11 +610,15 @@ class _AgendaScreenState extends State<AgendaScreen> {
         query: query,
       ),
     );
-    route.popped.then((_) {
-      if (!mounted) return;
-      _closeAreas();
-      _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (!mounted) return;
+        _closeAreas();
+        _reload();
+      }),
+    );
     return route;
   }
 

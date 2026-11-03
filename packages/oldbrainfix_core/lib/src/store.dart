@@ -224,13 +224,19 @@ class Store {
   void close() => _db.close();
 
   /// This installation's stable device id; created once.
-  String get deviceId => localSetting('device')!;
+  String get deviceId =>
+      localSetting('device') ??
+      (throw StateError('the store was opened without a device id'));
 
   SigningKey? _signingKey;
 
   /// This Device's signing key.
-  SigningKey get signingKey =>
-      _signingKey ??= SigningKey.fromSeed(fromHex(localSetting('signseed')!));
+  SigningKey get signingKey => _signingKey ??= SigningKey.fromSeed(
+    fromHex(
+      localSetting('signseed') ??
+          (throw StateError('the store was opened without a signing seed')),
+    ),
+  );
 
   /// Author name stamped on own entries.
   String get author => localSetting('author') ?? '';
@@ -1250,7 +1256,7 @@ class RefusalMark {
   static RefusalMark? parse(String text) {
     try {
       final json = jsonDecode(text);
-      if (json case {'runs': final List list}) {
+      if (json case {'runs': final List<Object?> list}) {
         final runs = <RefusedRun>[];
         for (final r in list) {
           if (r

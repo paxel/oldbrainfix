@@ -1951,10 +1951,9 @@ class _RenderCursorStrip extends RenderBox
     }
     var x = -_scroll;
     for (final child in children) {
-      (child.parentData! as _StripParentData).offset = Offset(
-        x,
-        (size.height - child.size.height) / 2,
-      );
+      if (child.parentData case final _StripParentData data) {
+        data.offset = Offset(x, (size.height - child.size.height) / 2);
+      }
       x += child.size.width;
     }
   }

@@ -75,7 +75,9 @@ void main() {
         'evening pills',
       ]);
       expect(
-        [for (final row in today ?? const []) row.time],
+        [
+          for (final row in [...?today]) row.time,
+        ],
         ['All day', '07:00', '08:00', '13:30', '20:00'],
       );
     });
@@ -360,7 +362,7 @@ void main() {
       });
       // Tomorrow's Occurrence starts with none checked.
       expect([
-        for (final row in snapshot().days['2026-10-25'] ?? const []) row.done,
+        for (final row in [...?snapshot().days['2026-10-25']]) row.done,
       ], everyElement(isFalse));
     });
 

@@ -559,7 +559,12 @@ mixin TypedRows<T extends StatefulWidget> on State<T> {
       });
       return;
     }
-    final group = row.inGroup || (row.id != null && hasGroup(row.id!));
+    final group =
+        row.inGroup ||
+        switch (row.id) {
+          final id? => hasGroup(id),
+          null => false,
+        };
     final first = filled.first;
     row.set(
       TextEditingValue(

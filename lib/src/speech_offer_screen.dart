@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
@@ -32,7 +34,9 @@ class _SpeechOfferScreenState extends State<SpeechOfferScreen> {
   @override
   void initState() {
     super.initState();
-    _askMobileData();
+    // Fire and forget: the platform answers false where it fails, and
+    // anything else reaches the crash guard.
+    unawaited(_askMobileData());
   }
 
   Future<void> _askMobileData() async {

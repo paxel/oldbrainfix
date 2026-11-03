@@ -212,10 +212,10 @@ String canonicalEntry(Map<String, dynamic> json) => jsonEncode({
 /// [value] with the keys of every object in it sorted, as the desktop
 /// core's JSON values keep them.
 Object? sortedJson(Object? value) => switch (value) {
-  final Map m => {
+  final Map<Object?, Object?> m => {
     for (final key in m.keys.cast<String>().toList()..sort())
       key: sortedJson(m[key]),
   },
-  final List l => [for (final e in l) sortedJson(e)],
+  final List<Object?> l => [for (final e in l) sortedJson(e)],
   _ => value,
 };

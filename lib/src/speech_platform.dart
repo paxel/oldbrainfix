@@ -545,7 +545,8 @@ class Transcriber extends ChangeNotifier {
         }
         waiting?.complete(kept);
         waiting = null;
-        for (final waits in _waiting.remove(next.hash) ?? const []) {
+        for (final waits
+            in _waiting.remove(next.hash) ?? const <Completer<bool>>[]) {
           waits.complete(kept);
         }
         notifyListeners();

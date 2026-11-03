@@ -75,6 +75,19 @@ void main() {
       expect(x25519(alice, Uint8List(32)), isNull, reason: 'low order');
     });
 
+    test('a secret of the wrong length has no public key (#230)', () {
+      expect(
+        () => boxPublicOf([1, 2, 3]),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => '${e.message}',
+            'message',
+            'a secret of 3 bytes has no public key',
+          ),
+        ),
+      );
+    });
+
     test('a key record carries its X25519 key, signed', () {
       final key = SigningKey.generate();
       final record = KeyRecord.make(key);
@@ -657,7 +670,9 @@ void main() {
       final gone = Routines(ben).byId(daily.id)!;
       expect(gone.isTrashed, isTrue, reason: 'restorable');
       expect(gone.done, isNotEmpty, reason: 'Done marks kept');
-      final link = jsonDecode(ben.current(got, SentKeys.received)!);
+      final link = jsonDecode(
+        ben.current(got, SentKeys.received)!,
+      ) as Map<String, Object?>;
       expect(link['version'], 2);
 
       // The same file again, or an older one, changes nothing.
@@ -867,7 +882,8 @@ void main() {
       );
       // One without a Profile, as written before Profiles, too.
       final bare = utf8.decode(sendNote(eve, Notes(eve).capture('x').id));
-      final payload = jsonDecode(bare)['item'] as String;
+      final payload =
+          (jsonDecode(bare) as Map<String, Object?>)['item'] as String;
       final json = jsonDecode(payload) as Map<String, Object?>;
       (json['from'] as Map<String, Object?>).remove('profile');
       expect(SentItem.parse(jsonEncode(json)), isNull);

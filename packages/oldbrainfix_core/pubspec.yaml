@@ -30,5 +30,8 @@ dependencies:
   sqlite3: ^3.0.0
 
 dev_dependencies:
+  # tool/no_null_assertions.dart (#230) reads the syntax tree; already in
+  # the lock through `test`. BSD-3-Clause.
+  analyzer: ^14.6.0
   lints: ^6.0.0
   test: ^1.25.0

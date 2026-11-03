@@ -1,6 +1,5 @@
-import 'dart:ui' show SemanticsRole;
-
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/look.dart';
@@ -329,6 +328,43 @@ void main() {
       semantics.dispose();
     });
   });
+
+  // Without a child the grown box is what a proxy box without one is
+  // (#230): as small as allowed, with nothing to measure or hit.
+  testWidgets('a grown box without a child is as small as allowed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 10, minHeight: 5),
+          child: const _Childless(),
+        ),
+      ),
+    );
+    final box = tester.renderObject<RenderGrown>(find.byType(_Childless));
+    expect(box.size, const Size(10, 5));
+    expect(
+      box.getDryLayout(const BoxConstraints(minWidth: 3, minHeight: 4)),
+      const Size(3, 4),
+    );
+    expect(box.getMinIntrinsicWidth(100), 0);
+    expect(box.getMaxIntrinsicWidth(100), 0);
+    expect(box.getMinIntrinsicHeight(100), 0);
+    expect(box.getMaxIntrinsicHeight(100), 0);
+    expect(
+      box.hitTestChildren(BoxHitTestResult(), position: const Offset(1, 1)),
+      isFalse,
+    );
+  });
+}
+
+/// A [RenderGrown] at twice the size, without a child.
+class _Childless extends LeafRenderObjectWidget {
+  const _Childless();
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderGrown(2);
 }
 
 /// WCAG contrast ratio of two colours.

@@ -502,7 +502,9 @@ class AndroidAlarms implements AlarmPlatform {
 
   @override
   Future<List<AlarmAction>> pendingActions() async {
-    final raw = await _channel.invokeListMethod<Map>('pending') ?? const [];
+    final raw =
+        await _channel.invokeListMethod<Map<Object?, Object?>>('pending') ??
+        const [];
     return [for (final m in raw) ?_action(m)];
   }
 

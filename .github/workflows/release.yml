@@ -1,7 +1,8 @@
 # The Android release pipeline, copied from cat(a)log's and adapted. A
 # `v*` tag (or the manual dispatch button) runs it:
 #
-#   gate           — analyze fatal-infos, all Dart tests, the OCR library's
+#   gate           — analyze fatal-infos, no `!` null assertion outside
+#                    tests, all Dart tests, the OCR library's
 #                    tests, the desktop's format, lint and tests,
 #                    tag = pubspec version = desktop Cargo version,
 #                    no open high or critical CodeQL alert
@@ -141,6 +142,8 @@ jobs:
         run: |
           dart pub get
           dart analyze --fatal-infos
+          # No `!` null assertion outside tests, in the core or the app (#230).
+          dart run tool/no_null_assertions.dart lib ../../lib
           dart test
       - name: App — analyze and test
         run: |

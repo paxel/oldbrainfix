@@ -134,7 +134,8 @@ class NamedPlaces {
       store.append(id, NamedPlaceKeys.centre, centre.encode());
       store.append(id, NamedPlaceKeys.radius, '$radius');
     });
-    return byId(id)!;
+    return byId(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Renames the Named Place [id].

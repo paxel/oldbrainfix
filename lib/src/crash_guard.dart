@@ -85,14 +85,15 @@ void reportCrash(Object error, StackTrace? stack) {
 /// Cleared by asking exactly once.
 Future<bool> previousRunDied() async {
   final marker = _marker;
-  if (marker == null) return false;
+  final seenFile = _exitSeen;
+  final crashFile = _crashFile;
+  if (marker == null || seenFile == null || crashFile == null) return false;
   final dirty = marker.existsSync();
   if (dirty) marker.deleteSync();
   final exit = await _lastExit();
   if (exit == null) return dirty;
   // Each record is asked about once; the same one at the next start
   // means the run in between ended without a record, so nothing died.
-  final seenFile = _exitSeen!;
   final seen = seenFile.existsSync() ? seenFile.readAsStringSync().trim() : '';
   if (seen == '${exit.timestamp}') return false;
   try {
@@ -101,7 +102,6 @@ Future<bool> previousRunDied() async {
   if (!exitDeservesReport(exit.reason, foreground: exit.foreground)) {
     return false;
   }
-  final crashFile = _crashFile!;
   if (!crashFile.existsSync()) {
     try {
       crashFile.writeAsStringSync(

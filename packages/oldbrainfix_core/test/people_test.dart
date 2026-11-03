@@ -98,7 +98,8 @@ void main() {
       expect(ann.personShown(idOf(cat)).name, 'Cat');
       final toBen = exchange(ben, ann).answer['profiles'] as List;
       expect([
-        for (final p in toBen) Profile.parse((p as Map)['record'])!.name,
+        for (final p in toBen)
+          Profile.parse((p as Map)['record'] as String)!.name,
       ], unorderedEquals(['Ann', 'Ben']));
       expect(ben.personShown(idOf(cat)).name, isEmpty);
       // And takes no others from them either.
@@ -884,7 +885,9 @@ void main() {
         (await folder.read('keys', profilesFileName(ann.deviceId, key.id)))!,
         aad: SealedAs.profiles(ann.deviceId),
       )!;
-      final sent = jsonDecode(utf8.decode(plain))['profiles'] as List;
+      final sent =
+          (jsonDecode(utf8.decode(plain)) as Map<String, Object?>)['profiles']
+              as List;
       expect(sent, hasLength(2));
       // Another reader of Ben's: it learns Ann's renamed Profile from the
       // folder.

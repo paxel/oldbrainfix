@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -161,9 +163,13 @@ class _AreasScreenState extends State<AreasScreen>
         areaId: area.id,
       ),
     );
-    route.popped.then((_) {
-      if (mounted) _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (mounted) _reload();
+      }),
+    );
     return route;
   }
 
@@ -176,8 +182,8 @@ class _AreasScreenState extends State<AreasScreen>
     return closed ? null : _areaRoute(area);
   }
 
-  void _forward() {
-    if (widget.trail.area(widget.places) case final area?) _open(area);
+  Future<void> _forward() async {
+    if (widget.trail.area(widget.places) case final area?) await _open(area);
   }
 
   Future<void> _openAllNotes() async {
@@ -583,9 +589,13 @@ class _AreaScreenState extends State<AreaScreen>
         topicId: topic.id,
       ),
     );
-    route.popped.then((_) {
-      if (mounted) _reload();
-    });
+    // Fire and forget: popped never fails, and a failure in what runs
+    // after it reaches the crash guard like any other callback's.
+    unawaited(
+      route.popped.then((_) {
+        if (mounted) _reload();
+      }),
+    );
     return route;
   }
 

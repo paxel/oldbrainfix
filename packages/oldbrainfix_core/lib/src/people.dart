@@ -147,7 +147,7 @@ extension People on Store {
     // replace somebody else's.
     final aliasTo = <String, String>{};
     for (final id in byId.keys.toList()..sort()) {
-      for (final a in byId[id]!.sent.aliases) {
+      for (final a in byId[id]?.sent.aliases ?? const <ProfileAlias>[]) {
         if (a.alias != id && _replaced(byId, a)) {
           aliasTo.putIfAbsent(a.alias, () => id);
         }
@@ -290,7 +290,7 @@ extension People on Store {
   /// Every Profile of another person kept here, by id.
   List<Profile> get keptPeople {
     final ids = _people.byId.keys.toList()..sort();
-    return [for (final id in ids) _people.byId[id]!.profile];
+    return [for (final id in ids) ?_people.byId[id]?.profile];
   }
 
   /// The Profile [json] that the Device [device] sent of its person, to
@@ -552,7 +552,7 @@ extension People on Store {
       }
     }
     final ids = out.keys.toList()..sort(_compareUtf8);
-    return [for (final id in ids) out[id]!];
+    return [for (final id in ids) ?out[id]];
   }
 
   /// The own Profile as it goes to another person: signed, with its

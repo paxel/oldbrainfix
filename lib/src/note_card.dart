@@ -1147,7 +1147,8 @@ class CaptureContextLines extends StatelessWidget {
     final lines = <(IconData, String, CapturedDetail?)>[
       (Icons.schedule, when.format(capture.captured.toLocal()), null),
       if (capture.location != null)
-        (Icons.place_outlined, whereCaptured(capture)!, CapturedDetail.place),
+        if (whereCaptured(capture) case final where?)
+          (Icons.place_outlined, where, CapturedDetail.place),
       if (capture.sourceApp case final app?)
         (Icons.apps, t.contextSourceApp(app.name), CapturedDetail.app),
       if (capture.calendarEvents.isNotEmpty)

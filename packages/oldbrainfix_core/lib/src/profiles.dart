@@ -342,7 +342,7 @@ String profileShortCode(String id, List<int> firstKey) {
 img.Decoder? _decoderFor(Uint8List bytes) {
   bool starts(List<int> magic) =>
       bytes.length >= magic.length &&
-      Iterable.generate(magic.length).every((i) => bytes[i] == magic[i]);
+      Iterable<int>.generate(magic.length).every((i) => bytes[i] == magic[i]);
   if (starts(const [0xFF, 0xD8, 0xFF])) return img.JpegDecoder();
   if (starts(const [0x89, 0x50, 0x4E, 0x47])) return img.PngDecoder();
   if (starts(const [0x52, 0x49, 0x46, 0x46]) &&
@@ -585,8 +585,8 @@ class SignedProfile {
           'signer': final String signer,
           'sig': final String sig,
           'first': final String first,
-          'keys': final List keys,
-          'aliases': final List aliases,
+          'keys': final List<Object?> keys,
+          'aliases': final List<Object?> aliases,
         }
         when _isKey(signer) && _isKey(first)) {
       final fresh = json['fresh'];

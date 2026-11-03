@@ -48,9 +48,35 @@ class InlineSyncRunner implements SyncRunner {
   }) => joining(store, device, host: host, port: port, name: name);
 }
 
-/// What a job in an isolate of its own brought back: its result or what
-/// it threw, and whether it changed the log or the Profiles.
-typedef IsolatedRun<T> = ({T? value, Object? error, bool log, bool profile});
+/// What a job in an isolate of its own brought back: its result
+/// ([IsolatedValue]) or what it threw ([IsolatedError]), and whether it
+/// changed the log or the Profiles.
+sealed class IsolatedRun<T> {
+  final bool log;
+  final bool profile;
+
+  const IsolatedRun({required this.log, required this.profile});
+
+  /// The job's result, or what it threw thrown again.
+  T get result => switch (this) {
+    IsolatedValue<T>(:final value) => value,
+    IsolatedError<T>(:final error) => throw error,
+  };
+}
+
+/// A job in an isolate that brought back [value].
+final class IsolatedValue<T> extends IsolatedRun<T> {
+  final T value;
+
+  const IsolatedValue(this.value, {required super.log, required super.profile});
+}
+
+/// A job in an isolate that threw [error].
+final class IsolatedError<T> extends IsolatedRun<T> {
+  final Object error;
+
+  const IsolatedError(this.error, {required super.log, required super.profile});
+}
 
 /// Runs the jobs in an isolate of their own, each on a connection of its
 /// own to the database at [path] (SQLite WAL), so the app keeps drawing
@@ -84,8 +110,7 @@ class IsolateSyncRunner implements SyncRunner {
     required String host,
     required int port,
     required String name,
-  }) async =>
-      (await _join(store, path, token, joining, device, host, port, name))!;
+  }) => _join(store, path, token, joining, device, host, port, name);
 }
 
 // Static, so the closures that cross into the isolate hold only what
@@ -106,7 +131,7 @@ Future<FolderSyncResult?> _folder(
   ),
 );
 
-Future<SyncResult?> _join(
+Future<SyncResult> _join(
   Store store,
   String path,
   RootIsolateToken? token,
@@ -126,14 +151,13 @@ Future<SyncResult?> _join(
 
 /// Runs [ran] in an isolate, tells [store] what it changed, and hands
 /// back its result or throws what it threw.
-Future<T?> _isolated<T>(
+Future<T> _isolated<T>(
   Store store,
   Future<IsolatedRun<T>> Function() ran,
 ) async {
   final out = await Isolate.run(ran);
   if (out.log || out.profile) store.changedElsewhere(profile: out.profile);
-  if (out.error case final error?) throw error;
-  return out.value;
+  return out.result;
 }
 
 /// Runs [work] in an isolate of its own on a store of its own on [path]
@@ -163,9 +187,9 @@ Future<IsolatedRun<T>> _inIsolate<T>(
     ..addProfileListener(() => profile = true);
   try {
     final value = await work(store);
-    return (value: value, error: null, log: log, profile: profile);
+    return IsolatedValue(value, log: log, profile: profile);
   } on Object catch (e) {
-    return (value: null, error: e, log: log, profile: profile);
+    return IsolatedError(e, log: log, profile: profile);
   } finally {
     store.close();
   }

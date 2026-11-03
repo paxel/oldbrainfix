@@ -213,15 +213,20 @@ class Tally {
 
   /// Whether the setting of [field] names a shown field other than it:
   /// such a field is never multiplied, so no chain forms.
-  bool _wouldMultiply(TallyField field) {
+  bool _wouldMultiply(TallyField field) => _named(field) != null;
+
+  /// The shown field other than [field] its setting names, if any.
+  TallyField? _named(TallyField field) {
     final other = switch (field._stored) {
       final id? => this.field(id),
       null => null,
     };
     return !field.hidden &&
-        other != null &&
-        other.id != field.id &&
-        !other.hidden;
+            other != null &&
+            other.id != field.id &&
+            !other.hidden
+        ? other
+        : null;
   }
 
   /// [micro] × [factor] millionths, rounded half away from zero and held
@@ -328,12 +333,10 @@ class Tallies {
   /// multiplies nothing and is multiplied by nothing.
   static Tally _multiplied(Tally tally) => Tally(tally.noteId, [
     for (final field in tally.fields)
-      field._multiplying(
-        tally._wouldMultiply(field) &&
-                !tally._wouldMultiply(tally.field(field._stored!)!)
-            ? field._stored
-            : null,
-      ),
+      field._multiplying(switch (tally._named(field)) {
+        final other? when !tally._wouldMultiply(other) => other.id,
+        _ => null,
+      }),
   ]);
 
   /// Whether the Note [noteId] is a Tally: told by its fields alone,
@@ -507,7 +510,8 @@ class Tallies {
       }
       within?.call(id);
     });
-    return entryById(id)!;
+    return entryById(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Changes the entry [id]: the values given (null takes one away), the

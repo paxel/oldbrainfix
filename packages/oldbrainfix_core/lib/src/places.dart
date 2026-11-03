@@ -148,7 +148,9 @@ class Places {
   /// Creates an Area named [name].
   Area addArea(String name, {String? starter}) {
     final trimmed = _name(name);
-    return areaById(store.batch(() => _appendArea(trimmed, starter)))!;
+    final id = store.batch(() => _appendArea(trimmed, starter));
+    return areaById(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Creates a Topic named [name] inside the Area [areaId]. Only an Area
@@ -161,9 +163,9 @@ class Places {
       throw StateError('not a Manager of $areaId');
     }
     final trimmed = _name(name);
-    return topicById(
-      store.batch(() => _appendTopic(areaId, trimmed, starter)),
-    )!;
+    final id = store.batch(() => _appendTopic(areaId, trimmed, starter));
+    return topicById(id) ??
+        (throw StateError('$id does not read back after it was written'));
   }
 
   /// Renames the Area or Topic [id].

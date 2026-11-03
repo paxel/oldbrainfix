@@ -135,9 +135,9 @@ class AreaOffer {
       if (json
           case {
             'area': final String area,
-            'areaKeys': final List areaKeys,
+            'areaKeys': final List<Object?> areaKeys,
             'from': final Object from,
-            'keys': final List keys,
+            'keys': final List<Object?> keys,
             'profile': final Object profile,
             'transport': final String transport,
           }
@@ -382,9 +382,9 @@ class _Kept {
     if (text == null) return null;
     try {
       if (jsonDecode(text) case {
-        'blobs': final List blobs,
+        'blobs': final List<Object?> blobs,
         'offer': final String offer,
-        'profiles': final List profiles,
+        'profiles': final List<Object?> profiles,
       }) {
         final read = AreaOffer.parse(offer);
         if (read == null) return null;
@@ -737,7 +737,9 @@ Future<List<Object?>> _profiles(
         : unseal(key.key, bytes, aad: SealedAs.profiles(parts[0]));
     if (plain == null) continue;
     try {
-      if (jsonDecode(utf8.decode(plain)) case {'profiles': final List list}) {
+      if (jsonDecode(utf8.decode(plain)) case {
+        'profiles': final List<Object?> list,
+      }) {
         out.addAll(list);
       }
     } on FormatException {
