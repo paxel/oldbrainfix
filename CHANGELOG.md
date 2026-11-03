@@ -19,6 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - One switch, Simple or Advanced, on the phone and the desktop. The first start asks it on the Starter Set page, Simple picked; Settings changes it any time. It is a setting of the person, the same on all of their own Devices. Simple offers making Notes, Checklists, Shopping Lists, Reminders and Routines; Advanced adds Tallies, Sessions, Frogs, Topics, the format bar and roles in Shared Areas. What was made before stays visible and usable in Simple. Someone who never chose, as everyone updating from 0.3.1, has Advanced. On the desktop the AI port reads the choice.
 - On the phone, Settings ▸ Look has "Fat fingers", off by default and kept for each Device. Switched on, text shows 1.3 times its size on top of the system's font size, and icons, buttons and tap targets 1.3 times theirs; the Agenda's rows grow with them, and so does the text of the home-screen widget. Actions that no longer fit on a page's bar, such as some of the Note editor's, go into ⋮ at its end. On the desktop, Settings ▸ This computer has "Bigger text and icons", off by default, which zooms the window to 1.3 times. The AI port reads the setting.
 - The guide has a page on syncing through Syncthing or Autosync.
+- The guide has a page on calendar apps such as FamilyWall: their appointments on the phone's Agenda through the phone's calendar, and Routines and Reminders exported into them as a calendar file.
 
 ### Changed
 

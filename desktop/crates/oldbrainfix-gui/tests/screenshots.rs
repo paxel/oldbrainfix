@@ -825,6 +825,9 @@ const DESKTOP: &str = "desktop-app";
 /// The guide page "Sync with family and friends" (#198).
 const FAMILY: &str = "sync-with-family-and-friends";
 
+/// The guide page "Calendar apps like FamilyWall" (#199).
+const CALENDAR_APPS: &str = "calendar-apps";
+
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by tool/guide-frames.sh and CI"]
 fn guide_frames() -> TestResult {
@@ -1223,6 +1226,20 @@ fn guide_frames() -> TestResult {
             problems.extend(family_frames(texts, language, theme, |name| {
                 box_frame(FAMILY, name)
             })?);
+            // Calendar apps like FamilyWall (#199): the Agenda, which shows
+            // no calendar appointments, and All Routines and Reminders with
+            // Export.
+            let mut harness = window(texts, language, theme)?;
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame(CALENDAR_APPS, "family-calendar-on-agenda"),
+            )?);
+            harness.state_mut().select(Selection::AllRoutines);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame(CALENDAR_APPS, "routines-into-family-calendar"),
+            )?);
             // The Settings dialog with this computer's switches, the AI
             // port and the hotkey, over the Agenda: the tray's box, as the
             // tray itself is drawn by the system.

@@ -2263,6 +2263,32 @@ void main() {
           boxFrame(family198, 'autosync', sharedFolder);
 
           boxFrame(family198, 'cloud-apps', sharedFolder);
+
+          // Calendar apps like FamilyWall (#199): the Calendar page, where
+          // the family calendar is picked for the Agenda, and All Routines
+          // and Reminders, whose Export makes the file to import there.
+          const calendar199 = 'calendar-apps';
+
+          boxFrame(calendar199, 'family-calendar-on-agenda', (tester) async {
+            await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              appointments: FakeAppointments(),
+            );
+            await _tap(tester, find.byKey(const ValueKey('calendarPage')));
+            expect(find.byType(CalendarScreen), findsOneWidget);
+          });
+
+          boxFrame(calendar199, 'routines-into-family-calendar', (
+            tester,
+          ) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('allRoutines')));
+            expect(find.byType(AllRoutinesScreen), findsOneWidget);
+          });
         }
       }
     },
