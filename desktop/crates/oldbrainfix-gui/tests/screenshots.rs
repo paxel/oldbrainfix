@@ -29,9 +29,10 @@ use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
-    ClockTime, Day, Importance, Notes, PersonSettings, Places, Routines, Schedule, SigningKey,
-    Store, parse_time,
+    ClockTime, Day, DeviceSettings, Importance, Notes, PersonSettings, Places, QuickNoteControl,
+    Routines, Schedule, SigningKey, Store, parse_time,
 };
+use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::{App, Page, Selection};
 use parking_lot::Mutex;
 
@@ -83,6 +84,8 @@ struct Texts {
     file_menu: &'static str,
     import: &'static str,
     keep: &'static str,
+    /// The Note menu's History.
+    history: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -113,6 +116,7 @@ const EN: Texts = Texts {
     file_menu: "File",
     import: "Import…",
     keep: "Google Keep…",
+    history: "History",
 };
 
 const DE: Texts = Texts {
@@ -143,6 +147,7 @@ const DE: Texts = Texts {
     file_menu: "Datei",
     import: "Importieren …",
     keep: "Google Keep …",
+    history: "Verlauf",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -298,13 +303,22 @@ fn repo(path: &str) -> PathBuf {
 /// Compares the window as it stands with the committed guide frame `path`,
 /// or writes it there with `UPDATE_FRAMES=1`. A changed frame is written to
 /// `build/guide-frames/` for a look and returned as the problem.
-fn match_frame(
-    harness: &mut Harness<'static, App>,
+fn match_frame<S>(
+    harness: &mut Harness<'static, S>,
     path: &str,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     harness.run_steps(4);
     let image = harness.render()?;
-    let shot = image::imageops::crop_imm(&image, MARGIN, MARGIN, SIZE.0, SIZE.1).to_image();
+    // The window, or the capture popup, without the harness's margin.
+    let (width, height) = image.dimensions();
+    let shot = image::imageops::crop_imm(
+        &image,
+        MARGIN,
+        MARGIN,
+        width - 2 * MARGIN,
+        height - 2 * MARGIN,
+    )
+    .to_image();
     let file = repo(path);
     if std::env::var("UPDATE_FRAMES").as_deref() == Ok("1") {
         if let Some(dir) = file.parent() {
@@ -387,6 +401,49 @@ fn window_with(
             app,
         );
     // The window follows the system's theme (#147).
+    harness.input_mut().system_theme = Some(theme);
+    harness.run_steps(4);
+    Ok(harness)
+}
+
+/// The capture popup's size, as its own window opens it.
+const POPUP: (u32, u32) = (480, 340);
+
+/// The capture popup over the demo store, as the hotkey opens it.
+struct Popup {
+    popup: CapturePopup,
+    outcome: Outcome,
+}
+
+/// The capture popup the hotkey opens over all windows, over the demo
+/// store in `x`'s words, in `locale` and `theme`.
+fn popup(
+    x: &Texts,
+    locale: &str,
+    theme: egui::Theme,
+) -> Result<Harness<'static, Popup>, Box<dyn std::error::Error>> {
+    let (store, _) = demo(x)?;
+    let mut popup = CapturePopup::new(Arc::new(store), locale);
+    popup.set_wall_clock(Arc::new(utc));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(
+            (POPUP.0 + 2 * MARGIN) as f32,
+            (POPUP.1 + 2 * MARGIN) as f32,
+        ))
+        .with_theme(theme)
+        .wgpu()
+        .build_ui_state(
+            |ui, state: &mut Popup| {
+                App::install(ui.ctx());
+                if state.outcome == Outcome::Open {
+                    state.outcome = state.popup.show(ui);
+                }
+            },
+            Popup {
+                popup,
+                outcome: Outcome::Open,
+            },
+        );
     harness.input_mut().system_theme = Some(theme);
     harness.run_steps(4);
     Ok(harness)
@@ -487,7 +544,50 @@ fn guide_frames() -> TestResult {
             harness.run();
             harness.get_by(|n| n.is_focused()).type_text(texts.capture);
             harness.run();
-            problems.extend(match_frame(&mut harness, &frame("capture"))?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "capture"),
+            )?);
+            // Capture and sort: the quick note with what Settings ▸ Quick
+            // note switched on, the capture popup of the hotkey, the
+            // Unsorted Notes, the Note dialog and its History.
+            let mut harness = window_with(texts, language, theme, |store, _| {
+                let device = DeviceSettings::new(store);
+                for control in [
+                    QuickNoteControl::FileInto,
+                    QuickNoteControl::Schedule,
+                    QuickNoteControl::Importance,
+                ] {
+                    device.set_quick_note_shows(control, true)?;
+                }
+                Ok(())
+            })?;
+            harness.state_mut().new_note();
+            harness.run();
+            harness
+                .get_by(|n| n.placeholder() == Some(texts.hint))
+                .click();
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "sort-while-capturing"),
+            )?);
+            let mut harness = popup(texts, language, theme)?;
+            harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "capture-outside"),
+            )?);
+            let mut harness = window(texts, language, theme)?;
+            harness.state_mut().select(Selection::Unsorted);
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "sort-later"),
+            )?);
             // An AI Task that fixed a typo and filed two Unsorted Notes
             // into the Household waits for its review: since before the
             // window opened, so the review shows at once.
@@ -524,6 +624,10 @@ fn guide_frames() -> TestResult {
             harness.state_mut().select(Selection::Place(household.id));
             harness.state_mut().select_note(&tap);
             problems.extend(match_frame(&mut harness, &frame("window"))?);
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "edit"),
+            )?);
             // The menu bar's Note menu over it, for that Note.
             harness
                 .get_all_by_label(texts.note_menu)
@@ -532,6 +636,17 @@ fn guide_frames() -> TestResult {
                 .click();
             harness.run();
             problems.extend(match_frame(&mut harness, &frame("menu"))?);
+            // Note ▸ History of that Note.
+            harness
+                .get_all_by_label(texts.history)
+                .last()
+                .ok_or("Note ▸ History")?
+                .click();
+            harness.run();
+            problems.extend(match_frame(
+                &mut harness,
+                &box_frame("capture-and-sort", "history"),
+            )?);
             // What "+" at the top of the Household's list makes (#161).
             let mut harness = window(texts, language, theme)?;
             let household = Places::new(harness.state().store())

@@ -28,10 +28,13 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
+import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/lock_settings.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/note_history_screen.dart';
+import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -1045,7 +1048,10 @@ void main() {
             expect(find.byType(SetupScreen), findsOneWidget);
           });
 
-          frame('capture-fan', (tester) async {
+          // Capture and sort: the fan of "+", a thought typed as a quick
+          // entry opens it, the quick note filed into the Household, the
+          // Unsorted Notes, the Note editor and its History.
+          boxFrame('capture-and-sort', 'capture', (tester) async {
             await start(tester, seed());
             await _tap(tester, find.byIcon(Icons.add));
             for (final way in ['text', 'voice', 'photo', 'gallery', 'paste']) {
@@ -1053,7 +1059,7 @@ void main() {
             }
           });
 
-          frame('capture', (tester) async {
+          boxFrame('capture-and-sort', 'capture-outside', (tester) async {
             await start(tester, seed());
             await openTextCapture(tester);
             await tester.enterText(find.byType(TextField), texts.captureText);
@@ -1062,21 +1068,64 @@ void main() {
             expect(find.byType(NudgeButtons), findsOneWidget);
           });
 
+          boxFrame('capture-and-sort', 'sort-while-capturing', (tester) async {
+            final seeded = seed();
+            // Settings ▸ Quick note: File into…, the alarm clock and the
+            // Importance switched on (#142).
+            for (final control in [
+              QuickNoteControl.fileInto,
+              QuickNoteControl.schedule,
+              QuickNoteControl.importance,
+            ]) {
+              seeded.store.setQuickNoteShows(control, true);
+            }
+            final t = await start(tester, seeded);
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await _tap(
+              tester,
+              find.descendant(
+                of: find.byKey(const ValueKey('note-actions')),
+                matching: find.byTooltip(t.fileInto),
+              ),
+            );
+            // File into… over the quick note: "→" has no glyph in the
+            // frames' fonts, so the frame stops before the pick.
+            expect(find.byType(FileIntoScreen), findsOneWidget);
+          });
+
+          boxFrame('capture-and-sort', 'sort-later', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+            expect(find.byType(UnsortedScreen), findsOneWidget);
+          });
+
           frame('routine-editor', (tester) async {
             await start(tester, seed());
             await _tap(tester, find.text(texts.snack).first);
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
           });
 
-          frame('note-editor', (tester) async {
+          /// The boiler's Note, with its two Amends, in the Note editor.
+          Future<void> boilerEditor(WidgetTester tester) async {
             final t = await start(tester, seed());
             await _tap(tester, find.byTooltip(t.browseTooltip));
             await _tap(tester, find.text(t.starterHousehold));
             await tester.longPress(find.text(texts.boiler));
             await tester.pumpAndSettle();
             expect(find.byType(NoteEditorScreen), findsOneWidget);
+          }
+
+          boxFrame('capture-and-sort', 'edit', (tester) async {
+            await boilerEditor(tester);
             // The row of badges under the text (#160).
             expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
+          boxFrame('capture-and-sort', 'history', (tester) async {
+            await boilerEditor(tester);
+            await _tap(tester, find.byKey(const ValueKey('note-history')));
+            expect(find.byType(NoteHistoryScreen), findsOneWidget);
           });
 
           /// The Household with its Checklist, Shopping List and Tally.
