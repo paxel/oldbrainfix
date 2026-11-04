@@ -1,5 +1,5 @@
 //! Transcripts for the Old Brain Fix desktop (ADR 0007): Whisper from the
-//! whisper.cpp sources the phone vendors, built unchanged and reached
+//! whisper.cpp submodule the phone builds too, built unchanged and reached
 //! through the small C bridge in `native/`, in English or German as on
 //! the phone, led in with the prompt for the language it hears; the
 //! speech model it needs, fetched from the phone's mirror

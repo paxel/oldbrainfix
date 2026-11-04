@@ -2,13 +2,11 @@
 # only, linked with the app's JNI bridge into one library,
 # liboldbrainfix_whisper.so. No network code, no GPU, no Google library.
 #
-# whisper.cpp is vendored under whisper/: the needed subset of the
-# v1.9.5 release (MIT, see whisper/LICENSE), unchanged:
-#   LICENSE, include/whisper.h, src/whisper.cpp, src/whisper-arch.h,
-#   src/aneforge/, ggml/CMakeLists.txt, ggml/cmake/, ggml/include/,
-#   ggml/src/ (its top-level files and ggml-cpu/ only).
-# Vendored rather than fetched, so the APK builds offline and the
-# sources cannot change under a pinned hash.
+# whisper.cpp is the git submodule third_party/whisper.cpp, pinned to an
+# upstream release (MIT, see its LICENSE; third_party/README.md names the
+# tag); only its CPU parts are built, unchanged. A submodule rather than
+# fetched at build time, so the APK builds offline and the sources cannot
+# change under the pinned commit.
 cmake_minimum_required(VERSION 3.18)
 project(oldbrainfix_whisper C CXX)
 
@@ -22,7 +20,16 @@ set(CMAKE_JOB_POOL_LINK link)
 # transcribe anything on a phone. Comes after the build type's flags.
 add_compile_options(-O2)
 
-set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/whisper)
+set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/whisper.cpp)
+if(NOT EXISTS ${WHISPER_DIR}/include/whisper.h)
+    message(FATAL_ERROR "whisper.cpp is missing: git submodule update --init")
+endif()
+# The version whisper_version() reports, from the submodule's
+# own CMakeLists.txt, so an update of the pin changes it with it.
+file(STRINGS ${WHISPER_DIR}/CMakeLists.txt WHISPER_VERSION_PARTS
+    REGEX "^set\\(WHISPER_VERSION_(MAJOR|MINOR|PATCH) [0-9]+\\)")
+string(REGEX REPLACE "[^0-9;]" "" WHISPER_VERSION_PARTS "${WHISPER_VERSION_PARTS}")
+list(JOIN WHISPER_VERSION_PARTS "." WHISPER_VERSION)
 
 # Static parts linked into one shared library.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -36,8 +43,8 @@ set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
 set(GGML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-# The vendored ggml is no git checkout: it must not stamp the app's
-# commit into itself, so the library builds the same from any checkout.
+# No commit stamped into ggml, so the library builds the same from any
+# checkout, with or without git.
 set(GIT_EXE OFF CACHE STRING "" FORCE)
 add_subdirectory(${WHISPER_DIR}/ggml ggml)
 
@@ -45,7 +52,7 @@ add_library(whisper STATIC
     ${WHISPER_DIR}/src/whisper.cpp
     ${WHISPER_DIR}/src/aneforge/whisper-aneforge.cpp)
 target_include_directories(whisper PUBLIC ${WHISPER_DIR}/include ${WHISPER_DIR}/src)
-target_compile_definitions(whisper PRIVATE WHISPER_VERSION="1.9.5")
+target_compile_definitions(whisper PRIVATE WHISPER_VERSION="${WHISPER_VERSION}")
 target_compile_features(whisper PUBLIC cxx_std_11)
 target_link_libraries(whisper PUBLIC ggml)
 

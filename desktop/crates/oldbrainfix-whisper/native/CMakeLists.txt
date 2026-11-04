@@ -1,6 +1,6 @@
 # Whisper for the desktop's voice Notes (ADR 0007): the whisper.cpp and
-# ggml sources the phone vendors under android/app/src/main/cpp/whisper,
-# unchanged and built the phone's way (CPU only, built in, no OpenMP),
+# ggml sources of the submodule third_party/whisper.cpp the phone builds
+# too, unchanged and built the phone's way (CPU only, built in, no OpenMP),
 # with a small C bridge for Rust. Built by build.rs through the cmake
 # crate; WHISPER_DIR comes from there.
 cmake_minimum_required(VERSION 3.18)
@@ -13,7 +13,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-# Only the CPU backend is vendored: no Metal or BLAS, also on macOS.
+# Only the CPU backend is built: no Metal or BLAS, also on macOS.
 set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_BLAS OFF CACHE BOOL "" FORCE)
 # Accelerate would need the framework linked, which cargo never hears of.
@@ -32,15 +32,22 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
         set(GGML_${feature} ON CACHE BOOL "" FORCE)
     endforeach()
 endif()
-# The vendored ggml is no git checkout: no commit stamped into it.
+# No commit stamped into ggml, so it builds the same from any checkout.
 set(GIT_EXE OFF CACHE STRING "" FORCE)
 add_subdirectory(${WHISPER_DIR}/ggml ggml)
+
+# The version whisper_version() reports, from the submodule's own
+# CMakeLists.txt, as on the phone.
+file(STRINGS ${WHISPER_DIR}/CMakeLists.txt WHISPER_VERSION_PARTS
+    REGEX "^set\\(WHISPER_VERSION_(MAJOR|MINOR|PATCH) [0-9]+\\)")
+string(REGEX REPLACE "[^0-9;]" "" WHISPER_VERSION_PARTS "${WHISPER_VERSION_PARTS}")
+list(JOIN WHISPER_VERSION_PARTS "." WHISPER_VERSION)
 
 add_library(whisper STATIC
     ${WHISPER_DIR}/src/whisper.cpp
     ${WHISPER_DIR}/src/aneforge/whisper-aneforge.cpp)
 target_include_directories(whisper PUBLIC ${WHISPER_DIR}/include ${WHISPER_DIR}/src)
-target_compile_definitions(whisper PRIVATE WHISPER_VERSION="1.9.5")
+target_compile_definitions(whisper PRIVATE WHISPER_VERSION="${WHISPER_VERSION}")
 target_compile_features(whisper PUBLIC cxx_std_11)
 target_link_libraries(whisper PUBLIC ggml)
 

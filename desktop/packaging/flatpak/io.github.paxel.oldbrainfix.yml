@@ -1,12 +1,15 @@
 # The Flatpak of the desktop app, built from source without network
-# access (#45): the Rust crates come from cargo-sources.json, whisper.cpp,
-# the PP-OCRv6 models and the translations from the repository itself.
+# access (#45): the Rust crates come from cargo-sources.json, whisper.cpp
+# from its own repository at the commit the submodule third_party/whisper.cpp
+# pins (#247), the PP-OCRv6 models and the translations from the
+# repository itself.
 #
 # One manifest for Flathub and the .flatpak file on each GitHub Release.
 # packaging/flatpak/render.sh writes it next to cargo-sources.json and the
 # metainfo it renders: with a tag and its commit, the app's source below
 # becomes that tag in git (what the Flathub repository holds); without,
-# it stays this checkout.
+# it stays this checkout. Either way render.sh writes the submodule's
+# commit into the whisper.cpp source.
 id: io.github.paxel.oldbrainfix
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
@@ -68,6 +71,12 @@ modules:
           - android/app/.cxx
           - android/app/build
           - packages/oldbrainfix_core/.dart_tool
+          - third_party/whisper.cpp
       - cargo-sources.json
+      # The submodule, from upstream at its pinned commit.
+      - type: git
+        url: https://github.com/ggml-org/whisper.cpp.git
+        commit: '@WHISPER_COMMIT@'
+        dest: third_party/whisper.cpp
       - type: file
         path: io.github.paxel.oldbrainfix.metainfo.xml

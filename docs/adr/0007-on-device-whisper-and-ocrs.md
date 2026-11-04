@@ -39,3 +39,7 @@ Both engines were run as the apps call them, ocrs 0.13.1 with its bundled models
 | Tiny, Spatial output, box threshold 0.3 (as the apps run it) |                                   4.4 |        32.0 |
 
 Neither engine reads the upside-down letter or the chalk handwriting. At the default box threshold, Tiny with Spatial output read 8 of the 11 real photos better than ocrs and 2 worse; at 0.3 only the pooled figure was measured. The strongly curved book page is the exception: Tiny still loses or garbles some of its lines at 0.3, and even at 0.1, with a CER of 40–44% on it against ocrs's 8.4%, and a lost line leaves no sign that it is gone. Per photo on the desktop, an AMD Ryzen AI 9 HX 370 with a release build, Tiny took 251 ms against ocrs's 132 ms on the synthetic set and 374 ms against 229 ms on the real photos, at a peak of 304 MB of memory against 829 MB.
+
+## whisper.cpp as a pinned submodule (#247)
+
+Amended by #247 (ADR 0045): the whisper.cpp sources both apps build are no longer copied under `android/app/src/main/cpp/whisper`; they are the git submodule `third_party/whisper.cpp`, pinned to upstream's release v1.9.5, the same sources as the copy, byte for byte. The phone's CMake and the desktop's `build.rs` build from it, the Flatpak fetches it at the pinned commit, and OSV-Scanner checks that commit.

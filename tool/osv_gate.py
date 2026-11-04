@@ -4,7 +4,9 @@ OSV-Scanner writes its findings as JSON (`--format json --output-file`);
 this lists every one and fails on a known vulnerability. A notice that a
 crate is unmaintained (RustSec's informational "unmaintained", no
 vulnerability described) is listed but does not fail. Advisories ignored
-in an osv-scanner.toml beside a lockfile are not in the JSON at all.
+in an osv-scanner.toml beside a lockfile are not in the JSON at all. A git
+submodule (third_party/whisper.cpp, #247) is found by its commit, without
+a name or version; it is listed as that commit.
 
     python3 tool/osv_gate.py osv-results.json
 
@@ -34,13 +36,16 @@ def findings(results):
         source = (result.get("source") or {}).get("path", "?")
         for package in result.get("packages") or []:
             info = package.get("package") or {}
+            name, version = info.get("name") or "?", info.get("version") or "?"
+            if not info.get("name") and info.get("commit"):
+                name, version = "commit", info["commit"]
             for vuln in package.get("vulnerabilities") or []:
                 rows.append(
                     (
                         not unmaintained(vuln),
                         vuln.get("id", "?"),
-                        info.get("name", "?"),
-                        info.get("version", "?"),
+                        name,
+                        version,
                         source,
                         vuln.get("summary", ""),
                     )

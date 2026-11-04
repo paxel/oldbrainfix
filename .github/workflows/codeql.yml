@@ -41,6 +41,8 @@ jobs:
             build-mode: manual
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
 
       # The Rust extractor may run build scripts: ALSA for the microphone,
       # cmake and g++ for whisper.cpp, as in CI's Desktop job.
@@ -69,10 +71,16 @@ jobs:
         if: matrix.language == 'java-kotlin'
         run: flutter build apk --debug --config-only
 
+      # The submodule third_party/whisper.cpp (#247) is upstream's code,
+      # scanned by OSV by its commit: its workflows and sources are not
+      # analysed here.
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          config: |
+            paths-ignore:
+              - third_party
 
       # Only the Kotlin compile: the native libraries (whisper.cpp, RustO)
       # are not Kotlin and are left out. No daemon, so every compilation

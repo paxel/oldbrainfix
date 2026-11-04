@@ -1,6 +1,7 @@
 # Fails when a dependency has a known advisory (OSV database, from
-# pubspec.lock, packages/oldbrainfix_core/pubspec.lock, desktop/Cargo.lock and
-# android/ocr/Cargo.lock). Runs weekly and on demand, because new advisories
+# pubspec.lock, packages/oldbrainfix_core/pubspec.lock, desktop/Cargo.lock,
+# android/ocr/Cargo.lock and the commit of the submodule
+# third_party/whisper.cpp, as in CI). Runs weekly and on demand, because new advisories
 # appear without any change in this repo. CI and the release gate run the
 # same scan on every push and tag (#231), but there a notice that a crate is
 # unmaintained is only listed; here it fails too, so a new one is seen
@@ -23,9 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - name: osv-scanner
         uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
         with:
           scan-args: |-
+            --include-git-root
+            --x-exclude=third_party
             --recursive
             ./

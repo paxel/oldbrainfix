@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -45,15 +47,22 @@ jobs:
           if-no-files-found: ignore
 
   # Known vulnerabilities in any lockfile (pubspec.lock, the core's
-  # pubspec.lock, desktop/Cargo.lock, android/ocr/Cargo.lock) fail every
-  # push (#231). A notice that a crate is unmaintained is listed but does
-  # not fail; tool/osv_gate.py decides. Ignores live in the osv-scanner.toml
-  # beside each lockfile. The weekly Security run stays stricter.
+  # pubspec.lock, desktop/Cargo.lock, android/ocr/Cargo.lock) or at the
+  # commit the submodule third_party/whisper.cpp pins fail every push
+  # (#231, #247). --include-git-root turns on the scanner's git extractor,
+  # which reads the submodule's commit from this repository's index;
+  # third_party itself is not walked, so the lockfiles of whisper.cpp's
+  # examples and bindings, which the apps never build, stay out. A notice
+  # that a crate is unmaintained is listed but does not fail;
+  # tool/osv_gate.py decides. Ignores live in the osv-scanner.toml beside
+  # each lockfile. The weekly Security run stays stricter.
   osv-scanner:
     name: Vulnerable dependencies (OSV-Scanner)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       # Exits 1 on any finding, unmaintained notices too; the next step
       # decides from the results, and fails when there are none.
       - name: osv-scanner
@@ -63,6 +72,8 @@ jobs:
           scan-args: |-
             --format=json
             --output-file=osv-results.json
+            --include-git-root
+            --x-exclude=third_party
             --recursive
             ./
       - name: No known vulnerability (unmaintained notices reported only)
@@ -81,6 +92,8 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - name: System libraries (ALSA for the microphone, cmake for whisper.cpp, lavapipe for the guide's frames)
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake g++ mesa-vulkan-drivers libvulkan1
       - uses: dtolnay/rust-toolchain@stable
@@ -137,6 +150,8 @@ jobs:
       LINT_IMAGE: ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       # The generator runs in a virtualenv of this Python.
       - uses: actions/setup-python@v5
         with:
@@ -145,9 +160,9 @@ jobs:
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo, What's-new, alarm sound, OSV gate and coverage floor tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor and whisper pin tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin
       - name: Render the files as Flathub gets them
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
@@ -177,6 +192,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - name: flatpak and flatpak-builder
         run: |
           sudo apt-get update
@@ -205,6 +222,8 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

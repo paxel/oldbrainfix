@@ -1,6 +1,6 @@
 [package]
 name = "oldbrainfix-whisper"
-description = "Transcripts for the Old Brain Fix desktop: the phone's vendored whisper.cpp behind a small C bridge, the speech model it needs, and recordings decoded as Whisper hears them"
+description = "Transcripts for the Old Brain Fix desktop: the whisper.cpp submodule the phone builds too, behind a small C bridge, the speech model it needs, and recordings decoded as Whisper hears them"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

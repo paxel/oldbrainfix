@@ -1,4 +1,5 @@
-//! Builds the whisper.cpp and ggml sources the phone vendors, unchanged,
+//! Builds the whisper.cpp and ggml sources of the submodule
+//! `third_party/whisper.cpp`, which the phone builds too, unchanged,
 //! with the C bridge in `native/`, and links them in. Always optimised:
 //! an unoptimised ggml is far too slow to transcribe anything. Needs
 //! CMake and a C++ compiler.
@@ -7,10 +8,14 @@ use std::path::Path;
 
 fn main() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let whisper = manifest.join("../../../android/app/src/main/cpp/whisper");
+    let whisper = manifest.join("../../../third_party/whisper.cpp");
     let native = manifest.join("native");
     println!("cargo:rerun-if-changed={}", native.display());
-    println!("cargo:rerun-if-changed={}", whisper.display());
+    // The parts built, not the submodule's root: its `.git` changes
+    // without the sources changing.
+    for part in ["CMakeLists.txt", "include", "src", "ggml"] {
+        println!("cargo:rerun-if-changed={}", whisper.join(part).display());
+    }
     let dst = cmake::Config::new(&native)
         .define("WHISPER_DIR", &whisper)
         .profile("Release")

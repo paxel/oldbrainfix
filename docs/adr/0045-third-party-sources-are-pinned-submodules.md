@@ -1,0 +1,22 @@
+# Third-party sources are git submodules pinned to a release
+
+Code by others reaches the apps in two ways. Dart packages, Rust crates and Android libraries come through their package managers, pinned by `pubspec.lock`, `Cargo.lock` and Gradle, and OSV-Scanner reads those lockfiles. Sources no package manager brings, so far only whisper.cpp with its ggml (ADR 0007), are a git submodule under `third_party/`, pinned to an upstream release tag and built unchanged (#247, Q576 (a)). Nothing is copied into the tree: a copy is something nobody scans or updates, as the whisper.cpp v1.9.5 copy under `android/app/src/main/cpp/whisper` from #20 showed, and it brought Sonar every `c:`/`cpp:` finding of upstream's code.
+
+- **Pinned.** The submodule's commit is the pin. `third_party/README.md` names the tag that commit is, in one row per submodule. `licenses/common.txt` names the same release for the About screen. Both apps' builds read whisper.cpp's version from the submodule's own `CMakeLists.txt`, so it is written nowhere else. The Flatpak, which builds without network, gets the submodule as a `git` source at that commit: `desktop/packaging/flatpak/render.sh` writes the commit checked out into the manifest, and the app's own `git` source leaves its submodules out.
+- **Built.** The phone (`android/app/src/main/cpp/CMakeLists.txt`) and the desktop (`desktop/crates/oldbrainfix-whisper/build.rs` with `native/`) build only whisper.cpp's `include/`, `src/` and `ggml/` with its CPU backend, from `third_party/whisper.cpp`. Every checkout in CI, CodeQL, Sonar, Security and the release takes the submodules; a fresh clone needs `git submodule update --init`.
+- **Scanned.** OSV-Scanner runs with `--include-git-root`, which turns on its git extractor: it reads each submodule's commit from the repository's index and asks OSV for that commit, as for C and C++ projects OSV lists by repository. A known vulnerability at the pinned commit fails CI and the release gate through `tool/osv_gate.py`, which names the commit. `--x-exclude=third_party` keeps the scanner from walking into the submodule, whose examples and bindings carry lockfiles the apps never build. Sonar (`sonar.exclusions`) and CodeQL (`paths-ignore`) leave `third_party/` out: it is upstream's code, not ours. The JNI bridge `android/app/src/main/cpp/whisper_jni.cpp` and the desktop's `native/` bridge are ours and stay in.
+- **Kept current.** Dependabot (`.github/dependabot.yml`, `gitsubmodule`, weekly) opens a pull request when upstream moves. It moves the submodule to upstream's newest commit, not to a release, so such a pull request is a reminder, not the update. `tool/whisper_pin.py` names upstream's latest release and warns when the pin is behind it, when the submodule is not at the tag `third_party/README.md` names, or when the licence list names another release. The release gate and verify-release run it report-only: an update is never forced, since it needs the Transcripts checked first.
+
+## Updating whisper.cpp
+
+1. Move the submodule to the release: `git -C third_party/whisper.cpp fetch --depth 1 origin tag vX.Y.Z` and `git -C third_party/whisper.cpp checkout vX.Y.Z`.
+2. Name the tag in `third_party/README.md` and in `licenses/common.txt`, with the licence text from the submodule's `LICENSE`.
+3. Build both bridges; fix them if the API moved.
+4. Check that the Transcripts of the test recordings are unchanged: `cargo test -p oldbrainfix-whisper -- --ignored --nocapture` with `OBF_WHISPER_MODEL` and `OBF_VOICE_SAMPLE` (`desktop/crates/oldbrainfix-whisper/testdata`), before and after, and the phone's Kotlin tests. A release that changes them is a decision of its own.
+5. `python3 tool/whisper_pin.py` prints no warning; commit the submodule, the README and the licence list together. A new version users get is one changelog line, such as "Transcripts use whisper.cpp vX.Y.Z".
+
+## Considered Options
+
+- Keeping the copy, updated by hand (rejected: no scanner sees it, nobody is told of a new release, and it fills Sonar with upstream's findings).
+- Fetching whisper.cpp at build time, by CMake's `FetchContent` or a script (rejected: the APK and the Flatpak build offline, and a fetched archive needs its checksum kept in step by hand all the same).
+- An SBOM listing whisper.cpp for OSV-Scanner (rejected: the version in it is written by hand, so it can say something the build does not use; the submodule's commit is what is built).
