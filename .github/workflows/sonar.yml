@@ -26,9 +26,11 @@ jobs:
     env:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - name: Room on the runner's disk (its preinstalled SDKs are not used here)
+      # The Android SDK in /usr/local/lib/android stays: the Kotlin unit
+      # tests' coverage needs it.
+      - name: Room on the runner's disk (preinstalled SDKs this job does not use)
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
       # The full history, for the blame and the new-code period.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -73,6 +75,22 @@ jobs:
         run: |
           cargo install cargo-llvm-cov --locked --version 0.9.1
           tool/coverage.sh
+
+      # JaCoCo XML of the Kotlin unit tests (android/), for
+      # sonar.coverage.jacoco.xmlReportPaths. The Gradle project needs Java,
+      # android/local.properties (written by `flutter pub get` above) and
+      # the Gradle wrapper (android/gradlew is ignored by git), which
+      # `flutter build apk --config-only` writes without building anything.
+      # Report only, like the LCOV step.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Coverage (JaCoCo XML of the Kotlin unit tests)
+        continue-on-error: true
+        run: |
+          flutter build apk --debug --config-only
+          (cd android && ./gradlew --no-daemon :app:createDebugUnitTestCoverageReport)
 
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:

@@ -72,6 +72,11 @@ android {
     }
 
     buildTypes {
+        // JaCoCo for the Kotlin unit tests: createDebugUnitTestCoverageReport
+        // writes the XML SonarQube Cloud imports (sonar-project.properties).
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             if (keystoreProperties.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
