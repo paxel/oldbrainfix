@@ -8,7 +8,8 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/crash_guard.dart';
 import 'package:oldbrainfix/src/feedback_screen.dart';
-import 'package:oldbrainfix/src/pack_screen.dart' show packWork, packWorkRuns;
+import 'package:oldbrainfix/src/pack_screen.dart'
+    show packTicksWorkedOut, packWork, packWorkRuns;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
@@ -301,6 +302,37 @@ void main() {
         bundles.fileBytes[sent.files.single.path]!,
       );
       expect(opened.pack.notes.map((n) => n.text), ['Drink water']);
+    });
+
+    testWidgets('what the ticks pick and the size are worked out when the '
+        'ticks change, not on each build', (tester) async {
+      Notes(store).capture('Drink water');
+      Notes(store).capture('Loose thought');
+      final t = await open(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('feedback-text')),
+        'Look.',
+      );
+      await tester.pump();
+      packTicksWorkedOut = 0;
+      await tap(tester, find.byKey(const ValueKey('feedback-notes')));
+      // The tree's page, once as it opens.
+      expect(packTicksWorkedOut, 1);
+      await tap(tester, find.byKey(const ValueKey('pack-tick-all')));
+      expect(packTicksWorkedOut, 2);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      // The page's own, once as the tree closes.
+      expect(packTicksWorkedOut, 3);
+      expect(find.text(t.feedbackPackNotInMail), findsOneWidget);
+      // Builds that change no tick work out nothing again.
+      await tester.enterText(
+        find.byKey(const ValueKey('feedback-text')),
+        'Look again.',
+      );
+      await tap(tester, find.byKey(const ValueKey('feedback-version')));
+      expect(packTicksWorkedOut, 3);
+      expect(find.byKey(const ValueKey('feedback-along')), findsOneWidget);
     });
 
     testWidgets('a tree left with nothing picked sends no Notes', (

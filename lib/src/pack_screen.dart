@@ -65,6 +65,10 @@ Future<void> writePackFile(PackWrite job, String path) =>
 @visibleForTesting
 int packTicksWorkedOut = 0;
 
+/// Counts one working out of a Pack's ticks ([packTicksWorkedOut]); also
+/// the Send feedback page's (#214).
+void countPackTicksWorkedOut() => packTicksWorkedOut++;
+
 /// Opens the tree of the Pack exported from the Area, Topic or Note
 /// [from]. A Tally of a locked Area that is closed now never goes along
 /// with a Session.
@@ -115,7 +119,7 @@ class _PackExportScreenState extends State<PackExportScreen> {
   /// [ticks] as they are now, with what they pick and the size worked
   /// out once for them, not on each build.
   void _setTicks(Set<String> ticks) {
-    packTicksWorkedOut++;
+    countPackTicksWorkedOut();
     _ticks = ticks;
     _picked = widget.pack.picked(ticks).notes.isNotEmpty;
     _size = widget.pack.size(ticks);
@@ -392,7 +396,7 @@ class _PackImportScreenState extends State<PackImportScreen> {
   /// [ticks] as they are now, with whether they pick a Note worked out
   /// once for them, not on each build.
   void _setTicks(Set<String> ticks) {
-    packTicksWorkedOut++;
+    countPackTicksWorkedOut();
     _ticks = ticks;
     _picked = _pack.picked(ticks).notes.isNotEmpty;
   }

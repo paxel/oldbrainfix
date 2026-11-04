@@ -165,6 +165,11 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   Set<String> _ticks = {};
   var _withNotes = false;
 
+  /// How many Notes [_ticks] pick and the Pack's size then, worked out
+  /// once for each change of the ticks ([_setTicks]), not on each build.
+  var _pickedNotes = 0;
+  var _size = 0;
+
   /// Whether the Pack is being written: Share… waits meanwhile.
   var _busy = false;
 
@@ -200,7 +205,16 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   Pack? get _picked {
     final pack = _pack;
     if (!_withNotes || pack == null) return null;
-    return pack.picked(_ticks).notes.isEmpty ? null : pack;
+    return _pickedNotes == 0 ? null : pack;
+  }
+
+  /// [ticks] of [pack] as the tree left them, with what they pick and
+  /// the size worked out once for them.
+  void _setTicks(Pack pack, Set<String> ticks) {
+    countPackTicksWorkedOut();
+    _ticks = ticks;
+    _pickedNotes = pack.picked(ticks).notes.length;
+    _size = pack.size(ticks);
   }
 
   /// Opens the Pack's tree, nothing ticked at first; the Notes go along
@@ -223,7 +237,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       ),
     );
     if (!mounted) return;
-    setState(() => _withNotes = pack.picked(_ticks).notes.isNotEmpty);
+    setState(() {
+      _setTicks(pack, _ticks);
+      _withNotes = _pickedNotes > 0;
+    });
   }
 
   Future<void> _share(String body) async {
@@ -285,10 +302,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     final crash = _crash;
     String? notes;
     if (picked != null) {
-      notes = t.feedbackNotesPicked(
-        picked.picked(_ticks).notes.length,
-        packSizeText(locale, picked.size(_ticks)),
-      );
+      notes = t.feedbackNotesPicked(_pickedNotes, packSizeText(locale, _size));
     }
     Widget tick(
       String key,
@@ -466,10 +480,27 @@ class _FeedbackNotesScreen extends StatefulWidget {
 }
 
 class _FeedbackNotesScreenState extends State<_FeedbackNotesScreen> {
-  late Set<String> _ticks = widget.ticks;
+  late Set<String> _ticks;
+  late bool _picked;
+  late int _size;
+
+  @override
+  void initState() {
+    super.initState();
+    _setTicks(widget.ticks);
+  }
+
+  /// [ticks] as they are now, with what they pick and the size worked
+  /// out once for them, not on each build.
+  void _setTicks(Set<String> ticks) {
+    countPackTicksWorkedOut();
+    _ticks = ticks;
+    _picked = widget.pack.picked(ticks).notes.isNotEmpty;
+    _size = widget.pack.size(ticks);
+  }
 
   void _set(Set<String> ticks) {
-    setState(() => _ticks = ticks);
+    setState(() => _setTicks(ticks));
     widget.onChanged(ticks);
   }
 
@@ -492,7 +523,7 @@ class _FeedbackNotesScreenState extends State<_FeedbackNotesScreen> {
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           Text(
-            t.packSize(packSizeText(locale, pack.size(_ticks))),
+            t.packSize(packSizeText(locale, _size)),
             key: const ValueKey('pack-size'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
@@ -502,7 +533,7 @@ class _FeedbackNotesScreenState extends State<_FeedbackNotesScreen> {
             ticks: _ticks,
             onTick: (key, on) => _set(pack.tick(_ticks, key, on)),
           ),
-          if (pack.picked(_ticks).notes.isEmpty) ...[
+          if (!_picked) ...[
             const SizedBox(height: 8),
             Text(t.packNothingTicked),
           ],
