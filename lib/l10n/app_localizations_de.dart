@@ -5205,32 +5205,71 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpQuickStartTitle => 'Schnellstart';
 
   @override
-  String get helpQuickStart1 => 'Erfasse einen Gedanken mit +.';
+  String get helpQuickStart1 =>
+      'Tippe unten rechts in der Agenda auf das runde +, dann auf Text, schreib einen Gedanken und tippe auf 1 Std.';
 
   @override
-  String get helpQuickStart2 => 'Lege die neue Notiz in einem Bereich ab.';
+  String get helpQuickStart2 =>
+      'Tippe in der Agenda auf „1 unsortiert“, dann unter der Notiz auf den Ordner mit Pfeil und wähl einen Bereich.';
 
   @override
-  String get helpQuickStart3 => 'Gib einer Notiz eine Erinnerung.';
+  String get helpQuickStart3 =>
+      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf den Wecker und Erinnerung, stell die Zeit ein, zweimal Speichern.';
 
   @override
   String get helpQuickStart4 =>
-      'Gib einer Notiz eine Routine, die wiederkehrt.';
+      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf den Wecker und Routine, wähl, wann sie sich wiederholt, zweimal Speichern.';
 
   @override
   String get helpQuickStart5 =>
-      'Hake diese Zeile ab: So funktioniert eine Checkliste.';
+      'Tippe auf das Kästchen vor dieser Zeile, um sie abzuhaken: So funktioniert eine Checkliste.';
 
   @override
-  String get helpQuickStart6 => 'Finde eine Notiz mit „Suchen und stöbern“.';
+  String get helpQuickStart6 =>
+      'Tippe oben in der Agenda auf den Ordner oder wische nach links, durchsuche alle Notizen und öffne deine Bereiche.';
 
   @override
   String get helpQuickStart7 =>
-      'Lege unter Einstellungen ▸ Sicherungen eine Sicherung an.';
+      'Tippe oben rechts in der Agenda auf dein Profilbild, dann auf „Dieses Gerät sichern“ und „Sicherungen einrichten“.';
 
   @override
   String get helpQuickStart8 =>
-      'Synchronisiere in den Einstellungen mit deinem anderen Gerät.';
+      'Tippe auf dein Profilbild, dann auf „Mit einem anderen Gerät synchronisieren“, und scanne den Code deines anderen Geräts.';
+
+  @override
+  String get helpQuickStartDesktopTitle =>
+      'Auf dem Desktop (auf macOS Cmd statt Strg):';
+
+  @override
+  String get helpQuickStartDesktop1 =>
+      'Erfassen: Datei ▸ Neue Notiz oder Strg+N, schreiben, dann Strg+Enter.';
+
+  @override
+  String get helpQuickStartDesktop2 =>
+      'Ablegen: in der Seitenleiste unter Unsortiert die Karte auf einen Bereich ziehen, oder Rechtsklick, Ablegen in …, und den Bereich wählen.';
+
+  @override
+  String get helpQuickStartDesktop3 =>
+      'Erinnerung: in der Schnellnotiz auf den Wecker klicken, dann Erinnerung; die Zeit einstellen, Speichern klicken, dann Strg+Enter.';
+
+  @override
+  String get helpQuickStartDesktop4 => 'Routine: genauso, mit Routine.';
+
+  @override
+  String get helpQuickStartDesktop5 =>
+      'Abhaken: auf das Kästchen vor einer Zeile klicken.';
+
+  @override
+  String get helpQuickStartDesktop6 =>
+      'Suchen und stöbern: einen Bereich in der Seitenleiste anklicken, oder Bearbeiten ▸ Suchen (Strg+F).';
+
+  @override
+  String get helpQuickStartDesktop7 =>
+      'Sicherung: Synchronisieren ▸ Sicherungen …, dann „Sicherungen einrichten“.';
+
+  @override
+  String get helpQuickStartDesktop8 =>
+      'Synchronisieren: Synchronisieren ▸ Gerät koppeln.';
 
   @override
   String get helpIconsTitle => 'Was die Symbole bedeuten';

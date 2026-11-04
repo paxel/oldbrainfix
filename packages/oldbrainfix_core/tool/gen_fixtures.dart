@@ -3896,6 +3896,7 @@ final _helpEnglish = HelpTexts(
   areaName: 'Old Brain Fix',
   quickStartTitle: 'Quick start',
   quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
+  quickStartDescription: 'On the desktop:\nCapture: Ctrl+N',
   iconsText: 'What the icons mean\n\nKind: what the Note is',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]),
@@ -3909,6 +3910,7 @@ final _helpGerman = HelpTexts(
     'Einen Gedanken mit + erfassen',
     'Ihn in einen Bereich einsortieren',
   ],
+  quickStartDescription: 'Auf dem Desktop:\nErfassen: Strg+N',
   iconsText: 'Was die Symbole bedeuten\n\nArt: was die Notiz ist',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2]),

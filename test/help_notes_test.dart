@@ -42,26 +42,56 @@ void main() {
   final de = lookupAppLocalizations(const Locale('de'));
 
   group('the texts', () {
-    test('Quick start: as many Lines in each language, each one action of '
-        'at most 12 words, nothing of Advanced', () {
+    /// What the Quick start must not teach (ADR 0042): Advanced's kinds,
+    /// Topics, the format bar and roles.
+    final advanced = RegExp(
+      'Tally|Session|Frog|Topic|format bar|role|Strichliste|'
+      'Einheit|Frosch|Thema|Formatleiste|Rolle',
+      caseSensitive: false,
+    );
+
+    test('Quick start: as many Lines in each language, each saying where '
+        'and how on the phone in at most about 20 words (#260), nothing of '
+        'Advanced', () {
       expect(quickStartLines(de), hasLength(quickStartLines(en).length));
       for (final t in [en, de]) {
         for (final line in quickStartLines(t)) {
-          expect(words(line), lessThanOrEqualTo(12), reason: line);
-          expect(
-            line,
-            isNot(
-              matches(
-                RegExp(
-                  'Tally|Session|Frog|Topic|format bar|role|Strichliste|'
-                  'Einheit|Frosch|Thema|Formatleiste|Rolle',
-                  caseSensitive: false,
-                ),
-              ),
-            ),
-          );
+          expect(words(line), lessThanOrEqualTo(20), reason: line);
+          expect(line, isNot(matches(advanced)));
         }
       }
+      // Where and how, as the user asked: the phone's places and taps.
+      expect(
+        quickStartLines(en).first,
+        'Tap the round + at the bottom right of the Agenda, then Text, '
+        'type a thought and tap 1 h.',
+      );
+      for (final (t, tap) in [(en, 'tap'), (de, 'tippe')]) {
+        for (final line in quickStartLines(t)) {
+          expect(line.toLowerCase(), contains(tap), reason: line);
+        }
+      }
+      expect(quickStartLines(en)[6], contains('Profile picture'));
+      expect(quickStartLines(de)[6], contains('Profilbild'));
+    });
+
+    test('the Quick start\'s Description holds the desktop\'s way for each '
+        'Line, in their order, nothing of Advanced (#260)', () {
+      for (final t in [en, de]) {
+        final description = quickStartDescription(t).split('\n');
+        expect(description.first, t.helpQuickStartDesktopTitle);
+        expect(
+          description.skip(1).toList(),
+          hasLength(quickStartLines(t).length),
+        );
+        for (final line in description) {
+          expect(line, isNot(matches(advanced)), reason: line);
+        }
+      }
+      expect(
+        quickStartDescription(en).split('\n')[1],
+        'Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.',
+      );
     });
 
     test('every icon named in the text has a picture in both languages', () {
@@ -194,7 +224,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Start'));
       await tester.pumpAndSettle();
-      expect(helpNotes(), ['Quick start', helpIconsText(en)]);
+      // Named "Quick start", the desktop's way folded under it (#260).
+      expect(helpNotes(), [
+        'Quick start\n${quickStartDescription(en)}',
+        helpIconsText(en),
+      ]);
       expect(Notes(store).unsorted(), isEmpty);
       final person = store.ownProfile!.id;
       final list = Checklists(store).byNote(HelpNotes.quickStartId(person))!;
@@ -228,7 +262,7 @@ void main() {
       await start(tester, language: 'de');
       expect(helpNotes(), [
         'Neu in 0.4.0\n\nNeu\n• Hilfe-Notizen.',
-        'Schnellstart',
+        'Schnellstart\n${quickStartDescription(de)}',
         helpIconsText(de),
       ]);
       // The next start makes nothing again.

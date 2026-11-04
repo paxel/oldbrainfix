@@ -12,6 +12,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop scrollt eine Auswahl, während sie gezogen wird: Solange die Maustaste gedrückt ist, scrollt das Mausrad und die Auswahl folgt, und Ziehen über den oberen oder unteren Rand hinaus scrollt von selbst, umso schneller, je weiter der Mauszeiger draußen ist. Das gilt in jedem Textfeld und in den Texten, die der Notiz-Dialog nur zeigt.
 - Eine Notiz mit einem Frosch zeigt ihn im Notiz-Editor als Plakette „Frosch“, auf dem Telefon und dem Desktop: Offen, danach Heute gegessen oder Gestern gegessen. Ein Tippen bietet Jetzt essen, solange er offen ist, und Frosch entfernen, das einmal nachfragt und ihn in den Papierkorb legt. Das „+“ bietet keinen Frosch mehr an, solange die Notiz einen offenen hat.
 
+### Geändert
+
+- Die Hilfe-Checkliste „Schnellstart“ sagt bei jedem Schritt, wo und wie: Jede Zeile nennt die Stelle auf dem Telefon und worauf du tippst, etwa „Tippe unten rechts in der Agenda auf das runde +, dann auf Text, schreib einen Gedanken und tippe auf 1 Std.“ Ihre Beschreibung unter dem Namen nennt für jeden Schritt den Weg auf dem Desktop: die Menüs, Tasten, das Ziehen und den Rechtsklick. Ein Schnellstart, den 0.4.0 angelegt hat, behält seine Worte.
+
 ### Behoben
 
 - Auf dem Telefon reagiert das Wischen zwischen der Agenda und der Bereichsliste sofort auf ein kurzes, schnelles Wischen und ruckelt nicht mehr: Die beiden Seiten liegen nebeneinander, und die Bereichsliste ist fertig, bevor das Wischen beginnt. Zurück und der Ordner wechseln wie bisher zwischen ihnen. Sieben Tipps auf die Version unter „Über Old Brain Fix“ zeigen unten links, wie lange die letzten Bilder gedauert haben, um es vom Telefon aus zu melden; sieben weitere blenden es aus.

@@ -8360,53 +8360,107 @@ abstract class AppLocalizations {
   /// **'Quick start'**
   String get helpQuickStartTitle;
 
-  /// A Line of the Quick start Checklist (#180): one action, at most 12 words, no Tallies, Sessions or Frogs.
+  /// A Line of the Quick start Checklist (#180, #260): where and how on the phone, the exact place and gesture, up to about 20 words, nothing of Advanced (no Tallies, Sessions, Frogs or Topics).
   ///
   /// In en, this message translates to:
-  /// **'Capture a thought with +.'**
+  /// **'Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h.'**
   String get helpQuickStart1;
 
   /// No description provided for @helpQuickStart2.
   ///
   /// In en, this message translates to:
-  /// **'File the new Note into an Area.'**
+  /// **'On the Agenda, tap \"1 Unsorted\", then the folder with an arrow under the Note, and pick an Area.'**
   String get helpQuickStart2;
 
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Give a Note a Reminder.'**
+  /// **'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Give a Note a Routine that repeats.'**
+  /// **'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
   ///
   /// In en, this message translates to:
-  /// **'Tick this Line: that is how a Checklist works.'**
+  /// **'Tap the box in front of this Line to tick it: that is how a Checklist works.'**
   String get helpQuickStart5;
 
   /// No description provided for @helpQuickStart6.
   ///
   /// In en, this message translates to:
-  /// **'Find a Note with Search and browse.'**
+  /// **'Tap the folder at the top of the Agenda, or swipe left, to search all Notes and open your Areas.'**
   String get helpQuickStart6;
 
   /// No description provided for @helpQuickStart7.
   ///
   /// In en, this message translates to:
-  /// **'Make a Backup in Settings ▸ Backups.'**
+  /// **'Tap your Profile picture at the top right of the Agenda, then \"Back up this Device\" and \"Set up Backups\".'**
   String get helpQuickStart7;
 
   /// No description provided for @helpQuickStart8.
   ///
   /// In en, this message translates to:
-  /// **'Sync with your other Device in Settings.'**
+  /// **'Tap your Profile picture, then \"Sync with another Device\", and scan the code your other Device shows.'**
   String get helpQuickStart8;
+
+  /// The first line of the Quick start's Description (#260), folded under its name: the desktop's way for each step follows, one line each.
+  ///
+  /// In en, this message translates to:
+  /// **'On the desktop (Cmd for Ctrl on macOS):'**
+  String get helpQuickStartDesktopTitle;
+
+  /// The desktop's way for the Quick start's Line of the same number (#260), a line of its Description: the step's short name, a colon, then the menus, keys and clicks; nothing of Advanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.'**
+  String get helpQuickStartDesktop1;
+
+  /// No description provided for @helpQuickStartDesktop2.
+  ///
+  /// In en, this message translates to:
+  /// **'File: in Unsorted in the sidebar, drag the card onto an Area, or right-click it, File into…, and pick the Area.'**
+  String get helpQuickStartDesktop2;
+
+  /// No description provided for @helpQuickStartDesktop3.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.'**
+  String get helpQuickStartDesktop3;
+
+  /// No description provided for @helpQuickStartDesktop4.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine: the same, with Routine.'**
+  String get helpQuickStartDesktop4;
+
+  /// No description provided for @helpQuickStartDesktop5.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick: click the box in front of a Line.'**
+  String get helpQuickStartDesktop5;
+
+  /// No description provided for @helpQuickStartDesktop6.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and browse: click an Area in the sidebar, or Edit ▸ Find (Ctrl+F).'**
+  String get helpQuickStartDesktop6;
+
+  /// No description provided for @helpQuickStartDesktop7.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup: Sync ▸ Backups…, then \"Set up Backups\".'**
+  String get helpQuickStartDesktop7;
+
+  /// No description provided for @helpQuickStartDesktop8.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync: Sync ▸ Pair a Device.'**
+  String get helpQuickStartDesktop8;
 
   /// The name of the help Note listing the icons with their names and meanings (#180).
   ///

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'checklists.dart';
+import 'note_kinds.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'profiles.dart';
@@ -15,9 +16,11 @@ class HelpTexts {
   /// The Area's name, "Old Brain Fix".
   final String areaName;
 
-  /// "Quick start" and its Lines, the steps to try.
+  /// "Quick start" and its Lines, the steps to try, and its Description
+  /// (#260), folded under the name: the desktop's way for each step.
   final String quickStartTitle;
   final List<String> quickStartLines;
+  final String quickStartDescription;
 
   /// "What the icons mean" in full, its title the first line, and the
   /// pictures of the icons, one per group.
@@ -31,6 +34,7 @@ class HelpTexts {
     required this.areaName,
     required this.quickStartTitle,
     required this.quickStartLines,
+    required this.quickStartDescription,
     required this.iconsText,
     required this.iconPictures,
     required this.whatsNewTitle,
@@ -190,14 +194,20 @@ class HelpNotes {
     }
   }
 
-  /// Writes the Quick start: a Checklist whose Lines are the steps to try,
-  /// under ids fixed by the person and the Line's place, shown on the
-  /// Agenda as one row with its count.
+  /// Writes the Quick start: a Checklist named [HelpTexts.quickStartTitle]
+  /// with its Description, whose Lines are the steps to try, under ids
+  /// fixed by the person and the Line's place, shown on the Agenda as one
+  /// row with its count.
   void _quickStart(String person, String area, HelpTexts texts) {
     final id = quickStartId(person);
     final making = quickStartMaking(person);
     final now = store.clock().toUtc();
-    _note(id, area, texts.quickStartTitle, const []);
+    _note(
+      id,
+      area,
+      NoteKinds.join(texts.quickStartTitle, texts.quickStartDescription),
+      const [],
+    );
     store.append(
       id,
       ChecklistKeys.kind,

@@ -73,7 +73,7 @@
           "entity": "note:help-00000000000000000000000000000001-quick-start",
           "kind": "captured",
           "before": null,
-          "after": "Quick start",
+          "after": "Quick start\nOn the desktop:\nCapture: Ctrl+N",
           "format": "plain",
           "by": "Ada",
           "mayUse": false

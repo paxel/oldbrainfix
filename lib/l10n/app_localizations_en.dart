@@ -5143,29 +5143,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpQuickStartTitle => 'Quick start';
 
   @override
-  String get helpQuickStart1 => 'Capture a thought with +.';
+  String get helpQuickStart1 =>
+      'Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h.';
 
   @override
-  String get helpQuickStart2 => 'File the new Note into an Area.';
+  String get helpQuickStart2 =>
+      'On the Agenda, tap \"1 Unsorted\", then the folder with an arrow under the Note, and pick an Area.';
 
   @override
-  String get helpQuickStart3 => 'Give a Note a Reminder.';
+  String get helpQuickStart3 =>
+      'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.';
 
   @override
-  String get helpQuickStart4 => 'Give a Note a Routine that repeats.';
+  String get helpQuickStart4 =>
+      'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.';
 
   @override
   String get helpQuickStart5 =>
-      'Tick this Line: that is how a Checklist works.';
+      'Tap the box in front of this Line to tick it: that is how a Checklist works.';
 
   @override
-  String get helpQuickStart6 => 'Find a Note with Search and browse.';
+  String get helpQuickStart6 =>
+      'Tap the folder at the top of the Agenda, or swipe left, to search all Notes and open your Areas.';
 
   @override
-  String get helpQuickStart7 => 'Make a Backup in Settings ▸ Backups.';
+  String get helpQuickStart7 =>
+      'Tap your Profile picture at the top right of the Agenda, then \"Back up this Device\" and \"Set up Backups\".';
 
   @override
-  String get helpQuickStart8 => 'Sync with your other Device in Settings.';
+  String get helpQuickStart8 =>
+      'Tap your Profile picture, then \"Sync with another Device\", and scan the code your other Device shows.';
+
+  @override
+  String get helpQuickStartDesktopTitle =>
+      'On the desktop (Cmd for Ctrl on macOS):';
+
+  @override
+  String get helpQuickStartDesktop1 =>
+      'Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.';
+
+  @override
+  String get helpQuickStartDesktop2 =>
+      'File: in Unsorted in the sidebar, drag the card onto an Area, or right-click it, File into…, and pick the Area.';
+
+  @override
+  String get helpQuickStartDesktop3 =>
+      'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.';
+
+  @override
+  String get helpQuickStartDesktop4 => 'Routine: the same, with Routine.';
+
+  @override
+  String get helpQuickStartDesktop5 =>
+      'Tick: click the box in front of a Line.';
+
+  @override
+  String get helpQuickStartDesktop6 =>
+      'Search and browse: click an Area in the sidebar, or Edit ▸ Find (Ctrl+F).';
+
+  @override
+  String get helpQuickStartDesktop7 =>
+      'Backup: Sync ▸ Backups…, then \"Set up Backups\".';
+
+  @override
+  String get helpQuickStartDesktop8 => 'Sync: Sync ▸ Pair a Device.';
 
   @override
   String get helpIconsTitle => 'What the icons mean';

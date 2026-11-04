@@ -115,6 +115,21 @@ List<String> quickStartLines(AppLocalizations t) => [
   t.helpQuickStart8,
 ];
 
+/// The Quick start's Description in [t]'s language (#260), folded under
+/// its name: "On the desktop", then the desktop's way for each Line, one
+/// line each, in the Lines' order.
+String quickStartDescription(AppLocalizations t) => [
+  t.helpQuickStartDesktopTitle,
+  t.helpQuickStartDesktop1,
+  t.helpQuickStartDesktop2,
+  t.helpQuickStartDesktop3,
+  t.helpQuickStartDesktop4,
+  t.helpQuickStartDesktop5,
+  t.helpQuickStartDesktop6,
+  t.helpQuickStartDesktop7,
+  t.helpQuickStartDesktop8,
+].join('\n');
+
 /// The text of "What the icons mean": its name, then each group's
 /// heading and its icons, "name: meaning" one per line, so search finds
 /// what the pictures show.
@@ -202,6 +217,7 @@ Future<List<String>> makeHelpNotes(
       areaName: t.helpAreaName,
       quickStartTitle: t.helpQuickStartTitle,
       quickStartLines: quickStartLines(t),
+      quickStartDescription: quickStartDescription(t),
       iconsText: helpIconsText(t),
       iconPictures: pictures,
       whatsNewTitle: (v) => t.helpWhatsNewTitle(v),

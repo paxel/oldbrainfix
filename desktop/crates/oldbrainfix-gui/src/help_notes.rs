@@ -100,6 +100,24 @@ pub fn quick_start_lines(t: &L10n) -> Vec<String> {
     .to_vec()
 }
 
+/// The Quick start's Description in `t`'s language (#260), as the phone
+/// writes it: "On the desktop", then the desktop's way for each Line, one
+/// line each, in the Lines' order.
+pub fn quick_start_description(t: &L10n) -> String {
+    [
+        t.help_quick_start_desktop_title(),
+        t.help_quick_start_desktop1(),
+        t.help_quick_start_desktop2(),
+        t.help_quick_start_desktop3(),
+        t.help_quick_start_desktop4(),
+        t.help_quick_start_desktop5(),
+        t.help_quick_start_desktop6(),
+        t.help_quick_start_desktop7(),
+        t.help_quick_start_desktop8(),
+    ]
+    .join("\n")
+}
+
 /// The text of "What the icons mean", as the phone writes it: its name,
 /// then each group's heading and its icons, "name: meaning" one per line.
 pub fn icons_text(t: &L10n) -> String {
@@ -133,6 +151,7 @@ pub fn make_due(store: &Store, t: &L10n, version: &str, fresh: bool) -> Result<V
         area_name: t.help_area_name().to_string(),
         quick_start_title: t.help_quick_start_title().to_string(),
         quick_start_lines: quick_start_lines(t),
+        quick_start_description: quick_start_description(t),
         icons_text: icons_text(t),
         icon_pictures: pictures(t),
         whats_new_title: Box::new(|v| t.help_whats_new_title(v)),
@@ -292,5 +311,40 @@ mod tests {
             quick_start_lines(&L10n::new("en")).len(),
             quick_start_lines(&L10n::new("de")).len()
         );
+    }
+
+    /// As the phone's test: the Description is "On the desktop" and the
+    /// desktop's way for each Line, and neither teaches Advanced (#260).
+    #[test]
+    fn the_quick_start_description_has_a_desktop_way_per_line_and_nothing_advanced() {
+        let advanced = [
+            "tally",
+            "session",
+            "frog",
+            "topic",
+            "format bar",
+            "role",
+            "strichliste",
+            "einheit",
+            "frosch",
+            "thema",
+            "formatleiste",
+            "rolle",
+        ];
+        for lang in ["en", "de"] {
+            let t = L10n::new(lang);
+            let description = quick_start_description(&t);
+            let lines: Vec<&str> = description.split('\n').collect();
+            assert_eq!(lines[0], t.help_quick_start_desktop_title());
+            assert_eq!(lines.len() - 1, quick_start_lines(&t).len(), "{lang}");
+            for line in lines
+                .iter()
+                .copied()
+                .chain(quick_start_lines(&t).iter().map(String::as_str))
+            {
+                let lower = line.to_lowercase();
+                assert!(!advanced.iter().any(|w| lower.contains(w)), "{line}");
+            }
+        }
     }
 }

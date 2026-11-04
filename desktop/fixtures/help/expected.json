@@ -46,7 +46,7 @@
     },
     {
       "id": "note:help-00000000000000000000000000000001-quick-start",
-      "text": "Quick start",
+      "text": "Quick start\nOn the desktop:\nCapture: Ctrl+N",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
@@ -221,7 +221,7 @@
       "html": null,
       "photos": [],
       "recordings": [],
-      "text": "Quick start"
+      "text": "Quick start\nOn the desktop:\nCapture: Ctrl+N"
     }
   },
   "search": {

@@ -49,6 +49,12 @@ One picture per group of icons (the Note editor's badges, the Agenda, a Note car
 
 Both apps make help Notes only when handed what to make them from: the phone's `OldBrainFixApp.help`, the desktop's `App::set_help`, given by `main.dart` and the desktop binary only. Every other test and the screenshot generators start without them.
 
+## Amendment: where and how (#260, Q589 (a))
+
+The 0.4.0 Lines said what to do, never where or how ("Capture a thought with +."). From 0.5.0 each Line names the phone's place and gesture, such as "Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h.", in up to about 20 words; the 12-word box rule (#171) does not hold for them. The Quick start's text is its name and a Description (#188), folded under it: "On the desktop", then the desktop's way for each Line, one line each, in the Lines' order (menus, keys, clicks, drag and right-click). Both cores take it as `HelpTexts.quickStartDescription` and write the Note's text as name and Description joined (`NoteKinds.join`). The phone's words are written whichever Device makes the Note first, as before; neither the Lines nor the Description name anything of Advanced, and tests on both apps hold it.
+
+A Quick start already made stays as it was: it is made once per person (above), and its id stays `note:help-<profile>-quick-start`, so a person who has the 0.4.0 one gets no second one and keeps its words. The What's new of 0.5.0, written at release time from the release notes, names the change and where the Quick start is (the Area "Old Brain Fix"); that needs no code. A deleted Quick start stays deleted, as before.
+
 ## Considered
 
 - Ids by version only, as the Starter Set's (rejected: a help Note filed into a Shared Area would mix with another person's).
@@ -57,6 +63,7 @@ Both apps make help Notes only when handed what to make them from: the phone's `
 - Dating the help Notes' entries back like a planting (rejected: their Note History would show a date the user never saw; the made-once check already keeps a second Device from writing them).
 - Failing every build when the current version has no Play notes (rejected: the notes are written at release time, so every branch build would fail until then).
 - Quick start Lines for Tallies, Sessions or Frogs marked Advanced (rejected: Simple is picked by default; the Quick start teaches what Simple offers).
+- A new version of the Quick start for people who have the 0.4.0 one, under a new id such as `note:help-<profile>-quick-start-2`, the old one kept (rejected for #260: a second Checklist of the same steps in the same Area, and a second "Quick start" row on the Agenda; the What's new already reaches everyone who updates).
 
 ## Consequences
 

@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::Result;
 use crate::checklists::{self, NewLine, order, write_line_as};
 use crate::entry::dart_iso;
+use crate::note_kinds;
 use crate::notes::keys as note_keys;
 use crate::places::{Places, keys as place_keys};
 use crate::profile::OwnProfile;
@@ -40,9 +41,11 @@ pub type WhatsNew = BTreeMap<String, BTreeMap<String, String>>;
 pub struct HelpTexts<'a> {
     /// The Area's name, "Old Brain Fix".
     pub area_name: String,
-    /// "Quick start" and its Lines, the steps to try.
+    /// "Quick start" and its Lines, the steps to try, and its Description
+    /// (#260), folded under the name: the desktop's way for each step.
     pub quick_start_title: String,
     pub quick_start_lines: Vec<String>,
+    pub quick_start_description: String,
     /// "What the icons mean" in full, its title the first line, and the
     /// pictures of the icons, one per group.
     pub icons_text: String,
@@ -286,15 +289,17 @@ impl<'a> HelpNotes<'a> {
         Ok(())
     }
 
-    /// Writes the Quick start: a Checklist whose Lines are the steps to
-    /// try, under ids fixed by the person and the Line's place, shown on
-    /// the Agenda as one row with its count.
+    /// Writes the Quick start: a Checklist named `quick_start_title` with
+    /// its Description, whose Lines are the steps to try, under ids fixed
+    /// by the person and the Line's place, shown on the Agenda as one row
+    /// with its count.
     fn quick_start(&self, person: &str, area: &str, texts: &HelpTexts) -> Result<()> {
         let s = self.store;
         let id = quick_start_id(person);
         let making = quick_start_making(person);
         let now = s.now();
-        self.note(&id, area, &texts.quick_start_title, &[])?;
+        let text = note_kinds::join(&texts.quick_start_title, &texts.quick_start_description);
+        self.note(&id, area, &text, &[])?;
         let kind = checklists::keys::kind_of(&making);
         s.append(&id, checklists::keys::KIND, Some(&kind), Some(now))?;
         s.append(&id, note_keys::SPAWNED, Some(&dart_iso(now)), Some(now))?;
@@ -395,6 +400,7 @@ mod tests {
                 "Capture a thought with +".into(),
                 "File it into an Area".into(),
             ],
+            quick_start_description: "On the desktop:\nCapture: Ctrl+N\nFile: drag it".into(),
             icons_text: "What the icons mean\n\nKind: what the Note is".into(),
             icon_pictures: vec![PICTURE],
             whats_new_title: Box::new(|v| format!("What's new in {v}")),
@@ -437,6 +443,17 @@ mod tests {
         assert_eq!(area.icon.as_deref(), Some(AREA_ICON));
         let notes = Notes::new(&ann);
         assert!(notes.unsorted()?.is_empty());
+        // Named "Quick start", the desktop's way folded under it (#260).
+        let text = notes.by_id(&quick_start_id(&p))?.ok_or("the Note")?.text;
+        assert_eq!(
+            text,
+            "Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it"
+        );
+        assert_eq!(crate::note_kinds::name(&text), "Quick start");
+        assert_eq!(
+            crate::note_kinds::description(&text),
+            english().quick_start_description
+        );
         let list = Checklists::new(&ann)
             .by_note(&quick_start_id(&p))?
             .ok_or("a list")?;
