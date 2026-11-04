@@ -1,11 +1,20 @@
 # Update pull requests for the git submodule third_party/whisper.cpp (#247),
 # weekly. Dependabot moves a submodule to the newest commit of upstream's
 # default branch, not to a release tag: point it at the release instead
-# (docs/adr/0045) and check the Transcripts before merging. The release
-# gate's tool/whisper_pin.py names upstream's latest release.
+# (docs/adr/0045) and check the Transcripts before merging. In CI and the
+# release gate, tool/whisper_pin.py fails while the submodule is off the
+# tag third_party/README.md names, and names upstream's latest release.
+#
+# Update pull requests for the actions the workflows use, weekly. Every
+# third-party action is pinned to a full commit SHA with its version in a
+# comment; Dependabot moves the SHA and the comment together.
 version: 2
 updates:
   - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
