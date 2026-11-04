@@ -818,6 +818,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.';
 
   @override
+  String get permAlarms => 'Alarms';
+
+  @override
+  String get permAlarmsWhy =>
+      'Lets a Routine you keep ignoring turn into an alarm that rings through silent mode and Focus, if you switch that on for it. Allow it in the dialog that opens, or for Old Brain Fix in Settings.';
+
+  @override
   String get catchUpTitle => 'Missed while the phone was off';
 
   @override

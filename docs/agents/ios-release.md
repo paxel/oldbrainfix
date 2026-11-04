@@ -10,8 +10,9 @@ need no secrets.
 
 - [ ] developer.apple.com → Certificates, Identifiers & Profiles →
       Identifiers → **+** → App IDs → App. Description `Old Brain Fix`,
-      Bundle ID **Explicit** `io.github.paxel.oldbrainfix`. No capabilities
-      yet; later tickets add theirs.
+      Bundle ID **Explicit** `io.github.paxel.oldbrainfix`. Capabilities:
+      **Time Sensitive Notifications** (#238, `ios/Runner/Runner.entitlements`);
+      later tickets add theirs. AlarmKit needs none, only its usage text.
 - [ ] appstoreconnect.apple.com → Apps → **+** → New App. Platform iOS,
       name `Old Brain Fix`, primary language English (U.S.), bundle id
       `io.github.paxel.oldbrainfix`, SKU `oldbrainfix`, full access.
@@ -46,8 +47,9 @@ need no secrets.
 - [ ] developer.apple.com → Profiles → **+** → Distribution → **App Store
       Connect**, App ID `io.github.paxel.oldbrainfix`, the certificate from
       step 3. Name `Old Brain Fix App Store`. Download the `.mobileprovision`.
-- [ ] When the certificate is renewed, make the profile again and replace
-      both secrets.
+- [ ] When the certificate is renewed, or a capability is added to the
+      App ID, make the profile again and replace `IOS_PROFILE` (with a new
+      certificate both secrets).
 
 ## 5. Repository secrets
 

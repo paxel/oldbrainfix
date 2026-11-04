@@ -218,6 +218,8 @@
   "permExactAlarmsWhy": "Ohne diese Erlaubnis kann Android einen Alarm bis zu einer Viertelstunde zu spät bringen. Schalte sie auf der Seite, die sich öffnet, für Old Brain Fix ein.",
   "permFullScreen": "Vollbild-Alarme",
   "permFullScreenWhy": "Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.",
+  "permAlarms": "Alarme",
+  "permAlarmsWhy": "Damit kann eine Routine, die du immer wieder übergehst, zu einem Alarm werden, der auch im Stummmodus und im Fokus klingelt – wenn du das für sie einschaltest. Erlaube es im Dialog, der sich öffnet, oder für Old Brain Fix in den Einstellungen.",
   "catchUpTitle": "Verpasst, während das Handy aus war",
   "catchUpOne": "Ein Alarm wurde verpasst. Öffne die App, um ihn zu sehen.",
   "catchUpMany": "{count} Alarme wurden verpasst. Öffne die App, um sie zu sehen.",

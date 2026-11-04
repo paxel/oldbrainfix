@@ -113,7 +113,9 @@ Future<void> _openAndRun(Directory dir) async {
       navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
-      alarms: AndroidAlarms(),
+      // The one place the platform picks the alarm layer; its answers,
+      // such as the setup's steps, do the rest (#238).
+      alarms: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       photos: AndroidPhotos(),
       voice: AndroidVoice(),
       context: const AndroidContext(),

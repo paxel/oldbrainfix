@@ -822,6 +822,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.';
 
   @override
+  String get permAlarms => 'Alarme';
+
+  @override
+  String get permAlarmsWhy =>
+      'Damit kann eine Routine, die du immer wieder übergehst, zu einem Alarm werden, der auch im Stummmodus und im Fokus klingelt – wenn du das für sie einschaltest. Erlaube es im Dialog, der sich öffnet, oder für Old Brain Fix in den Einstellungen.';
+
+  @override
   String get catchUpTitle => 'Verpasst, während das Handy aus war';
 
   @override

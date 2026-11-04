@@ -52,6 +52,7 @@ const channels = [
 
 void main() {
   late Store store;
+  late IosAlarms alarms;
 
   setUp(() {
     final messenger =
@@ -80,14 +81,15 @@ void main() {
     }
   }
 
-  /// The app as main.dart starts it on the phone, with the Android
-  /// wrappers of every channel and none of them answering.
+  /// The app as main.dart starts it on the phone, with the wrappers of
+  /// every channel, the iPhone's alarms, and none of them answering.
   Future<void> start(WidgetTester tester) async {
+    alarms = IosAlarms();
     await tester.pumpWidget(
       OldBrainFixApp(
         store: store,
         location: const AndroidLocation(),
-        alarms: AndroidAlarms(),
+        alarms: alarms,
         photos: AndroidPhotos(),
         voice: AndroidVoice(),
         context: const AndroidContext(),
@@ -126,7 +128,7 @@ void main() {
     // Nothing is allowed where no channel answers: every step offers
     // Allow, which asks in vain, and Next moves on, to the Agenda at the
     // end.
-    for (final _ in AlarmPermission.values) {
+    for (final _ in alarms.steps) {
       await tester.tap(find.byType(FilledButton));
       await settle(tester);
       expect(find.byType(FilledButton), findsOneWidget);

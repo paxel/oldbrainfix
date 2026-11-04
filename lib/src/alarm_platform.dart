@@ -15,6 +15,10 @@ enum AlarmPermission {
 
   /// Full-screen alarms, for Escalation.
   fullScreen,
+
+  /// The iPhone's alarms (AlarmKit), for Escalation: they ring through
+  /// silent mode and Focus.
+  alarms,
 }
 
 /// One planned alarm with the texts its notification shows.
@@ -243,6 +247,10 @@ abstract interface class AlarmPlatform {
   /// only show where it has.
   bool get available;
 
+  /// The permissions this platform's alarms need, in the order the
+  /// setup asks for them; the others do not exist here.
+  List<AlarmPermission> get steps;
+
   /// Arms exactly [alarms], the [nudge] and the Changes Nudge
   /// [changes], replacing everything armed before, and takes away the
   /// notifications of the Occurrences in [done], given as Routine id and
@@ -313,6 +321,9 @@ class NoAlarms implements AlarmPlatform {
   bool get available => false;
 
   @override
+  List<AlarmPermission> get steps => const [];
+
+  @override
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
@@ -375,6 +386,13 @@ class AndroidAlarms implements AlarmPlatform {
 
   @override
   bool get available => true;
+
+  @override
+  List<AlarmPermission> get steps => const [
+    AlarmPermission.notifications,
+    AlarmPermission.exactAlarms,
+    AlarmPermission.fullScreen,
+  ];
 
   @override
   Future<void> arm(
@@ -560,7 +578,7 @@ class AndroidAlarms implements AlarmPlatform {
           () => _channel.invokeMapMethod<String, bool>('permissions'),
         ) ??
         const {};
-    return {for (final p in AlarmPermission.values) p: raw[p.name] ?? false};
+    return {for (final p in steps) p: raw[p.name] ?? false};
   }
 
   @override
@@ -581,8 +599,8 @@ class AndroidAlarms implements AlarmPlatform {
   }
 
   /// [run] on the alarm channel; null where the platform has no such
-  /// channel, as on the iPhone until its alarms arrive (#238), so the app
-  /// runs on there without alarms. A platform error still fails.
+  /// channel or method, as the iPhone's Agenda widget until #242, so the
+  /// app runs on there without it. A platform error still fails.
   static Future<T?> _call<T>(Future<T?> Function() run) async {
     try {
       return await run();
@@ -645,4 +663,16 @@ class AndroidAlarms implements AlarmPlatform {
       _ => null,
     };
   }
+}
+
+/// The iPhone's alarm layer (ios/Runner/AlarmsChannel.swift): the same
+/// channel and calls as on Android, with AlarmKit for Escalation in place
+/// of exact and full-screen alarms. AlarmKit's own alarm screen replaces
+/// the full-screen alarm, so nothing ever rings here as [ringing].
+class IosAlarms extends AndroidAlarms {
+  @override
+  List<AlarmPermission> get steps => const [
+    AlarmPermission.notifications,
+    AlarmPermission.alarms,
+  ];
 }

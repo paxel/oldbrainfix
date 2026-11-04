@@ -444,6 +444,8 @@
   "permExactAlarmsWhy": "Without this, Android may bring an alarm up to a quarter of an hour late. Turn it on for Old Brain Fix on the page that opens.",
   "permFullScreen": "Full-screen alarms",
   "permFullScreenWhy": "Lets a Routine you keep ignoring turn into a full-screen alarm you can't miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.",
+  "permAlarms": "Alarms",
+  "permAlarmsWhy": "Lets a Routine you keep ignoring turn into an alarm that rings through silent mode and Focus, if you switch that on for it. Allow it in the dialog that opens, or for Old Brain Fix in Settings.",
   "catchUpTitle": "Missed while the phone was off",
   "catchUpOne": "One alarm was Missed. Open the app to see it.",
   "catchUpMany": "{count} alarms were Missed. Open the app to see them.",

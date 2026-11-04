@@ -1352,6 +1352,18 @@ abstract class AppLocalizations {
   /// **'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.'**
   String get permFullScreenWhy;
 
+  /// No description provided for @permAlarms.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms'**
+  String get permAlarms;
+
+  /// No description provided for @permAlarmsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets a Routine you keep ignoring turn into an alarm that rings through silent mode and Focus, if you switch that on for it. Allow it in the dialog that opens, or for Old Brain Fix in Settings.'**
+  String get permAlarmsWhy;
+
   /// No description provided for @catchUpTitle.
   ///
   /// In en, this message translates to:

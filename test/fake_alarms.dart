@@ -41,6 +41,14 @@ class FakeAlarms implements AlarmPlatform {
   @override
   bool get available => true;
 
+  /// The setup's steps; Android's unless a test answers as the iPhone.
+  @override
+  List<AlarmPermission> steps = const [
+    AlarmPermission.notifications,
+    AlarmPermission.exactAlarms,
+    AlarmPermission.fullScreen,
+  ];
+
   /// The Occurrences whose notifications were taken away last, as
   /// `routine@occurrence`.
   List<String> done = [];
@@ -188,7 +196,9 @@ class FakeAlarms implements AlarmPlatform {
   }
 
   @override
-  Future<Map<AlarmPermission, bool>> permissions() async => Map.of(granted);
+  Future<Map<AlarmPermission, bool>> permissions() async => {
+    for (final p in steps) p: granted[p] ?? false,
+  };
 
   @override
   Future<void> request(AlarmPermission permission) async {

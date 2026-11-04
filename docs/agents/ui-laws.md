@@ -849,6 +849,22 @@ replace a law of Both apps where they say so. A desktop law marked
 - An Occurrence from a locked Area whose Area is set to Masked never
   shows its title in a notification or on the Agenda, and stays
   checkable.
+- **On the iPhone** (#238) the alarm laws differ where iOS decides:
+  - There is no full-screen alarm page. An escalated Occurrence rings
+    as an AlarmKit alarm, through silent mode and Focus, and AlarmKit's
+    own alarm screen replaces the page: its Stop answers Done, and its
+    one Snooze waits 10 min, as there is room for one only. Without the
+    Alarms permission it comes as a time-sensitive notification.
+  - An Occurrence's notification is time-sensitive and offers Done and
+    the three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h")
+    at once, not Snooze and then its choices; each Re-nag is a
+    notification of its own in the Occurrence's group.
+  - The setup asks for Notifications and Alarms only; exact and
+    full-screen alarms do not exist there.
+  - iOS rings only what was handed to it beforehand, at most 64 rings
+    ahead; every plan, tap and answer hands over the next 64. There is
+    no Catch-up Notification; the Missed Summary shows what was Missed
+    when the app opens.
 
 ## Desktop
 
