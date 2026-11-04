@@ -7,6 +7,8 @@
 //! it is from, and Add. Each box stands beside its words (UI laws,
 //! Desktop, "Dialogs"); an item under a Note not ticked cannot be ticked.
 
+use std::cell::Cell;
+
 use egui::{RichText, Ui};
 use oldbrainfix_core::{
     OpenedPack, Pack, PackItem, PackItemKind, PackNote, PackTicks, text_format,
@@ -58,31 +60,72 @@ pub fn size_text(t: &L10n, bytes: usize) -> String {
     format!("{mb} MB")
 }
 
+thread_local! {
+    /// How many times a Pack's ticks were worked out on this thread.
+    static WORKED_OUT: Cell<usize> = const { Cell::new(0) };
+}
+
+/// How many times [`Worked::of`] worked out a Pack's ticks on this
+/// thread, for tests: once for each change of the ticks.
+pub fn worked_out() -> usize {
+    WORKED_OUT.with(Cell::get)
+}
+
+/// How many Notes a Pack's ticks pick and the Pack's size, worked out
+/// once for each change of the ticks, not on each frame.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Worked {
+    ticks: Option<PackTicks>,
+    picked: usize,
+    size: usize,
+}
+
+impl Worked {
+    /// How many Notes `ticks` pick from `pack`, and its size then.
+    pub fn of(&mut self, pack: &Pack, ticks: &PackTicks) -> (usize, usize) {
+        if self.ticks.as_ref() != Some(ticks) {
+            WORKED_OUT.with(|n| n.set(n.get() + 1));
+            self.picked = pack.picked(ticks).notes.len();
+            self.size = pack.size(ticks);
+            self.ticks = Some(ticks.clone());
+        }
+        (self.picked, self.size)
+    }
+}
+
 /// The export (Q467–Q470): the size and "Tick all" and "Untick all" over
 /// the tree, "Add my Profile" under it, then Cancel and Save…, greyed
-/// while no Note is ticked.
+/// while no Note is ticked or the Pack is being saved (`busy`).
 pub fn export_form(
     ui: &mut Ui,
     t: &L10n,
     pack: &Pack,
-    (ticks, profile): (&mut PackTicks, &mut bool),
+    (ticks, profile, worked): (&mut PackTicks, &mut bool, &mut Worked),
+    busy: bool,
     asked: &mut Option<PackAsk>,
 ) {
     heading(ui, t.pack_export_title());
     let text = ui.visuals().text_color();
-    let size = size_text(t, pack.size(ticks));
-    ui.label(RichText::new(t.pack_size(&size)).strong().color(text));
+    let (_, size) = worked.of(pack, ticks);
+    ui.label(
+        RichText::new(t.pack_size(&size_text(t, size)))
+            .strong()
+            .color(text),
+    );
     tick_buttons(ui, t, pack, ticks);
     tree(ui, t, pack, ticks);
     ui.separator();
     tick_with_hint(ui, profile, t.pack_add_profile(), t.pack_add_profile_hint());
-    let picked = !pack.picked(ticks).notes.is_empty();
+    let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
-        if theme::primary(ui, picked, t.pack_save()).clicked() {
+        if theme::primary(ui, picked && !busy, t.pack_save()).clicked() {
             *asked = Some(PackAsk::Save);
+        }
+        if busy {
+            ui.spinner();
         }
     });
     nothing_ticked(ui, t, picked);
@@ -96,7 +139,7 @@ pub fn import_form(
     ui: &mut Ui,
     t: &L10n,
     (opened, pictures): (&OpenedPack, &mut Pictures),
-    (ticks, claim): (&mut PackTicks, &mut bool),
+    (ticks, claim, worked): (&mut PackTicks, &mut bool, &mut Worked),
     asked: &mut Option<PackAsk>,
 ) {
     heading(ui, t.pack_title());
@@ -124,7 +167,7 @@ pub fn import_form(
     if opened.from.is_some() {
         tick_with_hint(ui, claim, t.pack_claim(), t.pack_claim_hint());
     }
-    let picked = !pack.picked(ticks).notes.is_empty();
+    let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
         if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
             *asked = Some(PackAsk::Cancel);

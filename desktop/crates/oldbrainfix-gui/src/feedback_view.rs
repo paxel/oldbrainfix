@@ -175,6 +175,11 @@ pub struct FeedbackForm {
     /// The Pack of everything the tree offers, nothing ticked at first.
     pub pack: Option<Pack>,
     pub ticks: PackTicks,
+    /// What the ticks pick and the size, worked out once for each
+    /// change of them.
+    pub worked: pack_view::Worked,
+    /// Whether the Pack is being saved: "Save the Pack…" waits meanwhile.
+    pub busy: bool,
 }
 
 impl Default for FeedbackForm {
@@ -187,6 +192,8 @@ impl Default for FeedbackForm {
             notes: false,
             pack: None,
             ticks: PackTicks::new(),
+            worked: pack_view::Worked::default(),
+            busy: false,
         }
     }
 }
@@ -265,9 +272,13 @@ pub fn form(
             {
                 asked = Some(FeedbackAsk::Notes(notes));
             }
-            let picked = form.picked().map(|pack| {
-                let size = pack_view::size_text(t, pack.size(&form.ticks));
-                t.feedback_notes_picked(pack.picked(&form.ticks).notes.len() as i64, &size)
+            let worked = match &form.pack {
+                Some(pack) => form.worked.of(pack, &form.ticks),
+                None => (0, 0),
+            };
+            let picked = (form.notes && worked.0 > 0).then(|| {
+                let size = pack_view::size_text(t, worked.1);
+                t.feedback_notes_picked(worked.0 as i64, &size)
             });
             let hint = picked
                 .clone()
@@ -282,7 +293,7 @@ pub fn form(
                         ..Default::default()
                     })
                     .show(ui, |ui| {
-                        let size = pack_view::size_text(t, pack.size(&form.ticks));
+                        let size = pack_view::size_text(t, worked.1);
                         ui.label(RichText::new(t.pack_size(&size)).strong().color(text));
                         pack_view::tick_buttons(ui, t, pack, &mut form.ticks);
                         pack_view::tree(ui, t, pack, &mut form.ticks);
@@ -315,12 +326,17 @@ pub fn form(
                 if ui.add_enabled(written, egui::Button::new(save)).clicked() {
                     asked = Some(FeedbackAsk::SaveFile);
                 }
-                if picked.is_some()
-                    && ui
-                        .button(RichText::new(t.feedback_save_pack()).color(text))
+                if picked.is_some() {
+                    let save = RichText::new(t.feedback_save_pack()).color(text);
+                    if ui
+                        .add_enabled(!form.busy, egui::Button::new(save))
                         .clicked()
-                {
-                    asked = Some(FeedbackAsk::SavePack);
+                    {
+                        asked = Some(FeedbackAsk::SavePack);
+                    }
+                    if form.busy {
+                        ui.spinner();
+                    }
                 }
             });
             if !written {

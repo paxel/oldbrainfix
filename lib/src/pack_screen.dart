@@ -55,8 +55,9 @@ Future<R> _aside<R>(FutureOr<R> Function() work) {
   return packWork(work);
 }
 
-/// Writes the Pack [job] to the file at [path], off the main isolate.
-Future<void> _writePackFile(PackWrite job, String path) =>
+/// Writes the Pack [job] to the file at [path], off the main isolate;
+/// also the Pack Send feedback shares (#214).
+Future<void> writePackFile(PackWrite job, String path) =>
     _aside(() => File(path).writeAsBytesSync(job.encode()));
 
 /// How many times a Pack's page worked out what its ticks pick and its
@@ -147,7 +148,7 @@ class _PackExportScreenState extends State<PackExportScreen> {
     );
     setState(() => _busy = true);
     try {
-      await _writePackFile(job, path);
+      await writePackFile(job, path);
     } on Exception catch (e) {
       notSent(t.packNotWrittenCause, t.nothingLostFix, '$e');
       return;

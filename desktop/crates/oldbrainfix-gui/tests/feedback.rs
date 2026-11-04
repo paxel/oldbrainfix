@@ -22,7 +22,7 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
 use oldbrainfix_gui::feedback_view::{self, FeedbackFacts, MAIL_BODY_LIMIT};
-use oldbrainfix_gui::{App, Page};
+use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -46,7 +46,13 @@ struct Opened {
 /// The window with the Settings open, saving into `dir`, and the page
 /// opened from them.
 fn open(store: Store, dir: &Path) -> Opened {
+    open_with(Arc::new(store), dir, |_| {})
+}
+
+/// [`open`] with `setup` done to the window first.
+fn open_with(store: Arc<Store>, dir: &Path, setup: impl FnOnce(&mut App)) -> Opened {
     let mut app = App::new(store, "en");
+    setup(&mut app);
     app.set_feedback_facts(facts());
     let (urls, saved) = (Seen::default(), Seen::default());
     let seen = urls.clone();
@@ -222,5 +228,86 @@ fn notes_picked_in_the_packs_tree_are_saved_as_a_pack_to_attach() -> TestResult 
         .click();
     harness.run();
     assert!(!shows(&harness, "Save the Pack…"));
+    Ok(())
+}
+
+#[test]
+fn the_pack_is_saved_on_a_thread_of_its_own_greyed_meanwhile() -> TestResult {
+    let desk = store()?;
+    Notes::new(&desk).capture("Drink water", None, None)?;
+    let desk = Arc::new(desk);
+    let dir = tempfile::tempdir()?;
+    // The window's threads get their connection once `held` is let go.
+    let held = Arc::new(Mutex::new(()));
+    let (gate, shared) = (held.clone(), desk.clone());
+    let Opened {
+        mut harness, saved, ..
+    } = open_with(desk, dir.path(), move |app| {
+        app.select(Selection::All);
+        app.set_agenda_store(move || {
+            drop(gate.lock());
+            shared.clone()
+        });
+    });
+    type_text(&mut harness, "Look at this.");
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Notes as a Pack")
+        .click();
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Drink water")
+        .click();
+    harness.run();
+    let guard = held.lock().map_err(|e| e.to_string())?;
+    // Stepped, not run: the window looks again while the thread runs.
+    last(&harness, "Save the Pack…").click_accesskit();
+    for _ in 0..3 {
+        harness.step();
+    }
+    assert!(disabled(&harness, "Save the Pack…"));
+    let names = seen(&saved);
+    let pack = names.last().ok_or("a Pack asked for")?.clone();
+    let path = PathBuf::from(dir.path()).join(&pack);
+    assert!(!path.exists());
+    drop(guard);
+    for _ in 0..6000 {
+        if !disabled(&harness, "Save the Pack…") {
+            break;
+        }
+        harness.step();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(!disabled(&harness, "Save the Pack…"));
+    let opened = store()?
+        .open_pack(&std::fs::read(&path)?)?
+        .map_err(|e| e.name())?;
+    let texts: Vec<_> = opened.pack.notes.iter().map(|n| n.text.as_str()).collect();
+    assert_eq!(texts, ["Drink water"]);
+    Ok(())
+}
+
+#[test]
+fn what_the_ticks_pick_and_the_size_are_worked_out_when_they_change() -> TestResult {
+    let desk = store()?;
+    Notes::new(&desk).capture("Drink water", None, None)?;
+    let dir = tempfile::tempdir()?;
+    let Opened { mut harness, .. } = open(desk, dir.path());
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Notes as a Pack")
+        .click();
+    harness.run();
+    let shown = oldbrainfix_gui::pack_view::worked_out();
+    // Frames and a change that ticks nothing work out nothing again.
+    type_text(&mut harness, "More words");
+    for _ in 0..5 {
+        harness.step();
+    }
+    assert_eq!(oldbrainfix_gui::pack_view::worked_out(), shown);
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Drink water")
+        .click();
+    harness.run();
+    assert_eq!(oldbrainfix_gui::pack_view::worked_out(), shown + 1);
+    assert!(shows(&harness, "With it, as a file: a Pack of 1 Note"));
     Ok(())
 }

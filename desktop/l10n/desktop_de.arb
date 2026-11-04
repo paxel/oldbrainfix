@@ -313,6 +313,7 @@
   "packSaveTitle": "Das Paket zum Senden speichern",
   "packNotSaved": "Das Paket wurde nicht gespeichert.",
   "packNotSavedTitle": "Paket nicht gespeichert",
+  "packOpening": "Das Paket wird geöffnet …",
   "packPersonAdded": "{name} wurde zu Menschen hinzugefügt.",
   "feedbackSaveFile": "Als Datei speichern …",
   "feedbackSaveTitle": "Feedback speichern",

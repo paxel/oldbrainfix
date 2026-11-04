@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/crash_guard.dart';
 import 'package:oldbrainfix/src/feedback_screen.dart';
+import 'package:oldbrainfix/src/pack_screen.dart' show packWork, packWorkRuns;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
@@ -87,6 +89,9 @@ void main() {
     late List<String> mailed;
 
     setUp(() {
+      // The Pack's work runs inline but where a test puts the isolate back.
+      packWork = <R>(work) async => work();
+      packWorkRuns = 0;
       store = Store.inMemory()
         ..starterSetOffered = true
         ..alarmSetupDone = true;
@@ -95,6 +100,7 @@ void main() {
       mailed = [];
     });
     tearDown(() {
+      packWork = Isolate.run;
       store.close();
       dir.deleteSync(recursive: true);
     });
@@ -244,6 +250,53 @@ void main() {
       expect(sent.text, shown);
       expect(sent.files.single.type, packMimeType);
       expect(bundles.mails.single, (to: crashMail, subject: feedbackSubject));
+      final opened = Store.inMemory().openPack(
+        bundles.fileBytes[sent.files.single.path]!,
+      );
+      expect(opened.pack.notes.map((n) => n.text), ['Drink water']);
+    });
+
+    testWidgets('the Pack is written on another isolate, Share… waiting '
+        'meanwhile', (tester) async {
+      Notes(store).capture('Drink water');
+      final t = await open(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('feedback-text')),
+        'Look at this.',
+      );
+      await tap(tester, find.byKey(const ValueKey('feedback-notes')));
+      await tap(tester, find.byKey(const ValueKey('pack-tick-all')));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text(t.feedbackPackNotInMail), findsOneWidget);
+      packWork = Isolate.run;
+      final share = find.byKey(const ValueKey('feedback-share'));
+      await tester.ensureVisible(share);
+      await tester.pumpAndSettle();
+      await tester.tap(share);
+      await tester.pump();
+      await tester.pump();
+      expect(enabled(tester, 'feedback-share'), isFalse);
+      expect(
+        find.descendant(
+          of: share,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(bundles.texts, isEmpty);
+      // The result arrives on the real clock, what awaits it on the
+      // test's.
+      for (var i = 0; i < 600 && bundles.texts.isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(packWorkRuns, 1);
+      expect(enabled(tester, 'feedback-share'), isTrue);
+      final sent = bundles.texts.single;
       final opened = Store.inMemory().openPack(
         bundles.fileBytes[sent.files.single.path]!,
       );

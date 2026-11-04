@@ -579,6 +579,8 @@
   "@packNotSaved": {"description": "Announced at the top of the desktop when the Pack could not be written; the click opens the dialog with the cause and the fix (#165)."},
   "packNotSavedTitle": "Pack not saved",
   "@packNotSavedTitle": {"description": "Title of the dialog behind 'packNotSaved'."},
+  "packOpening": "Opening the Pack…",
+  "@packOpening": {"description": "Names the line under the desktop's menu bar while a Pack opens off the window's thread, for screen readers (#165)."},
   "packPersonAdded": "{name} was added to People.",
   "@packPersonAdded": {"description": "Announced in the desktop's Pack dialog after 'Add {name} to People' (#165).", "placeholders": {"name": {"type": "String"}}},
   "feedbackSaveFile": "Save as file…",

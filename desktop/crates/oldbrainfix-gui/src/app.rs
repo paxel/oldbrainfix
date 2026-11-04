@@ -391,6 +391,36 @@ struct AgendaReads {
 /// What the Agenda's thread read, at its mark, and whether it wrote.
 type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
 
+/// What a Pack's work off the window's thread did (#165), and whether
+/// it wrote to the log there.
+struct PackDone {
+    done: PackDid,
+    wrote: bool,
+}
+
+/// What a Pack's work did.
+enum PackDid {
+    /// The file at the path read and opened; none when it is no Pack
+    /// after all.
+    Opened(
+        Option<oldbrainfix_core::Result<std::result::Result<OpenedPack, PackError>>>,
+        std::path::PathBuf,
+    ),
+    /// The Pack saved, from the export or, with `true`, from Send
+    /// feedback.
+    Saved(std::result::Result<(), String>, bool),
+}
+
+/// The file at `path` as far as it may be a Pack (#165).
+enum PackFile {
+    No,
+    /// Read whole, a Pack.
+    Bytes(Vec<u8>),
+    /// Larger than a Sent Item or a card file can be, so read off the
+    /// window's thread.
+    Large,
+}
+
 /// What this Device may do to the selected Note in a Shared Area
 /// (ADR 0013): change it (edit, file, merge, delete), give it Routines,
 /// and Amend it.
@@ -767,6 +797,7 @@ enum Dialog {
         pack: Box<Pack>,
         ticks: PackTicks,
         profile: bool,
+        worked: pack_view::Worked,
     },
     /// A Pack opened here (#165): its tree, the items `ticks` ticks, and
     /// whether "Claim as mine" is ticked.
@@ -774,6 +805,7 @@ enum Dialog {
         opened: Box<OpenedPack>,
         ticks: PackTicks,
         claim: bool,
+        worked: pack_view::Worked,
     },
     /// Whether the "From `name`" badge of the Note `note` goes (#165).
     RemovePackFrom {
@@ -1667,6 +1699,9 @@ pub struct App {
     /// Where the Agenda is read off the window's thread (#207); without
     /// it, the window reads it itself.
     agenda_reads: Option<AgendaReads>,
+    /// The Pack work running on threads of their own, on connections
+    /// the Agenda's opener hands them, with whether each opens a Pack.
+    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, bool)>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -1818,18 +1853,45 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
     )
 }
 
-/// The bytes of the file at `path` when it is a Pack (#165), read whole:
-/// a Pack has no size limit. None for any other file, read only as far as
-/// its first byte that is no blank when that opens no JSON object.
-fn pack_file_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
+/// Writes the Pack `pack` as `ticks` pick from it, with the own Profile
+/// when `profile`, to the file at `path`.
+fn write_pack_file(
+    store: &Store,
+    pack: &Pack,
+    ticks: &PackTicks,
+    profile: bool,
+    path: &std::path::Path,
+) -> std::result::Result<(), String> {
+    let bytes = store
+        .write_pack(pack, ticks, profile)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(path, bytes).map_err(|e| e.to_string())
+}
+
+/// The file at `path` as far as it may be a Pack (#165): read whole when
+/// it is one, as a Pack has no size limit, unless it is larger than a
+/// Sent Item or a card file can be (`most`); no Pack, read only as far
+/// as its first byte that is no blank, when that opens no JSON object.
+fn pack_file(path: &std::path::Path, most: u64) -> PackFile {
     use std::io::Read;
     let mut head = [0u8; 64];
-    let read = std::fs::File::open(path)
-        .and_then(|mut file| file.read(&mut head))
-        .ok()?;
-    if !packs::starts_like_json(head.get(..read)?) {
-        return None;
+    let Ok(read) = std::fs::File::open(path).and_then(|mut file| file.read(&mut head)) else {
+        return PackFile::No;
+    };
+    if !head.get(..read).is_some_and(packs::starts_like_json) {
+        return PackFile::No;
     }
+    if std::fs::metadata(path).is_ok_and(|m| m.len() > most) {
+        return PackFile::Large;
+    }
+    match read_pack_file(path) {
+        Some(bytes) => PackFile::Bytes(bytes),
+        None => PackFile::No,
+    }
+}
+
+/// The bytes of the file at `path` when it is a Pack.
+fn read_pack_file(path: &std::path::Path) -> Option<Vec<u8>> {
     let bytes = std::fs::read(path).ok()?;
     packs::looks_like_pack(&bytes).then_some(bytes)
 }
@@ -2041,6 +2103,7 @@ impl App {
             folder_wanted: None,
             syncing: None,
             agenda_reads: None,
+            pack_work: Vec::new(),
             unsorted_wanted: None,
             changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
@@ -2930,13 +2993,26 @@ impl App {
     /// added, a Sent Item shows its preview, a stranger's held and hidden
     /// until "Show" (#91); anything else is imported as a bundle. A Pack
     /// and a card file are JSON as a Sent Item is, so they are asked for
-    /// first, a Pack read whole, as it has no size limit.
+    /// first, a Pack read whole, as it has no size limit: one larger
+    /// than a Sent Item or a card file can be read off the window's
+    /// thread, and every Pack opened there.
     fn open_file(&mut self, path: &std::path::Path) {
-        if let Some(bytes) = pack_file_bytes(path) {
-            self.open_pack(&bytes);
-            return;
-        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
+        match pack_file(path, most) {
+            PackFile::Bytes(bytes) => {
+                self.open_pack(bytes, path.to_path_buf());
+                return;
+            }
+            PackFile::Large => {
+                let path = path.to_path_buf();
+                self.pack_aside(true, move |store| {
+                    let opened = read_pack_file(&path).map(|bytes| store.open_pack(&bytes));
+                    PackDid::Opened(opened, path)
+                });
+                return;
+            }
+            PackFile::No => {}
+        }
         let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= most);
         let bytes = if small {
             std::fs::read(path).unwrap_or_default()
@@ -2978,17 +3054,99 @@ impl App {
         }
     }
 
-    /// Opens the Pack `bytes` (#165): its tree, everything ticked, "Claim
-    /// as mine" ticked; or why it did not open, behind the click.
-    fn open_pack(&mut self, bytes: &[u8]) {
+    /// Opens the Pack `bytes` of the file at `path` (#165) off the
+    /// window's thread.
+    fn open_pack(&mut self, bytes: Vec<u8>, path: std::path::PathBuf) {
+        self.pack_aside(true, move |store| {
+            PackDid::Opened(Some(store.open_pack(&bytes)), path)
+        });
+    }
+
+    /// Runs `work` on a Pack on a thread of its own, on a connection the
+    /// Agenda's opener hands it (#207), its result taken in by
+    /// [`App::pack_arrived`]; without the opener, the window runs it
+    /// itself. `opening` when it opens a Pack: the line under the menu
+    /// bar shows meanwhile.
+    fn pack_aside(&mut self, opening: bool, work: impl FnOnce(&Store) -> PackDid + Send + 'static) {
+        let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone()) else {
+            let done = work(&self.store);
+            self.pack_done(done);
+            return;
+        };
+        let (sent, arrives) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let store = open();
+            let before = store.current_seq().ok();
+            let done = work(&store);
+            let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
+            drop(sent.send(PackDone { done, wrote }));
+        });
+        self.pack_work.push((arrives, opening));
+    }
+
+    /// Whether a Pack is being opened off the window's thread.
+    fn pack_opening(&self) -> bool {
+        self.pack_work.iter().any(|(_, opening)| *opening)
+    }
+
+    /// Whether a Pack is being saved off the window's thread.
+    fn pack_saving(&self) -> bool {
+        self.pack_work.iter().any(|(_, opening)| !*opening)
+    }
+
+    /// Takes in what the Pack threads did once it is in; the window
+    /// looks again shortly while one runs.
+    fn pack_arrived(&mut self, ctx: &egui::Context) {
+        if self.pack_work.is_empty() {
+            return;
+        }
+        let mut arrived = Vec::new();
+        self.pack_work
+            .retain(|(running, _)| match running.try_recv() {
+                Ok(done) => {
+                    arrived.push(done);
+                    false
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => true,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => false,
+            });
+        if !self.pack_work.is_empty() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+        }
+        for PackDone { done, wrote } in arrived {
+            if wrote {
+                self.store.changed_elsewhere();
+            }
+            self.pack_done(done);
+        }
+    }
+
+    /// Shows what a Pack's work did.
+    fn pack_done(&mut self, done: PackDid) {
+        match done {
+            PackDid::Opened(Some(opened), _) => self.pack_opened(opened),
+            // JSON larger than a Sent Item or a card, and no Pack.
+            PackDid::Opened(None, path) => self.import_bundle(&path),
+            PackDid::Saved(saved, false) => self.pack_saved(saved),
+            PackDid::Saved(saved, true) => self.feedback_saved(saved),
+        }
+    }
+
+    /// The Pack opened (#165): its tree, everything ticked, "Claim as
+    /// mine" ticked; or why it did not open, behind the click.
+    fn pack_opened(
+        &mut self,
+        opened: oldbrainfix_core::Result<std::result::Result<OpenedPack, PackError>>,
+    ) {
         let t = self.t;
-        let (why, details) = match self.store.open_pack(bytes) {
+        let (why, details) = match opened {
             Ok(Ok(opened)) => {
                 let ticks = opened.pack.all_keys();
                 self.dialog = Some(Dialog::PackOpened {
                     opened: Box::new(opened),
                     ticks,
                     claim: true,
+                    worked: pack_view::Worked::default(),
                 });
                 return;
             }
@@ -3020,6 +3178,7 @@ impl App {
             pack: Box::new(pack),
             ticks,
             profile: false,
+            worked: pack_view::Worked::default(),
         });
         Ok(())
     }
@@ -3074,12 +3233,20 @@ impl App {
                 if path.extension().is_none_or(|e| e != packs::EXTENSION) {
                     path.set_extension(packs::EXTENSION);
                 }
-                match self.store.write_pack(pack, &self.feedback.ticks, false) {
-                    Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
-                    Err(e) => Err(e.to_string()),
-                }
+                let (pack, ticks) = (pack.clone(), self.feedback.ticks.clone());
+                self.pack_aside(false, move |store| {
+                    PackDid::Saved(write_pack_file(store, &pack, &ticks, false, &path), true)
+                });
+                return Ok(());
             }
         };
+        self.feedback_saved(written);
+        Ok(())
+    }
+
+    /// A save of Send feedback done: a failure is announced.
+    fn feedback_saved(&mut self, written: std::result::Result<(), String>) {
+        let t = self.t;
         if let Err(e) = written {
             self.announce_failure(
                 t.feedback_not_saved(),
@@ -3088,17 +3255,17 @@ impl App {
                 format!("feedback: {e}"),
             );
         }
-        Ok(())
     }
 
     /// Save… in the export: the Pack as ticked, saved where the user
-    /// says, and the dialog closed; saved says nothing, a failure is
-    /// announced and the dialog stays.
+    /// says off the window's thread, and the dialog closed; saved says
+    /// nothing, a failure is announced and the dialog stays.
     fn save_pack(&mut self) {
         let Some(Dialog::PackExport {
             pack,
             ticks,
             profile,
+            ..
         }) = &self.dialog
         else {
             return;
@@ -3111,12 +3278,22 @@ impl App {
         if path.extension().is_none_or(|e| e != packs::EXTENSION) {
             path.set_extension(packs::EXTENSION);
         }
-        let written = match self.store.write_pack(pack, ticks, *profile) {
-            Ok(bytes) => std::fs::write(&path, bytes).map_err(|e| e.to_string()),
-            Err(e) => Err(e.to_string()),
-        };
+        let (pack, ticks, profile) = (pack.as_ref().clone(), ticks.clone(), *profile);
+        self.pack_aside(false, move |store| {
+            PackDid::Saved(write_pack_file(store, &pack, &ticks, profile, &path), false)
+        });
+    }
+
+    /// Save… in the export done: the dialog closed, or a failure
+    /// announced and the dialog left as it is.
+    fn pack_saved(&mut self, written: std::result::Result<(), String>) {
+        let t = self.t;
         match written {
-            Ok(()) => self.dialog = None,
+            Ok(()) => {
+                if matches!(self.dialog, Some(Dialog::PackExport { .. })) {
+                    self.dialog = None;
+                }
+            }
             Err(e) => self.announce_failure(
                 t.pack_not_saved(),
                 t.pack_not_saved_title(),
@@ -3133,6 +3310,7 @@ impl App {
             opened,
             ticks,
             claim,
+            ..
         }) = &self.dialog
         else {
             return Ok(());
@@ -7779,6 +7957,8 @@ impl App {
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
         self.agenda_arrived(ui.ctx());
+        self.pack_arrived(ui.ctx());
+        self.feedback.busy = self.pack_saving();
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
@@ -8084,6 +8264,9 @@ impl App {
             // Under it, while a sync of this Device runs (#225).
             if self.syncing.as_ref().is_some_and(Syncing::running) {
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
+            } else if self.pack_opening() {
+                // And while a Pack opens off the window's thread.
+                sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
             }
         }
         // What the Note dialog lies over: all but the menu bar, which
@@ -10461,6 +10644,7 @@ impl App {
     /// The open dialog, over everything else.
     fn dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
         let focus = self.focus;
+        let saving = self.pack_saving();
         let Some(dialog) = &mut self.dialog else {
             self.focus = false;
             return;
@@ -10709,19 +10893,23 @@ impl App {
                         pack,
                         ticks,
                         profile,
+                        worked,
                     } => {
                         let mut asked = None;
-                        pack_view::export_form(ui, &t, pack, (ticks, profile), &mut asked);
+                        let form = (ticks, profile, worked);
+                        pack_view::export_form(ui, &t, pack, form, saving, &mut asked);
                         actions.extend(asked.map(Action::Pack));
                     }
                     Dialog::PackOpened {
                         opened,
                         ticks,
                         claim,
+                        worked,
                     } => {
                         let mut asked = None;
                         let shown = (opened.as_ref(), &mut *pictures);
-                        pack_view::import_form(ui, &t, shown, (ticks, claim), &mut asked);
+                        let form = (ticks, claim, worked);
+                        pack_view::import_form(ui, &t, shown, form, &mut asked);
                         actions.extend(asked.map(Action::Pack));
                     }
                     Dialog::RemovePackFrom { note, name } => {

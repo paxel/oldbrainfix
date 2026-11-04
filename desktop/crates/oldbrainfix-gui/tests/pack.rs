@@ -486,3 +486,119 @@ fn a_changed_pack_a_later_one_and_one_from_a_blocked_person_do_not_open() -> Tes
     );
     Ok(())
 }
+
+/// Hands the window's threads a connection to `store` once `held` is
+/// let go: while the test holds it, a Pack's work waits there.
+fn gated(app: &mut App, store: &Arc<Store>) -> Arc<Mutex<()>> {
+    let held = Arc::new(Mutex::new(()));
+    let (gate, store) = (held.clone(), store.clone());
+    app.set_agenda_store(move || {
+        drop(gate.lock());
+        store.clone()
+    });
+    held
+}
+
+/// Steps the window until `done`, up to half a minute.
+fn until(harness: &mut Harness<'_, App>, done: impl Fn(&Harness<'_, App>) -> bool) -> TestResult {
+    for _ in 0..6000 {
+        if done(harness) {
+            return Ok(());
+        }
+        harness.step();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    Err("never done".into())
+}
+
+#[test]
+fn save_writes_the_pack_on_a_thread_of_its_own_greyed_meanwhile() -> TestResult {
+    let desk = store(4, "Desk")?;
+    health(&desk)?;
+    let desk = Arc::new(desk);
+    let dir = tempfile::tempdir()?;
+    let mut app = App::new(desk.clone(), "en");
+    app.select(Selection::All);
+    let held = gated(&mut app, &desk);
+    saving(&mut app, dir.path());
+    let mut harness = window(app);
+    place_menu(&mut harness, "Health", "Export as Pack…");
+    let guard = held.lock().map_err(|e| e.to_string())?;
+    // Stepped, not run: the window looks again while the thread runs.
+    last(&harness, "Save…").click_accesskit();
+    // The window draws on, Save… greyed, the dialog open, nothing saved.
+    for _ in 0..3 {
+        harness.step();
+    }
+    assert!(shows(&harness, "Export as Pack"));
+    assert!(last(&harness, "Save…").accesskit_node().is_disabled());
+    assert_eq!(std::fs::read_dir(dir.path())?.count(), 0);
+    drop(guard);
+    until(&mut harness, |h| !shows(h, "Export as Pack"))?;
+    let saved = std::fs::read_dir(dir.path())?
+        .next()
+        .ok_or("a Pack saved")??;
+    let opened = store(5, "Ben")?
+        .open_pack(&std::fs::read(saved.path())?)?
+        .map_err(|e| e.name())?;
+    let texts: Vec<&str> = opened.pack.notes.iter().map(|n| n.text.as_str()).collect();
+    assert_eq!(texts, ["Water", "Laps"]);
+    Ok(())
+}
+
+#[test]
+fn a_large_pack_is_read_and_opened_on_a_thread_the_line_showing_meanwhile() -> TestResult {
+    let ada = store(6, "Ada")?;
+    let (health, _, water) = health(&ada)?;
+    Notes::new(&ada).add_photo(&water, &vec![7u8; (1 << 20) + 1000])?;
+    let pack = ada.pack_of(&health, &HashSet::new())?;
+    let bytes = ada.write_pack(&pack, &pack.all_keys(), false)?;
+    assert!(bytes.len() > 1 << 20);
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join(format!("big.{EXTENSION}"));
+    std::fs::write(&path, bytes)?;
+    let ben = Arc::new(store(5, "Ben")?);
+    let mut app = App::new(ben.clone(), "en");
+    app.select(Selection::All);
+    let held = gated(&mut app, &ben);
+    let mut harness = window(app);
+    let guard = held.lock().map_err(|e| e.to_string())?;
+    // Stepped, not run: the line moves while the thread runs.
+    harness.input_mut().dropped_files = vec![egui::DroppedFile {
+        path: Some(path.clone()),
+        ..Default::default()
+    }];
+    for _ in 0..3 {
+        harness.step();
+    }
+    assert!(shows(&harness, "Opening the Pack…"));
+    assert!(!shows(&harness, "Claim as mine"));
+    assert!(!shows(&harness, "Water"));
+    drop(guard);
+    until(&mut harness, |h| shows(h, "Water"))?;
+    assert!(!shows(&harness, "Opening the Pack…"));
+    assert!(ticked(&harness, "Water"));
+    assert!(ticked(&harness, "Laps"));
+    Ok(())
+}
+
+#[test]
+fn what_the_ticks_pick_and_the_size_are_worked_out_when_they_change() -> TestResult {
+    let desk = store(4, "Desk")?;
+    health(&desk)?;
+    let mut harness = window(App::new(desk, "en"));
+    place_menu(&mut harness, "Health", "Export as Pack…");
+    let opened = oldbrainfix_gui::pack_view::worked_out();
+    // Frames that change no tick work out nothing again.
+    for _ in 0..5 {
+        harness.step();
+    }
+    last(&harness, "Add my Profile").click();
+    harness.run();
+    assert_eq!(oldbrainfix_gui::pack_view::worked_out(), opened);
+    tick(&harness, "Water").click();
+    harness.run();
+    assert_eq!(oldbrainfix_gui::pack_view::worked_out(), opened + 1);
+    assert!(!ticked(&harness, "Water"));
+    Ok(())
+}

@@ -165,6 +165,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   Set<String> _ticks = {};
   var _withNotes = false;
 
+  /// Whether the Pack is being written: Share… waits meanwhile.
+  var _busy = false;
+
   @override
   void initState() {
     super.initState();
@@ -245,11 +248,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         notSent(t.packNotWrittenCause, t.nothingLostFix, 'feedback: no path');
         return;
       }
+      final job = widget.store.packWrite(pack, _ticks);
+      setState(() => _busy = true);
       try {
-        File(path).writeAsBytesSync(widget.store.writePack(pack, _ticks));
+        await writePackFile(job, path);
       } on Exception catch (e) {
         notSent(t.packNotWrittenCause, t.nothingLostFix, 'feedback: $e');
         return;
+      } finally {
+        if (mounted) setState(() => _busy = false);
       }
       shared.add((path: path, type: packMimeType));
     }
@@ -409,8 +416,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   key: const ValueKey('feedback-share'),
-                  onPressed: ready ? () => unawaited(_share(body)) : null,
-                  icon: const Icon(Icons.share_outlined),
+                  onPressed: ready && !_busy
+                      ? () => unawaited(_share(body))
+                      : null,
+                  icon: _busy
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.share_outlined),
                   label: Text(t.feedbackShare),
                 ),
               ),
