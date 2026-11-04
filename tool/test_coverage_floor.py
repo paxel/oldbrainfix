@@ -39,13 +39,21 @@ class CoverageFloorTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(floors, FLOORS.format(floor=76))
 
-    def test_above_the_floor_raises_it_rounded_down(self):
-        # 2 of 3 lines: 66.67 % is raised to 66.
+    def test_above_the_floor_raises_it_to_one_point_below_rounded_down(self):
+        # 2 of 3 lines: 66.67 % is raised to 65.
         code, floors, _ = self.run_floor(60, record("lib/a.dart", [1, 1, 0]))
         self.assertEqual(code, 0)
-        self.assertEqual(floors, FLOORS.format(floor=66))
+        self.assertEqual(floors, FLOORS.format(floor=65))
+
+    def test_two_points_above_the_floor_raises_it_by_one(self):
+        # 77 %: the floor trails it at 76.
+        hits = [1] * 77 + [0] * 23
+        code, floors, _ = self.run_floor(75, record("lib/a.dart", hits))
+        self.assertEqual(code, 0)
+        self.assertEqual(floors, FLOORS.format(floor=76))
 
     def test_equal_to_the_floor_leaves_the_file_alone(self):
+        # 75 %: the trailing 74 is below the floor, which is never lowered.
         code, floors, _ = self.run_floor(75, self.APP)
         self.assertEqual(code, 0)
         self.assertEqual(floors, FLOORS.format(floor=75))
@@ -53,6 +61,13 @@ class CoverageFloorTest(unittest.TestCase):
     def test_a_fraction_above_the_floor_leaves_it_alone(self):
         # 75.5 %: not a whole percent above 75.
         hits = [1] * 151 + [0] * 49
+        code, floors, _ = self.run_floor(75, record("lib/a.dart", hits))
+        self.assertEqual(code, 0)
+        self.assertEqual(floors, FLOORS.format(floor=75))
+
+    def test_one_point_above_the_floor_leaves_it_alone(self):
+        # 76.5 %: one point below it, rounded down, is the floor itself.
+        hits = [1] * 153 + [0] * 47
         code, floors, _ = self.run_floor(75, record("lib/a.dart", hits))
         self.assertEqual(code, 0)
         self.assertEqual(floors, FLOORS.format(floor=75))

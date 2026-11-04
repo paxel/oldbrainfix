@@ -8,11 +8,12 @@ line coverage, and compares it with the group's floor in the floors file
 (default: tool/coverage-floors.txt):
 
 - below the floor: exit 1;
-- a whole percent or more above it: the floor is raised in the file, for
-  the user to commit;
-- otherwise the file is left alone.
+- the measured value rounded down, less one point, above the floor: the
+  floor is raised to that in the file, for the user to commit;
+- otherwise the file is left alone. A floor is never lowered.
 
-Floors are whole percents, rounded down (see the floors file).
+Floors are whole percents and trail the measured value by one point (see
+the floors file).
 
 It also writes the group's README badge, a shields.io endpoint file
 (default: .github/badges/coverage-<group>.json), with the measured value
@@ -150,14 +151,16 @@ def main(argv):
         badge(group, measured), encoding="utf-8"
     )
     floor = read_floors(floors_path)[group]
-    rounded = math.floor(measured)
+    # One point below the measured value, rounded down: the margin that
+    # keeps a CI run measuring a fraction lower from stopping a release.
+    target = math.floor(measured) - 1
     print(f"{group}: {measured:.2f}% of lines covered, floor {floor}%")
     if measured < floor:
         print(f"{group}: below its floor of {floor}%", file=sys.stderr)
         return 1
-    if rounded > floor:
-        write_floor(floors_path, group, rounded)
-        print(f"{group}: floor raised to {rounded}% in {floors_path}; commit it")
+    if target > floor:
+        write_floor(floors_path, group, target)
+        print(f"{group}: floor raised to {target}% in {floors_path}; commit it")
     return 0
 
 

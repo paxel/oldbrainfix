@@ -2,13 +2,11 @@
 # its floor fails the release; a group that rose raises its floor here, and
 # the raised file is committed. Floors only rise.
 #
-# Whole percents, rounded down from the measured line coverage: a local
-# run and a CI run may differ by a fraction (other test environment, other
-# Flutter), and one decimal would stop a release over that noise.
-#
-# rust-gui sits one point below its measured 89.02-89.03: a one-time
-# margin when the floors were introduced, so a CI run that measures a
-# fraction lower does not stop a release. From here on, floors only rise.
+# Whole percents, one point below the measured line coverage rounded down
+# (89.03 % gives 88): a local run and a CI run may differ by a fraction
+# (other test environment, other Flutter), and that margin keeps such
+# noise from stopping a release. A floor is raised only when the measured
+# value, so computed, is above it; it is never lowered.
 rust-core 96
 rust-gui 88
 dart-core 96
