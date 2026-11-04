@@ -177,15 +177,17 @@ Future<int> openReceivedFile(
   final navigator = Navigator.of(context);
   // A Pack is JSON as a card file is, and of any size (#164): asked
   // for first, and read whole.
-  if (packFileBytes(path) case final pack?) {
+  if (await packFileBytes(path) case final pack?) {
     try {
       File(path).deleteSync();
     } on FileSystemException {
       // Gone already.
     }
+    if (!context.mounted) return 0;
     await openPackBytes(context, store, pack);
     return 0;
   }
+  if (!context.mounted) return 0;
   final bytes = _small(path);
   final card = looksLikeProfileCard(bytes);
   if (!card && !looksLikeSentItem(bytes)) {
@@ -254,7 +256,7 @@ List<int> _small(String path) {
 bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
 
 /// Whether the file at [path] is a Pack (#164).
-bool isPackFile(String path) => packFileBytes(path) != null;
+Future<bool> isPackFile(String path) async => await packFileBytes(path) != null;
 
 /// Whether the file at [path] is a Profile card file (#144).
 bool isProfileCardFile(String path) => looksLikeProfileCard(_small(path));

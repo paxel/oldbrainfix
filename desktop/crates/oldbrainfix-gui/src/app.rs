@@ -1827,11 +1827,7 @@ fn pack_file_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
     let read = std::fs::File::open(path)
         .and_then(|mut file| file.read(&mut head))
         .ok()?;
-    let first = head
-        .get(..read)?
-        .iter()
-        .find(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))?;
-    if *first != b'{' {
+    if !packs::starts_like_json(head.get(..read)?) {
         return None;
     }
     let bytes = std::fs::read(path).ok()?;

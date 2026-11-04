@@ -2084,6 +2084,10 @@ void main() {
           });
 
           boxFrame(sharing176, 'open-pack', (tester) async {
+            // The Pack's work inline, as the frame's clock is the test's.
+            final work = packWork;
+            packWork = <R>(work) async => work();
+            addTearDown(() => packWork = work);
             final seeded = _Seeded(texts, packs: true);
             await sharingApp(
               tester,

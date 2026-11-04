@@ -748,7 +748,8 @@ class _HomeState extends State<_Home> {
     for (final path in paths) {
       if (!mounted) return;
       // A Pack names its sender as a card does (#164).
-      final card = isProfileCardFile(path) || isPackFile(path);
+      final card = isProfileCardFile(path) || await isPackFile(path);
+      if (!mounted) return;
       // A Sent Item, a card or a Pack shows what is in it: not past the
       // App Lock.
       if ((widget.lock.locked && (card || isSentItemFile(path))) ||

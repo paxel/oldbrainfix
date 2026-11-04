@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -609,5 +610,65 @@ void main() {
       expect(looksLikeProfileCard(signed), isFalse);
       expect(() => ben.openPack(utf8.encode('{}')), throwsA(isA<NotAPack>()));
     });
+
+    test('a Pack is written and opened off the Store\'s isolate', () async {
+      final h = health();
+      final pack = ann.packOf(h.plain);
+      final ticks = pack.allKeys();
+      final job = ann.packWrite(pack, ticks, addProfile: true);
+      final bytes = await Isolate.run(job.encode);
+      expect(bytes, ann.writePack(pack, ticks, addProfile: true));
+      final checked = await _checkAside(bytes);
+      expect(checked.card?.id, ann.ownProfile!.id);
+      ben.refuseBlockedSender(checked);
+      final read = await _readAside(checked);
+      final opened = ben.openedPack(checked, read);
+      expect(opened.from!.name, 'Ann');
+      expect(
+        read.notes.map((n) => n.text),
+        ben.openPack(bytes).pack.notes.map((n) => n.text),
+      );
+      ben.blockPerson(ann.ownProfile!.id);
+      expect(
+        () => ben.refuseBlockedSender(checked),
+        throwsA(isA<PackFromBlocked>()),
+      );
+      expect(() => _checkAside(utf8.encode('{}')), throwsA(isA<NotAPack>()));
+    });
+
+    test('the card and the signature are checked before the Areas and '
+        'Notes are read (ADR 0043)', () {
+      final card = ann.profileCardText()!;
+      final type = (jsonDecode(
+        utf8.decode(ann.writePack(ann.packOf(health().plain), {})),
+      ) as Map<String, Object?>)['type'];
+      // A payload with a Note that is none: it does not parse.
+      final payload = jsonEncode({
+        'areas': <Object?>[],
+        'notes': [
+          {'bad': true},
+        ],
+        'profile': card,
+      });
+      List<int> file(String sig) =>
+          utf8.encode(jsonEncode({'pack': payload, 'sig': sig, 'type': type}));
+      final signed = file(ann.signingKey.sign(packBytes(payload)));
+      final badSig = file(ann.signingKey.sign(packBytes('$payload ')));
+      expect(() => ben.openPack(signed), throwsA(isA<NotAPack>()));
+      expect(() => ben.openPack(badSig), throwsA(isA<NotAPack>()));
+      ben.openProfileCard(card);
+      ben.blockPerson(ann.ownProfile!.id);
+      // Only the order tells the two apart: the sender is refused before
+      // the Notes fail.
+      expect(() => ben.openPack(signed), throwsA(isA<PackFromBlocked>()));
+      expect(() => ben.openPack(badSig), throwsA(isA<NotAPack>()));
+    });
   });
 }
+
+// Top level, so the closures carry no Store to the other isolate.
+Future<CheckedPack> _checkAside(List<int> bytes) =>
+    Isolate.run(() => checkPack(bytes));
+
+Future<Pack> _readAside(CheckedPack checked) =>
+    Isolate.run(() => readPack(checked));

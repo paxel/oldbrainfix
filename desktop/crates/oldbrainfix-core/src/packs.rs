@@ -969,8 +969,9 @@ fn pack_json(bytes: &[u8]) -> Option<Map<String, Value>> {
     }
 }
 
-/// Whether the first byte that is no blank opens a JSON object.
-fn starts_like_json(bytes: &[u8]) -> bool {
+/// Whether the first byte of `bytes` that is no blank opens a JSON
+/// object, as a Pack's file does: its first bytes are enough to tell.
+pub fn starts_like_json(bytes: &[u8]) -> bool {
     bytes
         .iter()
         .find(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
@@ -1079,16 +1080,29 @@ fn dart_base64(text: &str) -> Option<Vec<u8>> {
 }
 
 /// The Pack the payload `text` holds; none when it is none.
+#[cfg(test)]
 fn parse(text: &str) -> Option<Pack> {
-    let json: Value = serde_json::from_str(text).ok()?;
-    let json = json.as_object()?;
+    let json = payload_json(text)?;
+    pack_of(&json, optional_str(&json, "profile")?)
+}
+
+/// The JSON object of the payload `text`; none when it is none.
+fn payload_json(text: &str) -> Option<Map<String, Value>> {
+    match serde_json::from_str(text).ok()? {
+        Value::Object(map) => Some(map),
+        _ => None,
+    }
+}
+
+/// The Pack the payload `json` holds, its card `card` read already;
+/// none when it is none.
+fn pack_of(json: &Map<String, Value>, card: Option<&str>) -> Option<Pack> {
     let areas = json.get("areas")?.as_array()?;
     let notes = json.get("notes")?.as_array()?;
-    let card = optional_str(json, "profile")?.map(str::to_string);
     let out = Pack {
         areas: areas.iter().map(area).collect::<Option<_>>()?,
         notes: notes.iter().map(note).collect::<Option<_>>()?,
-        card,
+        card: card.map(str::to_string),
     };
     check(&out).then_some(out)
 }
@@ -1710,16 +1724,24 @@ impl Store {
             Some(Value::String(sig)) => Some(sig.as_str()),
             Some(_) => return Ok(Err(PackError::NotAPack)),
         };
-        let Some(pack) = parse(payload) else {
+        // The card and the signature are checked, and a blocked sender
+        // refused, before any Area or Note is read (ADR 0043).
+        let Some(body) = payload_json(payload) else {
             return Ok(Err(PackError::NotAPack));
         };
-        let (card, sig) = match (&pack.card, sig) {
+        let Some(card) = optional_str(&body, "profile") else {
+            return Ok(Err(PackError::NotAPack));
+        };
+        let (card, sig) = match (card, sig) {
             (None, None) => {
-                return Ok(Ok(OpenedPack {
-                    pack,
-                    from: None,
-                    from_kept: false,
-                }));
+                return Ok(match pack_of(&body, None) {
+                    Some(pack) => Ok(OpenedPack {
+                        pack,
+                        from: None,
+                        from_kept: false,
+                    }),
+                    None => Err(PackError::NotAPack),
+                });
             }
             (Some(card), Some(sig)) => (card, sig),
             _ => return Ok(Err(PackError::NotAPack)),
@@ -1733,6 +1755,9 @@ impl Store {
         if self.is_blocked(&checked.id)? || self.blocked_devices()?.contains(&checked.key.device) {
             return Ok(Err(PackError::FromBlocked));
         }
+        let Some(pack) = pack_of(&body, Some(card)) else {
+            return Ok(Err(PackError::NotAPack));
+        };
         if self.is_own_person(&checked.id)? {
             return Ok(Ok(OpenedPack {
                 pack,
@@ -2781,6 +2806,32 @@ mod tests {
         assert!(!crate::cards::looks_like_profile_card(&signed));
         assert_eq!(refused(&ben, b"{}")?, Some(PackError::NotAPack));
         assert_eq!(refused(&ben, b"hello")?, Some(PackError::NotAPack));
+        Ok(())
+    }
+
+    #[test]
+    fn the_card_and_the_signature_are_checked_before_the_areas_and_notes_are_read() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let card = ann.profile_card_text()?.ok_or("a card")?;
+        // A payload with a Note that is none: it does not parse.
+        let payload = json!({"areas": [], "notes": [{"bad": true}], "profile": card}).to_string();
+        let file = |sig: String| {
+            json!({"pack": payload, "sig": sig, "type": PACK_TYPE})
+                .to_string()
+                .into_bytes()
+        };
+        let key = ann.signing_key()?;
+        let signed = file(key.sign(&pack_bytes(&payload)));
+        let bad_sig = file(key.sign(&pack_bytes(&format!("{payload} "))));
+        assert_eq!(refused(&ben, &signed)?, Some(PackError::NotAPack));
+        assert_eq!(refused(&ben, &bad_sig)?, Some(PackError::NotAPack));
+        ben.open_profile_card(&ann.profile_card(false)?.ok_or("a card")?, false)?;
+        ben.block_person(&own_id(&ann)?, false)?;
+        // Only the order tells the two apart: the sender is refused before
+        // the Notes fail.
+        assert_eq!(refused(&ben, &signed)?, Some(PackError::FromBlocked));
+        assert_eq!(refused(&ben, &bad_sig)?, Some(PackError::NotAPack));
         Ok(())
     }
 

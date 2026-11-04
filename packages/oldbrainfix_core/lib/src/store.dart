@@ -322,6 +322,10 @@ class Store {
   /// here.
   Uint8List? audio(String hash) => _audio.get(hash);
 
+  /// The photos and the voice recordings kept here, to read them off
+  /// this isolate, as a Pack is written ([PackWrite]).
+  ({Blobs photos, Blobs audio}) get blobs => (photos: _photos, audio: _audio);
+
   /// The bytes of the [kind] (`photo` or `audio`) blob [hash], or null.
   Uint8List? blob(String kind, String hash) => switch (kind) {
     'photo' => _photos.get(hash),

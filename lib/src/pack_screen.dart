@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -39,6 +40,30 @@ String packSizeText(String locale, int bytes) {
   return '${number.format(bytes / (1000 * 1000))} MB';
 }
 
+/// Runs a Pack's work off the main isolate, so the page keeps moving
+/// while a Pack of any size is written, read or opened. Each call is
+/// made at the top level, where its closure holds no Store.
+@visibleForTesting
+Future<R> Function<R>(FutureOr<R> Function() work) packWork = Isolate.run;
+
+/// How many times [packWork] was asked to run, for tests.
+@visibleForTesting
+int packWorkRuns = 0;
+
+Future<R> _aside<R>(FutureOr<R> Function() work) {
+  packWorkRuns++;
+  return packWork(work);
+}
+
+/// Writes the Pack [job] to the file at [path], off the main isolate.
+Future<void> _writePackFile(PackWrite job, String path) =>
+    _aside(() => File(path).writeAsBytesSync(job.encode()));
+
+/// How many times a Pack's page worked out what its ticks pick and its
+/// size, for tests: once for each change of the ticks.
+@visibleForTesting
+int packTicksWorkedOut = 0;
+
 /// Opens the tree of the Pack exported from the Area, Topic or Note
 /// [from]. A Tally of a locked Area that is closed now never goes along
 /// with a Session.
@@ -72,8 +97,28 @@ class PackExportScreen extends StatefulWidget {
 }
 
 class _PackExportScreenState extends State<PackExportScreen> {
-  late Set<String> _ticks = widget.pack.exportTicks();
+  late Set<String> _ticks;
+  late bool _picked;
+  late int _size;
   var _profile = false;
+
+  /// Whether the Pack is being written: Share… waits meanwhile.
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setTicks(widget.pack.exportTicks());
+  }
+
+  /// [ticks] as they are now, with what they pick and the size worked
+  /// out once for them, not on each build.
+  void _setTicks(Set<String> ticks) {
+    packTicksWorkedOut++;
+    _ticks = ticks;
+    _picked = widget.pack.picked(ticks).notes.isNotEmpty;
+    _size = widget.pack.size(ticks);
+  }
 
   Future<void> _share() async {
     final t = context.t;
@@ -95,13 +140,19 @@ class _PackExportScreenState extends State<PackExportScreen> {
       notSent(t.packNotWrittenCause, t.nothingLostFix, 'pack: no path');
       return;
     }
+    final job = widget.store.packWrite(
+      widget.pack,
+      _ticks,
+      addProfile: _profile,
+    );
+    setState(() => _busy = true);
     try {
-      File(path).writeAsBytesSync(
-        widget.store.writePack(widget.pack, _ticks, addProfile: _profile),
-      );
+      await _writePackFile(job, path);
     } on Exception catch (e) {
       notSent(t.packNotWrittenCause, t.nothingLostFix, '$e');
       return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
     if (await files.share(path, type: packMimeType) == ShareOutcome.noApp) {
       notSent(t.sendNoApp, t.sendNoAppFix, 'pack: no app took the file');
@@ -112,22 +163,22 @@ class _PackExportScreenState extends State<PackExportScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
-    final picked = widget.pack.picked(_ticks).notes.isNotEmpty;
+    final picked = _picked;
     return Scaffold(
       appBar: pageBar(
         context,
         title: t.packExportTitle,
         actions: packTickActions(
           t,
-          onAll: () => setState(() => _ticks = widget.pack.allKeys()),
-          onNone: () => setState(() => _ticks = {}),
+          onAll: () => setState(() => _setTicks(widget.pack.allKeys())),
+          onNone: () => setState(() => _setTicks({})),
         ),
       ),
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           Text(
-            t.packSize(packSizeText(locale, widget.pack.size(_ticks))),
+            t.packSize(packSizeText(locale, _size)),
             key: const ValueKey('pack-size'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
@@ -136,7 +187,7 @@ class _PackExportScreenState extends State<PackExportScreen> {
             pack: widget.pack,
             ticks: _ticks,
             onTick: (key, on) =>
-                setState(() => _ticks = widget.pack.tick(_ticks, key, on)),
+                setState(() => _setTicks(widget.pack.tick(_ticks, key, on))),
           ),
           const Divider(height: 32),
           _TickBelow(
@@ -149,8 +200,13 @@ class _PackExportScreenState extends State<PackExportScreen> {
           const SizedBox(height: 8),
           FilledButton.icon(
             key: const ValueKey('pack-share'),
-            onPressed: picked ? () => unawaited(_share()) : null,
-            icon: const Icon(Icons.share_outlined),
+            onPressed: picked && !_busy ? () => unawaited(_share()) : null,
+            icon: _busy
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.share_outlined),
             label: Text(t.packShare),
           ),
           if (!picked) ...[
@@ -218,25 +274,49 @@ List<BarAction> packTickActions(
 
 /// The bytes of the file at [path] when it is a Pack (#164), read whole:
 /// a Pack has no size limit. Null for any other file, read only as far
-/// as its first byte that is no blank when that opens no JSON object.
-List<int>? packFileBytes(String path) {
+/// as its first byte that is no blank when that opens no JSON object. A
+/// file no larger than a Sent Item is read here, as one is; a larger one
+/// off the main isolate.
+Future<List<int>?> packFileBytes(String path) async {
   try {
     final file = File(path);
     final head = file.openSync();
     try {
-      final first = head
-          .readSync(64)
-          .skipWhile((b) => b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0d);
-      if (first.isEmpty || first.first != 0x7b) return null;
+      if (!startsLikeJson(head.readSync(64))) return null;
     } finally {
       head.closeSync();
     }
-    final bytes = file.readAsBytesSync();
+    if (file.lengthSync() > maxSentItemBytes) {
+      return await _aside(() => _readPackFile(path));
+    }
+  } on FileSystemException {
+    return null;
+  }
+  return _readPackFile(path);
+}
+
+/// The bytes of the file at [path] when it is a Pack, or null.
+List<int>? _readPackFile(String path) {
+  try {
+    final bytes = File(path).readAsBytesSync();
     return looksLikePack(bytes) ? bytes : null;
   } on FileSystemException {
     return null;
   }
 }
+
+/// [Store.openPack] with its checks and the reading of the Areas and
+/// Notes off the main isolate, the sender asked for between them.
+Future<OpenedPack> _openPack(Store store, List<int> bytes) async {
+  final checked = await _checkPack(bytes);
+  store.refuseBlockedSender(checked);
+  return store.openedPack(checked, await _readPack(checked));
+}
+
+Future<CheckedPack> _checkPack(List<int> bytes) =>
+    _aside(() => checkPack(bytes));
+
+Future<Pack> _readPack(CheckedPack checked) => _aside(() => readPack(checked));
 
 /// Opens the Pack [bytes] (a file opened with the app, #164): its page,
 /// or why it did not open, behind the tap.
@@ -246,18 +326,21 @@ Future<void> openPackBytes(
   List<int> bytes,
 ) async {
   final t = context.t;
+  final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context);
+  final root = Navigator.of(context, rootNavigator: true);
   final OpenedPack opened;
   try {
-    opened = store.openPack(bytes);
+    opened = await _openPack(store, bytes);
   } on Exception catch (e) {
     final (cause, fix) = switch (e) {
       PackNeedsUpdate() => (t.sentItemNeedsUpdate, t.updateOpenAgainFix),
       PackFromBlocked() => (t.packFromBlocked, t.blockedFix),
       _ => (t.packUnreadable, t.packAskAgainFix),
     };
-    announceFailure(
-      context,
+    announceFailureWith(
+      announcements,
+      root,
       t.packNotOpened,
       title: t.packNotOpenedTitle,
       cause: cause,
@@ -293,10 +376,25 @@ class PackImportScreen extends StatefulWidget {
 }
 
 class _PackImportScreenState extends State<PackImportScreen> {
-  late Set<String> _ticks = widget.opened.pack.allKeys();
+  late Set<String> _ticks;
+  late bool _picked;
   var _claim = true;
 
   Pack get _pack => widget.opened.pack;
+
+  @override
+  void initState() {
+    super.initState();
+    _setTicks(_pack.allKeys());
+  }
+
+  /// [ticks] as they are now, with whether they pick a Note worked out
+  /// once for them, not on each build.
+  void _setTicks(Set<String> ticks) {
+    packTicksWorkedOut++;
+    _ticks = ticks;
+    _picked = _pack.picked(ticks).notes.isNotEmpty;
+  }
 
   void _add() {
     final t = context.t;
@@ -326,7 +424,7 @@ class _PackImportScreenState extends State<PackImportScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final from = widget.opened.from;
-    final picked = _pack.picked(_ticks).notes.isNotEmpty;
+    final picked = _picked;
     final name = from == null ? null : profileDisplayName(t, from.name);
     return Scaffold(
       appBar: pageBar(
@@ -334,8 +432,8 @@ class _PackImportScreenState extends State<PackImportScreen> {
         title: t.packTitle,
         actions: packTickActions(
           t,
-          onAll: () => setState(() => _ticks = _pack.allKeys()),
-          onNone: () => setState(() => _ticks = {}),
+          onAll: () => setState(() => _setTicks(_pack.allKeys())),
+          onNone: () => setState(() => _setTicks({})),
         ),
       ),
       body: ListView(
@@ -370,7 +468,7 @@ class _PackImportScreenState extends State<PackImportScreen> {
             pack: _pack,
             ticks: _ticks,
             onTick: (key, on) =>
-                setState(() => _ticks = _pack.tick(_ticks, key, on)),
+                setState(() => _setTicks(_pack.tick(_ticks, key, on))),
           ),
           const Divider(height: 32),
           if (from != null)

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,9 @@ void main() {
   late String training;
 
   setUp(() {
+    // The Pack's work runs inline but where a test puts the isolate back.
+    packWork = <R>(work) async => work();
+    packWorkRuns = 0;
     store = Store.inMemory()
       ..starterSetOffered = true
       ..alarmSetupDone = true
@@ -55,6 +59,7 @@ void main() {
     );
   });
   tearDown(() {
+    packWork = Isolate.run;
     store.close();
     ann.close();
     dir.deleteSync(recursive: true);
@@ -99,6 +104,31 @@ void main() {
     final path = '${dir.path}/in-${bytes.length}.obfsync';
     File(path).writeAsBytesSync(bytes);
     return path;
+  }
+
+  /// A photo larger than a Sent Item can be, on a new Note of Ann's
+  /// Health.
+  void bigPhoto() => Notes(ann).capture(
+    'Big map',
+    place: health.id,
+    photos: [
+      Uint8List.fromList(
+        List<int>.generate(maxSentItemBytes + 1000, (i) => i % 241),
+      ),
+    ],
+  );
+
+  /// Waits, on the real clock, until [done], up to a minute.
+  /// The work's results arrive on the real clock, what awaits them runs
+  /// on the test's, with each pump.
+  Future<void> until(WidgetTester tester, bool Function() done) async {
+    for (var i = 0; i < 600 && !done(); i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
   }
 
   group('export', () {
@@ -186,6 +216,101 @@ void main() {
       expect(find.text('Training'), findsWidgets);
       expect(find.text('Laps'), findsOneWidget);
       expect(find.text('Route'), findsNothing);
+    });
+  });
+
+  group('off the UI thread', () {
+    testWidgets('what the ticks pick and the size are worked out when the '
+        'ticks change, not on each build', (tester) async {
+      store.close();
+      store = ann
+        ..starterSetOffered = true
+        ..alarmSetupDone = true;
+      ann = Store.inMemory();
+      await start(tester, store);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byKey(ValueKey('area-menu-${health.id}')));
+      packTicksWorkedOut = 0;
+      await tap(tester, find.byKey(ValueKey('area-pack-${health.id}')));
+      expect(packTicksWorkedOut, 1);
+      // A build that changes no tick works out nothing again.
+      await tap(tester, find.byKey(const ValueKey('pack-add-profile')));
+      expect(packTicksWorkedOut, 1);
+      final before = sizeShown(tester);
+      await tap(tester, find.byKey(const ValueKey('pack-tick-all')));
+      expect(packTicksWorkedOut, 2);
+      expect(sizeShown(tester), isNot(before));
+      await tap(tester, find.byKey(const ValueKey('pack-untick-all')));
+      expect(packTicksWorkedOut, 3);
+    });
+
+    testWidgets('a large Pack is written on another isolate, Share… '
+        'waiting meanwhile', (tester) async {
+      bigPhoto();
+      store.close();
+      store = ann
+        ..starterSetOffered = true
+        ..alarmSetupDone = true;
+      ann = Store.inMemory();
+      await start(tester, store);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byKey(ValueKey('area-menu-${health.id}')));
+      await tap(tester, find.byKey(ValueKey('area-pack-${health.id}')));
+      await tap(tester, find.byKey(const ValueKey('pack-tick-all')));
+      packWork = Isolate.run;
+      final share = find.byKey(const ValueKey('pack-share'));
+      await tester.ensureVisible(share);
+      await tester.pumpAndSettle();
+      await tester.tap(share);
+      await tester.pump();
+      await tester.pump();
+      // The page keeps drawing, Share… greyed with its spinner.
+      expect(tester.widget<FilledButton>(share).onPressed, isNull);
+      expect(
+        find.descendant(
+          of: share,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(bundles.shared, isEmpty);
+      await until(tester, () => bundles.shared.isNotEmpty);
+      expect(packWorkRuns, 1);
+      expect(tester.widget<FilledButton>(share).onPressed, isNotNull);
+      final bytes = File(bundles.shared.single).readAsBytesSync();
+      expect(bytes.length, greaterThan(maxSentItemBytes));
+      final opened = Store.inMemory().openPack(bytes);
+      expect(opened.pack.notes.map((n) => n.text), contains('Big map'));
+    });
+
+    testWidgets('a large Pack is read and opened on another isolate, a '
+        'small one read here', (tester) async {
+      bigPhoto();
+      final pack = ann.packOf(health.id);
+      final big = ann.writePack(pack, pack.allKeys(), addProfile: true);
+      expect(big.length, greaterThan(maxSentItemBytes));
+      await start(tester, store);
+      packWork = Isolate.run;
+      bundles.open(copyOf(big));
+      await until(
+        tester,
+        () => find.byType(PackImportScreen).evaluate().isNotEmpty,
+      );
+      expect(find.byType(PackImportScreen), findsOneWidget);
+      expect(find.text('From Ann'), findsOneWidget);
+      // Read when asked whether it is a Pack and when it is opened, then
+      // checked and its Notes read.
+      expect(packWorkRuns, 4);
+      await tap(tester, find.byTooltip('Back'));
+
+      packWork = <R>(work) async => work();
+      packWorkRuns = 0;
+      final small = ann.packOf(running.id);
+      bundles.open(copyOf(ann.writePack(small, small.allKeys())));
+      await tester.pumpAndSettle();
+      expect(find.byType(PackImportScreen), findsOneWidget);
+      // Only the checks and the reading of its Notes.
+      expect(packWorkRuns, 2);
     });
   });
 

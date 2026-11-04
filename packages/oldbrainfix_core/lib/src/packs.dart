@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'blobs.dart';
 import 'checklists.dart';
 import 'frogs.dart';
 import 'note_kinds.dart';
@@ -769,7 +770,7 @@ Uint8List encodePack(
 /// The JSON object of the file [bytes] when it says it is a Pack, of any
 /// format; null for anything else.
 Map<String, Object?>? _packJson(List<int> bytes) {
-  if (!_startsLikeJson(bytes)) return null;
+  if (!startsLikeJson(bytes)) return null;
   final Object? json;
   try {
     json = jsonDecode(utf8.decode(bytes));
@@ -781,8 +782,9 @@ Map<String, Object?>? _packJson(List<int> bytes) {
       : null;
 }
 
-/// Whether the first byte that is no blank opens a JSON object.
-bool _startsLikeJson(List<int> bytes) {
+/// Whether the first byte of [bytes] that is no blank opens a JSON
+/// object, as a Pack's file does: its first bytes are enough to tell.
+bool startsLikeJson(List<int> bytes) {
   for (final b in bytes) {
     if (b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0d) continue;
     return b == 0x7b;
@@ -794,24 +796,37 @@ bool _startsLikeJson(List<int> bytes) {
 /// file or a bundle, in a format this version reads or a later one.
 bool looksLikePack(List<int> bytes) => _packJson(bytes) != null;
 
-/// The Pack the payload [text] holds; throws [NotAPack] when it is none.
-Pack _parse(String text) {
+/// The JSON object of the payload [text]; throws [NotAPack] when it is
+/// none.
+Map<String, Object?> _payloadJson(String text) {
   final Object? json;
   try {
     json = jsonDecode(text);
   } on FormatException {
     throw const NotAPack();
   }
+  if (json is! Map<String, Object?>) throw const NotAPack();
+  return json;
+}
+
+/// The Profile card the payload [json] carries, or null; throws
+/// [NotAPack] when it is no text.
+String? _cardOf(Map<String, Object?> json) => switch (json['profile']) {
+  null => null,
+  final String card => card,
+  _ => throw const NotAPack(),
+};
+
+/// The Pack the payload [json] holds; throws [NotAPack] when it is none.
+Pack _packOf(Map<String, Object?> json) {
   if (json case {
     'areas': final List<Object?> areas,
     'notes': final List<Object?> notes,
   }) {
-    final card = json['profile'];
-    if (card != null && card is! String) throw const NotAPack();
     final out = Pack(
       areas: [for (final a in areas) _area(a)],
       notes: [for (final n in notes) _note(n)],
-      card: card as String?,
+      card: _cardOf(json),
     );
     _check(out);
     return out;
@@ -1250,17 +1265,45 @@ extension PackExport on Store {
   /// with [addProfile] it carries the own Profile card and is signed by
   /// this Device (Q462). Throws a [StateError] when [addProfile] is
   /// asked before the own Profile can make a card.
-  Uint8List writePack(Pack pack, Set<String> ticks, {bool addProfile = false}) {
+  Uint8List writePack(
+    Pack pack,
+    Set<String> ticks, {
+    bool addProfile = false,
+  }) => packWrite(pack, ticks, addProfile: addProfile).encode();
+
+  /// [writePack] as far as it needs this Store: what it writes, to be
+  /// written with [PackWrite.encode] off this isolate.
+  PackWrite packWrite(Pack pack, Set<String> ticks, {bool addProfile = false}) {
     final picked = pack.picked(ticks);
     final card = addProfile
         ? (profileCardText() ?? (throw StateError('no own Profile card')))
         : null;
-    return encodePack(
+    return PackWrite._(
       Pack(areas: picked.areas, notes: picked.notes, card: card),
-      key: card == null ? null : signingKey,
-      bytesOf: blob,
+      card == null ? null : signingKey,
+      blobs,
     );
   }
+}
+
+/// A Pack to write, with what it needs of a Store: its key and the
+/// photos and recordings its files are read from. It can be sent to
+/// another isolate, which writes it there.
+class PackWrite {
+  final Pack _pack;
+  final SigningKey? _key;
+  final ({Blobs photos, Blobs audio}) _blobs;
+
+  const PackWrite._(this._pack, this._key, this._blobs);
+
+  /// The file of the Pack ([encodePack]).
+  Uint8List encode() => encodePack(
+    _pack,
+    key: _key,
+    // A Pack's files are photos and recordings, nothing else.
+    bytesOf: (kind, hash) =>
+        (kind == 'photo' ? _blobs.photos : _blobs.audio).get(hash),
+  );
 }
 
 /// The wall clock a Shopping List is read on for a Pack: UTC, the same
@@ -1304,6 +1347,57 @@ class PackAdded {
   const PackAdded(this.areas, this.notes);
 }
 
+/// A Pack's file checked as far as no Store is needed ([checkPack]),
+/// its Areas and Notes not read yet ([readPack]).
+class CheckedPack {
+  /// The payload, as it was signed.
+  final String payload;
+
+  /// The sender's Profile card the Pack carries, its signature holding
+  /// over the payload; null for a Pack without one.
+  final CheckedProfileCard? card;
+
+  const CheckedPack._(this.payload, this.card);
+}
+
+/// Checks the Pack [bytes] (a file opened with the app) as far as no
+/// Store is needed, before any Area or Note is read (ADR 0043): its
+/// format, and the card it carries with the signature over its payload.
+/// Throws [PackNeedsUpdate] for one of a later format, and [NotAPack]
+/// for a file that is none, damaged, or whose signature does not hold
+/// over what it holds.
+CheckedPack checkPack(List<int> bytes) {
+  final json = _packJson(bytes);
+  if (json == null) throw const NotAPack();
+  // `1.0 == 1` in Dart: only the whole number 1 is version 1.
+  final format = json['format'];
+  if (json.containsKey('format') && !(format is int && format == 1)) {
+    throw const PackNeedsUpdate();
+  }
+  final payload = json['pack'];
+  final sig = json['sig'];
+  if (payload is! String || (sig != null && sig is! String)) {
+    throw const NotAPack();
+  }
+  final card = _cardOf(_payloadJson(payload));
+  if ((card == null) != (sig == null)) throw const NotAPack();
+  if (card == null) return CheckedPack._(payload, null);
+  final checked = checkProfileCard(card);
+  if (checked == null ||
+      !verifySignature(
+        checked.key.publicKey,
+        packBytes(payload),
+        sig as String,
+      )) {
+    throw const NotAPack();
+  }
+  return CheckedPack._(payload, checked);
+}
+
+/// The Areas and Notes of the Pack [checked]; throws [NotAPack] when
+/// they are none.
+Pack readPack(CheckedPack checked) => _packOf(_payloadJson(checked.payload));
+
 extension PackImport on Store {
   /// Opens the Pack [bytes] (a file opened with the app): checks it and
   /// says who it is from. Throws [PackNeedsUpdate] for one of a later
@@ -1311,42 +1405,33 @@ extension PackImport on Store {
   /// signature does not hold over what it holds or carries a Profile not
   /// bound to the key that signed it, and [PackFromBlocked] for one
   /// carrying the Profile of a blocked person, or made by a Device of
-  /// theirs (Q471). Nothing is kept.
+  /// theirs (Q471). Nothing is kept. The card and the signature are
+  /// checked, and a blocked sender refused, before any Area or Note is
+  /// read (ADR 0043); [checkPack] and [readPack] can run off this
+  /// isolate.
   OpenedPack openPack(List<int> bytes) {
-    final json = _packJson(bytes);
-    if (json == null) throw const NotAPack();
-    // `1.0 == 1` in Dart: only the whole number 1 is version 1.
-    final format = json['format'];
-    if (json.containsKey('format') && !(format is int && format == 1)) {
-      throw const PackNeedsUpdate();
-    }
-    final payload = json['pack'];
-    final sig = json['sig'];
-    if (payload is! String || (sig != null && sig is! String)) {
-      throw const NotAPack();
-    }
-    final pack = _parse(payload);
-    final card = pack.card;
-    if ((card == null) != (sig == null)) throw const NotAPack();
-    if (card == null) return OpenedPack(pack: pack);
-    final checked = checkProfileCard(card);
-    if (checked == null ||
-        !verifySignature(
-          checked.key.publicKey,
-          packBytes(payload),
-          sig as String,
-        )) {
-      throw const NotAPack();
-    }
-    if (isBlocked(checked.id) ||
-        blockedDevices().contains(checked.key.device)) {
+    final checked = checkPack(bytes);
+    refuseBlockedSender(checked);
+    return openedPack(checked, readPack(checked));
+  }
+
+  /// Throws [PackFromBlocked] when the Pack [checked] carries the Profile
+  /// of a blocked person, or was made by a Device of theirs (Q471).
+  void refuseBlockedSender(CheckedPack checked) {
+    final card = checked.card;
+    if (card != null &&
+        (isBlocked(card.id) || blockedDevices().contains(card.key.device))) {
       throw const PackFromBlocked();
     }
-    if (isOwnPerson(checked.id)) return OpenedPack(pack: pack);
-    final sender = sentItemProfile(
-      checked.profile.toJson(),
-      checked.key.publicKey,
-    );
+  }
+
+  /// The Pack [checked], its Areas and Notes [pack], opened here: who it
+  /// is from. Throws [NotAPack] when it carries a Profile not bound to
+  /// the key that signed it.
+  OpenedPack openedPack(CheckedPack checked, Pack pack) {
+    final card = checked.card;
+    if (card == null || isOwnPerson(card.id)) return OpenedPack(pack: pack);
+    final sender = sentItemProfile(card.profile.toJson(), card.key.publicKey);
     if (sender == null) throw const NotAPack();
     return OpenedPack(pack: pack, from: sender.profile, fromKept: sender.kept);
   }
