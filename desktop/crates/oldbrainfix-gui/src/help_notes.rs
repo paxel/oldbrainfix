@@ -249,6 +249,39 @@ mod tests {
         Ok(())
     }
 
+    /// As the phone's test: every icon that leads to an Advanced feature
+    /// says so (#197); File into… does not, as Simple files into Topics too.
+    #[test]
+    fn every_icon_of_an_advanced_feature_says_so() {
+        for (lang, marker) in [("en", "in Advanced"), ("de", "in Erweitert")] {
+            let t = L10n::new(lang);
+            let advanced = [
+                t.help_icon_kind_means(),
+                t.help_icon_place_means(),
+                t.help_icon_add_means(),
+                t.help_icon_new_session_means(),
+                t.help_icon_alarm_means(),
+                t.help_icon_more_means(),
+            ];
+            let named = [
+                "Tally",
+                "Session",
+                "Frog",
+                "Strichliste",
+                "Einheit",
+                "Frosch",
+            ];
+            for group in &GROUPS {
+                for (name, means) in group.icons {
+                    let line = format!("{}: {}", name(&t), means(&t));
+                    let expected = advanced.contains(&means(&t))
+                        || named.iter().any(|word| line.contains(word));
+                    assert_eq!(line.contains(marker), expected, "{line}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn the_quick_start_has_as_many_lines_in_each_language() {
         assert_eq!(

@@ -8375,7 +8375,7 @@ abstract class AppLocalizations {
   /// An icon's meaning in the help Note on icons (#180), after its name and a colon.
   ///
   /// In en, this message translates to:
-  /// **'what the Note is: a plain Note, a Checklist or a Shopping List.'**
+  /// **'a plain Note, Checklist or Shopping List; in Advanced also a Tally or Session.'**
   String get helpIconKindMeans;
 
   /// No description provided for @helpIconImportance.
@@ -8399,7 +8399,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpIconPlaceMeans.
   ///
   /// In en, this message translates to:
-  /// **'where the Note is filed.'**
+  /// **'where the Note is filed; new Topics are made in Advanced.'**
   String get helpIconPlaceMeans;
 
   /// No description provided for @helpIconCaptured.
@@ -8447,7 +8447,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpIconAddMeans.
   ///
   /// In en, this message translates to:
-  /// **'gives the Note a Routine or Reminder.'**
+  /// **'gives the Note a Routine or Reminder, in Advanced also a Frog or Session.'**
   String get helpIconAddMeans;
 
   /// No description provided for @helpIconBrowse.
@@ -8531,7 +8531,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpIconAlarmMeans.
   ///
   /// In en, this message translates to:
-  /// **'gives the card\'s Note one.'**
+  /// **'gives the card\'s Note one, in Advanced also a Frog or Session.'**
   String get helpIconAlarmMeans;
 
   /// No description provided for @helpIconMerge.
@@ -8555,7 +8555,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpIconMoreMeans.
   ///
   /// In en, this message translates to:
-  /// **'the card\'s other actions.'**
+  /// **'the card\'s other actions, in Advanced also Make it a Tally.'**
   String get helpIconMoreMeans;
 
   /// The name of the help Note holding a release's Play notes (#180).

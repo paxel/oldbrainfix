@@ -53,7 +53,8 @@ void main() {
             isNot(
               matches(
                 RegExp(
-                  'Tally|Session|Frog|Strichliste|Einheit|Frosch',
+                  'Tally|Session|Frog|Topic|format bar|role|Strichliste|'
+                  'Einheit|Frosch|Thema|Formatleiste|Rolle',
                   caseSensitive: false,
                 ),
               ),
@@ -80,6 +81,35 @@ void main() {
             isTrue,
             reason: group.asset(t.localeName),
           );
+        }
+      }
+    });
+
+    test('every icon that leads to an Advanced feature says "in Advanced" '
+        '(#197); File into… does not, as Simple files into Topics too', () {
+      // Tally and Session kinds, Frog and Session in "+" and the alarm
+      // clock, Make it a Tally in ⋮, New Session, and making new Topics.
+      for (final (t, marker) in [(en, 'in Advanced'), (de, 'in Erweitert')]) {
+        final advanced = {
+          t.helpIconKindMeans,
+          t.helpIconPlaceMeans,
+          t.helpIconAddMeans,
+          t.helpIconNewSessionMeans,
+          t.helpIconAlarmMeans,
+          t.helpIconMoreMeans,
+        };
+        for (final group in helpIconGroups) {
+          for (final icon in group.icons) {
+            final line = '${icon.name(t)}: ${icon.means(t)}';
+            final named = RegExp(
+              'Tally|Session|Frog|Strichliste|Einheit|Frosch',
+            ).hasMatch(line);
+            expect(
+              line.contains(marker),
+              advanced.contains(icon.means(t)) || named,
+              reason: line,
+            );
+          }
         }
       }
     });

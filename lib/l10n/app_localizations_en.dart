@@ -5146,7 +5146,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpIconKindMeans =>
-      'what the Note is: a plain Note, a Checklist or a Shopping List.';
+      'a plain Note, Checklist or Shopping List; in Advanced also a Tally or Session.';
 
   @override
   String get helpIconImportance => 'Importance';
@@ -5158,7 +5158,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpIconPlace => 'Area and Topic';
 
   @override
-  String get helpIconPlaceMeans => 'where the Note is filed.';
+  String get helpIconPlaceMeans =>
+      'where the Note is filed; new Topics are made in Advanced.';
 
   @override
   String get helpIconCaptured => 'Captured';
@@ -5182,7 +5183,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpIconAdd => 'Add';
 
   @override
-  String get helpIconAddMeans => 'gives the Note a Routine or Reminder.';
+  String get helpIconAddMeans =>
+      'gives the Note a Routine or Reminder, in Advanced also a Frog or Session.';
 
   @override
   String get helpIconBrowse => 'Search and browse';
@@ -5225,7 +5227,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpIconAlarm => 'Routine or Reminder';
 
   @override
-  String get helpIconAlarmMeans => 'gives the card\'s Note one.';
+  String get helpIconAlarmMeans =>
+      'gives the card\'s Note one, in Advanced also a Frog or Session.';
 
   @override
   String get helpIconMerge => 'Merge into…';
@@ -5237,7 +5240,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get helpIconMore => 'More';
 
   @override
-  String get helpIconMoreMeans => 'the card\'s other actions.';
+  String get helpIconMoreMeans =>
+      'the card\'s other actions, in Advanced also Make it a Tally.';
 
   @override
   String helpWhatsNewTitle(String version) {

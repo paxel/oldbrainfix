@@ -5211,7 +5211,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpIconKindMeans =>
-      'was die Notiz ist: eine einfache Notiz, eine Checkliste oder eine Einkaufsliste.';
+      'einfache Notiz, Checkliste oder Einkaufsliste; in Erweitert auch Strichliste oder Einheit.';
 
   @override
   String get helpIconImportance => 'Wichtigkeit';
@@ -5223,7 +5223,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpIconPlace => 'Bereich und Thema';
 
   @override
-  String get helpIconPlaceMeans => 'wo die Notiz abgelegt ist.';
+  String get helpIconPlaceMeans =>
+      'wo die Notiz abgelegt ist; neue Themen legst du in Erweitert an.';
 
   @override
   String get helpIconCaptured => 'Erfasst';
@@ -5247,7 +5248,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpIconAdd => 'Hinzufügen';
 
   @override
-  String get helpIconAddMeans => 'gibt der Notiz eine Routine oder Erinnerung.';
+  String get helpIconAddMeans =>
+      'gibt der Notiz eine Routine oder Erinnerung, in Erweitert auch einen Frosch oder eine Einheit.';
 
   @override
   String get helpIconBrowse => 'Suchen und stöbern';
@@ -5294,7 +5296,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpIconAlarm => 'Routine oder Erinnerung';
 
   @override
-  String get helpIconAlarmMeans => 'gibt der Notiz der Karte eine.';
+  String get helpIconAlarmMeans =>
+      'gibt der Notiz der Karte eine, in Erweitert auch einen Frosch oder eine Einheit.';
 
   @override
   String get helpIconMerge => 'Zusammenführen mit …';
@@ -5306,7 +5309,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpIconMore => 'Mehr';
 
   @override
-  String get helpIconMoreMeans => 'die weiteren Aktionen der Karte.';
+  String get helpIconMoreMeans =>
+      'die weiteren Aktionen der Karte, in Erweitert auch „Zur Strichliste machen“.';
 
   @override
   String helpWhatsNewTitle(String version) {
