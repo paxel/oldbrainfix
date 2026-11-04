@@ -88,6 +88,10 @@ env:
   # Every publishing step asks this; the artifacts are built regardless.
   PUBLISH: ${{ github.ref_type == 'tag' || github.event.inputs.publish == 'true' }}
 
+# Read-only by default; a job that writes asks for more itself.
+permissions:
+  contents: read
+
 jobs:
   gate:
     name: Gate (tests)
