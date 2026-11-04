@@ -3371,6 +3371,7 @@ dependencies = [
  "sys-locale",
  "tempfile",
  "tray-icon",
+ "ttf-parser",
  "ureq",
  "windows-sys 0.61.2",
  "zbus",

@@ -21,6 +21,7 @@ desktop under Help ▸ About Old Brain Fix, Open-source licenses.
 | Rust crates of the desktop app (egui, eframe, rusqlite, rustls, symphonia, …)                 | desktop          | mostly MIT OR Apache-2.0; see below                           | `licenses/desktop-crates.txt` |
 | SQLite                                                                                        | desktop          | public domain                                                 | `licenses/desktop.txt`        |
 | egui's fonts: Hack, Noto Emoji, Ubuntu Light, emoji-icon-font                                 | desktop          | MIT and Bitstream Vera, OFL-1.1, Ubuntu Font Licence 1.0, MIT | `licenses/desktop.txt`        |
+| Noto Sans Symbols 2 and Noto Sans Math fonts (The Noto Project Authors)                       | desktop          | OFL-1.1                                                       | `licenses/desktop.txt`        |
 | KDE's Plasma Wayland protocols (through wayland-protocols-plasma)                             | desktop on Linux | LGPL-2.1-or-later, MIT-CMU, MIT, BSD-3-Clause                 | `licenses/desktop.txt`        |
 
 The PP-OCRv6 models are credited as Apache-2.0 asks: the licence text with

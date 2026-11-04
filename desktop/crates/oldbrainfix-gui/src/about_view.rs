@@ -207,6 +207,8 @@ mod tests {
         assert!(of("Material Icons").contains("Attribution 4.0 International"));
         assert!(of("SQLite").contains("blessing"));
         assert!(of("Ubuntu font").contains("UBUNTU FONT LICENCE"));
+        assert!(of("Noto Sans Symbols 2 font").contains("SIL Open Font License"));
+        assert!(of("Noto Sans Math font").contains("SIL Open Font License"));
         assert!(of_crate("rusto-rs").contains("RustO Contributors"));
         assert!(of_crate("egui").contains("Emil Ernerfeldt"));
     }
