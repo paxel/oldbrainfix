@@ -1,1 +1,6 @@
-{}
+{
+  "0.4.0": {
+    "de": "Neu\n• Notizen haben Arten: Checkliste, Einkaufsliste, Strichliste, Einheit.\n• Pakete geben Kopien von Notizen weiter.\n• Verlauf einer Notiz; Code-Text, Codeblöcke.\n• Einfach oder Erweitert; Dicke Finger.\n• Erledigt direkt in Notiz und Karten.\n• Hilfe-Notizen und Feedback senden.\nGeändert\n• Die Agenda gruppiert Reihen, blendet Abgehaktes auf Wunsch aus.\n• Das Widget zeigt die Tage der Agenda.\n• Abgleich und Agenda im Hintergrund.\nBehoben\n• Schnelles Wischen öffnet sofort die Bereiche.",
+    "en": "Added\n• Notes have kinds: Checklist, Shopping List, Tally, Session.\n• Packs hand copies of Notes to other people.\n• A Note's History; Code text and code blocks.\n• Simple or Advanced; Fat fingers.\n• Done right from a Note and its cards.\n• Help Notes and Send feedback.\nChanged\n• The Agenda groups its rows and can hide what is checked.\n• The widget shows the Agenda's days.\n• Sync and the Agenda load in the background.\nFixed\n• A quick swipe opens the Areas at once."
+  }
+}
