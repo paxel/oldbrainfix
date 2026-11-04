@@ -5,16 +5,22 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'frogs_screen.dart' show FrogIcon;
 import 'note_editor_screen.dart' show kindBadgeIcon;
 
 /// One icon the help Note "What the icons mean" explains (#180): the icon
 /// the app draws, its name and what it means, in words.
 class HelpIcon {
-  final IconData icon;
+  /// The icon, or null where [drawn] draws one that is no [IconData],
+  /// such as the frog.
+  final IconData? icon;
+  final Widget? drawn;
   final String Function(AppLocalizations t) name;
   final String Function(AppLocalizations t) means;
 
-  const HelpIcon(this.icon, this.name, this.means);
+  const HelpIcon(IconData this.icon, this.name, this.means) : drawn = null;
+
+  const HelpIcon.drawn(Widget this.drawn, this.name, this.means) : icon = null;
 }
 
 /// A group of [HelpIcon]s: a heading of the Note and one picture.
@@ -42,6 +48,8 @@ String _reminder(AppLocalizations t) => t.helpIconReminder;
 String _reminderMeans(AppLocalizations t) => t.helpIconReminderMeans;
 String _routine(AppLocalizations t) => t.helpIconRoutine;
 String _routineMeans(AppLocalizations t) => t.helpIconRoutineMeans;
+String _frog(AppLocalizations t) => t.helpIconFrog;
+String _frogMeans(AppLocalizations t) => t.helpIconFrogMeans;
 String _add(AppLocalizations t) => t.helpIconAdd;
 String _addMeans(AppLocalizations t) => t.helpIconAddMeans;
 String _browse(AppLocalizations t) => t.helpIconBrowse;
@@ -77,6 +85,7 @@ const helpIconGroups = [
     HelpIcon(Icons.schedule, _captured, _capturedMeans),
     HelpIcon(Icons.notifications_outlined, _reminder, _reminderMeans),
     HelpIcon(Icons.repeat, _routine, _routineMeans),
+    HelpIcon.drawn(FrogIcon(size: 28), _frog, _frogMeans),
     HelpIcon(Icons.add, _add, _addMeans),
   ]),
   HelpIconGroup('agenda', _agenda, [
@@ -246,7 +255,21 @@ class HelpIconsPicture extends StatelessWidget {
                 height: rowHeight,
                 child: Row(
                   children: [
-                    Icon(icon.icon, size: 28, color: scheme.primary),
+                    switch (icon.drawn) {
+                      // In the icons' square; the picture has no Material
+                      // to give its text a style.
+                      final drawn? => SizedBox.square(
+                        dimension: 28,
+                        child: FittedBox(
+                          child: DefaultTextStyle(
+                            style:
+                                theme.textTheme.bodyMedium ?? const TextStyle(),
+                            child: drawn,
+                          ),
+                        ),
+                      ),
+                      null => Icon(icon.icon, size: 28, color: scheme.primary),
+                    },
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(

@@ -3318,6 +3318,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete this Frog? It stays in the trash. Its Note stays.';
 
   @override
+  String get frogOpen => 'Open';
+
+  @override
+  String get frogEatenToday => 'Eaten today';
+
+  @override
+  String get frogEatenYesterday => 'Eaten yesterday';
+
+  @override
+  String get frogEatNow => 'Eat now';
+
+  @override
+  String get frogRemove => 'Remove the Frog';
+
+  @override
   String get makeTally => 'Make it a Tally';
 
   @override
@@ -5185,6 +5200,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpIconRoutineMeans => 'rings again on its days.';
+
+  @override
+  String get helpIconFrog => 'Frog';
+
+  @override
+  String get helpIconFrogMeans =>
+      'the Note\'s Frog, open or just eaten; made in Advanced.';
 
   @override
   String get helpIconAdd => 'Add';

@@ -79,6 +79,13 @@ Future<void> frogMenu(
     items: [PopupMenuItem(value: true, child: Text(t.delete))],
   );
   if (choice != true || !context.mounted) return;
+  await trashFrog(context, frogs, frog);
+}
+
+/// Asks once whether [frog] goes to the trash, and moves it there; its
+/// Note stays. True when it went.
+Future<bool> trashFrog(BuildContext context, Frogs frogs, Frog frog) async {
+  final t = context.t;
   final sure = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -98,8 +105,25 @@ Future<void> frogMenu(
       ],
     ),
   );
-  if (sure != true) return;
+  if (sure != true) return false;
   frogs.trash(frog.id);
+  return true;
+}
+
+/// The Frog the Note [noteId] shows as its badge (#259): its open one,
+/// else the one eaten last when that was today or yesterday on
+/// [wallClock]; null otherwise. One in the trash shows none.
+Frog? badgeFrog(Frogs frogs, String noteId, WallClock wallClock) {
+  final today = Day.today(frogs.store.clock(), wallClock);
+  Frog? eaten;
+  for (final frog in frogs.ofNote(noteId)) {
+    final done = frog.done;
+    if (done == null) return frog;
+    // Eaten today or yesterday.
+    if (Day.today(done, wallClock).daysUntil(today) > 1) continue;
+    if (eaten == null || done.isAfter(eaten.done ?? done)) eaten = frog;
+  }
+  return eaten;
 }
 
 /// One Frog as an embossed row: the box to check it off, its Note's

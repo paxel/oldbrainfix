@@ -6,7 +6,7 @@
 //! offers Delete to who may manage it.
 
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
-use oldbrainfix_core::{Area, Day, Frog, Note};
+use oldbrainfix_core::{Area, Day, Frog, Frogs, Note, Store, WallClock};
 
 use crate::app::{agenda_card, area_colour, check, list_scroll, row_title};
 use crate::icons;
@@ -29,6 +29,55 @@ pub struct FrogShown {
     pub may_check: bool,
     pub manages: bool,
     pub done_on: Option<Day>,
+}
+
+/// The Frog a Note's badge shows (#259), with whether it was eaten today
+/// rather than yesterday, and whether this Device may check it off and
+/// manage it (ADR 0013).
+#[derive(Debug, Clone)]
+pub struct NoteFrog {
+    pub frog: Frog,
+    pub eaten_today: bool,
+    pub may_check: bool,
+    pub manages: bool,
+}
+
+/// The Frog the Note `note_id` shows as its badge (#259), as the phone's
+/// `badgeFrog`: its open one, else the one eaten last when that was today
+/// or yesterday on `wall`; none otherwise. One in the trash shows none.
+pub fn note_frog(
+    store: &Store,
+    note_id: &str,
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<Option<NoteFrog>> {
+    let today = Day::today(store.now(), wall);
+    let mut shown: Option<(Frog, Day)> = None;
+    for frog in Frogs::new(store).of_note(note_id)? {
+        let Some(done) = frog.done else {
+            shown = Some((frog, today));
+            break;
+        };
+        let day = Day::of(wall(done));
+        // Eaten today or yesterday.
+        if day.days_until(today) > 1 {
+            continue;
+        }
+        if shown
+            .as_ref()
+            .is_none_or(|(last, _)| last.done.is_some_and(|at| done > at))
+        {
+            shown = Some((frog, day));
+        }
+    }
+    let Some((frog, day)) = shown else {
+        return Ok(None);
+    };
+    Ok(Some(NoteFrog {
+        may_check: store.may_check_off(&frog.id)?,
+        manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
+        eaten_today: frog.is_done() && day == today,
+        frog,
+    }))
 }
 
 /// What the user asked of a Frog or the Frog view.

@@ -5330,6 +5330,36 @@ abstract class AppLocalizations {
   /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
   String get deleteFrogQuestion;
 
+  /// The Frog badge's value in the Note editor while the Frog is not eaten (#259).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get frogOpen;
+
+  /// No description provided for @frogEatenToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaten today'**
+  String get frogEatenToday;
+
+  /// No description provided for @frogEatenYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaten yesterday'**
+  String get frogEatenYesterday;
+
+  /// The Frog badge's menu: checks the Frog off.
+  ///
+  /// In en, this message translates to:
+  /// **'Eat now'**
+  String get frogEatNow;
+
+  /// The Frog badge's menu: moves the Frog to the trash after asking; its Note stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the Frog'**
+  String get frogRemove;
+
   /// A Note card's menu entry that gives the Note its first Tally field (CONTEXT.md: Tally).
   ///
   /// In en, this message translates to:
@@ -8449,6 +8479,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'rings again on its days.'**
   String get helpIconRoutineMeans;
+
+  /// No description provided for @helpIconFrog.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog'**
+  String get helpIconFrog;
+
+  /// No description provided for @helpIconFrogMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'the Note\'s Frog, open or just eaten; made in Advanced.'**
+  String get helpIconFrogMeans;
 
   /// No description provided for @helpIconAdd.
   ///

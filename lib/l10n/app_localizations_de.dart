@@ -3355,6 +3355,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
 
   @override
+  String get frogOpen => 'Offen';
+
+  @override
+  String get frogEatenToday => 'Heute gegessen';
+
+  @override
+  String get frogEatenYesterday => 'Gestern gegessen';
+
+  @override
+  String get frogEatNow => 'Jetzt essen';
+
+  @override
+  String get frogRemove => 'Frosch entfernen';
+
+  @override
   String get makeTally => 'Zur Strichliste machen';
 
   @override
@@ -5250,6 +5265,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpIconRoutineMeans => 'klingelt an ihren Tagen immer wieder.';
+
+  @override
+  String get helpIconFrog => 'Frosch';
+
+  @override
+  String get helpIconFrogMeans =>
+      'der Frosch der Notiz, offen oder gerade gegessen; angelegt in Erweitert.';
 
   @override
   String get helpIconAdd => 'Hinzufügen';

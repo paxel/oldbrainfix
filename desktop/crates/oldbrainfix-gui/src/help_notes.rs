@@ -36,6 +36,7 @@ pub static GROUPS: [Group; 3] = [
             (L10n::help_icon_captured, L10n::help_icon_captured_means),
             (L10n::help_icon_reminder, L10n::help_icon_reminder_means),
             (L10n::help_icon_routine, L10n::help_icon_routine_means),
+            (L10n::help_icon_frog, L10n::help_icon_frog_means),
             (L10n::help_icon_add, L10n::help_icon_add_means),
         ],
         pictures: [
@@ -190,7 +191,10 @@ mod tests {
                 let (slug, rest) = rest.split_once("', ").ok_or("a slug")?;
                 let heading = rest.split(',').next().ok_or("a heading")?;
                 groups.push((slug.to_string(), key(heading)?, Vec::new()));
-            } else if let Some(rest) = line.strip_prefix("HelpIcon(") {
+            } else if let Some(rest) = line
+                .strip_prefix("HelpIcon(")
+                .or_else(|| line.strip_prefix("HelpIcon.drawn("))
+            {
                 let parts: Vec<&str> = rest.trim_end_matches("),").split(", ").collect();
                 let [_, name, means] = parts[..] else {
                     return Err(format!("an icon: {line}").into());

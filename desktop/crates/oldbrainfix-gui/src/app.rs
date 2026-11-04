@@ -122,7 +122,7 @@ use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
-use crate::frogs_view::{self, FrogAction, FrogShown};
+use crate::frogs_view::{self, FrogAction, FrogShown, NoteFrog};
 use crate::help_notes;
 use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
@@ -580,9 +580,9 @@ struct View {
     /// How many of them a newer version of the app saved the schedule of,
     /// which shows only that (ADR 0034).
     newer_routines: usize,
-    /// The Frogs the selected Note spawned, oldest first, each with
-    /// whether this Device may check it off.
-    note_frogs: Vec<(Frog, bool)>,
+    /// The Frog the selected Note's badge shows (#259): its open one, or
+    /// one eaten today or yesterday.
+    note_frog: Option<NoteFrog>,
     /// The Tally of the selected Note, while it is one (#103).
     tally: Option<TallyShown>,
     /// The Checklist of the selected Note, while it is one, and whether
@@ -4961,15 +4961,12 @@ impl App {
                 }
             }
         }
-        let mut note_frogs = Vec::new();
-        if let Some((p, _)) = &detail
-            && !p.note.is_trashed()
-        {
-            for frog in frogs.of_note(&p.note.id)? {
-                let may_check = store.may_check_off(&frog.id)?;
-                note_frogs.push((frog, may_check));
+        let note_frog = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => {
+                frogs_view::note_frog(store, &p.note.id, &*self.wall)?
             }
-        }
+            _ => None,
+        };
         let tally = match &detail {
             Some((p, _)) if !p.note.is_trashed() => tally_view::read(
                 store,
@@ -5210,7 +5207,7 @@ impl App {
             open,
             card_today,
             newer_routines,
-            note_frogs,
+            note_frog,
             tally,
             checklist,
             makes_checklist,
@@ -6560,6 +6557,11 @@ impl App {
     /// when all of them are empty.
     /// Does what was asked of a Frog or the Frog view (#101).
     fn frog_action(&mut self, asked: FrogAction) -> oldbrainfix_core::Result<()> {
+        // What was typed into the Note dialog first, as its Frog badge
+        // eats or removes from there (#259).
+        if matches!(asked, FrogAction::Toggle(_) | FrogAction::AskDelete(_)) {
+            self.save_text()?;
+        }
         let frogs = Frogs::new(&self.store);
         match asked {
             FrogAction::Toggle(id) => {
@@ -8621,7 +8623,11 @@ impl App {
             return None;
         }
         let may = self.view.may;
-        let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
+        let frog_open = self
+            .view
+            .note_frog
+            .as_ref()
+            .is_some_and(|f| !f.frog.is_done());
         // A Code text becomes no Tally or Session (#213).
         let code = note.text_format == text_format::CODE;
         let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
@@ -10167,7 +10173,7 @@ impl App {
         let makes_session = self.view.makes_session;
         let session_draft = &mut self.session_draft;
         let typed = &mut self.lines;
-        let note_frogs = &self.view.note_frogs;
+        let note_frog = self.view.note_frog.as_ref();
         let may = self.view.may;
         let t = self.t;
         let note = &placed.note;
@@ -10376,7 +10382,7 @@ impl App {
                     ticks: has_boxes.then_some(show_ticks),
                     session: session_setup.map(|s| (s, makes_session)),
                     may,
-                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
+                    frog: note_frog,
                     advanced: self.view.advanced,
                 };
                 note_badges(ui, (&t, tones), &shown, actions);
@@ -15281,7 +15287,7 @@ fn embossed_inside(
 /// its kind with whether it may go back to a plain Note, Show on the
 /// Agenda of a Checklist or a Shopping List and Show ticks where they
 /// apply, a Session's setup, what this Device may do to it and whether it
-/// has an open Frog.
+/// has a Frog to show (#259).
 struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
@@ -15294,7 +15300,8 @@ struct BadgesShown<'a> {
     /// whether this Device may change them (#191).
     session: Option<(&'a SessionSetup, bool)>,
     may: NoteMay,
-    frog_open: bool,
+    /// Its open Frog, or one eaten today or yesterday (#259).
+    frog: Option<&'a NoteFrog>,
     /// Whether Frogs and Sessions are offered under "+": only in
     /// Advanced (#197).
     advanced: bool,
@@ -15423,10 +15430,11 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// otherwise (#192), in the phone's order:
 /// the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
-/// opening its editor, and those a newer version saved, only shown; the
-/// kind; a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog and, on a
-/// plain Note, Session, for who may set them up. A setting that does not
+/// opening its editor, and those a newer version saved, only shown; its
+/// Frog, open or eaten today or yesterday, offering Eat now and Remove
+/// the Frog (#259); the kind; a Session's rule and weekdays' counts (#191); Show on the
+/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog while none is
+/// open and, on a plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
@@ -15498,6 +15506,9 @@ fn note_badges(
             let icon = (icons::REPEAT, None);
             let newer = Some(BadgeValue::Text(t.newer_version_needed()));
             badge(ui, look, icon, t.routine(), newer, false);
+        }
+        if let Some(frog) = shown.frog {
+            frog_badge(ui, look, frog, actions);
         }
         // Every Note has its kind, a plain Note too (#188); it opens
         // where there is another to make it.
@@ -15604,7 +15615,8 @@ fn note_badges(
             ];
             // A Note has one open Frog at a time; Frogs and Sessions are
             // made only in Advanced (#197).
-            if shown.advanced && !shown.frog_open {
+            let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
+            if shown.advanced && !frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
             // Only a plain Note becomes a Session, and no Code text
@@ -15626,6 +15638,45 @@ fn note_badges(
                 }
             }
         });
+    });
+}
+
+/// The Frog's badge (#259): the frog, then Open, or Eaten today or
+/// yesterday; a click offers Eat now while it is open and this Device may
+/// check it off, and Remove the Frog for who may manage it (ADR 0013),
+/// which asks once, as the Frog view does. It only shows for others.
+fn frog_badge(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &NoteFrog,
+    actions: &mut Vec<Action>,
+) {
+    let frog = &shown.frog;
+    let eats = !frog.is_done() && shown.may_check;
+    let value = if !frog.is_done() {
+        t.frog_open()
+    } else if shown.eaten_today {
+        t.frog_eaten_today()
+    } else {
+        t.frog_eaten_yesterday()
+    };
+    let value = Some(BadgeValue::Text(value));
+    let active = eats || shown.manages;
+    let icon = (icons::FROG, None);
+    let badge = badge(ui, (t, tones), icon, t.frog(), value, active);
+    if !active {
+        return;
+    }
+    let text = ui.visuals().text_color();
+    egui::Popup::menu(&badge).show(|ui| {
+        if eats && menu_entry(ui, (icons::PICK_DONE, text), t.frog_eat_now()).clicked() {
+            actions.push(Action::Frog(FrogAction::Toggle(frog.id.clone())));
+            ui.close();
+        }
+        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
+            actions.push(Action::Frog(FrogAction::AskDelete(frog.id.clone())));
+            ui.close();
+        }
     });
 }
 

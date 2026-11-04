@@ -324,7 +324,12 @@ replace a law of Both apps where they say so. A desktop law marked
   "50 pages", "Reps"). **Never an icon plus the same word.** The
   desktop draws the same Material icons as the phone. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
-  its schedule; the kind, Plain Note included (#188); the text format of
+  its schedule; its Frog (#259) while one is open or was eaten today or
+  yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
+  in Simple too, its tap offering at the finger Eat now while it is open
+  and this Device may check it off and "Remove the Frog" for who may
+  manage it, which asks once as the Frog view does; for a Member an
+  eaten one only shows; the kind, Plain Note included (#188); the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
@@ -356,7 +361,8 @@ replace a law of Both apps where they say so. A desktop law marked
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
-  there only for who may set them up; on a Session it offers no
+  there only for who may set them up; no Frog while the Note has an open
+  one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
   recordings and the Sections stay the page's content; the editor has no
   "Make it a Checklist" or "Make it a Shopping List" button of its own,
