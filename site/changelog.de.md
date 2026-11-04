@@ -14,6 +14,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 
+- Auf dem Telefon reagiert das Wischen zwischen der Agenda und der Bereichsliste sofort auf ein kurzes, schnelles Wischen und ruckelt nicht mehr: Die beiden Seiten liegen nebeneinander, und die Bereichsliste ist fertig, bevor das Wischen beginnt. Zurück und der Ordner wechseln wie bisher zwischen ihnen. Sieben Tipps auf die Version unter „Über Old Brain Fix“ zeigen unten links, wie lange die letzten Bilder gedauert haben, um es vom Telefon aus zu melden; sieben weitere blenden es aus.
 - Der Desktop zeichnet Pfeile, Häkchen und andere Symbole, die als leere Kästchen erschienen, etwa den → in Notizen, mit den Schriften Noto Sans Symbols 2 und Noto Sans Math.
 
 ## [0.4.0] - 2026-11-04

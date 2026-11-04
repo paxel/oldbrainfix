@@ -1,10 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
-import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
@@ -53,8 +53,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The app's whole screen.
+  final screen = find.byType(MaterialApp);
+
+  /// The middle of the screen, where a swipe starts.
+  Offset middle(WidgetTester tester) => tester.getCenter(screen);
+
   Future<void> swipe(WidgetTester tester, double dx) async {
-    await tester.fling(find.byType(BrowserSwipes), Offset(dx, 0), 1000);
+    await tester.flingFrom(middle(tester), Offset(dx, 0), 1000);
+    await tester.pumpAndSettle();
+  }
+
+  /// Drags [dx] sideways in small steps and lets go standing still: no
+  /// fling, only the distance counts.
+  Future<void> slowDrag(WidgetTester tester, double dx) async {
+    final finger = await tester.startGesture(middle(tester));
+    const steps = 20;
+    for (var i = 1; i <= steps; i++) {
+      await finger.moveBy(
+        Offset(dx / steps, 0),
+        timeStamp: Duration(milliseconds: 50 * i),
+      );
+      await tester.pump();
+    }
+    await finger.up(timeStamp: const Duration(milliseconds: 50 * steps + 500));
     await tester.pumpAndSettle();
   }
 
@@ -71,7 +93,7 @@ void main() {
       .dx;
 
   /// How many pages the app's navigator holds: a preview shares the
-  /// route of the page it sits beside.
+  /// route of the page it sits beside, the Areas list the Agenda's.
   int routes(WidgetTester tester) => {
     for (final page in find.byType(Scaffold, skipOffstage: false).evaluate())
       ModalRoute.of(page),
@@ -357,14 +379,13 @@ void main() {
       expect(find.byType(AgendaScreen), findsOneWidget);
     });
 
-    testWidgets('the next level slides in with the finger', (tester) async {
+    testWidgets('the Areas list slides in with the finger, beside the '
+        'Agenda', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      final width = tester.getSize(find.byType(BrowserSwipes)).width;
+      final width = tester.getSize(screen).width;
 
-      final finger = await tester.startGesture(
-        tester.getCenter(find.byType(BrowserSwipes)),
-      );
+      final finger = await tester.startGesture(middle(tester));
       await finger.moveBy(const Offset(-30, 0));
       await finger.moveBy(const Offset(-200, 0));
       await tester.pump();
@@ -375,7 +396,7 @@ void main() {
       expect(areas, lessThan(width - 100));
       // Side by side: the Areas list starts where the Agenda ends.
       expect(areas, closeTo(agenda + width, 1));
-      // Only a preview while the finger is down: nothing pushed yet.
+      // Two pages of one route: nothing is pushed.
       expect(routes(tester), 1);
 
       await finger.moveBy(const Offset(100, 0));
@@ -383,7 +404,7 @@ void main() {
       expect(pageLeft(tester, AreasScreen), closeTo(areas + 100, 1));
 
       // Letting go there, before the middle, springs back.
-      await finger.up();
+      await finger.up(timeStamp: const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.byType(AreasScreen), findsNothing);
       expect(pageLeft(tester, AgendaScreen), 0);
@@ -393,33 +414,33 @@ void main() {
     testWidgets('the pushed level takes over where the preview was', (
       tester,
     ) async {
-      await tester.pumpWidget(OldBrainFixApp(store: store));
-      await tester.pumpAndSettle();
-      final width = tester.getSize(find.byType(BrowserSwipes)).width;
+      await openBrowser(tester);
+      await open(tester, 'Household');
+      await swipe(tester, 400);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      final width = tester.getSize(screen).width;
 
-      final finger = await tester.startGesture(
-        tester.getCenter(find.byType(BrowserSwipes)),
-      );
+      final finger = await tester.startGesture(middle(tester));
       await finger.moveBy(const Offset(-30, 0));
       await finger.moveBy(const Offset(-500, 0));
       await tester.pump();
+      final area = pageLeft(tester, AreaScreen);
       final areas = pageLeft(tester, AreasScreen);
-      final agenda = pageLeft(tester, AgendaScreen);
-      expect(areas, lessThan(width / 2));
+      expect(area, lessThan(width / 2));
       await finger.up();
       // The frame of the push, then the frame of the take-over.
       for (var i = 0; i < 2; i++) {
         await tester.pump();
-        expect(find.byType(AreasScreen), findsOneWidget);
+        expect(find.byType(AreaScreen), findsOneWidget);
+        expect(pageLeft(tester, AreaScreen), closeTo(area, 1));
         expect(pageLeft(tester, AreasScreen), closeTo(areas, 1));
-        expect(pageLeft(tester, AgendaScreen), closeTo(agenda, 1));
       }
       await tester.pump(const Duration(milliseconds: 50));
-      expect(pageLeft(tester, AreasScreen), lessThan(areas));
+      expect(pageLeft(tester, AreaScreen), lessThan(area));
       await tester.pumpAndSettle();
-      expect(find.byType(AreasScreen), findsOneWidget);
-      expect(find.byType(AgendaScreen), findsNothing);
-      expect(pageLeft(tester, AreasScreen), 0);
+      expect(find.byType(AreaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(pageLeft(tester, AreaScreen), 0);
       expect(routes(tester), 2);
     });
 
@@ -427,11 +448,9 @@ void main() {
       tester,
     ) async {
       await openBrowser(tester);
-      final width = tester.getSize(find.byType(BrowserSwipes)).width;
+      final width = tester.getSize(screen).width;
 
-      final finger = await tester.startGesture(
-        tester.getCenter(find.byType(BrowserSwipes)),
-      );
+      final finger = await tester.startGesture(middle(tester));
       await finger.moveBy(const Offset(30, 0));
       await finger.moveBy(const Offset(200, 0));
       await tester.pump();
@@ -439,7 +458,7 @@ void main() {
       final agenda = pageLeft(tester, AgendaScreen);
       expect(areas, greaterThan(100));
       expect(agenda, closeTo(areas - width, 1));
-      await finger.up();
+      await finger.up(timeStamp: const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(pageLeft(tester, AreasScreen), 0);
@@ -449,60 +468,39 @@ void main() {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
 
-      // Slow: no fling, only the distance counts.
-      await tester.timedDrag(
-        find.byType(BrowserSwipes),
-        const Offset(-560, 0),
-        const Duration(seconds: 3),
-      );
-      await tester.pumpAndSettle();
+      await slowDrag(tester, -560);
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(find.byType(AgendaScreen), findsNothing);
 
-      await tester.timedDrag(
-        find.byType(BrowserSwipes),
-        const Offset(560, 0),
-        const Duration(seconds: 3),
-      );
-      await tester.pumpAndSettle();
+      await slowDrag(tester, 560);
       expect(find.byType(AreasScreen), findsNothing);
       expect(find.byType(AgendaScreen), findsOneWidget);
     });
 
-    testWidgets('a slow drag turns past a third, springs back short of it', (
-      tester,
-    ) async {
+    testWidgets('a slow drag turns past the middle, springs back short of '
+        'it', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      final third = tester.getSize(find.byType(BrowserSwipes)).width / 3;
-      // The drag only counts once the finger moved past the touch slop.
-      final past = third + kTouchSlop + 10;
-      final short = third - 10;
+      final half = tester.getSize(screen).width / 2;
+      // The pages move only once the finger moved past the touch slop.
+      final past = half + kTouchSlop + 10;
+      final short = half - 10;
 
-      Future<void> drag(double dx) async {
-        await tester.timedDrag(
-          find.byType(BrowserSwipes),
-          Offset(dx, 0),
-          const Duration(seconds: 3),
-        );
-        await tester.pumpAndSettle();
-      }
-
-      await drag(-short);
+      await slowDrag(tester, -short);
       expect(find.byType(AgendaScreen), findsOneWidget);
       expect(find.byType(AreasScreen), findsNothing);
       expect(pageLeft(tester, AgendaScreen), 0);
 
-      await drag(-past);
+      await slowDrag(tester, -past);
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(find.byType(AgendaScreen), findsNothing);
 
-      await drag(short);
+      await slowDrag(tester, short);
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(find.byType(AgendaScreen), findsNothing);
       expect(pageLeft(tester, AreasScreen), 0);
 
-      await drag(past);
+      await slowDrag(tester, past);
       expect(find.byType(AreasScreen), findsNothing);
       expect(find.byType(AgendaScreen), findsOneWidget);
     });
@@ -513,27 +511,18 @@ void main() {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
 
-      await tester.timedDrag(
-        find.byType(BrowserSwipes),
-        const Offset(-200, 0),
-        const Duration(seconds: 2),
-      );
-      await tester.pumpAndSettle();
+      await slowDrag(tester, -200);
       expect(find.byType(AgendaScreen), findsOneWidget);
       expect(find.byType(AreasScreen), findsNothing);
       expect(pageLeft(tester, AgendaScreen), 0);
 
       // Taps still work afterwards.
-      await openBrowser(tester);
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
       await open(tester, 'Household');
       expect(find.byType(AreaScreen), findsOneWidget);
 
-      await tester.timedDrag(
-        find.byType(BrowserSwipes),
-        const Offset(200, 0),
-        const Duration(seconds: 2),
-      );
-      await tester.pumpAndSettle();
+      await slowDrag(tester, 200);
       expect(find.byType(AreaScreen), findsOneWidget);
       expect(find.byType(AreasScreen), findsNothing);
       expect(pageLeft(tester, AreaScreen), 0);
@@ -564,9 +553,7 @@ void main() {
       // 40 pixels in 16 ms, past the touch slop only with the last move,
       // as a quick thumb sends it.
       Future<void> flick(double dx) async {
-        final finger = await tester.startGesture(
-          tester.getCenter(find.byType(BrowserSwipes)),
-        );
+        final finger = await tester.startGesture(middle(tester));
         await finger.moveBy(
           Offset(dx / 4, 0),
           timeStamp: const Duration(milliseconds: 8),
@@ -589,18 +576,12 @@ void main() {
 
       // A short fling of the test's own, 60 pixels in 30 ms: its last
       // twenty moves must pass the touch slop to count as a fling.
-      await tester.fling(
-        find.byType(BrowserSwipes),
-        const Offset(-60, 0),
-        2000,
-      );
+      await tester.flingFrom(middle(tester), const Offset(-60, 0), 2000);
       await tester.pumpAndSettle();
       expect(find.byType(AreasScreen), findsOneWidget);
     });
 
-    testWidgets('the Agenda is not built again while the browser comes', (
-      tester,
-    ) async {
+    testWidgets('neither page is built while the other comes', (tester) async {
       final routines = Routines(store);
       for (var i = 0; i < 5; i++) {
         routines.create(
@@ -621,18 +602,69 @@ void main() {
       };
       addTearDown(() => debugOnRebuildDirtyWidget = null);
 
+      // The Areas list was built ahead: going there builds neither page,
+      // not while the finger moves, not as it glides in.
       await swipe(tester, -150);
-      debugOnRebuildDirtyWidget = null;
       expect(find.byType(AreasScreen), findsOneWidget);
-      // Neither the Agenda under it nor the preview beside it is built
-      // again when the browser's page is pushed: only the preview and
-      // the pushed page are built, once each.
       expect(built[AgendaScreen] ?? 0, 0);
-      expect(built[AreasScreen], 2);
+      expect(built[AreasScreen] ?? 0, 0);
+
+      // Nor coming back, until the Agenda is in place: then it reads its
+      // rows once.
+      final finger = await tester.startGesture(middle(tester));
+      for (var i = 0; i < 10; i++) {
+        await finger.moveBy(
+          const Offset(30, 0),
+          timeStamp: Duration(milliseconds: 8 * i),
+        );
+        await tester.pump(const Duration(milliseconds: 8));
+      }
+      await finger.up(timeStamp: const Duration(milliseconds: 88));
+      while (pageLeft(tester, AgendaScreen) < 0) {
+        expect(built[AgendaScreen] ?? 0, 0);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpAndSettle();
+      debugOnRebuildDirtyWidget = null;
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(built[AgendaScreen], 1);
+      expect(built[AreasScreen] ?? 0, 0);
+
+      // An Area pushed from the Areas list does not build the Agenda
+      // under it either (BrowserHomeRoute, #210).
+      await swipe(tester, -150);
+      built.clear();
+      debugOnRebuildDirtyWidget = (element, _) {
+        final type = element.widget.runtimeType;
+        built[type] = (built[type] ?? 0) + 1;
+      };
+      await open(tester, 'Household');
+      debugOnRebuildDirtyWidget = null;
+      expect(find.byType(AreaScreen), findsOneWidget);
+      expect(built[AgendaScreen] ?? 0, 0);
     });
 
-    testWidgets('with animations off nothing follows; letting go changes '
-        'at once', (tester) async {
+    testWidgets('a screen reader reads only the page shown', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      // Not even as the hidden page beside it.
+      expect(
+        find.bySemanticsLabel('Household', skipOffstage: false),
+        findsNothing,
+      );
+
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Household'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Search and browse', skipOffstage: false),
+        findsNothing,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('with animations off letting go lands at once', (tester) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(
@@ -641,32 +673,31 @@ void main() {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
 
-      var finger = await tester.startGesture(
-        tester.getCenter(find.byType(BrowserSwipes)),
-      );
+      var finger = await tester.startGesture(middle(tester));
       await finger.moveBy(const Offset(-30, 0));
       await finger.moveBy(const Offset(-500, 0));
       await tester.pump();
-      expect(find.byType(AreasScreen), findsNothing);
-      expect(pageLeft(tester, AgendaScreen), 0);
       await finger.up();
       await tester.pump();
       expect(find.byType(AreasScreen), findsOneWidget);
       expect(find.byType(AgendaScreen), findsNothing);
       expect(pageLeft(tester, AreasScreen), 0);
 
-      finger = await tester.startGesture(
-        tester.getCenter(find.byType(BrowserSwipes)),
-      );
+      finger = await tester.startGesture(middle(tester));
       await finger.moveBy(const Offset(30, 0));
       await finger.moveBy(const Offset(500, 0));
       await tester.pump();
-      expect(find.byType(AgendaScreen), findsNothing);
-      expect(pageLeft(tester, AreasScreen), 0);
       await finger.up();
       await tester.pump();
       expect(find.byType(AgendaScreen), findsOneWidget);
       expect(find.byType(AreasScreen), findsNothing);
+      expect(pageLeft(tester, AgendaScreen), 0);
+
+      // The folder changes at once too.
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pump();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(pageLeft(tester, AreasScreen), 0);
     });
 
     testWidgets('a vertical drag on the Agenda scrolls, it does not swipe', (
@@ -674,14 +705,92 @@ void main() {
     ) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tester.fling(
-        find.byType(BrowserSwipes),
-        const Offset(0, -400),
+      await tester.flingFrom(middle(tester), const Offset(0, -400), 1000);
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+    });
+
+    testWidgets('the folder and back go between the Agenda and the Areas '
+        'list', (tester) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+
+      // The folder slides the Areas list in.
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(pageLeft(tester, AreasScreen), greaterThan(0));
+      expect(pageLeft(tester, AgendaScreen), lessThan(0));
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+      expect(routes(tester), 1);
+
+      // The bar's back on the Areas list.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+      // The Agenda has no way back in its bar.
+      expect(find.byType(BackButton), findsNothing);
+
+      // The system's back, from an Area to the Areas list to the Agenda.
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await open(tester, 'Household');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+    });
+
+    testWidgets('only a swipe, the folder and back change the page', (
+      tester,
+    ) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      // Revealing the bar's last button moves the pages towards the
+      // Areas list; they go back to the Agenda.
+      await tester.ensureVisible(find.byKey(const ValueKey('profile')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(pageLeft(tester, AgendaScreen), 0);
+    });
+
+    testWidgets('on iOS a drag from the left edge moves neither page', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      final height = tester.getSize(screen).height;
+
+      await tester.flingFrom(
+        Offset(5, height / 2),
+        const Offset(-150, 0),
         1000,
       );
       await tester.pumpAndSettle();
       expect(find.byType(AgendaScreen), findsOneWidget);
       expect(find.byType(AreasScreen), findsNothing);
+
+      await swipe(tester, -150);
+      expect(find.byType(AreasScreen), findsOneWidget);
+
+      await tester.flingFrom(Offset(5, height / 2), const Offset(300, 0), 1000);
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+
+      await swipe(tester, 150);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets('from the Agenda left goes on into the last Area and Topic', (
@@ -730,6 +839,7 @@ void main() {
       // Nothing selected yet: swipe left stays.
       await swipe(tester, -400);
       expect(find.byType(AreaScreen), findsNothing);
+      expect(find.byType(AreasScreen), findsOneWidget);
 
       await open(tester, 'Household');
       await open(tester, 'Kitchen');

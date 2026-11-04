@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/agenda_widget.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/alarm_sync.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
@@ -992,6 +993,28 @@ void main() {
 
       expect(find.byType(UnsortedScreen), findsOneWidget);
       expect(find.text('nees mor sauce'), findsOneWidget);
+    });
+
+    testWidgets('tapping the Unsorted count while the Areas list shows '
+        'opens it on top, and back goes to the Areas list', (tester) async {
+      notes.capture('nees mor sauce');
+      await start(tester);
+      await tester.tap(find.byTooltip(en.browseTooltip));
+      await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsOneWidget);
+
+      alarms.tapUnsorted();
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(find.text('nees mor sauce'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsortedScreen), findsNothing);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
     });
 
     testWidgets('tapping the Unsorted count starts the app on the Unsorted '

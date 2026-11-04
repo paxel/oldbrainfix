@@ -290,12 +290,14 @@ void main() {
       await away(tester, const Duration(minutes: 2));
       expect(lockScreen, findsOneWidget);
       expect(find.byType(AllNotesScreen, skipOffstage: false), findsNothing);
-      expect(find.byType(AreasScreen, skipOffstage: false), findsNothing);
+      // Only the Areas list beside the Agenda, hidden under the lock.
+      expect(find.byType(AreasScreen, skipOffstage: false), findsOneWidget);
       expect(find.text('secret plan'), findsNothing);
 
       await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
       await tap(tester, find.byKey(const ValueKey('unlockPin')));
       expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
     });
 
     testWidgets('locks at once when the Device says so', (tester) async {
@@ -345,7 +347,8 @@ void main() {
       await away(tester, const Duration(minutes: 5));
       expect(find.byType(CaptureScreen), findsOneWidget);
       expect(find.byType(AllNotesScreen, skipOffstage: false), findsNothing);
-      expect(find.byType(AreasScreen, skipOffstage: false), findsNothing);
+      // Only the Areas list beside the Agenda, hidden under the lock.
+      expect(find.byType(AreasScreen, skipOffstage: false), findsOneWidget);
 
       await back(tester);
       expect(lockScreen, findsOneWidget);

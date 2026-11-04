@@ -28,7 +28,9 @@ import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
+import 'frame_times.dart';
 import 'help_notes.dart';
+import 'home_pages.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -217,6 +219,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _notes = Notes(widget.store);
   late final _places = Places(widget.store);
   final _trail = BrowserTrail();
+  late final _frameTimes = FrameTimesSwitch(widget.store);
   late final AlarmSync _alarms;
   late final _mirror = CalendarMirror(
     store: widget.store,
@@ -288,6 +291,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _lock.dispose();
     _profile.dispose();
     _scroll.dispose();
+    _frameTimes.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }
@@ -317,56 +321,62 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     darkTheme: _dark,
     themeMode: _themeMode,
     navigatorObservers: [_scroll, _routes],
-    builder: (context, child) => FatFingersText(
-      on: _fatFingers,
-      child: QuestionMarkBackground(
-        scroll: _scroll,
-        child: AnnouncementStrip(
-          announcements: _announcements,
-          child: AnnouncementsScope(
-            announcements: _announcements,
-            child: LocationScope(
-              location: widget.location,
-              child: ContextScope(
-                source: widget.context,
-                child: PhotoScope(
-                  photos: widget.photos,
-                  bytes: _notes.photoBytes,
-                  child: VoiceScope(
-                    voice: widget.voice,
-                    playback: _playback,
-                    child: SpeechScope(
-                      model: _speechModel,
-                      transcriber: _transcriber,
-                      child: PhotoReaderScope(
-                        reader: _photoReader,
-                        child: CalendarScope(
-                          calendar: widget.calendar,
-                          child: CalendarMirrorScope(
-                            mirror: _mirror,
-                            child: AppointmentScope(
-                              source: widget.appointments,
-                              child: DraftsScope(
-                                drafts: _drafts,
-                                child: LockScope(
-                                  lock: _lock,
-                                  child: PairingScope(
-                                    pairing: widget.pairing,
-                                    child: AutoSyncScope(
-                                      sync: _autoSync,
-                                      child: FolderScope(
-                                        folders: widget.folders,
-                                        child: BundleScope(
-                                          bundles: widget.bundles,
-                                          child: PersonScope(
-                                            store: widget.store,
-                                            platform: widget.profile,
-                                            onChangesSent: _alarms.replan,
-                                            child: TagSearchScope(
-                                              onSearch: _searchTag,
-                                              child:
-                                                  child ??
-                                                  const SizedBox.shrink(),
+    builder: (context, child) => FrameTimesScope(
+      frameTimes: _frameTimes,
+      child: FrameTimesOverlay(
+        frameTimes: _frameTimes,
+        child: FatFingersText(
+          on: _fatFingers,
+          child: QuestionMarkBackground(
+            scroll: _scroll,
+            child: AnnouncementStrip(
+              announcements: _announcements,
+              child: AnnouncementsScope(
+                announcements: _announcements,
+                child: LocationScope(
+                  location: widget.location,
+                  child: ContextScope(
+                    source: widget.context,
+                    child: PhotoScope(
+                      photos: widget.photos,
+                      bytes: _notes.photoBytes,
+                      child: VoiceScope(
+                        voice: widget.voice,
+                        playback: _playback,
+                        child: SpeechScope(
+                          model: _speechModel,
+                          transcriber: _transcriber,
+                          child: PhotoReaderScope(
+                            reader: _photoReader,
+                            child: CalendarScope(
+                              calendar: widget.calendar,
+                              child: CalendarMirrorScope(
+                                mirror: _mirror,
+                                child: AppointmentScope(
+                                  source: widget.appointments,
+                                  child: DraftsScope(
+                                    drafts: _drafts,
+                                    child: LockScope(
+                                      lock: _lock,
+                                      child: PairingScope(
+                                        pairing: widget.pairing,
+                                        child: AutoSyncScope(
+                                          sync: _autoSync,
+                                          child: FolderScope(
+                                            folders: widget.folders,
+                                            child: BundleScope(
+                                              bundles: widget.bundles,
+                                              child: PersonScope(
+                                                store: widget.store,
+                                                platform: widget.profile,
+                                                onChangesSent: _alarms.replan,
+                                                child: TagSearchScope(
+                                                  onSearch: _searchTag,
+                                                  child:
+                                                      child ??
+                                                      const SizedBox.shrink(),
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -388,7 +398,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
         ),
       ),
     ),
-    // Its own route, so the notes browser coming does not build the
+    // Its own route, so a browser level coming does not build the
     // Agenda anew (BrowserHomeRoute). There are no named pages.
     onGenerateRoute: (_) => null,
     onGenerateInitialRoutes: (_) => [
@@ -553,6 +563,9 @@ class _HomeState extends State<_Home> {
 
   /// Whether the app is locked, as shown.
   late bool _locked = widget.lock.locked;
+
+  /// The Agenda and the Areas list beside it (#258).
+  final _pager = HomePager();
 
   /// The Nudge screen and the Unsorted list, asked for while locked, and
   /// Conflicts a sync brought meanwhile.
@@ -729,6 +742,7 @@ class _HomeState extends State<_Home> {
     unawaited(_bundlesOpened.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
+    _pager.dispose();
     super.dispose();
   }
 
@@ -822,9 +836,10 @@ class _HomeState extends State<_Home> {
 
   /// Removes every route over the Agenda up to the first that needs no
   /// unlocking: Capture, and what it opened, stays and the full-screen
-  /// alarm too, the browser goes. Unsaved text in the editor is kept in
-  /// its draft.
+  /// alarm too, the browser goes, the Areas list beside the Agenda as
+  /// well. Unsaved text in the editor is kept in its draft.
   void _clearBrowsing() {
+    _pager.jumpToAgenda();
     final navigator = Navigator.of(context);
     final routes = widget.routes.routes;
     final free = routes.indexWhere(LockFreeRoutes.contains);
@@ -1144,14 +1159,24 @@ class _HomeState extends State<_Home> {
           offstage: _locked,
           child: TickerMode(
             enabled: !_locked,
-            child: AgendaScreen(
-              notes: widget.notes,
-              places: widget.places,
-              trail: widget.trail,
-              alarms: widget.alarms,
-              requests: widget.requests,
-              profile: widget.profile,
-              onThemeChanged: widget.onThemeChanged,
+            child: HomePages(
+              pager: _pager,
+              agenda: AgendaScreen(
+                notes: widget.notes,
+                places: widget.places,
+                trail: widget.trail,
+                alarms: widget.alarms,
+                requests: widget.requests,
+                profile: widget.profile,
+                onThemeChanged: widget.onThemeChanged,
+                pager: _pager,
+              ),
+              areas: AreasScreen(
+                notes: widget.notes,
+                places: widget.places,
+                trail: widget.trail,
+                onBack: _pager.showAgenda,
+              ),
             ),
           ),
         ),

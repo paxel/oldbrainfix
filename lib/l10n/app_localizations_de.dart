@@ -1552,6 +1552,22 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get frameTimesOn => 'Bildzeiten an';
+
+  @override
+  String get frameTimesOff => 'Bildzeiten aus';
+
+  @override
+  String frameTimesLast(String build, String raster) {
+    return 'Letzte Bilder: Aufbau $build ms, Rastern $raster ms';
+  }
+
+  @override
+  String frameTimesWorst(String total) {
+    return 'Langsamstes der letzten Sekunde: $total ms';
+  }
+
+  @override
   String get documentation => 'Dokumentation';
 
   @override

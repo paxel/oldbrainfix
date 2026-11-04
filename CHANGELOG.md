@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- On the phone, the swipe between the Agenda and the Areas list reacts at once to a quick short flick and no longer stutters: the two pages lie side by side and the Areas list is ready before the swipe starts. Back and the folder go between them as before. Tapping the version under About Old Brain Fix seven times shows how long the last frames took, at the bottom left, for reporting from the phone; seven more taps hide it.
 - The desktop draws arrows, ticks and other symbols that showed as empty squares, such as the → in Notes, with the fonts Noto Sans Symbols 2 and Noto Sans Math.
 
 ---

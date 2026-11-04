@@ -1543,6 +1543,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get frameTimesOn => 'Frame times on';
+
+  @override
+  String get frameTimesOff => 'Frame times off';
+
+  @override
+  String frameTimesLast(String build, String raster) {
+    return 'Last frames: build $build ms, raster $raster ms';
+  }
+
+  @override
+  String frameTimesWorst(String total) {
+    return 'Slowest in the last second: $total ms';
+  }
+
+  @override
   String get documentation => 'Documentation';
 
   @override

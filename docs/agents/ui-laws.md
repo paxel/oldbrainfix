@@ -622,6 +622,18 @@ replace a law of Both apps where they say so. A desktop law marked
   right goes back** one level (Topic, Area, Areas list, Agenda) and
   **swipe left goes forward** into the last selected Area or Topic, if
   there is one. The last selected Area and Topic are highlighted.
+- **The Agenda and the Areas list are two pages of one `PageView`**
+  (#258), side by side: the platform's own drag and fling
+  (`PageScrollPhysics`), counted from the touch-down so a quick short
+  flick switches both ways; letting go past the middle or with a fling
+  switches, otherwise they spring back. The Areas list is built with
+  the Agenda and kept, so a swipe builds neither page. Back on the
+  Areas list, by the system or its bar's arrow, and the folder move
+  between them; nothing else does, and the lock goes back to the
+  Agenda. An Area, a Topic and their Notes are pages pushed on top, as
+  is the Areas list of a tag's search. On iOS a drag that starts at the
+  left edge moves neither page (Q570). With the system's animations off
+  the pages still follow the finger, and letting go lands at once.
 - **In an Area, a Topic and All Notes "+" fans out** its kinds (#161),
   each an icon with its words, upward from the button as the Agenda's
   fan does.

@@ -2510,6 +2510,30 @@ abstract class AppLocalizations {
   /// **'Version {version} ({build})'**
   String versionLabel(String version, String build);
 
+  /// Announced when seven taps on the version under About switched the frame-time overlay on.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame times on'**
+  String get frameTimesOn;
+
+  /// Announced when seven taps on the version under About switched the frame-time overlay off.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame times off'**
+  String get frameTimesOff;
+
+  /// First line of the frame-time overlay: the slowest build and raster of the frames drawn lately, in milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Last frames: build {build} ms, raster {raster} ms'**
+  String frameTimesLast(String build, String raster);
+
+  /// Second line of the frame-time overlay: the slowest frame of the last second, start to end, in milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Slowest in the last second: {total} ms'**
+  String frameTimesWorst(String total);
+
   /// No description provided for @documentation.
   ///
   /// In en, this message translates to:

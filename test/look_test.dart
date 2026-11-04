@@ -177,12 +177,18 @@ void main() {
       }
       await tester.pumpWidget(OldBrainFixApp(store: store));
       expect(painter(tester).shift, 0);
-      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      // The Agenda's list, inside the pages it shares with the Areas list.
+      final list = find
+          .descendant(
+            of: find.byType(AgendaScreen),
+            matching: find.byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            ),
+          )
+          .first;
+      await tester.drag(list, const Offset(0, -600));
       await tester.pumpAndSettle();
-      return tester
-          .state<ScrollableState>(find.byType(Scrollable))
-          .position
-          .pixels;
+      return tester.state<ScrollableState>(list).position.pixels;
     }
 
     testWidgets('the marks move slower than the page', (tester) async {

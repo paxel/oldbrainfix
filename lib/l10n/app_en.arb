@@ -933,6 +933,31 @@
   "aboutTitle": "About Old Brain Fix",
   "aboutTagline": "Capture a thought in one tap. Get nagged until it is sorted or done.",
   "versionLabel": "Version {version} ({build})",
+  "frameTimesOn": "Frame times on",
+  "@frameTimesOn": {"description": "Announced when seven taps on the version under About switched the frame-time overlay on."},
+  "frameTimesOff": "Frame times off",
+  "@frameTimesOff": {"description": "Announced when seven taps on the version under About switched the frame-time overlay off."},
+  "frameTimesLast": "Last frames: build {build} ms, raster {raster} ms",
+  "@frameTimesLast": {
+    "description": "First line of the frame-time overlay: the slowest build and raster of the frames drawn lately, in milliseconds.",
+    "placeholders": {
+      "build": {
+        "type": "String"
+      },
+      "raster": {
+        "type": "String"
+      }
+    }
+  },
+  "frameTimesWorst": "Slowest in the last second: {total} ms",
+  "@frameTimesWorst": {
+    "description": "Second line of the frame-time overlay: the slowest frame of the last second, start to end, in milliseconds.",
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
   "@versionLabel": {
     "placeholders": {
       "version": {
