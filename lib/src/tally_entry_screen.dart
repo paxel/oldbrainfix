@@ -7,6 +7,7 @@ import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
+import 'unit_system.dart';
 
 /// "Add entry" (#103): the entry page for a new entry of the Tally of
 /// [noteId]; whether one was saved.

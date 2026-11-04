@@ -49,33 +49,47 @@ class InlineSyncRunner implements SyncRunner {
 }
 
 /// What a job in an isolate of its own brought back: its result
-/// ([IsolatedValue]) or what it threw ([IsolatedError]), and whether it
+/// ([_IsolatedValue]) or what it threw ([_IsolatedError]), and whether it
 /// changed the log or the Profiles.
-sealed class IsolatedRun<T> {
+sealed class _IsolatedRun<T> {
   final bool log;
   final bool profile;
 
-  const IsolatedRun({required this.log, required this.profile});
+  const _IsolatedRun({required this.log, required this.profile});
 
-  /// The job's result, or what it threw thrown again.
+  /// The job's result, or what it threw thrown again with the trace it
+  /// was thrown at in the isolate.
   T get result => switch (this) {
-    IsolatedValue<T>(:final value) => value,
-    IsolatedError<T>(:final error) => throw error,
+    _IsolatedValue<T>(:final value) => value,
+    _IsolatedError<T>(:final error, :final trace) => Error.throwWithStackTrace(
+      error,
+      trace,
+    ),
   };
 }
 
 /// A job in an isolate that brought back [value].
-final class IsolatedValue<T> extends IsolatedRun<T> {
+final class _IsolatedValue<T> extends _IsolatedRun<T> {
   final T value;
 
-  const IsolatedValue(this.value, {required super.log, required super.profile});
+  const _IsolatedValue(
+    this.value, {
+    required super.log,
+    required super.profile,
+  });
 }
 
-/// A job in an isolate that threw [error].
-final class IsolatedError<T> extends IsolatedRun<T> {
+/// A job in an isolate that threw [error] at [trace].
+final class _IsolatedError<T> extends _IsolatedRun<T> {
   final Object error;
+  final StackTrace trace;
 
-  const IsolatedError(this.error, {required super.log, required super.profile});
+  const _IsolatedError(
+    this.error,
+    this.trace, {
+    required super.log,
+    required super.profile,
+  });
 }
 
 /// Runs the jobs in an isolate of their own, each on a connection of its
@@ -122,13 +136,11 @@ Future<FolderSyncResult?> _folder(
   RootIsolateToken? token,
   SyncFolder Function(String setting) open,
   String setting,
-) => _isolated(
+) => runIsolated(
   store,
-  () => _inIsolate<FolderSyncResult?>(
-    path,
-    token,
-    (s) => folderRound(s, open(setting)),
-  ),
+  path,
+  (s) => folderRound(s, open(setting)),
+  token: token,
 );
 
 Future<SyncResult> _join(
@@ -140,40 +152,42 @@ Future<SyncResult> _join(
   String host,
   int port,
   String name,
-) => _isolated(
+) => runIsolated(
   store,
-  () => _inIsolate(
-    path,
-    token,
-    (s) => joining(s, device, host: host, port: port, name: name),
-  ),
+  path,
+  (s) => joining(s, device, host: host, port: port, name: name),
+  token: token,
 );
 
-/// Runs [ran] in an isolate, tells [store] what it changed, and hands
-/// back its result or throws what it threw.
-Future<T> _isolated<T>(
+/// Runs [work] in an isolate of its own on a store of its own on [path]
+/// (SQLite WAL), as the sync does (#225), and hands back its result or
+/// throws what it threw. Whatever it wrote there, [store], the one the
+/// app reads, hears of afterwards ([Store.changedElsewhere]), as after
+/// a change of its own: here and nowhere else, so no caller can forget
+/// it, and also when the job threw. When the isolate itself failed,
+/// nobody knows what it wrote, and [store] hears of everything. [work]
+/// crosses into the isolate: a top-level function, or a closure holding
+/// only what may.
+Future<T> runIsolated<T>(
   Store store,
-  Future<IsolatedRun<T>> Function() ran,
-) async {
-  final out = await Isolate.run(ran);
+  String path,
+  FutureOr<T> Function(Store store) work, {
+  RootIsolateToken? token,
+}) async {
+  final _IsolatedRun<T> out;
+  try {
+    out = await Isolate.run(() => _inIsolate(path, token, work));
+  } on Object {
+    store.changedElsewhere(profile: true);
+    rethrow;
+  }
   if (out.log || out.profile) store.changedElsewhere(profile: out.profile);
   return out.result;
 }
 
-/// Runs [work] in an isolate of its own on a store of its own on [path]
-/// (SQLite WAL), as the sync does (#225), and hands back what it brought
-/// and changed; the caller tells the store it reads. [work] crosses into
-/// the isolate: a top-level function, or a closure holding only what
-/// may.
-Future<IsolatedRun<T>> runIsolated<T>(
-  String path,
-  FutureOr<T> Function(Store store) work, {
-  RootIsolateToken? token,
-}) => Isolate.run(() => _inIsolate(path, token, work));
-
 /// Inside the isolate: [work] on a store of its own on [path], closed
 /// again afterwards.
-Future<IsolatedRun<T>> _inIsolate<T>(
+Future<_IsolatedRun<T>> _inIsolate<T>(
   String path,
   RootIsolateToken? token,
   FutureOr<T> Function(Store store) work,
@@ -187,9 +201,9 @@ Future<IsolatedRun<T>> _inIsolate<T>(
     ..addProfileListener(() => profile = true);
   try {
     final value = await work(store);
-    return IsolatedValue(value, log: log, profile: profile);
-  } on Object catch (e) {
-    return IsolatedError(e, log: log, profile: profile);
+    return _IsolatedValue(value, log: log, profile: profile);
+  } on Object catch (e, trace) {
+    return _IsolatedError(e, trace, log: log, profile: profile);
   } finally {
     store.close();
   }

@@ -258,8 +258,16 @@ class Frogs {
   /// called again, it writes nothing.
   FrogsToday pickToday(WallClock wallClock) {
     final day = Day.today(store.clock(), wallClock);
-    final wanted = _wanted(day, wallClock);
-    _writePick(day, wanted);
+    var wanted = _wanted(day, wallClock);
+    if (!_held(day, wanted)) {
+      // Worked out again and written in one transaction (#207): a pick
+      // another connection wrote meanwhile is the pick, not written twice.
+      wanted = store.batch(() {
+        final again = _wanted(day, wallClock);
+        _writePick(day, again);
+        return again;
+      });
+    }
     return _today(day, wallClock, wanted);
   }
 
@@ -337,16 +345,19 @@ class Frogs {
   /// Writes [ids] as the pick of [day], unless that is the pick already
   /// or there is nothing to pick.
   void _writePick(Day day, List<String> ids) {
-    if (ids.isEmpty) return;
+    if (_held(day, ids)) return;
+    store.append(FrogKeys.pickEntity, FrogKeys.pick, '$day,${ids.join(',')}');
+  }
+
+  /// Whether [ids] need no writing as the pick of [day]: there is nothing
+  /// to pick, or that is the pick already.
+  bool _held(Day day, List<String> ids) {
+    if (ids.isEmpty) return true;
     final held = _currentPick();
-    if (held != null &&
+    return held != null &&
         held.day == day &&
         held.ids.length == ids.length &&
-        Iterable<int>.generate(ids.length)
-            .every((i) => held.ids[i] == ids[i])) {
-      return;
-    }
-    store.append(FrogKeys.pickEntity, FrogKeys.pick, '$day,${ids.join(',')}');
+        Iterable<int>.generate(ids.length).every((i) => held.ids[i] == ids[i]);
   }
 
   /// Every pick one of the user's own Devices wrote, in latest-wins

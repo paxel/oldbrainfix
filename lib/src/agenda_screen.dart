@@ -45,6 +45,7 @@ import 'setup_screen.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
+import 'unit_system.dart';
 
 /// What the menu of an Occurrence's row does.
 enum _RowChoice { history, share }
@@ -341,6 +342,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   var _reading = false;
   var _again = false;
 
+  /// How often the log changed while the read off the UI thread ran.
+  var _heard = 0;
+
   /// What the boxes tapped here show until the next read is in, by
   /// [_boxKey]: checked or not (#207). A tap shows at once, and a second
   /// one undoes what the first did.
@@ -386,18 +390,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// since it was read: then it reads again (#207).
   Future<void> _loaded(Future<AgendaLoad> loading) async {
     _reading = true;
+    _heard = 0;
     try {
+      // The picks it wrote on a connection of its own, the store heard
+      // of on the way (#207), even with the Agenda closed meanwhile.
       final load = await loading;
       if (!mounted) return;
       final store = widget.notes.store;
-      if (load.wroteElsewhere) {
-        _loading = true;
-        try {
-          store.changedElsewhere();
-        } finally {
-          _loading = false;
-        }
-      }
+      if (_heard > (load.wrote ? 1 : 0)) _again = true;
       if (load.seq == store.currentSeq()) {
         setState(() => _apply(load));
       } else {
@@ -517,9 +517,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   /// The log changed: read again, unless the change is the Agenda's own
-  /// picks written as it read.
+  /// picks written as it read. While a read runs off the UI thread, the
+  /// change shows what was tapped and is counted ([_heard]): the picks
+  /// that read wrote there, which the store hears of before the read
+  /// arrives (#207), are no reason to read again; any other change is.
   void _logChanged() {
     if (_loading) return;
+    if (_reading) {
+      setState(() => _heard++);
+      return;
+    }
     _reload();
   }
 

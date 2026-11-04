@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/auto_sync.dart';
@@ -46,6 +47,24 @@ Future<SyncResult> _tooOld(
   required int port,
   required String name,
 }) async => throw const SyncException(SyncFailure.updateHere);
+
+/// A job that writes a Note there and hands back its id.
+String _writes(Store store) => Notes(store).capture('From the isolate').id;
+
+/// A job that writes a Note there, then throws from [_failsHere].
+String _writesThenThrows(Store store) {
+  Notes(store).capture('Half done');
+  return _failsHere();
+}
+
+String _failsHere() => throw StateError('broke there');
+
+/// A job that writes a Note there and hands back what cannot leave the
+/// isolate, so the isolate itself fails.
+Object _writesUnsendable(Store store) {
+  Notes(store).capture('Lost on the way');
+  return ReceivePort();
+}
 
 void main() {
   late Directory dir;
@@ -149,5 +168,55 @@ void main() {
       ),
     );
     expect(told, 1, reason: 'nothing changed');
+  });
+
+  group('a job on a connection of its own (#207, #225)', () {
+    var profiles = 0;
+    setUp(() {
+      profiles = 0;
+      phone.addProfileListener(() => profiles++);
+    });
+
+    test('tells the store here of what it wrote, and nothing when it '
+        'wrote nothing', () async {
+      final id = await runIsolated(phone, phonePath, _writes);
+      expect(told, 1);
+      expect(Notes(phone).byId(id)?.text, 'From the isolate');
+      final count = await runIsolated(
+        phone,
+        phonePath,
+        (store) => Notes(store).all().length,
+      );
+      expect(count, 1);
+      expect(told, 1, reason: 'a read writes nothing');
+      expect(profiles, 0);
+    });
+
+    test('tells the store here of what it wrote before it threw, and '
+        'throws it with the trace it was thrown at there', () async {
+      Object? thrown;
+      StackTrace? trace;
+      try {
+        await runIsolated(phone, phonePath, _writesThenThrows);
+      } on StateError catch (e, t) {
+        thrown = e;
+        trace = t;
+      }
+      expect(thrown, isA<StateError>());
+      expect(trace.toString(), contains('_failsHere'));
+      expect(told, 1);
+      expect([for (final n in Notes(phone).all()) n.text], ['Half done']);
+    });
+
+    test('tells the store here of everything when the isolate itself '
+        'failed, as nobody knows what it wrote', () async {
+      await expectLater(
+        runIsolated(phone, phonePath, _writesUnsendable),
+        throwsA(anything),
+      );
+      expect(told, 1);
+      expect(profiles, 1);
+      expect([for (final n in Notes(phone).all()) n.text], ['Lost on the way']);
+    });
   });
 }

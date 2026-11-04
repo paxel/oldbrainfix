@@ -825,7 +825,7 @@ impl<'a> Sessions<'a> {
     /// Today's Occurrences of every Session on `wall` with their picks,
     /// by time, then by Session; written nowhere.
     pub fn today(&self, wall: &WallClock) -> Result<Vec<SessionOccurrence>> {
-        self.day(wall, false)
+        Ok(self.day(Day::today(self.store.now(), wall), false)?.0)
     }
 
     /// Today's Occurrences of every Session on `wall` with their picks,
@@ -833,7 +833,15 @@ impl<'a> Sessions<'a> {
     /// the first, or one that replaces Tallies gone since. The Agenda
     /// calls it as it shows; called again, it writes nothing.
     pub fn pick_today(&self, wall: &WallClock) -> Result<Vec<SessionOccurrence>> {
-        self.day(wall, true)
+        let day = Day::today(self.store.now(), wall);
+        let (shown, fresh) = self.day(day, false)?;
+        if !fresh {
+            return Ok(shown);
+        }
+        // Worked out again and written in one transaction (#207): a pick
+        // another connection wrote meanwhile is the pick, not written
+        // twice.
+        self.store.batch(|| Ok(self.day(day, true)?.0))
     }
 
     /// "Another one": swaps the Tally of `note_id` picked for
@@ -921,8 +929,9 @@ impl<'a> Sessions<'a> {
         })
     }
 
-    fn day(&self, wall: &WallClock, write: bool) -> Result<Vec<SessionOccurrence>> {
-        let day = Day::today(self.store.now(), wall);
+    /// The Occurrences of `day`, today, with their picks, each new one
+    /// written with `write`; and whether one was new.
+    fn day(&self, day: Day, write: bool) -> Result<(Vec<SessionOccurrence>, bool)> {
         // By time, then by Routine, so that Rolling over several Routines
         // of a Note goes on from the pick written before (ADR 0039).
         let sessions = self.all()?;
@@ -935,20 +944,22 @@ impl<'a> Sessions<'a> {
         }
         due.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| utf16_cmp(a.0.id(), b.0.id())));
         let mut shown = Vec::new();
+        let mut fresh = false;
         for (session, occurrence) in due {
             let pool = self.pool(&session.setup)?;
             let mut marks = SessionMarks::of(self.store, session.id())?;
             let runners = self.runners(&session, Some(&routines))?;
             let picks = self.wanted(&session, &occurrence, &pool, &marks, &runners)?;
-            if write
-                && self.store.may_check_off(session.id())?
-                && self.write_pick(session.id(), &occurrence, &picks, &marks)?
-            {
-                marks = SessionMarks::of(self.store, session.id())?;
+            if self.store.may_check_off(session.id())? && !held(&occurrence, &picks, &marks) {
+                fresh = true;
+                if write {
+                    self.write_pick(session.id(), &occurrence, &picks, &marks)?;
+                    marks = SessionMarks::of(self.store, session.id())?;
+                }
             }
             shown.push(self.shown(session, occurrence, picks, &pool, &marks)?);
         }
-        Ok(shown)
+        Ok((shown, fresh))
     }
 
     fn shown(
@@ -1134,25 +1145,20 @@ impl<'a> Sessions<'a> {
     }
 
     /// Writes `ids` as the pick of `occurrence`, unless its field holds
-    /// that pick already or there is nothing to pick; whether it wrote.
+    /// that pick already or there is nothing to pick.
     fn write_pick(
         &self,
         id: &str,
         occurrence: &Occurrence,
         ids: &[String],
         marks: &SessionMarks,
-    ) -> Result<bool> {
-        if ids.is_empty()
-            || marks
-                .stored
-                .get(&occurrence.key())
-                .is_some_and(|held| held == ids)
-        {
-            return Ok(false);
+    ) -> Result<()> {
+        if held(occurrence, ids, marks) {
+            return Ok(());
         }
         self.store
-            .append(id, &keys::pick(occurrence), Some(&ids.join(",")), None)?;
-        Ok(true)
+            .append(id, &keys::pick(occurrence), Some(&ids.join(",")), None)
+            .map(drop)
     }
 
     /// `pool` without repeats, each a Tally a Session in `area` may pick
@@ -1329,6 +1335,16 @@ impl<'a> Sessions<'a> {
         }
         Ok(())
     }
+}
+
+/// Whether `ids` need no writing as the pick of `occurrence` in
+/// `marks`: there is nothing to pick, or that is the pick already.
+fn held(occurrence: &Occurrence, ids: &[String], marks: &SessionMarks) -> bool {
+    ids.is_empty()
+        || marks
+            .stored
+            .get(&occurrence.key())
+            .is_some_and(|held| held == ids)
 }
 
 #[cfg(test)]

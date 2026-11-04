@@ -287,8 +287,17 @@ impl<'a> Frogs<'a> {
     /// called again, it writes nothing.
     pub fn pick_today(&self, wall: &WallClock) -> Result<FrogsToday> {
         let day = Day::today(self.store.now(), wall);
-        let wanted = self.wanted(day, wall)?;
-        self.write_pick(day, &wanted)?;
+        let mut wanted = self.wanted(day, wall)?;
+        if !self.held(day, &wanted)? {
+            // Worked out again and written in one transaction (#207): a
+            // pick another connection wrote meanwhile is the pick, not
+            // written twice.
+            wanted = self.store.batch(|| {
+                let again = self.wanted(day, wall)?;
+                self.write_pick(day, &again)?;
+                Ok(again)
+            })?;
+        }
         self.section(day, wall, &wanted)
     }
 
@@ -387,19 +396,24 @@ impl<'a> Frogs<'a> {
     /// Writes `ids` as the pick of `day`, unless that is the pick already
     /// or there is nothing to pick.
     fn write_pick(&self, day: Day, ids: &[String]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        if let Some(held) = self.current_pick()?
-            && held.day == day
-            && held.ids == ids
-        {
+        if self.held(day, ids)? {
             return Ok(());
         }
         let value = format!("{day},{}", ids.join(","));
         self.store
             .append(keys::PICK_ENTITY, keys::PICK, Some(&value), None)
             .map(drop)
+    }
+
+    /// Whether `ids` need no writing as the pick of `day`: there is
+    /// nothing to pick, or that is the pick already.
+    fn held(&self, day: Day, ids: &[String]) -> Result<bool> {
+        if ids.is_empty() {
+            return Ok(true);
+        }
+        Ok(self
+            .current_pick()?
+            .is_some_and(|held| held.day == day && held.ids == ids))
     }
 
     /// Every pick one of the user's own Devices wrote, in latest-wins

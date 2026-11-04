@@ -28,13 +28,14 @@ class _HeldReader implements AgendaReader {
   /// Whether the Agenda's loads wait for [release].
   var holding = false;
 
-  /// Whether a load says it wrote on a connection of its own.
-  var wroteElsewhere = false;
+  /// Whether a load wrote on a connection of its own, as the isolate's
+  /// does: the store hears of it as the load is handed over.
+  var wrote = false;
 
   /// Whether the alarms' plans wait for [releasePlan].
   var holdingPlans = false;
 
-  final _held = <(Completer<AgendaLoad>, AgendaLoad)>[];
+  final _held = <(Completer<AgendaLoad>, AgendaLoad, Store)>[];
   final _heldPlans = <(Completer<AlarmPlanRead>, AlarmPlanRead)>[];
 
   int get waiting => _held.length;
@@ -42,7 +43,8 @@ class _HeldReader implements AgendaReader {
 
   /// Hands the oldest load waiting over.
   void release() {
-    final (completer, load) = _held.removeAt(0);
+    final (completer, load, store) = _held.removeAt(0);
+    if (load.wrote) store.changedElsewhere();
     completer.complete(load);
   }
 
@@ -64,11 +66,11 @@ class _HeldReader implements AgendaReader {
       missed: read.missed,
       unsorted: read.unsorted,
       seq: read.seq,
-      wroteElsewhere: wroteElsewhere,
+      wrote: wrote,
     );
     if (!holding) return load;
     final completer = Completer<AgendaLoad>();
-    _held.add((completer, load));
+    _held.add((completer, load, store));
     return completer.future;
   }
 
@@ -193,15 +195,18 @@ void main() {
         ticks++;
         gap.reset();
       });
+      var told = 0;
+      store.addListener(() => told++);
       final took = Stopwatch()..start();
       final load = await IsolateAgendaReader(path)
           .load(store, deviceWallClock, UnitSystem.metric);
       took.stop();
       ticker.cancel();
       if (gap.elapsed > longest) longest = gap.elapsed;
-      // Today's picks were made there, on its connection.
-      expect(load.wroteElsewhere, isTrue);
-      store.changedElsewhere();
+      // Today's picks were made there, on its connection, and this
+      // store heard of them.
+      expect(load.wrote, isTrue);
+      expect(told, 1);
       expect(load.seq, store.currentSeq());
       final here = loadAgenda(store, deviceWallClock, UnitSystem.metric);
       expect(here.seq, load.seq, reason: 'nothing more written');
@@ -219,8 +224,10 @@ void main() {
       _halfYear(store, routines: 3, days: 20);
       final reader = IsolateAgendaReader(path);
       final seq = store.currentSeq();
+      var told = 0;
+      store.addListener(() => told++);
       final read = await reader.read(store, deviceWallClock, UnitSystem.metric);
-      expect(read.wroteElsewhere, isFalse);
+      expect(read.wrote, isFalse);
       expect(store.currentSeq(), seq);
       expect(
         shown(read),
@@ -240,6 +247,24 @@ void main() {
         expect(there.armed, isNotEmpty);
         expect(words(there), words(here));
       }
+      expect(told, 0, reason: 'nothing was written there');
+    });
+
+    test('tells the store here of the picks a load wrote there, with no '
+        'Agenda left to show the load', () async {
+      final frog = Frogs(store).spawn(Notes(store).capture('Call mum').id);
+      var told = 0;
+      store.addListener(() => told++);
+      final load = await IsolateAgendaReader(path)
+          .load(store, deviceWallClock, UnitSystem.metric);
+      expect(told, 1);
+      expect(load.wrote, isTrue);
+      expect(Frogs(store).today(deviceWallClock).shown.map((f) => f.id), [
+        frog.id,
+      ]);
+      await IsolateAgendaReader(path)
+          .load(store, deviceWallClock, UnitSystem.metric);
+      expect(told, 1, reason: 'picked already');
     });
   });
 
@@ -367,7 +392,7 @@ void main() {
       await start(tester);
       reader
         ..holding = true
-        ..wroteElsewhere = true;
+        ..wrote = true;
       var told = 0;
       store.addListener(() => told++);
       AgendaScreen.loads = 0;
@@ -380,6 +405,32 @@ void main() {
       expect(told, changes + 1, reason: 'the picks written there');
       expect(find.text('tea'), findsWidgets);
       expect(AgendaScreen.loads, 1);
+      expect(reader.waiting, 0);
+    });
+
+    testWidgets('a change while it reads that leaves the log\'s mark, as '
+        'a Pending Change shown or a block\'s deletion, reads again', (
+      tester,
+    ) async {
+      routines.create('pills', daily());
+      await start(tester);
+      reader
+        ..holding = true
+        ..wrote = true;
+      AgendaScreen.loads = 0;
+      routines.create('tea', daily());
+      await tester.pumpAndSettle();
+      // Told while the read runs, the log's mark where it was.
+      store.changedElsewhere();
+      await tester.pumpAndSettle();
+      expect(AgendaScreen.loads, 1);
+
+      reader.release();
+      await tester.pumpAndSettle();
+      expect(find.text('tea'), findsWidgets);
+      expect(AgendaScreen.loads, 2, reason: 'read once more');
+      reader.release();
+      await tester.pumpAndSettle();
       expect(reader.waiting, 0);
     });
   });

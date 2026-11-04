@@ -611,14 +611,20 @@ class Sessions {
   /// Today's Occurrences of every Session on [wallClock] with their
   /// picks, by time, then by Session; written nowhere.
   List<SessionOccurrence> today(WallClock wallClock) =>
-      _today(wallClock, write: false);
+      _today(Day.today(store.clock(), wallClock), write: false).shown;
 
   /// Today's Occurrences of every Session on [wallClock] with their
   /// picks, each pick written for everyone the Session reaches when it
   /// is new: the first, or one that replaces Tallies gone since. The
   /// Agenda calls it as it shows; called again, it writes nothing.
-  List<SessionOccurrence> pickToday(WallClock wallClock) =>
-      _today(wallClock, write: true);
+  List<SessionOccurrence> pickToday(WallClock wallClock) {
+    final day = Day.today(store.clock(), wallClock);
+    final read = _today(day, write: false);
+    if (!read.fresh) return read.shown;
+    // Worked out again and written in one transaction (#207): a pick
+    // another connection wrote meanwhile is the pick, not written twice.
+    return store.batch(() => _today(day, write: true).shown);
+  }
 
   /// "Another one": swaps the Tally of [noteId] picked for [occurrence]
   /// of the Session [id] for the next by the Session's rule, in its
@@ -685,8 +691,12 @@ class Sessions {
     );
   }
 
-  List<SessionOccurrence> _today(WallClock wallClock, {required bool write}) {
-    final day = Day.today(store.clock(), wallClock);
+  /// The Occurrences of [day], today, with their picks, each new one
+  /// written with [write]; [fresh] when one was new.
+  ({List<SessionOccurrence> shown, bool fresh}) _today(
+    Day day, {
+    required bool write,
+  }) {
     // By time, then by Routine, so that Rolling over several Routines of
     // a Note goes on from the pick written before (ADR 0039).
     final sessions = all();
@@ -701,19 +711,22 @@ class Sessions {
       return byTime != 0 ? byTime : a.$1.id.compareTo(b.$1.id);
     });
     final shown = <SessionOccurrence>[];
+    var fresh = false;
     for (final (session, occurrence) in due) {
       final pool = this.pool(session.setup);
       var marks = SessionMarks.of(store, session.id);
       final runners = _runners(session, routines);
       final picks = _wanted(session, occurrence, pool, marks, runners);
-      if (write &&
-          store.mayCheckOff(session.id) &&
-          _writePick(session.id, occurrence, picks, marks)) {
-        marks = SessionMarks.of(store, session.id);
+      if (store.mayCheckOff(session.id) && !_held(occurrence, picks, marks)) {
+        fresh = true;
+        if (write) {
+          _writePick(session.id, occurrence, picks, marks);
+          marks = SessionMarks.of(store, session.id);
+        }
       }
       shown.add(_shown(session, occurrence, picks, pool, marks));
     }
-    return shown;
+    return (shown: shown, fresh: fresh);
   }
 
   SessionOccurrence _shown(
@@ -853,22 +866,29 @@ class Sessions {
   }
 
   /// Writes [ids] as the pick of [occurrence], unless its field holds
-  /// that pick already or there is nothing to pick; whether it wrote.
-  bool _writePick(
+  /// that pick already or there is nothing to pick.
+  void _writePick(
     String id,
     Occurrence occurrence,
     List<String> ids,
     SessionMarks marks,
   ) {
-    if (ids.isEmpty) return false;
-    final held = marks.stored[occurrence.key];
-    if (held != null &&
-        held.length == ids.length &&
-        Iterable<int>.generate(ids.length).every((i) => held[i] == ids[i])) {
-      return false;
-    }
+    if (_held(occurrence, ids, marks)) return;
     store.append(id, SessionKeys.pick(occurrence), ids.join(','));
-    return true;
+  }
+
+  /// Whether [ids] need no writing as the pick of [occurrence] in
+  /// [marks]: there is nothing to pick, or that is the pick already.
+  static bool _held(
+    Occurrence occurrence,
+    List<String> ids,
+    SessionMarks marks,
+  ) {
+    if (ids.isEmpty) return true;
+    final held = marks.stored[occurrence.key];
+    return held != null &&
+        held.length == ids.length &&
+        Iterable<int>.generate(ids.length).every((i) => held[i] == ids[i]);
   }
 
   /// [pool] without repeats, each a Tally a Session in [area] may pick or

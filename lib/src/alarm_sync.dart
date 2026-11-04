@@ -8,7 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'agenda_reader.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
-import 'tally_view.dart';
+import 'unit_system.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
 /// start, on every change to the log, and whenever the app comes back;

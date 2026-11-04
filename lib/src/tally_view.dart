@@ -14,13 +14,7 @@ import 'routine_editor_screen.dart';
 import 'setting_badges.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
-
-/// The system this Device shows the known units of Tallies in: the one
-/// chosen in Settings, else the one of the region the system reports
-/// (ADR 0028).
-UnitSystem deviceUnitSystem(Store store) => store.unitSystem(
-  WidgetsBinding.instance.platformDispatcher.locale.countryCode,
-);
+import 'unit_system.dart';
 
 /// The rule [rule] as the value icon of a field's rule badge (#192).
 IconData tallyRuleIcon(TallyRule rule) => switch (rule) {

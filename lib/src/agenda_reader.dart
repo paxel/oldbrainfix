@@ -26,9 +26,10 @@ class AgendaLoad {
   /// wrote: a result whose store has moved on since is not shown.
   final int seq;
 
-  /// Whether the read wrote today's picks on a connection of its own,
-  /// which the store the app reads has not heard of yet.
-  final bool wroteElsewhere;
+  /// Whether the load wrote today's picks. On a connection of its own,
+  /// the store the app reads heard of them before the load arrived
+  /// ([runIsolated]).
+  final bool wrote;
 
   const AgendaLoad({
     required this.days,
@@ -36,17 +37,8 @@ class AgendaLoad {
     required this.missed,
     required this.unsorted,
     required this.seq,
-    this.wroteElsewhere = false,
+    this.wrote = false,
   });
-
-  AgendaLoad _elsewhere(bool wrote) => AgendaLoad(
-    days: days,
-    frogs: frogs,
-    missed: missed,
-    unsorted: unsorted,
-    seq: seq,
-    wroteElsewhere: wrote,
-  );
 }
 
 /// The alarms' plan with the texts its notifications show, read at the
@@ -74,7 +66,9 @@ class AlarmPlanRead {
 /// Where the Agenda's reads and the alarms' plan run (#207): the app
 /// runs them in an isolate of their own ([IsolateAgendaReader]), so the
 /// screen draws on while they read; tests on the store they read
-/// ([InlineAgendaReader]), whose answers come at once.
+/// ([InlineAgendaReader]), whose answers come at once. Each is handed
+/// the store the app reads: the inline reader reads it, the isolate's
+/// tells it what its own connection wrote.
 abstract interface class AgendaReader {
   /// The Agenda as it loads, with the [system] its targets show in: it
   /// writes today's Session and Frog picks when they are new, then reads.
@@ -127,8 +121,8 @@ class InlineAgendaReader implements AgendaReader {
 /// Reads in an isolate of its own, on a connection of its own to the
 /// database at [path] (SQLite WAL), as the sync does (#225): the app
 /// keeps drawing meanwhile and gets plain data back. The picks a load
-/// writes are told to the app's store by whoever shows the load
-/// ([AgendaLoad.wroteElsewhere]).
+/// writes there, the store handed in hears of before the load arrives
+/// ([runIsolated]), whether anyone still shows it or not.
 class IsolateAgendaReader implements AgendaReader {
   final String path;
 
@@ -139,14 +133,14 @@ class IsolateAgendaReader implements AgendaReader {
     Store store,
     WallClock wallClock,
     UnitSystem system,
-  ) => _load(path, wallClock, system, writes: true);
+  ) => _load(store, path, wallClock, system, writes: true);
 
   @override
   Future<AgendaLoad> read(
     Store store,
     WallClock wallClock,
     UnitSystem system,
-  ) => _load(path, wallClock, system, writes: false);
+  ) => _load(store, path, wallClock, system, writes: false);
 
   @override
   Future<AlarmPlanRead> plan(
@@ -154,50 +148,48 @@ class IsolateAgendaReader implements AgendaReader {
     WallClock wallClock,
     AppLocalizations t,
     String locale,
-  ) => _plan(path, wallClock, t, locale);
+  ) => _plan(store, path, wallClock, t, locale);
 }
 
 // Static, so the closures that cross into the isolate hold only what
 // they are handed.
 
 Future<AgendaLoad> _load(
+  Store store,
   String path,
   WallClock wallClock,
   UnitSystem system, {
   required bool writes,
-}) async {
-  final run = await runIsolated(
-    path,
-    (store) => writes
-        ? loadAgenda(store, wallClock, system)
-        : readAgenda(store, wallClock, system),
-  );
-  return run.result._elsewhere(run.log);
-}
+}) => runIsolated(
+  store,
+  path,
+  (own) => writes
+      ? loadAgenda(own, wallClock, system)
+      : readAgenda(own, wallClock, system),
+);
 
 Future<AlarmPlanRead> _plan(
+  Store store,
   String path,
   WallClock wallClock,
   AppLocalizations t,
   String locale,
-) async {
-  final run = await runIsolated(path, (store) async {
-    // The isolate's own dates in the reader's language, as the app's
-    // localizations load them there.
-    await initializeDateFormatting(locale);
-    return planAlarms(store, wallClock, t, locale);
-  });
-  return run.result;
-}
+) => runIsolated(store, path, (own) async {
+  // The isolate's own dates in the reader's language, as the app's
+  // localizations load them there.
+  await initializeDateFormatting(locale);
+  return planAlarms(own, wallClock, t, locale);
+});
 
 /// The Agenda's load of [store]: today's Session and Frog picks written
 /// when they are new, then its days, Frogs, Missed Summary and Unsorted
 /// count read, at the mark after the picks.
 AgendaLoad loadAgenda(Store store, WallClock wallClock, UnitSystem system) {
+  final before = store.currentSeq();
   // Written before the rows read their Done.
   final sessions = Sessions(store).pickToday(wallClock);
   final frogs = Frogs(store).pickToday(wallClock);
-  return _read(store, wallClock, system, sessions, frogs);
+  return _read(store, wallClock, system, sessions, frogs, before: before);
 }
 
 /// The Agenda of [store] as [loadAgenda] reads it, writing nothing.
@@ -215,8 +207,9 @@ AgendaLoad _read(
   WallClock wallClock,
   UnitSystem system,
   List<SessionOccurrence> sessions,
-  FrogsToday frogs,
-) {
+  FrogsToday frogs, {
+  int? before,
+}) {
   final seq = store.currentSeq();
   return AgendaLoad(
     days: AgendaDays.read(
@@ -232,6 +225,7 @@ AgendaLoad _read(
     missed: Alarms(store).missed(wallClock),
     unsorted: Notes(store).unsorted().length,
     seq: seq,
+    wrote: before != null && before != seq,
   );
 }
 

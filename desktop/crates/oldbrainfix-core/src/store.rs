@@ -328,6 +328,9 @@ impl Store {
         // Read before anything is written: a database of a newer version
         // is left exactly as it was.
         let version = saved_version(&db)?;
+        // Another connection's write lock is waited for, as long as the
+        // Dart core waits (#207), then the write fails instead of hanging.
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
         db.execute_batch(SCHEMA)?;
@@ -380,6 +383,7 @@ impl Store {
     /// Runs `body` in one transaction: all of its entries or none. A
     /// batch inside another one joins it: the outer one commits, or rolls
     /// back on an error from anywhere inside, as the Dart core's `batch`.
+    /// It takes the database's write lock as it begins.
     pub fn batch<T>(&self, body: impl FnOnce() -> Result<T>) -> Result<T> {
         let db = self.db.lock();
         // The outer batch holds the connection until it ends, so an open
@@ -387,7 +391,11 @@ impl Store {
         if !db.is_autocommit() {
             return body();
         }
-        let tx = db.unchecked_transaction()?;
+        // The write lock from the start: another connection's batch waits
+        // until this one is done (#207), and what `body` reads is still
+        // so when it writes.
+        let tx =
+            rusqlite::Transaction::new_unchecked(&db, rusqlite::TransactionBehavior::Immediate)?;
         let out = body();
         // Rolled back or not, what was worked out from inside is stale.
         self.changed();
@@ -694,6 +702,13 @@ impl Store {
             return self.draft_entry(&set, entity, field, value, date);
         }
         let db = self.db.lock();
+        // Its number read and taken in one transaction, so another
+        // connection's append waits for it instead of taking the same
+        // number (#207).
+        if db.is_autocommit() {
+            drop(db);
+            return self.batch(|| self.append(entity, field, value, date));
+        }
         let now = self.now();
         let device = self.device_id()?;
         let vector = self.held_vector()?;

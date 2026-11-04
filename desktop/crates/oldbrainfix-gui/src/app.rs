@@ -3875,7 +3875,9 @@ impl App {
             let store = open();
             let before = store.current_seq().ok();
             let read = read_agenda(&store, &t, &*wall, system);
-            let wrote = read.as_ref().map_or(true, |(_, seq)| before != Some(*seq));
+            // Today's picks written there, also by a read that failed
+            // after them; a read that failed writing nothing wrote nothing.
+            let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
             drop(sent.send((read, wrote)));
         });
         reads.running = Some(arrives);

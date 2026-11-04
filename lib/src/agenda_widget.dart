@@ -9,8 +9,8 @@ import 'app_lock.dart';
 import 'l10n.dart';
 import 'missed_summary_card.dart';
 import 'session_view.dart';
-import 'tally_view.dart';
 import 'schedule_text.dart';
+import 'unit_system.dart';
 
 /// One row of the home-screen Agenda widget, in the words it shows: an
 /// Occurrence, a Line of its Checklist or a pick of its Session under

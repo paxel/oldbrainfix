@@ -12,6 +12,7 @@ import 'session_view.dart';
 import 'setting_badges.dart';
 import 'tally_form_screen.dart';
 import 'tally_view.dart';
+import 'unit_system.dart';
 
 /// "Session" in the kind badge of the plain Note [noteId] (#191): the
 /// setup's page, its pool with at least one Tally, how many it picks and

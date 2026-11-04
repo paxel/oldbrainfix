@@ -358,8 +358,13 @@ class Store {
 
   /// Appends one fact under this Device, signed. [date] defaults to now.
   /// An edit to a field concurrent edits are a Conflict on carries its
-  /// causal context ([Entry.ctx]).
+  /// causal context ([Entry.ctx]). Its number is read and taken in one
+  /// transaction, so another connection's append waits for it instead of
+  /// taking the same number (#207).
   Entry append(String entity, String field, String? value, {DateTime? date}) {
+    if (_db.autocommit) {
+      return batch(() => append(entity, field, value, date: date));
+    }
     final now = clock().toUtc();
     final device = deviceId;
     final vector = _heldVector();
@@ -584,10 +589,12 @@ class Store {
 
   /// Runs [body] in one transaction. A batch inside another one joins
   /// it: the outer one commits, or rolls back on an error from anywhere
-  /// inside, and listeners hear it once.
+  /// inside, and listeners hear it once. It takes the database's write
+  /// lock as it begins: another connection's batch waits until it is
+  /// done (#207), and what [body] reads is still so when it writes.
   T batch<T>(T Function() body) {
     if (!_db.autocommit) return body();
-    _db.execute('BEGIN');
+    _db.execute('BEGIN IMMEDIATE');
     _inBatch = true;
     final T result;
     try {

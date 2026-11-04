@@ -11,6 +11,7 @@ import 'system_bars.dart';
 import 'tally_field_screen.dart';
 import 'tally_unit_match.dart';
 import 'tally_view.dart';
+import 'unit_system.dart';
 
 /// One field of the New Tally page as it is typed: its name, its unit as
 /// typed and the known one a chip picked, its rule, which follows the
