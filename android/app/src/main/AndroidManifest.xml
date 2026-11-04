@@ -318,8 +318,9 @@
              system may send; any other intent, such as an explicit one from
              another app, is ignored by the receiver (RearmActions). Sonar's
              xml:S5322 asks for a permission here, which the system's own
-             broadcasts cannot be relied on to hold. -->
-        <!-- NOSONAR xml:S5322 --><receiver
+             broadcasts cannot be relied on to hold; it is marked Won't fix
+             in SonarQube Cloud (its XML analysis ignores NOSONAR). -->
+        <receiver
             android:name=".RearmReceiver"
             android:exported="true">
             <intent-filter>
