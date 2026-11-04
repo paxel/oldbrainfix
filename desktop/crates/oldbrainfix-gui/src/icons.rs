@@ -201,7 +201,8 @@ pub fn area_icon(key: Option<&str>) -> Option<char> {
 }
 
 /// The fonts: egui's own, the symbol fonts as the text's fallbacks right
-/// after egui's text font, and the icon font in a family of its own.
+/// after egui's text font, Hack last for box drawing, and the icon font
+/// in a family of its own.
 pub fn fonts() -> egui::FontDefinitions {
     let mut fonts = egui::FontDefinitions::default();
     for (name, bytes) in [
@@ -222,6 +223,11 @@ pub fn fonts() -> egui::FontDefinitions {
             .position(|f| f == "Ubuntu-Light")
             .map_or(chain.len(), |i| i + 1);
         chain.splice(at..at, SYMBOL_FONTS.iter().map(|f| f.to_string()));
+    }
+    // Hack, already bundled as the monospace font, last: box drawing,
+    // which neither the text font nor the symbol fonts have.
+    if let Some(chain) = fonts.families.get_mut(&FontFamily::Proportional) {
+        chain.push("Hack".into());
     }
     fonts.font_data.insert(
         "material-icons".into(),
@@ -389,10 +395,11 @@ mod tests {
     fn every_symbol_of_the_app_and_its_texts_has_a_glyph() {
         let defs = fonts();
         let symbols = symbols();
-        // Arrows, math operators and geometric shapes, whole.
+        // Arrows, math operators, box drawing and geometric shapes, whole.
         let blocks = || {
             range(0x2190..=0x21ff)
                 .chain(range(0x2200..=0x22ff))
+                .chain(range(0x2500..=0x257f))
                 .chain(range(0x25a0..=0x25ff))
         };
         for family in [FontFamily::Proportional, FontFamily::Monospace] {
@@ -400,9 +407,6 @@ mod tests {
             let missing = lacking(&defs, &family, wanted);
             assert!(missing.is_empty(), "{family:?} lacks {missing:?}");
         }
-        // Box drawing draws tables in code, in the monospace font.
-        let missing = lacking(&defs, &FontFamily::Monospace, range(0x2500..=0x257f));
-        assert!(missing.is_empty(), "box drawing lacks {missing:?}");
         // The check itself: egui's own fonts lack the arrow (#254).
         let before = lacking(
             &egui::FontDefinitions::default(),
