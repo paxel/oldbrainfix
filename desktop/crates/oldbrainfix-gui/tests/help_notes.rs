@@ -7,10 +7,10 @@
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::help_notes::{self, VERSION_SETTING};
+use oldbrainfix_core::help_notes::{self, VERSION_SETTING, parse_whats_new};
 use oldbrainfix_core::{Checklists, Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::App;
-use oldbrainfix_gui::help_notes::{GROUPS, icons_text, quick_start_lines};
+use oldbrainfix_gui::help_notes::{GROUPS, WHATS_NEW, icons_text, quick_start_lines};
 use oldbrainfix_gui::l10n::L10n;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -116,10 +116,20 @@ fn an_ordinary_start_makes_what_was_never_made_in_its_language_once() -> TestRes
     assert!(!app.welcoming());
     app.set_help("0.4.0")?;
     let t = L10n::new("de");
-    assert_eq!(
-        help_texts(app.store())?,
-        ["Schnellstart".to_string(), icons_text(&t)]
-    );
+    // An update from before the help Notes also gets the bundled What's
+    // new of this version, in the computer's language.
+    let bundled = parse_whats_new(WHATS_NEW);
+    let notes = bundled
+        .get("0.4.0")
+        .and_then(|n| n.get("de"))
+        .ok_or("the bundled German What's new of 0.4.0")?;
+    let mut expected = vec![
+        format!("{}\n\n{notes}", t.help_whats_new_title("0.4.0")),
+        "Schnellstart".to_string(),
+        icons_text(&t),
+    ];
+    expected.sort();
+    assert_eq!(help_texts(app.store())?, expected);
     assert_eq!(
         app.store().local_setting(VERSION_SETTING)?.as_deref(),
         Some("0.4.0")
