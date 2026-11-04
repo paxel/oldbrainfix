@@ -1,18 +1,19 @@
 package io.github.paxel.oldbrainfix
 
 import java.io.File
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class AutoBackupTest {
-    private fun files(): File {
-        val root = Files.createTempDirectory("autobackup").toFile()
-        root.deleteOnExit()
-        return root
-    }
+    /** Deleted with everything in it after each test. */
+    @get:Rule
+    val temp = TemporaryFolder()
+
+    private fun files(): File = temp.newFolder("autobackup")
 
     @Test
     fun nothingIsBackedUpUntilTheUserOptedIn() {

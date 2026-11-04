@@ -1,14 +1,19 @@
 package io.github.paxel.oldbrainfix
 
 import java.io.File
-import java.nio.file.Files
 import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class CrashLogTest {
+    /** Deleted with everything in it after each test. */
+    @get:Rule
+    val temp = TemporaryFolder()
+
     private fun deepCrash(): Throwable {
         fun dig(depth: Int): Nothing =
             if (depth == 0) throw IllegalStateException("the root cause") else dig(depth - 1)
@@ -51,7 +56,7 @@ class CrashLogTest {
 
     @Test
     fun anUncaughtExceptionIsWrittenForTheDartSideAndPassedOn() {
-        val dir = Files.createTempDirectory("crashlog").toFile().apply { deleteOnExit() }
+        val dir = temp.newFolder("crashlog")
         val before = Thread.getDefaultUncaughtExceptionHandler()
         var passedOn: Throwable? = null
         var shown: String? = null

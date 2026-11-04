@@ -6,15 +6,20 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
-import java.nio.file.Files
 
 class SpeechTest {
+    /** Deleted with everything in it after each test. */
+    @get:Rule
+    val temp = TemporaryFolder()
+
     @Test
     fun `a transcribe request carries the recording and both prompts`() {
         val bytes = byteArrayOf(1, 2, 3)
@@ -147,8 +152,7 @@ class SpeechTest {
     }
 
     /** A model file with "abc" in it, its record beside it, and the bytes read from it. */
-    private class Model {
-        val dir: File = Files.createTempDirectory("whisper").toFile().apply { deleteOnExit() }
+    private class Model(val dir: File) {
         val file = File(dir, "ggml-base.bin").apply { writeText("abc") }
         val record = File(dir, "ggml-base.bin.checked")
         var read = 0L
@@ -165,7 +169,7 @@ class SpeechTest {
 
     @Test
     fun `a model without a record is hashed once and then recorded`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         assertEquals(abc, model.hash())
         assertEquals(3L, model.read)
         assertEquals(Speech.ModelRecord(abc, 3, model.file.lastModified()), Speech.readRecord(model.record))
@@ -175,7 +179,7 @@ class SpeechTest {
 
     @Test
     fun `a model kept with its hash is not read again`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         val incoming = File(model.dir, "ggml-base.bin.part").apply { writeText("abc") }
         model.file.delete()
         assertTrue(Speech.keep(incoming, model.file, model.record, abc))
@@ -185,7 +189,7 @@ class SpeechTest {
 
     @Test
     fun `a changed modification time hashes the model again`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         model.hash()
         assertTrue(model.file.setLastModified(model.file.lastModified() - 60_000))
         assertEquals(abc, model.hash())
@@ -194,7 +198,7 @@ class SpeechTest {
 
     @Test
     fun `a changed size hashes the model again`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         val modified = model.file.lastModified()
         model.hash()
         model.file.writeText("abcd")
@@ -205,7 +209,7 @@ class SpeechTest {
 
     @Test
     fun `a record that is not one is no record`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         for (text in listOf("", "ba78 3 1", "$abc 3", "$abc x 1", "${abc.uppercase()} 3 1", "$abc 3 1 1")) {
             model.record.writeText(text)
             assertNull(text, Speech.readRecord(model.record))
@@ -217,7 +221,7 @@ class SpeechTest {
 
     @Test
     fun `no model has no hash and reads nothing`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         model.file.delete()
         assertNull(model.hash())
         assertEquals(0L, model.read)
@@ -225,7 +229,7 @@ class SpeechTest {
 
     @Test
     fun `keeping a model drops the record of the one before`() {
-        val model = Model()
+        val model = Model(temp.newFolder("whisper"))
         model.hash()
         val incoming = File(model.dir, "ggml-base.bin.part").apply { writeText("abcd") }
         assertTrue(Speech.keep(incoming, model.file, model.record, null))
