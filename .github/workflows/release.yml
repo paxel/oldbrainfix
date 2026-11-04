@@ -691,11 +691,21 @@ jobs:
           fi
       - if: steps.secrets.outputs.ready == 'true'
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
       - if: steps.secrets.outputs.ready == 'true'
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
+      # RustO and whisper.cpp for the device, as in ios.yml (#239).
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        with:
+          targets: aarch64-apple-ios
+      - name: Native libraries
+        if: steps.secrets.outputs.ready == 'true'
+        run: sh tool/ios-native.sh iphoneos
       # A keychain of its own for the certificate, and the profile where
       # Xcode looks; its UUID and team come from the profile itself.
       - name: Install the certificate and the profile

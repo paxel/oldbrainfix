@@ -1,2 +1,5 @@
 /* Why the app asks for AlarmKit's alarms (#238). */
 "NSAlarmKitUsageDescription" = "Damit kann eine Routine, die du immer wieder übergehst, als Alarm klingeln – auch im Stummmodus und im Fokus.";
+
+/* Why the app asks for the microphone (#239). */
+"NSMicrophoneUsageDescription" = "Sprachnotizen nehmen auf, was du sagst. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst.";

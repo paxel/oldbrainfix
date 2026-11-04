@@ -16,6 +16,10 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    AlarmsChannel.register(messenger: engineBridge.applicationRegistrar.messenger())
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    AlarmsChannel.register(messenger: messenger)
+    OcrChannel.register(messenger: messenger)
+    SpeechChannel.register(messenger: messenger)
+    VoiceChannel.register(messenger: messenger)
   }
 }

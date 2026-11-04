@@ -20,16 +20,32 @@ jobs:
     # Xcode 26 with the iOS 26 SDK, the oldest iOS the app runs on.
     runs-on: macos-26
     steps:
+      # whisper.cpp is the submodule third_party/whisper.cpp (#247).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
-      # So a red run says which Xcode and which simulators it had.
-      - name: Xcode and simulator runtimes
+      # RustO for Photo Texts is Rust (android/ocr), built for the device
+      # and the simulator (#239).
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: android/ocr
+      # So a red run says which Xcode, simulators and cmake it had.
+      - name: Xcode, simulator runtimes and cmake
         run: |
           xcodebuild -version
           xcrun simctl list runtimes
+          cmake --version
+      # RustO and whisper.cpp as static libraries in ios/Native, which
+      # the Runner links (#239).
+      - name: Native libraries
+        run: sh tool/ios-native.sh
       - run: flutter pub get
       - name: Build for a device, unsigned
         run: flutter build ios --release --no-codesign

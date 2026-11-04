@@ -2,6 +2,8 @@
 //! the PP-OCRv6 Tiny detection and recognition models and their
 //! character list bundled in the app, behind three JNI functions for
 //! `OcrNative` in the app's Kotlin. Fully offline, no Google library.
+//! The iPhone links the same crate as a static library and calls the C
+//! functions of its `ios` module (#239).
 //!
 //! The app decodes the photo itself (an upright JPEG of at most 2048
 //! px) and hands in its RGBA pixels and the bytes of the model files, so
@@ -271,6 +273,134 @@ pub extern "system" fn Java_io_github_paxel_oldbrainfix_OcrNative_close<'local>(
     let _ = catch_unwind(|| drop(unsafe { Box::from_raw(reader as *mut Reader) }));
 }
 
+/// The C functions the iPhone's `OcrChannel.swift` calls (#239), the
+/// twins of the JNI ones above: the same [Reader] behind an opaque
+/// pointer, the text as a NUL-terminated UTF-8 string that only
+/// [ios::obf_ocr_free_text] may free. Declared for Swift in
+/// `ios/Runner/oldbrainfix_native.h`. Built for the host too in tests, so
+/// they run here.
+// SAFETY: FFI: the only place besides the JNI exports that may use
+// unsafe code; each block says why it holds.
+#[allow(unsafe_code)]
+#[cfg(any(target_os = "ios", test))]
+pub mod ios {
+    use super::Reader;
+    use std::ffi::{c_char, CString};
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::{ptr, slice};
+
+    /// The `len` bytes at `data` as a slice; empty for null.
+    ///
+    /// # Safety
+    ///
+    /// A non-null `data` points to `len` readable bytes that stay
+    /// unchanged while the slice lives.
+    unsafe fn bytes<'a>(data: *const u8, len: usize) -> &'a [u8] {
+        if data.is_null() || len == 0 {
+            return &[];
+        }
+        // SAFETY: the caller's promise above.
+        unsafe { slice::from_raw_parts(data, len) }
+    }
+
+    /// A [Reader] with the bytes of the detection and recognition
+    /// models and of `dict.txt`, or null when they could not be loaded.
+    /// A panic never crosses into Swift.
+    ///
+    /// # Safety
+    ///
+    /// Each pointer is null or points to its length in readable bytes,
+    /// for the length of the call.
+    #[no_mangle]
+    pub unsafe extern "C" fn obf_ocr_open(
+        detection: *const u8,
+        detection_len: usize,
+        recognition: *const u8,
+        recognition_len: usize,
+        characters: *const u8,
+        characters_len: usize,
+    ) -> *mut Reader {
+        // SAFETY: the caller's promise above, for each buffer.
+        let (detection, recognition, characters) = unsafe {
+            (
+                bytes(detection, detection_len),
+                bytes(recognition, recognition_len),
+                bytes(characters, characters_len),
+            )
+        };
+        let reader = catch_unwind(AssertUnwindSafe(|| {
+            let characters = std::str::from_utf8(characters).ok()?;
+            Reader::new(detection.to_vec(), recognition.to_vec(), characters).ok()
+        }));
+        match reader {
+            Ok(Some(reader)) => Box::into_raw(Box::new(reader)),
+            _ => ptr::null_mut(),
+        }
+    }
+
+    /// The text in the picture of `width` × `height` RGBA pixels, row
+    /// by row, at `rgba`: empty when there is none, null when it could
+    /// not be read. Free it with [obf_ocr_free_text].
+    ///
+    /// # Safety
+    ///
+    /// `reader` is null or comes from [obf_ocr_open] and was not closed;
+    /// no other call uses it meanwhile. `rgba` is null or points to
+    /// `len` readable bytes.
+    #[no_mangle]
+    pub unsafe extern "C" fn obf_ocr_read(
+        reader: *mut Reader,
+        rgba: *const u8,
+        len: usize,
+        width: u32,
+        height: u32,
+    ) -> *mut c_char {
+        if reader.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: a non-null reader is open and used by this call only,
+        // and the pixels are readable, as the caller promised.
+        let (reader, pixels) = unsafe { (&mut *reader, bytes(rgba, len)) };
+        let text = catch_unwind(AssertUnwindSafe(|| {
+            let text = reader.read(pixels, width, height).ok()?;
+            CString::new(text).ok()
+        }));
+        match text {
+            Ok(Some(text)) => text.into_raw(),
+            _ => ptr::null_mut(),
+        }
+    }
+
+    /// Frees a text [obf_ocr_read] answered; null is ignored.
+    ///
+    /// # Safety
+    ///
+    /// `text` is null or comes from [obf_ocr_read] and was not freed.
+    #[no_mangle]
+    pub unsafe extern "C" fn obf_ocr_free_text(text: *mut c_char) {
+        if text.is_null() {
+            return;
+        }
+        // SAFETY: it came from CString::into_raw in obf_ocr_read, once.
+        drop(unsafe { CString::from_raw(text) });
+    }
+
+    /// Frees the [Reader] and its models; null is ignored.
+    ///
+    /// # Safety
+    ///
+    /// `reader` is null or comes from [obf_ocr_open] and is never used
+    /// again.
+    #[no_mangle]
+    pub unsafe extern "C" fn obf_ocr_close(reader: *mut Reader) {
+        if reader.is_null() {
+            return;
+        }
+        // SAFETY: it came from Box::into_raw in obf_ocr_open, once.
+        let _ = catch_unwind(AssertUnwindSafe(|| drop(unsafe { Box::from_raw(reader) })));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399,5 +529,87 @@ mod tests {
     #[test]
     fn pixels_that_do_not_fit_are_not_read() {
         assert!(reader().read(&[0; 10], 64, 48).is_err());
+    }
+
+    /// The iPhone's C functions (#239), with their pointers as Swift
+    /// hands them in.
+    #[allow(unsafe_code)]
+    mod ios_ffi {
+        use super::*;
+        use crate::ios::*;
+        use std::ffi::CStr;
+
+        /// A reader opened through the C function, or null.
+        fn open(detection: &[u8], recognition: &[u8], characters: &[u8]) -> *mut Reader {
+            // SAFETY: each slice is alive and its length is its own.
+            unsafe {
+                obf_ocr_open(
+                    detection.as_ptr(),
+                    detection.len(),
+                    recognition.as_ptr(),
+                    recognition.len(),
+                    characters.as_ptr(),
+                    characters.len(),
+                )
+            }
+        }
+
+        /// The text read through the C function, freed with it; None for
+        /// null.
+        fn read(reader: *mut Reader, rgba: &[u8], width: u32, height: u32) -> Option<String> {
+            // SAFETY: reader is open or null, rgba is alive.
+            let text = unsafe { obf_ocr_read(reader, rgba.as_ptr(), rgba.len(), width, height) };
+            if text.is_null() {
+                return None;
+            }
+            // SAFETY: a non-null text is a NUL-terminated string from
+            // obf_ocr_read, freed once right after it is copied.
+            unsafe {
+                let copy = CStr::from_ptr(text).to_str().unwrap().to_string();
+                obf_ocr_free_text(text);
+                Some(copy)
+            }
+        }
+
+        #[test]
+        fn the_bundled_models_read_a_photo_through_the_c_functions() {
+            let reader = open(
+                &bundled("det.rten"),
+                &bundled("rec.rten"),
+                &bundled("dict.txt"),
+            );
+            assert!(!reader.is_null());
+            let photo = image::open(root().join("testdata/german-receipt.jpg"))
+                .unwrap()
+                .into_rgba8();
+            let (width, height) = photo.dimensions();
+            let text = read(reader, photo.as_raw(), width, height).unwrap();
+            assert!(text.contains("Bäckerei Müller GmbH"), "{text}");
+            let white = vec![255u8; 64 * 48 * 4];
+            assert_eq!(read(reader, &white, 64, 48).as_deref(), Some(""));
+            assert_eq!(read(reader, &white, 64, 47), None);
+            // SAFETY: opened above and not used again.
+            unsafe { obf_ocr_close(reader) };
+        }
+
+        #[test]
+        fn models_that_do_not_load_give_no_reader() {
+            assert!(open(b"no model", b"no model", b"a\nb").is_null());
+            let characters = [0xff, 0xfe];
+            assert!(open(&bundled("det.rten"), &bundled("rec.rten"), &characters).is_null());
+            // SAFETY: null pointers with zero lengths, as allowed.
+            let empty = unsafe { obf_ocr_open(ptr::null(), 0, ptr::null(), 0, ptr::null(), 0) };
+            assert!(empty.is_null());
+        }
+
+        #[test]
+        fn null_is_nothing_to_read_or_free() {
+            assert_eq!(read(ptr::null_mut(), &[0; 4], 1, 1), None);
+            // SAFETY: null is ignored by both.
+            unsafe {
+                obf_ocr_free_text(ptr::null_mut());
+                obf_ocr_close(ptr::null_mut());
+            }
+        }
     }
 }

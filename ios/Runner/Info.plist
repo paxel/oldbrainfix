@@ -31,6 +31,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Lets a Routine you keep ignoring ring as an alarm, even in silent mode and Focus.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voice Notes record what you say. Old Brain Fix uses the microphone only while you record.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

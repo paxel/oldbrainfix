@@ -25,6 +25,12 @@ class RunnerTests: XCTestCase {
     XCTAssertTrue(languages.contains("de"))
   }
 
+  /// The microphone's reason for voice Notes (#239), in English here and
+  /// in German in de.lproj.
+  func testTheMicrophoneIsExplained() {
+    XCTAssertNotNil(info("NSMicrophoneUsageDescription") as? String)
+  }
+
   func testIos26AndNewer() {
     XCTAssertEqual(info("MinimumOSVersion") as? String, "26.0")
   }

@@ -27,6 +27,9 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
+# The native libraries tool/ios-native.sh builds (#239).
+/Native/
+
 # Exceptions to above rules.
 !default.mode1v3
 !default.mode2v3

@@ -25,8 +25,8 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
 
 # No unsafe and no panics, as in the desktop's workspace (#229). The JNI
 # functions are FFI: each allows `unsafe_code` itself, with a
-# `// SAFETY:` reason. Tests may unwrap, expect, panic and index
-# (clippy.toml).
+# `// SAFETY:` reason; so does the iPhone's C module `ios` (#239). Tests
+# may unwrap, expect, panic and index (clippy.toml).
 [lints.rust]
 unsafe_code = "deny"
 
