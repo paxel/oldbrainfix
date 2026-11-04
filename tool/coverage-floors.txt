@@ -5,7 +5,11 @@
 # Whole percents, rounded down from the measured line coverage: a local
 # run and a CI run may differ by a fraction (other test environment, other
 # Flutter), and one decimal would stop a release over that noise.
+#
+# rust-gui sits one point below its measured 89.02-89.03: a one-time
+# margin when the floors were introduced, so a CI run that measures a
+# fraction lower does not stop a release. From here on, floors only rise.
 rust-core 96
-rust-gui 89
+rust-gui 88
 dart-core 96
 flutter-app 91
