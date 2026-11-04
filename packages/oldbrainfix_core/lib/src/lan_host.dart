@@ -755,12 +755,21 @@ class PairingHost {
   }
 }
 
+/// Answers a paired Device's `POST /sync` as [LanServing.servePaired]
+/// does, somewhere else: the app merges what it brought in an isolate of
+/// its own (#225).
+typedef PairedMerge = Future<(HostResponse, SyncSession?)> Function(
+  HostRequest request,
+);
+
 /// The paired host as every Device runs it for automatic sync (ADR
 /// 0003), the twin of the desktop's: paired Devices that sync with this
 /// one on its own join it without the PIN, proven by their keys
 /// ([LanServing.servePaired]); on every address of this Device, its port
 /// kept from run to run. The phone runs it while the app is open and
-/// during its background sync, and advertises it ([serviceType]).
+/// during its background sync, and advertises it ([serviceType]). A
+/// `POST /sync`, where the joiner's entries merge, goes to [merging]
+/// when given; everything else is answered here.
 class PairedHost {
   final Store store;
   final LanHost host;
@@ -768,10 +777,17 @@ class PairedHost {
   /// The name this Device goes by.
   final String name;
   final void Function(SyncSession session)? onSession;
+  final PairedMerge? merging;
   late final StreamSubscription<HostRequest> _subscription;
 
-  PairedHost._(this.store, this.host, {required this.name, this.onSession}) {
-    _subscription = host.requests.listen(_serve);
+  PairedHost._(
+    this.store,
+    this.host, {
+    required this.name,
+    this.onSession,
+    this.merging,
+  }) {
+    _subscription = host.requests.listen((r) => unawaited(_serve(r)));
   }
 
   /// Starts the paired host on [bind], every IPv4 address unless given.
@@ -780,9 +796,16 @@ class PairedHost {
     required String name,
     InternetAddress? bind,
     void Function(SyncSession session)? onSession,
+    PairedMerge? merging,
   }) async {
     final host = await store.startPairedHost(bind ?? InternetAddress.anyIPv4);
-    return PairedHost._(store, host, name: name, onSession: onSession);
+    return PairedHost._(
+      store,
+      host,
+      name: name,
+      onSession: onSession,
+      merging: merging,
+    );
   }
 
   int get port => host.port;
@@ -792,10 +815,14 @@ class PairedHost {
     await host.stop();
   }
 
-  void _serve(HostRequest request) {
+  Future<void> _serve(HostRequest request) async {
     final (HostResponse, SyncSession?) done;
     try {
-      done = store.servePaired(request, name: name);
+      done = switch (merging) {
+        final merge? when request.method == 'POST' && request.path == '/sync' =>
+          await merge(request),
+        _ => store.servePaired(request, name: name),
+      };
     } on Object {
       request.reply(const HostResponse.status(500));
       return;

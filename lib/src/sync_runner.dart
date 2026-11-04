@@ -7,8 +7,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'auto_sync.dart';
 import 'folder_platform.dart';
 
-/// Where the automatic sync's two jobs run (#225): a round through the
-/// shared folder and a join of a paired Device. The app runs them in an
+/// Where the automatic sync's jobs run (#225): a round through the
+/// shared folder, a join of a paired Device and a paired Device's join
+/// of this one's host. The app runs them in an
 /// isolate of their own ([IsolateSyncRunner]), tests on the store they
 /// read ([InlineSyncRunner]).
 abstract interface class SyncRunner {
@@ -23,6 +24,15 @@ abstract interface class SyncRunner {
     PairedDevice device, {
     required String host,
     required int port,
+    required String name,
+  });
+
+  /// [request], which a paired Device sent this Device's paired host,
+  /// answered by [store] going by [name], its `/sync` merging what it
+  /// brought, as [LanServing.servePaired].
+  Future<(HostResponse, SyncSession?)> host(
+    Store store,
+    HostRequest request, {
     required String name,
   });
 }
@@ -46,6 +56,13 @@ class InlineSyncRunner implements SyncRunner {
     required int port,
     required String name,
   }) => joining(store, device, host: host, port: port, name: name);
+
+  @override
+  Future<(HostResponse, SyncSession?)> host(
+    Store store,
+    HostRequest request, {
+    required String name,
+  }) async => store.servePaired(request, name: name);
 }
 
 /// What a job in an isolate of its own brought back: its result
@@ -125,6 +142,13 @@ class IsolateSyncRunner implements SyncRunner {
     required int port,
     required String name,
   }) => _join(store, path, token, joining, device, host, port, name);
+
+  @override
+  Future<(HostResponse, SyncSession?)> host(
+    Store store,
+    HostRequest request, {
+    required String name,
+  }) => _host(store, path, token, request, name);
 }
 
 // Static, so the closures that cross into the isolate hold only what
@@ -158,6 +182,34 @@ Future<SyncResult> _join(
   (s) => joining(s, device, host: host, port: port, name: name),
   token: token,
 );
+
+/// The request crosses as its parts: its answer waits here.
+Future<(HostResponse, SyncSession?)> _host(
+  Store store,
+  String path,
+  RootIsolateToken? token,
+  HostRequest request,
+  String name,
+) {
+  final HostRequest(:method, path: at, :headers, :body, :from, :challenged) =
+      request;
+  return runIsolated(
+    store,
+    path,
+    (s) => s.servePaired(
+      HostRequest(
+        method: method,
+        path: at,
+        headers: headers,
+        body: body,
+        from: from,
+        challenged: challenged,
+      ),
+      name: name,
+    ),
+    token: token,
+  );
+}
 
 /// Runs [work] in an isolate of its own on a store of its own on [path]
 /// (SQLite WAL), as the sync does (#225), and hands back its result or

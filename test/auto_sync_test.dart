@@ -16,6 +16,7 @@ import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/sync_platform.dart';
 import 'package:oldbrainfix/src/sync_line.dart';
+import 'package:oldbrainfix/src/sync_runner.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -102,9 +103,10 @@ class FakeHosts {
     Store store, {
     required String name,
     required void Function(SyncSession session) onSession,
+    PairedMerge? merging,
   }) async {
     starts++;
-    return running = FakeHost(4700 + starts, onSession);
+    return running = FakeHost(4700 + starts, onSession, merging);
   }
 }
 
@@ -112,12 +114,31 @@ class FakeHost implements PairedHosting {
   @override
   final int port;
   final void Function(SyncSession session) onSession;
+  final PairedMerge? merging;
   var stopped = false;
 
-  FakeHost(this.port, this.onSession);
+  FakeHost(this.port, this.onSession, this.merging);
 
   @override
   Future<void> stop() async => stopped = true;
+}
+
+/// Where a test's jobs run: here, the paired host's merges recorded.
+class RecordingRunner extends InlineSyncRunner {
+  final hosted = <(HostRequest, String)>[];
+
+  RecordingRunner()
+    : super(folders: const NoFolders(), joining: quickPairedSync);
+
+  @override
+  Future<(HostResponse, SyncSession?)> host(
+    Store store,
+    HostRequest request, {
+    required String name,
+  }) async {
+    hosted.add((request, name));
+    return (const HostResponse.status(204), null);
+  }
 }
 
 void main() {
@@ -428,6 +449,35 @@ void main() {
       auto.shown();
       await tester.pump();
       expect(hosts.starts, 1);
+      auto.dispose();
+    });
+
+    testWidgets('a joiner\'s /sync merges where the runner runs the joins '
+        '(#225)', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final runner = RecordingRunner();
+      final auto = AutoSync(
+        store: phone,
+        platform: sync,
+        deviceName: () async => 'Pixel',
+        join: join,
+        clock: () => now,
+        host: hosts.start,
+        runner: runner,
+      );
+      auto.shown();
+      await tester.pump();
+      final request = HostRequest(
+        method: 'POST',
+        path: '/sync',
+        body: Uint8List(0),
+      );
+      final (response, session) = await hosts.running!.merging!(request);
+      expect(response.status, 204);
+      expect(session, isNull);
+      expect(runner.hosted.single.$1, same(request));
+      expect(runner.hosted.single.$2, 'Pixel');
       auto.dispose();
     });
 

@@ -238,6 +238,46 @@ void main() {
       expect(b.localSetting(LanServing.pairedPortKey), '${onB.port}');
     });
 
+    test('the paired host hands a joiner\'s /sync to merging, answers the '
+        'rest itself, and a merge that throws is a 500 (#225)', () async {
+      final host = await pairing(a);
+      await join(host, b);
+      await host.stop();
+      Notes(b).capture('B later');
+      final merged = <String>[];
+      final sessions = <SyncSession>[];
+      var broken = false;
+      final onA = await PairedHost.start(
+        a,
+        name: 'Phone A',
+        bind: InternetAddress.loopbackIPv4,
+        onSession: sessions.add,
+        merging: (request) async {
+          merged.add('${request.method} ${request.path}');
+          if (broken) throw StateError('broke there');
+          return a.servePaired(request, name: 'Phone A');
+        },
+      );
+      addTearDown(onA.stop);
+      Future<SyncResult> joinA() => pairedSync(
+        b,
+        b.pairedDevice(a.deviceId)!,
+        host: '127.0.0.1',
+        port: onA.port,
+        name: 'Phone B',
+      );
+      await joinA();
+      expect(merged, ['POST /sync']);
+      expect(texts(a), ['B later']);
+      expect([for (final s in sessions) s.peer], [b.deviceId]);
+      broken = true;
+      Notes(b).capture('B again');
+      await expectLater(joinA(), throwsA(isA<SyncException>()));
+      expect(merged, ['POST /sync', 'POST /sync']);
+      expect(texts(a), ['B later']);
+      expect(sessions, hasLength(1));
+    });
+
     test('the paired host answers paired Devices only', () async {
       final stranger = Store.inMemory(clock: clock.call);
       addTearDown(stranger.close);

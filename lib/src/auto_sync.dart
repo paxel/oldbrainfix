@@ -44,11 +44,13 @@ abstract interface class PairedHosting {
 }
 
 /// How the paired host is started; the app passes [startPairedHosting],
-/// tests a fake.
+/// tests a fake. A joiner's `/sync` merges where [merging] says, else on
+/// [store] here.
 typedef StartPairedHost = Future<PairedHosting> Function(
   Store store, {
   required String name,
   required void Function(SyncSession session) onSession,
+  PairedMerge? merging,
 });
 
 /// The core's [PairedHost] on every IPv4 address of this Device.
@@ -56,8 +58,14 @@ Future<PairedHosting> startPairedHosting(
   Store store, {
   required String name,
   required void Function(SyncSession session) onSession,
+  PairedMerge? merging,
 }) async => _PairedHosting(
-  await PairedHost.start(store, name: name, onSession: onSession),
+  await PairedHost.start(
+    store,
+    name: name,
+    onSession: onSession,
+    merging: merging,
+  ),
 );
 
 class _PairedHosting implements PairedHosting {
@@ -93,9 +101,10 @@ const retryEvery = Duration(seconds: 15);
 /// while the app shows and, when the periodic work comes due while the
 /// app is out of sight, for [hostWindow]. Tells its listeners when a sync brought
 /// Conflicts or needs an update, or a background sync did while the app
-/// was closed, for the announcement at the top. The folder rounds and
-/// the joins run where [runner] runs them, in the app an isolate of their
-/// own (#225); [syncing] says while one does.
+/// was closed, for the announcement at the top. The folder rounds, the
+/// joins and the merges of the paired host run where [runner] runs them,
+/// in the app an isolate of their own (#225); [syncing] says while a
+/// folder round or a join does.
 class AutoSync extends ChangeNotifier {
   final Store store;
   final SyncPlatform platform;
@@ -120,8 +129,9 @@ class AutoSync extends ChangeNotifier {
   /// Starts the paired host; without one, this Device only joins.
   final StartPairedHost? host;
 
-  /// Where the folder rounds and the joins run; on [store] in its
-  /// isolate, with [folders] and [join], unless the app hands in another.
+  /// Where the folder rounds, the joins and the paired host's merges
+  /// run; on [store] in its isolate, with [folders] and [join], unless
+  /// the app hands in another.
   late final SyncRunner runner;
 
   /// Whether a folder round or a join of this Device runs now (#225).
@@ -308,10 +318,13 @@ class AutoSync extends ChangeNotifier {
       return;
     }
     if (!want) return;
+    final name = await deviceName();
     final started = await start(
       store,
-      name: await deviceName(),
+      name: name,
       onSession: _hostSession,
+      // A joiner's entries merge where the joins do (#225).
+      merging: (request) => runner.host(store, request, name: name),
     );
     if (_disposed) {
       await started.stop();

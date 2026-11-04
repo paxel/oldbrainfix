@@ -66,6 +66,28 @@ Object _writesUnsendable(Store store) {
   return ReceivePort();
 }
 
+/// The desk, its database at [path], joining the phone's paired host on
+/// [port] in an isolate of its own, as another Device would over the
+/// network: its own work stalls nobody here. What it sent comes back.
+Future<int> _deskJoinsHost(String path, String phone, int port) =>
+    Isolate.run(() => _deskJoins(path, phone, port));
+
+Future<int> _deskJoins(String path, String phone, int port) async {
+  final desk = Store.open(path);
+  try {
+    final result = await pairedSync(
+      desk,
+      desk.pairedDevice(phone)!,
+      host: '127.0.0.1',
+      port: port,
+      name: 'Desk',
+    );
+    return result.entriesSent;
+  } finally {
+    desk.close();
+  }
+}
+
 void main() {
   late Directory dir;
   late Store phone;
@@ -168,6 +190,63 @@ void main() {
       ),
     );
     expect(told, 1, reason: 'nothing changed');
+  });
+
+  test('a paired Device\'s join of this Device\'s host merges in an '
+      'isolate of its own while this one keeps running, and the store here '
+      'hears of it (#225)', () async {
+    // Paired by pair code, as the phones do once.
+    final pairing = await PairingHost.start(
+      phone,
+      name: 'Pixel',
+      bind: InternetAddress.loopbackIPv4,
+      ask: (_, _) async => true,
+    );
+    await lanSync(
+      desk,
+      decodePairCode(pairing.pairCode(typed: true))!,
+      name: 'Desk',
+    );
+    await pairing.stop();
+    // The other Device's months of use, brought along by its join.
+    desk.batch(() {
+      for (var i = 0; i < 2000; i++) {
+        Notes(desk).capture('Desk note $i');
+      }
+    });
+    told = 0;
+    final sessions = <SyncSession>[];
+    final host = await PairedHost.start(
+      phone,
+      name: 'Pixel',
+      bind: InternetAddress.loopbackIPv4,
+      onSession: sessions.add,
+      merging: (request) => runner().host(phone, request, name: 'Pixel'),
+    );
+    addTearDown(host.stop);
+    // This isolate's event loop, as the app's frames ride on it.
+    var longest = Duration.zero;
+    var ticks = 0;
+    final gap = Stopwatch()..start();
+    final ticker = Timer.periodic(const Duration(milliseconds: 2), (_) {
+      if (gap.elapsed > longest) longest = gap.elapsed;
+      ticks++;
+      gap.reset();
+    });
+    final took = Stopwatch()..start();
+    final sent = await _deskJoinsHost(deskPath, phone.deviceId, host.port);
+    took.stop();
+    ticker.cancel();
+    if (gap.elapsed > longest) longest = gap.elapsed;
+    expect(sent, greaterThanOrEqualTo(6000));
+    expect(sessions.single.peer, desk.deviceId);
+    expect(sessions.single.applied, hasLength(sent));
+    expect(told, 1, reason: 'once, as after a sync of its own');
+    expect(Notes(phone).all(), hasLength(2000));
+    // Drawing goes on: no stall here near the time the merge took.
+    expect(took.elapsed, greaterThan(const Duration(milliseconds: 300)));
+    expect(longest, lessThan(took.elapsed ~/ 3));
+    expect(ticks, greaterThan(10));
   });
 
   group('a job on a connection of its own (#207, #225)', () {
