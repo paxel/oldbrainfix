@@ -50,14 +50,17 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- Android's Auto Backup to the user's Google account (ADR 0010):
          the agent backs up nothing until the user opts in, and then only
-         the encrypted Backup file, never the database. -->
+         the encrypted Backup file, never the database.
+         LAN sync runs over TLS only, so clear-text traffic stays off on
+         every Android version. -->
     <application
         android:label="Old Brain Fix"
         android:name=".OldBrainFixApplication"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:backupAgent=".AutoBackupAgent"
-        android:fullBackupOnly="true">
+        android:fullBackupOnly="true"
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -311,6 +314,9 @@
         <receiver
             android:name=".ShareChosenReceiver"
             android:exported="false" />
+        <!-- Exported for the system's broadcasts below, which only the
+             system may send; any other intent, such as an explicit one from
+             another app, is ignored by the receiver. -->
         <receiver
             android:name=".RearmReceiver"
             android:exported="true">

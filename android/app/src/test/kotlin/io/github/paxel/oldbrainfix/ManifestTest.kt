@@ -11,7 +11,8 @@ import org.w3c.dom.Element
 /**
  * The manifest's "open with" filters: a Profile card file (#144) and a
  * Pack (#164) come in as a bundle or a Sent Item does, and no card link
- * opens the app.
+ * opens the app. Clear-text traffic is off, and the one exported receiver
+ * hears only the system's broadcasts (#235).
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -70,5 +71,20 @@ class ManifestTest {
         assertFalse(paths.any { it.startsWith("/oldbrainfix/p") })
         assertFalse(dataOf(manifest.documentElement, "host").contains("paxel.github.io"))
         assertTrue(elements(manifest.documentElement, "activity").none { it.getAttributeNS(android, "name") == ".CardActivity" })
+    }
+
+    @Test
+    fun clearTextTrafficIsOffOnEveryAndroidVersion() {
+        val application = elements(manifest.documentElement, "application").single()
+        assertEquals("false", application.getAttributeNS(android, "usesCleartextTraffic"))
+    }
+
+    @Test
+    fun theOnlyExportedReceiverListensForTheRearmBroadcasts() {
+        val exported = elements(manifest.documentElement, "receiver")
+            .filter { it.getAttributeNS(android, "exported") != "false" }
+        assertEquals(listOf(".RearmReceiver"), exported.map { it.getAttributeNS(android, "name") })
+        val actions = elements(exported.single(), "action").map { it.getAttributeNS(android, "name") }.toSet()
+        assertEquals(RearmActions.all, actions)
     }
 }

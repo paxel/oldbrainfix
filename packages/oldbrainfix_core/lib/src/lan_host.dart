@@ -127,7 +127,7 @@ class LanHost {
     try {
       response = await _answer(req);
     } on Object {
-      response = HostResponse.status(HttpStatus.internalServerError);
+      response = const HostResponse.status(HttpStatus.internalServerError);
     }
     try {
       res.statusCode = response.status;
@@ -146,11 +146,11 @@ class LanHost {
   Future<HostResponse> _answer(HttpRequest req) async {
     final path = req.uri.path;
     final limit = path.startsWith('/blob/') ? maxBlobBytes : maxEntriesBytes;
-    if (req.contentLength > limit) return HostResponse.status(413);
+    if (req.contentLength > limit) return const HostResponse.status(413);
     final body = BytesBuilder(copy: false);
     await for (final chunk in req) {
       body.add(chunk);
-      if (body.length > limit) return HostResponse.status(413);
+      if (body.length > limit) return const HostResponse.status(413);
     }
     final headers = <String, String>{};
     req.headers.forEach((name, values) {
@@ -162,7 +162,7 @@ class LanHost {
     if (req.method == 'GET' && path == '/challenge') {
       return pin.isEmpty
           ? HostResponse.json(200, {'nonce': _challenge()})
-          : HostResponse.status(404);
+          : const HostResponse.status(404);
     }
     final challenged = pin.isEmpty && _knows(headers[nonceHeader]);
     if (!challenged) {
@@ -212,7 +212,7 @@ class LanHost {
   /// answer to send instead. The lock is looked at before the PIN: once
   /// locked, even the right PIN hears `locked`.
   HostResponse? _check(String from, String? given) {
-    if (pin.isEmpty) return HostResponse.status(403);
+    if (pin.isEmpty) return const HostResponse.status(403);
     if (_failuresTotal >= pinFailuresTotal ||
         (_failures[from] ?? 0) >= pinFailuresPerAddress) {
       return HostResponse.text(403, 'locked');
@@ -221,7 +221,7 @@ class LanHost {
       _failures[from] = (_failures[from] ?? 0) + 1;
       _failuresTotal++;
       if (_failuresTotal >= pinFailuresTotal) _locked = true;
-      return HostResponse.status(403);
+      return const HostResponse.status(403);
     }
     return null;
   }
@@ -521,7 +521,7 @@ extension LanServing on Store {
         }
         final bytes = blob(kind, hash);
         if (bytes == null || (areas != null && !blobIn(ref, areas))) {
-          return (HostResponse.status(404), null);
+          return (const HostResponse.status(404), null);
         }
         return (HostResponse.bytes(bytes), null);
       }
@@ -532,7 +532,7 @@ extension LanServing on Store {
         return (HostResponse.status(kept ? 200 : 404), null);
       }
     }
-    return (HostResponse.status(404), null);
+    return (const HostResponse.status(404), null);
   }
 
   /// `/vector`: the version vector, with the wire formats and this
@@ -561,11 +561,11 @@ extension LanServing on Store {
     try {
       final value = jsonDecode(utf8.decode(body));
       if (value is! Map<String, Object?>) {
-        return (HostResponse.status(500), null);
+        return (const HostResponse.status(500), null);
       }
       json = value;
     } on FormatException {
-      return (HostResponse.status(500), null);
+      return (const HostResponse.status(500), null);
     }
     final format = formatOf(json);
     final done = answerSync(
