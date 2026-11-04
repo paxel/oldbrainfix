@@ -145,6 +145,8 @@ class AndroidSync implements SyncPlatform {
       return [for (final f in found ?? const []) ?_read(f)];
     } on PlatformException {
       return const [];
+    } on MissingPluginException {
+      return const [];
     }
   }
 

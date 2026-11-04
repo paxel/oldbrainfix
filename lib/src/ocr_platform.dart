@@ -57,6 +57,8 @@ class AndroidOcr implements OcrPlatform {
       return await _channel.invokeMethod<T>(method, arguments);
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 }

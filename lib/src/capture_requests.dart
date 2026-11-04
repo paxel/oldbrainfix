@@ -47,6 +47,8 @@ class AndroidCaptureRequests implements CaptureRequests {
       name = await _channel.invokeMethod<String>('take');
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
     for (final mode in CaptureMode.values) {
       if (mode.name == name) return mode;

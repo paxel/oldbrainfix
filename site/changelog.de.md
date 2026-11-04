@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.5.0]
 
+### Neu
+
+- Die Grundlage für eine iPhone-Version von Old Brain Fix: Der iPhone-Build ist eingerichtet und getestet und geht über TestFlight an Testende, sobald das Apple-Konto verbunden ist. Für iPhone-Nutzende gibt es noch nichts.
+
 ## [0.4.0] - 2026-11-04
 
 ### Neu

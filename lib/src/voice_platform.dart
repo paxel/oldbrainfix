@@ -105,6 +105,8 @@ class AndroidVoice implements VoicePlatform {
       return await _channel.invokeMethod<Uint8List>('stop');
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 
@@ -124,6 +126,8 @@ class AndroidVoice implements VoicePlatform {
     try {
       return await _channel.invokeMethod<bool>(method, arguments) ?? false;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
       return false;
     }
   }

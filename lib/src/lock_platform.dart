@@ -41,6 +41,8 @@ class AndroidBiometrics implements LockPlatform {
       return await _channel.invokeMethod<bool>(method, args);
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 }

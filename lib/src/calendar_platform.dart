@@ -73,6 +73,8 @@ class AndroidCalendar implements CalendarPlatform {
       return await _channel.invokeMethod<bool>(method, args) ?? false;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 }

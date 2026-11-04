@@ -13,6 +13,7 @@ analyzer:
   exclude:
     - build/**
     - android/**
+    - ios/**
   # Strict typing (#230, Q556 (a)): no implicit downcasts from dynamic, no
   # raw generic types, no inference that falls back to dynamic.
   language:

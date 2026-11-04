@@ -177,6 +177,8 @@ class AndroidPhotos implements PhotoPlatform {
       return await _channel.invokeMethod<Uint8List>('take');
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 
@@ -186,6 +188,8 @@ class AndroidPhotos implements PhotoPlatform {
       final picked = await _channel.invokeListMethod<Object?>('pick');
       return [...?picked?.whereType<Uint8List>()];
     } on PlatformException {
+      return const [];
+    } on MissingPluginException {
       return const [];
     }
   }
@@ -199,6 +203,8 @@ class AndroidPhotos implements PhotoPlatform {
     try {
       raw = await _channel.invokeMapMethod<String, Object?>('paste');
     } on PlatformException {
+      return null;
+    } on MissingPluginException {
       return null;
     }
     if (raw == null) return null;
@@ -218,6 +224,8 @@ class AndroidPhotos implements PhotoPlatform {
     try {
       raw = await _channel.invokeMapMethod<String, Object?>('shared');
     } on PlatformException {
+      return null;
+    } on MissingPluginException {
       return null;
     }
     if (raw == null) return null;
@@ -262,6 +270,8 @@ class AndroidPhotos implements PhotoPlatform {
       });
     } on PlatformException {
       return PhotoSaved.failed;
+    } on MissingPluginException {
+      return PhotoSaved.failed;
     }
     return switch (saved) {
       'saved' => PhotoSaved.saved,
@@ -279,6 +289,8 @@ class AndroidPhotos implements PhotoPlatform {
           }) ??
           false;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
       return false;
     }
   }

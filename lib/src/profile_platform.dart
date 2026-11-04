@@ -42,6 +42,8 @@ class AndroidProfile implements ProfilePlatform {
       return await _channel.invokeMethod<String>('deviceName') ?? '';
     } on PlatformException {
       return '';
+    } on MissingPluginException {
+      return '';
     }
   }
 
@@ -53,6 +55,8 @@ class AndroidProfile implements ProfilePlatform {
     try {
       return await _channel.invokeMethod<Uint8List>('pick');
     } on PlatformException {
+      return null;
+    } on MissingPluginException {
       return null;
     }
   }

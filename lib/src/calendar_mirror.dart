@@ -168,6 +168,8 @@ class AndroidMirror implements MirrorPlatform {
       return await _channel.invokeMethod<T>(method, args);
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 }

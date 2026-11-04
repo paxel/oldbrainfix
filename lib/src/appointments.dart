@@ -174,6 +174,8 @@ class AndroidAppointments implements AppointmentSource {
       return await channel.invokeMethod<T>(method, args);
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 }

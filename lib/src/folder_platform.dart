@@ -164,6 +164,8 @@ class AndroidFolders implements FolderPlatform {
       return await channel.invokeMethod<String>('pickTree');
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 
@@ -173,6 +175,8 @@ class AndroidFolders implements FolderPlatform {
       final name = await channel.invokeMethod<String>('name', {'tree': folder});
       if (name != null && name.isNotEmpty) return name;
     } on PlatformException {
+      // Named from the URI below.
+    } on MissingPluginException {
       // Named from the URI below.
     }
     // The last segment reads `primary:Sync`; the part after the colon is
@@ -233,6 +237,8 @@ class AndroidFolders implements FolderPlatform {
     try {
       return await channel.invokeMethod<String>('pickZip');
     } on PlatformException {
+      return null;
+    } on MissingPluginException {
       return null;
     }
   }

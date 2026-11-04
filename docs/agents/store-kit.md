@@ -7,7 +7,12 @@ every release.
 
 - Google Play: `io.github.paxel.oldbrainfix`. The tag pipeline uploads the
   bundle to the internal track; promotion is done in the Play Console.
-- App Store: none. Every App Store block, frame table and step stays empty.
+- App Store: the app record for bundle id `io.github.paxel.oldbrainfix`
+  (the same id as the Android package), Apple id `<to be filled in by the
+  user>`, SKU `oldbrainfix`. The tag pipeline uploads each build to
+  TestFlight once the Apple secrets exist (`docs/agents/ios-release.md`).
+  Nothing is in the App Store for users yet: every App Store block, frame
+  table and step stays empty until #244 writes the listing.
 - F-Droid: the tag pipeline copies `fastlane/metadata/android/` into the
   repo's F-Droid metadata, screenshots included.
 

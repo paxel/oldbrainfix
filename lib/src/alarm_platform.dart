@@ -384,114 +384,118 @@ class AndroidAlarms implements AlarmPlatform {
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
     String? sound,
-  }) => _channel.invokeMethod('arm', {
-    'alarms': [
-      for (final ArmedAlarm(:alarm, :title, :body) in alarms)
-        {
-          'id': alarm.id,
-          'routine': alarm.routineId,
-          'occurrence': alarm.occurrence.key,
-          if (alarm.wall case final wall?)
-            // Wall-clock fields, so Android re-arms at the same local
-            // time after a time-zone or clock change.
-            'local': [
-              wall.day.year,
-              wall.day.month,
-              wall.day.day,
-              wall.time.hour,
-              wall.time.minute,
-            ]
-          else
-            'at': alarm.at.millisecondsSinceEpoch,
-          'renag': alarm.renag.inMinutes,
-          'escalate': ?alarm.escalation,
-          // On the wall clock as well, like 'local'.
-          'end': [
-            alarm.ends.day.year,
-            alarm.ends.day.month,
-            alarm.ends.day.day,
-            alarm.ends.time.hour,
-            alarm.ends.time.minute,
+  }) => _call(
+    () => _channel.invokeMethod<void>('arm', {
+      'alarms': [
+        for (final ArmedAlarm(:alarm, :title, :body) in alarms)
+          {
+            'id': alarm.id,
+            'routine': alarm.routineId,
+            'occurrence': alarm.occurrence.key,
+            if (alarm.wall case final wall?)
+              // Wall-clock fields, so Android re-arms at the same local
+              // time after a time-zone or clock change.
+              'local': [
+                wall.day.year,
+                wall.day.month,
+                wall.day.day,
+                wall.time.hour,
+                wall.time.minute,
+              ]
+            else
+              'at': alarm.at.millisecondsSinceEpoch,
+            'renag': alarm.renag.inMinutes,
+            'escalate': ?alarm.escalation,
+            // On the wall clock as well, like 'local'.
+            'end': [
+              alarm.ends.day.year,
+              alarm.ends.day.month,
+              alarm.ends.day.day,
+              alarm.ends.time.hour,
+              alarm.ends.time.minute,
+            ],
+            'title': title,
+            'body': body,
+          },
+      ],
+      'labels': labels.toMap(),
+      'sound': sound,
+      'done': [
+        for (final (routine, occurrence) in done)
+          {'routine': routine, 'occurrence': occurrence.key},
+      ],
+      if (nudge case ArmedNudge(:final nudge, :final title, :final body))
+        'nudge': {
+          'anchors': [
+            for (final (:due, :captured) in nudge.anchors)
+              [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
           ],
+          if (nudge.snooze case (:final at, :final until)) ...{
+            'snoozeAt': at.millisecondsSinceEpoch,
+            'snoozeUntil': until.millisecondsSinceEpoch,
+          },
+          'repeat': nudge.repeat.inMinutes,
+          // On the wall clock, so they hold in whatever zone the phone is.
+          if (nudge.quiet case final quiet?)
+            'quiet': [
+              quiet.start.hour,
+              quiet.start.minute,
+              quiet.end.hour,
+              quiet.end.minute,
+            ],
+          'since': ?nudge.since?.millisecondsSinceEpoch,
           'title': title,
           'body': body,
         },
-    ],
-    'labels': labels.toMap(),
-    'sound': sound,
-    'done': [
-      for (final (routine, occurrence) in done)
-        {'routine': routine, 'occurrence': occurrence.key},
-    ],
-    if (nudge case ArmedNudge(:final nudge, :final title, :final body))
-      'nudge': {
-        'anchors': [
-          for (final (:due, :captured) in nudge.anchors)
-            [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
-        ],
-        if (nudge.snooze case (:final at, :final until)) ...{
-          'snoozeAt': at.millisecondsSinceEpoch,
-          'snoozeUntil': until.millisecondsSinceEpoch,
+      if (changes case ArmedChangesNudge(
+        nudge: final changes,
+        :final title,
+        :final body,
+        :final public,
+      ))
+        // Followed like the Nudge, without a snooze.
+        'changes': {
+          'anchors': [
+            for (final (:due, :captured) in changes.anchors)
+              [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
+          ],
+          'repeat': changes.repeat.inMinutes,
+          if (changes.quiet case final quiet?)
+            'quiet': [
+              quiet.start.hour,
+              quiet.start.minute,
+              quiet.end.hour,
+              quiet.end.minute,
+            ],
+          'since': ?changes.since?.millisecondsSinceEpoch,
+          'title': title,
+          'body': body,
+          'public': public,
         },
-        'repeat': nudge.repeat.inMinutes,
-        // On the wall clock, so they hold in whatever zone the phone is.
-        if (nudge.quiet case final quiet?)
-          'quiet': [
-            quiet.start.hour,
-            quiet.start.minute,
-            quiet.end.hour,
-            quiet.end.minute,
-          ],
-        'since': ?nudge.since?.millisecondsSinceEpoch,
-        'title': title,
-        'body': body,
-      },
-    if (changes case ArmedChangesNudge(
-      nudge: final changes,
-      :final title,
-      :final body,
-      :final public,
-    ))
-      // Followed like the Nudge, without a snooze.
-      'changes': {
-        'anchors': [
-          for (final (:due, :captured) in changes.anchors)
-            [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
-        ],
-        'repeat': changes.repeat.inMinutes,
-        if (changes.quiet case final quiet?)
-          'quiet': [
-            quiet.start.hour,
-            quiet.start.minute,
-            quiet.end.hour,
-            quiet.end.minute,
-          ],
-        'since': ?changes.since?.millisecondsSinceEpoch,
-        'title': title,
-        'body': body,
-        'public': public,
-      },
-  });
+    }),
+  );
 
   @override
   Future<bool> nudgeOpened() async =>
-      await _channel.invokeMethod<bool>('nudgeOpened') ?? false;
+      await _call(() => _channel.invokeMethod<bool>('nudgeOpened')) ?? false;
 
   @override
   Future<bool> changesOpened() async =>
-      await _channel.invokeMethod<bool>('changesOpened') ?? false;
+      await _call(() => _channel.invokeMethod<bool>('changesOpened')) ?? false;
 
   @override
   Future<void> showAgenda(AgendaSnapshot snapshot) =>
-      _channel.invokeMethod('agenda', snapshot.toMap());
+      _call(() => _channel.invokeMethod<void>('agenda', snapshot.toMap()));
 
   @override
   Future<bool> unsortedOpened() async =>
-      await _channel.invokeMethod<bool>('unsortedOpened') ?? false;
+      await _call(() => _channel.invokeMethod<bool>('unsortedOpened')) ?? false;
 
   @override
   Future<WidgetPick?> pickOpened() async {
-    final raw = await _channel.invokeMapMethod<String, Object?>('pickOpened');
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('pickOpened'),
+    );
     return switch ((raw?['session'], raw?['occurrence'], raw?['note'])) {
       (final String session, final String occurrence, final String note)
           when session.isNotEmpty && occurrence.isNotEmpty && note.isNotEmpty =>
@@ -503,20 +507,25 @@ class AndroidAlarms implements AlarmPlatform {
   @override
   Future<List<AlarmAction>> pendingActions() async {
     final raw =
-        await _channel.invokeListMethod<Map<Object?, Object?>>('pending') ??
+        await _call(
+          () => _channel.invokeListMethod<Map<Object?, Object?>>('pending'),
+        ) ??
         const [];
     return [for (final m in raw) ?_action(m)];
   }
 
   @override
-  Future<void> acknowledge(int seq) => _channel.invokeMethod('ack', seq);
+  Future<void> acknowledge(int seq) =>
+      _call(() => _channel.invokeMethod<void>('ack', seq));
 
   @override
   Stream<void> get actionsArrived => _actions.stream;
 
   @override
   Future<Ringing?> ringing() async {
-    final raw = await _channel.invokeMapMethod<String, Object?>('ringing');
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('ringing'),
+    );
     if (raw == null) return null;
     final (routine, occurrence, title, body) = (
       raw['routine'],
@@ -534,35 +543,52 @@ class AndroidAlarms implements AlarmPlatform {
   }
 
   @override
-  Future<void> answerRing(Ringing ring, {Duration? snooze}) =>
-      _channel.invokeMethod('answerRing', {
-        'routine': ring.routineId,
-        'occurrence': ring.occurrenceKey,
-        'title': ring.title,
-        'body': ring.body,
-        'snooze': ?snooze?.inMinutes,
-      });
+  Future<void> answerRing(Ringing ring, {Duration? snooze}) => _call(
+    () => _channel.invokeMethod<void>('answerRing', {
+      'routine': ring.routineId,
+      'occurrence': ring.occurrenceKey,
+      'title': ring.title,
+      'body': ring.body,
+      'snooze': ?snooze?.inMinutes,
+    }),
+  );
 
   @override
   Future<Map<AlarmPermission, bool>> permissions() async {
     final raw =
-        await _channel.invokeMapMethod<String, bool>('permissions') ?? const {};
+        await _call(
+          () => _channel.invokeMapMethod<String, bool>('permissions'),
+        ) ??
+        const {};
     return {for (final p in AlarmPermission.values) p: raw[p.name] ?? false};
   }
 
   @override
   Future<void> request(AlarmPermission permission) =>
-      _channel.invokeMethod('request', permission.name);
+      _call(() => _channel.invokeMethod<void>('request', permission.name));
 
   @override
   Future<PickedSound?> pickSound(String? current, String title) async {
-    final raw = await _channel.invokeMapMethod<String, Object?>('pickSound', {
-      'current': current,
-      'title': title,
-    });
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('pickSound', {
+        'current': current,
+        'title': title,
+      }),
+    );
     if (raw == null) return null;
     final sound = raw['sound'];
     return (sound: sound is String ? sound : null);
+  }
+
+  /// [run] on the alarm channel; null where the platform has no such
+  /// channel, as on the iPhone until its alarms arrive (#238), so the app
+  /// runs on there without alarms. A platform error still fails.
+  static Future<T?> _call<T>(Future<T?> Function() run) async {
+    try {
+      return await run();
+    } on MissingPluginException {
+      return null;
+    }
   }
 
   static AlarmAction? _action(Map<Object?, Object?> m) {
