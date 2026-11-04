@@ -563,7 +563,7 @@ pub fn photos(
         // A photo without text, or not read yet, shows none.
         let said = photo_texts.get(hash);
         if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
-            ui.label(RichText::new(said).color(weak));
+            crate::read_text::shown(ui, |ui| ui.label(RichText::new(said).color(weak)));
         }
         if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
             clicked = Some(Photo::Text(asked));
@@ -580,13 +580,15 @@ pub fn photos(
 /// texts stay (ADR 0020), where the files were: each Photo Text of
 /// `photos` and Transcript of `recordings` that is not empty, with the
 /// buttons it `offers` by hash and whether it is a photo's. What was
-/// asked of a Photo Text (`true`) or Transcript comes back.
+/// asked of a Photo Text (`true`) or Transcript comes back. In the Note
+/// dialog, `selects`, each text selects to be copied (#255).
 pub fn removed_texts(
     ui: &mut Ui,
     t: &L10n,
     (photos, photo_texts): (&[String], &BTreeMap<String, String>),
     (recordings, transcripts): (&[String], &BTreeMap<String, String>),
     offers: &dyn Fn(&str, bool) -> Offers,
+    selects: bool,
 ) -> Option<(bool, Generated)> {
     let weak = ui.visuals().weak_text_color();
     let texts = photos
@@ -598,7 +600,11 @@ pub fn removed_texts(
         let Some(said) = said.filter(|s| !s.trim().is_empty()) else {
             continue;
         };
-        ui.label(RichText::new(said).color(weak));
+        if selects {
+            crate::read_text::shown(ui, |ui| ui.label(RichText::new(said).color(weak)));
+        } else {
+            ui.label(RichText::new(said).color(weak));
+        }
         if let Some(asked) = generated_buttons(ui, t, hash, Some(said), offers(hash, photo), photo)
         {
             clicked = Some((photo, asked));
@@ -627,14 +633,15 @@ pub enum Recording {
 /// made, or "No words heard." for an empty one, none for a removed one;
 /// under it the buttons it `offers` for its Transcript and the one that
 /// removes it and keeps its Transcript. What was clicked comes back,
-/// `None` without buttons.
+/// `None` without buttons. With `selects`, in the Note dialog, each
+/// Transcript selects to be copied (#255).
 pub fn recordings(
     ui: &mut Ui,
     t: &L10n,
     hashes: &[String],
     transcripts: &BTreeMap<String, String>,
     (playing, transcribing, speed): (Option<&str>, Option<&str>, f64),
-    buttons: bool,
+    (buttons, selects): (bool, bool),
     offers: &dyn Fn(&str) -> Offers,
 ) -> Option<Recording> {
     let text = ui.visuals().text_color();
@@ -669,7 +676,12 @@ pub fn recordings(
             None => None,
         };
         if let Some(line) = line {
-            ui.label(line.color(weak));
+            // In the Note dialog it selects to be copied (#255).
+            if selects {
+                crate::read_text::shown(ui, |ui| ui.label(line.color(weak)));
+            } else {
+                ui.label(line.color(weak));
+            }
         }
         let offered = offers(hash);
         let said = transcripts.get(hash);

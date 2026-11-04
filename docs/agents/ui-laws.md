@@ -987,9 +987,15 @@ replace a law of Both apps where they say so. A desktop law marked
   another place drop the selection. A double-click or Edit opens the
   Note dialog.
 - **In the Note dialog a text that is only read selects with the
-  mouse** and copies with Ctrl+C (Cmd on macOS): the Note's and a
-  Section's (#183); a Section this Device may edit has its own field and
-  format bar there. "Copy as text" in a card's right-click menu, the
+  mouse** and copies with Ctrl+C (Cmd on macOS): another person's text,
+  the Note's in the trash, a Section's (#183), a Transcript, a Photo
+  Text and the History (#255). A drag selects, over its lines and
+  formats, which it keeps; a click on a link, a box, a tag or a table in
+  it still does what it does. A right-click on it opens Copy, greyed
+  while nothing is selected, and Select all, which selects that whole
+  text; the right-click and the menu keep the selection. The cards in
+  the list stay click-to-select. A Section this Device may edit has its
+  own field and format bar there. "Copy as text" in a card's right-click menu, the
   Note menu and the dialog is the desktop's "Copy text": the Note and
   its Sections as they show.
 - **Cards move into an Area or Topic together** (#148): dragged onto it

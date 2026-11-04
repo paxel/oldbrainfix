@@ -58,6 +58,7 @@ pub mod person_view;
 pub mod photo_out;
 pub mod popup;
 pub mod profile_view;
+pub mod read_text;
 pub mod ring;
 pub mod routine_editor;
 pub mod schedule_text;

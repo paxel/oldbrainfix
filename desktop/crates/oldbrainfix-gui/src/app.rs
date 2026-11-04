@@ -146,6 +146,7 @@ use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
+use crate::read_text;
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
@@ -8332,6 +8333,8 @@ impl App {
             }
         }
         self.dragged(ui.ctx(), tones);
+        // The menu of a text only shown, over everything (#255).
+        read_text::menu(ui.ctx(), &self.t);
         for action in actions {
             self.apply(action);
         }
@@ -10260,22 +10263,26 @@ impl App {
                         // A Code text moves sideways (#213).
                         if note.text_format == text_format::CODE {
                             let look = (Some(18.0), text);
-                            text_marks_view::code_text_label(
-                                ui,
-                                &note.text,
-                                all,
-                                look,
-                                (false, true),
-                            );
+                            read_text::shown(ui, |ui| {
+                                text_marks_view::code_text_label(
+                                    ui,
+                                    &note.text,
+                                    all,
+                                    look,
+                                    (false, true),
+                                )
+                            });
                             return;
                         }
-                        let spots = text_marks_view::formatted_label(
-                            ui,
-                            (&note.text, &note.text_format, boxes),
-                            all,
-                            (Some(18.0), text),
-                            false,
-                        );
+                        let spots = read_text::shown(ui, |ui| {
+                            text_marks_view::formatted_label(
+                                ui,
+                                (&note.text, &note.text_format, boxes),
+                                all,
+                                (Some(18.0), text),
+                                false,
+                            )
+                        });
                         let of = Id::new(("text", &note.id));
                         // Its tables open to read (#128).
                         if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
@@ -10441,13 +10448,15 @@ impl App {
                             ui.style_mut().interaction.selectable_labels = true;
                             let all = (0, section.text.len());
                             let shown = (None, text);
-                            let spots = text_marks_view::formatted_label(
-                                ui,
-                                (&section.text, &section.text_format, look),
-                                all,
-                                shown,
-                                false,
-                            );
+                            let spots = read_text::shown(ui, |ui| {
+                                text_marks_view::formatted_label(
+                                    ui,
+                                    (&section.text, &section.text_format, look),
+                                    all,
+                                    shown,
+                                    false,
+                                )
+                            });
                             let of = Id::new(("text", &section.id));
                             if let Some(at) =
                                 text_marks_view::table_clicks(ui, &t, of, &spots.tables)
@@ -12542,18 +12551,21 @@ fn note_change(
     actions: &mut Vec<Action>,
 ) {
     ui.vertical(|ui| {
-        ui.label(RichText::new(&row.title).strong().color(text));
-        ui.label(RichText::new(&row.said).small().color(weak));
-        if let Some(before) = &row.before {
-            ui.label(RichText::new(t.note_history_before()).small().color(weak));
-            ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
-        }
-        if let Some(after) = &row.after {
-            if row.before.is_some() {
-                ui.label(RichText::new(t.note_history_after()).small().color(weak));
+        // What it says selects to be copied (#255).
+        read_text::shown(ui, |ui| {
+            ui.label(RichText::new(&row.title).strong().color(text));
+            ui.label(RichText::new(&row.said).small().color(weak));
+            if let Some(before) = &row.before {
+                ui.label(RichText::new(t.note_history_before()).small().color(weak));
+                ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
             }
-            ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
-        }
+            if let Some(after) = &row.after {
+                if row.before.is_some() {
+                    ui.label(RichText::new(t.note_history_after()).small().color(weak));
+                }
+                ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
+            }
+        });
         if row.may_use
             && ui
                 .button(RichText::new(t.use_this_version()).color(text))
@@ -15690,7 +15702,7 @@ fn editor_media(
         recordings,
         transcripts,
         (playing, transcribing, speed),
-        can_play,
+        (can_play, true),
         &|hash| offering.offers(id, hash, false),
     );
     match asked {
@@ -15706,6 +15718,7 @@ fn editor_media(
         (removed_photos, photo_texts),
         (removed_recordings, transcripts),
         &|hash, photo| offering.offers(id, hash, photo),
+        true,
     ) {
         actions.push(text(asked, photo));
     }
@@ -16310,7 +16323,9 @@ fn kinded_text(
         let mut spots = Spots::default();
         if named > 0 {
             let heading = (Some(NAME_SIZE), text);
-            let label = text_marks_view::formatted_label(ui, look, (0, named), heading, false);
+            let label = read_text::shown(ui, |ui| {
+                text_marks_view::formatted_label(ui, look, (0, named), heading, false)
+            });
             spots.extend(label);
         }
         let description = note_kinds::description(whole);
@@ -16325,7 +16340,9 @@ fn kinded_text(
             };
             let small = (Some(DESCRIPTION_SIZE), weak);
             let drawn = folded_row(ui, open, |ui| {
-                text_marks_view::formatted_label(ui, look, range, small, !open)
+                read_text::shown(ui, |ui| {
+                    text_marks_view::formatted_label(ui, look, range, small, !open)
+                })
             });
             if description_fold(ui, &t, (drawn.response.rect, id), open) {
                 ui.data_mut(|d| d.insert_temp(id, !open));
@@ -16967,7 +16984,7 @@ fn note_card(
                 &note.recordings,
                 &note.transcripts,
                 (None, transcribing, 1.0),
-                false,
+                (false, false),
                 &|_| Offers::default(),
             );
             media_view::removed_texts(
@@ -16976,6 +16993,7 @@ fn note_card(
                 (&note.removed_photos, &note.photo_texts),
                 (&note.removed_recordings, &note.transcripts),
                 &|_, _| Offers::default(),
+                false,
             );
         });
         let rect = card.rect;
