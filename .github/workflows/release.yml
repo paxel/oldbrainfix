@@ -355,10 +355,10 @@ jobs:
       # crate pulls in the other three.
       - name: Desktop
         continue-on-error: true
-        run: cargo geiger --manifest-path desktop/crates/oldbrainfix-gui/Cargo.toml
+        run: cargo geiger --manifest-path "$GITHUB_WORKSPACE/desktop/crates/oldbrainfix-gui/Cargo.toml"
       - name: OCR library
         continue-on-error: true
-        run: cargo geiger --manifest-path android/ocr/Cargo.toml
+        run: cargo geiger --manifest-path "$GITHUB_WORKSPACE/android/ocr/Cargo.toml"
 
   build-android:
     name: Android APKs and bundle
