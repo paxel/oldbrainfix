@@ -238,7 +238,7 @@ jobs:
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: cargo-sources.json is current with desktop/Cargo.lock
