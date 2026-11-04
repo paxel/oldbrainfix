@@ -75,6 +75,7 @@ fn entries(
     copies: bool,
 ) -> Option<Pick> {
     let id = response.id;
+    follow(ui, response.dragged());
     keep_selection(ui, response);
     let (start, end) = format_bar::selection(ui, id, text);
     let selected = start < end;
@@ -161,4 +162,56 @@ fn keep_selection(ui: &Ui, response: &Response) {
     if let Some(range) = range {
         ui.data_mut(|d| d.insert_temp(kept, range));
     }
+}
+
+/// How fast a drag past the edge scrolls, in points a second for each
+/// point the pointer is out.
+const EDGE_SPEED: f32 = 10.0;
+
+/// While a selection is being dragged, `dragging`, in the text whose
+/// `ui` lies in a scrolled view (#256): the wheel scrolls the view, and
+/// the pointer past its top or bottom edge scrolls it by itself, faster
+/// the further out it is. The text's selection follows the pointer as
+/// the view moves under it.
+pub fn follow(ui: &Ui, dragging: bool) {
+    if !dragging {
+        return;
+    }
+    let view = ui.clip_rect();
+    let (wheel, pointer, dt) = ui.input(|i| {
+        (
+            i.smooth_scroll_delta.y,
+            i.pointer.interact_pos(),
+            i.stable_dt.min(0.1),
+        )
+    });
+    let mut down = -wheel;
+    if wheel != 0.0 {
+        ui.input_mut(|i| i.smooth_scroll_delta.y = 0.0);
+    }
+    if let Some(at) = pointer {
+        let out = if at.y < view.top() {
+            at.y - view.top()
+        } else if at.y > view.bottom() {
+            at.y - view.bottom()
+        } else {
+            0.0
+        };
+        if out != 0.0 {
+            down += out * EDGE_SPEED * dt;
+            ui.ctx().request_repaint();
+        }
+    }
+    if down == 0.0 {
+        return;
+    }
+    // The view's top `down` further on: its scroll area puts the item
+    // spacing above what it brings into view.
+    let spacing = ui.spacing().item_spacing;
+    let top = egui::pos2(view.left() + spacing.x, view.top() + down + spacing.y);
+    ui.scroll_to_rect_animation(
+        egui::Rect::from_min_size(top, egui::vec2(1.0, 1.0)),
+        Some(egui::Align::Min),
+        egui::style::ScrollAnimation::none(),
+    );
 }

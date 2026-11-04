@@ -12553,17 +12553,26 @@ fn note_change(
     ui.vertical(|ui| {
         // What it says selects to be copied (#255).
         read_text::shown(ui, |ui| {
-            ui.label(RichText::new(&row.title).strong().color(text));
-            ui.label(RichText::new(&row.said).small().color(weak));
+            let says = |ui: &mut Ui, said: RichText| {
+                read_text::label(ui, egui::Label::new(said).wrap());
+            };
+            says(ui, RichText::new(&row.title).strong().color(text));
+            says(ui, RichText::new(&row.said).small().color(weak));
             if let Some(before) = &row.before {
-                ui.label(RichText::new(t.note_history_before()).small().color(weak));
-                ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
+                says(
+                    ui,
+                    RichText::new(t.note_history_before()).small().color(weak),
+                );
+                says(ui, RichText::new(before).color(text));
             }
             if let Some(after) = &row.after {
                 if row.before.is_some() {
-                    ui.label(RichText::new(t.note_history_after()).small().color(weak));
+                    says(
+                        ui,
+                        RichText::new(t.note_history_after()).small().color(weak),
+                    );
                 }
-                ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
+                says(ui, RichText::new(after).color(text));
             }
         });
         if row.may_use

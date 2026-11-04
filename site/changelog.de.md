@@ -9,6 +9,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Die Grundlage für eine iPhone-Version von Old Brain Fix: Der iPhone-Build ist eingerichtet und getestet und geht über TestFlight an Testende, sobald das Apple-Konto verbunden ist. Für iPhone-Nutzende gibt es noch nichts.
 - Auf dem Desktop öffnet ein Rechtsklick in ein Textfeld am Mauszeiger ein Menü mit Ausschneiden, Kopieren, Einfügen und Alles auswählen, Ausschneiden und Kopieren ausgegraut, solange nichts ausgewählt ist. Mit ausgewählten Wörtern in einem formatierten Text, und in der Schnellnotiz und Zur Notiz hinzufügen, solange ihre Formatleiste zu sehen ist, bietet es für sie auch Fett, Kursiv, Code, Link und Codeblock der Formatleiste an. Ein Rechtsklick auf die Auswahl lässt sie ausgewählt.
 - Auf dem Desktop lässt sich jeder Text, den der Notiz-Dialog nur zeigt, auswählen und kopieren: der Text einer anderen Person, der einer Notiz im Papierkorb, Abschnitte, Transkripte, Fototexte und der Verlauf. Ziehen mit der Maus wählt aus, auch über formatierte Zeilen, und Strg+C kopiert; ein Rechtsklick öffnet Kopieren und Alles auswählen. Links, Kästchen und #Wörter darin funktionieren weiter mit einem Klick.
+- Auf dem Desktop scrollt eine Auswahl, während sie gezogen wird: Solange die Maustaste gedrückt ist, scrollt das Mausrad und die Auswahl folgt, und Ziehen über den oberen oder unteren Rand hinaus scrollt von selbst, umso schneller, je weiter der Mauszeiger draußen ist. Das gilt in jedem Textfeld und in den Texten, die der Notiz-Dialog nur zeigt.
 
 ### Behoben
 

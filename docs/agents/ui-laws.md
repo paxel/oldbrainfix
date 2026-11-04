@@ -1050,6 +1050,12 @@ replace a law of Both apps where they say so. A desktop law marked
   the selection keeps it, and the field keeps the cursor through the
   menu, so nothing it does on losing the cursor happens. Cut, Copy and
   Paste work as their keys do. No spelling entries.
+- **A selection scrolls while it is dragged** (#256): in every text
+  field and in the Note dialog's texts that are only read, while the
+  button is held the wheel scrolls and the selection follows the
+  pointer, and a drag past the top or bottom edge of the view scrolls by
+  itself, faster the further out the pointer is. The selection stays
+  when its start scrolls out of view.
 
 ### Settings
 

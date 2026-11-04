@@ -563,7 +563,9 @@ pub fn photos(
         // A photo without text, or not read yet, shows none.
         let said = photo_texts.get(hash);
         if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
-            crate::read_text::shown(ui, |ui| ui.label(RichText::new(said).color(weak)));
+            crate::read_text::shown(ui, |ui| {
+                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
+            });
         }
         if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
             clicked = Some(Photo::Text(asked));
@@ -601,7 +603,9 @@ pub fn removed_texts(
             continue;
         };
         if selects {
-            crate::read_text::shown(ui, |ui| ui.label(RichText::new(said).color(weak)));
+            crate::read_text::shown(ui, |ui| {
+                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
+            });
         } else {
             ui.label(RichText::new(said).color(weak));
         }
@@ -678,7 +682,9 @@ pub fn recordings(
         if let Some(line) = line {
             // In the Note dialog it selects to be copied (#255).
             if selects {
-                crate::read_text::shown(ui, |ui| ui.label(line.color(weak)));
+                crate::read_text::shown(ui, |ui| {
+                    crate::read_text::label(ui, egui::Label::new(line.color(weak)))
+                });
             } else {
                 ui.label(line.color(weak));
             }

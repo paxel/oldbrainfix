@@ -315,6 +315,38 @@ pub fn shown<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
         ui.style_mut().interaction.selectable_labels = true;
         add(ui)
     });
-    region(ui, drawn.response.rect.intersect(ui.clip_rect()));
+    let rect = drawn.response.rect;
+    region(ui, rect.intersect(ui.clip_rect()));
+    // A selection dragged from it scrolls the view (#256).
+    let dragging = ui.ctx().dragged_id().is_some()
+        && ui.input(|i| {
+            i.pointer.primary_down() && i.pointer.press_origin().is_some_and(|at| rect.contains(at))
+        });
+    crate::text_menu::follow(ui, dragging);
     drawn.inner
+}
+
+/// Draws `label`, selectable where the labels of `ui` are, as
+/// [`egui::Label`] does, but taking part in the selection also while it
+/// is scrolled out of view: egui drops a selection whose start or end it
+/// did not see in a frame, and a label out of view is not seen. Its text
+/// still shows only in view (#256).
+pub fn label(ui: &mut Ui, label: egui::Label) -> egui::Response {
+    if !ui.style().interaction.selectable_labels {
+        return ui.add(label);
+    }
+    let (pos, galley, response) = label.layout_in_ui(ui);
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), galley.text())
+    });
+    let colour = ui.visuals().text_color();
+    egui::text_selection::LabelSelectionState::label_text_selection(
+        ui,
+        &response,
+        pos,
+        galley,
+        colour,
+        egui::Stroke::NONE,
+    );
+    response
 }

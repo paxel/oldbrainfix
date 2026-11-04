@@ -247,7 +247,7 @@ pub fn marked_label(
             rich = rich.size(size);
         }
         let label = egui::Label::new(rich);
-        ui.add(if truncate { label.truncate() } else { label });
+        crate::read_text::label(ui, if truncate { label.truncate() } else { label });
         return Spots::default();
     }
     let wrap = if truncate {
@@ -264,7 +264,7 @@ pub fn marked_label(
         ui.available_width(),
         FontSelection::Default,
     );
-    let response = ui.add(egui::Label::new(galley.clone()));
+    let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
     line_spots(&galley, response.rect.min, &line)
 }
 
@@ -345,7 +345,7 @@ pub fn code_text_label(
     let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
     let job = LayoutJob::single_section(text_boxes::strip(part), format);
     if truncate {
-        ui.add(egui::Label::new(job).truncate());
+        crate::read_text::label(ui, egui::Label::new(job).truncate());
         return;
     }
     egui::Frame::NONE
@@ -357,7 +357,9 @@ pub fn code_text_label(
             if sideways {
                 egui::ScrollArea::horizontal()
                     .id_salt(("code text", from))
-                    .show(ui, |ui| ui.add(egui::Label::new(job).extend()));
+                    .show(ui, |ui| {
+                        crate::read_text::label(ui, egui::Label::new(job).extend())
+                    });
                 return;
             }
             // Cut off at the edge, every line kept.
@@ -399,7 +401,7 @@ fn code_label(
         .inner_margin(egui::Margin::symmetric(8, 6))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.add(egui::Label::new(job).wrap());
+            crate::read_text::label(ui, egui::Label::new(job).wrap());
         });
 }
 
@@ -826,7 +828,7 @@ fn block_label(
             ui.available_width(),
             FontSelection::Default,
         );
-        let response = ui.add(egui::Label::new(galley.clone()));
+        let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
         let origin = response.rect.min;
         if line.bold && ui.is_rect_visible(response.rect) {
             let mut ghost = std::mem::take(&mut line.ghost);
