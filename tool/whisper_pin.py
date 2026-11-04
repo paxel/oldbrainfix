@@ -1,15 +1,15 @@
-"""Says whether the submodule third_party/whisper.cpp is upstream's latest
-release (#247), for the release gate and verify-release.
+"""Checks the pin of the submodule third_party/whisper.cpp (#247), for CI,
+the release gate and verify-release.
 
     python3 tool/whisper_pin.py
 
-Report-only: it always exits 0, because an update needs the Transcripts
-checked first. It prints, as GitHub warnings where something is off:
-the commit checked out in third_party/whisper.cpp and whether it is the
-commit of the tag third_party/README.md names; whether that tag is
-upstream's latest release; and whether licenses/common.txt names the same
-release. Asks GitHub's API, with $GITHUB_TOKEN or $GH_TOKEN when set; when
-that fails it says so and still exits 0.
+Exits 1, with GitHub errors, when the pin is not one: when the commit
+checked out in third_party/whisper.cpp is not the commit of the tag
+third_party/README.md names, or when licenses/common.txt names another
+release than that tag (as a Dependabot update leaves them), or when that
+cannot be checked. Whether the tag is upstream's latest release is only a
+GitHub warning, never a failure, because an update needs the Transcripts
+checked first. Asks GitHub's API, with $GITHUB_TOKEN or $GH_TOKEN when set.
 """
 
 import json
@@ -39,19 +39,23 @@ def licence_tag(text):
 
 
 def report(pinned, tag, tag_commit, latest, latest_commit, licence):
-    """The lines to print; a line that starts with ::warning:: is off."""
+    """The lines to print; a line that starts with ::error:: fails the
+    check, one that starts with ::warning:: is only reported. latest is
+    None when upstream's latest release could not be asked for."""
     lines = [f"whisper.cpp: third_party/whisper.cpp is at {pinned}, third_party/README.md pins {tag}"]
     if tag_commit != pinned:
         lines.append(
-            f"::warning::third_party/whisper.cpp is at {pinned}, but {tag} in "
+            f"::error::third_party/whisper.cpp is at {pinned}, but {tag} in "
             f"third_party/README.md is {tag_commit}: name the tag the submodule is at"
         )
     if licence != tag:
         lines.append(
-            f"::warning::licenses/common.txt names whisper.cpp release {licence}, "
+            f"::error::licenses/common.txt names whisper.cpp release {licence}, "
             f"third_party/README.md {tag}"
         )
-    if latest_commit == pinned:
+    if latest is None:
+        lines.append("::warning::whisper.cpp: could not ask for upstream's latest release")
+    elif latest_commit == pinned:
         lines.append(f"whisper.cpp: {latest} is upstream's latest release")
     else:
         lines.append(
@@ -60,6 +64,11 @@ def report(pinned, tag, tag_commit, latest, latest_commit, licence):
             "test recordings are checked (docs/adr/0045)"
         )
     return lines
+
+
+def failed(lines):
+    """Whether the report holds an error."""
+    return any(line.startswith("::error::") for line in lines)
 
 
 def github(path):
@@ -73,6 +82,7 @@ def github(path):
 
 
 def main():
+    errors = (OSError, ValueError, KeyError, subprocess.CalledProcessError)
     try:
         # Not checked out, git would answer for this repository instead.
         if not os.path.exists(os.path.join(SUBMODULE, ".git")):
@@ -87,15 +97,21 @@ def main():
             tag = readme_tag(f.read())
         with open(LICENCES, encoding="utf-8") as f:
             licence = licence_tag(f.read())
-        tag_commit = github(f"/commits/{tag}")["sha"] if tag else None
+        if not tag:
+            raise ValueError("third_party/README.md names no tag for whisper.cpp")
+        tag_commit = github(f"/commits/{tag}")["sha"]
+    except errors as error:
+        print(f"::error::whisper.cpp: could not check the pin: {error}")
+        return 1
+    try:
         latest = github("/releases/latest")["tag_name"]
         latest_commit = github(f"/commits/{latest}")["sha"]
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
-        print(f"::warning::whisper.cpp: could not compare with upstream: {error}")
-        return 0
-    for line in report(pinned, tag, tag_commit, latest, latest_commit, licence):
+    except errors:
+        latest = latest_commit = None
+    lines = report(pinned, tag, tag_commit, latest, latest_commit, licence)
+    for line in lines:
         print(line)
-    return 0
+    return 1 if failed(lines) else 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Third-party sources
 
-Sources the apps build from that Old Brain Fix does not write. Each is a git submodule pinned to an upstream release tag ([ADR 0045](../docs/adr/0045-third-party-sources-are-pinned-submodules.md)), built unchanged. The submodule's commit is the pin; the Pinned column names the tag it is, and `licenses/common.txt` repeats it for the About screen. `python3 tool/whisper_pin.py` warns when they part or when upstream has a newer release.
+Sources the apps build from that Old Brain Fix does not write. Each is a git submodule pinned to an upstream release tag ([ADR 0045](../docs/adr/0045-third-party-sources-are-pinned-submodules.md)), built unchanged. The submodule's commit is the pin; the Pinned column names the tag it is, and `licenses/common.txt` repeats it for the About screen. `python3 tool/whisper_pin.py` fails CI and the release when they part, and warns when upstream has a newer release.
 
 | Submodule     | Upstream                                | Pinned   | Licence                                               | Built by                                                                                                                        |
 |---------------|-----------------------------------------|----------|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
