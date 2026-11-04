@@ -277,6 +277,7 @@ fn for_me(
             .hint_text(theirs)
             .desired_width(320.0),
     );
+    crate::text_menu::show(ui, t, &field, name);
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_for_me_name()));
     if field.lost_focus() {
         actions.push(PersonAction::Rename(name.clone()));

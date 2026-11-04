@@ -935,7 +935,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A right-click is the desktop's long press** (draft, #196): it opens
   the same menu as ⋮ where there is one, on a Note card, an Occurrence
   row and a Checklist Line's words, and the thing's menu on an Area, a
-  Topic, a Frog, a Tally entry, a table and a photo. Like the long
+  Topic, a Frog, a Tally entry, a table and a photo, and in a text field
+  the field's menu (#253, see Text editor and Lines). Like the long
   press, it never changes data by itself.
 - **Hover only shows** (draft, #196): what a click opens turns the
   pointer into a hand, an icon-only button gets its rounded background
@@ -1033,6 +1034,16 @@ replace a law of Both apps where they say so. A desktop law marked
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.
+- **A right-click in a text field opens its menu at the pointer**
+  (#253): every field one types into has Cut, Copy, Paste and Select
+  all, Cut and Copy greyed without a selection or in a password field,
+  Select all in an empty field. With a selection in a formatted text,
+  and in the quick note and Add to Note while their format bar shows,
+  the menu also has the bar's Bold, Italic, Code, Link and Code block,
+  as far as the bar has them (the quick note no Link). A right-click on
+  the selection keeps it, and the field keeps the cursor through the
+  menu, so nothing it does on losing the cursor happens. Cut, Copy and
+  Paste work as their keys do. No spelling entries.
 
 ### Settings
 

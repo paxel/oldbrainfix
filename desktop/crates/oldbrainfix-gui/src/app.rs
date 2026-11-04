@@ -169,6 +169,7 @@ use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
+use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -9657,6 +9658,21 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            // Its right-click menu, with the bar's formats while the
+            // bar shows (#253); Paste as the capture's Paste (#130).
+            let formats: &[Format] = if quick.format_bar {
+                &Format::CAPTURE
+            } else {
+                &[]
+            };
+            match text_menu::menu(ui, &t, &field, &self.capture, formats) {
+                Some(MenuPick::Format(format)) => {
+                    format_bar::put(ui, id, &mut self.capture, format)
+                }
+                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
+                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
+                None => {}
+            }
             name_field(ui, &field, t.capture_field_name());
             // File ▸ New Note: after the field, so the menu's click does
             // not take it out again; asked again past the dialog's first,
@@ -9825,6 +9841,7 @@ impl App {
                         .text_color(text)
                         .desired_width(ui.available_width() - 32.0),
                 );
+                text_menu::show(ui, &self.t, &field, &self.query);
                 // Edit ▸ Find: after the field, so the menu's click does
                 // not take it out again.
                 if std::mem::take(&mut self.search_focus) {
@@ -10539,7 +10556,7 @@ impl App {
                             None => ui.memory_mut(|m| m.request_focus(id)),
                         }
                     }
-                    ui.add(
+                    let field = ui.add(
                         TextEdit::multiline(amend)
                             .id(id)
                             .hint_text(t.amend_hint())
@@ -10548,6 +10565,14 @@ impl App {
                             .desired_width(f32::INFINITY)
                             .frame(Frame::NONE),
                     );
+                    // Its right-click menu, with the bar's formats while
+                    // the bar shows (#253).
+                    let offered: &[Format] = if self.view.advanced { formats } else { &[] };
+                    match text_menu::menu(ui, &t, &field, amend, offered) {
+                        Some(MenuPick::Format(format)) => picked = Some(format),
+                        Some(pick) => text_menu::apply(ui, id, amend, pick),
+                        None => {}
+                    }
                     match picked {
                         Some(Format::Table) => actions.push(Action::AmendTable(selected.0)),
                         Some(Format::Link) => actions.push(Action::AskLink {
@@ -12142,6 +12167,7 @@ impl App {
                                 .text_color(text)
                                 .desired_width(60.0),
                         );
+                        text_menu::show(ui, &t, &field, all_day_text);
                         if field.changed()
                             && let Some(time) = ClockTime::parse(all_day_text.trim())
                             && time != all_day_from
@@ -12195,6 +12221,7 @@ impl App {
                                     .text_color(text)
                                     .desired_width(60.0),
                             );
+                            text_menu::show(ui, &t, &field, value);
                             if field.changed()
                                 && let Some(time) = ClockTime::parse(value.trim())
                             {
@@ -12546,6 +12573,7 @@ fn title(ui: &mut Ui, title: &str) {
 /// A dialog's text field, taking the keyboard when `focus` says so.
 fn focused_field(
     ui: &mut Ui,
+    t: &L10n,
     (value, focus): (&mut String, bool),
     id: &str,
     hint: &str,
@@ -12558,6 +12586,7 @@ fn focused_field(
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
+    text_menu::show(ui, t, &field, value);
     if focus {
         field.request_focus();
     }
@@ -12837,7 +12866,7 @@ fn name_form(
     actions: &mut Vec<Action>,
 ) {
     title(ui, heading);
-    let field = focused_field(ui, (&mut *name, focus), "name", t.name_hint());
+    let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
     let ready = !name.trim().is_empty();
     if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         actions.push(done.clone());
@@ -12860,7 +12889,7 @@ fn link_form(
     actions: &mut Vec<Action>,
 ) {
     title(ui, t.format_link());
-    let field = focused_field(ui, (&mut *address, focus), "link", t.link_address());
+    let field = focused_field(ui, t, (&mut *address, focus), "link", t.link_address());
     if linked {
         let weak = ui.visuals().weak_text_color();
         ui.label(RichText::new(t.link_remove_hint()).small().color(weak));
@@ -13785,7 +13814,13 @@ fn merge_form(
 ) {
     let weak = ui.visuals().weak_text_color();
     title(ui, t.merge_into());
-    let field = focused_field(ui, (&mut *query, focus), "merge query", t.search_all_hint());
+    let field = focused_field(
+        ui,
+        t,
+        (&mut *query, focus),
+        "merge query",
+        t.search_all_hint(),
+    );
     if field.changed() {
         actions.push(Action::MergeQuery);
     }
@@ -13859,6 +13894,7 @@ fn quick_capture_card(
                 .text_color(text)
                 .desired_width(180.0),
         );
+        text_menu::show(ui, t, &field, typed);
         chord = typed.parse::<Chord>().ok();
         // Kept once typed out, so no key on the way is grabbed.
         if field.lost_focus()
@@ -16095,6 +16131,18 @@ fn edited_text(
                     .inner
             }
         };
+        // Its right-click menu, with the bar's formats for a selection
+        // in a formatted text (#253).
+        let offered: &[Format] = if formatted && edit.bar && !as_code {
+            &Format::ALL
+        } else {
+            &[]
+        };
+        match text_menu::menu(ui, &t, &output.response.response, edited, offered) {
+            Some(MenuPick::Format(format)) => picked = Some(format),
+            Some(pick) => text_menu::apply(ui, id, edited, pick),
+            None => {}
+        }
         text_marks_view::guard_cursor(ui, id, edited);
         if cut {
             ui.ctx().request_repaint();
@@ -16352,6 +16400,7 @@ fn kinded_text(
                 .desired_width(f32::INFINITY)
                 .frame(Frame::NONE),
         );
+        text_menu::show(ui, &t, &field, edited);
         name_field(ui, &field, t.note_description());
         if field.has_focus() {
             *editing = true;
@@ -16431,6 +16480,7 @@ fn name_edit(
         .return_key(None)
         .frame(Frame::NONE)
         .show(ui);
+    text_menu::show(ui, t, &output.response.response, name);
     text_marks_view::guard_cursor(ui, id, name);
     if cut {
         ui.ctx().request_repaint();

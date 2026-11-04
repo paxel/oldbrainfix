@@ -1082,6 +1082,7 @@ impl FieldForm {
                                 .desired_width(f32::INFINITY),
                         )
                         .labelled_by(label.id);
+                    crate::text_menu::show(ui, t, &field, &self.name);
                     if focus == Some(NAME_FIELD) {
                         field.request_focus();
                     }
@@ -1104,6 +1105,7 @@ impl FieldForm {
                                 .desired_width(f32::INFINITY),
                         )
                         .labelled_by(label.id);
+                    crate::text_menu::show(ui, t, &field, &self.unit_text);
                     if focus == Some(UNIT_FIELD) {
                         field.request_focus();
                     }
@@ -1183,6 +1185,7 @@ impl FieldForm {
                                         .desired_width(120.0),
                                 )
                                 .labelled_by(label.id);
+                            crate::text_menu::show(ui, t, &field, &self.target);
                             if focus == Some(TARGET_FIELD) {
                                 field.request_focus();
                             }
@@ -1413,6 +1416,7 @@ impl EntryForm {
                                         .desired_width(120.0),
                                 )
                                 .labelled_by(label.id);
+                            crate::text_menu::show(ui, t, &edit, typed);
                             if focus.as_deref() == Some(field.id.as_str()) {
                                 edit.request_focus();
                             }
@@ -1441,6 +1445,7 @@ impl EntryForm {
                                 .desired_width(f32::INFINITY),
                         )
                         .labelled_by(label.id);
+                    crate::text_menu::show(ui, t, &field, &self.line);
                     if focus.as_deref() == Some(LINE_FIELD) {
                         field.request_focus();
                     }
@@ -1478,6 +1483,7 @@ impl EntryForm {
                         .desired_width(110.0),
                 )
                 .labelled_by(label);
+            crate::text_menu::show(ui, t, &field, &self.day_text);
             if focus {
                 field.request_focus();
             }

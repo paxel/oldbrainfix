@@ -351,6 +351,7 @@ pub fn section(
             let below = at.and_then(|at| fields.get(at + 1)).copied();
             line_editing::field(
                 ui,
+                t,
                 typed,
                 (key, FieldOf::Shopping),
                 (line.checked, width),

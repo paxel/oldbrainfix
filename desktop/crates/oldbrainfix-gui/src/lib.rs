@@ -77,6 +77,7 @@ pub mod tally_page;
 pub mod tally_unit_match;
 pub mod tally_view;
 pub mod text_marks_view;
+pub mod text_menu;
 pub mod theme;
 pub mod tray;
 

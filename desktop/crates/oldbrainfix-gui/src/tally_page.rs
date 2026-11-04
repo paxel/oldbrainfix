@@ -245,6 +245,7 @@ impl TallyPage {
                                 .desired_width(f32::INFINITY),
                         )
                         .labelled_by(label.id);
+                    crate::text_menu::show(ui, t, &field, &self.name);
                     if focus == Some(field.id) {
                         field.request_focus();
                         focused |= field.has_focus();
@@ -269,6 +270,7 @@ impl TallyPage {
                                     .desired_width(f32::INFINITY),
                             )
                             .labelled_by(label.id);
+                        crate::text_menu::show(ui, t, &typed, &field.name);
                         if focus == Some(id) {
                             typed.request_focus();
                             focused |= typed.has_focus();
@@ -391,6 +393,7 @@ impl TallyPage {
                             .text_color(text)
                             .desired_width(f32::INFINITY),
                     );
+                    crate::text_menu::show(ui, t, &typed, &field.unit_text);
                     if !typed.has_focus()
                         && !typed.lost_focus()
                         && ui.memory(|m| m.focused().is_none())
@@ -448,6 +451,7 @@ impl TallyPage {
                                     .desired_width(120.0),
                             )
                             .labelled_by(label.id);
+                        crate::text_menu::show(ui, t, &typed, &field.target);
                         if !typed.has_focus()
                             && !typed.lost_focus()
                             && ui.memory(|m| m.focused().is_none())

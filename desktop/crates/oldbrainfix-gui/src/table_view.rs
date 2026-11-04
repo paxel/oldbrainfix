@@ -600,7 +600,7 @@ impl TableView {
                 (t, tones),
                 asked,
             );
-            self.field(ui, field, rect_of, asked);
+            self.field(ui, t, field, rect_of, asked);
         }
     }
 
@@ -709,6 +709,7 @@ impl TableView {
     fn field(
         &mut self,
         ui: &mut Ui,
+        t: &L10n,
         id: Id,
         rect_of: impl Fn(usize, usize) -> Rect,
         asked: &mut Vec<Asked>,
@@ -753,6 +754,7 @@ impl TableView {
                 .desired_width(f32::INFINITY)
                 .vertical_align(egui::Align::Center),
         );
+        crate::text_menu::show(ui, t, &response, &editing.typed);
         text_marks_view::guard_cursor(ui, id, &mut editing.typed);
         text_marks_view::remember_text(ui, id, &editing.typed);
         ui.painter().rect_stroke(

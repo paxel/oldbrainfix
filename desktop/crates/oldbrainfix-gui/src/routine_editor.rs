@@ -696,6 +696,7 @@ impl RoutineEditor {
                                     .desired_width(f32::INFINITY),
                             )
                             .labelled_by(label.id);
+                        crate::text_menu::show(ui, t, &field, &self.text);
                         if self.name_missing {
                             let error = ui.visuals().error_fg_color;
                             ui.label(RichText::new(t.kind_name_missing()).color(error));
@@ -706,7 +707,7 @@ impl RoutineEditor {
                         return;
                     }
                     if !self.from_note {
-                        ui.add(
+                        let field = ui.add(
                             TextEdit::multiline(&mut self.text)
                                 .id(Id::new("routine text"))
                                 .hint_text(t.routine_what_hint())
@@ -715,6 +716,7 @@ impl RoutineEditor {
                                 .desired_width(f32::INFINITY)
                                 .frame(egui::Frame::NONE),
                         );
+                        crate::text_menu::show(ui, t, &field, &self.text);
                         return;
                     }
                     ui.label(RichText::new(t.from_note()).strong().color(text));
@@ -896,6 +898,7 @@ impl RoutineEditor {
                     .layouter(&mut layouter),
             )
             .labelled_by(label.id);
+        crate::text_menu::show(ui, t, &field, &typed);
         let mut changed = false;
         if simple && field.changed() {
             self.type_sentence(t, &typed);
@@ -1151,6 +1154,7 @@ impl RoutineEditor {
                 .text_color(text)
                 .desired_width(f32::INFINITY),
         );
+        crate::text_menu::show(ui, t, &field, &self.rule);
         ui.label(RichText::new(t.rrule_helper()).small().color(weak));
         if let Some(detail) = &self.rule_error {
             ui.label(RichText::new(t.rrule_invalid(detail)).color(ui.visuals().error_fg_color));
@@ -1213,6 +1217,7 @@ impl RoutineEditor {
                         .text_color(text)
                         .desired_width(70.0),
                 );
+                crate::text_menu::show(ui, t, &field, &self.time_text);
                 let typed = ClockTime::parse(self.time_text.trim());
                 let entered = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 let add = ui.add_enabled(
@@ -1352,6 +1357,7 @@ fn day_stepper(ui: &mut Ui, t: &L10n, day: &mut Day, text: &mut String, id: &str
             .text_color(colour)
             .desired_width(110.0),
     );
+    crate::text_menu::show(ui, t, &field, text);
     if field.changed()
         && let Some(typed) = Day::parse(text.trim())
     {

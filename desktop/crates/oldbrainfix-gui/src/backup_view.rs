@@ -74,9 +74,9 @@ impl Passphrase {
 }
 
 /// A password field with its hint, as wide as the card.
-fn secret(ui: &mut Ui, id: &str, hint: &str, value: &mut String) {
+fn secret(ui: &mut Ui, t: &L10n, id: &str, hint: &str, value: &mut String) {
     let text = ui.visuals().text_color();
-    ui.add(
+    let field = ui.add(
         TextEdit::singleline(value)
             .id(Id::new(id))
             .password(true)
@@ -84,6 +84,7 @@ fn secret(ui: &mut Ui, id: &str, hint: &str, value: &mut String) {
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
+    crate::text_menu::secret(ui, t, &field, value);
 }
 
 /// How the last Backup went, in words, and whether that is a failure.
@@ -131,12 +132,14 @@ fn own_backups(
         ui.label(RichText::new(t.backup_set_up_elsewhere()).color(text));
         secret(
             ui,
+            t,
             "backup passphrase",
             t.backup_passphrase(),
             &mut form.first,
         );
         secret(
             ui,
+            t,
             "backup passphrase again",
             t.backup_passphrase_again(),
             &mut form.again,
@@ -333,6 +336,7 @@ pub fn welcome(
     }
     secret(
         ui,
+        t,
         "restore passphrase",
         t.backup_passphrase(),
         &mut state.passphrase,
@@ -345,6 +349,7 @@ pub fn welcome(
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
+    crate::text_menu::show(ui, t, &code, &state.code);
     if code.changed() {
         state.code_invalid = false;
     }

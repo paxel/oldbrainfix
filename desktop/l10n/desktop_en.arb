@@ -515,6 +515,8 @@
   "@menuCut": {"description": "Edit ▸ Cut: cuts the text selected in the field the cursor was in."},
   "menuCopy": "Copy",
   "@menuCopy": {"description": "Edit ▸ Copy: copies the text selected in the field the cursor was in."},
+  "menuSelectAll": "Select all",
+  "@menuSelectAll": {"description": "The right-click menu of a text field (#253): selects all of its text."},
   "menuFind": "Find",
   "@menuFind": {"description": "Edit ▸ Find (Ctrl+F): puts the cursor into the search field of the list, or of All Notes where the list has none."},
   "menuSettings": "Settings…",

@@ -30,6 +30,7 @@ use oldbrainfix_core::{
 };
 
 use crate::format_bar;
+use crate::l10n::L10n;
 
 /// What the id a new Line shows under starts with, its row's key after
 /// it: no Line's id looks like it.
@@ -832,6 +833,7 @@ pub fn field_id(key: u64) -> Id {
 /// it asks goes to `asked`.
 pub fn field(
     ui: &mut Ui,
+    t: &L10n,
     lines: &mut TypedLines,
     (key, kind): (u64, FieldOf),
     (checked, width): (bool, f32),
@@ -884,6 +886,7 @@ pub fn field(
             .frame(egui::Frame::NONE)
             .desired_width(width),
     );
+    crate::text_menu::show(ui, t, &response, &row.text);
     // egui drops a focus asked for a field new this frame; it is asked
     // again until the field holds it.
     if let Some(byte) = pending {

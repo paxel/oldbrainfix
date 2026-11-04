@@ -321,9 +321,15 @@ pub fn capture_bar(ui: &mut Ui, t: &L10n, id: Id, text: &mut String, colours: (C
             }
         });
     }
-    let Some(format) = picked else {
-        return;
-    };
+    if let Some(format) = picked {
+        put(ui, id, text, format);
+    }
+}
+
+/// Puts `format` on the selection of the field `id` holding `text`, as
+/// a button of the bar does, and selects what was formatted.
+pub fn put(ui: &Ui, id: Id, text: &mut String, format: Format) {
+    let selected = selection(ui, id, text);
     match change(format, text, selected) {
         Some(changed) => {
             *text = changed.text;

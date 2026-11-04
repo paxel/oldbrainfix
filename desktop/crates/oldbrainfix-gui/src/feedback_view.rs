@@ -249,6 +249,7 @@ pub fn form(
                     .desired_rows(4)
                     .desired_width(f32::INFINITY),
             );
+            crate::text_menu::show(ui, t, &field, &form.text);
             app::name_field(ui, &field, t.feedback_text_label());
             ui.label(RichText::new(t.feedback_goes_along()).strong().color(text));
             for (on, label, value) in [
