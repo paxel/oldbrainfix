@@ -17,13 +17,15 @@ class HelpTexts {
   final String areaName;
 
   /// "Quick start" and its Lines, the steps to try, and its Description
-  /// (#260), folded under the name: the desktop's way for each step.
+  /// (#260), folded under the name: a link to each step's place (#261)
+  /// and the desktop's way for each step, Markdown.
   final String quickStartTitle;
   final List<String> quickStartLines;
   final String quickStartDescription;
 
-  /// "What the icons mean" in full, its title the first line, and the
-  /// pictures of the icons, one per group.
+  /// "What the icons mean" in full, its title the first line, Markdown
+  /// with a link to the guide (#261), and the pictures of the icons, one
+  /// per group.
   final String iconsText;
   final List<Uint8List> iconPictures;
 
@@ -119,7 +121,13 @@ class HelpNotes {
         made.add(quickStartId(person));
       }
       if (!_made(persons, iconsId)) {
-        _note(iconsId(person), areaFor(), texts.iconsText, texts.iconPictures);
+        _note(
+          iconsId(person),
+          areaFor(),
+          texts.iconsText,
+          texts.iconPictures,
+          format: TextFormats.markdown,
+        );
         made.add(iconsId(person));
       }
       for (final v in due) {
@@ -175,9 +183,16 @@ class HelpNotes {
     return id;
   }
 
-  /// Writes the plain Note [id] with [text] and [photos], filed into
-  /// [area], with no Nudge.
-  void _note(String id, String area, String text, List<Uint8List> photos) {
+  /// Writes the Note [id] with [text] in [format] and [photos], filed
+  /// into [area], with no Nudge. Quick start and What the icons mean are
+  /// formatted, so their app links open (#261); a What's new is plain.
+  void _note(
+    String id,
+    String area,
+    String text,
+    List<Uint8List> photos, {
+    String format = TextFormats.plain,
+  }) {
     final now = store.clock().toUtc();
     final hashes = [for (final bytes in photos) store.putPhoto(bytes)];
     store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
@@ -185,7 +200,7 @@ class HelpNotes {
     store.append(
       id,
       NoteKeys.text,
-      StoredText.of(TextFormats.plain, text).encode(),
+      StoredText.of(format, text).encode(),
       date: now,
     );
     store.append(id, NoteKeys.place, area, date: now);
@@ -207,6 +222,7 @@ class HelpNotes {
       area,
       NoteKinds.join(texts.quickStartTitle, texts.quickStartDescription),
       const [],
+      format: TextFormats.markdown,
     );
     store.append(
       id,

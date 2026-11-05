@@ -1620,8 +1620,12 @@ fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
                 "Einen Gedanken mit + erfassen".into(),
                 "Ihn in einen Bereich einsortieren".into(),
             ],
-            quick_start_description: "Auf dem Desktop:\nErfassen: Strg+N".into(),
-            icons_text: "Was die Symbole bedeuten\n\nArt: was die Notiz ist".into(),
+            quick_start_description:
+                "Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\nAuf dem Desktop:\nErfassen: Strg+N"
+                    .into(),
+            icons_text:
+                "Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n[Anleitung](oldbrainfix://guide)"
+                    .into(),
             icon_pictures: vec![DE],
             whats_new_title: Box::new(|v| format!("Neu in {v}")),
         }
@@ -1633,8 +1637,12 @@ fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
                 "Capture a thought with +".into(),
                 "File it into an Area".into(),
             ],
-            quick_start_description: "On the desktop:\nCapture: Ctrl+N".into(),
-            icons_text: "What the icons mean\n\nKind: what the Note is".into(),
+            quick_start_description:
+                "Go there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N"
+                    .into(),
+            icons_text:
+                "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)"
+                    .into(),
             icon_pictures: vec![EN],
             whats_new_title: Box::new(|v| format!("What's new in {v}")),
         }
@@ -2210,14 +2218,15 @@ fn write_routines(store: &Store) -> Built {
         &walk.id,
         &Schedule::new(day(2026, 1, 1), &[at(7, 0)?], daily()).ok_or("daily")?,
     )?;
-    routines.trash_note(&walk.id, true)?;
+    routines.trash_note(&walk.id)?;
     routines.restore_note(&walk.id)?;
     let flyer = notes.capture("Flyer for the fair", None, None)?;
     routines.spawn(&flyer.id, &schedule(day(2026, 4, 1), &[at(10, 0)?], None)?)?;
-    routines.trash_note(&flyer.id, false)?;
+    // Left behind as "Delete only the Note" did before #262.
+    store.batch(|| notes.trash(&flyer.id))?;
     let car = notes.capture("Car inspection", None, None)?;
     routines.spawn(&car.id, &schedule(day(2026, 5, 1), &[], None)?)?;
-    routines.trash_note(&car.id, true)?;
+    routines.trash_note(&car.id)?;
     notes.capture("Unsorted thought", None, Some(Duration::minutes(10)))?;
     notes.capture("Another thought", None, None)?;
     Ok(())
@@ -6892,8 +6901,7 @@ fn markdown_table(text: &str, table: &oldbrainfix_core::markdown::table::Table) 
 #[test]
 fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::markdown::{
-        self, BlockKind, Change, SpanKind, code_block, indent, link, may_open, table, toggle,
-        toggle_line,
+        self, BlockKind, Change, SpanKind, code_block, indent, may_open, table, toggle, toggle_line,
     };
     use table::Align;
     let fixture = read_json(&fixtures().join("markdown.json"))?;
@@ -7041,7 +7049,13 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         };
         let got: Change = match edit["op"].as_str().ok_or("op")? {
             "toggle" => toggle(text, start, end, span_kind(kind)?)?,
-            "link" => link(text, start, end, edit["url"].as_str().ok_or("url")?),
+            "link" => markdown::link_labelled(
+                text,
+                start,
+                end,
+                edit["url"].as_str().ok_or("url")?,
+                edit["label"].as_str(),
+            ),
             "line" => toggle_line(text, start, end, block_kind(kind)?),
             "indent" => indent(text, start, end, false),
             "codeBlock" => code_block(text, start, end),
@@ -7082,6 +7096,38 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
+    }
+    // App links (#261, ADR 0046), read and written back as the Dart core
+    // does.
+    let links = fixture["appLinks"].as_object().ok_or("appLinks")?;
+    assert!(links.len() > 20);
+    for (url, expected) in links {
+        use oldbrainfix_core::app_link::{self, AppLink};
+        let ours = app_link::parse(url).map(|link| {
+            let (kind, target, anchor) = match &link {
+                AppLink::Note(id) => ("note", Some(id.clone()), None),
+                AppLink::Place(id) => ("place", Some(id.clone()), None),
+                AppLink::Agenda => ("agenda", None, None),
+                AppLink::Unsorted => ("unsorted", None, None),
+                AppLink::Settings(section) => ("settings", section.clone(), None),
+                AppLink::Routines => ("routines", None, None),
+                AppLink::Backups => ("backups", None, None),
+                AppLink::Sync => ("sync", None, None),
+                AppLink::Profile => ("profile", None, None),
+                AppLink::Frogs => ("frogs", None, None),
+                AppLink::NewSession => ("newSession", None, None),
+                AppLink::Guide(page, anchor) => ("guide", page.clone(), anchor.clone()),
+                AppLink::File(path) => ("file", Some(path.clone()), None),
+            };
+            json!({
+                "anchor": anchor,
+                "guide": link.guide_address("de"),
+                "kind": kind,
+                "target": target,
+                "url": link.url(),
+            })
+        });
+        assert_eq!(&ours.unwrap_or(Value::Null), expected, "{url:?}");
     }
     let code = fixture["looksLikeCode"]
         .as_object()

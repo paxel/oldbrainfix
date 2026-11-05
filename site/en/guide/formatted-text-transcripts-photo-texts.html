@@ -53,7 +53,7 @@
   <li><strong>Bold</strong>, <strong>Italic</strong> and <strong>Strike through</strong>.</li>
   <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
   <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
-  <li><strong>Link</strong>, <strong>Code</strong> and <strong>Code block</strong>.</li>
+  <li><strong>Link</strong>, <strong>Link to…</strong>, <strong>Code</strong> and <strong>Code block</strong>.</li>
   <li><strong>Indent list item</strong> and <strong>Move list item out</strong>.</li>
   <li><strong>Table</strong>.</li>
 </ul>
@@ -110,8 +110,24 @@
   <strong>Set link</strong> puts it on the selection or the word at the cursor. Leave it empty to
   remove the link. An address typed without "https://" is taken as a web address, or as an e-mail
   address when it holds an "@" and no "/". A tap on a link on a card opens it in the browser or the
-  mail app. Only web and e-mail addresses open; any other link, which may come from another person
-  in a Shared Area, stays text.
+  mail app. Only web and e-mail addresses and the app's own links open; any other link, which may
+  come from another person in a Shared Area, stays text.
+</p>
+<p>
+  <strong>Link to…</strong> links to a place in the app: pick a Note, an Area or Topic, or a page
+  such as the Agenda, Unsorted, the Settings or one of their sections, All Routines and Reminders,
+  Backups, Sync, the Profile, the Frogs, New Session or the user guide, the search above the list
+  finding it. The link goes on the selection or the word at the cursor, or in with the target's
+  name. A tap on it opens the place without asking, on every Device; where the target cannot be
+  seen, such as a Note in the Trash or one never synced here, it says "Not available here". Other
+  Markdown apps show its words. Its address starts with <code>oldbrainfix://</code>, such as
+  <code>oldbrainfix://settings/backups</code>.
+</p>
+<p>
+  A link to a file of the shared folder, such as <code>oldbrainfix://file/Scans/tax.pdf</code>,
+  opens it with the app the phone or computer has for it, after one question naming the file and
+  that app. Files outside the shared folder (on the desktop the synced folder) never open, and the
+  file is not copied into the app. On the iPhone file links do not open yet.
 </p>
 <p>
   A web address written into any text, plain or formatted, that starts with "http://" or
@@ -128,6 +144,7 @@
   <li>A Markdown task such as <code>- [ ] milk</code> typed in the quick note or Add to Note becomes a box when the text is saved; in the Note dialog it does as the space after <code>]</code> is typed.</li>
   <li>Add to Note has the format bar too, without ☐, which only the Note's text puts in; a table in it is edited in the field as in the Note editor, and nothing is kept before <strong>Add to Note</strong>.</li>
   <li><strong>Link</strong> opens a dialog with the same field; Enter or <strong>Set link</strong> takes it. A click on a link opens it in the browser or the mail program; the mouse over it shows its address. A web address written into a text opens on a click too.</li>
+  <li><strong>Link to…</strong>, beside <strong>Link</strong>, opens the same picker with its search; a click on a target puts the link in. A click on an app link opens its place in the window, the Settings at their section, a guide page in the browser.</li>
 </ul>
 </box-more>
 </guide-box>

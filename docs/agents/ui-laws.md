@@ -442,11 +442,20 @@ replace a law of Both apps where they say so. A desktop law marked
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error
   colour.
+- Deleting a Note takes its Routines and Reminders into the trash with
+  it, on every path and in both apps (#262): the one question names
+  them ("Delete this Note and its 1 Routine?", "… its 1 Reminder?",
+  "… its 3 Routines and Reminders?") and offers only Cancel and Delete;
+  restoring the Note brings them back. There is no "Delete only the
+  Note". All Routines and Reminders marks one whose Note is in the
+  trash or deleted.
 
 ### Text editor
 
 - **The format bar goes with the field**: ☐, bold, italic,
-  strike-through, two headings, bullets, numbers, quote, link, code,
+  strike-through, two headings, bullets, numbers, quote, link, "Link
+  to…" (#261: a picker of the app's pages, Areas, Topics and Notes with
+  a search, never an id typed), code,
   code block (on the lines touched, or taking a block's fences off), in
   and out, each on the selection or the word at the cursor, and table,
   which puts a new table at the cursor and edits its first cell, or goes
@@ -667,6 +676,12 @@ replace a law of Both apps where they say so. A desktop law marked
   bare `http://` or `https://` address (#222), opens that link instead; a
   long press on it is still the card's. A tap on a row or card never
   opens a menu.
+- **An app link opens its place without asking** (#261, ADR 0046): a
+  Note, an Area or Topic, the Agenda, Unsorted or one of the app's
+  pages, as its own menu opens it. A target this Device cannot see is an
+  announcement, "Not available here", never an error dialog. A file link
+  is the one link that asks first, once, naming the file and the app
+  that opens it, and opens only a file of the shared folder.
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A

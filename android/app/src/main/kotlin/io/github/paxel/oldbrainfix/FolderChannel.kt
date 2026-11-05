@@ -45,7 +45,7 @@ object FolderChannel {
 
     /** Answers [call] and returns true, or false when it is not one of these. */
     fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup", "files", "readDoc", "release", "zipNames", "unzip", "dropUnzipped")) {
+        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup", "files", "readDoc", "release", "zipNames", "unzip", "dropUnzipped", "fileApp", "openFile")) {
             return false
         }
         val app = context.applicationContext
@@ -75,6 +75,17 @@ object FolderChannel {
         }
         "name" -> tree(context, call)?.name
         "files" -> files(context, call)
+        // A file link (#261): the app that opens the file, "" when the
+        // system asks which, or null when the tree holds no such file.
+        "fileApp" -> fileIn(context, call)?.let { appFor(context, viewOf(it)) }
+        "openFile" -> fileIn(context, call)?.let {
+            try {
+                context.startActivity(viewOf(it))
+                true
+            } catch (_: android.content.ActivityNotFoundException) {
+                false
+            }
+        } ?: false
         "release" -> {
             val tree = call.argument<String>("tree") ?: throw IllegalArgumentException("no tree")
             if (releases(tree, call.argument<List<String>>("keep") ?: emptyList())) {
@@ -208,6 +219,38 @@ object FolderChannel {
             }
         }
         return found
+    }
+
+    /**
+     * The file at the path inside the tree, its names separated by `/`,
+     * found name by name below the tree, so it never lies outside it; null
+     * when there is none. The cores refuse `..`, `.` and empty names.
+     */
+    private fun fileIn(context: Context, call: MethodCall): DocumentFile? {
+        val tree = call.argument<String>("tree") ?: return null
+        val path = call.argument<String>("path") ?: return null
+        var at = DocumentFile.fromTreeUri(context, Uri.parse(tree)) ?: return null
+        for (name in path.split('/')) {
+            if (name.isEmpty() || name == "." || name == "..") return null
+            at = at.findFile(name) ?: return null
+        }
+        return at.takeIf { it.isFile }
+    }
+
+    /** Viewing [file] in the app the system has for its type, allowed to read it. */
+    private fun viewOf(file: DocumentFile): Intent =
+        Intent(Intent.ACTION_VIEW)
+            .setDataAndType(file.uri, file.type ?: "*/*")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** The name of the app [view] opens in, "" when the system asks which or tells none. */
+    private fun appFor(context: Context, view: Intent): String {
+        val pm = context.packageManager
+        val found = pm.resolveActivity(view, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+            ?: return ""
+        // The system's chooser, as when no app is the default.
+        if (found.activityInfo.packageName == "android") return ""
+        return found.loadLabel(pm).toString()
     }
 
     private val columns = arrayOf(

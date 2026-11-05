@@ -1613,7 +1613,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteLinkedDetail.
   ///
   /// In en, this message translates to:
-  /// **'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.'**
+  /// **'They stay in the trash with it for 30 days and come back when you restore it.'**
   String get deleteNoteLinkedDetail;
 
   /// No description provided for @noteInTrash.
@@ -4598,17 +4598,17 @@ abstract class AppLocalizations {
   /// **'It stays in the trash for 30 days.'**
   String get deleteNoteDetail;
 
-  /// No description provided for @deleteNoteOnly.
+  /// No description provided for @deleteNoteLinkedQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete only the Note'**
-  String get deleteNoteOnly;
+  /// **'{count, plural, =1{Delete this Note and its 1 Routine?} other{Delete this Note and its {count} Routines and Reminders?}}'**
+  String deleteNoteLinkedQuestion(int count);
 
-  /// No description provided for @deleteNoteWithLinked.
+  /// No description provided for @deleteNoteReminderQuestion.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}'**
-  String deleteNoteWithLinked(int count);
+  /// **'Delete this Note and its 1 Reminder?'**
+  String get deleteNoteReminderQuestion;
 
   /// No description provided for @removeRecordingKeepText.
   ///
@@ -7508,6 +7508,78 @@ abstract class AppLocalizations {
   /// **'Set link'**
   String get linkSet;
 
+  /// Format bar button (#261): opens the picker of the app's pages, Areas, Topics and Notes; the one picked becomes an app link on the selection or word, or is put in with its name.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to…'**
+  String get formatLinkTo;
+
+  /// Hint of the search field of the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Search Notes, Areas and pages'**
+  String get linkToSearch;
+
+  /// Heading of the app's pages in the Link to… picker (#261): the Agenda, Unsorted, Settings and its sections, All Routines and Reminders, Backups, Sync, the Profile, the Frogs, New Session and the user guide.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages'**
+  String get linkToPages;
+
+  /// Heading of the Areas and Topics in the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Areas and Topics'**
+  String get linkToPlaces;
+
+  /// Heading of the Notes in the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get linkToNotes;
+
+  /// Shown in the Link to… picker when the search finds nothing (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found.'**
+  String get linkToNothing;
+
+  /// The user guide's start page on the website, as a page of the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'User guide'**
+  String get linkToGuide;
+
+  /// Said when an app link's target cannot be seen on this Device (#261): a Note or Area deleted, in the trash, in a closed locked Area or never synced here, or a file not in the shared folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available here'**
+  String get linkNotAvailable;
+
+  /// Title of the one question before a file link opens (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Open this file?'**
+  String get fileLinkTitle;
+
+  /// The one question before a file link opens (#261), naming the file and the app that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Open \"{file}\" from the shared folder with {app}?'**
+  String fileLinkQuestion(String file, String app);
+
+  /// Stands for {app} in fileLinkQuestion where the system does not tell which app opens the file (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'the app the system picks for it'**
+  String get fileLinkSomeApp;
+
+  /// Button of the question before a file link opens (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get fileLinkOpen;
+
   /// Format bar button: puts a new table at the cursor, or opens the table the cursor is in full screen.
   ///
   /// In en, this message translates to:
@@ -8527,6 +8599,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync: Sync ▸ Pair a Device.'**
   String get helpQuickStartDesktop8;
+
+  /// The first line of the Quick start's Description (#261): a numbered link to the place of each step follows, one line each, before the desktop's way.
+  ///
+  /// In en, this message translates to:
+  /// **'Go where each step is done:'**
+  String get helpQuickStartPlacesTitle;
+
+  /// The place of the Quick start's step 5, ticking a Line, in its list of places (#261): the Checklist itself, so no link.
+  ///
+  /// In en, this message translates to:
+  /// **'Here, in this Checklist.'**
+  String get helpQuickStartPlaceHere;
+
+  /// The last line of the help Note on icons (#261), a link to the user guide's start page.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything else is in the user guide.'**
+  String get helpIconsGuide;
 
   /// The name of the help Note listing the icons with their names and meanings (#180).
   ///

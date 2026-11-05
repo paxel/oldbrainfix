@@ -50,7 +50,7 @@
     "note:help-00000000000000000000000000000001-whats-new-0.5.0": false
   },
   "plain": {
-    "note:help-00000000000000000000000000000001-quick-start": "Quick start\nOn the desktop:\nCapture: Ctrl+N\nCapture a thought with +\nFile it into an Area"
+    "note:help-00000000000000000000000000000001-quick-start": "Quick start\nGo there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N\nCapture a thought with +\nFile it into an Area"
   },
   "rows": [
     null,

@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'table_grid.dart';
@@ -731,6 +732,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     _focus.requestFocus();
     _format(
       (text, start, end) => Markdown.link(text, start, end, address),
+      at: selection,
+    );
+  }
+
+  /// Asks which of the app's pages, Areas, Topics or Notes an app link
+  /// on the selection or the word at the cursor opens (#261); without
+  /// either, the link goes in with the target's name.
+  Future<void> _linkTo(LinkPick pick) async {
+    final selection = widget.controller.selection;
+    final target = await pick(context);
+    if (!mounted || target == null) return;
+    _focus.requestFocus();
+    _format(
+      (text, start, end) =>
+          Markdown.link(text, start, end, target.link.url, label: target.label),
       at: selection,
     );
   }
@@ -1544,6 +1560,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.url != null,
           run: () => unawaited(_link(at.url)),
         ),
+        if (AppLinkScope.pickOf(context) case final pick?)
+          _Format(
+            key: 'format-link-to',
+            label: t.formatLinkTo,
+            icon: (_) => const Icon(Icons.add_link),
+            run: () => unawaited(_linkTo(pick)),
+          ),
         _Format(
           key: 'format-code',
           label: t.formatCode,

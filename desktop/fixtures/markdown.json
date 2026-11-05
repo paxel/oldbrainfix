@@ -23870,6 +23870,32 @@
     },
     {
       "op": "link",
+      "start": 3,
+      "end": 3,
+      "text": "go ",
+      "url": "oldbrainfix://unsorted",
+      "label": "Unsorted [all] *",
+      "result": {
+        "end": 23,
+        "start": 4,
+        "text": "go [Unsorted \\[all\\] \\*](oldbrainfix://unsorted)"
+      }
+    },
+    {
+      "op": "link",
+      "start": 6,
+      "end": 6,
+      "text": "see Frogs",
+      "url": "oldbrainfix://frogs",
+      "label": "Frogs",
+      "result": {
+        "end": 7,
+        "start": 7,
+        "text": "see [Frogs](oldbrainfix://frogs)"
+      }
+    },
+    {
+      "op": "link",
       "start": 1,
       "end": 1,
       "text": "see",
@@ -25438,7 +25464,142 @@
     "x.org": false,
     " https://x.org": false,
     "ʜttps://x.org": false,
-    "": false
+    "": false,
+    "oldbrainfix://note/note:a": true,
+    "OldBrainFix://settings/backups": true,
+    "oldbrainfix://file/a/b.pdf": true,
+    "oldbrainfix://file/../b.pdf": false,
+    "oldbrainfix://capture/voice": false,
+    "oldbrainfix://x": false
+  },
+  "appLinks": {
+    "oldbrainfix://note/note:3f2a": {
+      "anchor": null,
+      "guide": null,
+      "kind": "note",
+      "target": "note:3f2a",
+      "url": "oldbrainfix://note/note:3f2a"
+    },
+    "oldbrainfix://area/topic:x%20y%2F%C3%BC": {
+      "anchor": null,
+      "guide": null,
+      "kind": "place",
+      "target": "topic:x y/ü",
+      "url": "oldbrainfix://area/topic:x%20y%2F%C3%BC"
+    },
+    "oldbrainfix://area/topic:x y": {
+      "anchor": null,
+      "guide": null,
+      "kind": "place",
+      "target": "topic:x y",
+      "url": "oldbrainfix://area/topic:x%20y"
+    },
+    "oldbrainfix://agenda": {
+      "anchor": null,
+      "guide": null,
+      "kind": "agenda",
+      "target": null,
+      "url": "oldbrainfix://agenda"
+    },
+    "OLDBRAINFIX://unsorted": {
+      "anchor": null,
+      "guide": null,
+      "kind": "unsorted",
+      "target": null,
+      "url": "oldbrainfix://unsorted"
+    },
+    "oldbrainfix://settings": {
+      "anchor": null,
+      "guide": null,
+      "kind": "settings",
+      "target": null,
+      "url": "oldbrainfix://settings"
+    },
+    "oldbrainfix://settings/alarms": {
+      "anchor": null,
+      "guide": null,
+      "kind": "settings",
+      "target": "alarms",
+      "url": "oldbrainfix://settings/alarms"
+    },
+    "oldbrainfix://settings/backups": {
+      "anchor": null,
+      "guide": null,
+      "kind": "backups",
+      "target": null,
+      "url": "oldbrainfix://settings/backups"
+    },
+    "oldbrainfix://settings/sync": {
+      "anchor": null,
+      "guide": null,
+      "kind": "sync",
+      "target": null,
+      "url": "oldbrainfix://settings/sync"
+    },
+    "oldbrainfix://settings/nothing": null,
+    "oldbrainfix://routines": {
+      "anchor": null,
+      "guide": null,
+      "kind": "routines",
+      "target": null,
+      "url": "oldbrainfix://routines"
+    },
+    "oldbrainfix://profile": {
+      "anchor": null,
+      "guide": null,
+      "kind": "profile",
+      "target": null,
+      "url": "oldbrainfix://profile"
+    },
+    "oldbrainfix://frogs": {
+      "anchor": null,
+      "guide": null,
+      "kind": "frogs",
+      "target": null,
+      "url": "oldbrainfix://frogs"
+    },
+    "oldbrainfix://session/new": {
+      "anchor": null,
+      "guide": null,
+      "kind": "newSession",
+      "target": null,
+      "url": "oldbrainfix://session/new"
+    },
+    "oldbrainfix://guide": {
+      "anchor": null,
+      "guide": "https://paxel.github.io/oldbrainfix/de/guide/",
+      "kind": "guide",
+      "target": null,
+      "url": "oldbrainfix://guide"
+    },
+    "oldbrainfix://guide/getting-started": {
+      "anchor": null,
+      "guide": "https://paxel.github.io/oldbrainfix/de/guide/getting-started.html",
+      "kind": "guide",
+      "target": "getting-started",
+      "url": "oldbrainfix://guide/getting-started"
+    },
+    "oldbrainfix://guide/getting-started#set-up": {
+      "anchor": "set-up",
+      "guide": "https://paxel.github.io/oldbrainfix/de/guide/getting-started.html#set-up",
+      "kind": "guide",
+      "target": "getting-started",
+      "url": "oldbrainfix://guide/getting-started#set-up"
+    },
+    "oldbrainfix://guide/Getting": null,
+    "oldbrainfix://file/Scans/Tax%202026.pdf": {
+      "anchor": null,
+      "guide": null,
+      "kind": "file",
+      "target": "Scans/Tax 2026.pdf",
+      "url": "oldbrainfix://file/Scans/Tax%202026.pdf"
+    },
+    "oldbrainfix://file/a%3Ab": null,
+    "oldbrainfix://file/a/%2E%2E/b": null,
+    "oldbrainfix://note/%C3": null,
+    "oldbrainfix://agenda#x": null,
+    "oldbrainfix://agenda?x": null,
+    "oldbrainfix://capture/voice": null
   },
   "looksLikeCode": {
     "": false,

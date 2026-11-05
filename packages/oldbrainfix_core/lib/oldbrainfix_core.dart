@@ -3,6 +3,7 @@
 library;
 
 export 'src/alarms.dart';
+export 'src/app_link.dart';
 export 'src/area_keys.dart';
 export 'src/area_offers.dart';
 export 'src/auto_sync.dart';

@@ -70,6 +70,23 @@ class FakeFolders implements FolderPlatform {
 
   @override
   Future<void> setAutoBackup(bool on) async {}
+
+  /// The files of the folder a file link may open (#261), by their path,
+  /// with the app that opens each; '' where the system tells none.
+  final fileApps = <String, String>{};
+
+  /// The paths of the files opened, in order.
+  final opened = <String>[];
+
+  @override
+  Future<String?> fileApp(String folder, String path) async => fileApps[path];
+
+  @override
+  Future<bool> openFile(String folder, String path) async {
+    if (!fileApps.containsKey(path)) return false;
+    opened.add(path);
+    return true;
+  }
 }
 
 void main() {

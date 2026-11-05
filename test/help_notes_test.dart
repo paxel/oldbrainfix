@@ -75,22 +75,57 @@ void main() {
       expect(quickStartLines(de)[6], contains('Profilbild'));
     });
 
-    test('the Quick start\'s Description holds the desktop\'s way for each '
-        'Line, in their order, nothing of Advanced (#260)', () {
+    test('the Quick start\'s Description links each Line\'s place, then '
+        'holds the desktop\'s way for each Line, in their order, nothing of '
+        'Advanced (#260, #261)', () {
+      final count = quickStartLines(en).length;
       for (final t in [en, de]) {
         final description = quickStartDescription(t).split('\n');
-        expect(description.first, t.helpQuickStartDesktopTitle);
-        expect(
-          description.skip(1).toList(),
-          hasLength(quickStartLines(t).length),
-        );
+        expect(description.first, t.helpQuickStartPlacesTitle);
+        final places = description.sublist(1, count + 1);
+        expect(places, [
+          for (final (i, place) in quickStartPlaces(t).indexed)
+            '${i + 1}. $place',
+        ]);
+        expect(description[count + 1], '');
+        final desktop = description.sublist(count + 2);
+        expect(desktop.first, t.helpQuickStartDesktopTitle);
+        expect(desktop.skip(1).toList(), hasLength(count));
         for (final line in description) {
           expect(line, isNot(matches(advanced)), reason: line);
         }
       }
       expect(
-        quickStartDescription(en).split('\n')[1],
+        quickStartDescription(en).split('\n')[count + 3],
         'Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.',
+      );
+      // Every place but this Checklist's own is a link that opens.
+      final links = [
+        for (final block in Markdown.parse(quickStartDescription(en)))
+          for (final span in block.spans)
+            if (span.kind == MarkdownSpanKind.link) span.url,
+      ];
+      expect(links, [
+        'oldbrainfix://agenda',
+        'oldbrainfix://unsorted',
+        'oldbrainfix://routines',
+        'oldbrainfix://routines',
+        'oldbrainfix://agenda',
+        'oldbrainfix://settings/backups',
+        'oldbrainfix://settings/sync',
+      ]);
+      expect(links.every(Markdown.mayOpen), isTrue);
+      expect(quickStartPlaces(en)[4], 'Here, in this Checklist.');
+    });
+
+    test('What the icons mean ends with a link to the guide (#261)', () {
+      expect(
+        helpIconsText(en).split('\n').last,
+        '[Everything else is in the user guide.](oldbrainfix://guide)',
+      );
+      expect(
+        helpIconsText(de).split('\n').last,
+        '[Alles Weitere steht in der Anleitung.](oldbrainfix://guide)',
       );
     });
 

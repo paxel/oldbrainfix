@@ -139,4 +139,10 @@ class FakeImportFolders implements FolderPlatform {
 
   @override
   Future<void> setAutoBackup(bool on) async {}
+
+  @override
+  Future<String?> fileApp(String folder, String path) async => null;
+
+  @override
+  Future<bool> openFile(String folder, String path) async => false;
 }

@@ -1006,7 +1006,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get deleteNoteLinkedDetail =>
-      'Mitgelöschte kommen mit der Notiz zurück, wenn du sie wiederherstellst. Behaltene erinnern dich weiter.';
+      'Sie bleiben mit ihr 30 Tage im Papierkorb und kommen zurück, wenn du sie wiederherstellst.';
 
   @override
   String get noteInTrash => 'Die Notiz liegt im Papierkorb';
@@ -2868,18 +2868,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deleteNoteDetail => 'Sie bleibt 30 Tage im Papierkorb.';
 
   @override
-  String get deleteNoteOnly => 'Nur die Notiz löschen';
-
-  @override
-  String deleteNoteWithLinked(int count) {
+  String deleteNoteLinkedQuestion(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Mit ihren $count Routinen und Erinnerungen löschen',
-      one: 'Mit ihrer Routine oder Erinnerung löschen',
+      other: 'Diese Notiz und ihre $count Routinen und Erinnerungen löschen?',
+      one: 'Diese Notiz und ihre 1 Routine löschen?',
     );
     return '$_temp0';
   }
+
+  @override
+  String get deleteNoteReminderQuestion =>
+      'Diese Notiz und ihre 1 Erinnerung löschen?';
 
   @override
   String get removeRecordingKeepText => 'Aufnahme entfernen, Text behalten';
@@ -4693,6 +4694,44 @@ class AppLocalizationsDe extends AppLocalizations {
   String get linkSet => 'Link setzen';
 
   @override
+  String get formatLinkTo => 'Link zu…';
+
+  @override
+  String get linkToSearch => 'Notizen, Bereiche und Seiten suchen';
+
+  @override
+  String get linkToPages => 'Seiten';
+
+  @override
+  String get linkToPlaces => 'Bereiche und Themen';
+
+  @override
+  String get linkToNotes => 'Notizen';
+
+  @override
+  String get linkToNothing => 'Nichts gefunden.';
+
+  @override
+  String get linkToGuide => 'Anleitung';
+
+  @override
+  String get linkNotAvailable => 'Hier nicht verfügbar';
+
+  @override
+  String get fileLinkTitle => 'Diese Datei öffnen?';
+
+  @override
+  String fileLinkQuestion(String file, String app) {
+    return '„$file“ aus dem geteilten Ordner mit $app öffnen?';
+  }
+
+  @override
+  String get fileLinkSomeApp => 'der App, die das System dafür wählt';
+
+  @override
+  String get fileLinkOpen => 'Öffnen';
+
+  @override
   String get formatTable => 'Tabelle';
 
   @override
@@ -5316,6 +5355,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get helpQuickStartDesktop8 =>
       'Synchronisieren: Synchronisieren ▸ Gerät koppeln.';
+
+  @override
+  String get helpQuickStartPlacesTitle =>
+      'Dorthin, wo jeder Schritt gemacht wird:';
+
+  @override
+  String get helpQuickStartPlaceHere => 'Hier, in dieser Checkliste.';
+
+  @override
+  String get helpIconsGuide => 'Alles Weitere steht in der Anleitung.';
 
   @override
   String get helpIconsTitle => 'Was die Symbole bedeuten';

@@ -55,6 +55,10 @@ The 0.4.0 Lines said what to do, never where or how ("Capture a thought with +."
 
 A Quick start already made stays as it was: it is made once per person (above), and its id stays `note:help-<profile>-quick-start`, so a person who has the 0.4.0 one gets no second one and keeps its words. The What's new of 0.5.0, written at release time from the release notes, names the change and where the Quick start is (the Area "Old Brain Fix"); that needs no code. A deleted Quick start stays deleted, as before.
 
+## Amendment: links to the places (#261, Q599 (a))
+
+The Quick start and What the icons mean are written as formatted texts from 0.5.0, so their app links open (ADR 0046): the Quick start's Description begins with a numbered link to each step's place, before the desktop's way, and What the icons mean ends with a link to the user guide. A Quick start or What the icons mean made before stays as it was, plain and without links, as above.
+
 ## Considered
 
 - Ids by version only, as the Starter Set's (rejected: a help Note filed into a Shared Area would mix with another person's).

@@ -75,6 +75,7 @@ use egui::{
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::ai_port::{AiPort, Reach, docker_bridge};
+use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
@@ -105,6 +106,7 @@ use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
 use crate::all_routines_view::{self, AllRoutinesAction};
+use crate::app_links;
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
@@ -611,7 +613,7 @@ struct View {
     frogs_done_open: bool,
     /// Every Routine and Reminder in alphabetical order with its name
     /// and its Note's Area, while their page shows (#115).
-    all_routines: Vec<(Routine, String, Option<Area>)>,
+    all_routines: Vec<all_routines_view::Row>,
     /// Those whose schedule a newer version of the app saved, with the
     /// name and Area of their Note, which a click opens (ADR 0034).
     all_newer: Vec<all_routines_view::NewerRow>,
@@ -695,6 +697,19 @@ enum Dialog {
         amend: bool,
         /// The Section whose field's text it goes on (#183).
         section: Option<String>,
+        /// "Link to…" (#261): the picker shown in place of the address.
+        picker: Option<app_links::Picker>,
+        /// The name an app link picked is put in with where no words
+        /// are selected (#261).
+        label: Option<String>,
+    },
+    /// The one question before a file link opens (#261): the file, its
+    /// path inside the synced folder, and the app that opens it, "" when
+    /// the system does not tell.
+    FileLink {
+        file: std::path::PathBuf,
+        path: String,
+        app: String,
     },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
@@ -717,10 +732,11 @@ enum Dialog {
         query: String,
         others: Vec<(String, String)>,
     },
-    /// Whether the selected Note goes to the trash, and with it its
-    /// `linked` Routines and Reminders.
+    /// Whether the selected Note goes to the trash with its Routines and
+    /// Reminders, as `question` names them; `linked` while it has any.
     TrashNote {
-        linked: i64,
+        question: String,
+        linked: bool,
     },
     /// Whether the edited Routine or Reminder goes to the trash.
     DeleteRoutine {
@@ -1170,9 +1186,20 @@ enum Action {
         url: Option<String>,
         amend: bool,
         section: Option<String>,
+        /// "Link to…" (#261): the picker of the app's pages, Areas,
+        /// Topics and Notes in place of the address.
+        pick: bool,
     },
     /// Puts the link asked for on the text it was asked for.
     SetLink,
+    /// Puts an app link to the target picked in "Link to…" on the text
+    /// it was asked for (#261).
+    PickLink(app_links::Target),
+    /// Opens what the app link clicked names (#261, ADR 0046).
+    FollowLink(AppLink),
+    /// Opens the file of the synced folder a file link named, after its
+    /// question (#261).
+    OpenLinkedFile(std::path::PathBuf),
     Amend,
     Importance(Importance),
     /// Files these Notes into the Area or Topic `place`, together; the
@@ -1247,8 +1274,8 @@ enum Action {
     Editor(Intent),
     /// Deletes the edited Routine, asked.
     DeleteRoutine,
-    /// Deletes the selected Note, with or without its Routines, asked.
-    TrashNote(bool),
+    /// Deletes the selected Note with its Routines and Reminders, asked.
+    TrashNote,
     RestoreRoutine(String),
     /// Something asked of a Frog or the Frog view (#101).
     Frog(FrogAction),
@@ -1747,6 +1774,10 @@ pub struct App {
     /// click on that notice opens it; a later notice says something else
     /// and leaves it closed.
     notice_dialog: Option<(String, Dialog)>,
+    /// The section of the Settings an app link opened them at (#261),
+    /// scrolled to for the frames it is kept, while the dialog finds its
+    /// size.
+    settings_section: Option<(String, u8)>,
     /// Syncs that need an update of the app here or on another Device,
     /// and settings a newer version saved that were kept (ADR 0034), each
     /// announced once, which Device behind the click (ADR 0019).
@@ -2143,6 +2174,7 @@ impl App {
             handed: None,
             notice: None,
             notice_dialog: None,
+            settings_section: None,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -5109,11 +5141,15 @@ impl App {
             let name = |r: &Routine| names.get(&r.id).cloned().unwrap_or_default();
             for routine in routines_by_name(all, name) {
                 let name = names.get(&routine.id).cloned().unwrap_or_default();
-                let area = match routines.note(&routine)? {
-                    Some(note) => place(note)?.area,
-                    None => None,
+                // One whose Note is in the trash or deleted says so (#262).
+                let (area, mark) = match routines.note(&routine)? {
+                    Some(note) => {
+                        let mark = note.is_trashed().then(|| self.t.note_in_trash());
+                        (place(note)?.area, mark)
+                    }
+                    None => (None, Some(self.t.note_deleted())),
                 };
-                all_routines.push((routine, name, area));
+                all_routines.push((routine, name, area, mark));
             }
         }
         let mut all_newer = Vec::new();
@@ -5569,7 +5605,16 @@ impl App {
                 url,
                 amend,
                 section,
+                pick,
             } => {
+                let picker = if pick {
+                    Some(app_links::Picker {
+                        search: String::new(),
+                        targets: app_links::targets(&self.store, &self.t, self.view.advanced)?,
+                    })
+                } else {
+                    None
+                };
                 self.dialog = Some(Dialog::Link {
                     linked: url.is_some(),
                     address: url.unwrap_or_default(),
@@ -5577,8 +5622,24 @@ impl App {
                     end,
                     amend,
                     section,
+                    picker,
+                    label: None,
                 });
                 self.focus = true;
+            }
+            Action::PickLink(target) => {
+                if let Some(Dialog::Link { address, label, .. }) = &mut self.dialog {
+                    *address = target.link.url();
+                    *label = Some(target.label);
+                }
+                self.act(Action::SetLink)?;
+            }
+            Action::FollowLink(link) => self.follow_link(link)?,
+            Action::OpenLinkedFile(file) => {
+                self.dialog = None;
+                if !app_links::open_file(&file) {
+                    self.notice = Some(self.t.link_not_available().to_string());
+                }
             }
             Action::SetLink => {
                 if let Some(Dialog::Link {
@@ -5586,12 +5647,14 @@ impl App {
                     start,
                     end,
                     amend: true,
+                    label,
                     ..
                 }) = &self.dialog
                 {
                     // Into the Amend field, kept with the Section.
                     let url = format_bar::address(address);
-                    let linked = markdown::link(&self.amend, *start, *end, &url);
+                    let linked =
+                        markdown::link_labelled(&self.amend, *start, *end, &url, label.as_deref());
                     self.amend = linked.text;
                     self.amend_select = Some((linked.start, linked.end));
                     self.amend_focus = true;
@@ -5601,6 +5664,7 @@ impl App {
                     start,
                     end,
                     section: Some(section),
+                    label,
                     ..
                 }) = &self.dialog
                 {
@@ -5608,7 +5672,13 @@ impl App {
                     let section = section.clone();
                     let url = format_bar::address(address);
                     if let Some(field) = self.section_texts.get_mut(&section) {
-                        let linked = markdown::link(&field.text, *start, *end, &url);
+                        let linked = markdown::link_labelled(
+                            &field.text,
+                            *start,
+                            *end,
+                            &url,
+                            label.as_deref(),
+                        );
                         field.text = linked.text;
                         field.select = Some((linked.start, linked.end));
                         field.editing = true;
@@ -5620,11 +5690,13 @@ impl App {
                     address,
                     start,
                     end,
+                    label,
                     ..
                 }) = self.dialog.take()
                 {
                     let url = format_bar::address(&address);
-                    let linked = markdown::link(&self.text, start, end, &url);
+                    let linked =
+                        markdown::link_labelled(&self.text, start, end, &url, label.as_deref());
                     self.text = linked.text;
                     self.text_select = Some((linked.start, linked.end));
                     self.text_editing = true;
@@ -5646,11 +5718,22 @@ impl App {
             Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
             Action::Trash => {
                 self.save_text()?;
-                let linked = Routines::new(&self.store).of_note(&selected)?.len() as i64;
-                self.dialog = Some(Dialog::TrashNote { linked });
+                let linked = Routines::new(&self.store).of_note(&selected)?;
+                let question = match linked.as_slice() {
+                    [] => self.t.delete_note_question().to_string(),
+                    [one] if one.is_reminder() => {
+                        self.t.delete_note_reminder_question().to_string()
+                    }
+                    _ => self.t.delete_note_linked_question(linked.len() as i64),
+                };
+                self.dialog = Some(Dialog::TrashNote {
+                    question,
+                    linked: !linked.is_empty(),
+                });
             }
-            Action::TrashNote(with_routines) => {
-                Routines::new(&self.store).trash_note(&selected, with_routines)?;
+            Action::TrashNote => {
+                // Its Routines and Reminders always go with it (#262).
+                Routines::new(&self.store).trash_note(&selected)?;
                 self.dialog = None;
             }
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
@@ -5757,7 +5840,7 @@ impl App {
                 let routines = Routines::new(&self.store);
                 routines.mark_done(&routine, &occurrence, None)?;
                 // The Reminder goes with it, and comes back with it.
-                routines.trash_note(&selected, true)?;
+                routines.trash_note(&selected)?;
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -7327,6 +7410,64 @@ impl App {
         }
     }
 
+    /// Opens what `link` names (#261, ADR 0046): a Note in the Note
+    /// dialog, an Area or Topic, the Agenda, Unsorted, All Routines and
+    /// Reminders and the Frogs in the list, the Settings (at a section),
+    /// Backups, Sync and the Profile as their dialogs, New Session as "+"
+    /// makes one (in Advanced), a guide page in the browser, and a file of
+    /// the synced folder after one question. A Note or place this Device
+    /// does not hold, or holds in the trash or merged, a file the folder
+    /// does not hold, and New Session in Simple say "Not available here".
+    fn follow_link(&mut self, link: AppLink) -> oldbrainfix_core::Result<()> {
+        let gone = self.t.link_not_available().to_string();
+        match link {
+            AppLink::Note(id) => match Notes::new(&self.store).by_id(&id)? {
+                Some(note) if !note.is_trashed() && !note.is_merged() => {
+                    self.act(Action::SelectNote(id))?;
+                }
+                _ => self.notice = Some(gone),
+            },
+            AppLink::Place(id) => {
+                let places = Places::new(&self.store);
+                if places.area_by_id(&id)?.is_some() || places.topic_by_id(&id)?.is_some() {
+                    self.act(Action::Select(Selection::Place(id)))?;
+                } else {
+                    self.notice = Some(gone);
+                }
+            }
+            AppLink::Agenda => self.act(Action::Select(Selection::Agenda))?,
+            AppLink::Unsorted => self.act(Action::Select(Selection::Unsorted))?,
+            AppLink::Routines => self.act(Action::Select(Selection::AllRoutines))?,
+            AppLink::Frogs => self.act(Action::Select(Selection::Frogs))?,
+            AppLink::Settings(section) => {
+                self.settings_section = section.map(|s| (s, 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+            AppLink::Backups => self.act(Action::OpenPage(Page::Backups))?,
+            AppLink::Sync => self.act(Action::OpenPage(Page::Sync))?,
+            AppLink::Profile => self.act(Action::OpenPage(Page::Profile))?,
+            AppLink::NewSession if self.view.advanced => {
+                self.act(Action::Add(NewKind::Session))?;
+            }
+            AppLink::NewSession => self.notice = Some(gone),
+            guide @ AppLink::Guide(..) => self.open_url = guide.guide_address(self.t.locale()),
+            AppLink::File(path) => {
+                let found = self
+                    .store
+                    .sync_folder()?
+                    .and_then(|folder| app_links::file_in(std::path::Path::new(&folder), &path));
+                match found {
+                    Some(file) => {
+                        let app = app_links::file_app(&file);
+                        self.dialog = Some(Dialog::FileLink { file, path, app });
+                    }
+                    None => self.notice = Some(gone),
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Makes `kind` as "+" asked, each on its own form: the Note through
     /// the quick note; a Checklist, a Shopping List or a Frog from its
     /// name; a Tally or a Session on its one page; a Topic as the Area
@@ -8293,6 +8434,10 @@ impl App {
         self.dragged(ui.ctx(), tones);
         // The menu of a text only shown, over everything (#255).
         read_text::menu(ui.ctx(), &self.t);
+        // An app link clicked in any text this frame (#261).
+        if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
+            actions.push(Action::FollowLink(link));
+        }
         for action in actions {
             self.apply(action);
         }
@@ -10579,6 +10724,7 @@ impl App {
                                 url,
                                 amend: true,
                                 section: None,
+                                pick: false,
                             });
                         }
                     }
@@ -10609,6 +10755,15 @@ impl App {
                             url: at.url.clone(),
                             amend: true,
                             section: None,
+                            pick: false,
+                        }),
+                        Some(Format::LinkTo) => actions.push(Action::AskLink {
+                            start: selected.0,
+                            end: selected.1,
+                            url: None,
+                            amend: true,
+                            section: None,
+                            pick: true,
                         }),
                         Some(format) => match format_bar::change(format, amend, selected) {
                             Some(changed) => {
@@ -10768,8 +10923,34 @@ impl App {
                         }
                     }
                     Dialog::Link {
+                        picker: Some(picker),
+                        ..
+                    } => match app_links::picker(ui, &t, picker, focus) {
+                        Some(app_links::Picked::Target(target)) => {
+                            actions.push(Action::PickLink(target));
+                        }
+                        Some(app_links::Picked::Cancel) => actions.push(Action::CloseDialog),
+                        None => {}
+                    },
+                    Dialog::Link {
                         address, linked, ..
                     } => link_form(ui, &t, (address, focus), *linked, actions),
+                    Dialog::FileLink { file, path, app } => {
+                        title(ui, t.file_link_title());
+                        let shown = if app.is_empty() {
+                            t.file_link_some_app()
+                        } else {
+                            app.as_str()
+                        };
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.file_link_question(path, shown)).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if theme::primary(ui, true, t.file_link_open()).clicked() {
+                                actions.push(Action::OpenLinkedFile(file.clone()));
+                            }
+                        });
+                    }
                     Dialog::NewPlace { area, name } => {
                         let title = if area.is_some() {
                             t.new_topic()
@@ -10797,29 +10978,19 @@ impl App {
                     Dialog::Merge { query, others } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
-                    Dialog::TrashNote { linked } => {
-                        let linked = *linked;
-                        title(ui, t.delete_note_question());
+                    Dialog::TrashNote { question, linked } => {
+                        title(ui, question);
                         let text = ui.visuals().text_color();
-                        let detail = if linked == 0 {
-                            t.delete_note_detail()
-                        } else {
+                        let detail = if *linked {
                             t.delete_note_linked_detail()
+                        } else {
+                            t.delete_note_detail()
                         };
                         ui.label(RichText::new(detail).color(text));
-                        ui.horizontal_wrapped(|ui| {
+                        ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
-                            if linked == 0 {
-                                if destructive(ui, t.delete()) {
-                                    actions.push(Action::TrashNote(false));
-                                }
-                            } else {
-                                if destructive(ui, t.delete_note_only()) {
-                                    actions.push(Action::TrashNote(false));
-                                }
-                                if destructive(ui, &t.delete_note_with_linked(linked)) {
-                                    actions.push(Action::TrashNote(true));
-                                }
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::TrashNote);
                             }
                         });
                     }
@@ -12100,6 +12271,21 @@ impl App {
             .unwrap_or(false);
         let quick = self.view.capture_quick;
         let advanced = self.view.advanced;
+        // The section an app link opened the Settings at (#261).
+        let section = self.settings_section.as_ref().map(|(s, _)| s.clone());
+        self.settings_section = self
+            .settings_section
+            .take()
+            .and_then(|(s, frames)| (frames > 1).then_some((s, frames - 1)));
+        let heading = |ui: &mut Ui, words: &str, slug: &str| {
+            let shown = ui.label(RichText::new(words).strong().color(text));
+            if section.as_deref() == Some(slug) {
+                shown.scroll_to_me_animation(
+                    Some(egui::Align::TOP),
+                    egui::style::ScrollAnimation::none(),
+                );
+            }
+        };
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -12107,7 +12293,7 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_computer()).strong().color(text));
+                    heading(ui, t.settings_computer(), "computer");
                     let mut on = alerts;
                     if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
                         .changed()
@@ -12176,7 +12362,7 @@ impl App {
                     });
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_alarms()).strong().color(text));
+                    heading(ui, t.settings_alarms(), "alarms");
                     let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
                     if !choices.contains(&renag) {
                         choices.push(renag);
@@ -12212,7 +12398,7 @@ impl App {
                     alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_nudges()).strong().color(text));
+                    heading(ui, t.settings_nudges(), "nudges");
                     ui.label(
                         RichText::new(t.nudge_settings_explain())
                             .small()
@@ -12280,7 +12466,7 @@ impl App {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_units()).strong().color(text));
+                    heading(ui, t.settings_units(), "units");
                     ui.label(RichText::new(t.settings_units_detail()).small().color(weak));
                     let region = match region_units {
                         UnitSystem::Metric => t.unit_system_metric_name(),
@@ -12300,7 +12486,7 @@ impl App {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_agenda()).strong().color(text));
+                    heading(ui, t.settings_agenda(), "agenda");
                     let mut on = hides_checked;
                     if theme::checkbox(
                         ui,
@@ -12333,7 +12519,7 @@ impl App {
                     );
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_history()).strong().color(text));
+                    heading(ui, t.settings_history(), "history");
                     let mut on = streaks;
                     if theme::checkbox(
                         ui,
@@ -12349,7 +12535,7 @@ impl App {
                 // Simple or Advanced, the person's (#197), last, so
                 // the settings of this computer come first.
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.features()).strong().color(text));
+                    heading(ui, t.features(), "features");
                     let mut picked = advanced;
                     if starter_set_view::features_choice(ui, &t, &mut picked) {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
@@ -16274,6 +16460,7 @@ fn edited_text(
                 url,
                 amend: false,
                 section: edit.section.then(|| of.to_string()),
+                pick: false,
             });
         }
         if let Some(asked) = grid.boxes.take() {
@@ -16364,6 +16551,18 @@ fn edited_text(
                 url: at.url.clone(),
                 amend: false,
                 section: edit.section.then(|| of.to_string()),
+                pick: false,
+            });
+        }
+        Some(Format::LinkTo) => {
+            *editing = true;
+            actions.push(Action::AskLink {
+                start: selected.0,
+                end: selected.1,
+                url: None,
+                amend: false,
+                section: edit.section.then(|| of.to_string()),
+                pick: true,
             });
         }
         Some(format) => {

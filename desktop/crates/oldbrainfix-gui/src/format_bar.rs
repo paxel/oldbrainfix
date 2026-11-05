@@ -34,6 +34,9 @@ pub enum Format {
     Numbers,
     Quote,
     Link,
+    /// "Link to…" (#261): a picker of the app's pages, Areas, Topics and
+    /// Notes, whose pick becomes an app link.
+    LinkTo,
     Code,
     CodeBlock,
     Indent,
@@ -43,7 +46,7 @@ pub enum Format {
 
 impl Format {
     /// The buttons in the phone's order.
-    pub const ALL: [Format; 15] = [
+    pub const ALL: [Format; 16] = [
         Format::Mark,
         Format::Bold,
         Format::Italic,
@@ -54,6 +57,7 @@ impl Format {
         Format::Numbers,
         Format::Quote,
         Format::Link,
+        Format::LinkTo,
         Format::Code,
         Format::CodeBlock,
         Format::Indent,
@@ -92,6 +96,7 @@ impl Format {
             Format::Numbers => t.format_numbers(),
             Format::Quote => t.format_quote(),
             Format::Link => t.format_link(),
+            Format::LinkTo => t.format_link_to(),
             Format::Code => t.format_code(),
             Format::CodeBlock => t.format_code_block(),
             Format::Indent => t.format_indent(),
@@ -113,6 +118,7 @@ impl Format {
             Format::Numbers => Ok(icons::FORMAT_NUMBERS),
             Format::Quote => Ok(icons::FORMAT_QUOTE),
             Format::Link => Ok(icons::LINK),
+            Format::LinkTo => Ok(icons::ADD_LINK),
             Format::Code => Ok(icons::CODE),
             Format::CodeBlock => Ok(icons::CODE_BLOCK),
             Format::Indent => Ok(icons::INDENT),
@@ -200,7 +206,8 @@ impl At {
 }
 
 /// What `format` makes of `text` with the bytes `start..end` selected;
-/// none for the link, which asks for its address first, for the table,
+/// none for the link, which asks for its address first, for "Link to…",
+/// which asks for its target, for the table,
 /// which the table view takes. ☐ goes in at the cursor, also in the
 /// middle of a word, or before the selection, which stays after it.
 pub fn change(format: Format, text: &str, (start, end): (usize, usize)) -> Option<Change> {

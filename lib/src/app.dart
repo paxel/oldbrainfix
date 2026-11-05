@@ -11,6 +11,7 @@ import 'agenda_screen.dart';
 import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
+import 'app_links.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
 import 'areas_screen.dart';
@@ -290,11 +291,35 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _photoReader.dispose();
     _lock.dispose();
     _profile.dispose();
+    _pager.dispose();
     _scroll.dispose();
     _frameTimes.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }
+
+  /// The Agenda and the Areas list beside it (#258), kept here so an
+  /// app link to the Agenda shows it from any page (#261).
+  final _pager = HomePager();
+
+  /// What the format bar's "Link to…" picks from (#261).
+  Future<LinkTarget?> _pickLink(BuildContext context) =>
+      pickLinkTarget(context, _notes, _places);
+
+  /// Where a tapped app link goes (#261, ADR 0046).
+  late final _links = AppLinks(
+    store: widget.store,
+    notes: _notes,
+    places: _places,
+    trail: _trail,
+    alarms: _alarms,
+    profile: _profile,
+    onThemeChanged: _themeChanged,
+    showAgenda: (context) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      _pager.jumpToAgenda();
+    },
+  );
 
   /// A tag tapped on a page of its own, such as the editor, opens the
   /// search over every Note for it on top (ADR 0032).
@@ -372,9 +397,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                 onChangesSent: _alarms.replan,
                                                 child: TagSearchScope(
                                                   onSearch: _searchTag,
-                                                  child:
-                                                      child ??
-                                                      const SizedBox.shrink(),
+                                                  child: AppLinkScope(
+                                                    onOpen: _links.open,
+                                                    onPick: _pickLink,
+                                                    child:
+                                                        child ??
+                                                        const SizedBox.shrink(),
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -427,6 +456,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     hosting: widget.hosting,
     help: widget.help,
     onThemeChanged: _themeChanged,
+    pager: _pager,
   );
 
   /// Shows the theme this Device chose in Settings at once, and its
@@ -505,6 +535,7 @@ class _Home extends StatefulWidget {
   final StartHosting hosting;
   final HelpSetup? help;
   final VoidCallback onThemeChanged;
+  final HomePager pager;
 
   const _Home({
     required this.store,
@@ -524,6 +555,7 @@ class _Home extends StatefulWidget {
     required this.hosting,
     required this.help,
     required this.onThemeChanged,
+    required this.pager,
   });
 
   @override
@@ -564,8 +596,8 @@ class _HomeState extends State<_Home> {
   /// Whether the app is locked, as shown.
   late bool _locked = widget.lock.locked;
 
-  /// The Agenda and the Areas list beside it (#258).
-  final _pager = HomePager();
+  /// The Agenda and the Areas list beside it (#258), the app's.
+  HomePager get _pager => widget.pager;
 
   /// The Nudge screen and the Unsorted list, asked for while locked, and
   /// Conflicts a sync brought meanwhile.
@@ -742,7 +774,6 @@ class _HomeState extends State<_Home> {
     unawaited(_bundlesOpened.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
-    _pager.dispose();
     super.dispose();
   }
 

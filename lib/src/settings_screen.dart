@@ -59,12 +59,18 @@ class SettingsScreen extends StatefulWidget {
   /// opens as the last selected one.
   final BrowserTrail? trail;
 
+  /// The section an app link opens the page at (#261), by its link's
+  /// name ([AppLink.settingsSections]); the top when null or when this
+  /// Device has no such section.
+  final String? section;
+
   const SettingsScreen({
     super.key,
     required this.store,
     required this.alarms,
     this.onThemeChanged,
     this.trail,
+    this.section,
   });
 
   @override
@@ -72,6 +78,25 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  /// The headings by their section's link name, for an app link (#261).
+  final _headings = <String, GlobalKey>{};
+
+  GlobalKey _heading(String section) =>
+      _headings.putIfAbsent(section, () => GlobalKey(debugLabel: section));
+
+  @override
+  void initState() {
+    super.initState();
+    final section = widget.section;
+    if (section == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final heading = _headings[section]?.currentContext;
+      if (heading != null && heading.mounted) {
+        unawaited(Scrollable.ensureVisible(heading));
+      }
+    });
+  }
+
   late ThemeChoice _theme = widget.store.themeChoice;
   late bool _fatFingers = widget.store.fatFingers;
   late Duration _renag = widget.store.renagInterval;
@@ -502,7 +527,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
               child: Text(t.settingsIntro),
             ),
-            SettingsHeading(t.settingsLook),
+            SettingsHeading(t.settingsLook, key: _heading('look')),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ChoiceChips<ThemeChoice>(
@@ -540,7 +565,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            SettingsHeading(t.settingsUnits),
+            SettingsHeading(t.settingsUnits, key: _heading('units')),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
               child: Text(t.settingsUnitsDetail),
@@ -575,7 +600,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: _setUnits,
               ),
             ),
-            SettingsHeading(t.settingsAgenda),
+            SettingsHeading(t.settingsAgenda, key: _heading('agenda')),
             SettingsSection(
               children: [
                 SwitchBelow(
@@ -596,7 +621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            SettingsHeading(t.settingsAlarms),
+            SettingsHeading(t.settingsAlarms, key: _heading('alarms')),
             SettingsSection(
               children: [
                 if (widget.alarms.platform.available)
@@ -655,9 +680,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
               ],
             ),
-            SettingsHeading(t.settingsNudges),
+            SettingsHeading(t.settingsNudges, key: _heading('nudges')),
             _NudgeSettings(store: widget.store, alarms: widget.alarms),
-            SettingsHeading(t.settingsCapture),
+            SettingsHeading(t.settingsCapture, key: _heading('capture')),
             SettingsSection(
               children: [
                 ListTile(
@@ -685,10 +710,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
               ],
             ),
-            SettingsHeading(t.settingsQuickNote),
+            SettingsHeading(t.settingsQuickNote, key: _heading('quick-note')),
             _QuickNoteSettings(store: widget.store, advanced: _advanced),
             if (hasCalendarPage(context)) ...[
-              SettingsHeading(t.settingsCalendar),
+              SettingsHeading(t.settingsCalendar, key: _heading('calendar')),
               SettingsSection(
                 children: [
                   ListTile(
@@ -702,14 +727,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
             if (LockScope.of(context) case final lock?) ...[
-              SettingsHeading(t.settingsPrivacy),
+              SettingsHeading(t.settingsPrivacy, key: _heading('privacy')),
               LockSettingsSection(
                 lock: lock,
                 alarms: widget.alarms,
                 places: Places(widget.store),
               ),
             ],
-            SettingsHeading(t.settingsTyping),
+            SettingsHeading(t.settingsTyping, key: _heading('typing')),
             SettingsSection(
               children: [
                 SwitchBelow(
@@ -722,7 +747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            SettingsHeading(t.settingsHistory),
+            SettingsHeading(t.settingsHistory, key: _heading('history')),
             SettingsSection(
               children: [
                 SwitchBelow(
@@ -736,7 +761,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             if (FolderScope.of(context).available) ...[
-              SettingsHeading(t.settingsImport),
+              SettingsHeading(t.settingsImport, key: _heading('import')),
               SettingsSection(
                 children: [
                   _importRow(
@@ -762,7 +787,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             // The person's own, on all of their own Devices (#197): after
             // the settings of this phone, before About.
-            SettingsHeading(t.features),
+            SettingsHeading(t.features, key: _heading('features')),
             FeaturesChoice(advanced: _advanced, onChanged: _setAdvanced),
             const SizedBox(height: 16),
             SettingsSection(

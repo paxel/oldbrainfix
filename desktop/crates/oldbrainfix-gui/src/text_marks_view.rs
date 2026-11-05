@@ -48,6 +48,7 @@ use egui::{
     Color32, FontId, FontSelection, Id, Modifiers, Popup, Pos2, Rect, RichText, Sense, Stroke,
     TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
+use oldbrainfix_core::app_link::{self, AppLink};
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
 use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
@@ -1171,9 +1172,24 @@ fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
     out
 }
 
+/// Where a clicked app link waits for the window to follow it (#261).
+fn app_link_id() -> Id {
+    Id::new("app link clicked")
+}
+
+/// The app link clicked this frame, which the window follows once;
+/// `None` when there is none.
+pub fn take_app_link(ctx: &egui::Context) -> Option<AppLink> {
+    ctx.data_mut(|d| d.remove_temp::<Option<AppLink>>(app_link_id()))
+        .flatten()
+}
+
 /// Takes the links `spots` of the text `of`, by id, as links over what
-/// was drawn under them; a click opens one in the system's browser or
-/// mail program. Only web and e-mail addresses are ever among them.
+/// was drawn under them; a click opens a web or e-mail address in the
+/// system's browser or mail program, and hands an app link (ADR 0046) to
+/// the window ([`take_app_link`]): these texts are drawn in many places
+/// that know nothing of the window. Only what `markdown::may_open`
+/// allows is ever among them.
 pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
     for spot in spots {
         for (i, rect) in spot.rects.iter().enumerate() {
@@ -1185,7 +1201,13 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
                 .clicked()
                 && markdown::may_open(&spot.url)
             {
-                ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url));
+                match app_link::parse(&spot.url) {
+                    Some(link) => {
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
+                    }
+                    None => ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url)),
+                }
             }
         }
     }

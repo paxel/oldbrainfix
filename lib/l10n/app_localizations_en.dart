@@ -999,7 +999,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteNoteLinkedDetail =>
-      'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.';
+      'They stay in the trash with it for 30 days and come back when you restore it.';
 
   @override
   String get noteInTrash => 'The Note is in the trash';
@@ -2840,18 +2840,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteNoteDetail => 'It stays in the trash for 30 days.';
 
   @override
-  String get deleteNoteOnly => 'Delete only the Note';
-
-  @override
-  String deleteNoteWithLinked(int count) {
+  String deleteNoteLinkedQuestion(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Delete with its $count Routines and Reminders',
-      one: 'Delete with its Routine or Reminder',
+      other: 'Delete this Note and its $count Routines and Reminders?',
+      one: 'Delete this Note and its 1 Routine?',
     );
     return '$_temp0';
   }
+
+  @override
+  String get deleteNoteReminderQuestion =>
+      'Delete this Note and its 1 Reminder?';
 
   @override
   String get removeRecordingKeepText => 'Remove recording, keep text';
@@ -4631,6 +4632,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get linkSet => 'Set link';
 
   @override
+  String get formatLinkTo => 'Link to…';
+
+  @override
+  String get linkToSearch => 'Search Notes, Areas and pages';
+
+  @override
+  String get linkToPages => 'Pages';
+
+  @override
+  String get linkToPlaces => 'Areas and Topics';
+
+  @override
+  String get linkToNotes => 'Notes';
+
+  @override
+  String get linkToNothing => 'Nothing found.';
+
+  @override
+  String get linkToGuide => 'User guide';
+
+  @override
+  String get linkNotAvailable => 'Not available here';
+
+  @override
+  String get fileLinkTitle => 'Open this file?';
+
+  @override
+  String fileLinkQuestion(String file, String app) {
+    return 'Open \"$file\" from the shared folder with $app?';
+  }
+
+  @override
+  String get fileLinkSomeApp => 'the app the system picks for it';
+
+  @override
+  String get fileLinkOpen => 'Open';
+
+  @override
   String get formatTable => 'Table';
 
   @override
@@ -5252,6 +5291,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop8 => 'Sync: Sync ▸ Pair a Device.';
+
+  @override
+  String get helpQuickStartPlacesTitle => 'Go where each step is done:';
+
+  @override
+  String get helpQuickStartPlaceHere => 'Here, in this Checklist.';
+
+  @override
+  String get helpIconsGuide => 'Everything else is in the user guide.';
 
   @override
   String get helpIconsTitle => 'What the icons mean';

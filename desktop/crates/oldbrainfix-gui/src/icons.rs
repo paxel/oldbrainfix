@@ -104,6 +104,8 @@ pub const FORMAT_BULLETS: char = '\u{e2b8}';
 pub const FORMAT_NUMBERS: char = '\u{e2b9}';
 pub const FORMAT_QUOTE: char = '\u{e2bc}';
 pub const LINK: char = '\u{e380}';
+/// The format bar's "Link to…" (#261), as the phone's `Icons.add_link`.
+pub const ADD_LINK: char = '\u{e053}';
 pub const CODE: char = '\u{e176}';
 /// The format bar's code block (#212), as the phone's: `data_object`.
 pub const CODE_BLOCK: char = '\u{f04e6}';

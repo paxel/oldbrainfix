@@ -8,6 +8,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
+import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
 import 'profile.dart';
@@ -322,7 +323,9 @@ typedef LinkOpen = Future<void> Function(Uri address);
 
 /// How a tapped link in a formatted text below is opened (ADR 0033);
 /// without one, the system opens it in the app it belongs to. Only a
-/// web or e-mail address ever gets here ([Markdown.mayOpen]).
+/// web or e-mail address ever gets here ([Markdown.mayOpen]), and a
+/// guide page an app link names (ADR 0046); other app links go to the
+/// [AppLinkScope].
 class LinkOpenScope extends InheritedWidget {
   final LinkOpen onOpen;
 
@@ -1561,19 +1564,25 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
           ),
         );
       case MarkdownSpanKind.link:
-        // Another person may have written it: only the web and e-mail.
+        // Another person may have written it: only the web, e-mail and
+        // the app's own links (ADR 0046).
         if (!Markdown.mayOpen(span.url)) {
           inner(style);
           return;
         }
-        final address = Uri.tryParse(span.url);
-        if (address == null) {
+        final appLink = AppLink.parse(span.url);
+        final address = appLink == null ? Uri.tryParse(span.url) : null;
+        if (appLink == null && address == null) {
           inner(style);
           return;
         }
         final open = LinkOpenScope.of(context);
         final tap = TapGestureRecognizer()
-          ..onTap = () => unawaited(_open(open, address));
+          ..onTap = () => unawaited(
+            appLink != null
+                ? followAppLink(context, appLink)
+                : _open(open, address!),
+          );
         _links.add(tap);
         inner(
           style.copyWith(

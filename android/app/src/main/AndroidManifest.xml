@@ -357,6 +357,12 @@
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
+        <!-- The app a file link opens a file of the shared folder in
+             (#261), named in the question before it opens. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
         <!-- The browser and mail app the About page's links open in. -->
         <intent>
             <action android:name="android.intent.action.VIEW" />

@@ -775,17 +775,18 @@ final _scenarios = <Scenario>[
           rule: Recurrence(frequency: Frequency.daily),
         ),
       );
-      routines.trashNote(walk.id, withRoutines: true);
+      routines.trashNote(walk.id);
       routines.restoreNote(walk.id);
       final flyer = notes.capture('Flyer for the fair');
       routines.spawn(
         flyer.id,
         Schedule(start: Day(2026, 4, 1), times: [_at(10)]),
       );
-      routines.trashNote(flyer.id, withRoutines: false);
+      // Left behind as "Delete only the Note" did before #262.
+      routines.store.batch(() => notes.trash(flyer.id));
       final car = notes.capture('Car inspection');
       routines.spawn(car.id, Schedule(start: Day(2026, 5, 1)));
-      routines.trashNote(car.id, withRoutines: true);
+      routines.trashNote(car.id);
       notes.capture('Unsorted thought', nudgeIn: const Duration(minutes: 10));
       notes.capture('Another thought');
     },
@@ -3896,8 +3897,12 @@ final _helpEnglish = HelpTexts(
   areaName: 'Old Brain Fix',
   quickStartTitle: 'Quick start',
   quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
-  quickStartDescription: 'On the desktop:\nCapture: Ctrl+N',
-  iconsText: 'What the icons mean\n\nKind: what the Note is',
+  quickStartDescription:
+      'Go there:\n1. [Agenda](oldbrainfix://agenda)\n\n'
+      'On the desktop:\nCapture: Ctrl+N',
+  iconsText:
+      'What the icons mean\n\nKind: what the Note is\n\n'
+      '[User guide](oldbrainfix://guide)',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]),
   ],
@@ -3910,8 +3915,12 @@ final _helpGerman = HelpTexts(
     'Einen Gedanken mit + erfassen',
     'Ihn in einen Bereich einsortieren',
   ],
-  quickStartDescription: 'Auf dem Desktop:\nErfassen: Strg+N',
-  iconsText: 'Was die Symbole bedeuten\n\nArt: was die Notiz ist',
+  quickStartDescription:
+      'Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\n'
+      'Auf dem Desktop:\nErfassen: Strg+N',
+  iconsText:
+      'Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n'
+      '[Anleitung](oldbrainfix://guide)',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2]),
   ],
@@ -8018,17 +8027,25 @@ Map<String, Object?> _markdown() {
           Markdown.toggle(text, u16(text, start), u16(text, end), kind),
         ),
       });
-  void link(String text, int start, int end, String url) => edits.add({
-    'op': 'link',
-    'start': start,
-    'end': end,
-    'text': text,
-    'url': url,
-    'result': change(
-      text,
-      Markdown.link(text, u16(text, start), u16(text, end), url),
-    ),
-  });
+  void link(String text, int start, int end, String url, [String? label]) =>
+      edits.add({
+        'op': 'link',
+        'start': start,
+        'end': end,
+        'text': text,
+        'url': url,
+        'label': ?label,
+        'result': change(
+          text,
+          Markdown.link(
+            text,
+            u16(text, start),
+            u16(text, end),
+            url,
+            label: label,
+          ),
+        ),
+      });
   void line(String text, int start, int end, MarkdownBlockKind kind) =>
       edits.add({
         'kind': kind.name,
@@ -8117,6 +8134,9 @@ Map<String, Object?> _markdown() {
   link('see [docs](https://x.org) here', 4, 25, '');
   link('see ', 4, 4, 'https://x.org/*x*');
   link('', 0, 0, r'https://x.org/[a]\]');
+  // "Link to…" puts an app link with its target's name (#261).
+  link('go ', 3, 3, 'oldbrainfix://unsorted', 'Unsorted [all] *');
+  link('see Frogs', 6, 6, 'oldbrainfix://frogs', 'Frogs');
   link('see', 1, 1, '  ');
   link('one two\nthree', 4, 13, 'u');
   link('🧠 x', 2, 3, 'https://x.org/ ü');
@@ -8378,8 +8398,57 @@ Map<String, Object?> _markdown() {
         ' https://x.org',
         'ʜttps://x.org',
         '',
+        'oldbrainfix://note/note:a',
+        'OldBrainFix://settings/backups',
+        'oldbrainfix://file/a/b.pdf',
+        'oldbrainfix://file/../b.pdf',
+        'oldbrainfix://capture/voice',
+        'oldbrainfix://x',
       ])
         url: Markdown.mayOpen(url),
+    },
+    // App links (#261, ADR 0046): what each reads as, null for none,
+    // and the link it writes back.
+    'appLinks': {
+      for (final url in [
+        'oldbrainfix://note/note:3f2a',
+        'oldbrainfix://area/topic:x%20y%2F%C3%BC',
+        'oldbrainfix://area/topic:x y',
+        'oldbrainfix://agenda',
+        'OLDBRAINFIX://unsorted',
+        'oldbrainfix://settings',
+        'oldbrainfix://settings/alarms',
+        'oldbrainfix://settings/backups',
+        'oldbrainfix://settings/sync',
+        'oldbrainfix://settings/nothing',
+        'oldbrainfix://routines',
+        'oldbrainfix://profile',
+        'oldbrainfix://frogs',
+        'oldbrainfix://session/new',
+        'oldbrainfix://guide',
+        'oldbrainfix://guide/getting-started',
+        'oldbrainfix://guide/getting-started#set-up',
+        'oldbrainfix://guide/Getting',
+        'oldbrainfix://file/Scans/Tax%202026.pdf',
+        'oldbrainfix://file/a%3Ab',
+        'oldbrainfix://file/a/%2E%2E/b',
+        'oldbrainfix://note/%C3',
+        'oldbrainfix://agenda#x',
+        'oldbrainfix://agenda?x',
+        'oldbrainfix://capture/voice',
+      ])
+        url: switch (AppLink.parse(url)) {
+          null => null,
+          final link => {
+            'anchor': link.anchor,
+            'guide': link.kind == AppLinkKind.guide
+                ? link.guideAddress('de')
+                : null,
+            'kind': link.kind.name,
+            'target': link.target,
+            'url': link.url,
+          },
+        },
     },
     // Whether a pasted text looks like code (#213).
     'looksLikeCode': {

@@ -101,6 +101,16 @@ void main() {
         text,
         'Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it',
       );
+      // Formatted, so the links of its steps open (#261); so is What the
+      // icons mean.
+      expect(
+        Notes(ann).byId(HelpNotes.quickStartId(p))!.textFormat,
+        TextFormats.markdown,
+      );
+      expect(
+        Notes(ann).byId(HelpNotes.iconsId(p))!.textFormat,
+        TextFormats.markdown,
+      );
       expect(NoteKinds.name(text), english.quickStartTitle);
       expect(NoteKinds.description(text), english.quickStartDescription);
       expect([for (final l in list.lines) l.text], english.quickStartLines);

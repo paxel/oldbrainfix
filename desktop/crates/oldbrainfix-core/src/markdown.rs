@@ -363,8 +363,9 @@ pub fn plain(text: &str) -> String {
 /// code block is a `<pre><code>`, `class="language-…"` its language when
 /// it has one, each line of its content followed by a line break. Bold
 /// is `<strong>`, italic `<em>`, strike-through `<del>`, code
-/// `<code>`; a link is an `<a>` only when [`may_open`] allows its
-/// destination, else its label alone. Every character of the text is
+/// `<code>`; a link is an `<a>` only when its destination is a web or
+/// e-mail address [`may_open`] allows, else its label alone, an app
+/// link's too (ADR 0046). Every character of the text is
 /// escaped, so nothing in it is markup; status marks and tags are text. A
 /// line break follows each part at the top.
 pub fn html(text: &str) -> String {
@@ -542,7 +543,7 @@ fn html_spans(out: &mut String, spans: &[Span]) {
                 html_escape(out, &s.text);
                 out.push_str("</code>");
             }
-            SpanKind::Link if may_open(&s.url) => {
+            SpanKind::Link if web_or_mail(&s.url) => {
                 out.push_str("<a href=\"");
                 html_escape(out, &s.url);
                 out.push_str("\">");
@@ -769,9 +770,17 @@ pub fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
 
 /// Whether a link to `url` may be opened: a web address, `http://` or
 /// `https://`, or an e-mail address, `mailto:`, in any case of ASCII
-/// letters. A text may come from another person's Device, so nothing
-/// else is opened from it: no file, no app's own address, no script.
+/// letters, or an app link [`crate::app_link::parse`] reads (#261, ADR
+/// 0046). A text may come from another person's Device, so nothing else
+/// is opened from it: no file outside the shared folder, no other app's
+/// address, no script.
 pub fn may_open(url: &str) -> bool {
+    web_or_mail(url) || crate::app_link::parse(url).is_some()
+}
+
+/// Whether `url` is a web or an e-mail address, which another app can
+/// open too.
+fn web_or_mail(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();
     lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:")
 }
@@ -906,6 +915,18 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
 /// %-encoded, `(`, `)` and `\` escaped. A code block's lines stay as
 /// they are.
 pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
+    link_labelled(text, start, end, url, None)
+}
+
+/// [`link`], with `label` in place of `url` as the label of a link put
+/// at a cursor without a word, as "Link to…" puts one (#261).
+pub fn link_labelled(
+    text: &str,
+    start: usize,
+    end: usize,
+    url: &str,
+    label: Option<&str>,
+) -> Change {
     let (s, e) = ordered(text, start, end);
     let blocks = parse(text);
     let Some(block) = blocks.get(line_at(text, s)) else {
@@ -941,7 +962,7 @@ pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
     };
     if from == to {
         // A `]` would end the label.
-        let label = escape(address).replace(']', "\\]");
+        let label = escape(label.unwrap_or(address)).replace(']', "\\]");
         return Change {
             text: format!(
                 "{}[{label}]({destination}){}",
@@ -2363,9 +2384,27 @@ mod tests {
     }
 
     #[test]
-    fn only_a_web_or_e_mail_address_is_opened_from_a_link() {
+    fn only_a_web_or_e_mail_address_or_an_app_link_is_opened() {
         assert!(may_open("HTTPS://x.org") && may_open("mailto:a@x.org"));
+        assert!(may_open("oldbrainfix://settings/backups"));
+        assert_eq!(
+            html("[Backups](oldbrainfix://settings/backups)"),
+            "<p>Backups</p>\n"
+        );
+        assert_eq!(
+            link_labelled(
+                "go ",
+                3,
+                3,
+                "oldbrainfix://unsorted",
+                Some("Unsorted [all]")
+            )
+            .text,
+            "go [Unsorted \\[all\\]](oldbrainfix://unsorted)"
+        );
         for url in [
+            "oldbrainfix://x",
+            "oldbrainfix://file/../a",
             "javascript:x",
             "file:///etc",
             "intent://x",

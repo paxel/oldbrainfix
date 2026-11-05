@@ -375,12 +375,14 @@ void main() {
       expect(inserted.url, r'https://x.org/[a]\]');
     });
 
-    test('only a web or e-mail address is opened from a link', () {
+    test('only a web or e-mail address or an app link is opened', () {
       for (final url in [
         'https://x.org',
         'HTTP://x.org/a',
         'mailto:ann@x.org',
         'MailTo:ann@x.org',
+        'oldbrainfix://note/note:a',
+        'OLDBRAINFIX://settings/backups',
       ]) {
         expect(Markdown.mayOpen(url), isTrue, reason: url);
       }
@@ -389,6 +391,7 @@ void main() {
         'file:///etc/passwd',
         'intent://x#Intent;end',
         'oldbrainfix://x',
+        'oldbrainfix://file/../a',
         'tel:123',
         'data:text/html,x',
         'x.org',

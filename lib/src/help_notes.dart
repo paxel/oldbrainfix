@@ -116,9 +116,13 @@ List<String> quickStartLines(AppLocalizations t) => [
 ];
 
 /// The Quick start's Description in [t]'s language (#260), folded under
-/// its name: "On the desktop", then the desktop's way for each Line, one
-/// line each, in the Lines' order.
+/// its name: a link to the place of each Line, in the Lines' order
+/// (#261), then "On the desktop" and the desktop's way for each Line, one
+/// line each.
 String quickStartDescription(AppLocalizations t) => [
+  t.helpQuickStartPlacesTitle,
+  for (final (i, place) in quickStartPlaces(t).indexed) '${i + 1}. $place',
+  '',
   t.helpQuickStartDesktopTitle,
   t.helpQuickStartDesktop1,
   t.helpQuickStartDesktop2,
@@ -130,9 +134,28 @@ String quickStartDescription(AppLocalizations t) => [
   t.helpQuickStartDesktop8,
 ].join('\n');
 
+/// [label] as a Markdown link to [to], as "Link to…" writes one.
+String _linked(String label, AppLink to) =>
+    Markdown.link('', 0, 0, to.url, label: label).text;
+
+/// Where each Quick start Line is done, as links (#261): the Agenda,
+/// Unsorted, All Routines and Reminders twice, this Checklist itself
+/// (no link), the Agenda, Backups and Sync. The desktop's
+/// `help_notes.rs` writes the same.
+List<String> quickStartPlaces(AppLocalizations t) => [
+  _linked(t.agenda, const AppLink(AppLinkKind.agenda)),
+  _linked(t.unsorted, const AppLink(AppLinkKind.unsorted)),
+  _linked(t.allRoutinesTitle, const AppLink(AppLinkKind.routines)),
+  _linked(t.allRoutinesTitle, const AppLink(AppLinkKind.routines)),
+  Markdown.escape(t.helpQuickStartPlaceHere),
+  _linked(t.agenda, const AppLink(AppLinkKind.agenda)),
+  _linked(t.backupsTitle, const AppLink(AppLinkKind.backups)),
+  _linked(t.syncTitle, const AppLink(AppLinkKind.sync)),
+];
+
 /// The text of "What the icons mean": its name, then each group's
 /// heading and its icons, "name: meaning" one per line, so search finds
-/// what the pictures show.
+/// what the pictures show, then a link to the user guide (#261).
 String helpIconsText(AppLocalizations t) {
   final out = StringBuffer(t.helpIconsTitle);
   for (final group in helpIconGroups) {
@@ -141,6 +164,10 @@ String helpIconsText(AppLocalizations t) {
       out.write('\n${icon.name(t)}: ${icon.means(t)}');
     }
   }
+  // A link to the guide's start page last (#261).
+  out.write(
+    '\n\n${_linked(t.helpIconsGuide, const AppLink(AppLinkKind.guide))}',
+  );
   return out.toString();
 }
 

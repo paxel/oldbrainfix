@@ -66,6 +66,15 @@ abstract interface class FolderPlatform {
   /// Tells the platform's backup whether the user opted in; until then
   /// it takes nothing at all.
   Future<void> setAutoBackup(bool on);
+
+  /// The app that opens the file at [path] inside the shared [folder],
+  /// folders separated by `/` (#261): its name, '' when the system does
+  /// not tell, or null when the folder holds no such file. Never fails.
+  Future<String?> fileApp(String folder, String path);
+
+  /// Opens the file at [path] inside the shared [folder] with the app
+  /// the system has for its type; whether one took it. Never fails.
+  Future<bool> openFile(String folder, String path);
 }
 
 /// One file of a folder to import: its [path] inside the folder,
@@ -140,6 +149,12 @@ class NoFolders implements FolderPlatform {
 
   @override
   Future<void> setAutoBackup(bool on) async {}
+
+  @override
+  Future<String?> fileApp(String folder, String path) async => null;
+
+  @override
+  Future<bool> openFile(String folder, String path) async => false;
 }
 
 /// Android's folder picker and the document tree it grants (Storage
@@ -316,6 +331,36 @@ class AndroidFolders implements FolderPlatform {
       // The agent keeps what it had; the switch is tried again at start.
     } on MissingPluginException {
       // No agent here.
+    }
+  }
+
+  @override
+  Future<String?> fileApp(String folder, String path) async {
+    try {
+      return await channel.invokeMethod<String>('fileApp', {
+        'tree': folder,
+        'path': path,
+      });
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      // The iPhone has no file links yet.
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> openFile(String folder, String path) async {
+    try {
+      return await channel.invokeMethod<bool>('openFile', {
+            'tree': folder,
+            'path': path,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 }
