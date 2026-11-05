@@ -754,6 +754,52 @@ void main() {
       expect(controller.markdown, isTrue);
     });
 
+    testWidgets('a task list item typed becomes a box at its space (#263)', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester);
+      await tester.enterText(find.byType(TextField), '- ');
+      await tester.pump();
+      expect(controller.markdown, isTrue);
+      await tester.enterText(find.byType(TextField), '- [ ]');
+      await tester.pump();
+      expect(controller.text, '- [ ]');
+      await tester.enterText(find.byType(TextField), '- [ ] ');
+      await tester.pump();
+      expect(controller.text, '- ☐ ');
+      expect(controller.selection, const TextSelection.collapsed(offset: 4));
+      await tester.enterText(find.byType(TextField), '- ☐ milk\n1. [X] ');
+      await tester.pump();
+      expect(controller.text, '- ☐ milk\n1. ✅ ');
+      expect(controller.selection, const TextSelection.collapsed(offset: 14));
+    });
+
+    testWidgets('pasted task list items become boxes, not in code (#263)', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester);
+      await paste(tester, '- [ ] milk\n- [x] bread');
+      expect(controller.markdown, isTrue);
+      expect(controller.text, '- ☐ milk\n- ✅ bread');
+      expect(controller.selection, const TextSelection.collapsed(offset: 18));
+      await paste(tester, '\n```\n- [ ] code\n```\n`- [ ] x`');
+      expect(
+        controller.text,
+        '- ☐ milk\n- ✅ bread\n```\n- [ ] code\n```\n`- [ ] x`',
+      );
+    });
+
+    testWidgets('a Code text keeps a task list item typed (#213, #263)', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, markdown: true);
+      controller.code = true;
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), '- [ ] x');
+      await tester.pump();
+      expect(controller.text, '- [ ] x');
+    });
+
     testWidgets('in two rows the marks are drawn as nothing on top and the '
         'bottom row shows the source of the cursor\'s line', (tester) async {
       final controller = await pumpField(

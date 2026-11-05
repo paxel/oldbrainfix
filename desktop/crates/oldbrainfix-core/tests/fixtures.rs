@@ -7001,6 +7001,8 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "shortcuts": shortcuts,
             "tables": tables,
             "tags": tags,
+            "taskBoxes": markdown::task_boxes(text, 0, text.len()).text,
+            "taskLists": markdown::task_lists(text),
             "text": text,
             "uses": markdown::uses(text),
             "words": words,
@@ -7067,6 +7069,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             }
             "headingColumn" => table::toggle_heading_column(text, start),
             "insertTable" => table::insert(text, start),
+            "taskBoxes" => markdown::task_boxes(text, start, end),
             op => return Err(format!("an op: {op}").into()),
         };
         let points = |at: usize| got.text.get(..at).map(|t| t.chars().count());

@@ -7456,6 +7456,7 @@ Map<String, Object?> _textBoxes() {
     '😀☐🧠✅\r\n❌\r☐',
     'Ünïcode ☐ Straße ✅ 👩‍👧 ❌',
     'https://x.org/☐ ☐ (https://x.org/✅) ❌',
+    '- [ ] milk\n1. [x] ☐ two\n```\n- [X] code\n```\n- `[ ]` x',
   ];
   return {
     'cases': [for (final text in texts) _textBoxesOf(text)],
@@ -7948,6 +7949,15 @@ Map<String, Object?> _markdown() {
         r'*https://f.org*, https://g.org/\_x (https://h.org).'
         '\n```\nhttps://i.org #no\n```\n| https://j.org/#k | b |\n|---|---|\n'
         '> https://k.org/☐ ☐ #q\n# https://l.org',
+    // Task list items (#263), taken in and written back.
+    '- [ ] milk\n* [x] bread\n+ [X] **eggs**\n1. [ ] call\n  - [x] in\n'
+        '- [ ]\n- [ ]x\n- [y] no\n- [  ] no\n[ ] no\n> - [ ] no\n'
+        r'- \[ ] no'
+        '\n- `[ ] no`\n- [ ](https://x.org) no\n```\n- [ ] code\n```\n'
+        '| - [ ] a |\n|---|\n🧠\r\n- [x] 日記',
+    '- ☐ milk\n2. ✅ bread\n  * ❌ call Ann  \n- ❌ \n- ❌ ~~gone~~\n'
+        '- ❌ **a** b\n☐ line\n- ☐\n- ☐x\n- x ☐ y\n> ☐ q\n```\n- ☐ c\n```\n'
+        '| ☐ b |\n|---|\n- ❌ 🧠 ü',
   ];
   int cp(String text, int offset) => text.substring(0, offset).runes.length;
   int u16(String text, int point) =>
@@ -8041,6 +8051,27 @@ Map<String, Object?> _markdown() {
       Markdown.codeBlock(text, u16(text, start), u16(text, end)),
     ),
   });
+  void taskBoxes(String text, int start, int end) => edits.add({
+    'op': 'taskBoxes',
+    'start': start,
+    'end': end,
+    'text': text,
+    'result': change(
+      text,
+      Markdown.taskBoxes(text, u16(text, start), u16(text, end)),
+    ),
+  });
+  for (final (text, start, end) in [
+    ('- [ ] a\n- [x] b\n- [ ] c', 6, 6),
+    ('- [ ] a\n- [x] b\n- [ ] c', 8, 16),
+    ('- [ ] a\n- [x] b\n- [ ] c', 23, 0),
+    ('x\n- [ ] ', 8, 8),
+    ('🧠\n- [X] ü', 9, 9),
+    ('- [ ]', 5, 5),
+    ('```\n- [ ] a\n```', 9, 9),
+  ]) {
+    taskBoxes(text, start, end);
+  }
   void indent(String text, int start, int end, bool out) => edits.add({
     'op': out ? 'outdent' : 'indent',
     'start': start,
@@ -8303,6 +8334,9 @@ Map<String, Object?> _markdown() {
               },
           ],
           'tables': [for (final t in MarkdownTables.all(text)) table(text, t)],
+          // Task list items as boxes and boxes as task list items (#263).
+          'taskBoxes': Markdown.taskBoxes(text, 0, text.length).text,
+          'taskLists': Markdown.taskLists(text),
           // Web addresses (#222), in it formatted and as a plain text, and
           // its tags as a plain text.
           'autolinks': [
@@ -9032,7 +9066,8 @@ Future<void> main(List<String> args) async {
     'ticked on, without ids, and as it reads, offsets counted in code '
     'points; glyphs mid-word, with variation selectors, joined into '
     'another emoji, other boxes and ticks, ids twice, ids of another '
-    'shape and alone, in inline code, a link, a table and a web address, and astral '
+    'shape and alone, in inline code, a link, a table and a web address, '
+    'task list items saved formatted and plain (#263), and astral '
     'characters and line breaks of every kind.\n'
     '- `text_tags.json`: tags in texts: for each text the tags found, each '
     'as written, as searched and where it lies, counted in code points; in '
@@ -9051,8 +9086,9 @@ Future<void> main(List<String> args) async {
     'tables with their rows and cells, its tags but those in code, link '
     'destinations and web addresses, its web addresses (#222) and those '
     'it holds as a plain text with the tags outside them, the offsets '
-    'where a typed shortcut ends, and the line and the word at every '
-    'offset; '
+    'where a typed shortcut ends, the text with its task list items as '
+    'boxes and its boxes as task list items (#263), and the line and the '
+    'word at every offset; '
     'bold, italic, strike-through, code, links, headings, quotes, bulleted '
     'and numbered items one level in, tables with ragged rows, escaped '
     'pipes, alignment and the line marking the first column as headings, '
@@ -9061,7 +9097,8 @@ Future<void> main(List<String> args) async {
     'put on and taken off at a cursor, on a word, a selection and lines, '
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
-    'moved and deleted, its first column marked, a new table put in, with '
+    'moved and deleted, its first column marked, a new table put in, the '
+    'task list items of the lines a selection touches made boxes, with '
     'the text and the selection they gave; which link destinations '
     'may be opened; and which pasted texts look like code (#213): a '
     'shebang, lines of code punctuation or indented, and lists, prose, '

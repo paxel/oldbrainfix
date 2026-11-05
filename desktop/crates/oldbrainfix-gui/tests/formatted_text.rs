@@ -388,6 +388,73 @@ fn a_paste_with_a_format_makes_a_plain_text_formatted() -> TestResult {
     Ok(())
 }
 
+/// The text of `note` as it shows, its boxes without their ids.
+fn shown(store: &Store, note: &str) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(Notes::new(store)
+        .by_id(note)?
+        .ok_or("the Note")?
+        .shown_text())
+}
+
+#[test]
+fn a_task_list_item_typed_becomes_a_box_at_its_space() -> TestResult {
+    let (store, note) = with_note("Shop", "plain")?;
+    let mut harness = editor(&store, &note);
+    focus_field(&mut harness, "Shop")?;
+    // "- " makes it formatted, then the mark is typed.
+    harness.event(egui::Event::Text("\n- ".into()));
+    harness.run();
+    harness.event(egui::Event::Text("[ ]".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- [ ]"));
+    harness.event(egui::Event::Text(" ".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- ☐ "));
+    // The cursor stays after the box.
+    harness.event(egui::Event::Text("milk\n1. [x] eggs".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- ☐ milk\n1. ✅ eggs"));
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    assert_eq!(shown(&store, &note)?, "Shop\n- ☐ milk\n1. ✅ eggs");
+    let boxes = Notes::new(&store).by_id(&note)?.ok_or("the Note")?.boxes;
+    assert_eq!(boxes.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn pasted_task_list_items_become_boxes_but_in_code() -> TestResult {
+    let (store, note) = with_note("Shop", MARKDOWN)?;
+    let mut harness = editor(&store, &note);
+    harness
+        .query_all_by_role_and_label(Role::Button, "Edit")
+        .last()
+        .ok_or("the text")?
+        .click_accesskit();
+    harness.run();
+    focus_field(&mut harness, "Shop")?;
+    harness.event(egui::Event::Key {
+        key: Key::End,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::COMMAND,
+    });
+    harness.run();
+    harness.event(egui::Event::Paste(
+        "\n- [ ] milk\n- [X] bread\n```\n- [ ] code\n```\n`- [ ] x`".into(),
+    ));
+    harness.run();
+    let both = "Shop\n- ☐ milk\n- ✅ bread\n```\n- [ ] code\n```\n`- [ ] x`";
+    assert!(field(&harness, both));
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    let note = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(note.shown_text(), both);
+    assert_eq!(note.boxes.len(), 2);
+    Ok(())
+}
+
 #[test]
 fn a_plain_paste_keeps_a_plain_text_plain() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;

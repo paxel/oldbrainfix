@@ -720,6 +720,23 @@ mod tests {
     }
 
     #[test]
+    fn a_markdown_files_task_list_items_become_boxes() -> Result<()> {
+        let store = store();
+        let summary = Imports::new(&store).folder(
+            "From Notes",
+            &[
+                file("Shop.md", "- [ ] milk\n- [x] bread", Some(march())),
+                file("Plain.txt", "- [ ] milk", Some(may())),
+            ],
+        )?;
+        let notes = inside(&store, &summary)?;
+        let shown: Vec<_> = notes.iter().map(|n| n.shown_text()).collect();
+        assert_eq!(shown, ["Plain\n- [ ] milk", "# Shop\n- ☐ milk\n- ✅ bread"]);
+        assert_eq!(notes[1].boxes.len(), 2);
+        Ok(())
+    }
+
+    #[test]
     fn a_folder_becomes_notes_in_a_new_area_dated_by_their_files() -> Result<()> {
         let store = store();
         let summary = Imports::new(&store).folder(

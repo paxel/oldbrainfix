@@ -822,6 +822,20 @@ void main() {
       expect(find.text('Import a folder'), findsNothing);
     });
 
+    testWidgets('a Markdown file\'s task list items come in as boxes (#263)', (
+      tester,
+    ) async {
+      folders.put('Shop.md', march, utf8.encode('- [ ] milk\n- [x] bread'));
+      await importFrom(tester);
+
+      final area = Places(store)
+          .areas()
+          .singleWhere((a) => a.name == 'From Notes');
+      final note = Notes(store).inside(area.id).single;
+      expect(note.shownText, '# Shop\n- ☐ milk\n- ✅ bread');
+      expect(note.boxes.map((b) => b.state), [BoxState.open, BoxState.done]);
+    });
+
     testWidgets('makes Notes of the Markdown and text files of a folder and '
         'its folders in a new Area, dated by their files, none Unsorted; '
         'the announcement opens the Area', (tester) async {

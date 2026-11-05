@@ -128,6 +128,25 @@ void main() {
     expect(shared.files, isEmpty);
   });
 
+  testWidgets('boxes go as task list items, as glyphs in HTML (#263)', (
+    tester,
+  ) async {
+    final note = notes.capture(
+      '- [ ] milk\n- [x] bread\n- [ ] eggs',
+      format: TextFormats.markdown,
+    );
+    final box = notes.byId(note.id)!.boxes.first.id;
+    Boxes(store).tick(note.id, box, BoxState.failed);
+    await shareFromCard(tester);
+
+    final shared = files.texts.single;
+    expect(shared.text, '- [x] ~~milk~~\n- [x] bread\n- [ ] eggs');
+    expect(
+      shared.html,
+      '<ul><li>❌ milk</li><li>✅ bread</li><li>☐ eggs</li></ul>\n',
+    );
+  });
+
   testWidgets('photos and recordings go as the files they are', (tester) async {
     final wav = Uint8List.fromList([
       ...'RIFF'.codeUnits,

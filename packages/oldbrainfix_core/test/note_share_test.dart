@@ -68,6 +68,22 @@ void main() {
     );
   });
 
+  test('boxes go as task list items, in HTML as their glyphs (#263)', () {
+    final share = _share(
+      _note('- ☐ milk\n- ✅ bread\n- ❌ eggs', format: TextFormats.markdown),
+      [_section('- ☐ plain', day: 31)],
+    );
+    expect(
+      share.text,
+      '- [ ] milk\n- [x] bread\n- [x] ~~eggs~~\n\n31.10.\n- ☐ plain',
+    );
+    expect(
+      share.html,
+      '<ul><li>☐ milk</li><li>✅ bread</li><li>❌ eggs</li></ul>\n'
+      '<p>31.10.<br>- ☐ plain</p>\n',
+    );
+  });
+
   test('Transcripts and Photo Texts go along only without words', () {
     final media = _note(
       '',

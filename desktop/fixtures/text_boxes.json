@@ -515,6 +515,28 @@
       "baked": "https://x.org/☐ ☐󠀸󠁯󠁩󠀶󠁿 (https://x.org/✅) ☐󠁵󠁸󠁰󠀰󠁿",
       "strip": "https://x.org/☐ ☐ (https://x.org/✅) ❌",
       "visible": "https://x.org/☐ ☐ (https://x.org/✅) ❌"
+    },
+    {
+      "text": "- [ ] milk\n1. [x] ☐ two\n```\n- [X] code\n```\n- `[ ]` x",
+      "plain": "- [ ] milk\n1. [x] ☐󠀸󠁯󠁩󠀶󠁿 two\n```\n- [X] code\n```\n- `[ ]` x",
+      "markdown": "- ☐󠀸󠁯󠁩󠀶󠁿 milk\n1. ✅󠁵󠁸󠁰󠀰󠁿 ☐󠁰󠀰󠁶󠁫󠁿 two\n```\n- [X] code\n```\n- `[ ]` x",
+      "found": [],
+      "shown": "- [ ] milk\n1. [x] ☐ two\n```\n- [X] code\n```\n- `[ ]` x",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 18,
+          "end": 19,
+          "sourceStart": 18,
+          "idStart": 19,
+          "sourceEnd": 24
+        }
+      ],
+      "baked": "- [ ] milk\n1. [x] ☐󠀸󠁯󠁩󠀶󠁿 two\n```\n- [X] code\n```\n- `[ ]` x",
+      "strip": "- [ ] milk\n1. [x] ☐ two\n```\n- [X] code\n```\n- `[ ]` x",
+      "visible": "☐ milk\n✅ ☐ two\n- [X] code\n[ ] x"
     }
   ]
 }

@@ -171,7 +171,7 @@
       "html": "<ul><li>☐ a <code>☐</code> <a href=\"https://x.org/☐\">☐ b</a></li></ul>\n<table><thead><tr><th>✅ c</th><th>d</th></tr></thead></table>\n",
       "photos": [],
       "recordings": [],
-      "text": "- ☐ a `☐` [☐ b](https://x.org/☐)\n\n| ✅ c | d |\n| --- | --- |"
+      "text": "- [ ] a `☐` [☐ b](https://x.org/☐)\n\n| ✅ c | d |\n| --- | --- |"
     },
     "note:00000000000000000000000000000001": {
       "html": null,

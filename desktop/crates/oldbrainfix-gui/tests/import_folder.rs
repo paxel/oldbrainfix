@@ -108,7 +108,8 @@ fn a_folder_becomes_dated_notes_in_a_new_area_and_the_click_opens_it() -> TestRe
     file(&dir.join("Dentist.txt"), "Tuesday 9:00", at(2024, 3, 1)?)?;
     file(
         &dir.join("Shopping.md"),
-        "# Shopping\n\n- milk",
+        // Task list items become boxes (#263).
+        "# Shopping\n\n- milk\n- [ ] eggs\n- [x] bread",
         at(2024, 2, 1)?,
     )?;
     file(
@@ -164,7 +165,10 @@ fn a_folder_becomes_dated_notes_in_a_new_area_and_the_click_opens_it() -> TestRe
     assert_eq!(dentist.text_format, "plain");
     assert_eq!(dentist.captured, at(2024, 3, 1)?);
     let shopping = note("# Shopping")?;
-    assert_eq!(shopping.text, "# Shopping\n\n- milk");
+    assert_eq!(
+        shopping.shown_text(),
+        "# Shopping\n\n- milk\n- ☐ eggs\n- ✅ bread"
+    );
     assert_eq!(shopping.text_format, "markdown");
     assert_eq!(shopping.captured, at(2024, 2, 1)?);
     assert_eq!(note("# Rome")?.captured, at(2023, 5, 6)?);

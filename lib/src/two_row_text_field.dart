@@ -629,13 +629,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// A change the user made, typed or pasted: a plain text becomes
   /// formatted with a format typed as Markdown or pasted (ADR 0033); a
   /// pasted text that looks like code goes to [TwoRowTextField.onCodePasted]
-  /// instead (#213).
+  /// instead (#213). In a formatted text, a task list item on the lines
+  /// it touched becomes an item with a box (#263), so `- [ ] ` typed
+  /// turns into `- ☐ ` at its space.
   void _userChanged(String text) {
     final onCode = widget.onCodePasted;
     final controller = _formatting;
-    if (onCode == null && (controller == null || controller.markdown)) {
-      return;
-    }
+    if (onCode == null && controller == null) return;
     final before = _before;
     final most = math.min(before.length, text.length);
     var head = 0;
@@ -656,12 +656,24 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       onCode();
       return;
     }
-    if (controller == null || controller.markdown) return;
-    final selection = controller.selection;
-    final cursor = selection.isValid ? selection.extentOffset : text.length;
-    if (Markdown.shortcutAt(text, cursor) ||
-        (inserted.length > 1 && Markdown.uses(inserted))) {
-      _becomeFormatted(controller);
+    if (controller == null) return;
+    if (!controller.markdown) {
+      final selection = controller.selection;
+      final cursor = selection.isValid ? selection.extentOffset : text.length;
+      if (Markdown.shortcutAt(text, cursor) ||
+          (inserted.length > 1 && Markdown.uses(inserted))) {
+        _becomeFormatted(controller);
+      }
+    }
+    // A table's cell is no line of items.
+    if (controller.markdown && widget.lineFormats) {
+      final change = Markdown.taskBoxes(text, head, text.length - tail);
+      if (change.text != text) {
+        controller.value = TextEditingValue(
+          text: change.text,
+          selection: TextSelection.collapsed(offset: change.end),
+        );
+      }
     }
   }
 

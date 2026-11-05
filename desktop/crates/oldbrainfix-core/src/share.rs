@@ -4,11 +4,14 @@
 //! words of its own gives its Photo Texts and then its Transcripts
 //! instead, in the order its photos and recordings were added; one
 //! without either is left out. When any of these texts is formatted,
-//! `text` holds them as written, the Markdown source among them, and
-//! `html` the whole as HTML ([`markdown::html`]), the plain texts and the
-//! dates in it as they read; else `html` is `None`. `markdown` holds
-//! the same as Markdown, the plain texts and the dates escaped so they
-//! read as written (the desktop's "Save as Markdown…"). `photos` and
+//! `text` holds them as written, the Markdown source among them with
+//! each item that starts with a box written as a task list item
+//! ([`markdown::task_lists`], #263), and `html` the whole as HTML
+//! ([`markdown::html`]), its boxes as their glyphs, the plain texts and
+//! the dates in it as they read; else `html` is `None`. `markdown` holds
+//! the same as Markdown, its boxes as task list items, the plain texts
+//! and the dates escaped so they read as written (the desktop's "Save as
+//! Markdown…"). `photos` and
 //! `recordings` are the hashes of the Note's and then its Sections'
 //! photos and recordings, each once, for the app to hand along as files.
 
@@ -71,6 +74,7 @@ pub fn note_share(
     }
     let mut written = Vec::new();
     let mut source = Vec::new();
+    let mut saved = Vec::new();
     let mut formatted = false;
     for (date, text, format, generated) in parts {
         let own = trim_end(text);
@@ -85,16 +89,23 @@ pub fn note_share(
         formatted = formatted || words.iter().any(|w| w.1);
         let mut shown: Vec<String> = date.iter().cloned().collect();
         let mut read: Vec<String> = date.iter().map(|d| markdown::escape(d)).collect();
+        let mut kept = read.clone();
         for (t, md) in words {
-            shown.push(t.to_string());
-            read.push(if md {
-                t.to_string()
+            // Boxes go out as task list items (#263), as glyphs in HTML.
+            if md {
+                let tasks = markdown::task_lists(t);
+                shown.push(tasks.clone());
+                kept.push(tasks);
+                read.push(t.to_string());
             } else {
-                markdown::escape(t)
-            });
+                shown.push(t.to_string());
+                kept.push(markdown::escape(t));
+                read.push(markdown::escape(t));
+            }
         }
         written.push(shown.join("\n"));
         source.push(read.join("\n"));
+        saved.push(kept.join("\n"));
     }
     let once = |lists: Vec<&Vec<String>>| {
         let mut out: Vec<String> = Vec::new();
@@ -109,7 +120,7 @@ pub fn note_share(
     NoteShare {
         text: written.join("\n\n"),
         html: formatted.then(|| markdown::html(&source)),
-        markdown: source,
+        markdown: saved.join("\n\n"),
         photos: once(
             std::iter::once(&note.photos)
                 .chain(sections.iter().map(|s| &s.photos))
@@ -166,8 +177,8 @@ fn trim_end(text: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Result;
     use crate::notes::Notes;
+    use crate::{Error, Result};
 
     fn day(d: DateTime<Utc>) -> String {
         d.format("%H:%M:%S").to_string()
@@ -210,6 +221,50 @@ mod tests {
         assert_eq!(
             share.markdown,
             format!("**Milk** *now*\n\n{}\n{plain}", markdown::escape(&at))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn boxes_go_as_task_list_items_and_as_glyphs_in_html() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let note =
+            notes.capture_as("- [ ] milk\n- [x] bread", text_format::MARKDOWN, None, None)?;
+        let id = notes
+            .by_id(&note.id)?
+            .ok_or_else(|| Error::Invalid("a Note".into()))?
+            .boxes[0]
+            .id
+            .clone();
+        crate::boxes::Boxes::new(&store).tick(
+            &note.id,
+            &id,
+            crate::text_boxes::BoxState::Failed,
+        )?;
+        let more = notes.amend_as(&note.id, "- ☐ plain", text_format::PLAIN)?;
+        let note = notes
+            .by_id(&note.id)?
+            .ok_or_else(|| Error::Invalid("a Note".into()))?;
+        let share = note_share(&note, &notes.sections(&note.id)?, day);
+        let at = day(more.captured);
+        assert_eq!(
+            share.text,
+            format!("- [x] ~~milk~~\n- [x] bread\n\n{at}\n- ☐ plain")
+        );
+        assert_eq!(
+            share.html.as_deref(),
+            Some(
+                format!("<ul><li>❌ milk</li><li>✅ bread</li></ul>\n<p>{at}<br>- ☐ plain</p>\n")
+                    .as_str()
+            )
+        );
+        assert!(
+            share
+                .markdown
+                .starts_with("- [x] ~~milk~~\n- [x] bread\n\n"),
+            "{}",
+            share.markdown
         );
         Ok(())
     }

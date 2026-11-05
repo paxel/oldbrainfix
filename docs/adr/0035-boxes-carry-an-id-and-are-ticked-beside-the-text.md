@@ -14,6 +14,12 @@ Whenever the text of a Note is captured or edited, and when a Section is added b
 
 An id is drawn from the store's maker of entity ids: the first four bytes of the SHA-256 of a fresh entity id, each taken modulo the 36 characters, drawn again while the text holds it already. Ids are random on a Device and counted in the fixtures, the same in both cores.
 
+### Task list items (#263, amended)
+
+GFM writes a box as a task list item: a bulleted or numbered item whose content starts with `[ ]`, `[x]` or `[X]` and a space. In a formatted text such an item is taken in as an item with a box: `[ ]` becomes ☐ and `[x]` or `[X]` ✅, those three characters replaced by the glyph and nothing else changed (`Markdown.taskBoxes`, `markdown::task_boxes`). It happens when a formatted text is saved, before the bare glyphs get their ids, so a pasted, imported (a Markdown file of a folder; Google Keep's texts are plain) or captured text gets boxes it can tick, with their History, like any other; and as it is typed or pasted in the phone's text fields and the desktop's Note dialog. The desktop's quick note and Add to Note take their format when saved (ADR 0033), so an item typed there becomes a box then. Typed, the item on a line the change touches converts, so `- [ ] ` turns into `- ☐ ` the moment the space after `]` is typed, as a line's mark is a shortcut the moment its space is typed (ADR 0033); a paste converts the items on the lines it brings. The lines of a code block and of a table are no items, an item in a quote is none either, a mark in inline code or escaped (`\[ ]`) is no mark, and a Code text (#213) and a plain text are never converted. The glyphs and the marks are three bytes each in UTF-8, so the Rust core's offsets do not move.
+
+Handed to another app (Share, Copy as text, Save as Markdown on the desktop), a formatted text writes each bulleted or numbered item whose content starts with a box and a space back as a task list item (`Markdown.taskLists`, `markdown::task_lists`), so other Markdown apps show a checkbox: ☐ as `[ ]`, ✅ as `[x]`, and ❌ as `[x]` with the rest of the item struck through, `~~` around it without the spaces at its ends, unless it is one strike-through already or empty. GFM has no failed state; checked and struck through reads as settled and not done, where `[ ]` would read as still to do. A text taken in again reads such an item as ✅ and its words struck through. A box anywhere else, a line that starts with a box but is no item, and a plain text stay as they are. The HTML beside it (`Markdown.html`) shows every box as its glyph, as before: an `<input type="checkbox">` is markup that mail and word processors, which take pasted HTML, drop, and the glyph keeps ❌.
+
 ## Ticks beside the text
 
 Changing the state of a Box writes a tick: the field `box@<id>` on the entity whose text holds the Box, the Note, the Section, or the Note merged into another, whose text shows as a Section, with the state's name, `open`, `done` or `failed`. The moment of a tick is its entry's date. The latest tick of a Box by latest wins (date, recording time, Device, dseq) is its state; without a tick its glyph is. Every tick stays in the log, so a Box has its history: each tick that counts with its state, its moment and the Device that wrote it. A tick to the state a Box shows already writes nothing. A tick is read only in the shape the apps write: an id of four digits or small letters and one of the three names; anything else is skipped. Ticks are no Conflict unit.
@@ -42,6 +48,9 @@ A Sent Item carries each text with every Box in the bare glyph of its state now,
 - A tick as an entity of its own, or one entity of ticks per Note (rejected: a field on the text's entity keeps each tick as its own signed entry, is sealed and filed with it, and needs no `$type` a Member would have to write).
 - The ticks of a Section's Boxes on its Note (rejected: a merged Note's text shows under its target and travels with its own entity; the text's entity holds its own ticks either way).
 - The tick's moment in its value (rejected: as for a Shopping List's check, the entry's date is the same everywhere).
+- Taking a task list item in only on leaving its line (rejected: a line's mark already formats as its space is typed, and the conversion on save catches every other way in).
+- Writing ❌ back as `[ ]` (rejected: another app would show a box the user decided not to do as still to do) or as its glyph after the item's mark (rejected: another app would show no checkbox).
+- A checkbox input in the HTML (rejected: rich text apps drop form inputs from pasted HTML, and the glyph keeps the failed state).
 - Changing the glyph in the text when a tick is written (rejected: it would be an edit of the text, the author's alone, and a Conflict with every concurrent edit).
 - Converting a text accepted from a Sent Item (rejected: a sender's Boxes arrive with their ids; bare glyphs from a Device of 0.1.x wait for the next edit, so an update writing the same text again draws no ids).
 - A Sent Item carrying the starting glyphs and the ticks beside them (rejected: the file format would grow a field a version without Boxes refuses; the glyph of the state now reads the same everywhere).
@@ -49,9 +58,10 @@ A Sent Item carries each text with every Box in the bare glyph of its state now,
 ## Consequences
 
 - No migration: no text with a Box or a status mark was ever shipped.
+- A formatted text of 0.4.0 holding `- [ ] milk` keeps it until its next edit, which gives it a box, as a bare glyph gets its id then (#263).
 - A text with Boxes on a Device of 0.1.x shows the glyphs and, on the desktop, replacement glyphs for the ids; its edits there keep the ids.
 - The API for the line-start marks (`TextMarks`, `Markdown.marks`/`swapMark`, `text_marks`, `markdown::marks`/`swap_mark`) and its fixture `text_marks.json` are removed, both apps having switched to Boxes; the line of an offset is `Markdown.lineAt`/`markdown::line_at`.
-- The fixtures `text_boxes.json` and the `boxes` scenario with its `boxes.json` compare both cores.
+- The fixtures `text_boxes.json` and the `boxes` scenario with its `boxes.json` compare both cores; `markdown.json` holds every text's task list items taken in and its boxes written back, and the conversion of the lines a selection touches (#263).
 
 ## Changes to earlier decisions
 

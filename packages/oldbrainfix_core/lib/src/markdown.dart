@@ -1124,6 +1124,90 @@ abstract final class Markdown {
     return ends(block.spans);
   }
 
+  /// [text] with every task list item of GFM on the lines the selection
+  /// from [start] to [end] touches made an item with a box (#263): a
+  /// bulleted or numbered item whose content starts with `[ ]`, `[x]` or
+  /// `[X]` and a space gets ☐ for `[ ]` and ✅ for the others in place of
+  /// those three characters. A selection ending at a line's start leaves
+  /// that line out. A code block's and a table's lines are no items, so
+  /// they stay as they are. The selection keeps what it selected, a
+  /// cursor right after a mark going after its glyph.
+  static MarkdownChange taskBoxes(String text, int start, int end) {
+    final (s, e) = _ordered(text, start, end);
+    final blocks = parse(text);
+    final (first, last) = _touched(text, blocks, s, e);
+    final edits = <_Edit>[
+      for (final b in blocks.sublist(first, last + 1))
+        if (_taskMark(text, b) case final glyph?)
+          _Edit(b.contentStart, 3, glyph, after: true),
+    ];
+    if (edits.isEmpty) return (text: text, start: s, end: e);
+    return _apply(text, edits, s, e);
+  }
+
+  /// The glyph of the box a task list item [block] of [text] becomes, or
+  /// null when it is none.
+  static String? _taskMark(String text, MarkdownBlock block) {
+    final at = block.contentStart;
+    if (!_listed(block.kind) ||
+        at + 4 > block.end ||
+        text.codeUnitAt(at) != 0x5B ||
+        text.codeUnitAt(at + 2) != 0x5D ||
+        text.codeUnitAt(at + 3) != _space) {
+      return null;
+    }
+    return switch (text.codeUnitAt(at + 1)) {
+      _space => '☐',
+      0x78 || 0x58 => '✅',
+      _ => null,
+    };
+  }
+
+  /// [text], a formatted text as it shows ([TextBoxes.shown]), with each
+  /// bulleted or numbered item whose content starts with a box and a
+  /// space written as a task list item of GFM (#263), so another
+  /// Markdown app reads it: ☐ as `[ ]`, ✅ as `[x]`, and ❌ as `[x]` with
+  /// the rest of its content struck through, `~~` around it without the
+  /// spaces at its ends, unless it is one strike-through already or
+  /// empty. Any other box, a code block's lines and a table's stay as
+  /// they are.
+  static String taskLists(String text) {
+    final edits = <_Edit>[];
+    for (final b in parse(text)) {
+      final at = b.contentStart;
+      if (!_listed(b.kind) ||
+          at + 2 > b.end ||
+          text.codeUnitAt(at + 1) != _space) {
+        continue;
+      }
+      switch (text.codeUnitAt(at)) {
+        case 0x2610:
+          edits.add(_Edit(at, 1, '[ ]'));
+        case 0x2705:
+          edits.add(_Edit(at, 1, '[x]'));
+        case 0x274C:
+          edits.add(_Edit(at, 1, '[x]'));
+          final from = _skipBlank(text, at + 2, b.end);
+          var to = b.end;
+          while (to > from && _blank(text.codeUnitAt(to - 1))) {
+            to--;
+          }
+          final struck = b.spans.any(
+            (s) =>
+                s.kind == MarkdownSpanKind.strike &&
+                s.start == from &&
+                s.end == to,
+          );
+          if (from < to && !struck) {
+            edits
+              ..add(_Edit(from, 0, '~~'))
+              ..add(_Edit(to, 0, '~~'));
+          }
+      }
+    }
+    return edits.isEmpty ? text : _apply(text, edits, 0, 0).text;
+  }
+
   static const _inline = {
     MarkdownSpanKind.bold,
     MarkdownSpanKind.italic,

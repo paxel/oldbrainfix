@@ -190,6 +190,21 @@ fn its_field_is_unwrapped_sideways_and_has_no_format_bar() -> TestResult {
 }
 
 #[test]
+fn a_task_list_item_typed_into_code_stays_as_written() -> TestResult {
+    let (store, note) = with_note("x", CODE)?;
+    let mut harness = window(&store, Selection::Unsorted, Some(&note));
+    focus_field(&mut harness, "x")?;
+    harness.event(egui::Event::Text("\n- [ ] y".into()));
+    harness.run();
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    let (text, format) = stored(&store, &note)?;
+    assert!(text.contains("- [ ] y"), "{text:?}");
+    assert_eq!(format, CODE);
+    Ok(())
+}
+
+#[test]
 fn the_text_format_badge_sets_code_and_back_never_formatted_to_plain() -> TestResult {
     let (store, note) = with_note("# comment\necho hi", PLAIN)?;
     let mut harness = window(&store, Selection::Unsorted, Some(&note));

@@ -16302,6 +16302,29 @@ fn edited_text(
                 actions.push(format_text());
             }
         }
+        // A task list item typed or pasted into a formatted text becomes
+        // an item with a box (#263), on the lines up to the cursor that
+        // the change touched: typed, `- [ ] ` turns into `- ☐ ` at its
+        // space.
+        if output.response.response.changed() && (formatted || pasted) && !as_code {
+            let (_, cursor) = format_bar::selection(ui, id, edited);
+            let brought: usize = ui.input(|i| {
+                i.events
+                    .iter()
+                    .map(|e| match e {
+                        egui::Event::Paste(p) => p.len(),
+                        _ => 0,
+                    })
+                    .sum()
+            });
+            let change = markdown::task_boxes(edited, cursor.saturating_sub(brought), cursor);
+            if change.text != *edited {
+                *edited = change.text;
+                // Both glyphs are as many bytes as the marks they replace.
+                format_bar::select(ui, id, edited, (cursor, cursor));
+                ui.ctx().request_repaint();
+            }
+        }
         let marked = Id::new(("field", of));
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots, edit.ticks) {
             actions.push(box_action(of.to_string(), asked));
