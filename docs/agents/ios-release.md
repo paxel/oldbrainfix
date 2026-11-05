@@ -125,6 +125,32 @@ from the same Flutter values as the app's, as App Store Connect requires.
       Builds shows it after Apple's processing, usually 5 to 30 minutes;
       an email says when it is done.
 - [ ] The first build asks the export-compliance question (Manage on the
-      build). The app encrypts backups and sync; answer it there.
+      build). The app encrypts backups and sync; the answers, and the
+      France decision that ends the question, are in
+      `docs/agents/app-review-notes.md`.
 - [ ] Add yourself under Internal Testing, then install through the
       TestFlight app on the iPhone.
+
+## 8. Submitting to the App Store
+
+- [ ] Once, before the first submission: the checklist "Before the first
+      submission" in `docs/agents/app-review-notes.md` (App Privacy from
+      `docs/agents/app-privacy.md`, age rating, pricing and
+      availability, review contact, screenshots).
+- [ ] For a release that goes to the App Store, write What's New into
+      `fastlane/metadata/ios/<locale>/release_notes.txt` (not for the
+      first version, which has none).
+- [ ] Actions → Release → **Run workflow**: the tag, **publish** on and
+      **submit_app_store** on. The `iOS to TestFlight` job uploads the
+      build, then `fastlane deliver` uploads the listing and the App
+      Review notes from `fastlane/metadata/ios/`, waits until Apple has
+      processed that build and submits it for review. The submitted
+      build is the one this run uploads, not an earlier TestFlight
+      build, so its export compliance comes from
+      `ITSAppUsesNonExemptEncryption` in `ios/Runner/Info.plist`; the
+      step stops while that key is missing
+      (`docs/agents/app-review-notes.md`). The screenshots stay as
+      uploaded by hand.
+- [ ] After approval, release the version by hand in App Store Connect:
+      the submission sets no automatic release.
+- A tag, or a dispatch without `submit_app_store`, never submits.

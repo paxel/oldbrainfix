@@ -11,9 +11,10 @@ every release.
   (the same id as the Android package), Apple id `<to be filled in by the
   user>`, SKU `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
   pipeline uploads each build to TestFlight once the Apple secrets exist
-  (`docs/agents/ios-release.md`). Until the first App Store release
-  (#245) the app reaches testers through TestFlight only; the listing
-  texts are written then.
+  (`docs/agents/ios-release.md`); a manual dispatch with `publish` and
+  `submit_app_store` also submits it for App Store review with the
+  listing below (#245), a tag never does. Until the first App Store
+  release the app reaches testers through TestFlight only.
 - F-Droid: the tag pipeline copies `fastlane/metadata/android/` into the
   repo's F-Droid metadata, screenshots included.
 
@@ -26,6 +27,26 @@ in Google Play and in App Store Connect alike.
 
 - Listing texts: `fastlane/metadata/android/<locale>/` (`title.txt`,
   `short_description.txt`, `full_description.txt`).
+- App Store listing texts (#245): `fastlane/metadata/ios/<locale>/`,
+  where fastlane `deliver` reads them: `name.txt`, `subtitle.txt`,
+  `promotional_text.txt`, `keywords.txt`, `description.txt`,
+  `support_url.txt`, `marketing_url.txt`, `privacy_url.txt`, and
+  `release_notes.txt` (What's New), empty until a release writes it;
+  `deliver` skips it while empty and on the first version. Next to the
+  locales: `copyright.txt`, `primary_category.txt` and
+  `review_information/notes.txt`, the App Review notes, the same text
+  as the block in `docs/agents/app-review-notes.md`. The App Store
+  blocks of a release notes record (`appstore_name`,
+  `appstore_subtitle_*`, `appstore_promo_*`, `appstore_keywords_*`,
+  `appstore_desc_*`, `appstore_privacy_url_*`) start from these files,
+  word for word, as the live listing; an accepted edit goes back into
+  the file. The `appstore_whatsnew_*` blocks go into `release_notes.txt`
+  before a submission. `python3 tool/appstore_listing.py` checks the
+  limits (keywords and review notes in bytes), the keywords' commas, the
+  URLs and that no text names another mobile platform; CI runs its
+  tests.
+- App Privacy answers: `docs/agents/app-privacy.md`. App Review notes
+  and the export-compliance answer: `docs/agents/app-review-notes.md`.
 - Release notes record: `docs/release-notes-<version>.md`. The tag pipeline
   takes What's new for Google Play and F-Droid from its `play_notes_en` and
   `play_notes_de` blocks, word for word, and refuses a tag without them.

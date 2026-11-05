@@ -1,0 +1,39 @@
+Old Brain Fix ist eine Notiz- und Erinnerungs-App für das iPhone. Eine Desktop-App für Linux, Windows und macOS nutzt dieselben Daten. Es gibt kein Konto und keinen Server; alle Daten liegen auf den eigenen Geräten.
+
+Erfassen
+• Text-, Foto- und Sprachnotizen, geöffnet über den +-Knopf, das Widget „Erfassen“ auf dem Startbildschirm und dem Sperrbildschirm oder die Steuerelemente im Kontrollzentrum für Sprache, Text und Foto.
+• Text, Links und Bilder, die aus anderen Apps geteilt werden, werden aufbewahrt und öffnen sich beim nächsten Öffnen der App im Erfassen.
+• Jede Notiz speichert den Zeitpunkt der Erfassung. Optional: den Ort (als benannter Ort wie „Zuhause“ angezeigt, wenn einer passt), den laufenden Kalendertermin und das Auto oder die Kopfhörer, über die der Ton läuft.
+• Sprachnotizen werden auf dem Gerät mit Whisper transkribiert (Deutsch und Englisch). Das Sprachmodell (148 MB) wird einmalig auf Anforderung heruntergeladen.
+• Text in Fotos und Screenshots wird auf dem Gerät mit RustO erkannt.
+• Transkripte und erkannter Text werden bei der Suche berücksichtigt.
+
+Ordnen
+• Neue Notizen liegen in „Unsortiert“. Eine Benachrichtigung (Stupser) meldet unsortierte Notizen in einem einstellbaren Abstand; die Ruhezeit unterdrückt sie nachts.
+• Notizen werden in Bereiche und Themen (zwei Ebenen) einsortiert, jeweils mit Farbe und Symbol. Beim ersten Start wird eine Auswahl an Bereichen angeboten.
+• Notizen lassen sich bearbeiten, ergänzen und zusammenführen. Gelöschtes bleibt 30 Tage im Papierkorb.
+• Eine Notiz kann Checkliste, Einkaufsliste mit wiederkehrenden Zeilen, Strichliste oder Einheit werden. Ihr Text lässt sich mit Überschriften, Listen und Tabellen formatieren.
+
+Routinen und Erinnerungen
+• Jede Notiz kann Erinnerungen (einmalig) und Routinen (wiederkehrend nach einer Wiederholungsregel, bei Bedarf mehrmals täglich) haben.
+• Sie kommen als zeitkritische Benachrichtigungen mit Erledigt und Später.
+• Eine Benachrichtigung, die weder erledigt noch verschoben wird, kommt in einem festen Abstand wieder (Erneut erinnern, Standard 10 Minuten). Optional klingelt sie nach einer einstellbaren Zahl von Wiederholungen als iPhone-Alarm, auch im Stummmodus und im Fokus.
+• Die Agenda zeigt die Routinen und Erinnerungen des Tages, verpasste Termine und die Zahl der unsortierten Notizen. Sie ist auch ein Widget auf dem Startbildschirm, dessen Kästchen sich abhaken lassen, ohne die App zu öffnen.
+• Jede Routine hat einen Verlauf mit Serie und Einhaltung.
+• Die Agenda kann die Termine gewählter Kalender zeigen. Routinen und Erinnerungen können in einen Kalender geschrieben oder als ICS-Datei exportiert werden.
+
+Abgleich und Teilen
+• Deine Geräte gleichen sich direkt im lokalen Netz ab, solange die App offen ist (TLS, gekoppelt per QR-Code oder eingetippten Code), über einen geteilten Ordner in iCloud Drive oder Möbius Sync (Ende-zu-Ende-verschlüsselt) oder über eine verschlüsselte Datei, die mit einer beliebigen App verschickt wird.
+• Ein einzelner Bereich lässt sich mit einer anderen Person teilen; andere Bereiche nicht.
+• Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
+• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
+
+Datenschutz und Sicherheit
+• Kein Konto, kein Server, keine Analyse, keine Werbung.
+• Die App nutzt das Netzwerk nur für den Abgleich und den Download des Sprachmodells.
+• Optionale App-Sperre (PIN, Face ID oder Touch ID) und Bereichssperren. Erfassen und Alarme funktionieren auch im gesperrten Zustand.
+• Verschlüsselte Sicherungen (Argon2id, XChaCha20-Poly1305) in einen gewählten Ordner, optional wöchentlich, mit einem druckbaren Wiederherstellungsblatt. Die eigene Datensicherung des iPhones lässt die Daten der App aus.
+
+Sonstiges
+• Deutsch und Englisch. Helles und dunkles Design. Ab iOS 26.
+• Kostenlos und quelloffen, lizenziert unter Apache-2.0 oder MIT.

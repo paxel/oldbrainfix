@@ -47,7 +47,11 @@
 #                    Release needs it
 #   testflight     — the iPhone app signed for the App Store and, when
 #                    publishing, uploaded to TestFlight; without the Apple
-#                    secrets below it skips with a notice and passes
+#                    secrets below it skips with a notice and passes. Only
+#                    a manual dispatch with publish and submit_app_store
+#                    then submits that build for App Store review with
+#                    the listing in fastlane/metadata/ios/ (#245); a tag
+#                    never does
 #   render-channels — Homebrew cask + formula and Scoop manifest rendered from
 #                    the artifacts, uploaded as an artifact on every run
 #   fdroid         — the arm64 APK, the store listing and the same What's
@@ -61,7 +65,9 @@
 #
 # Publishing (Play, TestFlight, F-Droid, the Release, the tap and the bucket) happens on a tag, or on a manual
 # dispatch that says publish=true. A dispatch without it is the dry run:
-# every artifact is built and uploaded, nothing leaves GitHub.
+# every artifact is built and uploaded, nothing leaves GitHub. The App
+# Store submission needs both publish=true and submit_app_store=true on a
+# dispatch; a tag uploads to TestFlight and submits nothing.
 #
 # One-time setup (repository secrets):
 #   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD — upload keystore,
@@ -73,7 +79,8 @@
 #   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
 #                 the same one cat(a)log and Chaos Alert use
 #   ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8 — App Store Connect API key
-#                 (the .p8 base64), for the TestFlight upload
+#                 (the .p8 base64), for the TestFlight upload and the
+#                 App Store submission
 #   IOS_DIST_CERT_P12 / IOS_DIST_CERT_PASSWORD — Apple Distribution
 #                 certificate (.p12 base64) and its export password
 #   IOS_PROFILE — App Store provisioning profile (.mobileprovision base64)
@@ -99,6 +106,12 @@ on:
         required: true
       publish:
         description: "Publish (release, Play, TestFlight, F-Droid, tap, bucket); off = dry run"
+        type: boolean
+        default: false
+      # The user decides each App Store submission (#245): only this
+      # input, with publish, submits; a tag never does.
+      submit_app_store:
+        description: "Also submit the iPhone build for App Store review (needs publish)"
         type: boolean
         default: false
 
@@ -255,9 +268,9 @@ jobs:
           node-version: 22
       - name: Site — unit tests
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor and whisper pin tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin and App Store listing tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
@@ -864,11 +877,56 @@ jobs:
           for ipa in build/ios/ipa/*.ipa; do
             xcrun altool --upload-app --type ios --file "$ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
           done
+      # The App Store submission (#245, docs/agents/app-review-notes.md):
+      # fastlane deliver, preinstalled on the macOS image, uploads the
+      # listing and the App Review notes from fastlane/metadata/ios/,
+      # waits until Apple has processed the build just uploaded (the
+      # ipa names its version and build number), selects it and submits
+      # it for review, released by hand after approval. Screenshots are
+      # uploaded by hand (docs/agents/store-kit.md), so they are skipped.
+      # The build is the one this run uploaded, so nobody has answered its
+      # export-compliance question yet: only ITSAppUsesNonExemptEncryption
+      # in ios/Runner/Info.plist answers it, and deliver refuses to submit
+      # without an answer. The key waits for the user's France decision
+      # (docs/agents/app-review-notes.md); until it is set, this step
+      # stops first, with that reason.
+      - name: Submit for App Store review
+        if: >-
+          steps.secrets.outputs.ready == 'true' && env.PUBLISH == 'true'
+          && github.event_name == 'workflow_dispatch' && github.event.inputs.submit_app_store == 'true'
+        timeout-minutes: 90
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if ! /usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' ios/Runner/Info.plist > /dev/null 2>&1; then
+            echo "::error title=App Store submission::ios/Runner/Info.plist has no ITSAppUsesNonExemptEncryption; the export-compliance decision is in docs/agents/app-review-notes.md."
+            exit 1
+          fi
+          python3 tool/appstore_listing.py
+          key="$RUNNER_TEMP/asc_api_key.json"
+          jq -n --arg id "$ASC_KEY_ID" --arg issuer "$ASC_ISSUER_ID" --arg key "$ASC_KEY_P8" \
+            '{key_id: $id, issuer_id: $issuer, key: $key, is_key_content_base64: true, in_house: false, duration: 1200}' > "$key"
+          fastlane --version
+          ipa=$(ls build/ios/ipa/*.ipa | head -n 1)
+          fastlane deliver \
+            --api_key_path "$key" \
+            --app_identifier io.github.paxel.oldbrainfix \
+            --platform ios \
+            --ipa "$ipa" \
+            --skip_binary_upload true \
+            --metadata_path fastlane/metadata/ios \
+            --skip_screenshots true \
+            --submit_for_review true \
+            --automatic_release false \
+            --precheck_include_in_app_purchases false \
+            --force true
       - name: Remove the keychain and the key
         if: always() && steps.secrets.outputs.ready == 'true'
         run: |
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
-          rm -rf "$HOME/private_keys"
+          rm -rf "$HOME/private_keys" "$RUNNER_TEMP/asc_api_key.json"
 
   render-channels:
     name: Render cask, formula and manifest

@@ -1,0 +1,39 @@
+Old Brain Fix is a note and reminder app for the iPhone. A desktop app for Linux, Windows and macOS uses the same data. There is no account and no server; all data is stored on the user's own devices.
+
+Capture
+• Text, photo and voice Notes, opened from the + button, the Capture widget on the home screen and the lock screen, or the Control Center controls for voice, text and photo.
+• Text, links and pictures shared from other apps are kept and open in Capture the next time the app opens.
+• Each Note records the time of capture. Optional: the location (shown as a Named Place such as "Home" when one matches), the current calendar event and the car or headphones the sound plays through.
+• Voice Notes are transcribed on the device with Whisper (English and German). The speech model (148 MB) is downloaded once, on request.
+• Text in photos and screenshots is recognised on the device with RustO.
+• Transcripts and recognised text are included in search.
+
+Organising
+• New Notes are kept in Unsorted. A notification (Nudge) reports Unsorted Notes at a set interval; Quiet Hours suppress it at night.
+• Notes are filed into Areas and Topics (two levels), each with a colour and an icon. A starter set of Areas is offered at first start.
+• Notes can be edited, amended and merged. Deleted items stay in the trash for 30 days.
+• A Note can become a Checklist, a Shopping List whose items come back, a Tally or a Session. Its text can be formatted with headings, lists and tables.
+
+Routines and Reminders
+• Any Note can have Reminders (one time) and Routines (repeating by a recurrence rule, several times a day if needed).
+• They come as time-sensitive notifications with Done and Snooze.
+• A notification that is neither Done nor snoozed comes again at a set interval (Re-nag, default 10 minutes). Optionally, after a set number of Re-nags it rings as an iPhone alarm, through silent mode and Focus.
+• The Agenda lists today's Routines and Reminders, missed ones and the number of Unsorted Notes. It is also a home-screen widget, whose boxes tick without opening the app.
+• Each Routine has a history with streak and adherence.
+• The Agenda can show the appointments of the calendars you pick. Routines and Reminders can be written to a calendar or exported as an ICS file.
+
+Sync and sharing
+• Your Devices sync directly over the local network while the app is open (TLS, paired by QR code or typed code), through a shared folder in iCloud Drive or Möbius Sync (end-to-end encrypted), or through an encrypted file sent with any app.
+• A single Area can be shared with another person. Other Areas are not shared.
+• A Note can be sent to another person as a file, with its Routines and Reminders, to accept or decline.
+• Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
+
+Privacy and security
+• No account, no server, no analytics, no advertising.
+• The app uses the network only for sync and for the speech model download.
+• Optional App Lock (PIN, Face ID or Touch ID) and Area Locks. Capture and alarms keep working while locked.
+• Encrypted Backups (Argon2id, XChaCha20-Poly1305) into a chosen folder, optionally weekly, with a printable Recovery Sheet. The iPhone's own backup leaves the app's data out.
+
+Other
+• English and German. Light and dark theme. iOS 26 or newer.
+• Free and open source, licensed under Apache-2.0 or MIT.
