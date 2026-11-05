@@ -31,11 +31,17 @@ class RunnerTests: XCTestCase {
     XCTAssertNotNil(info("NSMicrophoneUsageDescription") as? String)
   }
 
-  /// The local network's reason, and the one Bonjour type the sync
-  /// looks for, without which iOS finds no paired host (#240).
+  /// The local network's reason, and the Bonjour type the sync looks
+  /// for, without which iOS finds no paired host (#240). A Debug build,
+  /// as the tests run, also carries Flutter's own `_dartVmService._tcp`,
+  /// which flutter's xcode_backend adds for the debugger.
   func testTheLocalNetworkIsExplainedAndOurServiceNamed() {
     XCTAssertNotNil(info("NSLocalNetworkUsageDescription") as? String)
-    XCTAssertEqual(info("NSBonjourServices") as? [String], ["_oldbrainfix._tcp"])
+    let services = info("NSBonjourServices") as? [String] ?? []
+    XCTAssertTrue(services.contains("_oldbrainfix._tcp"), "\(services)")
+    XCTAssertTrue(
+      services.allSatisfy { ["_oldbrainfix._tcp", "_dartVmService._tcp"].contains($0) },
+      "\(services)")
   }
 
   /// The background sync's app refresh task (#240).
