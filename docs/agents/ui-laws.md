@@ -708,6 +708,11 @@ replace a law of Both apps where they say so. A desktop law marked
   opens Capture as on Android, and a Pack, Profile card, Sent Item or
   bundle opens as "Open with" opens it. A share carries no source app on
   the iPhone.
+- **On the iPhone iOS's own prompts may come beside Capture** (#243,
+  #244): the first Photo asks iOS's camera permission, and Paste may
+  show iOS's own "Allow Paste" prompt each time it reads the clipboard.
+  Both are iOS's, not the app's, and are allowed beside "Capture never
+  asks anything"; the app itself still asks nothing there.
 - **The quick note is uncluttered** (#142): by default it shows the
   text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu

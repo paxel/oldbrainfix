@@ -25,6 +25,8 @@
 		B23900000000000000000002 /* OcrChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000001 /* OcrChannel.swift */; };
 		B23900000000000000000004 /* SpeechChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000003 /* SpeechChannel.swift */; };
 		B23900000000000000000006 /* SpeechFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000005 /* SpeechFiles.swift */; };
+		B24400000000000000000002 /* BackupExclusion.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24400000000000000000001 /* BackupExclusion.swift */; };
+		B24400000000000000000004 /* BackupExclusionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24400000000000000000003 /* BackupExclusionTests.swift */; };
 		B23900000000000000000008 /* VoiceChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000007 /* VoiceChannel.swift */; };
 		B2390000000000000000000B /* rusto in Resources */ = {isa = PBXBuildFile; fileRef = B2390000000000000000000A /* rusto */; };
 		B2390000000000000000000D /* OcrTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2390000000000000000000C /* OcrTests.swift */; };
@@ -158,6 +160,8 @@
 		B23900000000000000000001 /* OcrChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OcrChannel.swift; sourceTree = "<group>"; };
 		B23900000000000000000003 /* SpeechChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechChannel.swift; sourceTree = "<group>"; };
 		B23900000000000000000005 /* SpeechFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechFiles.swift; sourceTree = "<group>"; };
+		B24400000000000000000001 /* BackupExclusion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupExclusion.swift; sourceTree = "<group>"; };
+		B24400000000000000000003 /* BackupExclusionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupExclusionTests.swift; sourceTree = "<group>"; };
 		B23900000000000000000007 /* VoiceChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceChannel.swift; sourceTree = "<group>"; };
 		B23900000000000000000009 /* oldbrainfix_native.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = oldbrainfix_native.h; sourceTree = "<group>"; };
 		B2390000000000000000000A /* rusto */ = {isa = PBXFileReference; lastKnownFileType = folder; name = rusto; path = ../android/app/src/main/assets/rusto; sourceTree = SOURCE_ROOT; };
@@ -251,6 +255,7 @@
 				B23800000000000000000009 /* AlarmPlanTests.swift */,
 				B2390000000000000000000C /* OcrTests.swift */,
 				B2390000000000000000000E /* SpeechFilesTests.swift */,
+				B24400000000000000000003 /* BackupExclusionTests.swift */,
 				B23900000000000000000010 /* german-receipt.jpg */,
 				B2400000000000000000000F /* FolderRulesTests.swift */,
 				B24000000000000000000011 /* ZipReaderTests.swift */,
@@ -323,6 +328,7 @@
 				B23900000000000000000001 /* OcrChannel.swift */,
 				B23900000000000000000003 /* SpeechChannel.swift */,
 				B23900000000000000000005 /* SpeechFiles.swift */,
+				B24400000000000000000001 /* BackupExclusion.swift */,
 				B23900000000000000000007 /* VoiceChannel.swift */,
 				B23900000000000000000009 /* oldbrainfix_native.h */,
 				B2390000000000000000000A /* rusto */,
@@ -591,6 +597,7 @@
 				B2380000000000000000000A /* AlarmPlanTests.swift in Sources */,
 				B2390000000000000000000D /* OcrTests.swift in Sources */,
 				B2390000000000000000000F /* SpeechFilesTests.swift in Sources */,
+				B24400000000000000000004 /* BackupExclusionTests.swift in Sources */,
 				B24000000000000000000010 /* FolderRulesTests.swift in Sources */,
 				B24000000000000000000012 /* ZipReaderTests.swift in Sources */,
 				B24000000000000000000014 /* SyncRecordsTests.swift in Sources */,
@@ -618,6 +625,7 @@
 				B23900000000000000000002 /* OcrChannel.swift in Sources */,
 				B23900000000000000000004 /* SpeechChannel.swift in Sources */,
 				B23900000000000000000006 /* SpeechFiles.swift in Sources */,
+				B24400000000000000000002 /* BackupExclusion.swift in Sources */,
 				B23900000000000000000008 /* VoiceChannel.swift in Sources */,
 				B24000000000000000000002 /* FolderRules.swift in Sources */,
 				B24000000000000000000004 /* ZipReader.swift in Sources */,

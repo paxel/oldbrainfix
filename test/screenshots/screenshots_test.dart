@@ -5,6 +5,10 @@
 //   flutter test test/screenshots --run-skipped --concurrency=1 \
 //     --plain-name 'store screenshots'
 //
+// The App Store's iPhone frames (#244), 1320 × 2868, drawn as on iOS into
+// fastlane/metadata/ios/<locale>/screenshots/iphone-6.9/, likewise with
+// --plain-name 'iphone screenshots'.
+//
 // The user guide's phone frames (#134) come from the same seeded data:
 // each screen in English and German, light and dark, 648 × 1152, under
 // site/assets/frames/phone/<language>/<theme>/, a guide box's frame in
@@ -16,8 +20,10 @@
 //     --plain-name 'guide frames'
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -73,10 +79,19 @@ import '../fake_voice.dart';
 import '../open_capture.dart';
 import '../reveal.dart';
 
-/// The frame in physical pixels and the density of a common phone:
-/// 432 × 768 logical pixels, which 2.5 scales to exactly 1080 × 1920.
-const _frame = Size(1080, 1920);
+/// The phone's screen in logical pixels and the density of a common
+/// phone: 432 × 768, which 2.5 scales to exactly 1080 × 1920.
+const _screen = Size(432, 768);
 const _dpr = 2.5;
+
+/// The App Store's iPhone frame (#244): the iPhone 16 Pro Max's screen,
+/// 440 × 956 points at 3, exactly 1320 × 2868, the size App Store
+/// Connect scales down for every smaller iPhone (docs/agents/store-kit.md),
+/// with its safe area: the status bar and Dynamic Island on top, the
+/// home indicator below.
+const _iphoneScreen = Size(440, 956);
+const _iphoneDpr = 3.0;
+const _iphoneSafeArea = FakeViewPadding(top: 62 * 3, bottom: 34 * 3);
 
 /// The guide's frames: the same 432 × 768 screen at 1.5, 648 × 1152,
 /// enough for a page and light in the repository.
@@ -878,6 +893,84 @@ Future<void> _loadFonts() async {
   await emoji.load();
 }
 
+/// Roboto under the names Flutter's iOS typography asks for, so the
+/// iPhone frames show text: the system font of iOS is not there to load
+/// outside Apple's systems.
+Future<void> _loadCupertinoFonts() async {
+  final dir = [
+    _flutterRoot(),
+    'bin',
+    'cache',
+    'artifacts',
+    'material_fonts',
+  ].join(Platform.pathSeparator);
+  for (final family in ['CupertinoSystemText', 'CupertinoSystemDisplay']) {
+    final loader = FontLoader(family);
+    for (final file in Directory(dir).listSync().whereType<File>()) {
+      final name = file.uri.pathSegments.last;
+      if (name.startsWith('Roboto-') && name.endsWith('.ttf')) {
+        loader.addFont(
+          file.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
+        );
+      }
+    }
+    await loader.load();
+  }
+}
+
+/// [rgba], [width] × [height], as a PNG without an alpha channel (colour
+/// type 2), as App Store Connect wants its screenshots. Every pixel has to
+/// be opaque already: a see-through one fails instead of changing colour.
+Uint8List _opaquePng(int width, int height, Uint8List rgba) {
+  final rows = BytesBuilder(copy: false);
+  for (var y = 0; y < height; y++) {
+    final row = Uint8List(1 + width * 3);
+    for (var x = 0; x < width; x++) {
+      final i = (y * width + x) * 4;
+      if (rgba[i + 3] != 255) fail('pixel $x, $y is not opaque');
+      row.setRange(1 + x * 3, 4 + x * 3, rgba, i);
+    }
+    rows.add(row);
+  }
+  final png = BytesBuilder(copy: false)
+    ..add(const [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  void chunk(String type, List<int> data) {
+    final body = Uint8List.fromList([...type.codeUnits, ...data]);
+    png
+      ..add(_bigEndian(data.length))
+      ..add(body)
+      ..add(_bigEndian(_crc32(body)));
+  }
+
+  chunk('IHDR', [
+    ..._bigEndian(width),
+    ..._bigEndian(height),
+    8, // bits per channel
+    2, // RGB
+    0,
+    0,
+    0,
+  ]);
+  chunk('IDAT', ZLibCodec(level: 6).encode(rows.takeBytes()));
+  chunk('IEND', const []);
+  return png.takeBytes();
+}
+
+Uint8List _bigEndian(int value) =>
+    Uint8List(4)..buffer.asByteData().setUint32(0, value);
+
+/// The CRC-32 a PNG chunk ends with (ISO 3309, as zlib's).
+int _crc32(List<int> bytes) {
+  var crc = 0xffffffff;
+  for (final byte in bytes) {
+    crc ^= byte;
+    for (var k = 0; k < 8; k++) {
+      crc = crc & 1 == 1 ? (crc >> 1) ^ 0xedb88320 : crc >> 1;
+    }
+  }
+  return crc ^ 0xffffffff;
+}
+
 /// Shows the app on [store] in [language] at [dpr], inside [boundary];
 /// with [bundles], a Backup can be picked on the first start.
 Future<AppLocalizations> _start(
@@ -891,10 +984,14 @@ Future<AppLocalizations> _start(
   FolderPlatform folders = const NoFolders(),
   AppointmentSource appointments = const NoAppointments(),
   SpeechPlatform speech = const NoSpeech(),
+  Size screen = _screen,
+  FakeViewPadding padding = FakeViewPadding.zero,
 }) async {
   tester.view
-    ..physicalSize = _frame / _dpr * dpr
-    ..devicePixelRatio = dpr;
+    ..physicalSize = screen * dpr
+    ..devicePixelRatio = dpr
+    ..padding = padding
+    ..viewPadding = padding;
   tester.platformDispatcher.localesTestValue = [Locale(language)];
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -1030,9 +1127,15 @@ Future<void> _matchFrame(
 /// Runs [body] as test [name] with real shadows and counted ids: the
 /// embossed cards are flat otherwise, and the own Profile's placeholder
 /// colour, made from its id, is the same on every run. Restored before
-/// the test ends, which checks it.
-void _shot(String name, Future<void> Function(WidgetTester) body) {
+/// the test ends, which checks it. With [platform], the app runs as on
+/// that platform.
+void _shot(
+  String name,
+  Future<void> Function(WidgetTester) body, {
+  TargetPlatform? platform,
+}) {
   testWidgets(name, (tester) async {
+    debugDefaultTargetPlatformOverride = platform;
     debugDisableShadows = false;
     EditableText.debugDeterministicCursor = true;
     // Bare screens: no debug banner in the corner.
@@ -1043,6 +1146,7 @@ void _shot(String name, Future<void> Function(WidgetTester) body) {
     try {
       await body(tester);
     } finally {
+      debugDefaultTargetPlatformOverride = null;
       debugDisableShadows = true;
       EditableText.debugDeterministicCursor = false;
       WidgetsApp.debugAllowBannerOverride = true;
@@ -1051,118 +1155,176 @@ void _shot(String name, Future<void> Function(WidgetTester) body) {
   });
 }
 
-void main() {
-  group('store screenshots', skip: 'writes PNGs; run with --run-skipped', () {
-    setUpAll(_loadFonts);
-
-    for (final (locale, language, texts) in [
-      ('en-US', 'en', _en),
-      ('de-DE', 'de', _de),
-    ]) {
-      final out = Directory(
-        'fastlane/metadata/android/$locale/images/phoneScreenshots',
-      );
-      final boundary = GlobalKey();
-
-      Future<AppLocalizations> start(
-        WidgetTester tester,
-        _Seeded seeded, {
-        FakeAlarms? alarms,
-      }) => _start(
-        tester,
-        boundary,
-        language,
-        seeded.store,
-        _dpr,
-        alarms: alarms,
+/// The store frames of one store, eight per locale: Play's and
+/// F-Droid's 1080 × 1920 frames, or with [iphone] the App Store's
+/// 1320 × 2868 ones (#244), drawn as on iOS: the iOS platform, so pushed
+/// pages carry the Cupertino back arrow and the edge back swipe, its
+/// safe area, Roboto standing in for the system font, and opaque PNGs,
+/// as App Store Connect takes no alpha channel. The iPhone has no alarm
+/// ring screen, as AlarmKit's own screen replaces it, so its sixth frame
+/// is All Routines and Reminders.
+void _storeScreenshots({required bool iphone}) {
+  group(
+    iphone ? 'iphone screenshots' : 'store screenshots',
+    skip: 'writes PNGs; run with --run-skipped',
+    () {
+      setUpAll(() async {
+        await _loadFonts();
+        if (iphone) await _loadCupertinoFonts();
+      });
+      final screen = iphone ? _iphoneScreen : _screen;
+      final dpr = iphone ? _iphoneDpr : _dpr;
+      final size = (
+        (screen.width * dpr).round(),
+        (screen.height * dpr).round(),
       );
 
-      Future<void> tap(WidgetTester tester, Finder finder) =>
-          _tap(tester, finder);
+      for (final (locale, language, texts) in [
+        ('en-US', 'en', _en),
+        ('de-DE', 'de', _de),
+      ]) {
+        final out = Directory(
+          iphone
+              ? 'fastlane/metadata/ios/$locale/screenshots/iphone-6.9'
+              : 'fastlane/metadata/android/$locale/images/phoneScreenshots',
+        );
+        final boundary = GlobalKey();
 
-      /// Writes what the app shows now as [name].
-      Future<void> shoot(WidgetTester tester, String name) async {
-        final shot = await _capture(tester, boundary, _dpr);
-        expect((shot.width, shot.height), (1080, 1920));
-        out.createSync(recursive: true);
-        File('${out.path}/$name').writeAsBytesSync(shot.png);
-      }
+        Future<AppLocalizations> start(
+          WidgetTester tester,
+          _Seeded seeded, {
+          FakeAlarms? alarms,
+          AppointmentSource appointments = const NoAppointments(),
+        }) => _start(
+          tester,
+          boundary,
+          language,
+          seeded.store,
+          dpr,
+          alarms: alarms,
+          appointments: appointments,
+          screen: screen,
+          padding: iphone ? _iphoneSafeArea : FakeViewPadding.zero,
+        );
 
-      void frame(String name, Future<void> Function(WidgetTester) body) {
-        _shot('$locale $name', (tester) async {
-          await body(tester);
-          await shoot(tester, name);
+        Future<void> tap(WidgetTester tester, Finder finder) =>
+            _tap(tester, finder);
+
+        /// Writes what the app shows now as [name].
+        Future<void> shoot(WidgetTester tester, String name) async {
+          final shot = await _capture(tester, boundary, dpr);
+          expect((shot.width, shot.height), size);
+          out.createSync(recursive: true);
+          File('${out.path}/$name').writeAsBytesSync(
+            iphone ? _opaquePng(shot.width, shot.height, shot.rgba) : shot.png,
+          );
+        }
+
+        void frame(String name, Future<void> Function(WidgetTester) body) {
+          _shot('$locale $name', platform: iphone ? TargetPlatform.iOS : null, (
+            tester,
+          ) async {
+            await body(tester);
+            await shoot(tester, name);
+          });
+        }
+
+        /// On the iPhone, a pushed page goes back with iOS's arrow.
+        void backArrow() {
+          if (!iphone) return;
+          expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsWidgets);
+          expect(find.byIcon(Icons.arrow_back), findsNothing);
+        }
+
+        frame('1-agenda.png', (tester) async {
+          await start(tester, _Seeded(texts));
+          expect(find.byType(AgendaScreen), findsOneWidget);
+        });
+
+        frame('2-capture.png', (tester) async {
+          final t = await start(tester, _Seeded(texts));
+          await openTextCapture(tester);
+          await tester.enterText(find.byType(TextField), texts.captureText);
+          await tester.pumpAndSettle();
+          expect(find.text(t.voice), findsOneWidget);
+          expect(find.text(t.photo), findsOneWidget);
+        });
+
+        frame('3-diary.png', (tester) async {
+          final t = await start(tester, _Seeded(texts));
+          await tap(tester, find.byTooltip(t.browseTooltip));
+          await tap(tester, find.text(t.starterHousehold));
+          backArrow();
+        });
+
+        frame('4-editor.png', (tester) async {
+          final t = await start(tester, _Seeded(texts));
+          await tap(tester, find.byTooltip(t.browseTooltip));
+          await tap(tester, find.text(t.starterHousehold));
+          await tester.longPress(find.text(texts.boiler));
+          await tester.pumpAndSettle();
+          expect(find.byType(NoteEditorScreen), findsOneWidget);
+          backArrow();
+        });
+
+        if (iphone) {
+          frame('6-routines.png', (tester) async {
+            await start(tester, _Seeded(texts));
+            await tap(tester, find.byKey(const ValueKey('allRoutines')));
+            expect(find.byType(AllRoutinesScreen), findsOneWidget);
+            backArrow();
+          });
+        } else {
+          frame('6-alarm.png', (tester) async {
+            final seeded = _Seeded(texts);
+            final alarms = FakeAlarms()
+              ..ringingNow = Ringing(
+                routineId: seeded.snack.id,
+                occurrenceKey: Occurrence(
+                  Day(2026, 10, 27),
+                  ClockTime(15, 0),
+                ).key,
+                title: texts.snack,
+                body: '15:00',
+              );
+            await start(tester, seeded, alarms: alarms);
+            expect(find.byType(RingScreen), findsOneWidget);
+          });
+        }
+
+        frame('7-history.png', (tester) async {
+          final t = await start(tester, _Seeded(texts));
+          await tap(tester, find.text(texts.snack).first);
+          await tap(tester, find.byTooltip(t.historyTitle));
+          expect(find.byType(RoutineHistoryScreen), findsOneWidget);
+          backArrow();
+        });
+
+        frame('5-fan.png', (tester) async {
+          await start(tester, _Seeded(texts));
+          await tap(tester, find.byIcon(Icons.add));
+          for (final way in ['text', 'voice', 'photo', 'gallery']) {
+            expect(fanEntry(way), findsOneWidget);
+          }
+        });
+
+        frame('8-dark.png', (tester) async {
+          final seeded = _Seeded(texts);
+          seeded.store.themeChoice = ThemeChoice.dark;
+          final t = await start(tester, seeded);
+          // Scrolled to the rest of the week, dimmed.
+          Scrollable.ensureVisible(tester.element(find.text(t.agendaTomorrow)));
+          await tester.pumpAndSettle();
+          expect(find.byType(AgendaScreen), findsOneWidget);
         });
       }
+    },
+  );
+}
 
-      frame('1-agenda.png', (tester) async {
-        await start(tester, _Seeded(texts));
-        expect(find.byType(AgendaScreen), findsOneWidget);
-      });
-
-      frame('2-capture.png', (tester) async {
-        final t = await start(tester, _Seeded(texts));
-        await openTextCapture(tester);
-        await tester.enterText(find.byType(TextField), texts.captureText);
-        await tester.pumpAndSettle();
-        expect(find.text(t.voice), findsOneWidget);
-        expect(find.text(t.photo), findsOneWidget);
-      });
-
-      frame('3-diary.png', (tester) async {
-        final t = await start(tester, _Seeded(texts));
-        await tap(tester, find.byTooltip(t.browseTooltip));
-        await tap(tester, find.text(t.starterHousehold));
-      });
-
-      frame('4-editor.png', (tester) async {
-        final t = await start(tester, _Seeded(texts));
-        await tap(tester, find.byTooltip(t.browseTooltip));
-        await tap(tester, find.text(t.starterHousehold));
-        await tester.longPress(find.text(texts.boiler));
-        await tester.pumpAndSettle();
-        expect(find.byType(NoteEditorScreen), findsOneWidget);
-      });
-
-      frame('6-alarm.png', (tester) async {
-        final seeded = _Seeded(texts);
-        final alarms = FakeAlarms()
-          ..ringingNow = Ringing(
-            routineId: seeded.snack.id,
-            occurrenceKey: Occurrence(Day(2026, 10, 27), ClockTime(15, 0)).key,
-            title: texts.snack,
-            body: '15:00',
-          );
-        await start(tester, seeded, alarms: alarms);
-        expect(find.byType(RingScreen), findsOneWidget);
-      });
-
-      frame('7-history.png', (tester) async {
-        final t = await start(tester, _Seeded(texts));
-        await tap(tester, find.text(texts.snack).first);
-        await tap(tester, find.byTooltip(t.historyTitle));
-        expect(find.byType(RoutineHistoryScreen), findsOneWidget);
-      });
-
-      frame('5-fan.png', (tester) async {
-        await start(tester, _Seeded(texts));
-        await tap(tester, find.byIcon(Icons.add));
-        for (final way in ['text', 'voice', 'photo', 'gallery']) {
-          expect(fanEntry(way), findsOneWidget);
-        }
-      });
-
-      frame('8-dark.png', (tester) async {
-        final seeded = _Seeded(texts);
-        seeded.store.themeChoice = ThemeChoice.dark;
-        final t = await start(tester, seeded);
-        // Scrolled to the rest of the week, dimmed.
-        Scrollable.ensureVisible(tester.element(find.text(t.agendaTomorrow)));
-        await tester.pumpAndSettle();
-        expect(find.byType(AgendaScreen), findsOneWidget);
-      });
-    }
-  });
+void main() {
+  _storeScreenshots(iphone: false);
+  _storeScreenshots(iphone: true);
 
   group(
     'guide frames',

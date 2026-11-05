@@ -36,6 +36,9 @@
 #                    before the bundle is uploaded
 #   screenshots    — desktop screenshots, drawn by kittest from demo data,
 #                    attached to the Release (the metainfo points at them)
+#   appstore-screenshots — the App Store's iPhone frames (1320 × 2868, en-US
+#                    and de-DE), drawn by the Flutter screenshot test as on
+#                    iOS and attached to the run; not a gate (#244)
 #   build-windows  — Rust desktop: zip with oldbrainfix.exe
 #   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
 #   ios            — the iPhone app built unsigned and its XCTest target
@@ -592,6 +595,31 @@ jobs:
         with:
           name: screenshots
           path: screenshots/*.png
+
+  # The App Store's iPhone frames (#244, docs/agents/store-kit.md), drawn
+  # by the Flutter screenshot test with the iOS platform and safe area,
+  # not by the iOS simulator: the same frames a Linux machine draws, ready
+  # to upload in App Store Connect. The Release does not wait for them.
+  appstore-screenshots:
+    name: App Store screenshots
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Render the iPhone frames from the seeded data
+        run: |
+          flutter pub get
+          flutter test test/screenshots --run-skipped --concurrency=1 --plain-name 'iphone screenshots'
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: appstore-screenshots
+          path: fastlane/metadata/ios/
 
   build-windows:
     name: Windows desktop

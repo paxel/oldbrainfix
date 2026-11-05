@@ -8,6 +8,9 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Before the database opens: the app's data stays out of the
+    // iPhone's own backups (#244).
+    BackupExclusion.excludeAppData()
     // Before launching ends, so a tap that started the app in the
     // background reaches it (#238).
     UNUserNotificationCenter.current().delegate = AlarmNotifications.shared
