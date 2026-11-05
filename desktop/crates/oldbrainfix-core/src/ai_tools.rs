@@ -284,12 +284,9 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "trash_note",
-            "Moves a Note to the trash, with the Routines and Reminders spawned from it unless told otherwise; it can be restored for 30 days.",
+            "Moves a Note to the trash with the Routines and Reminders spawned from it; restoring it within 30 days brings them back.",
             false,
-            json!({
-                "id": id("Note"),
-                "withRoutines": {"description": "Its Routines and Reminders too; true when left out", "type": "boolean"},
-            }),
+            json!({"id": id("Note")}),
             &["id"],
         ),
         tool(
@@ -1668,8 +1665,7 @@ impl Store {
                 id()?.to_string()
             }
             "trash_note" => {
-                let with = args.get("withRoutines").and_then(Value::as_bool) != Some(false);
-                routines.trash_note(id()?, with)?;
+                routines.trash_note(id()?)?;
                 id()?.to_string()
             }
             "restore_note" => {

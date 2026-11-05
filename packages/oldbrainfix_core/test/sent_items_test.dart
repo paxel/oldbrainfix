@@ -791,7 +791,7 @@ void main() {
 
     test('an update to a Note in the trash brings it back', () {
       final (:ann, :ben, :sent, :got) = accepted();
-      Routines(ben).trashNote(got, withRoutines: true);
+      Routines(ben).trashNote(got);
       final cancel = openSentItem(ben, sendNote(ann, sent, cancel: true));
       expect(cancel.state, SentItemState.nothingToCancel);
       expect(acceptSentItem(ben, cancel.item), isNull);

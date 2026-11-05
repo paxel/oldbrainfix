@@ -4,6 +4,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::notes::{Notes, keys as note_keys};
+use crate::routines::Routines;
 use crate::store::{Store, utf16_cmp};
 use crate::{Error, Result};
 
@@ -330,7 +331,8 @@ impl<'a> Places<'a> {
                     self.store
                         .append(&note.id, note_keys::PLACE, area_id, None)?;
                 }
-                NotesGo::Trash => notes.trash(&note.id)?,
+                // With its Routines and Reminders, as every deletion (#262).
+                NotesGo::Trash => Routines::new(self.store).trash_note(&note.id)?,
             }
         }
         Ok(())

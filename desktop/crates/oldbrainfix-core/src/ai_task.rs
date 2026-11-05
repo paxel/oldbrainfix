@@ -1180,7 +1180,7 @@ mod tests {
             notes.file(&milk.id, &house.id)?;
             notes.set_importance(&pills.id, crate::Importance::Important)?;
             Routines::new(&store).set_renag(&routine.id, Some(chrono::Duration::minutes(5)))?;
-            Routines::new(&store).trash_note(&old.id, true)?;
+            Routines::new(&store).trash_note(&old.id)?;
             places.add_topic(&house.id, "Kitchen")?;
             // Written back as it was: no change.
             notes.edit(&pills.id, "Pills")?;

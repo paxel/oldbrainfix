@@ -1,5 +1,6 @@
 import 'device_settings.dart';
 import 'notes.dart';
+import 'routines.dart';
 import 'shared_areas.dart';
 import 'store.dart';
 
@@ -322,7 +323,7 @@ class Places {
   /// Sends the Notes inside [id] where [notesGo] says; [areaId] is where
   /// [NotesGo.area] leads.
   void _moveNotes(String id, NotesGo notesGo, String? areaId) {
-    final notes = Notes(store);
+    final routines = Routines(store);
     for (final note in _notesInside(id)) {
       switch (notesGo) {
         case NotesGo.unsorted:
@@ -332,7 +333,8 @@ class Places {
         case NotesGo.area:
           store.append(note.id, NoteKeys.place, areaId);
         case NotesGo.trash:
-          notes.trash(note.id);
+          // With its Routines and Reminders, as every deletion (#262).
+          routines.trashNote(note.id);
       }
     }
   }

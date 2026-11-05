@@ -147,21 +147,21 @@ Future<bool> amendNote(
 
 /// Asks once whether the Note [noteId] goes to the trash, with the verb
 /// on the button in the error colour, and moves it there; whether it
-/// did. When it spawned Routines or Reminders, the dialog offers to
-/// delete the Note only or with them; they never go as a side effect.
+/// did. Its Routines and Reminders always go with it, and the question
+/// names them (#262).
 Future<bool> deleteNote(
   BuildContext context,
   Notes notes,
   String noteId,
 ) async {
   final book = Routines(notes.store);
-  final linked = book.ofNote(noteId).length;
-  final withRoutines = await showDialog<bool>(
+  final linked = book.ofNote(noteId);
+  final delete = await showDialog<bool>(
     context: context,
     builder: (context) => _DeleteNoteDialog(linked: linked),
   );
-  if (withRoutines == null) return false;
-  book.trashNote(noteId, withRoutines: withRoutines);
+  if (delete != true) return false;
+  book.trashNote(noteId);
   return true;
 }
 
@@ -2224,7 +2224,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _reload();
       return;
     }
-    if (!trashed) _routineBook.trashNote(widget.noteId, withRoutines: true);
+    if (!trashed) _routineBook.trashNote(widget.noteId);
     Navigator.of(context).pop();
   }
 
@@ -2765,40 +2765,37 @@ class EditorPanel extends StatelessWidget {
   );
 }
 
-/// Asks once whether a Note goes to the trash: true to delete its
-/// [linked] Routines and Reminders with it, false to delete the Note
-/// only, null to cancel.
+/// Asks once whether a Note goes to the trash with its [linked]
+/// Routines and Reminders: true to delete, null to cancel.
 class _DeleteNoteDialog extends StatelessWidget {
-  final int linked;
+  final List<Routine> linked;
 
   const _DeleteNoteDialog({required this.linked});
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    Widget destructive(String label, bool value) => TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.error,
-      ),
-      onPressed: () => Navigator.of(context).pop(value),
-      child: Text(label),
-    );
     return AlertDialog(
-      title: Text(t.deleteNoteQuestion),
+      title: Text(switch (linked) {
+        [] => t.deleteNoteQuestion,
+        [final one] when one.isReminder => t.deleteNoteReminderQuestion,
+        _ => t.deleteNoteLinkedQuestion(linked.length),
+      }),
       content: Text(
-        linked == 0 ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
+        linked.isEmpty ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(t.cancel),
         ),
-        if (linked == 0)
-          destructive(t.delete, false)
-        else ...[
-          destructive(t.deleteNoteOnly, false),
-          destructive(t.deleteNoteWithLinked(linked), true),
-        ],
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(t.delete),
+        ),
       ],
     );
   }

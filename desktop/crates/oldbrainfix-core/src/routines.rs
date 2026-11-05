@@ -298,15 +298,12 @@ impl<'a> Routines<'a> {
         self.store.batch(|| self.untrash(&routine))
     }
 
-    /// Moves the Note `note_id` to the trash, and with `with_routines` the
-    /// Routines and Reminders it spawned too: they come back with it.
-    /// Without, they stay and link back to a Note in the trash.
-    pub fn trash_note(&self, note_id: &str, with_routines: bool) -> Result<()> {
-        let routines = if with_routines {
-            self.of_note(note_id)?
-        } else {
-            Vec::new()
-        };
+    /// Moves the Note `note_id` to the trash with the Routines and
+    /// Reminders it spawned, those of the Notes merged into it included:
+    /// they come back with it. A Note never leaves a Routine behind
+    /// (#262); one is kept only by moving it off the Note first.
+    pub fn trash_note(&self, note_id: &str) -> Result<()> {
+        let routines = self.of_note(note_id)?;
         self.store.batch(|| {
             Notes::new(self.store).trash(note_id)?;
             // The same moment as the Note's, so both are purged together.
@@ -400,7 +397,7 @@ impl<'a> Routines<'a> {
             let Some(note) = self.trashed_when_done(&self.require(id)?)? else {
                 return Ok(false);
             };
-            self.trash_note(&note.id, true)?;
+            self.trash_note(&note.id)?;
             Ok(true)
         })
     }
@@ -1108,14 +1105,32 @@ mod tests {
         let routines = Routines::new(&store);
         let note = notes.capture("Walk the dog", None, None)?;
         routines.spawn(&note.id, &daily_at_eight())?;
-        routines.trash_note(&note.id, true)?;
+        routines.trash_note(&note.id)?;
         assert!(routines.all()?.is_empty());
         // Trashed with the Note, they come back with it, not on their own.
         assert!(routines.trashed()?.is_empty());
         routines.restore_note(&note.id)?;
         assert_eq!(routines.all()?.len(), 1);
-        routines.trash_note(&note.id, false)?;
+        // One left behind before #262 stays, linking to the Note in the
+        // trash.
+        notes.trash(&note.id)?;
         assert_eq!(routines.all()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_place_sending_its_notes_to_the_trash_takes_their_routines_along() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let routines = Routines::new(&store);
+        let places = crate::places::Places::new(&store);
+        let health = places.add_area("Health")?;
+        let note = notes.capture("pills", Some(&health.id), None)?;
+        routines.spawn(&note.id, &daily_at_eight())?;
+        places.delete_area(&health.id, crate::places::NotesGo::Trash)?;
+        assert!(routines.all()?.is_empty());
+        routines.restore_note(&note.id)?;
+        assert_eq!(routines.of_note(&note.id)?.len(), 1);
         Ok(())
     }
 

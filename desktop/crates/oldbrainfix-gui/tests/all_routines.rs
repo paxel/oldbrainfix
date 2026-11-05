@@ -446,3 +446,26 @@ fn a_card_shows_its_areas_colour_and_icon_and_an_unsorted_one_neither() -> TestR
     assert!(!icon_in(&shapes, unsorted, icon, colour));
     Ok(())
 }
+
+#[test]
+fn a_routine_whose_note_is_in_the_trash_or_deleted_says_so() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let course = routine(&store, "Course")?;
+    let dentist = routine(&store, "Dentist")?;
+    // As "Delete only the Note" left them before #262.
+    notes.trash(&course.note_id)?;
+    notes.trash(&dentist.note_id)?;
+    // How the phone's purge writes it, 30 days on.
+    store.append(&dentist.note_id, "$type", None, None)?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::AllRoutines);
+    let harness = window(app);
+    assert_eq!(cards(&harness, "Course").count(), 1);
+    assert_eq!(cards(&harness, "The Note is gone").count(), 1);
+    // Only these two are marked.
+    let marked = |label| harness.query_all_by_label_contains(label).count();
+    assert_eq!(marked("The Note is in the trash"), 1);
+    assert_eq!(marked("The Note was deleted"), 1);
+    Ok(())
+}

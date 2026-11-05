@@ -76,6 +76,19 @@ void main() {
       expect(routines.ofNote(pills.id), hasLength(1));
     });
 
+    test('a deleted place sending its Notes to the trash takes their '
+        'Routines along, and restoring a Note brings them back', () {
+      final places = Places(store);
+      final health = places.addArea('Health');
+      final pills = notes.capture('pills', place: health.id);
+      final routine = routines.spawn(pills.id, daily([at(8)]));
+      places.deleteArea(health.id, NotesGo.trash);
+      expect(notes.byId(pills.id)?.isTrashed, isTrue);
+      expect(routines.all(), isEmpty);
+      routines.restoreNote(pills.id);
+      expect(routines.ofNote(pills.id).map((r) => r.id), [routine.id]);
+    });
+
     test('creating a Routine directly captures its Note, not Unsorted', () {
       final routine = routines.create('  water the plants ', daily([]));
       final note = routines.note(routine);
@@ -508,7 +521,7 @@ void main() {
       expect(notes.all(), hasLength(1));
     });
 
-    test('Yes: a Note goes to the trash with its Routines, and comes back '
+    test('a Note goes to the trash with its Routines, and comes back '
         'with them', () {
       final dentist = notes.capture('dentist');
       final dayBefore = routines.spawn(
@@ -519,7 +532,7 @@ void main() {
         dentist.id,
         Schedule(start: tomorrow, times: [at(9)]),
       );
-      routines.trashNote(dentist.id, withRoutines: true);
+      routines.trashNote(dentist.id);
       expect(notes.byId(dentist.id)?.isTrashed, isTrue);
       expect(routines.all(), isEmpty);
       expect(planned(), isEmpty);
@@ -543,13 +556,13 @@ void main() {
       expect(planned(), {dayBefore.id, hourBefore.id});
     });
 
-    test('Yes: Note and Routines are purged together', () {
+    test('Note and Routines are purged together', () {
       final dentist = notes.capture('dentist');
       final reminder = routines.spawn(
         dentist.id,
         Schedule(start: tomorrow, times: [at(9)]),
       );
-      routines.trashNote(dentist.id, withRoutines: true);
+      routines.trashNote(dentist.id);
       now = now.add(Notes.trashKeep);
       notes.purgeTrash();
       routines.purgeTrash();
@@ -563,17 +576,18 @@ void main() {
       final morning = routines.spawn(pills.id, daily([at(8)]));
       final evening = routines.spawn(pills.id, daily([at(20)]));
       routines.trash(morning.id);
-      routines.trashNote(pills.id, withRoutines: true);
+      routines.trashNote(pills.id);
       routines.restoreNote(pills.id);
       expect(routines.ofNote(pills.id).map((r) => r.id), [evening.id]);
       expect(routines.trashed().map((r) => r.id), [morning.id]);
     });
 
-    test('No: the Routines stay, linking to the Note in the trash and then '
-        'to nothing once it is purged', () {
+    test('Routines left behind before #262 link to the Note in the trash '
+        'and then to nothing once it is purged', () {
       final pills = notes.capture('pills');
       final routine = routines.spawn(pills.id, daily([at(20)]));
-      routines.trashNote(pills.id, withRoutines: false);
+      // How "Delete only the Note" trashed it.
+      notes.trash(pills.id);
       expect(routines.all().map((r) => r.id), [routine.id]);
       expect(routines.note(routine)?.isTrashed, isTrue);
       expect(planned(), {routine.id});
@@ -585,14 +599,14 @@ void main() {
       expect(routines.note(routine), isNull);
     });
 
-    test('No, then the Note comes back: the Routines were never away', () {
+    test('a Note left without its Routines comes back: they were never '
+        'away, and its next deletion takes them along', () {
       final pills = notes.capture('pills');
       final routine = routines.spawn(pills.id, daily([at(20)]));
-      routines.trashNote(pills.id, withRoutines: false);
+      notes.trash(pills.id);
       routines.restoreNote(pills.id);
       expect(routines.note(routine)?.isTrashed, isFalse);
-      // A second deletion with Yes takes them along after all.
-      routines.trashNote(pills.id, withRoutines: true);
+      routines.trashNote(pills.id);
       expect(routines.all(), isEmpty);
     });
 
@@ -601,19 +615,19 @@ void main() {
       final merged = notes.capture('dentist Tuesday');
       final routine = routines.spawn(merged.id, daily([at(8)]));
       notes.merge(merged.id, target.id);
-      routines.trashNote(target.id, withRoutines: true);
+      routines.trashNote(target.id);
       expect(routines.all(), isEmpty);
       routines.restoreNote(target.id);
       expect(routines.ofNote(target.id).map((r) => r.id), [routine.id]);
     });
 
-    test('a merged Note\'s kept Routines link to the trashed target, then '
-        'to nothing', () {
+    test('a merged Note\'s Routines left behind before #262 link to the '
+        'trashed target, then to nothing', () {
       final target = notes.capture('dentist');
       final merged = notes.capture('dentist Tuesday');
       final routine = routines.spawn(merged.id, daily([at(8)]));
       notes.merge(merged.id, target.id);
-      routines.trashNote(target.id, withRoutines: false);
+      notes.trash(target.id);
       final note = routines.note(routine);
       expect(note?.id, target.id);
       expect(note?.isTrashed, isTrue);

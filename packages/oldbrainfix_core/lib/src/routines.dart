@@ -283,12 +283,13 @@ class Routines {
     store.batch(() => _untrash(routine));
   }
 
-  /// Moves the Note [noteId] to the trash, and with [withRoutines] the
-  /// Routines and Reminders it spawned too, those of the Notes merged
-  /// into it included: they come back with it ([restoreNote]). Without,
-  /// they stay and link back to a Note in the trash.
-  void trashNote(String noteId, {required bool withRoutines}) {
-    final routines = withRoutines ? ofNote(noteId) : const <Routine>[];
+  /// Moves the Note [noteId] to the trash with the Routines and
+  /// Reminders it spawned, those of the Notes merged into it included:
+  /// they come back with it ([restoreNote]). A Note never leaves a
+  /// Routine behind (#262); one is kept only by moving it off the Note
+  /// first.
+  void trashNote(String noteId) {
+    final routines = ofNote(noteId);
     store.batch(() {
       Notes(store).trash(noteId);
       // The same moment as the Note's, so both are purged together.
@@ -380,7 +381,7 @@ class Routines {
         markDone(id, occurrence, at: at);
         final note = _trashedWhenDone(_require(id));
         if (note == null) return false;
-        trashNote(note.id, withRoutines: true);
+        trashNote(note.id);
         return true;
       });
 
