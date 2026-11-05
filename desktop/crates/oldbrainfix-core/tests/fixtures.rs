@@ -6895,6 +6895,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         self, BlockKind, Change, SpanKind, code_block, indent, link, may_open, table, toggle,
         toggle_line,
     };
+    use table::Align;
     let fixture = read_json(&fixtures().join("markdown.json"))?;
     let cases = fixture["cases"].as_array().ok_or("cases")?;
     assert!(cases.len() >= 15);
@@ -7056,6 +7057,14 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "deleteColumn" => table::delete_column(text, start, number("index")?),
             "moveRow" => table::move_row(text, start, number("from")?, number("to")?),
             "moveColumn" => table::move_column(text, start, number("from")?, number("to")?),
+            "setAlign" => {
+                let name = edit["align"].as_str().ok_or("align")?;
+                let align = [Align::None, Align::Left, Align::Center, Align::Right]
+                    .into_iter()
+                    .find(|a| a.name() == name)
+                    .ok_or("an align")?;
+                table::set_align(text, start, number("column")?, align)
+            }
             "headingColumn" => table::toggle_heading_column(text, start),
             "insertTable" => table::insert(text, start),
             op => return Err(format!("an op: {op}").into()),

@@ -208,6 +208,24 @@ abstract final class MarkdownTables {
         return true;
       });
 
+  /// [text] with the column [column] of the table at [at] lining up its
+  /// cells as [align] says; a column that lines up so already gives the
+  /// text as it was.
+  static MarkdownChange setAlign(
+    String text,
+    int at,
+    int column,
+    MarkdownAlign align,
+  ) => _change(text, at, (grid) {
+    if (column < 0 ||
+        column >= grid.aligns.length ||
+        grid.aligns[column] == align) {
+      return false;
+    }
+    grid.aligns[column] = align;
+    return true;
+  });
+
   /// [text] with the row [row] of the table at [at] deleted; the header
   /// row's going makes the next row the header row, and the last row's
   /// going takes the table with it.

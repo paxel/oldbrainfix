@@ -461,32 +461,6 @@ fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
 }
 
 #[test]
-fn a_table_of_add_to_note_is_edited_full_screen_and_goes_back_into_the_field() -> TestResult {
-    let (store, note) = with_note("Shop", "plain")?;
-    let mut harness = editor(&store, &note);
-    amend_format(&mut harness, "Table")?;
-    assert!(harness.state().shown_table().is_some());
-    harness.event(egui::Event::Text("Item".into()));
-    harness.run();
-    harness.key_press(Key::Enter);
-    harness.run();
-    // Its arrow back, "Close", over the Note dialog's cross, leaves it.
-    harness
-        .query_all_by_role_and_label(Role::Button, "Close")
-        .last()
-        .ok_or("the arrow back")?
-        .click_accesskit();
-    harness.run();
-    assert!(harness.state().shown_table().is_none());
-    let added = amend_field(&harness).ok_or("the Amend field")?;
-    assert!(added.starts_with("| Item |  |\n| --- | --- |"), "{added}");
-    // Nothing of it in the Note until it is added.
-    assert_eq!(stored(&store, &note)?, ("Shop".into(), "plain".into()));
-    assert!(Notes::new(&store).sections(&note)?.is_empty());
-    Ok(())
-}
-
-#[test]
 fn the_text_fields_have_a_name_once_they_hold_text() -> TestResult {
     let (store, note) = with_note("buy milk", "plain")?;
     let mut harness = editor(&store, &note);

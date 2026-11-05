@@ -37,7 +37,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::backup;
 use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
@@ -1326,7 +1326,7 @@ fn texts_scene(
 /// The frames of the page "Formatted text, Transcripts and Photo Texts"
 /// (#175), in `texts`' words, `language` and `theme`: the boiler's service
 /// being edited under the format bar, the script's Text format, the meter
-/// readings full screen, a box's History, a #tag's and a word's search,
+/// readings edited as a grid in the Note dialog (#257), a box's History, a #tag's and a word's search,
 /// the receipt's Photo Text, the voice note's Transcript with its buttons
 /// and the speech model in the Settings.
 fn texts_frames(
@@ -1353,12 +1353,28 @@ fn texts_frames(
         ("table", |harness, notes, _| {
             harness.state_mut().select_note(&notes.meters);
             harness.run();
-            let open = harness.state().t().table_open().to_string();
+            let (open, cell) = {
+                let t = harness.state().t();
+                (t.table_open().to_string(), t.table_cell(3, "C"))
+            };
             harness
                 .query_all_by_role_and_label(Role::Button, &open)
                 .last()
                 .ok_or("the table's Open the table")?
                 .click_accesskit();
+            harness.run();
+            // February's water, edited in place in the grid.
+            harness
+                .query_all_by_role(Role::Button)
+                .find(|n| {
+                    n.accesskit_node()
+                        .label()
+                        .is_some_and(|l| l.starts_with(&cell))
+                })
+                .ok_or("the cell of February's water")?
+                .click();
+            harness.run();
+            harness.remove_cursor();
             harness.run();
             Ok(())
         }),

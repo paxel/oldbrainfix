@@ -14,6 +14,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Geändert
 
+- Auf dem Telefon und dem Desktop wird eine Tabelle in einem formatierten Text, auch eine eingefügte, direkt im Notiz-Editor bearbeitet, Zelle für Zelle, statt als ihre `|`-Zeilen oder im Vollbild. Ein Tippen oder Klicken auf eine Zelle bearbeitet sie an Ort und Stelle; Tab, Umschalt+Tab, Eingabe und die Pfeiltasten wechseln zwischen den Zellen und in die Tabelle hinein und wieder hinaus. „+“ fügt eine Reihe oder Spalte hinzu, und die Nummer einer Reihe oder der Buchstabe einer Spalte öffnet ein Menü, um sie einzufügen, zu verschieben und zu löschen und eine Spalte links, zentriert oder rechts auszurichten. Am Desktop lassen sich die Breiten der Spalten ziehen; sie werden nicht gespeichert. Jede Änderung wird als die Markdown-Zeilen der Tabelle zurückgeschrieben, und „Als Zeilen zeigen“ zeigt sie, um sie als Text zu bearbeiten, bis „Als Tabelle zeigen“.
 - Die Hilfe-Checkliste „Schnellstart“ sagt bei jedem Schritt, wo und wie: Jede Zeile nennt die Stelle auf dem Telefon und worauf du tippst, etwa „Tippe unten rechts in der Agenda auf das runde +, dann auf Text, schreib einen Gedanken und tippe auf 1 Std.“ Ihre Beschreibung unter dem Namen nennt für jeden Schritt den Weg auf dem Desktop: die Menüs, Tasten, das Ziehen und den Rechtsklick. Ein Schnellstart, den 0.4.0 angelegt hat, behält seine Worte.
 
 ### Behoben

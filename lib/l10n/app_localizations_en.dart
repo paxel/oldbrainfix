@@ -4680,6 +4680,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'The words in its cells are deleted from the Note.';
 
   @override
+  String get tableAlignLeft => 'Align left';
+
+  @override
+  String get tableAlignCenter => 'Centre';
+
+  @override
+  String get tableAlignRight => 'Align right';
+
+  @override
+  String get tableShowLines => 'Show as lines';
+
+  @override
+  String get tableShowGrid => 'Show as table';
+
+  @override
+  String tableCell(int number, String letter) {
+    return 'Row $number, column $letter';
+  }
+
+  @override
   String get pairCodeNeedsUpdate =>
       'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.';
 

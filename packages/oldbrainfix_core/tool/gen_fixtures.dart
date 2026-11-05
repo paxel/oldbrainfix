@@ -8183,6 +8183,22 @@ Map<String, Object?> _markdown() {
       'index': index,
     }, (at) => MarkdownTables.deleteColumn(grid, at, index));
   }
+  for (final (column, align) in [
+    (0, MarkdownAlign.center),
+    (1, MarkdownAlign.none),
+    (0, MarkdownAlign.left),
+    (1, MarkdownAlign.right),
+    (2, MarkdownAlign.left),
+  ]) {
+    tableEdit('setAlign', grid, 5, {
+      'align': align.name,
+      'column': column,
+    }, (at) => MarkdownTables.setAlign(grid, at, column, align));
+  }
+  tableEdit('setAlign', flagged, 40, {
+    'align': MarkdownAlign.right.name,
+    'column': 1,
+  }, (at) => MarkdownTables.setAlign(flagged, at, 1, MarkdownAlign.right));
   for (final (from, to) in [(0, 2), (2, 0), (1, 1), (0, 3)]) {
     tableEdit('moveRow', grid, 5, {
       'from': from,

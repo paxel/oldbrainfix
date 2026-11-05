@@ -73,6 +73,7 @@ pub mod store_needs_update;
 pub mod sync_line;
 pub mod sync_view;
 pub mod system_theme;
+pub mod table_grid;
 pub mod table_view;
 pub mod tally_page;
 pub mod tally_unit_match;

@@ -22057,6 +22057,84 @@
       }
     },
     {
+      "align": "center",
+      "column": 0,
+      "op": "setAlign",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 52,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-: | --: |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "align": "none",
+      "column": 1,
+      "op": "setAlign",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 52,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --- |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "align": "left",
+      "column": 0,
+      "op": "setAlign",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "align": "right",
+      "column": 1,
+      "op": "setAlign",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "align": "left",
+      "column": 2,
+      "op": "setAlign",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "align": "right",
+      "column": 1,
+      "op": "setAlign",
+      "start": 40,
+      "end": 40,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 54,
+        "start": 0,
+        "text": "<!-- first column headings -->\n| 🧠 | ü |\n| --- | --: |\n\n# next"
+      }
+    },
+    {
       "from": 0,
       "to": 2,
       "op": "moveRow",

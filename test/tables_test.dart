@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/table_grid.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
@@ -475,9 +476,8 @@ void main() {
   });
 
   group('the bar of formats', () {
-    testWidgets('puts a new table at the cursor and edits its first cell', (
-      tester,
-    ) async {
+    testWidgets('puts a new table at the cursor and edits its first cell '
+        'in its grid (#257)', (tester) async {
       tester.view.physicalSize = const Size(1000, 1600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -511,42 +511,36 @@ void main() {
       expect(formatted, 1);
       expect(controller.markdown, isTrue);
       expect(controller.text, 'Shop\n\n|  |  |\n| --- | --- |\n|  |  |');
-      expect(find.byType(TableScreen), findsOneWidget);
+      expect(find.byType(TableScreen), findsNothing);
+      // In the field it is drawn as its grid, its first cell edited.
       expect(
         find.descendant(
-          of: key('cell-0-0'),
-          matching: find.byType(TwoRowTextField),
+          of: find.byType(EditableText).first,
+          matching: find.byType(TableGrid),
         ),
         findsOneWidget,
       );
-      await tester.enterText(find.byType(TextField).last, 'Item');
-      await tester.pageBack();
+      final cell = find.descendant(
+        of: key('grid-cell-0-0'),
+        matching: find.byType(TextField),
+      );
+      expect(cell, findsOneWidget);
+      await tester.enterText(cell, 'Item');
       await tester.pumpAndSettle();
       expect(controller.text, 'Shop\n\n| Item |  |\n| --- | --- |\n|  |  |');
-      // In the field it is drawn as its grid, its source as nothing.
+
+      // A tap on another cell edits that one; the field's cursor stays.
+      final cursor = controller.selection;
+      await tester.tap(key('grid-cell-1-1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsNothing);
       expect(
         find.descendant(
-          of: find.byType(EditableText),
-          matching: find.byType(Table),
+          of: key('grid-cell-1-1'),
+          matching: find.byType(TextField),
         ),
         findsOneWidget,
       );
-      // At a table the button opens it.
-      controller.selection = const TextSelection.collapsed(offset: 8);
-      await tester.pumpAndSettle();
-      await tester.tap(key('format-table'));
-      await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsOneWidget);
-      expect(find.text('Item'), findsOneWidget);
-
-      // So does a tap on it in the field; the cursor stays.
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsNothing);
-      final cursor = controller.selection;
-      await tester.tap(find.text('Item').first, warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsOneWidget);
       expect(controller.selection, cursor);
     });
   });
@@ -617,8 +611,9 @@ void main() {
     }
 
     for (final twoRows in [true, false]) {
-      testWidgets('a table is its grid, scaled to the field, its source '
-          'never drawn (${twoRows ? 'two rows' : 'plain'})', (tester) async {
+      testWidgets('a table is its grid, its cells at a readable size and '
+          'moving sideways, its source never drawn '
+          '(${twoRows ? 'two rows' : 'plain'})', (tester) async {
         await pumpField(
           tester,
           'Readings\n\n${wide(headings: true)}\n\nDone',
@@ -626,14 +621,22 @@ void main() {
           width: 300,
         );
         final grid = find.descendant(
-          of: find.byType(EditableText),
-          matching: find.byType(Table),
+          of: find.byType(EditableText).first,
+          matching: find.byType(TableGrid),
         );
         expect(grid, findsOneWidget);
-        expect(tester.widget<Table>(grid).border, isNotNull);
+        // Not made smaller to fit: it moves sideways in the field.
         expect(
-          tester.getSize(find.byType(FittedBox).first).width,
+          find.descendant(of: grid, matching: find.byType(FittedBox)),
+          findsNothing,
+        );
+        expect(
+          tester.getSize(key('table-grid-sideways')).width,
           lessThanOrEqualTo(300),
+        );
+        expect(
+          tester.getSize(key('grid-cell-1-1')).width,
+          greaterThanOrEqualTo(TableScreen.narrowest),
         );
         final shown = drawn(tester).join();
         expect(shown, contains('Readings'));
@@ -644,26 +647,15 @@ void main() {
       });
     }
 
-    testWidgets('a tap on it in the plain field opens it full screen and '
-        'its change comes back into the field', (tester) async {
+    testWidgets('a tap on a cell in the plain field edits it in place, '
+        'its change written into the field', (tester) async {
       final controller = await pumpField(tester, shop, twoRows: false);
-      await tester.tap(find.text('oat').first, warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsOneWidget);
-      await tester.tap(key('cell-2-0'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).last, 'oats');
-      await tester.pageBack();
+      await tester.tap(key('grid-cell-2-0'));
       await tester.pumpAndSettle();
       expect(find.byType(TableScreen), findsNothing);
+      await tester.enterText(find.byType(TextField).last, 'oats');
+      await tester.pumpAndSettle();
       expect(controller.text, contains('| oats | 1 |'));
-      expect(
-        find.descendant(
-          of: find.byType(EditableText),
-          matching: find.text('oats'),
-        ),
-        findsOneWidget,
-      );
       final table = tableOf(controller);
       expect(controller.selection.isCollapsed, isTrue);
       expect([
@@ -694,13 +686,8 @@ void main() {
         isEmpty,
       );
 
-      await tester.tap(key('two-row-forward'));
-      await tester.pump();
-      expect(controller.selection.baseOffset, table.end);
-      expect(key('two-row-table'), findsOneWidget);
-      await tester.tap(key('two-row-back'));
-      await tester.pump();
-      expect(controller.selection.baseOffset, table.start);
+      // ◀ from before it goes on in the text; ▶ goes into its grid
+      // (#257).
       await tester.tap(key('two-row-back'));
       await tester.pump();
       expect(controller.selection.baseOffset, table.start - 1);
@@ -721,7 +708,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the arrow keys pass it as one block', (tester) async {
+    testWidgets('Shift and an arrow key select past it as one block', (
+      tester,
+    ) async {
       final controller = await pumpField(
         tester,
         '$shop\n\nBread',
@@ -730,12 +719,16 @@ void main() {
       final table = tableOf(controller);
       controller.selection = TextSelection.collapsed(offset: table.end);
       await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
       await tester.pump();
-      expect(controller.selection.baseOffset, table.start);
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await tester.pump();
-      expect(controller.selection.baseOffset, table.end);
+      expect(
+        controller.selection,
+        TextSelection(baseOffset: table.end, extentOffset: table.start),
+      );
+      expect(find.byType(TableGrid), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
     });
 
     testWidgets('typing right before or after it goes on a line of its own', (
@@ -907,30 +900,55 @@ void main() {
           as TagTextController;
     }
 
-    /// The table button with the cursor at [cursor]: the table it opens
-    /// is the one in the text there, [cell] being edited.
+    /// The table button with the cursor at [cursor], in the Note's text:
+    /// the table it goes into or puts in is edited in its grid in the
+    /// field (#257), its first cell being edited; the words typed there
+    /// are [typed].
     Future<void> tableButton(
       WidgetTester tester,
       TagTextController field,
       int cursor, {
-      bool editing = true,
+      String? typed,
     }) async {
+      // The cursor back in the Note's text.
+      tester
+          .widget<TextField>(find.byType(TextField).first)
+          .focusNode
+          ?.requestFocus();
+      await tester.pumpAndSettle();
       field.selection = TextSelection.collapsed(offset: cursor);
       await tester.pumpAndSettle();
       await tester.tap(key('format-table'));
       await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsOneWidget);
-      expect(key('cell-0-0'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: key('cell-0-0'),
-          matching: find.byType(TwoRowTextField),
-        ),
-        editing ? findsOneWidget : findsNothing,
+      expect(find.byType(TableScreen), findsNothing);
+      final cell = find.descendant(
+        of: key('grid-cell-0-0'),
+        matching: find.byType(TextField),
       );
+      expect(cell, findsOneWidget);
+      if (typed != null) {
+        tester.testTextInput.updateEditingValue(
+          TextEditingValue(
+            text: typed,
+            selection: TextSelection.collapsed(offset: typed.length),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
     }
 
-    testWidgets('the table button opens the table it put in, also where '
+    /// The words of the cell being edited.
+    String editedCell(WidgetTester tester) => tester
+        .widget<TextField>(
+          find.descendant(
+            of: find.byType(TableGrid),
+            matching: find.byType(TextField),
+          ),
+        )
+        .controller!
+        .text;
+
+    testWidgets('the table button edits the table it put in, also where '
         'keeping the first format gives a new box its id (#154)', (
       tester,
     ) async {
@@ -942,24 +960,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(field.text, 'Milk☐');
 
-      await tableButton(tester, field, field.text.length);
-      await tester.enterText(find.byType(TextField).last, 'Item');
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(find.byType(TableScreen), findsNothing);
+      await tableButton(tester, field, field.text.length, typed: 'Item');
       expect(field.markdown, isTrue);
       expect(field.text, contains('| Item |  |'));
 
-      // In that table the button opens it, the words there.
-      await tableButton(
-        tester,
-        field,
-        field.text.indexOf('Item'),
-        editing: false,
-      );
-      expect(find.text('Item'), findsOneWidget);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      // In that table the button goes into it, the words there.
+      await tableButton(tester, field, field.text.indexOf('Item'));
+      expect(editedCell(tester), 'Item');
 
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -970,7 +977,7 @@ void main() {
       expect(note.shownText, contains('| Item |  |'));
     });
 
-    testWidgets('in a formatted Note the table button opens the table it '
+    testWidgets('in a formatted Note the table button edits the table it '
         'put in after a new box, and a second one beside the first', (
       tester,
     ) async {
@@ -983,23 +990,20 @@ void main() {
       await tester.tap(key('two-row-insert-box'));
       await tester.pumpAndSettle();
 
-      await tableButton(tester, field, field.text.length);
-      await tester.enterText(find.byType(TextField).last, 'Second');
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await tableButton(tester, field, field.text.length, typed: 'Second');
       expect(field.text, contains('| Second |  |'));
+      expect(find.byType(TableGrid), findsNWidgets(2));
 
-      // The first table opens on itself.
-      await tableButton(
-        tester,
-        field,
-        field.text.indexOf('Item'),
-        editing: false,
+      // The first table is gone into itself.
+      await tableButton(tester, field, field.text.indexOf('Item'));
+      expect(editedCell(tester), 'Item');
+      expect(
+        find.descendant(
+          of: find.byType(TableGrid).first,
+          matching: find.byType(TextField),
+        ),
+        findsOneWidget,
       );
-      expect(find.text('Qty'), findsOneWidget);
-      expect(find.text('Second'), findsNothing);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
 
       await tester.pageBack();
       await tester.pumpAndSettle();

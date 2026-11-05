@@ -118,14 +118,24 @@ pub struct TableSpot {
     pub rect: Rect,
 }
 
+/// A cell of a table of a formatted text as it is drawn: the table's
+/// [`TableSpot::at`], the cell's row and column, and where it lies.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CellSpot {
+    pub at: usize,
+    pub cell: (usize, usize),
+    pub rect: Rect,
+}
+
 /// The boxes, the tags, the links and the tables of a text as it is
-/// drawn.
+/// drawn, and the tables' cells.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spots {
     pub boxes: Vec<BoxSpot>,
     pub tags: Vec<TagSpot>,
     pub links: Vec<LinkSpot>,
     pub tables: Vec<TableSpot>,
+    pub cells: Vec<CellSpot>,
 }
 
 impl Spots {
@@ -135,6 +145,17 @@ impl Spots {
         self.tags.extend(other.tags);
         self.links.extend(other.links);
         self.tables.extend(other.tables);
+        self.cells.extend(other.cells);
+    }
+
+    /// The cell of the table at `at` drawn under `pos`, by row and
+    /// column.
+    pub fn cell_at(&self, at: usize, pos: Option<Pos2>) -> Option<(usize, usize)> {
+        let pos = pos?;
+        self.cells
+            .iter()
+            .find(|spot| spot.at == at && spot.rect.contains(pos))
+            .map(|spot| spot.cell)
     }
 }
 
@@ -1030,6 +1051,11 @@ fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &
             let left = aligned(align, width, words.x, pad.x);
             let pos = egui::pos2(x + left, y + pad.y);
             spots.extend(cell.paint(&mut cells, pos, scaled.colour, true));
+            spots.cells.push(CellSpot {
+                at: table.start,
+                cell: (r, c),
+                rect: at,
+            });
             if ui.is_rect_visible(at) {
                 ui.painter()
                     .rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
@@ -1120,6 +1146,7 @@ fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
             })
             .collect(),
         tables: Vec::new(),
+        cells: Vec::new(),
     }
 }
 

@@ -449,7 +449,8 @@ replace a law of Both apps where they say so. A desktop law marked
   strike-through, two headings, bullets, numbers, quote, link, code,
   code block (on the lines touched, or taking a block's fences off), in
   and out, each on the selection or the word at the cursor, and table,
-  which puts a new table at the cursor or opens the one it is in. On the phone
+  which puts a new table at the cursor and edits its first cell, or goes
+  into the one at the cursor. On the phone
   it sits directly above the bottom row while the keyboard is open, and
   the buttons without room go into ⋮ at its end, opening at the finger.
   On the desktop it sits above the field, which shows a formatted text's
@@ -458,7 +459,26 @@ replace a law of Both apps where they say so. A desktop law marked
 - **In Simple there is no format bar** (#197): no ☐ and no formats
   over any field, while a field's own buttons, such as a Line's in and
   out, stay. Typed and pasted Markdown still formats, a formatted text
-  shows formatted and a table still opens.
+  shows formatted and a table is still edited as its grid, with its +,
+  menus and Show as lines.
+- **In the editor a table is edited as its grid** (#257), on both apps,
+  pasted tables included: a tap or click on a cell edits it in place;
+  Tab and Shift+Tab go to the next and previous cell row by row, Enter
+  to the cell below, and the arrow keys at a cell's edge to the cell
+  beside it, past the grid's edge into the text before or after it; the
+  arrow keys from the text go into it. "+" after the last row and after
+  the last column adds one. A row's number and a column's letter open
+  its menu: insert, move, delete (asking once while it holds words; the
+  last one deletes the table), for a column Align left, Centre and Align
+  right, and for the first column First column as headings. While a
+  cell is edited, the format bar, where the field has one, holds only ☐,
+  bold, italic, strike-through, link and code, on the cell's words.
+  Every change writes the table's lines anew (ADR 0033); the Markdown
+  stays the source. **Show as lines** on the grid shows that table's
+  lines as text until the cursor leaves them, the field loses focus or
+  Show as table is pressed. Column widths are the view's only, never
+  stored. Cards and texts that are only read show the grid and open the
+  table full screen.
 - **A Code text has no format bar and no ☐** (#213): the field shows it
   in the fixed-width font on the grey ground of code, unwrapped, and it
   moves sideways. **A paste that looks like code** into a Plain Note's
@@ -654,7 +674,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
-  sideways, as its bar does, and a Code text in the Note editor (#213),
+  sideways, as its bar does, a table wider than the editor's field
+  (#257), which a drag on it moves sideways, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
   off at the edge instead.
 
@@ -828,12 +849,16 @@ replace a law of Both apps where they say so. A desktop law marked
   end.
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
-- **On the phone a table in the field is its grid**, the same as on the
-  card, never its Markdown; a tap opens it full screen. It is one block:
-  the cursor and a selection never end inside it, the bottom row shows
-  it as a table's sign, what is typed right before or after it goes on
-  a line of its own, and deleting any of it deletes all of it, asking
-  first while its cells hold words.
+- **On the phone a table in the field is its grid**, never its
+  Markdown, edited in place (see "In the editor a table is edited as
+  its grid"); a grid wider than the field moves sideways with a drag
+  on it. For the text around it, it is one block: the cursor and a
+  selection never end inside its lines, ◀ and ▶ go into its first or
+  last cell, what is typed right before or after it goes on a line of
+  its own, and deleting any of it deletes all of it, asking first while
+  its cells hold words. While a cell is edited the bottom row is hidden,
+  the cell's own field shows its words, and Show as table sits on the
+  bar above the keyboard while the cursor is in a table shown as lines.
 
 ### Checklist and Shopping List Lines
 
@@ -1054,7 +1079,9 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Text editor and Lines
 
 - The desktop keeps its own field, not the phone's two rows. The
-  desktop's field shows a table's Markdown.
+  desktop's field shows a formatted text's Markdown, except a table,
+  which it shows as its grid (see "In the editor a table is edited as
+  its grid"), whose column widths are dragged at their borders.
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.

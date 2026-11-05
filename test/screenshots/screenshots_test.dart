@@ -60,7 +60,6 @@ import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
-import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -1755,14 +1754,23 @@ void main() {
             await formattedNotes(tester);
             final meters = cardText(texts.meters);
             await scrollTo(tester, meters);
-            final table = find.descendant(
-              of: meters.first,
-              matching: find.byWidgetPredicate(
-                (w) => w is GestureDetector && '${w.key}'.contains('table-'),
-              ),
+            await tester.longPress(meters.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            // The keyboard up, drawn as nothing: a cell of the table is
+            // edited in its grid in the text (#257), the bar of its words'
+            // formats above the keyboard.
+            await tester.showKeyboard(find.byType(TextField).first);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 1);
+            addTearDown(tester.view.resetViewInsets);
+            await tester.pumpAndSettle();
+            final cell = find.byKey(const ValueKey('grid-cell-1-1'));
+            await _tap(tester, cell);
+            expect(
+              find.descendant(of: cell, matching: find.byType(TextField)),
+              findsOneWidget,
             );
-            await _tap(tester, table.first);
-            expect(find.byType(TableScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('format-bar')), findsOneWidget);
           });
 
           boxFrame(texts175, 'box', (tester) async {

@@ -6,7 +6,7 @@
 </p>
 <p id="on-the-desktop">
   The desktop app does the same with the mouse and the keyboard. A Note opens in the Note dialog
-  with a double-click on its card; the format bar sits above the text field; a table full screen
+  with a double-click on its card; the format bar sits above the text field; a table in the text
   takes Tab and Shift+Tab to the next and the previous cell; and the search field sits above the
   list of Notes. The details of each box say where the desktop differs.
 </p>
@@ -63,7 +63,7 @@
   word at the cursor when nothing is selected; the line formats work on every line the selection
   touches. A button shows highlighted while the cursor is in its format. A second tap takes the
   format off again, except for <strong>Link</strong>, which asks for the address again, and
-  <strong>Table</strong>, which opens the table; <strong>Indent list item</strong> and
+  <strong>Table</strong>, which goes into the table; <strong>Indent list item</strong> and
   <strong>Move list item out</strong> each move the item one way.
 </p>
 <p>
@@ -125,7 +125,7 @@
   <li>The format bar sits above the text field of the Note dialog, with the same buttons; each shows its name as a tooltip. Buttons that find no room go onto a further line. Ctrl+B and Ctrl+I are bold and italic while typing.</li>
   <li>A right-click on words selected in a formatted text offers the format bar's <strong>Bold</strong>, <strong>Italic</strong>, <strong>Code</strong>, <strong>Link</strong> and <strong>Code block</strong> for them, below Cut, Copy, Paste and Select all.</li>
   <li>A formatted text shows as it reads; a click on it edits its Markdown, the marks dimmed. Leaving the field or Ctrl+Enter saves it.</li>
-  <li>Add to Note has the format bar too, without ☐, which only the Note's text puts in; a table edited from it full screen goes back into the field, and nothing is kept before <strong>Add to Note</strong>.</li>
+  <li>Add to Note has the format bar too, without ☐, which only the Note's text puts in; a table in it is edited in the field as in the Note editor, and nothing is kept before <strong>Add to Note</strong>.</li>
   <li><strong>Link</strong> opens a dialog with the same field; Enter or <strong>Set link</strong> takes it. A click on a link opens it in the browser or the mail program; the mouse over it shows its address. A web address written into a text opens on a click too.</li>
 </ul>
 </box-more>
@@ -170,57 +170,56 @@
 <guide-box name="table">
 <h2>Put a table in a Note</h2>
 <p>Keep rows and columns, such as meter readings, in a Note's text.</p>
-<box-tab device="phone" alt="A table of meter readings full screen, its first column as headings, the bar to move it sideways above it">
+<box-tab device="phone" alt="The Note editor with a table in the Note's text; one cell is being typed into, and the bar above the keyboard holds the formats for its words">
 <li>Long-press the Note's card.</li>
 <li>Tap where the table should go.</li>
 <li>Tap <strong>Table</strong> on the format bar.</li>
-<li>Type into each cell.</li>
-<li>Tap Back.</li>
+<li>Type into each cell; ↵ goes to the cell below.</li>
+<li>Tap <strong>Save</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="A table of meter readings full screen over the window, its first column as headings">
+<box-tab device="desktop" alt="The meter readings edited as a table in the Note dialog: numbered rows, lettered columns, and February's water cell being typed into">
 <li>Double-click the Note's card.</li>
 <li>Click where the table should go.</li>
 <li>Click <strong>Table</strong> above the text.</li>
 <li>Type into each cell; press Tab for the next.</li>
-<li>Click the arrow at the top.</li>
+<li>Click <strong>Save</strong>.</li>
 </box-tab>
 <box-more>
 <p>
-  In the text, a table is drawn as a grid, made smaller to fit the width, its header row in bold. A
-  tap on it opens it full screen. <strong>Table</strong> in the format bar opens the table the cursor
-  is in; elsewhere it puts a new table at the cursor, two empty columns with a header row and one
-  more row, on lines of their own, and opens it with its first cell being edited.
+  In the Note editor a table is edited right in the text, with its rows numbered and its columns
+  lettered, pasted Markdown tables too. <strong>Table</strong> in the format bar puts a new table at
+  the cursor, two empty columns with a header row and one more row, on lines of their own, and
+  edits its first cell.
 </p>
 <ul>
-  <li>Full screen, the header row stays on screen while the rows scroll up and down, and so does the first column while it holds headings. A table wider than the screen moves sideways with a one-finger drag on its cells or by the bar above it, <strong>Move the table sideways</strong>; this is the only place where a sideways swipe does not go back or forward.</li>
-  <li>A tap on a cell edits it in place, framed, with the format bar of ☐, bold, italic, strike-through, link and code. A cell holds one line; ↵, a tap on another cell or on the space around the table, or Back writes it.</li>
-  <li>A tap or long press on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong> at the finger; a column's letter opens <strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>, <strong>Move left</strong>, <strong>Move right</strong> and <strong>Delete column</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
-  <li>The empty row under the table (+) and the empty column beside it add a row or column once words are written into them.</li>
+  <li>A tap or click on a cell edits it in place. Tab and Shift+Tab go to the next and the previous cell row by row, ↵ to the cell below, and the arrow keys at a cell's edge to the cell beside it. Past the first or the last cell the cursor goes into the text before or after the table, and the arrow keys (on the phone also ◀ and ▶) go from the text into it.</li>
+  <li>While a cell is edited, the format bar holds ☐, bold, italic, strike-through, link and code for its words. A cell holds one line.</li>
+  <li><strong>+</strong> under the last row and beside the last column adds a row or a column.</li>
+  <li>A tap or click on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong>; a column's letter opens <strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>, <strong>Move left</strong>, <strong>Move right</strong>, <strong>Delete column</strong>, <strong>Align left</strong>, <strong>Centre</strong> and <strong>Align right</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
   <li>Deleting a row or column that holds words asks once, "Delete this row?" or "Delete this column?": "The words in its cells are deleted from the Note." Deleting the last row or column deletes the table, and asks "Delete the table?".</li>
+  <li><strong>Show as lines</strong> shows the table's Markdown lines to edit them as text; <strong>Show as table</strong>, the cursor leaving the lines or leaving the field shows the table again.</li>
 </ul>
 <p>
-  On the phone, the fields of a formatted text show a table as the same grid, never as its
-  Markdown; a tap on it opens it full screen, and what changes there comes back into the field. The
-  cursor passes a table as one block: ◀, ▶ and the arrow keys go from right before it to right after
-  it, and the row above the keyboard shows it as a table sign. What is typed right before a table
-  goes on a line of its own, and what is typed right after it goes under it with a blank line
-  between. Backspace right after a table, or deleting a selection that holds one, deletes the whole
-  table, and asks first while its cells hold words.
+  For the text around it, a table is one block: what is typed right before it goes on a line of
+  its own, and what is typed right after it goes under it with a blank line between. Backspace right
+  after a table, or deleting a selection that holds one, deletes the whole table, and asks first
+  while its cells hold words. On the phone a table wider than the field moves sideways with a drag
+  on it, and the row above the keyboard is hidden while a cell is edited.
 </p>
 <p>
   Tables are written as GFM tables: each edit writes the whole table anew, every row as
-  <code>| a | b |</code>, and leaves the words in its cells as they were. On the desktop, a line
-  typed right under a table's Markdown, without a blank line between, becomes a row of it. Markdown
-  tables pasted in become tables. Where you may only read the Note, the table opens to read.
+  <code>| a | b |</code>, and leaves the words in its cells as they were. Markdown has no column
+  widths: on the desktop a column's border can be dragged to make it wider or narrower, and that
+  width is not kept. A line typed right under a table's Markdown, without a blank line between,
+  becomes a row of it.
 </p>
 <p>
-  On the desktop the field being edited shows a table's Markdown; the table opens full screen from
-  the text as it reads, with a click, or with <strong>Table</strong> while the cursor is in its
-  Markdown. Full screen it scrolls with the mouse wheel, Shift and the wheel, or the scroll bars. A
-  click on a cell edits its words, framed, without a format bar: Enter or a click elsewhere writes
-  them, Tab goes on to the next cell, Shift+Tab back, and Esc leaves the cell as it was. The rows'
-  numbers and the columns' letters open their menus on a click or a right-click. Alt+Left, the
-  mouse's back button, Esc or the arrow at the top leave the table.
+  On a card, and where you may only read the Note, a table is drawn as a grid made smaller to fit
+  the width, its header row in bold; a tap or click on it opens it full screen, to edit from the
+  card or only to read. Full screen, the header row stays on screen while the rows scroll, and so
+  does the first column while it holds headings; on the phone a table wider than the screen moves
+  sideways with a one-finger drag on its cells or by <strong>Move the table sideways</strong>. On
+  the desktop Alt+Left, the mouse's back button, Esc or the arrow at the top leave it.
 </p>
 </box-more>
 </guide-box>

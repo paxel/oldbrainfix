@@ -7,7 +7,7 @@
 </p>
 <p id="auf-dem-desktop">
   Die Desktop-App macht dasselbe mit Maus und Tastatur. Eine Notiz öffnet mit einem Doppelklick auf
-  ihre Karte im Notiz-Dialog; die Formatleiste sitzt über dem Textfeld; in einer Tabelle im Vollbild
+  ihre Karte im Notiz-Dialog; die Formatleiste sitzt über dem Textfeld; in einer Tabelle im Text
   gehen Tab und Umschalt+Tab zur nächsten und zur vorigen Zelle; und das Suchfeld sitzt über der
   Liste der Notizen. Die Details jedes Kastens sagen, wo der Desktop anders ist.
 </p>
@@ -67,7 +67,7 @@
   Auswahl oder, wenn nichts ausgewählt ist, auf das Wort am Cursor; die Zeilenformate wirken auf
   jede Zeile, die die Auswahl berührt. Eine Taste ist hervorgehoben, solange der Cursor in ihrem
   Format steht. Ein zweites Tippen nimmt das Format wieder weg, außer bei <strong>Link</strong>,
-  das wieder nach der Adresse fragt, und <strong>Tabelle</strong>, das die Tabelle öffnet;
+  das wieder nach der Adresse fragt, und <strong>Tabelle</strong>, das in die Tabelle geht;
   <strong>Listenpunkt einrücken</strong> und <strong>Listenpunkt ausrücken</strong> bewegen den
   Punkt jeweils in eine Richtung.
 </p>
@@ -135,7 +135,7 @@
   <li>Die Formatleiste sitzt über dem Textfeld des Notiz-Dialogs, mit denselben Tasten; jede zeigt ihren Namen als Tooltip. Tasten, die keinen Platz finden, kommen in eine weitere Zeile. Strg+B und Strg+I sind beim Tippen fett und kursiv.</li>
   <li>Ein Rechtsklick auf Wörter, die in einem formatierten Text ausgewählt sind, bietet für sie die Tasten der Formatleiste <strong>Fett</strong>, <strong>Kursiv</strong>, <strong>Code</strong>, <strong>Link</strong> und <strong>Codeblock</strong> an, unter Ausschneiden, Kopieren, Einfügen und Alles auswählen.</li>
   <li>Ein formatierter Text erscheint so, wie er sich liest; ein Klick darauf bearbeitet sein Markdown, die Zeichen gedämpft. Das Feld zu verlassen oder Strg+Enter speichert ihn.</li>
-  <li>Zur Notiz hinzufügen hat die Formatleiste ebenfalls, ohne ☐, das nur der Text der Notiz einfügt; eine Tabelle, die von dort im Vollbild bearbeitet wird, geht zurück ins Feld, und vor <strong>Zur Notiz hinzufügen</strong> wird nichts gespeichert.</li>
+  <li>Zur Notiz hinzufügen hat die Formatleiste ebenfalls, ohne ☐, das nur der Text der Notiz einfügt; eine Tabelle darin wird im Feld bearbeitet wie im Notiz-Editor, und vor <strong>Zur Notiz hinzufügen</strong> wird nichts gespeichert.</li>
   <li><strong>Link</strong> öffnet einen Dialog mit demselben Feld; Enter oder <strong>Link setzen</strong> übernimmt es. Ein Klick auf einen Link öffnet ihn im Browser oder im Mailprogramm; die Maus darüber zeigt seine Adresse. Eine Webadresse in einem Text öffnet sich ebenfalls mit einem Klick.</li>
 </ul>
 </box-more>
@@ -182,61 +182,58 @@
 <guide-box name="table">
 <h2>Eine Tabelle in eine Notiz setzen</h2>
 <p>Halte Zeilen und Spalten, etwa Zählerstände, im Text einer Notiz fest.</p>
-<box-tab device="phone" alt="Eine Tabelle mit Zählerständen im Vollbild, ihre erste Spalte als Überschriften, darüber die Leiste zum seitlichen Verschieben">
+<box-tab device="phone" alt="Der Notiz-Editor mit einer Tabelle im Text der Notiz; in eine Zelle wird gerade getippt, und die Leiste über der Tastatur bietet die Formate für ihre Wörter">
 <li>Drücke lange auf die Karte der Notiz.</li>
 <li>Tippe dorthin, wo die Tabelle hin soll.</li>
 <li>Tippe <strong>Tabelle</strong> in der Formatleiste.</li>
-<li>Schreibe in jede Zelle.</li>
-<li>Tippe Zurück.</li>
+<li>Schreibe in jede Zelle; ↵ geht zur Zelle darunter.</li>
+<li>Tippe <strong>Speichern</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="Eine Tabelle mit Zählerständen im Vollbild über dem Fenster, ihre erste Spalte als Überschriften">
+<box-tab device="desktop" alt="Die Zählerstände im Notiz-Dialog als Tabelle bearbeitet: nummerierte Reihen, Spalten mit Buchstaben, und die Zelle für Februar beim Wasser wird gerade getippt">
 <li>Doppelklicke die Karte der Notiz.</li>
 <li>Klicke dorthin, wo die Tabelle hin soll.</li>
 <li>Klicke <strong>Tabelle</strong> über dem Text.</li>
 <li>Schreibe in jede Zelle; Tab geht zur nächsten.</li>
-<li>Klicke den Pfeil oben.</li>
+<li>Klicke <strong>Speichern</strong>.</li>
 </box-tab>
 <box-more>
 <p>
-  Im Text erscheint eine Tabelle als Raster, auf die Breite verkleinert, ihre Kopfzeile fett. Ein
-  Tippen darauf öffnet sie im Vollbild. <strong>Tabelle</strong> in der Formatleiste öffnet die
-  Tabelle, in der der Cursor steht; anderswo setzt sie eine neue Tabelle an den Cursor, zwei leere
-  Spalten mit einer Kopfzeile und einer weiteren Zeile, auf eigenen Zeilen, und öffnet sie mit ihrer
-  ersten Zelle in Bearbeitung.
+  Im Notiz-Editor wird eine Tabelle direkt im Text bearbeitet, ihre Reihen nummeriert und ihre
+  Spalten mit Buchstaben, auch eingefügte Markdown-Tabellen. <strong>Tabelle</strong> in der
+  Formatleiste setzt eine neue Tabelle an den Cursor, zwei leere Spalten mit einer Kopfreihe und
+  einer weiteren Reihe, auf eigenen Zeilen, und bearbeitet ihre erste Zelle.
 </p>
 <ul>
-  <li>Im Vollbild bleibt die Kopfzeile sichtbar, während die Zeilen hoch und runter rollen, und ebenso die erste Spalte, solange sie Überschriften enthält. Eine Tabelle, die breiter als der Bildschirm ist, bewegt sich seitwärts, wenn ein Finger über ihre Zellen zieht, oder über die Leiste über ihr, <strong>Tabelle seitlich verschieben</strong>; nur hier führt Wischen zur Seite nicht zurück oder weiter.</li>
-  <li>Ein Tippen auf eine Zelle bearbeitet sie an ihrem Platz, umrahmt, mit der Formatleiste für ☐, fett, kursiv, durchgestrichen, Link und Code. Eine Zelle hält eine Zeile; ↵, ein Tippen auf eine andere Zelle oder auf den Platz um die Tabelle oder Zurück schreibt sie.</li>
-  <li>Ein Tippen oder langes Drücken auf die Nummer einer Zeile öffnet am Finger <strong>Zeile darüber einfügen</strong>, <strong>Zeile darunter einfügen</strong>, <strong>Nach oben</strong>, <strong>Nach unten</strong> und <strong>Zeile löschen</strong>; der Buchstabe einer Spalte öffnet <strong>Spalte links einfügen</strong>, <strong>Spalte rechts einfügen</strong>, <strong>Nach links</strong>, <strong>Nach rechts</strong> und <strong>Spalte löschen</strong>, und bei Spalte A den Schalter <strong>Erste Spalte als Überschriften</strong>.</li>
-  <li>Die leere Zeile unter der Tabelle (+) und die leere Spalte daneben fügen eine Zeile oder Spalte hinzu, sobald Wörter in sie geschrieben werden.</li>
-  <li>Eine Zeile oder Spalte zu löschen, die Wörter enthält, fragt einmal nach, „Diese Zeile löschen?“ oder „Diese Spalte löschen?“: „Die Wörter in ihren Zellen werden aus der Notiz gelöscht.“ Die letzte Zeile oder Spalte zu löschen, löscht die Tabelle und fragt „Die Tabelle löschen?“.</li>
+  <li>Ein Tippen oder Klick auf eine Zelle bearbeitet sie an ihrem Platz. Tab und Umschalt+Tab gehen Reihe für Reihe zur nächsten und zur vorigen Zelle, ↵ zur Zelle darunter, und die Pfeiltasten am Rand einer Zelle zur Zelle daneben. Hinter der ersten oder der letzten Zelle geht der Cursor in den Text vor oder nach der Tabelle, und die Pfeiltasten (auf dem Handy auch ◀ und ▶) gehen aus dem Text in sie hinein.</li>
+  <li>Während eine Zelle bearbeitet wird, bietet die Formatleiste ☐, fett, kursiv, durchgestrichen, Link und Code für ihre Wörter. Eine Zelle hält eine Zeile.</li>
+  <li><strong>+</strong> unter der letzten Reihe und neben der letzten Spalte fügt eine Reihe oder eine Spalte hinzu.</li>
+  <li>Ein Tippen oder Klick auf die Nummer einer Reihe öffnet <strong>Zeile darüber einfügen</strong>, <strong>Zeile darunter einfügen</strong>, <strong>Nach oben</strong>, <strong>Nach unten</strong> und <strong>Zeile löschen</strong>; der Buchstabe einer Spalte öffnet <strong>Spalte links einfügen</strong>, <strong>Spalte rechts einfügen</strong>, <strong>Nach links</strong>, <strong>Nach rechts</strong>, <strong>Spalte löschen</strong>, <strong>Linksbündig</strong>, <strong>Zentriert</strong> und <strong>Rechtsbündig</strong>, und bei Spalte A den Schalter <strong>Erste Spalte als Überschriften</strong>.</li>
+  <li>Eine Reihe oder Spalte zu löschen, die Wörter enthält, fragt einmal nach, „Diese Zeile löschen?“ oder „Diese Spalte löschen?“: „Die Wörter in ihren Zellen werden aus der Notiz gelöscht.“ Die letzte Reihe oder Spalte zu löschen, löscht die Tabelle und fragt „Die Tabelle löschen?“.</li>
+  <li><strong>Als Zeilen zeigen</strong> zeigt die Markdown-Zeilen der Tabelle, um sie als Text zu bearbeiten; <strong>Als Tabelle zeigen</strong>, ein Cursor, der die Zeilen verlässt, oder das Verlassen des Felds zeigt wieder die Tabelle.</li>
 </ul>
 <p>
-  Auf dem Handy zeigen die Felder eines formatierten Texts eine Tabelle als dasselbe Raster, nie als
-  ihr Markdown; ein Tippen darauf öffnet sie im Vollbild, und was sich dort ändert, kommt
-  zurück ins Feld. Der Cursor überspringt eine Tabelle als einen Block: ◀, ▶ und die Pfeiltasten
-  gehen von direkt vor ihr nach direkt hinter sie, und die Zeile über der Tastatur zeigt sie als
-  Tabellenzeichen. Was direkt vor einer Tabelle getippt wird, kommt auf eine eigene Zeile, und was
-  direkt nach ihr getippt wird, kommt unter sie, mit einer Leerzeile dazwischen. Die Rücktaste
-  direkt nach einer Tabelle oder das Löschen einer Auswahl, die eine enthält, löscht die ganze
-  Tabelle und fragt vorher nach, solange ihre Zellen Wörter enthalten.
+  Für den Text um sie herum ist eine Tabelle ein Block: Was direkt vor ihr getippt wird, kommt auf
+  eine eigene Zeile, und was direkt nach ihr getippt wird, kommt unter sie, mit einer Leerzeile
+  dazwischen. Die Rücktaste direkt nach einer Tabelle oder das Löschen einer Auswahl, die eine
+  enthält, löscht die ganze Tabelle und fragt vorher nach, solange ihre Zellen Wörter enthalten. Auf
+  dem Handy bewegt sich eine Tabelle, die breiter als das Feld ist, seitwärts, wenn ein Finger über
+  sie zieht, und die Zeile über der Tastatur ist verborgen, während eine Zelle bearbeitet wird.
 </p>
 <p>
   Tabellen werden als GFM-Tabellen geschrieben: Jede Änderung schreibt die ganze Tabelle neu, jede
-  Zeile als <code>| a | b |</code>, und lässt die Wörter in ihren Zellen, wie sie waren. Auf dem
-  Desktop wird eine Zeile, die direkt unter das Markdown einer Tabelle getippt wird, ohne Leerzeile
-  dazwischen, eine Zeile von ihr. Eingefügte Markdown-Tabellen werden zu Tabellen. Wo du die Notiz
-  nur lesen darfst, öffnet sich die Tabelle zum Lesen.
+  Reihe als <code>| a | b |</code>, und lässt die Wörter in ihren Zellen, wie sie waren. Markdown
+  kennt keine Spaltenbreiten: Am Desktop lässt sich der Rand einer Spalte ziehen, um sie breiter
+  oder schmaler zu machen, und diese Breite wird nicht behalten. Eine Zeile, die direkt unter das
+  Markdown einer Tabelle getippt wird, ohne Leerzeile dazwischen, wird eine Reihe von ihr.
 </p>
 <p>
-  Auf dem Desktop zeigt das Feld in Bearbeitung das Markdown einer Tabelle; im Vollbild öffnet sie
-  sich aus dem Text, wie er sich liest, mit einem Klick, oder mit <strong>Tabelle</strong>, während
-  der Cursor in ihrem Markdown steht. Im Vollbild rollt sie mit dem Mausrad, mit Umschalt und dem
-  Mausrad oder mit den Bildlaufleisten. Ein Klick auf eine Zelle bearbeitet ihre Wörter, umrahmt,
-  ohne Formatleiste: Enter oder ein Klick anderswohin schreibt sie, Tab geht zur nächsten Zelle,
-  Umschalt+Tab zurück, und Esc lässt die Zelle, wie sie war. Die Nummern der Zeilen und die
-  Buchstaben der Spalten öffnen ihre Menüs mit einem Klick oder Rechtsklick. Alt+Links, die
-  Zurück-Taste der Maus, Esc oder der Pfeil oben verlassen die Tabelle.
+  Auf einer Karte und wo du die Notiz nur lesen darfst, erscheint eine Tabelle auf die Breite
+  verkleinert, ihre Kopfreihe fett; ein Tippen oder Klick darauf öffnet sie im Vollbild, um sie von
+  der Karte aus zu bearbeiten oder nur zu lesen. Im Vollbild bleibt die Kopfreihe sichtbar, während
+  die Reihen rollen, und ebenso die erste Spalte, solange sie Überschriften enthält; auf dem Handy
+  bewegt sich eine Tabelle, die breiter als der Bildschirm ist, seitwärts, wenn ein Finger über ihre
+  Zellen zieht, oder über <strong>Tabelle seitlich verschieben</strong>. Am Desktop verlassen
+  Alt+Links, die Zurück-Taste der Maus, Esc oder der Pfeil oben sie.
 </p>
 </box-more>
 </guide-box>

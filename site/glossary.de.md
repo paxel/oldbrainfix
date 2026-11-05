@@ -94,7 +94,7 @@ Die Reihe von Tasten, die die Auswahl oder das Wort am Cursor formatiert, oder d
 _Avoid_: Werkzeugleiste, Symbolleiste
 
 **Tabelle** [Table]:
-Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Vollbild geöffnet, um ihre Zellen zu bearbeiten und Reihen und Spalten einzufügen, zu verschieben und zu löschen.
+Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Editor an Ort und Stelle bearbeitet, Zelle für Zelle, und dort werden Reihen und Spalten eingefügt, verschoben und gelöscht und Spalten ausgerichtet; von einer Karte oder einem Text, der nur gelesen wird, öffnet sie sich im Vollbild.
 _Avoid_: Tabellenkalkulation, Raster
 
 **Statuskästchen** [Box]:

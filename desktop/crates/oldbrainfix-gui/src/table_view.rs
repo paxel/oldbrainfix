@@ -98,21 +98,23 @@ struct Editing {
 /// The row or column whose delete is asked about, and whether it is the
 /// last, taking the table with it.
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct Deleting {
-    column: bool,
-    index: usize,
-    gone: bool,
+pub(crate) struct Deleting {
+    pub(crate) column: bool,
+    pub(crate) index: usize,
+    pub(crate) gone: bool,
 }
 
 /// What a heading's menu does.
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Op {
+pub(crate) enum Op {
     Before,
     After,
     Back,
     Forward,
     Delete,
     Headings,
+    /// Lines the column's cells up so (#257).
+    Align(Align),
 }
 
 /// The room around a cell's words.
@@ -277,6 +279,7 @@ impl TableView {
             (Op::Back, true) if index > 0 => table::move_column(text, at, index, index - 1),
             (Op::Forward, true) => table::move_column(text, at, index, index + 1),
             (Op::Headings, _) => table::toggle_heading_column(text, at),
+            (Op::Align(align), _) => table::set_align(text, at, index, align),
             (Op::Delete, _) => {
                 let gone = if column {
                     table.columns() == 1
@@ -375,39 +378,7 @@ impl TableView {
         deleting: Deleting,
         asked: &mut Vec<Asked>,
     ) {
-        let frame = Frame::NONE
-            .fill(tones.card)
-            .corner_radius(theme::CARD_RADIUS)
-            .inner_margin(Margin::same(20));
-        let mut answer = None;
-        let modal = egui::Modal::new(Id::new("table delete"))
-            .frame(frame)
-            .show(ctx, |ui| {
-                ui.set_width(360.0);
-                ui.spacing_mut().item_spacing.y = 10.0;
-                let text = ui.visuals().text_color();
-                let question = if deleting.gone {
-                    t.table_delete_table_question()
-                } else if deleting.column {
-                    t.table_delete_column_question()
-                } else {
-                    t.table_delete_row_question()
-                };
-                ui.label(RichText::new(question).size(18.0).color(text));
-                ui.label(RichText::new(t.table_delete_body()).color(text));
-                ui.horizontal_wrapped(|ui| {
-                    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
-                        answer = Some(false);
-                    }
-                    if theme::destructive(ui, true, t.delete()).clicked() {
-                        answer = Some(true);
-                    }
-                });
-            });
-        if modal.should_close() && answer.is_none() {
-            answer = Some(false);
-        }
-        if let Some(sure) = answer {
+        if let Some(sure) = question(ctx, t, tones, deleting) {
             self.deleting = None;
             if sure {
                 self.delete(deleting, asked);
@@ -649,7 +620,7 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((rows, 0));
                 }
-            } else if let Some(op) = menu(t, &resp, (false, r, rows), false) {
+            } else if let Some(op) = menu(t, &resp, (false, r, rows), (false, None)) {
                 picked = Some((op, false, r));
             }
         }
@@ -688,7 +659,9 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((0, columns));
                 }
-            } else if let Some(op) = menu(t, &resp, (true, c, columns), table.heading_column) {
+            } else if let Some(op) =
+                menu(t, &resp, (true, c, columns), (table.heading_column, None))
+            {
                 picked = Some((op, true, c));
             }
         }
@@ -786,6 +759,50 @@ impl TableView {
     }
 }
 
+/// The question before the row or column `deleting` says, holding
+/// words, is deleted, over everything: whether it is to go, once
+/// answered.
+pub(crate) fn question(
+    ctx: &egui::Context,
+    t: &L10n,
+    tones: Tones,
+    deleting: Deleting,
+) -> Option<bool> {
+    let frame = Frame::NONE
+        .fill(tones.card)
+        .corner_radius(theme::CARD_RADIUS)
+        .inner_margin(Margin::same(20));
+    let mut answer = None;
+    let modal = egui::Modal::new(Id::new("table delete"))
+        .frame(frame)
+        .show(ctx, |ui| {
+            ui.set_width(360.0);
+            ui.spacing_mut().item_spacing.y = 10.0;
+            let text = ui.visuals().text_color();
+            let question = if deleting.gone {
+                t.table_delete_table_question()
+            } else if deleting.column {
+                t.table_delete_column_question()
+            } else {
+                t.table_delete_row_question()
+            };
+            ui.label(RichText::new(question).size(18.0).color(text));
+            ui.label(RichText::new(t.table_delete_body()).color(text));
+            ui.horizontal_wrapped(|ui| {
+                if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                    answer = Some(false);
+                }
+                if theme::destructive(ui, true, t.delete()).clicked() {
+                    answer = Some(true);
+                }
+            });
+        });
+    if modal.should_close() && answer.is_none() {
+        answer = Some(false);
+    }
+    answer
+}
+
 /// Paints the words `laid` of a cell in `rect`, lined up as `align` says,
 /// and gives where its boxes, tags and links lie.
 fn paint_cell(ui: &mut Ui, laid: &LaidCell, rect: Rect, align: Align, look: &Look) -> Spots {
@@ -802,7 +819,7 @@ fn paint_cell(ui: &mut Ui, laid: &LaidCell, rect: Rect, align: Align, look: &Loo
 
 /// A row's number or a column's letter in `rect`, `(shown, label)` its
 /// text and what a screen reader says; a button.
-fn heading(
+pub(crate) fn heading(
     ui: &mut Ui,
     rect: Rect,
     (shown, label): (&str, &str),
@@ -832,12 +849,13 @@ fn heading(
 /// The menu of a row's number or a column's letter, `(column, index,
 /// count)` saying which of how many, opened by a click or a right-click
 /// where the pointer is; the first column's says whether it holds
-/// headings, `headings`. Gives what was picked.
-fn menu(
+/// headings, `headings`, and a column's how it lines up its cells while
+/// `align` is that (#257). Gives what was picked.
+pub(crate) fn menu(
     t: &L10n,
     resp: &egui::Response,
     (column, index, count): (bool, usize, usize),
-    headings: bool,
+    (headings, align): (bool, Option<Align>),
 ) -> Option<Op> {
     let mut picked = None;
     let mut entries = |ui: &mut Ui| {
@@ -881,6 +899,23 @@ fn menu(
                 ui.close();
             }
         }
+        if let Some(now) = align.filter(|_| column) {
+            ui.separator();
+            let aligns = [
+                (Align::Left, t.table_align_left()),
+                (Align::Center, t.table_align_center()),
+                (Align::Right, t.table_align_right()),
+            ];
+            for (to, words) in aligns {
+                // A column lined up by default reads as left.
+                let on = now == to || (now == Align::None && to == Align::Left);
+                let entry = egui::Button::selectable(on, RichText::new(words).color(text));
+                if ui.add(entry).clicked() {
+                    picked = Some(Op::Align(to));
+                    ui.close();
+                }
+            }
+        }
         if column && index == 0 {
             ui.separator();
             let mut on = headings;
@@ -914,7 +949,7 @@ fn starts(first: f32, sizes: &[f32]) -> Vec<f32> {
 }
 
 /// Whether the row or column `deleting` says holds words.
-fn holds_words(table: &Table, deleting: Deleting) -> bool {
+pub(crate) fn holds_words(table: &Table, deleting: Deleting) -> bool {
     if deleting.column {
         table
             .rows

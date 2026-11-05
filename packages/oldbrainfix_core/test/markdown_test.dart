@@ -774,6 +774,37 @@ void main() {
       }
     });
 
+    test('a column lines up as it is set to', () {
+      const text = 'x\n| a | b |\n|:-|-:|\n| c | d | e |\n\ny';
+      final at = text.indexOf('|');
+      String table(MarkdownChange change) =>
+          change.text.substring(change.start, change.end);
+      expect(
+        table(MarkdownTables.setAlign(text, at, 0, MarkdownAlign.center)),
+        '| a | b |\n| :-: | --: |\n| c | d | e |',
+      );
+      expect(
+        table(MarkdownTables.setAlign(text, at, 1, MarkdownAlign.none)),
+        '| a | b |\n| :-- | --- |\n| c | d | e |',
+      );
+      final right = MarkdownTables.setAlign(text, at, 0, MarkdownAlign.right);
+      expect(MarkdownTables.all(right.text).single.aligns, [
+        MarkdownAlign.right,
+        MarkdownAlign.right,
+      ]);
+      expect(right.text.substring(0, right.start), 'x\n');
+      expect(right.text.substring(right.end), '\n\ny');
+      // What cannot be done, or is so already, changes nothing.
+      for (final change in [
+        MarkdownTables.setAlign(text, at, 0, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, at, 2, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, at, -1, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, 0, 0, MarkdownAlign.center),
+      ]) {
+        expect(change.text, text);
+      }
+    });
+
     test('the last row or column going takes the table with it', () {
       const text = 'x\n| a |\n|---|\n\ny';
       final at = text.indexOf('|');

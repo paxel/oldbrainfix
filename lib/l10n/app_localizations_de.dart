@@ -4741,6 +4741,26 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Wörter in ihren Zellen werden aus der Notiz gelöscht.';
 
   @override
+  String get tableAlignLeft => 'Linksbündig';
+
+  @override
+  String get tableAlignCenter => 'Zentriert';
+
+  @override
+  String get tableAlignRight => 'Rechtsbündig';
+
+  @override
+  String get tableShowLines => 'Als Zeilen zeigen';
+
+  @override
+  String get tableShowGrid => 'Als Tabelle zeigen';
+
+  @override
+  String tableCell(int number, String letter) {
+    return 'Zeile $number, Spalte $letter';
+  }
+
+  @override
   String get pairCodeNeedsUpdate =>
       'Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.';
 

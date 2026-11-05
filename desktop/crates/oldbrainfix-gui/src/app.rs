@@ -164,6 +164,7 @@ use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
 };
+use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
@@ -1173,9 +1174,6 @@ enum Action {
     /// Puts the link asked for on the text it was asked for.
     SetLink,
     Amend,
-    /// Opens the table of the Amend field's text at this byte full
-    /// screen, putting a new one in there when there is none.
-    AmendTable(usize),
     Importance(Importance),
     /// Files these Notes into the Area or Topic `place`, together; the
     /// ones this Device may not move stay (#148).
@@ -1529,9 +1527,6 @@ pub struct App {
     viewer: Option<Viewer>,
     /// The table shown full screen over the window, while one is (#128).
     table: Option<TableView>,
-    /// Whether that table is in the Amend field's text, which it is
-    /// written back into, instead of a Note's.
-    table_amends: bool,
     /// Where back and forward lead through the places the list showed
     /// (#145).
     nav: Navigation<Selection>,
@@ -2027,7 +2022,6 @@ impl App {
             scrolled: 0.0,
             viewer: None,
             table: None,
-            table_amends: false,
             nav: Navigation::default(),
             pages: Vec::new(),
             last_field: None,
@@ -5648,33 +5642,6 @@ impl App {
                 notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
             }
-            Action::AmendTable(at) => {
-                let opening = match markdown::table::at(&self.amend, at) {
-                    Some(table) => Opening {
-                        note: Some(selected),
-                        text: self.amend.clone(),
-                        at: table.start,
-                        cell: None,
-                        tags: true,
-                        boxes: None,
-                    },
-                    None => {
-                        let change = markdown::table::insert(&self.amend, at);
-                        self.amend = change.text;
-                        Opening {
-                            note: Some(selected),
-                            text: self.amend.clone(),
-                            at: change.start,
-                            cell: Some((0, 0)),
-                            tags: true,
-                            boxes: None,
-                        }
-                    }
-                };
-                // Edited there, it is written back into the field.
-                self.table = Some(TableView::new(opening));
-                self.table_amends = true;
-            }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
             Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
             Action::Trash => {
@@ -6918,7 +6885,6 @@ impl App {
     /// shown goes in first, and the view holds the text as stored, at the
     /// same table.
     fn open_table(&mut self, mut opening: Opening) -> oldbrainfix_core::Result<()> {
-        self.table_amends = false;
         if let Some(note) = opening.note.take() {
             if self.text_of.as_deref() == Some(note.as_str())
                 || self.section_texts.contains_key(&note)
@@ -6952,10 +6918,6 @@ impl App {
                     self.write_table(&text)?;
                 }
                 self.table = None;
-                // The Amend field has the keyboard again.
-                if std::mem::take(&mut self.table_amends) {
-                    self.amend_focus = true;
-                }
             }
             table_view::Asked::SearchFor(tag) => {
                 self.table_asked(table_view::Asked::Close)?;
@@ -6982,12 +6944,6 @@ impl App {
     /// change it as it is stored now; a text left blank is not kept. The
     /// field of the Note or Section shown then holds it.
     fn write_table(&mut self, text: &str) -> oldbrainfix_core::Result<()> {
-        // A table of the Amend field goes back into it, kept with the
-        // Section.
-        if self.table_amends && self.table.is_some() {
-            self.amend = text.to_string();
-            return Ok(());
-        }
         let Some(note) = self
             .table
             .as_ref()
@@ -9110,8 +9066,10 @@ impl App {
             && self.badge.is_none()
             && self.viewer.is_none()
             && self.table.is_none();
+        // In a cell of a table's grid (#257) it leaves the cell.
         if top
             && !egui::Popup::is_any_open(ctx)
+            && !table_grid::cell_had_keyboard(ctx)
             && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
         {
             actions.push(Action::CloseNote);
@@ -10548,15 +10506,30 @@ impl App {
                     // Note's text puts in.
                     let id = Id::new("amend");
                     let focused = ui.memory(|m| m.has_focus(id));
+                    // Its tables as grids, as in the Note's text (#257).
+                    let unticked = BoxLook::default();
+                    let body = egui::TextStyle::Body.resolve(ui.style());
+                    let grids = markdown::uses(amend).then(|| {
+                        let look = GridLook {
+                            size: body.size,
+                            colour: text,
+                            boxes: &unticked,
+                        };
+                        Grids::prepare(ui, (id, "amend"), amend, look)
+                    });
+                    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
                     let selected = format_bar::selection(ui, id, amend);
-                    let at = format_bar::At::of(amend, selected, markdown::uses(amend));
+                    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+                        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+                        None => format_bar::At::of(amend, selected, markdown::uses(amend)),
+                    };
                     let formats = &Format::ALL[1..];
                     // Only in Advanced (#197).
                     let mut picked = match self.view.advanced {
                         true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
                         false => None,
                     };
-                    if focused {
+                    if focused || in_cell {
                         ui.input_mut(|i| {
                             if i.consume_key(Modifiers::COMMAND, Key::B) {
                                 picked = Some(Format::Bold);
@@ -10571,15 +10544,44 @@ impl App {
                             None => ui.memory_mut(|m| m.request_focus(id)),
                         }
                     }
-                    let field = ui.add(
-                        TextEdit::multiline(amend)
-                            .id(id)
-                            .hint_text(t.amend_hint())
-                            .text_color(text)
-                            .desired_rows(1)
-                            .desired_width(f32::INFINITY)
-                            .frame(Frame::NONE),
-                    );
+                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                        let typed = typed.as_str();
+                        let format = egui::TextFormat::simple(body.clone(), text);
+                        let mut job =
+                            egui::text::LayoutJob::single_section(typed.to_string(), format);
+                        if let Some(grids) = &grids {
+                            job = grids.hide(typed, job);
+                        }
+                        job.wrap.max_width = width;
+                        ui.fonts_mut(|f| f.layout_job(job))
+                    };
+                    let output = TextEdit::multiline(amend)
+                        .id(id)
+                        .hint_text(t.amend_hint())
+                        .text_color(text)
+                        .layouter(&mut layouter)
+                        .desired_rows(1)
+                        .desired_width(f32::INFINITY)
+                        .frame(Frame::NONE)
+                        .show(ui);
+                    let field = output.response.response.clone();
+                    if let Some(grids) = grids {
+                        let shown = (&output, &mut *amend);
+                        let ticks: table_grid::Ticks<'_> = (false, &|_| false);
+                        let grid = grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
+                        if grid.took {
+                            picked = None;
+                        }
+                        if let Some((start, end, url)) = grid.link {
+                            actions.push(Action::AskLink {
+                                start,
+                                end,
+                                url,
+                                amend: true,
+                                section: None,
+                            });
+                        }
+                    }
                     // Its right-click menu, with the bar's formats while
                     // the bar shows (#253).
                     let offered: &[Format] = if self.view.advanced { formats } else { &[] };
@@ -10589,7 +10591,18 @@ impl App {
                         None => {}
                     }
                     match picked {
-                        Some(Format::Table) => actions.push(Action::AmendTable(selected.0)),
+                        // As in the Note's text (#257).
+                        Some(Format::Table) => match markdown::table::at(amend, selected.0) {
+                            Some(table) => {
+                                let cell = table_grid::cell_at(amend, &table, selected.0);
+                                table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
+                            }
+                            None => {
+                                let change = markdown::table::insert(amend, selected.0);
+                                *amend = change.text;
+                                table_grid::edit(ui, (id, "amend"), amend, change.start, (0, 0));
+                            }
+                        },
                         Some(Format::Link) => actions.push(Action::AskLink {
                             start: selected.0,
                             end: selected.1,
@@ -16024,8 +16037,19 @@ fn edited_text(
     let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
     let id = edit.id;
     let of = edit.of;
+    let as_code = edit.code;
     let focused = ui.memory(|m| m.has_focus(id));
-    if focused {
+    // Its tables as grids while it is edited (#257).
+    let grids = (formatted && !as_code && (*editing || focused)).then(|| {
+        let look = GridLook {
+            size,
+            colour: written,
+            boxes,
+        };
+        Grids::prepare(ui, (id, of), edited, look)
+    });
+    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
+    if focused || in_cell {
         *editing = true;
         if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
             actions.push(Action::SaveText);
@@ -16033,16 +16057,19 @@ fn edited_text(
     }
     // The format bar above the field (#127), on its
     // selection as the field last had it; Ctrl+B and
-    // Ctrl+I as its bold and italic while typing.
+    // Ctrl+I as its bold and italic while typing. In a
+    // cell of a grid, on the cell's words.
     let selected = format_bar::selection(ui, id, edited);
-    let at = format_bar::At::of(edited, selected, formatted);
+    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+        None => format_bar::At::of(edited, selected, formatted),
+    };
     // A Code text has none (#213).
-    let as_code = edit.code;
     let mut picked = match as_code || !edit.bar {
         true => None,
         false => format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL),
     };
-    if focused && !as_code {
+    if (focused || in_cell) && !as_code {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::B) {
                 picked = Some(Format::Bold);
@@ -16051,6 +16078,7 @@ fn edited_text(
             }
         });
     }
+    let mut took = false;
     if formatted && !*editing {
         // As it reads; a click on it edits its source.
         let all = (0, edited.len());
@@ -16072,17 +16100,13 @@ fn edited_text(
         }
         let spots = shown.inner;
         let marked = Id::new(("field", of));
-        // A click on a table opens it full screen, to
-        // edit (#128).
+        // A click on a table edits the cell clicked in its
+        // grid (#257).
         if let Some(at) = text_marks_view::table_clicks(ui, &t, marked, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: Some(of.to_string()),
-                text: edited.clone(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(of.to_string()),
-            }));
+            let pointer = ui.input(|i| i.pointer.interact_pos());
+            let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
+            *editing = true;
+            table_grid::edit(ui, (id, of), edited, at, cell);
         }
         // A tick is no edit: what is typed stays.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, edit.ticks) {
@@ -16122,6 +16146,9 @@ fn edited_text(
                 galley.size().x + 8.0
             };
             let mut job = text_marks_view::field_job(job, boxes, &gap);
+            if let Some(grids) = &grids {
+                job = grids.hide(typed, job);
+            }
             job.wrap.max_width = width;
             ui.fonts_mut(|f| f.layout_job(job))
         };
@@ -16221,8 +16248,42 @@ fn edited_text(
             ui.ctx().request_repaint();
         }
         name_field(ui, &output.response.response, edit.name);
-        // A click on the bar keeps the field being edited.
-        if output.response.response.lost_focus() && picked.is_none() {
+        // With Show ticks, who ticked each box, after it; a
+        // click on a box ticks it, no edit of the text (ADR
+        // 0035). The grids take those in their cells.
+        let place = (&output.galley, output.galley_pos);
+        let mut spots =
+            text_marks_view::field_spots(&output.galley, output.galley_pos, edited, boxes);
+        let mut grid = table_grid::Outcome::default();
+        if let Some(grids) = grids {
+            spots = grids.outside(&output, edited, spots);
+            let outside = grids.look_outside(edited, boxes);
+            text_marks_view::paint_after(ui, place, (edited, &outside), (small.clone(), weak));
+            let shown = (&output, &mut *edited);
+            grid = grids.show(ui, (&t, tones), shown, (picked, boxes, edit.ticks));
+        } else {
+            text_marks_view::paint_after(ui, place, (edited, boxes), (small.clone(), weak));
+        }
+        if grid.took {
+            took = true;
+        }
+        if let Some((start, end, url)) = grid.link.take() {
+            actions.push(Action::AskLink {
+                start,
+                end,
+                url,
+                amend: false,
+                section: edit.section.then(|| of.to_string()),
+            });
+        }
+        if let Some(asked) = grid.boxes.take() {
+            actions.push(box_action(of.to_string(), asked));
+        }
+        // A click on the bar keeps the field being edited,
+        // and so does the keyboard going into a cell of its
+        // grids or back.
+        let lost = output.response.response.lost_focus() && picked.is_none() && !grid.holds;
+        if lost || grid.left {
             *editing = false;
             actions.push(Action::SaveText);
         }
@@ -16241,31 +16302,25 @@ fn edited_text(
                 actions.push(format_text());
             }
         }
-        // With Show ticks, who ticked each box, after it.
-        let place = (&output.galley, output.galley_pos);
-        text_marks_view::paint_after(ui, place, (edited, boxes), (small, weak));
-        // A click on a box ticks it, no edit of the text
-        // (ADR 0035).
-        let spots = text_marks_view::field_spots(&output.galley, output.galley_pos, edited, boxes);
         let marked = Id::new(("field", of));
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots, edit.ticks) {
             actions.push(box_action(of.to_string(), asked));
         }
     }
+    // What the bar did in a cell of a grid is done.
+    let picked = if took { None } else { picked };
     match picked {
-        // In a table it opens it; elsewhere it puts a new
-        // one in and edits its first cell (#128), the
-        // text formatted from then on.
+        // In a table shown as lines it shows it as a grid;
+        // elsewhere it puts a new one in and edits its first
+        // cell in its grid (#257), the text formatted from
+        // then on.
         Some(Format::Table) => {
-            let opening = match markdown::table::at(edited, selected.0) {
-                Some(table) => Opening {
-                    note: Some(of.to_string()),
-                    text: edited.clone(),
-                    at: table.start,
-                    cell: None,
-                    tags: true,
-                    boxes: Some(of.to_string()),
-                },
+            *editing = true;
+            match markdown::table::at(edited, selected.0) {
+                Some(table) => {
+                    let cell = table_grid::cell_at(edited, &table, selected.0);
+                    table_grid::edit(ui, (id, of), edited, table.start, cell);
+                }
                 None => {
                     let change = markdown::table::insert(edited, selected.0);
                     *edited = change.text;
@@ -16274,17 +16329,9 @@ fn edited_text(
                     } else {
                         format_text()
                     });
-                    Opening {
-                        note: Some(of.to_string()),
-                        text: edited.clone(),
-                        at: change.start,
-                        cell: Some((0, 0)),
-                        tags: true,
-                        boxes: Some(of.to_string()),
-                    }
+                    table_grid::edit(ui, (id, of), edited, change.start, (0, 0));
                 }
-            };
-            actions.push(Action::OpenTable(opening));
+            }
         }
         Some(Format::Link) => {
             *editing = true;

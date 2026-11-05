@@ -364,7 +364,9 @@ TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
 ///
 /// A table of a formatted text is drawn as the grid [MarkedText] draws,
 /// its source never seen (#152): the cursor and a selection pass it as
-/// one block, never ending inside it ([snapOutOfTables]).
+/// one block, never ending inside it ([snapOutOfTables]). With [grid] the
+/// field draws each table as what [grid] gives, the grid it is edited in
+/// (#257); the table [rawTable] shows as its lines, edited as text.
 class TagTextController extends TextEditingController {
   final bool hideMarks;
 
@@ -408,9 +410,38 @@ class TagTextController extends TextEditingController {
     return _tablesOf;
   }
 
-  /// The tables drawn as grids: those of a formatted text, top first.
+  /// The tables drawn as grids: those of a formatted text, top first,
+  /// but [rawTable].
   List<MarkdownTable> get tables =>
-      _markdown ? _tablesIn(text) : const <MarkdownTable>[];
+      _markdown ? _gridsIn(text) : const <MarkdownTable>[];
+
+  List<MarkdownTable> _gridsIn(String text) {
+    final all = _tablesIn(text);
+    final raw = _raw;
+    if (raw == null || raw >= all.length) return all;
+    return [...all.take(raw), ...all.skip(raw + 1)];
+  }
+
+  int? _raw;
+
+  /// The table, by its place among the tables of the text, that shows as
+  /// its Markdown lines rather than as a grid; null when none does. It is
+  /// only how the field shows it now, never stored.
+  int? get rawTable => _raw;
+  set rawTable(int? index) {
+    if (index == _raw) return;
+    _raw = index;
+    final selection = snapOutOfTables(tables, value.selection);
+    if (selection != value.selection) {
+      super.value = value.copyWith(selection: selection);
+      return;
+    }
+    notifyListeners();
+  }
+
+  /// What draws the table [index] of the text, [table], in the field in
+  /// [style]; without it, the grid [MarkedText] draws, only read.
+  Widget Function(int index, MarkdownTable table, TextStyle? style)? grid;
 
   BoxTicking? _boxes;
 
@@ -432,7 +463,7 @@ class TagTextController extends TextEditingController {
     );
     if (_markdown) {
       selection = snapOutOfTables(
-        _tablesIn(newValue.text),
+        _gridsIn(newValue.text),
         selection,
         before: before,
       );
@@ -562,6 +593,10 @@ class TagTextController extends TextEditingController {
       }
     }
 
+    final raw = switch (_raw) {
+      final index? when _markdown => _tablesIn(text).elementAtOrNull(index),
+      _ => null,
+    };
     for (final block in _markdown ? Markdown.parse(text) : <MarkdownBlock>[]) {
       set(block.start, block.end, switch (block.kind) {
         MarkdownBlockKind.heading1 => _heading1,
@@ -594,6 +629,9 @@ class TagTextController extends TextEditingController {
             shown.setRange(sign, dot, number.codeUnits);
           }
           set(sign, dot + 1, _sign);
+        case MarkdownBlockKind.table when block.table?.start == raw?.start:
+          // A table shown as its lines shows them as written.
+          break;
         case MarkdownBlockKind.table:
           // A table's pipes, its delimiter row and its comment line are
           // marks; its cells' words are not.
@@ -656,9 +694,9 @@ class TagTextController extends TextEditingController {
     if (composing.isValid) set(composing.start, composing.end, _composing);
     // A table's grid stands for its first character; the others are word
     // joiners, which take no room and keep the grid on its line.
-    final grids = <int, MarkdownTable>{};
+    final grids = <int, (int, MarkdownTable)>{};
     for (final table in tables) {
-      grids[table.start] = table;
+      grids[table.start] = (_tablesIn(text).indexOf(table), table);
       labels.removeWhere((at, _) => at >= table.start && at < table.end);
       for (var i = table.start; i < table.end; i++) {
         bits[i] = _grid;
@@ -682,22 +720,25 @@ class TagTextController extends TextEditingController {
         continue;
       }
       final b = bits[from];
-      if (grids[from] case final table?) {
+      if (grids[from] case (final index, final table)) {
+        final grid = this.grid;
         children.add(
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
-            // The field takes the taps: one on the grid opens the table.
-            child: ExcludeSemantics(
-              child: IgnorePointer(
-                child: MarkedText(
-                  text.substring(table.start, table.end),
-                  key: ValueKey('field-table-${table.start}'),
-                  format: TextFormats.markdown,
-                  style: style,
-                  ticking: _boxes,
-                ),
-              ),
-            ),
+            child: grid != null
+                ? grid(index, table, style)
+                // Only read: the field takes the taps.
+                : ExcludeSemantics(
+                    child: IgnorePointer(
+                      child: MarkedText(
+                        text.substring(table.start, table.end),
+                        key: ValueKey('field-table-${table.start}'),
+                        format: TextFormats.markdown,
+                        style: style,
+                        ticking: _boxes,
+                      ),
+                    ),
+                  ),
           ),
         );
       } else if (labels[from] case final label?) {

@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Changed
 
+- On the phone and the desktop, a table in a formatted text, a pasted one too, is edited right in the Note editor, cell by cell, instead of as its `|` lines or full screen. A tap or click on a cell edits it in place; Tab, Shift+Tab, Enter and the arrow keys move between the cells and into and out of the table. "+" adds a row or a column, and a row's number or a column's letter opens a menu to insert, move and delete it and to align a column left, centred or right. On the desktop the columns' widths can be dragged; they are not stored. Every change is written back as the table's Markdown lines, and "Show as lines" shows them for editing as text until "Show as table".
 - The help Checklist "Quick start" says where and how for every step: each Line names the place on the phone and what to tap, such as "Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h." Its description, under its name, gives the desktop's way for each step: the menus, keys, drag and right-click. A Quick start made by 0.4.0 keeps its words.
 
 ### Fixed

@@ -7616,6 +7616,42 @@ abstract class AppLocalizations {
   /// **'The words in its cells are deleted from the Note.'**
   String get tableDeleteBody;
 
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells line up on the left (Markdown `:--`).
+  ///
+  /// In en, this message translates to:
+  /// **'Align left'**
+  String get tableAlignLeft;
+
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells are centred (Markdown `:-:`).
+  ///
+  /// In en, this message translates to:
+  /// **'Centre'**
+  String get tableAlignCenter;
+
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells line up on the right (Markdown `--:`).
+  ///
+  /// In en, this message translates to:
+  /// **'Align right'**
+  String get tableAlignRight;
+
+  /// Button on a table edited as a grid in the editor (#257): shows the table's Markdown lines instead, to edit as text, until the cursor leaves them or Show as table is pressed.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as lines'**
+  String get tableShowLines;
+
+  /// Button beside a table shown as its Markdown lines in the editor (#257): shows it as a table again.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as table'**
+  String get tableShowGrid;
+
+  /// What a screen reader says for a cell of a table edited as a grid in the editor (#257), before the cell's words.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {number}, column {letter}'**
+  String tableCell(int number, String letter);
+
   /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
   ///
   /// In en, this message translates to:
