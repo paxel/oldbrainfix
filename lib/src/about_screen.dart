@@ -142,7 +142,14 @@ class _AboutScreenState extends State<AboutScreen> {
               _feedbackMail,
               'mailto:$_feedbackMail?subject=Old%20Brain%20Fix%20feedback',
             ),
-            (Icons.coffee_outlined, t.buyCoffee, t.coffeeSubtitle, _donateUrl),
+            // Not on the iPhone: App Store guideline 3.1.1 (Q591).
+            if (defaultTargetPlatform != TargetPlatform.iOS)
+              (
+                Icons.coffee_outlined,
+                t.buyCoffee,
+                t.coffeeSubtitle,
+                _donateUrl,
+              ),
           ])
             ListTile(
               leading: Icon(icon),

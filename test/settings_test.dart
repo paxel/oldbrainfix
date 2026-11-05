@@ -628,6 +628,26 @@ void main() {
       );
     });
 
+    testWidgets('offers no Ko-fi on the iPhone (Q591)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await about(tester);
+        // The row would sit right under this one: scroll it into view so
+        // a Ko-fi row would be built if there were one.
+        await tester.scrollUntilVisible(
+          find.text('Write to the developer'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
+        await tester.pumpAndSettle();
+        expect(find.text('Write to the developer'), findsOneWidget);
+        expect(find.text('Buy me a coffee', skipOffstage: false), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
     testWidgets('links the German docs and privacy policy in German', (
       tester,
     ) async {

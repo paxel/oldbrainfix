@@ -131,7 +131,11 @@ code meets the criteria" of § 742.15(b)
 notification and no year-end self-classification report follow from
 that. This is a reading of the regulations, not legal advice.
 
-### Decision for the user
+### Decision (Q590 (b), 2026-11-05): France is included
+
+The user decided to distribute in France. Before the first submission: file the French encryption declaration (second row below); once Apple shows its code, set `ITSAppUsesNonExemptEncryption` = YES and `ITSEncryptionExportComplianceCode` = that code in `ios/Runner/Info.plist`. Until then the submission step stops with its error; TestFlight is unaffected.
+
+### The two choices
 
 The only open question is France, so `ITSAppUsesNonExemptEncryption` is
 not set in `ios/Runner/Info.plist` yet; App Store Connect asks on each
