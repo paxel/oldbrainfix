@@ -12,3 +12,12 @@
 
 /* Why the app asks for the location (#241). */
 "NSLocationWhenInUseUsageDescription" = "Notiert, wo du eine Notiz erfasst, damit sie auch Tage später noch Sinn ergibt. Nur während du die App nutzt und nur wenn du das einschaltest.";
+
+/* Why the app asks for the camera (#243). */
+"NSCameraUsageDescription" = "Nimmt Fotos für deine Notizen auf und vom Kopplungscode eines Computers. Nur wenn du auf Foto tippst.";
+
+/* Why the app asks for Face ID (#243). */
+"NSFaceIDUsageDescription" = "Entsperrt die App und gesperrte Bereiche mit Face ID, statt die PIN einzutippen.";
+
+/* Why the app asks to add to the photos (#243). */
+"NSPhotoLibraryAddUsageDescription" = "Legt das Foto einer Notiz in deinen Fotos ab, wenn du auf Speichern tippst. Old Brain Fix fügt nur hinzu und liest deine Fotos nie.";

@@ -32,10 +32,12 @@ class FeedbackFacts {
   /// The app's version and build number, "0.4.0+57".
   final String version;
 
-  /// The system and the device, "Android 14 (SDK 34), Google Pixel 7".
+  /// The system and the device, "Android 14 (SDK 34), Google Pixel 7",
+  /// on the iPhone "iOS 26.1, iPhone17,1".
   final String system;
 
-  /// Where the app was installed from ([installMethodOf]).
+  /// Where the app was installed from ([installMethodOf]); on the
+  /// iPhone "App Store", "TestFlight" or "unknown".
   final String install;
 
   const FeedbackFacts({
@@ -85,8 +87,32 @@ Future<FeedbackFacts> readFeedbackFacts() async {
       install: 'unknown',
     );
   }
+  return feedbackFactsOf(facts, version: version);
+}
+
+/// [FeedbackFacts] from the device channel's [facts]: Android's
+/// (MainActivity.kt), or the iPhone's (ios/Runner/DeviceFacts.swift),
+/// which say `os` "iOS", name the model by its identifier, "iPhone17,1",
+/// and the installer as "App Store", "TestFlight" or "unknown" (#243).
+FeedbackFacts feedbackFactsOf(
+  Map<Object?, Object?> facts, {
+  required String version,
+}) {
   final maker = facts['manufacturer'] as String? ?? '';
   final model = facts['model'] as String? ?? '';
+  final known = facts['installerKnown'] as bool? ?? false;
+  if (facts['os'] == 'iOS') {
+    final installer = facts['installer'];
+    return FeedbackFacts(
+      version: version,
+      system:
+          'iOS ${facts['release'] ?? '?'}, '
+          '${model.trim().isEmpty ? 'device unknown' : model.trim()}',
+      install: known && (installer == 'App Store' || installer == 'TestFlight')
+          ? installer as String
+          : 'unknown',
+    );
+  }
   final device = model.toLowerCase().startsWith(maker.toLowerCase())
       ? model
       : '$maker $model';
@@ -95,10 +121,7 @@ Future<FeedbackFacts> readFeedbackFacts() async {
     system:
         'Android ${facts['release'] ?? '?'} (SDK ${facts['sdk'] ?? '?'}), '
         '${device.trim().isEmpty ? 'device unknown' : device.trim()}',
-    install: installMethodOf(
-      facts['installer'] as String?,
-      known: facts['installerKnown'] as bool? ?? false,
-    ),
+    install: installMethodOf(facts['installer'] as String?, known: known),
   );
 }
 

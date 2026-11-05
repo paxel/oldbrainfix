@@ -23,7 +23,9 @@ class NoBiometrics implements LockPlatform {
 }
 
 /// Android's BiometricPrompt, with the screen lock as fallback, behind
-/// the app's method channel; no Google library.
+/// the app's method channel; no Google library. On the iPhone the same
+/// channel answers with Face ID or Touch ID and the passcode
+/// (ios/Runner/LockChannel.swift, #243).
 class AndroidBiometrics implements LockPlatform {
   static const _channel = MethodChannel('io.github.paxel.oldbrainfix/lock');
 

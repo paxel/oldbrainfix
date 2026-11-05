@@ -678,6 +678,11 @@ replace a law of Both apps where they say so. A desktop law marked
   (#257), which a drag on it moves sideways, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
   off at the edge instead.
+- **On the iPhone a pushed page goes back with the edge swipe** (#243,
+  Q570), iOS's own, from the left edge; a browser level goes back with
+  a swipe right anywhere, as on Android. A page that holds its leaving,
+  such as one asking to keep changes, takes no edge swipe. A long-press
+  on a Note card gives the iPhone's haptic where Android vibrates.
 
 ### Capture
 

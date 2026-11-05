@@ -71,6 +71,14 @@
 		B24200000000000000000030 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B24200000000000000000011 /* Localizable.strings */; };
 		B24200000000000000000031 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B24200000000000000000013 /* InfoPlist.strings */; };
 		B24200000000000000000032 /* Widgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B24200000000000000000014 /* Widgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B24300000000000000000011 /* DeviceFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000001 /* DeviceFacts.swift */; };
+		B24300000000000000000012 /* ShareRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000002 /* ShareRules.swift */; };
+		B24300000000000000000013 /* LockChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000003 /* LockChannel.swift */; };
+		B24300000000000000000014 /* Pickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000004 /* Pickers.swift */; };
+		B24300000000000000000015 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000005 /* ShareSheet.swift */; };
+		B24300000000000000000016 /* DeviceChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000006 /* DeviceChannel.swift */; };
+		B24300000000000000000017 /* DeviceFactsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000007 /* DeviceFactsTests.swift */; };
+		B24300000000000000000018 /* ShareRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24300000000000000000008 /* ShareRulesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -200,6 +208,14 @@
 		B24200000000000000000010 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B24200000000000000000012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B24200000000000000000014 /* Widgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Widgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B24300000000000000000001 /* DeviceFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceFacts.swift; sourceTree = "<group>"; };
+		B24300000000000000000002 /* ShareRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRules.swift; sourceTree = "<group>"; };
+		B24300000000000000000003 /* LockChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockChannel.swift; sourceTree = "<group>"; };
+		B24300000000000000000004 /* Pickers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pickers.swift; sourceTree = "<group>"; };
+		B24300000000000000000005 /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		B24300000000000000000006 /* DeviceChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceChannel.swift; sourceTree = "<group>"; };
+		B24300000000000000000007 /* DeviceFactsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceFactsTests.swift; sourceTree = "<group>"; };
+		B24300000000000000000008 /* ShareRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRulesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -245,6 +261,8 @@
 				B24200000000000000000005 /* AgendaWidgetPlanTests.swift */,
 				B24200000000000000000006 /* WidgetLinksTests.swift */,
 				B24200000000000000000007 /* agenda_snapshot.json */,
+				B24300000000000000000007 /* DeviceFactsTests.swift */,
+				B24300000000000000000008 /* ShareRulesTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -324,6 +342,12 @@
 				B24200000000000000000002 /* AgendaWidgetPlan.swift */,
 				B24200000000000000000003 /* WidgetLinks.swift */,
 				B24200000000000000000004 /* CaptureChannel.swift */,
+				B24300000000000000000001 /* DeviceFacts.swift */,
+				B24300000000000000000002 /* ShareRules.swift */,
+				B24300000000000000000003 /* LockChannel.swift */,
+				B24300000000000000000004 /* Pickers.swift */,
+				B24300000000000000000005 /* ShareSheet.swift */,
+				B24300000000000000000006 /* DeviceChannel.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -575,6 +599,8 @@
 				B24100000000000000000011 /* ContextTests.swift in Sources */,
 				B24200000000000000000024 /* AgendaWidgetPlanTests.swift in Sources */,
 				B24200000000000000000025 /* WidgetLinksTests.swift in Sources */,
+				B24300000000000000000017 /* DeviceFactsTests.swift in Sources */,
+				B24300000000000000000018 /* ShareRulesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -609,6 +635,12 @@
 				B24200000000000000000021 /* AgendaWidgetPlan.swift in Sources */,
 				B24200000000000000000022 /* WidgetLinks.swift in Sources */,
 				B24200000000000000000023 /* CaptureChannel.swift in Sources */,
+				B24300000000000000000011 /* DeviceFacts.swift in Sources */,
+				B24300000000000000000012 /* ShareRules.swift in Sources */,
+				B24300000000000000000013 /* LockChannel.swift in Sources */,
+				B24300000000000000000014 /* Pickers.swift in Sources */,
+				B24300000000000000000015 /* ShareSheet.swift in Sources */,
+				B24300000000000000000016 /* DeviceChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

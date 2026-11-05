@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ import 'package:oldbrainfix/src/ocr_platform.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/profile_platform.dart';
+import 'package:oldbrainfix/src/profile_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart'
     show deviceWallClock;
 import 'package:oldbrainfix/src/speech_platform.dart';
@@ -30,10 +32,11 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'open_capture.dart';
 import 'open_settings.dart';
 
-/// Every method channel the app talks to. On the iPhone none of them
-/// answers until its ticket brings the Swift side (#237): each call
-/// fails with a [MissingPluginException], as here, where no handler is
-/// set.
+/// Every method channel the app talks to. On the iPhone each answers
+/// since its ticket brought the Swift side (#237 to #243), but `exit`,
+/// which iOS keeps no record for; the app must
+/// still start and run where none answers: each call fails with a
+/// [MissingPluginException], as here, where no handler is set.
 const channels = [
   'alarms',
   'bundle',
@@ -261,6 +264,28 @@ void main() {
     expect(acknowledged.last, 2);
     expect(pending, isEmpty);
     expect(find.byType(UnsortedScreen), findsOneWidget);
+  });
+
+  testWidgets('on the iPhone a page pushed on the Agenda goes back with '
+      'the edge swipe (#243)', (tester) async {
+    store
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await start(tester);
+      await openProfilePage(tester);
+      expect(find.byType(ProfileScreen), findsOneWidget);
+
+      await tester.dragFrom(const Offset(5, 400), const Offset(600, 0));
+      await settle(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(ProfileScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('a first start without any channel shows the first screen', (

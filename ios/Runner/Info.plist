@@ -76,12 +76,18 @@
 	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Shows the appointments of the calendars you pick on the Agenda, notes the event running when you capture a Note, and writes your Routines and Reminders into a calendar you choose. Only if you turn these on.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Takes photos for your Notes, and of a computer's pair code. Only when you tap Photo.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlocks the app and locked Areas with Face ID instead of typing the PIN.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Syncs with your paired Devices on the same Wi-Fi, such as your computer, without the internet.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Notes where you capture a Note, so it still makes sense days later. Only while you use the app, and only if you turn it on.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voice Notes record what you say. Old Brain Fix uses the microphone only while you record.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Saves a photo of a Note into your photos when you tap Save. Old Brain Fix only adds, it never reads your photos.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- iOS copies a file opened with the app into Documents/Inbox, which

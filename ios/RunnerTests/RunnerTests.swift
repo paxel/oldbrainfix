@@ -31,6 +31,18 @@ class RunnerTests: XCTestCase {
     XCTAssertNotNil(info("NSMicrophoneUsageDescription") as? String)
   }
 
+  /// Face ID's reason for the App Lock and the Area Locks, the camera's
+  /// for photos and adding to the Photos library's for Save (#243), in
+  /// English here and in German in de.lproj.
+  func testFaceIdTheCameraAndSavingPhotosAreExplained() {
+    XCTAssertNotNil(info("NSFaceIDUsageDescription") as? String)
+    XCTAssertNotNil(info("NSCameraUsageDescription") as? String)
+    XCTAssertNotNil(info("NSPhotoLibraryAddUsageDescription") as? String)
+    // Adding only: the app never reads the library, the picker needs no
+    // access.
+    XCTAssertNil(info("NSPhotoLibraryUsageDescription"))
+  }
+
   /// The local network's reason, and the Bonjour type the sync looks
   /// for, without which iOS finds no paired host (#240). A Debug build,
   /// as the tests run, also carries Flutter's own `_dartVmService._tcp`,

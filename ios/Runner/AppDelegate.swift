@@ -30,5 +30,7 @@ import UserNotifications
     CalendarChannel.register(messenger: messenger)
     SharesChannel.register(messenger: messenger)
     CaptureChannel.register(messenger: messenger)
+    LockChannel.register(messenger: messenger)
+    DeviceChannel.register(messenger: messenger)
   }
 }

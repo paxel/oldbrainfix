@@ -13,10 +13,12 @@ import UniformTypeIdentifiers
 /// app comes back; `take` itself always reads the inbox, so nothing
 /// depends on which comes first.
 ///
-/// Only those methods so far: every other one of the two channels
-/// answers not implemented, which Dart takes as "not on this phone",
-/// until the camera, picker, clipboard and share sheet come (#243),
-/// which extend these handlers rather than register new ones.
+/// The rest of both channels came with #243, as MainActivity.kt answers
+/// them: on `photos` the camera (`take`), the photo picker (`pick`),
+/// the clipboard (`paste`) and a photo saved into the Photos library or
+/// copied (`save`, `copy`); on `bundle` where a file is written to go
+/// out (`exportPath`), the share sheet (`share`, `shareText`), the
+/// Files picker (`pick`) and the print dialog (`print`).
 enum SharesChannel {
   static let photosName = "io.github.paxel.oldbrainfix/photos"
   static let bundleName = "io.github.paxel.oldbrainfix/bundle"
@@ -45,6 +47,22 @@ enum SharesChannel {
           let answer = takeShared()
           DispatchQueue.main.async { result(answer) }
         }
+      case "take":
+        CameraPicker.shared.take(result)
+      case "pick":
+        PhotoPicker.shared.pick(limit: 0) { photos in
+          result(photos.map { FlutterStandardTypedData(bytes: $0) })
+        }
+      case "paste":
+        paste(result)
+      case "save":
+        let args = call.arguments as? [String: Any] ?? [:]
+        ShareSheet.savePhoto(path: args["path"] as? String ?? "", result)
+      case "copy":
+        let args = call.arguments as? [String: Any] ?? [:]
+        result(
+          ShareSheet.copyPhoto(
+            path: args["path"] as? String ?? "", type: args["type"] as? String ?? "image/jpeg"))
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -59,6 +77,26 @@ enum SharesChannel {
           let paths = (early + takeFiles()).map(\.path)
           DispatchQueue.main.async { result(paths) }
         }
+      case "exportPath":
+        let args = call.arguments as? [String: Any] ?? [:]
+        result(Exports.path(for: args["name"] as? String ?? ""))
+      case "share":
+        let args = call.arguments as? [String: Any] ?? [:]
+        ShareSheet.share(
+          text: "", subject: nil, paths: [args["path"] as? String ?? ""], result)
+      case "shareText":
+        // No share sheet takes a recipient or an HTML twin: the text
+        // goes as it is, and the feedback page's Mail names the address.
+        let args = call.arguments as? [String: Any] ?? [:]
+        ShareSheet.share(
+          text: args["text"] as? String ?? "", subject: args["subject"] as? String,
+          paths: (args["paths"] as? [Any] ?? []).map { $0 as? String ?? "" }, result)
+      case "pick":
+        BundlePicker.shared.pick(into: bundles, result)
+      case "print":
+        let args = call.arguments as? [String: Any] ?? [:]
+        result(
+          ShareSheet.print(path: args["path"] as? String ?? "", name: args["name"] as? String ?? ""))
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -109,6 +147,32 @@ enum SharesChannel {
     }
   }
 
+  /// What the clipboard holds as the `paste` answer: its text and its
+  /// pictures as photos; nil when it holds neither. Read only now, as
+  /// Paste was tapped; iOS asks the user first.
+  private static func paste(_ result: @escaping FlutterResult) {
+    let board = UIPasteboard.general
+    guard board.hasStrings || board.hasURLs || board.hasImages else {
+      result(nil)
+      return
+    }
+    // The items are read here, on the main thread, as UIKit wants; a
+    // picture may come as an image rather than its bytes.
+    let items: [[String: Any]] = board.items.map { item in
+      item.mapValues { value in
+        (value as? UIImage).flatMap { $0.jpegData(compressionQuality: 1) } ?? value
+      }
+    }
+    work.async {
+      let (text, pictures) = Clipboard.taken(items)
+      let photos = pictures.compactMap { PhotoShape.normalize($0) }
+      let answer: [String: Any]? =
+        text.isEmpty && photos.isEmpty
+        ? nil : ["text": text, "photos": photos.map { FlutterStandardTypedData(bytes: $0) }]
+      DispatchQueue.main.async { result(answer) }
+    }
+  }
+
   /// The oldest share as the `shared` answer, or nil.
   private static func takeShared() -> [String: Any]? {
     guard let inbox = ShareInbox.directory(),
@@ -116,7 +180,7 @@ enum SharesChannel {
     else { return nil }
     var answer: [String: Any] = [
       "text": taken.text,
-      "photos": taken.photos.compactMap(PhotoShape.normalize).map {
+      "photos": taken.photos.compactMap { PhotoShape.normalize($0) }.map {
         FlutterStandardTypedData(bytes: $0)
       },
       "recordings": [Any](),
@@ -138,6 +202,12 @@ enum SharesChannel {
 enum PhotoShape {
   static let maxEdge = 2048
   static let quality: CGFloat = 0.85
+
+  /// The camera's [image] as such a JPEG: its orientation goes into
+  /// the encoded data, which [normalize] then turns upright.
+  static func normalize(image: UIImage) -> Data? {
+    image.jpegData(compressionQuality: 1).flatMap { normalize($0) }
+  }
 
   /// The picture in [data] as such a JPEG; nil when it is no picture
   /// iOS can decode (HEIC included).
