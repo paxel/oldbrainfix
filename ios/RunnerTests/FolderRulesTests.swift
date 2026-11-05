@@ -81,6 +81,40 @@ class FolderRulesTests: XCTestCase {
     XCTAssertNil(FolderRules.parseRef("other|a.md"))
   }
 
+  func testAFileLinkNamesOnlyFilesInsideTheFolder() {
+    XCTAssertEqual(FolderRules.fileSegments("Scans/tax 2026.pdf"), ["Scans", "tax 2026.pdf"])
+    XCTAssertEqual(FolderRules.fileSegments(".hidden.md"), [".hidden.md"])
+    for path in [
+      "", "../secret", "Scans/../../secret", "./a.pdf", "a//b", "a/", "/etc/passwd", "a\\b",
+      "C:/x", "a\u{0}b", "a\nb",
+    ] {
+      XCTAssertNil(FolderRules.fileSegments(path), path)
+    }
+  }
+
+  func testAFileLinkStaysInsideTheFolderAfterSymbolicLinks() throws {
+    let files = FileManager.default
+    let base = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let folder = base.appendingPathComponent("Sync")
+    defer { try? files.removeItem(at: base) }
+    try files.createDirectory(
+      at: folder.appendingPathComponent("Scans"), withIntermediateDirectories: true)
+    let secret = base.appendingPathComponent("secret.txt")
+    try Data("x".utf8).write(to: secret)
+    let tax = folder.appendingPathComponent("Scans/tax.pdf")
+    try Data("x".utf8).write(to: tax)
+    let linked = folder.appendingPathComponent("ln.txt")
+    try files.createSymbolicLink(at: linked, withDestinationURL: secret)
+
+    XCTAssertTrue(FolderRules.inside(tax, folder))
+    XCTAssertFalse(FolderRules.inside(secret, folder))
+    XCTAssertFalse(FolderRules.inside(linked, folder), "a symbolic link out of the folder")
+    XCTAssertFalse(FolderRules.inside(folder, folder), "the folder itself is no file in it")
+    XCTAssertFalse(
+      FolderRules.inside(base.appendingPathComponent("Sync2/a.pdf"), folder),
+      "a folder whose name starts the same")
+  }
+
   func testAFileIsReadWholeOrNotAtAll() {
     func chunks(_ parts: [String]) -> () -> Data {
       var left = parts.map { Data($0.utf8) }

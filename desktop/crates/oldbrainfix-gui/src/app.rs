@@ -1528,6 +1528,10 @@ enum Setting {
 /// Opens an address in the browser; tests hand in one that keeps it.
 pub type UrlOpener = Box<dyn Fn(&str)>;
 
+/// Opens a file of the synced folder with the system's app, whether it
+/// could be started (#261); tests hand in one that keeps the path.
+pub type LinkedFileOpener = Box<dyn Fn(&std::path::Path) -> bool>;
+
 /// The wall clock the window shows days on.
 pub type Wall = Arc<dyn Fn(DateTime<Utc>) -> NaiveDateTime + Send + Sync>;
 
@@ -1581,6 +1585,8 @@ pub struct App {
     /// `open_url` when none.
     open_url: Option<String>,
     url_opener: Option<UrlOpener>,
+    /// Who opens a file link's file; `app_links::open_file` when none.
+    linked_file_opener: Option<LinkedFileOpener>,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
     capture: String,
@@ -2066,6 +2072,7 @@ impl App {
             zoom_shown: false,
             open_url: None,
             url_opener: None,
+            linked_file_opener: None,
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
             edit_wanted: None,
@@ -4461,6 +4468,12 @@ impl App {
         self.url_opener = Some(opener);
     }
 
+    /// Opens a file link's file with `opener` instead of the system's
+    /// app (#261).
+    pub fn set_linked_file_opener(&mut self, opener: LinkedFileOpener) {
+        self.linked_file_opener = Some(opener);
+    }
+
     /// Opens the Note `id` in the Note dialog (#146).
     pub fn select_note(&mut self, id: &str) {
         self.apply(Action::SelectNote(id.to_string()));
@@ -5637,7 +5650,11 @@ impl App {
             Action::FollowLink(link) => self.follow_link(link)?,
             Action::OpenLinkedFile(file) => {
                 self.dialog = None;
-                if !app_links::open_file(&file) {
+                let opened = match &self.linked_file_opener {
+                    Some(open) => open(&file),
+                    None => app_links::open_file(&file),
+                };
+                if !opened {
                     self.notice = Some(self.t.link_not_available().to_string());
                 }
             }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_links.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
+import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
@@ -171,6 +173,62 @@ void main() {
     await tapLink(tester, 'a missing one');
     expect(find.text('Not available here'), findsOneWidget);
     expect(folders.opened, hasLength(1));
+  });
+
+  testWidgets('on the iPhone, which names no app, the question says the '
+      'system picks one, and Open opens the file', (tester) async {
+    // FolderChannel.swift answers '' for a file the folder holds.
+    final folders = FakeFolders()..fileApps['Scans/tax.pdf'] = '';
+    store.chooseSyncFolder('ios-folder:5D3A9C3E-1B2F-4C6D-9E8F-0A1B2C3D4E5F');
+    notes.capture(
+      '[the tax](oldbrainfix://file/Scans/tax.pdf)',
+      format: TextFormats.markdown,
+    );
+    await pumpAllNotes(tester, folders: folders);
+
+    await tapLink(tester, 'the tax');
+    expect(
+      find.text(
+        'Open "Scans/tax.pdf" from the shared folder with the app the '
+        'system picks for it?',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(key('fileLinkOpen'));
+    await tester.pumpAndSettle();
+    expect(folders.opened, ['Scans/tax.pdf']);
+  });
+
+  test('a file link asks the folder channel by the folder and the path; '
+      'an error or no channel opens nothing', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = AndroidFolders.channel;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return call.method == 'fileApp' ? '' : true;
+    });
+    const folders = AndroidFolders();
+    const key = 'ios-folder:5D3A9C3E-1B2F-4C6D-9E8F-0A1B2C3D4E5F';
+    expect(await folders.fileApp(key, 'Scans/tax.pdf'), '');
+    expect(await folders.openFile(key, 'Scans/tax.pdf'), isTrue);
+    expect([for (final c in calls) c.method], ['fileApp', 'openFile']);
+    for (final c in calls) {
+      expect(c.arguments, {'tree': key, 'path': 'Scans/tax.pdf'});
+    }
+
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async => throw PlatformException(code: 'folder'),
+    );
+    expect(await folders.fileApp(key, 'a.pdf'), isNull);
+    expect(await folders.openFile(key, 'a.pdf'), isFalse);
+    messenger.setMockMethodCallHandler(channel, null);
+    expect(await folders.fileApp(key, 'a.pdf'), isNull);
+    expect(await folders.openFile(key, 'a.pdf'), isFalse);
   });
 
   testWidgets('without a shared folder a file link says not available', (

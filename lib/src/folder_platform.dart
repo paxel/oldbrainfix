@@ -69,7 +69,8 @@ abstract interface class FolderPlatform {
 
   /// The app that opens the file at [path] inside the shared [folder],
   /// folders separated by `/` (#261): its name, '' when the system does
-  /// not tell, or null when the folder holds no such file. Never fails.
+  /// not tell (always on the iPhone), or null when the folder holds no
+  /// such file. Never fails.
   Future<String?> fileApp(String folder, String path);
 
   /// Opens the file at [path] inside the shared [folder] with the app
@@ -344,7 +345,6 @@ class AndroidFolders implements FolderPlatform {
     } on PlatformException {
       return null;
     } on MissingPluginException {
-      // The iPhone has no file links yet.
       return null;
     }
   }

@@ -9,13 +9,13 @@ import UniformTypeIdentifiers
 /// Drive, Möbius Sync and other file providers work; it is kept as a
 /// security-scoped bookmark under a key of its own ([FolderRules]),
 /// resolved on every call. The background sync's engine answers the
-/// same calls, all but the pickers ([picking]).
+/// same calls, all but the pickers and opening a file ([picking]).
 enum FolderChannel {
   static let name = "io.github.paxel.oldbrainfix/folder"
 
   private static let calls: Set<String> = [
     "name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup",
-    "files", "readDoc", "release", "zipNames", "unzip", "dropUnzipped",
+    "files", "readDoc", "release", "zipNames", "unzip", "dropUnzipped", "fileApp",
   ]
 
   @discardableResult
@@ -26,6 +26,17 @@ enum FolderChannel {
         FolderPicker.shared.pickFolder(result)
       } else if picking && call.method == "pickZip" {
         FolderPicker.shared.pickZip(result)
+      } else if picking && call.method == "openFile" {
+        let args = call.arguments as? [String: Any] ?? [:]
+        Folders.shared.linked(args) { found in
+          DispatchQueue.main.async {
+            guard let found else {
+              result(false)
+              return
+            }
+            result(FileOpener.shared.open(found.file, in: found.folder))
+          }
+        }
       } else if calls.contains(call.method) {
         let args = call.arguments as? [String: Any] ?? [:]
         Folders.shared.answer(call.method, args) { answer in
@@ -116,6 +127,23 @@ final class Folders {
     io.async { self.zips.append(url) }
   }
 
+  /// The file a file link names (#261, `tree` and `path`) and the
+  /// folder it lies in, for [FileOpener]; nil when the folder holds no
+  /// such file.
+  func linked(_ args: [String: Any], done: @escaping ((file: URL, folder: URL)?) -> Void) {
+    io.async {
+      guard let tree = args["tree"] as? String, let path = args["path"] as? String,
+        let folder = try? self.resolve(tree)
+      else {
+        done(nil)
+        return
+      }
+      let scoped = folder.startAccessingSecurityScopedResource()
+      defer { if scoped { folder.stopAccessingSecurityScopedResource() } }
+      done(self.linkedFile(folder, path).map { (file: $0, folder: folder) })
+    }
+  }
+
   private func answerNow(_ method: String, _ args: [String: Any]) throws -> Any? {
     switch method {
     // The iPhone has no Auto Backup of the app's own (ADR 0010): none.
@@ -123,6 +151,13 @@ final class Folders {
       return nil
     case "name":
       return name(try string(args, "tree"))
+    // A file link (#261): the iPhone does not tell which app opens a
+    // file, so "" when the folder holds it, else nil.
+    case "fileApp":
+      let path = try string(args, "path")
+      let found = try? inFolder(try string(args, "tree")) { linkedFile($0, path) }
+      guard found != nil else { return nil }
+      return ""
     case "files":
       return try importFiles(of: try string(args, "tree"))
     case "release":
@@ -285,6 +320,23 @@ final class Folders {
       }
     }
     return dir
+  }
+
+  /// The regular file a file link's [path] names inside [folder] (#261),
+  /// found name by name and still inside once symbolic links are
+  /// followed; nil otherwise. One of iCloud Drive not downloaded yet is
+  /// none, but starts coming down, so the next tap finds it.
+  private func linkedFile(_ folder: URL, _ path: String) -> URL? {
+    guard let names = FolderRules.fileSegments(path) else { return nil }
+    let file = names.reduce(folder) { $0.appendingPathComponent($1) }
+    if !files.fileExists(atPath: file.path) && exists(file) {
+      try? files.startDownloadingUbiquitousItem(at: file)
+      return nil
+    }
+    let resolved = file.resolvingSymlinksInPath()
+    let regular = (try? resolved.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile
+    guard regular == true, FolderRules.inside(resolved, folder) else { return nil }
+    return resolved
   }
 
   /// Whether [file] is there, downloaded or not.
@@ -453,6 +505,63 @@ final class Folders {
     let name = try string(args, "name")
     guard FolderRules.safeName(name) else { throw FolderFailure("not a folder file: \(name)") }
     return name
+  }
+}
+
+/// Opens a file of the shared folder in another app (#261), as
+/// FolderChannel.kt's view intent does: the Open In menu of the apps
+/// that take its type, the folder's access held until the menu is left
+/// or the app chosen has the file. One menu at a time.
+final class FileOpener: NSObject, UIDocumentInteractionControllerDelegate {
+  static let shared = FileOpener()
+
+  private var shown: UIDocumentInteractionController?
+  private var scoped: URL?
+  private var sending = false
+
+  /// Shows the menu for [file] of [folder]; false when no app takes the
+  /// file or there is no screen to show it over.
+  func open(_ file: URL, in folder: URL) -> Bool {
+    end()
+    guard let top = FolderPicker.top(), let view = top.view else { return false }
+    let started = folder.startAccessingSecurityScopedResource()
+    let menu = UIDocumentInteractionController(url: file)
+    menu.delegate = self
+    shown = menu
+    scoped = started ? folder : nil
+    let at = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+    guard menu.presentOpenInMenu(from: at, in: view, animated: true) else {
+      end()
+      return false
+    }
+    return true
+  }
+
+  private func end() {
+    scoped?.stopAccessingSecurityScopedResource()
+    scoped = nil
+    shown = nil
+    sending = false
+  }
+
+  func documentInteractionController(
+    _ controller: UIDocumentInteractionController,
+    willBeginSendingToApplication application: String?
+  ) {
+    sending = true
+  }
+
+  func documentInteractionController(
+    _ controller: UIDocumentInteractionController,
+    didEndSendingToApplication application: String?
+  ) {
+    if controller === shown { end() }
+  }
+
+  func documentInteractionControllerDidDismissOpenInMenu(
+    _ controller: UIDocumentInteractionController
+  ) {
+    if controller === shown && !sending { end() }
   }
 }
 

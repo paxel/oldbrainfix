@@ -97,6 +97,30 @@ enum FolderRules {
     return (folder, path)
   }
 
+  /// The names of a file link's [path] inside the shared folder (#261),
+  /// separated by `/`, or nil when one would leave its folder or name a
+  /// drive: empty, `.`, `..`, `\`, `:` or a control character, as the
+  /// cores refuse them. Nothing is dropped, so no other file opens.
+  static func fileSegments(_ path: String) -> [String]? {
+    let names = path.components(separatedBy: "/")
+    let control = CharacterSet.controlCharacters
+    guard
+      names.allSatisfy({ name in
+        safeName(name) && !name.contains(":")
+          && !name.unicodeScalars.contains(where: control.contains)
+      })
+    else { return nil }
+    return names
+  }
+
+  /// Whether [file] lies inside [folder] once both are resolved, symbolic
+  /// links followed, so a link out of the shared folder opens nothing.
+  static func inside(_ file: URL, _ folder: URL) -> Bool {
+    let root = folder.resolvingSymlinksInPath().standardizedFileURL.path
+    let at = file.resolvingSymlinksInPath().standardizedFileURL.path
+    return at.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+  }
+
   /// The bytes of [read], or nil as soon as there are more than [limit]:
   /// a larger file is never read whole. [read] answers the next chunk,
   /// empty at the end.

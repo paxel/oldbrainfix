@@ -7,6 +7,7 @@
 //! picker.
 
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -36,11 +37,16 @@ fn device() -> Result<Store, Box<dyn std::error::Error>> {
 
 /// The window over `store` in English with the Note `note` open.
 fn window(store: &Arc<Store>, note: &str) -> Harness<'static, App> {
+    window_of(store, note, 1600.0)
+}
+
+/// The window, `height` tall, over `store` with the Note `note` open.
+fn window_of(store: &Arc<Store>, note: &str, height: f32) -> Harness<'static, App> {
     let mut app = App::new(store.clone(), "en");
     app.select(Selection::All);
     app.select_note(note);
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1600.0))
+        .with_size(egui::vec2(1280.0, height))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());
@@ -219,6 +225,94 @@ fn link_to_puts_the_picked_target_in_with_its_name() -> TestResult {
         stored.text.contains("](oldbrainfix://settings/backups)"),
         "{}",
         stored.text
+    );
+    Ok(())
+}
+
+#[test]
+fn the_file_question_opens_the_file_on_open_and_nothing_on_cancel() -> TestResult {
+    let base = std::env::temp_dir().join(format!("obf-file-open-{}", std::process::id()));
+    let folder = base.join("Sync");
+    std::fs::create_dir_all(folder.join("Scans"))?;
+    std::fs::write(folder.join("Scans/tax 2026.pdf"), b"%PDF")?;
+    let store = Arc::new(device()?);
+    store.choose_sync_folder(folder.to_str().ok_or("a path")?)?;
+    let note = Notes::new(&store).capture_as(
+        "[the tax](oldbrainfix://file/Scans/tax%202026.pdf)",
+        MARKDOWN,
+        None,
+        None,
+    )?;
+    let mut harness = window(&store, &note.id);
+    let opened = Rc::new(RefCell::new(Vec::<PathBuf>::new()));
+    let kept = opened.clone();
+    harness
+        .state_mut()
+        .set_linked_file_opener(Box::new(move |file| {
+            kept.borrow_mut().push(file.to_path_buf());
+            true
+        }));
+    let answer = |harness: &mut Harness<'_, App>, button: &str| -> TestResult {
+        harness
+            .query_all_by_role_and_label(Role::Button, button)
+            .last()
+            .ok_or(format!("{button:?}"))?
+            .click_accesskit();
+        harness.run();
+        Ok(())
+    };
+
+    follow(&mut harness, "the tax")?;
+    answer(&mut harness, "Cancel")?;
+    let after_cancel = opened.borrow().clone();
+    follow(&mut harness, "the tax")?;
+    answer(&mut harness, "Open")?;
+    let after_open = opened.borrow().clone();
+    let notice_after_open = harness.state().notice().map(str::to_string);
+    let asked_after_open = harness
+        .query_all_by_label_contains("from the shared folder with")
+        .count();
+
+    // No app took it: it says so.
+    harness
+        .state_mut()
+        .set_linked_file_opener(Box::new(|_| false));
+    follow(&mut harness, "the tax")?;
+    answer(&mut harness, "Open")?;
+    let notice_not_taken = harness.state().notice().map(str::to_string);
+    let expected = folder.join("Scans/tax 2026.pdf").canonicalize()?;
+    drop(std::fs::remove_dir_all(&base));
+
+    assert_eq!(after_cancel, Vec::<PathBuf>::new(), "Cancel opens nothing");
+    assert_eq!(after_open, [expected]);
+    assert_eq!(notice_after_open, None);
+    assert_eq!(asked_after_open, 0, "the question is gone");
+    assert_eq!(notice_not_taken.as_deref(), Some("Not available here"));
+    Ok(())
+}
+
+#[test]
+fn a_settings_section_link_scrolls_its_section_into_view() -> TestResult {
+    let store = Arc::new(device()?);
+    let note = Notes::new(&store).capture_as(
+        "[history settings](oldbrainfix://settings/history)",
+        MARKDOWN,
+        None,
+        None,
+    )?;
+    // Short, so the History section lies below the Settings' first view.
+    let mut harness = window_of(&store, &note.id, 700.0);
+    follow(&mut harness, "history settings")?;
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    let heading = harness
+        .query_all_by_label("History")
+        .last()
+        .ok_or("the History heading")?
+        .rect();
+    assert!(
+        heading.top() >= 0.0 && heading.bottom() <= 700.0,
+        "the History heading on the screen: {heading:?}"
     );
     Ok(())
 }
