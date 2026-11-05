@@ -696,6 +696,13 @@ replace a law of Both apps where they say so. A desktop law marked
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **On the iPhone a share waits for the app** (#241): iOS lets no Share
+  extension open its app, so "Old Brain Fix" in the share sheet keeps
+  the text, links, pictures or the app's own files and says so on a small
+  card with OK. The next time the app opens or comes back, each share
+  opens Capture as on Android, and a Pack, Profile card, Sent Item or
+  bundle opens as "Open with" opens it. A share carries no source app on
+  the iPhone.
 - **The quick note is uncluttered** (#142): by default it shows the
   text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu

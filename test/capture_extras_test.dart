@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/announcements.dart';
@@ -292,6 +293,29 @@ void main() {
       await tap(tester, find.text('Allow'));
       expect(source.asked, [ContextKind.calendar, ContextKind.bluetooth]);
       expect(store.bluetoothContextOn, isTrue);
+    });
+
+    testWidgets('on the iPhone the device explains the audio route, not '
+        "Android's Nearby devices (#241)", (tester) async {
+      source.allowed.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await start(tester);
+        await openPage(tester);
+        await tap(tester, bluetoothSwitch);
+        expect(find.textContaining('plays sound through'), findsOneWidget);
+        expect(find.textContaining('Nearby devices'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('on Android it names Nearby devices', (tester) async {
+      source.allowed.clear();
+      await start(tester);
+      await openPage(tester);
+      await tap(tester, bluetoothSwitch);
+      expect(find.textContaining('Nearby devices'), findsOneWidget);
     });
 
     testWidgets('"Not now" leaves it off and never asks', (tester) async {

@@ -74,6 +74,8 @@
 #   IOS_DIST_CERT_P12 / IOS_DIST_CERT_PASSWORD — Apple Distribution
 #                 certificate (.p12 base64) and its export password
 #   IOS_PROFILE — App Store provisioning profile (.mobileprovision base64)
+#   IOS_PROFILE_SHARE — the Share extension's App Store provisioning
+#                 profile (.mobileprovision base64, #241)
 #   APPLE_TEAM_ID — the Apple Developer team id
 #                 (steps: docs/agents/ios-release.md)
 #
@@ -677,10 +679,11 @@ jobs:
           IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
+          IOS_PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           missing=""
-          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD IOS_PROFILE APPLE_TEAM_ID; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD IOS_PROFILE IOS_PROFILE_SHARE APPLE_TEAM_ID; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
@@ -706,20 +709,21 @@ jobs:
       - name: Native libraries
         if: steps.secrets.outputs.ready == 'true'
         run: sh tool/ios-native.sh iphoneos
-      # A keychain of its own for the certificate, and the profile where
-      # Xcode looks; its UUID and team come from the profile itself.
-      - name: Install the certificate and the profile
+      # A keychain of its own for the certificate, and the profiles where
+      # Xcode looks: the app's and the Share extension's (#241); each
+      # UUID and team come from the profile itself.
+      - name: Install the certificate and the profiles
         if: steps.secrets.outputs.ready == 'true'
         env:
           P12: ${{ secrets.IOS_DIST_CERT_P12 }}
           P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           PROFILE: ${{ secrets.IOS_PROFILE }}
+          PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           keychain="$RUNNER_TEMP/signing.keychain-db"
           keychain_password=$(openssl rand -base64 24)
           printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
-          printf '%s' "$PROFILE" | base64 --decode > "$RUNNER_TEMP/dist.mobileprovision"
           security create-keychain -p "$keychain_password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
@@ -727,21 +731,33 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain"
           security list-keychains -d user -s "$keychain" login.keychain-db
           rm "$RUNNER_TEMP/dist.p12"
-          security cms -D -i "$RUNNER_TEMP/dist.mobileprovision" > "$RUNNER_TEMP/profile.plist"
-          uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
-          app_id=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/profile.plist")
-          if [ "$app_id" != "$APPLE_TEAM_ID.io.github.paxel.oldbrainfix" ]; then
-            echo "::error::IOS_PROFILE is for $app_id, not $APPLE_TEAM_ID.io.github.paxel.oldbrainfix"
-            exit 1
-          fi
-          for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
-            mkdir -p "$dir"
-            cp "$RUNNER_TEMP/dist.mobileprovision" "$dir/$uuid.mobileprovision"
-          done
-          echo "PROFILE_UUID=$uuid" >> "$GITHUB_ENV"
-      # Manual signing for the Runner's Release configuration only, on
-      # this runner; the committed project keeps automatic signing for
-      # local builds.
+          # install <base64 profile> <bundle id> <secret name>: its UUID
+          # in $installed.
+          install() {
+            file="$RUNNER_TEMP/$2.mobileprovision"
+            printf '%s' "$1" | base64 --decode > "$file"
+            security cms -D -i "$file" > "$RUNNER_TEMP/$2.plist"
+            app_id=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/$2.plist")
+            if [ "$app_id" != "$APPLE_TEAM_ID.$2" ]; then
+              echo "::error::$3 is for $app_id, not $APPLE_TEAM_ID.$2"
+              exit 1
+            fi
+            uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/$2.plist")
+            for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+              mkdir -p "$dir"
+              cp "$file" "$dir/$uuid.mobileprovision"
+            done
+            installed=$uuid
+          }
+          install "$PROFILE" io.github.paxel.oldbrainfix IOS_PROFILE
+          echo "PROFILE_UUID=$installed" >> "$GITHUB_ENV"
+          install "$PROFILE_SHARE" io.github.paxel.oldbrainfix.ShareExtension IOS_PROFILE_SHARE
+          echo "PROFILE_SHARE_UUID=$installed" >> "$GITHUB_ENV"
+      # Manual signing for the Release configurations of the Runner and
+      # of the Share extension (#241), each with its own profile, on this
+      # runner; the committed project keeps automatic signing for local
+      # builds. The extension's xcconfig is its own, so the Runner's
+      # profile never reaches it.
       - name: Sign the Release build with them
         if: steps.secrets.outputs.ready == 'true'
         env:
@@ -754,6 +770,13 @@ jobs:
             echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
             echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_UUID"
           } >> ios/Flutter/Release.xcconfig
+          {
+            echo 'CODE_SIGN_STYLE = Manual'
+            echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID"
+            echo 'CODE_SIGN_IDENTITY = Apple Distribution'
+            echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_SHARE_UUID"
+          } >> ios/ShareExtension/Release.xcconfig
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -773,6 +796,8 @@ jobs:
             <dict>
               <key>io.github.paxel.oldbrainfix</key>
               <string>$PROFILE_UUID</string>
+              <key>io.github.paxel.oldbrainfix.ShareExtension</key>
+              <string>$PROFILE_SHARE_UUID</string>
             </dict>
           </dict>
           </plist>

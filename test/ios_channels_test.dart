@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/calendar_mirror.dart';
 import 'package:oldbrainfix/src/calendar_platform.dart';
 import 'package:oldbrainfix/src/capture_requests.dart';
+import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/context_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -114,6 +115,39 @@ void main() {
       'sight (#240)', () {
     expect(IosSync().hostsOutOfSight, isFalse);
     expect(AndroidSync().hostsOutOfSight, isTrue);
+  });
+
+  testWidgets('a share the Share extension kept opens Capture on start, '
+      'subject and text in one (#241)', (tester) async {
+    store
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    // The photos channel as SharesChannel.swift answers it: the share
+    // once, then none; every other method not implemented.
+    final waiting = <Map<String, Object?>>[
+      {
+        'subject': 'Sauce recipe',
+        'text': 'https://example.org/sauce',
+        'photos': <Object?>[],
+        'recordings': <Object?>[],
+      },
+    ];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('io.github.paxel.oldbrainfix/photos'),
+          (call) async {
+            if (call.method != 'shared') {
+              throw MissingPluginException(call.method);
+            }
+            return waiting.isEmpty ? null : waiting.removeAt(0);
+          },
+        );
+    await start(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CaptureScreen), findsOneWidget);
+    expect(find.text('Sauce recipe\nhttps://example.org/sauce'), findsOne);
+    expect(waiting, isEmpty);
   });
 
   testWidgets('a first start without any channel shows the first screen', (

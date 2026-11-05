@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -194,10 +195,14 @@ Future<bool> explainAndAskContext(
           t.calendarExplainTitle,
           t.calendarExplainBody,
         ),
+        // The iPhone reads the audio route, without Android's Nearby
+        // devices (#241).
         ContextKind.bluetooth => (
           Icons.bluetooth,
           t.bluetoothExplainTitle,
-          t.bluetoothExplainBody,
+          defaultTargetPlatform == TargetPlatform.iOS
+              ? t.bluetoothExplainBodyIphone
+              : t.bluetoothExplainBody,
         ),
       };
       return AlertDialog(

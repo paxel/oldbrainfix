@@ -26,5 +26,8 @@ import UserNotifications
     FolderChannel.register(messenger: messenger, picking: true)
     PairingChannel.register(messenger: messenger)
     SyncChannel.registerApp(messenger: messenger)
+    ContextChannel.register(messenger: messenger)
+    CalendarChannel.register(messenger: messenger)
+    SharesChannel.register(messenger: messenger)
   }
 }

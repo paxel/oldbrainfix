@@ -47,8 +47,11 @@ jobs:
       - name: Native libraries
         run: sh tool/ios-native.sh
       - run: flutter pub get
+      # The Share extension (#241) rides inside the app.
       - name: Build for a device, unsigned
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign
+          test -f build/ios/iphoneos/Runner.app/PlugIns/ShareExtension.appex/Info.plist
       # Also writes ios/Flutter/Generated.xcconfig, which xcodebuild needs.
       - name: Build for the simulator
         run: flutter build ios --simulator --debug

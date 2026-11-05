@@ -12,6 +12,24 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Old Brain Fix</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Old Brain Fix file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>io.github.paxel.oldbrainfix.sync</string>
+				<string>io.github.paxel.oldbrainfix.item</string>
+				<string>io.github.paxel.oldbrainfix.card</string>
+				<string>io.github.paxel.oldbrainfix.pack</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -39,12 +57,20 @@
 	<array>
 		<string>_oldbrainfix._tcp</string>
 	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Shows the appointments of the calendars you pick on the Agenda, notes the event running when you capture a Note, and writes your Routines and Reminders into a calendar you choose. Only if you turn these on.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Syncs with your paired Devices on the same Wi-Fi, such as your computer, without the internet.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Notes where you capture a Note, so it still makes sense days later. Only while you use the app, and only if you turn it on.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voice Notes record what you say. Old Brain Fix uses the microphone only while you record.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- iOS copies a file opened with the app into Documents/Inbox, which
+	     the app moves out of (#241). -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -88,6 +114,95 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- The app's own files (#241), as Android's manifest names them:
+	     opened with the app and taken by its Share extension. -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Old Brain Fix sync bundle</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.paxel.oldbrainfix.sync</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>obfsync</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.oldbrainfix.sync</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Old Brain Fix Sent Item</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.paxel.oldbrainfix.item</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>oldbrain</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.oldbrainfix.item</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Old Brain Fix Profile card</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.paxel.oldbrainfix.card</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>obfcard</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.oldbrainfix.card</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Old Brain Fix Pack</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.paxel.oldbrainfix.pack</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>obfpack</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.oldbrainfix.pack</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>

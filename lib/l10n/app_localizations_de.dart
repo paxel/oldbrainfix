@@ -1034,6 +1034,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
+  String get bluetoothExplainBodyIphone =>
+      'Old Brain Fix kann notieren, über welches Bluetooth-Gerät das iPhone den Ton spielt, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Es liest nur den Namen dieses Geräts und sucht nie nach anderen. Der Name geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
+
+  @override
   String get bluetoothNotAllowed =>
       'Old Brain Fix darf deine Bluetooth-Geräte nicht sehen.';
 

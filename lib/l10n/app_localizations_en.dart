@@ -1028,6 +1028,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.';
 
   @override
+  String get bluetoothExplainBodyIphone =>
+      'Old Brain Fix can note the Bluetooth device the iPhone plays sound through when you capture a Note, like your car or your headphones. It reads only the name of that device and never searches for others. The name goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.';
+
+  @override
   String get bluetoothNotAllowed =>
       'Old Brain Fix may not see your Bluetooth devices.';
 
