@@ -1081,7 +1081,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - The desktop keeps its own field, not the phone's two rows. The
   desktop's field shows a formatted text's Markdown, except a table,
   which it shows as its grid (see "In the editor a table is edited as
-  its grid"), whose column widths are dragged at their borders.
+  its grid"), whose column widths are dragged at their borders. As on
+  the phone, what is typed right before or after a table goes on a line
+  of its own, so the table keeps its rows.
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.

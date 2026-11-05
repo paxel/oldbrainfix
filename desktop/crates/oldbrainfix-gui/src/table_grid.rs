@@ -368,6 +368,15 @@ impl Grids {
         (picked, boxes, ticks): (Option<Format>, &BoxLook, Ticks<'_>),
     ) -> Outcome {
         let mut outcome = Outcome::default();
+        // What is typed or deleted around a table shown as a grid leaves
+        // it whole, as on the phone (`keepTables`).
+        if self.state.seen != *text {
+            let raw: Vec<usize> = self.state.raw.keys().copied().collect();
+            if let Some((kept, at)) = keep_tables(&self.state.seen, text, &raw) {
+                *text = kept;
+                format_bar::select(ui, self.id, text, (at, at));
+            }
+        }
         if self.state.seen != *text {
             // Typed into the field meanwhile.
             self.lay(ui, text, boxes);
@@ -1449,6 +1458,82 @@ fn undoable(ui: &Ui, id: Id, old: &str) {
     state.store(ui.ctx(), id);
 }
 
+/// `after`, an edit of `before` typed outside its tables, changed so
+/// that each table of `before` shown as a grid (not one of `raw`, by its
+/// place among them) stays the table it was, as the phone's `keepTables`
+/// does: what is typed goes on a line of its own after a line break or
+/// a blank line, and a line break whose deletion would join a line to a
+/// table is put back. Gives the text and the byte its cursor goes to;
+/// `None` while nothing needs changing, or for an edit of a table's own
+/// lines, which the grid makes.
+pub(crate) fn keep_tables(before: &str, after: &str, raw: &[usize]) -> Option<(String, usize)> {
+    let tables: Vec<Arc<Table>> = table::all(before)
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| !raw.contains(index))
+        .map(|(_, t)| t)
+        .collect();
+    if tables.is_empty() || before == after {
+        return None;
+    }
+    // What `before` lost from `a` to `b`, and what took its place.
+    let most = before.len().min(after.len());
+    let mut a = before
+        .bytes()
+        .zip(after.bytes())
+        .take_while(|(x, y)| x == y)
+        .count();
+    while !before.is_char_boundary(a) || !after.is_char_boundary(a) {
+        a -= 1;
+    }
+    let mut tail = before
+        .bytes()
+        .rev()
+        .zip(after.bytes().rev())
+        .take(most - a)
+        .take_while(|(x, y)| x == y)
+        .count();
+    while !before.is_char_boundary(before.len() - tail)
+        || !after.is_char_boundary(after.len() - tail)
+    {
+        tail -= 1;
+    }
+    let b = before.len() - tail;
+    let typed = after.get(a..after.len() - tail)?;
+    if tables.iter().any(|t| a < t.end && b > t.start) {
+        return None;
+    }
+    // Whether each table is still one where it went, `grew` bytes later
+    // when it lay after the edit.
+    let whole = |text: &str, grew: isize| {
+        let now = table::all(text);
+        tables.iter().all(|t| {
+            let start = if t.start >= b {
+                t.start.checked_add_signed(grew).unwrap_or(t.start)
+            } else {
+                t.start
+            };
+            let end = start + t.end - t.start;
+            now.iter().any(|n| n.start == start && n.end == end)
+        })
+    };
+    let removed = (b - a) as isize;
+    if whole(after, typed.len() as isize - removed) {
+        return None;
+    }
+    let br = line_break(before);
+    let (head, rest) = (before.get(..a)?, before.get(b..)?);
+    let two = format!("{br}{br}");
+    for (lead, trail) in [("", br), (br, ""), (two.as_str(), "")] {
+        let put = format!("{lead}{typed}{trail}");
+        let text = format!("{head}{put}{rest}");
+        if whole(&text, put.len() as isize - removed) {
+            return Some((text, a + lead.len() + typed.len()));
+        }
+    }
+    None
+}
+
 /// The line break `text` uses: its first, `\n` while it has none.
 fn line_break(text: &str) -> &'static str {
     match text.find(['\n', '\r']) {
@@ -1686,6 +1771,27 @@ mod tests {
             Some(table) => table,
             None => panic!("a table in {text:?}"),
         }
+    }
+
+    #[test]
+    fn what_is_typed_or_deleted_around_a_table_leaves_it_whole() {
+        // Typed right under it: a blank line between.
+        let under = format!("{TABLE}\n");
+        let typed = format!("{TABLE}\nü");
+        assert_eq!(
+            keep_tables(&under, &typed, &[]),
+            Some((format!("{TABLE}\n\nü"), TABLE.len() + 2 + "ü".len()))
+        );
+        // The blank line deleted that keeps a paragraph out: not deleted.
+        let apart = format!("{TABLE}\n\nBread");
+        let joined = format!("{TABLE}\nBread");
+        assert_eq!(
+            keep_tables(&apart, &joined, &[]),
+            Some((apart.clone(), TABLE.len() + 1))
+        );
+        // Typed elsewhere, or by a table shown as lines: as typed.
+        assert_eq!(keep_tables(&apart, &format!("{apart}s"), &[]), None);
+        assert_eq!(keep_tables(&under, &typed, &[0]), None);
     }
 
     #[test]

@@ -303,6 +303,26 @@ fn leaving_the_grid_puts_no_line_in_where_a_line_follows_or_precedes() -> TestRe
 }
 
 #[test]
+fn words_typed_right_under_a_table_stay_out_of_it() -> TestResult {
+    let (store, note) = with_note(&format!("{TABLE}\n# Next"), MARKDOWN)?;
+    let mut harness = editor(&store, &note);
+    edit_table(&mut harness)?;
+    // Out after the last cell, at the start of the heading under it.
+    for _ in 0..4 {
+        key(&mut harness, Key::Tab);
+    }
+    typed(&mut harness, "Bread");
+    typed(&mut harness, " ");
+    let text = field(&harness)?;
+    // As on the phone, a blank line keeps the words out of the table.
+    assert_eq!(text, format!("{TABLE}\n\nBread # Next"));
+    let tables = oldbrainfix_core::markdown::table::all(&text);
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables.first().map(|t| t.rows.len()), Some(2));
+    Ok(())
+}
+
+#[test]
 fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
     let (store, note) = with_note(&format!("{TABLE}\n\nend"), MARKDOWN)?;
     let mut harness = editor(&store, &note);
