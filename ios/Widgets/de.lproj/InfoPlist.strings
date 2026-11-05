@@ -1,0 +1,2 @@
+/* Why the widget reads the calendars, the app's text (#241, #242). */
+"NSCalendarsFullAccessUsageDescription" = "Zeigt die Termine der Kalender, die du auswählst, in der Agenda, notiert den Termin, der läuft, wenn du eine Notiz erfasst, und schreibt deine Routinen und Erinnerungen in einen Kalender deiner Wahl. Nur wenn du das einschaltest.";

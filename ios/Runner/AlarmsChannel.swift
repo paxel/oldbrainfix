@@ -3,14 +3,16 @@ import Flutter
 import SwiftUI
 import UIKit
 import UserNotifications
+import WidgetKit
 
 /// The alarm channel on the iPhone (#238), answering the calls of
 /// android/…/AlarmChannel.kt and MainActivity.kt with the same
 /// arguments and answers: the plan armed, the taps queued meanwhile,
 /// the permissions and what was tapped open. Nothing rings as a
 /// full-screen alarm here; AlarmKit's own alarm screen takes its place.
-/// The Agenda widget's calls come with #242 and the sound picker is not
-/// there; they answer not implemented, which the app takes as none.
+/// The Agenda widget's calls (#242) keep its snapshot in the App Group
+/// and answer what a tap on it opened. The sound picker is not there;
+/// it answers not implemented, which the app takes as none.
 enum AlarmsChannel {
   static let name = "io.github.paxel.oldbrainfix/alarms"
   private static var channel: FlutterMethodChannel?
@@ -26,6 +28,10 @@ enum AlarmsChannel {
     channel.setMethodCallHandler { call, result in
       if background && ["nudgeOpened", "changesOpened", "unsortedOpened"].contains(call.method) {
         result(false)
+        return
+      }
+      if background && call.method == "pickOpened" {
+        result(nil)
         return
       }
       handle(call, result)
@@ -72,10 +78,14 @@ enum AlarmsChannel {
     case "changesOpened":
       result(scheduler.changesOpened)
       scheduler.changesOpened = false
-    case "unsortedOpened":
-      result(false)
-    case "pickOpened":
+    case "agenda":
+      WidgetFiles.writeAgenda(call.arguments as? [String: Any] ?? [:])
+      WidgetCenter.shared.reloadAllTimelines()
       result(nil)
+    case "unsortedOpened":
+      result(WidgetOpens.takeUnsorted())
+    case "pickOpened":
+      result(WidgetOpens.takePick())
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -200,23 +210,14 @@ final class AlarmScheduler {
   private var tail: Task<Void, Never>?
 
   private static let planFile = "plan.json"
-  private static let queueFile = "queue.json"
   /// The AlarmKit alarms handed over, by id, with their Occurrence.
   private static let alarmsFile = "alarmkit.json"
 
   // MARK: Kept on disk
 
-  var queue: ActionQueue {
-    let stored = AlarmFiles.read(Self.queueFile) as? [String: Any] ?? [:]
-    return ActionQueue(
-      stored: stored["actions"] as? [[String: Any]] ?? [],
-      seq: PlanCodec.int64(stored["seq"]) ?? 0)
-  }
-
-  private func save(_ queue: ActionQueue) {
-    AlarmFiles.write(
-      Self.queueFile, ["actions": queue.stored, "seq": NSNumber(value: queue.seq)] as [String: Any])
-  }
+  /// The taps not applied yet, in the App Group, where the Agenda
+  /// widget's boxes queue theirs too (#242).
+  var queue: ActionQueue { WidgetFiles.readQueue() }
 
   /// Keeps the plan "arm" handed over and hands it to iOS. The
   /// notifications of what is `done` go away, and so do the Nudge's
@@ -234,9 +235,8 @@ final class AlarmScheduler {
   }
 
   func ack(_ seq: Int64) {
-    var queue = self.queue
-    queue.ack(seq)
-    save(queue)
+    WidgetFiles.updateQueue { $0.ack(seq) }
+    WidgetCenter.shared.reloadTimelines(ofKind: WidgetFiles.agendaKind)
     replan()
   }
 
@@ -249,20 +249,25 @@ final class AlarmScheduler {
   ) -> Task<Void, Never> {
     let now = Int64(Date().timeIntervalSince1970 * 1000)
     let key = "\(routine)@\(occurrence)"
-    var queue = self.queue
     switch answer {
     case .done:
-      queue.add(
-        kind: QueuedAction.done, routine: routine, occurrence: occurrence, title: title,
-        body: body, now: now)
+      WidgetFiles.updateQueue {
+        $0.add(
+          kind: QueuedAction.done, routine: routine, occurrence: occurrence, title: title,
+          body: body, now: now)
+      }
     case .snooze(let minutes):
-      queue.add(
-        kind: QueuedAction.snooze, routine: routine, occurrence: occurrence, title: title,
-        body: body, until: now + Int64(minutes) * 60_000, now: now)
+      WidgetFiles.updateQueue {
+        $0.add(
+          kind: QueuedAction.snooze, routine: routine, occurrence: occurrence, title: title,
+          body: body, until: now + Int64(minutes) * 60_000, now: now)
+      }
     case .nudgeSnooze(let minutes):
-      queue.add(
-        kind: QueuedAction.nudgeSnooze, routine: "", occurrence: "", title: "", body: "",
-        until: now + Int64(minutes) * 60_000, now: now)
+      WidgetFiles.updateQueue {
+        $0.add(
+          kind: QueuedAction.nudgeSnooze, routine: "", occurrence: "", title: "", body: "",
+          until: now + Int64(minutes) * 60_000, now: now)
+      }
     case .openNudge:
       nudgeOpened = true
     case .openChanges:
@@ -270,7 +275,8 @@ final class AlarmScheduler {
     case .open:
       return replan()
     }
-    save(queue)
+    // A Done shows checked on the Agenda widget at once, as on Android.
+    WidgetCenter.shared.reloadTimelines(ofKind: WidgetFiles.agendaKind)
     switch answer {
     case .done, .snooze:
       removeDelivered(keys: [key])

@@ -1,0 +1,5 @@
+// The Widgets extension's Release and Profile builds (#242): the app's
+// version and build number from Flutter, which the extension's must
+// equal. release.yml's testflight job appends the extension's signing
+// here, as it appends the Runner's to Flutter/Release.xcconfig.
+#include "../Flutter/Generated.xcconfig"

@@ -1,0 +1,26 @@
+/* The Agenda widget in the widget gallery (#242), as Android's. */
+"agenda.name" = "Agenda";
+"agenda.description" = "The days the Agenda shows, with boxes to check off today.";
+
+/* Before the app handed the widget what it shows, or when that does not reach today. */
+"agenda.openApp" = "Open Old Brain Fix to see what's due today.";
+
+/* The Capture widget in the widget gallery (#242). */
+"capture.name" = "Capture";
+"capture.description" = "Opens Capture with one tap.";
+
+/* Which capture screen the widget or control opens. */
+"capture.mode" = "Capture";
+"capture.voice" = "Voice note";
+"capture.text" = "Text note";
+"capture.photo" = "Photo note";
+
+/* The short names on a small widget. */
+"capture.voiceShort" = "Voice";
+"capture.textShort" = "Text";
+"capture.photoShort" = "Photo";
+
+/* What the widget's actions are called where iOS names them. */
+"intent.tick" = "Check off";
+"intent.nothing" = "Done shows only";
+"intent.capture" = "Open Capture";

@@ -49,8 +49,25 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<!-- The widgets' and controls' links (#242), which SceneDelegate
+	     hands to WidgetOpens. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.paxel.oldbrainfix.widgets</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oldbrainfix</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- The links above are the app's own; Flutter must not push them as
+	     routes. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Lets a Routine you keep ignoring ring as an alarm, even in silent mode and Focus.</string>
 	<key>NSBonjourServices</key>

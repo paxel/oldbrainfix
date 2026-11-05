@@ -29,5 +29,6 @@ import UserNotifications
     ContextChannel.register(messenger: messenger)
     CalendarChannel.register(messenger: messenger)
     SharesChannel.register(messenger: messenger)
+    CaptureChannel.register(messenger: messenger)
   }
 }

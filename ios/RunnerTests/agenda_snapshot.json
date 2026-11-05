@@ -1,0 +1,194 @@
+{
+  "v": 4,
+  "days": {
+    "2026-10-24": [
+      {
+        "kind": "occurrence",
+        "title": "Water the plants",
+        "time": "All day",
+        "done": false,
+        "checks": true,
+        "routine": "water",
+        "occurrence": "2026-10-24",
+        "block": "allDay"
+      },
+      {
+        "kind": "shopping",
+        "title": "Groceries",
+        "done": false,
+        "block": "lists"
+      },
+      {
+        "kind": "shopping",
+        "title": "Milk",
+        "done": false,
+        "checks": true,
+        "indent": 1,
+        "line": "milk",
+        "block": "lists"
+      },
+      {
+        "kind": "checklist",
+        "title": "Packing",
+        "done": false,
+        "block": "lists"
+      },
+      {
+        "kind": "checklistLine",
+        "title": "Passport",
+        "done": true,
+        "checks": true,
+        "indent": 1,
+        "line": "passport",
+        "block": "lists"
+      },
+      {
+        "kind": "occurrence",
+        "title": "Something in Private",
+        "time": "08:00",
+        "done": false,
+        "checks": true,
+        "routine": "masked",
+        "occurrence": "2026-10-24T08:00",
+        "block": "timed",
+        "at": 480
+      },
+      {
+        "kind": "occurrence",
+        "title": "Morning",
+        "time": "09:00",
+        "done": false,
+        "checks": true,
+        "routine": "morning",
+        "occurrence": "2026-10-24T09:00",
+        "block": "timed",
+        "at": 540
+      },
+      {
+        "kind": "line",
+        "title": "Teeth",
+        "done": false,
+        "checks": true,
+        "indent": 1,
+        "routine": "morning",
+        "occurrence": "2026-10-24T09:00",
+        "line": "teeth",
+        "block": "timed",
+        "at": 540
+      },
+      {
+        "kind": "line",
+        "title": "Floss",
+        "done": false,
+        "checks": true,
+        "indent": 2,
+        "routine": "morning",
+        "occurrence": "2026-10-24T09:00",
+        "line": "floss",
+        "block": "timed",
+        "at": 540
+      },
+      {
+        "kind": "session",
+        "title": "Workout",
+        "time": "18:00",
+        "done": false,
+        "routine": "workout",
+        "occurrence": "2026-10-24T18:00",
+        "block": "timed",
+        "at": 1080
+      },
+      {
+        "kind": "pick",
+        "title": "Push-ups",
+        "done": false,
+        "checks": true,
+        "indent": 1,
+        "routine": "workout",
+        "occurrence": "2026-10-24T18:00",
+        "note": "pushups",
+        "block": "timed",
+        "at": 1080
+      },
+      {
+        "kind": "heading",
+        "title": "Eat a frog",
+        "done": false,
+        "block": "frogs"
+      },
+      {
+        "kind": "frog",
+        "title": "Call the bank",
+        "done": false,
+        "checks": true,
+        "frog": "bank",
+        "block": "frogs"
+      }
+    ],
+    "2026-10-25": [
+      {
+        "kind": "occurrence",
+        "title": "Morning",
+        "time": "09:00",
+        "done": false,
+        "checks": true,
+        "routine": "morning",
+        "occurrence": "2026-10-25T09:00",
+        "block": "timed",
+        "at": 540
+      },
+      {
+        "kind": "text",
+        "title": "Picks 2",
+        "done": false,
+        "indent": 1,
+        "block": "timed",
+        "at": 540
+      }
+    ],
+    "2026-10-26": []
+  },
+  "headings": {
+    "2026-10-24": "Saturday, 24 October",
+    "2026-10-25": "Sunday, 25 October",
+    "2026-10-26": "Monday, 26 October"
+  },
+  "missed": [
+    {
+      "kind": "heading",
+      "title": "Missed",
+      "done": false
+    },
+    {
+      "kind": "text",
+      "title": "Pills · 2 times",
+      "done": false
+    },
+    {
+      "kind": "missed",
+      "title": "Fri, 23 Oct",
+      "time": "08:00",
+      "done": false,
+      "checks": true,
+      "routine": "pills",
+      "occurrence": "2026-10-23T08:00"
+    }
+  ],
+  "unsorted": 3,
+  "calendars": [
+    "calendar-1"
+  ],
+  "fatFingers": true,
+  "labels": {
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "empty": "Nothing due today.",
+    "planned": "Nothing planned",
+    "unsorted": "3 Unsorted",
+    "done": "Done",
+    "allDay": "All day",
+    "noTitle": "(No title)",
+    "since": "from {time}",
+    "until": "until {time}"
+  }
+}

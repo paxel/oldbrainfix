@@ -1,0 +1,3 @@
+// The Widgets extension's Debug build (#242): the app's version and build
+// number from Flutter, which the extension's must equal.
+#include "../Flutter/Generated.xcconfig"

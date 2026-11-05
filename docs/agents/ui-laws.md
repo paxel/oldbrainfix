@@ -800,6 +800,19 @@ replace a law of Both apps where they say so. A desktop law marked
   headings and the other headings have no box; every other tap opens
   the app. Masked rows show as on the Agenda and the lock screen.
   Nothing of an appointment is kept for the widget either.
+- **On the iPhone the Agenda widget** (#242) is medium or large and
+  differs where WidgetKit decides: it does not scroll, so it shows the
+  rows from the top as far as its height allows, never a heading as its
+  last row, and "+n" for the rows left out, which opens the app like
+  every other tap. With Fat fingers fewer rows fit. A box ticks without
+  opening the app and shows checked at once; the app applies it the
+  next time it opens or comes back. The appointments show while the app
+  has full access to the calendars. Capture there is one small Capture
+  widget, its button opening voice, text or photo as chosen when the
+  widget is edited (text until then), the same widget on the lock
+  screen, and a Control Center control each for voice, text and photo;
+  each opens its capture screen directly, as Android's widgets and
+  tiles do.
 
 ### Cards
 

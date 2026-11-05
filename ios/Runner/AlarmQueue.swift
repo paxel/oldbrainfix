@@ -6,9 +6,20 @@ struct QueuedAction: Equatable {
   static let done = "done"
   static let snooze = "snooze"
   static let nudgeSnooze = "nudgeSnooze"
+  /// A Line of a Checklist Routine's Occurrence checked in the Agenda
+  /// widget (#242).
+  static let line = "line"
+  /// A Frog checked off in the Agenda widget; its id travels as the
+  /// routine.
+  static let frog = "frog"
+  /// A Shopping List's Line checked in the Agenda widget.
+  static let shopping = "shopping"
+  /// A Line of a Checklist without a Routine checked in the Agenda widget.
+  static let checklist = "checklist"
 
-  /// The kinds the iPhone queues; the Agenda widget's come with #242.
-  static let kinds: Set<String> = [done, snooze, nudgeSnooze]
+  /// The kinds the iPhone queues: a notification's or an alarm's, and
+  /// the Agenda widget's boxes (#242), as android/…/EventQueue.kt.
+  static let kinds: Set<String> = [done, snooze, nudgeSnooze, line, frog, shopping, checklist]
 
   /// Counts up; the app acknowledges everything up to one it applied.
   var seq: Int64
@@ -21,6 +32,8 @@ struct QueuedAction: Equatable {
   var until: Int64
   var title: String
   var body: String
+  /// The Line a widget's box checked; empty for every other kind.
+  var line: String = ""
 
   var key: String { "\(routine)@\(occurrence)" }
 
@@ -33,15 +46,17 @@ struct QueuedAction: Equatable {
       "occurrence": occurrence,
       "at": NSNumber(value: at),
       "until": NSNumber(value: until),
-      "line": "",
+      "line": line,
     ]
   }
 
-  /// As it is stored.
+  /// As it is stored, in the shape of android/…/EventQueue.kt's
+  /// entries: `line` only where a Line was checked.
   var json: [String: Any] {
     var map = channelMap
     map["title"] = title
     map["body"] = body
+    if line.isEmpty { map.removeValue(forKey: "line") }
     return map
   }
 
@@ -58,12 +73,13 @@ struct QueuedAction: Equatable {
       seq: seq, kind: kind, routine: routine, occurrence: occurrence, at: at,
       until: PlanCodec.int64(json["until"]) ?? 0,
       title: json["title"] as? String ?? "",
-      body: json["body"] as? String ?? "")
+      body: json["body"] as? String ?? "",
+      line: json["line"] as? String ?? "")
   }
 
   init(
     seq: Int64, kind: String, routine: String, occurrence: String, at: Int64, until: Int64,
-    title: String, body: String
+    title: String, body: String, line: String = ""
   ) {
     self.seq = seq
     self.kind = kind
@@ -73,6 +89,7 @@ struct QueuedAction: Equatable {
     self.until = until
     self.title = title
     self.body = body
+    self.line = line
   }
 }
 
@@ -98,13 +115,13 @@ struct ActionQueue {
   @discardableResult
   mutating func add(
     kind: String, routine: String, occurrence: String, title: String, body: String,
-    until: Int64 = 0, now: Int64
+    until: Int64 = 0, line: String = "", now: Int64
   ) -> QueuedAction {
     let last = stored.compactMap { PlanCodec.int64($0["seq"]) }.max() ?? 0
     seq = max(seq, last) + 1
     let action = QueuedAction(
       seq: seq, kind: kind, routine: routine, occurrence: occurrence, at: now, until: until,
-      title: title, body: body)
+      title: title, body: body, line: line)
     stored.append(action.json)
     return action
   }

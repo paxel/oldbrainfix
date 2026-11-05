@@ -680,10 +680,11 @@ jobs:
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
           IOS_PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
+          IOS_PROFILE_WIDGETS: ${{ secrets.IOS_PROFILE_WIDGETS }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           missing=""
-          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD IOS_PROFILE IOS_PROFILE_SHARE APPLE_TEAM_ID; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD IOS_PROFILE IOS_PROFILE_SHARE IOS_PROFILE_WIDGETS APPLE_TEAM_ID; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
@@ -710,8 +711,9 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: sh tool/ios-native.sh iphoneos
       # A keychain of its own for the certificate, and the profiles where
-      # Xcode looks: the app's and the Share extension's (#241); each
-      # UUID and team come from the profile itself.
+      # Xcode looks: the app's, the Share extension's (#241) and the
+      # Widgets extension's (#242); each UUID and team come from the
+      # profile itself.
       - name: Install the certificate and the profiles
         if: steps.secrets.outputs.ready == 'true'
         env:
@@ -719,6 +721,7 @@ jobs:
           P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           PROFILE: ${{ secrets.IOS_PROFILE }}
           PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
+          PROFILE_WIDGETS: ${{ secrets.IOS_PROFILE_WIDGETS }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           keychain="$RUNNER_TEMP/signing.keychain-db"
@@ -753,11 +756,13 @@ jobs:
           echo "PROFILE_UUID=$installed" >> "$GITHUB_ENV"
           install "$PROFILE_SHARE" io.github.paxel.oldbrainfix.ShareExtension IOS_PROFILE_SHARE
           echo "PROFILE_SHARE_UUID=$installed" >> "$GITHUB_ENV"
-      # Manual signing for the Release configurations of the Runner and
-      # of the Share extension (#241), each with its own profile, on this
-      # runner; the committed project keeps automatic signing for local
-      # builds. The extension's xcconfig is its own, so the Runner's
-      # profile never reaches it.
+          install "$PROFILE_WIDGETS" io.github.paxel.oldbrainfix.Widgets IOS_PROFILE_WIDGETS
+          echo "PROFILE_WIDGETS_UUID=$installed" >> "$GITHUB_ENV"
+      # Manual signing for the Release configurations of the Runner, of
+      # the Share extension (#241) and of the Widgets extension (#242),
+      # each with its own profile, on this runner; the committed project
+      # keeps automatic signing for local builds. Each extension's
+      # xcconfig is its own, so the Runner's profile never reaches it.
       - name: Sign the Release build with them
         if: steps.secrets.outputs.ready == 'true'
         env:
@@ -777,6 +782,13 @@ jobs:
             echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
             echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_SHARE_UUID"
           } >> ios/ShareExtension/Release.xcconfig
+          {
+            echo 'CODE_SIGN_STYLE = Manual'
+            echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID"
+            echo 'CODE_SIGN_IDENTITY = Apple Distribution'
+            echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_WIDGETS_UUID"
+          } >> ios/Widgets/Release.xcconfig
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -798,6 +810,8 @@ jobs:
               <string>$PROFILE_UUID</string>
               <key>io.github.paxel.oldbrainfix.ShareExtension</key>
               <string>$PROFILE_SHARE_UUID</string>
+              <key>io.github.paxel.oldbrainfix.Widgets</key>
+              <string>$PROFILE_WIDGETS_UUID</string>
             </dict>
           </dict>
           </plist>

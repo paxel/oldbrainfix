@@ -15,10 +15,13 @@ import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/location.dart';
 import 'package:oldbrainfix/src/lock_platform.dart';
+import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/ocr_platform.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/profile_platform.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart'
+    show deviceWallClock;
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/sync_platform.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
@@ -148,6 +151,116 @@ void main() {
     expect(find.byType(CaptureScreen), findsOneWidget);
     expect(find.text('Sauce recipe\nhttps://example.org/sauce'), findsOne);
     expect(waiting, isEmpty);
+  });
+
+  testWidgets('a capture a Capture widget or control asked for opens its '
+      'screen on start (#242)', (tester) async {
+    store
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    // The capture channel as CaptureChannel.swift answers it: the mode
+    // the link asked for once, then none.
+    final asked = ['text'];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('io.github.paxel.oldbrainfix/capture'),
+          (call) async {
+            if (call.method != 'take') throw MissingPluginException();
+            return asked.isEmpty ? null : asked.removeAt(0);
+          },
+        );
+    await start(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CaptureScreen), findsOneWidget);
+    expect(asked, isEmpty);
+  });
+
+  testWidgets('boxes ticked on the Agenda widget reach the log as the app '
+      'refreshes, and its Unsorted count opens the Unsorted list (#242)', (
+    tester,
+  ) async {
+    store
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    final notes = Notes(store);
+    final frogs = Frogs(store);
+    final taxes = frogs.spawn(notes.capture('taxes').id);
+    final shopping = ShoppingLists(store);
+    final groceries = notes.capture('Groceries\nMilk').id;
+    shopping.make(groceries);
+    notes.capture('nees mor sauce');
+    final milk = shopping.byNote(groceries, deviceWallClock)!.lines.single;
+    final at = DateTime(2026, 10, 24, 8).millisecondsSinceEpoch;
+    // The alarms channel as AlarmsChannel.swift answers it: the widget's
+    // ticks queued in the App Group, in QueuedAction.channelMap's shape,
+    // until acknowledged; the Unsorted count's link once.
+    var pending = <Map<String, Object?>>[
+      {
+        'seq': 1,
+        'kind': 'shopping',
+        'routine': '',
+        'occurrence': '',
+        'at': at,
+        'until': 0,
+        'line': milk.id,
+      },
+      {
+        'seq': 2,
+        'kind': 'frog',
+        'routine': taxes.id,
+        'occurrence': '',
+        'at': at,
+        'until': 0,
+        'line': '',
+      },
+    ];
+    var unsorted = true;
+    final acknowledged = <int>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('io.github.paxel.oldbrainfix/alarms'),
+          (call) async {
+            switch (call.method) {
+              case 'pending':
+                return pending;
+              case 'ack':
+                final seq = call.arguments as int;
+                acknowledged.add(seq);
+                pending = [
+                  for (final p in pending)
+                    if ((p['seq'] as int) > seq) p,
+                ];
+                return null;
+              case 'unsortedOpened':
+                final opened = unsorted;
+                unsorted = false;
+                return opened;
+              case 'pickOpened':
+              case 'ringing':
+                return null;
+              case 'nudgeOpened':
+              case 'changesOpened':
+                return false;
+              case 'permissions':
+                return {'notifications': true, 'alarms': true};
+              default:
+                return null;
+            }
+          },
+        );
+    await start(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(
+      shopping.byNote(groceries, deviceWallClock)?.lines.single.struck,
+      isTrue,
+    );
+    expect(frogs.byId(taxes.id)?.isDone, isTrue);
+    expect(acknowledged, isNotEmpty);
+    expect(acknowledged.last, 2);
+    expect(pending, isEmpty);
+    expect(find.byType(UnsortedScreen), findsOneWidget);
   });
 
   testWidgets('a first start without any channel shows the first screen', (
