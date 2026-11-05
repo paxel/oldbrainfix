@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/look.dart';
@@ -97,6 +98,27 @@ void main() {
       await tap(tester, find.text('Save'));
       expect(routines.byId(pills.id)?.escalation, 5);
       expect(alarms.armed.first.alarm.escalation, 5);
+    });
+
+    testWidgets('is an iPhone alarm on the iPhone, which has no full-screen '
+        'alarm (#244)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        routines.create('pills', daily([at(20)]));
+        await start(tester);
+        await tap(tester, find.text('pills').first);
+        await openSection(tester);
+        expect(find.text('Escalate to an iPhone alarm'), findsOneWidget);
+        expect(find.textContaining('full-screen'), findsNothing);
+        await tap(tester, find.byKey(const ValueKey('escalationOn')));
+        expect(
+          find.text('iPhone alarm after 3 ignored Re-nags'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Snooze rings it again'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('a count outside the choices stays chosen', (tester) async {

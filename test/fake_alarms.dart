@@ -41,6 +41,10 @@ class FakeAlarms implements AlarmPlatform {
   @override
   bool get available => true;
 
+  /// Whether the Alarm sound row shows; false answers as the iPhone.
+  @override
+  bool choosesSound = true;
+
   /// The setup's steps; Android's unless a test answers as the iPhone.
   @override
   List<AlarmPermission> steps = const [

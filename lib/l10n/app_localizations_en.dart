@@ -916,6 +916,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get escalationSwitch => 'Escalate to a full-screen alarm';
 
   @override
+  String get escalationSwitchIphone => 'Escalate to an iPhone alarm';
+
+  @override
+  String escalationSummaryIphone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'iPhone alarm after $count ignored Re-nags',
+      one: 'iPhone alarm after 1 ignored Re-nag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get escalationExplainIphone =>
+      'When this one is ignored again and again, it rings as an iPhone alarm, through silent mode and Focus, also on the lock screen. Stop counts as Done; Snooze rings it again in 10 min.';
+
+  @override
   String get escalationAfter => 'After ignored Re-nags';
 
   @override
@@ -1623,6 +1641,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unlockBiometrics => 'Unlock with fingerprint or screen lock';
+
+  @override
+  String get unlockBiometricsIphone => 'Unlock with Face ID or Touch ID';
 
   @override
   String get biometricsDetail => 'The PIN always works as well.';

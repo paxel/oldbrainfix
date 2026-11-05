@@ -642,7 +642,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   onTap: _pickAllDayFrom,
                 ),
-                if (widget.alarms.platform.available)
+                if (widget.alarms.platform.available &&
+                    widget.alarms.platform.choosesSound)
                   ListTile(
                     key: const ValueKey('alarmSound'),
                     leading: const Icon(Icons.music_note_outlined),

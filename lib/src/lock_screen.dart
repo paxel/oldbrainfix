@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'capture_fan.dart';
+import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
@@ -94,7 +95,7 @@ class _LockScreenState extends State<LockScreen> {
                       key: const ValueKey('unlockBiometrics'),
                       onPressed: _biometrics,
                       icon: const Icon(Icons.fingerprint),
-                      label: Text(t.unlockBiometrics),
+                      label: Text(t.unlockBiometricsHere),
                     ),
                   ],
                   const SizedBox(height: 16),

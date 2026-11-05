@@ -247,6 +247,10 @@ abstract interface class AlarmPlatform {
   /// only show where it has.
   bool get available;
 
+  /// Whether the user chooses the sound Occurrences ring with; the
+  /// iPhone has no sound picker (#243), so it rings with the system's.
+  bool get choosesSound;
+
   /// The permissions this platform's alarms need, in the order the
   /// setup asks for them; the others do not exist here.
   List<AlarmPermission> get steps;
@@ -321,6 +325,9 @@ class NoAlarms implements AlarmPlatform {
   bool get available => false;
 
   @override
+  bool get choosesSound => false;
+
+  @override
   List<AlarmPermission> get steps => const [];
 
   @override
@@ -386,6 +393,9 @@ class AndroidAlarms implements AlarmPlatform {
 
   @override
   bool get available => true;
+
+  @override
+  bool get choosesSound => true;
 
   @override
   List<AlarmPermission> get steps => const [
@@ -670,6 +680,11 @@ class AndroidAlarms implements AlarmPlatform {
 /// of exact and full-screen alarms. AlarmKit's own alarm screen replaces
 /// the full-screen alarm, so nothing ever rings here as [ringing].
 class IosAlarms extends AndroidAlarms {
+  /// No sound picker on iOS: notifications ring with the iPhone's
+  /// notification sound, AlarmKit alarms with its alarm sound (#244).
+  @override
+  bool get choosesSound => false;
+
   @override
   List<AlarmPermission> get steps => const [
     AlarmPermission.notifications,

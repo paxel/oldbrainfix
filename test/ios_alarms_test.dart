@@ -67,6 +67,11 @@ void main() {
 
   ClockTime at(int hour, [int minute = 0]) => ClockTime(hour, minute);
 
+  test('offer no choice of sound: iOS has no sound picker (#244)', () {
+    expect(IosAlarms().choosesSound, isFalse);
+    expect(AndroidAlarms().choosesSound, isTrue);
+  });
+
   Schedule daily(List<ClockTime> times) => Schedule(
     start: Day(2026, 10, 1),
     times: times,

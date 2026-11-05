@@ -1490,6 +1490,24 @@ abstract class AppLocalizations {
   /// **'Escalate to a full-screen alarm'**
   String get escalationSwitch;
 
+  /// escalationSwitch on the iPhone (#244), which has no full-screen alarm: the escalated Occurrence rings as an AlarmKit alarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalate to an iPhone alarm'**
+  String get escalationSwitchIphone;
+
+  /// escalationSummary on the iPhone (#244).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{iPhone alarm after 1 ignored Re-nag} other{iPhone alarm after {count} ignored Re-nags}}'**
+  String escalationSummaryIphone(int count);
+
+  /// escalationExplain on the iPhone (#244): AlarmKit's own alarm screen with Stop and one Snooze of 10 min.
+  ///
+  /// In en, this message translates to:
+  /// **'When this one is ignored again and again, it rings as an iPhone alarm, through silent mode and Focus, also on the lock screen. Stop counts as Done; Snooze rings it again in 10 min.'**
+  String get escalationExplainIphone;
+
   /// No description provided for @escalationAfter.
   ///
   /// In en, this message translates to:
@@ -2659,6 +2677,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock with fingerprint or screen lock'**
   String get unlockBiometrics;
+
+  /// unlockBiometrics on the iPhone (#244); the iPhone's passcode is the fallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with Face ID or Touch ID'**
+  String get unlockBiometricsIphone;
 
   /// No description provided for @biometricsDetail.
   ///

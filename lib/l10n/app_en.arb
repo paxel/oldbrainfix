@@ -516,6 +516,19 @@
   },
   "escalationExplain": "When this one is ignored again and again, it turns into a full-screen alarm with sound, even over the lock screen. It rings for up to 5 minutes, then Re-nags again, until it is Done or snoozed.",
   "escalationSwitch": "Escalate to a full-screen alarm",
+  "escalationSwitchIphone": "Escalate to an iPhone alarm",
+  "@escalationSwitchIphone": {"description": "escalationSwitch on the iPhone (#244), which has no full-screen alarm: the escalated Occurrence rings as an AlarmKit alarm."},
+  "escalationSummaryIphone": "{count, plural, =1{iPhone alarm after 1 ignored Re-nag} other{iPhone alarm after {count} ignored Re-nags}}",
+  "@escalationSummaryIphone": {
+    "description": "escalationSummary on the iPhone (#244).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "escalationExplainIphone": "When this one is ignored again and again, it rings as an iPhone alarm, through silent mode and Focus, also on the lock screen. Stop counts as Done; Snooze rings it again in 10 min.",
+  "@escalationExplainIphone": {"description": "escalationExplain on the iPhone (#244): AlarmKit's own alarm screen with Stop and one Snooze of 10 min."},
   "escalationAfter": "After ignored Re-nags",
   "nudgeHeading": "Remind me to sort it in",
   "unsortedBanner": "{count} Unsorted",
@@ -991,6 +1004,8 @@
   "lockedExplain": "Unlock to see your Notes. You can capture with + right away.",
   "unlock": "Unlock",
   "unlockBiometrics": "Unlock with fingerprint or screen lock",
+  "unlockBiometricsIphone": "Unlock with Face ID or Touch ID",
+  "@unlockBiometricsIphone": {"description": "unlockBiometrics on the iPhone (#244); the iPhone's passcode is the fallback."},
   "biometricsDetail": "The PIN always works as well.",
   "pinLabel": "PIN",
   "pinAgainLabel": "PIN again",

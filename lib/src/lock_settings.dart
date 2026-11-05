@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'calendar_mirror.dart';
+import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
@@ -106,9 +107,9 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
       if (!await confirmOwner(
             context,
             widget.lock,
-            title: t.unlockBiometrics,
+            title: t.unlockBiometricsHere,
           ) ||
-          !await widget.lock.biometrics(t.unlockBiometrics, anyway: true)) {
+          !await widget.lock.biometrics(t.unlockBiometricsHere, anyway: true)) {
         return;
       }
     }
@@ -163,7 +164,7 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
                     leading: const Icon(Icons.fingerprint),
                     value: _biometrics,
                     onChanged: _setBiometrics,
-                    title: Text(t.unlockBiometrics),
+                    title: Text(t.unlockBiometricsHere),
                     subtitle: Text(t.biometricsDetail),
                   ),
                 if (_hasPin)

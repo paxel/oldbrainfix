@@ -61,6 +61,12 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(info("UIBackgroundModes") as? [String], ["fetch"])
   }
 
+  /// iPhone only (#236, #244): no iPad, so the App Store asks for no
+  /// iPad screenshots. Xcode writes TARGETED_DEVICE_FAMILY as this key.
+  func testIphoneOnly() {
+    XCTAssertEqual(info("UIDeviceFamily") as? [Int], [1])
+  }
+
   func testIos26AndNewer() {
     XCTAssertEqual(info("MinimumOSVersion") as? String, "26.0")
   }

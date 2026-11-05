@@ -9,7 +9,7 @@ every release.
   bundle to the internal track; promotion is done in the Play Console.
 - App Store: the app record for bundle id `io.github.paxel.oldbrainfix`
   (the same id as the Android package), Apple id `<to be filled in by the
-  user>`, SKU `oldbrainfix`, iOS 26 and newer. The tag
+  user>`, SKU `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
   pipeline uploads each build to TestFlight once the Apple secrets exist
   (`docs/agents/ios-release.md`). Until the first App Store release
   (#245) the app reaches testers through TestFlight only; the listing
@@ -104,11 +104,9 @@ Sizes, from Apple's
   Face ID (large) size the Dynamic Island (large) ones, so the one set at
   1320 × 2868 covers every iPhone.
 - Up to 10 screenshots per size, PNG or JPEG, no alpha channel.
-- iPad: an app that supports iPadOS also needs at least one iPad 13"
-  screenshot. The Xcode project still says `TARGETED_DEVICE_FAMILY =
-  "1,2"` (iPhone and iPad, Flutter's default) while #236 plans the
-  iPhone; before #245 submits, either the project goes to `1` or iPad
-  frames are added here.
+- No iPad frames: the app is iPhone only (`TARGETED_DEVICE_FAMILY = 1`
+  for the app and both extensions, #236), so App Store Connect asks for
+  no iPad 13" screenshots.
 - iPhone Duo (1398 × 2034 outer, 2007 × 2853 inner) is required from
   April 2027 for apps built with the iOS 27.1 SDK or later; no frames for
   it yet.

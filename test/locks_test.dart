@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -862,6 +863,21 @@ void main() {
       await start(tester);
       await openSettings(tester);
       expect(find.byKey(const ValueKey('biometrics')), findsNothing);
+    });
+
+    testWidgets('name Face ID and Touch ID on the iPhone (#244)', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        biometrics.can = true;
+        await start(tester);
+        await openSettings(tester);
+        expect(find.text('Unlock with Face ID or Touch ID'), findsOneWidget);
+        expect(find.text(en.unlockBiometrics), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('switch biometrics on with the PIN, once they work', (

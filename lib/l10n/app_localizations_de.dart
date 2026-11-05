@@ -922,6 +922,25 @@ class AppLocalizationsDe extends AppLocalizations {
   String get escalationSwitch => 'Zum Vollbild-Alarm eskalieren';
 
   @override
+  String get escalationSwitchIphone => 'Zu einem iPhone-Alarm eskalieren';
+
+  @override
+  String escalationSummaryIphone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'iPhone-Alarm, nachdem es $count-mal unbeachtet wieder geklingelt hat',
+      one: 'iPhone-Alarm, nachdem es einmal unbeachtet wieder geklingelt hat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get escalationExplainIphone =>
+      'Wird diese immer wieder übergangen, klingelt sie als iPhone-Alarm, auch im Stummmodus und im Fokus und auf dem Sperrbildschirm. Stopp zählt als erledigt; Später lässt sie in 10 Min. wieder klingeln.';
+
+  @override
   String get escalationAfter => 'Nach so oft unbeachtetem Wiederklingeln';
 
   @override
@@ -1633,6 +1652,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get unlockBiometrics =>
       'Mit Fingerabdruck oder Displaysperre entsperren';
+
+  @override
+  String get unlockBiometricsIphone => 'Mit Face ID oder Touch ID entsperren';
 
   @override
   String get biometricsDetail => 'Die PIN funktioniert immer auch.';

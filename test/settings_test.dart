@@ -396,6 +396,16 @@ void main() {
       const bell = 'content://media/internal/audio/media/42';
       final tile = find.byKey(const ValueKey('alarmSound'));
 
+      testWidgets('is no choice on the iPhone, which has no sound picker', (
+        tester,
+      ) async {
+        await start(tester);
+        alarms.choosesSound = false;
+        await openDeviceSettings(tester);
+        expect(tile, findsNothing);
+        expect(find.byKey(const ValueKey('renagDevice')), findsOneWidget);
+      });
+
       testWidgets('is the app\'s own until another is picked, which is kept '
           'on this Device and armed', (tester) async {
         await start(tester);
