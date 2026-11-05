@@ -31,6 +31,18 @@ class RunnerTests: XCTestCase {
     XCTAssertNotNil(info("NSMicrophoneUsageDescription") as? String)
   }
 
+  /// The local network's reason, and the one Bonjour type the sync
+  /// looks for, without which iOS finds no paired host (#240).
+  func testTheLocalNetworkIsExplainedAndOurServiceNamed() {
+    XCTAssertNotNil(info("NSLocalNetworkUsageDescription") as? String)
+    XCTAssertEqual(info("NSBonjourServices") as? [String], ["_oldbrainfix._tcp"])
+  }
+
+  /// The background sync's app refresh task (#240).
+  func testBackgroundFetchIsOn() {
+    XCTAssertEqual(info("UIBackgroundModes") as? [String], ["fetch"])
+  }
+
   func testIos26AndNewer() {
     XCTAssertEqual(info("MinimumOSVersion") as? String, "26.0")
   }

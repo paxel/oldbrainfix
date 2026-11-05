@@ -11,6 +11,8 @@ import UserNotifications
     // Before launching ends, so a tap that started the app in the
     // background reaches it (#238).
     UNUserNotificationCenter.current().delegate = AlarmNotifications.shared
+    // Registered before launching ends, as BGTaskScheduler requires (#240).
+    BackgroundSync.register()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -21,5 +23,8 @@ import UserNotifications
     OcrChannel.register(messenger: messenger)
     SpeechChannel.register(messenger: messenger)
     VoiceChannel.register(messenger: messenger)
+    FolderChannel.register(messenger: messenger, picking: true)
+    PairingChannel.register(messenger: messenger)
+    SyncChannel.registerApp(messenger: messenger)
   }
 }

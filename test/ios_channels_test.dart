@@ -101,7 +101,7 @@ void main() {
         appointments: const AndroidAppointments(),
         lock: const AndroidBiometrics(),
         pairing: const AndroidPairing(),
-        sync: AndroidSync(),
+        sync: IosSync(),
         folders: const AndroidFolders(),
         bundles: AndroidBundles(),
         profile: AndroidProfile(),
@@ -109,6 +109,12 @@ void main() {
     );
     await settle(tester);
   }
+
+  test('the iPhone hosts only while the app is open, Android also out of '
+      'sight (#240)', () {
+    expect(IosSync().hostsOutOfSight, isFalse);
+    expect(AndroidSync().hostsOutOfSight, isTrue);
+  });
 
   testWidgets('a first start without any channel shows the first screen', (
     tester,

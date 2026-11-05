@@ -150,6 +150,10 @@ class NoFolders implements FolderPlatform {
 /// writes it: what the automatic sync's isolate opens (#225).
 SyncFolder openSafFolder(String setting) => SafSyncFolder(setting);
 
+/// The iPhone's ios/Runner/FolderChannel.swift answers the same calls
+/// (#240): the Files app's folder picker, the folder kept as a
+/// security-scoped bookmark, so iCloud Drive and other file providers
+/// work; the folder as kept is the bookmark's key there, not a URI.
 class AndroidFolders implements FolderPlatform {
   static const channel = MethodChannel('io.github.paxel.oldbrainfix/folder');
 

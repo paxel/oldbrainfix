@@ -30,6 +30,16 @@
 		B2390000000000000000000D /* OcrTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2390000000000000000000C /* OcrTests.swift */; };
 		B2390000000000000000000F /* SpeechFilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2390000000000000000000E /* SpeechFilesTests.swift */; };
 		B23900000000000000000011 /* german-receipt.jpg in Resources */ = {isa = PBXBuildFile; fileRef = B23900000000000000000010 /* german-receipt.jpg */; };
+		B24000000000000000000002 /* FolderRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000001 /* FolderRules.swift */; };
+		B24000000000000000000004 /* ZipReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000003 /* ZipReader.swift */; };
+		B24000000000000000000006 /* FolderChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000005 /* FolderChannel.swift */; };
+		B24000000000000000000008 /* SyncRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000007 /* SyncRecords.swift */; };
+		B2400000000000000000000A /* SyncChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000009 /* SyncChannel.swift */; };
+		B2400000000000000000000C /* PairingChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2400000000000000000000B /* PairingChannel.swift */; };
+		B2400000000000000000000E /* BackgroundSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2400000000000000000000D /* BackgroundSync.swift */; };
+		B24000000000000000000010 /* FolderRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2400000000000000000000F /* FolderRulesTests.swift */; };
+		B24000000000000000000012 /* ZipReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000011 /* ZipReaderTests.swift */; };
+		B24000000000000000000014 /* SyncRecordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24000000000000000000013 /* SyncRecordsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,6 +98,16 @@
 		B2390000000000000000000A /* rusto */ = {isa = PBXFileReference; lastKnownFileType = folder; name = rusto; path = ../android/app/src/main/assets/rusto; sourceTree = SOURCE_ROOT; };
 		B2390000000000000000000C /* OcrTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OcrTests.swift; sourceTree = "<group>"; };
 		B2390000000000000000000E /* SpeechFilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechFilesTests.swift; sourceTree = "<group>"; };
+		B24000000000000000000001 /* FolderRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderRules.swift; sourceTree = "<group>"; };
+		B24000000000000000000003 /* ZipReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZipReader.swift; sourceTree = "<group>"; };
+		B24000000000000000000005 /* FolderChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderChannel.swift; sourceTree = "<group>"; };
+		B24000000000000000000007 /* SyncRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecords.swift; sourceTree = "<group>"; };
+		B24000000000000000000009 /* SyncChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncChannel.swift; sourceTree = "<group>"; };
+		B2400000000000000000000B /* PairingChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingChannel.swift; sourceTree = "<group>"; };
+		B2400000000000000000000D /* BackgroundSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSync.swift; sourceTree = "<group>"; };
+		B2400000000000000000000F /* FolderRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderRulesTests.swift; sourceTree = "<group>"; };
+		B24000000000000000000011 /* ZipReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZipReaderTests.swift; sourceTree = "<group>"; };
+		B24000000000000000000013 /* SyncRecordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecordsTests.swift; sourceTree = "<group>"; };
 		B23900000000000000000010 /* german-receipt.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = "german-receipt.jpg"; path = "../android/ocr/testdata/german-receipt.jpg"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -111,6 +131,9 @@
 				B2390000000000000000000C /* OcrTests.swift */,
 				B2390000000000000000000E /* SpeechFilesTests.swift */,
 				B23900000000000000000010 /* german-receipt.jpg */,
+				B2400000000000000000000F /* FolderRulesTests.swift */,
+				B24000000000000000000011 /* ZipReaderTests.swift */,
+				B24000000000000000000013 /* SyncRecordsTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -170,6 +193,13 @@
 				B23900000000000000000007 /* VoiceChannel.swift */,
 				B23900000000000000000009 /* oldbrainfix_native.h */,
 				B2390000000000000000000A /* rusto */,
+				B24000000000000000000001 /* FolderRules.swift */,
+				B24000000000000000000003 /* ZipReader.swift */,
+				B24000000000000000000005 /* FolderChannel.swift */,
+				B24000000000000000000007 /* SyncRecords.swift */,
+				B24000000000000000000009 /* SyncChannel.swift */,
+				B2400000000000000000000B /* PairingChannel.swift */,
+				B2400000000000000000000D /* BackgroundSync.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -327,6 +357,9 @@
 				B2380000000000000000000A /* AlarmPlanTests.swift in Sources */,
 				B2390000000000000000000D /* OcrTests.swift in Sources */,
 				B2390000000000000000000F /* SpeechFilesTests.swift in Sources */,
+				B24000000000000000000010 /* FolderRulesTests.swift in Sources */,
+				B24000000000000000000012 /* ZipReaderTests.swift in Sources */,
+				B24000000000000000000014 /* SyncRecordsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,6 +378,13 @@
 				B23900000000000000000004 /* SpeechChannel.swift in Sources */,
 				B23900000000000000000006 /* SpeechFiles.swift in Sources */,
 				B23900000000000000000008 /* VoiceChannel.swift in Sources */,
+				B24000000000000000000002 /* FolderRules.swift in Sources */,
+				B24000000000000000000004 /* ZipReader.swift in Sources */,
+				B24000000000000000000006 /* FolderChannel.swift in Sources */,
+				B24000000000000000000008 /* SyncRecords.swift in Sources */,
+				B2400000000000000000000A /* SyncChannel.swift in Sources */,
+				B2400000000000000000000C /* PairingChannel.swift in Sources */,
+				B2400000000000000000000E /* BackgroundSync.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

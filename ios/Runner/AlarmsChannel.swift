@@ -15,10 +15,23 @@ enum AlarmsChannel {
   static let name = "io.github.paxel.oldbrainfix/alarms"
   private static var channel: FlutterMethodChannel?
 
-  static func register(messenger: FlutterBinaryMessenger) {
+  /// The app's engine's channel, or the background sync's (#240): there
+  /// nothing was tapped to open, since there is no screen, and the app's
+  /// channel stays the one told of taps.
+  @discardableResult
+  static func register(messenger: FlutterBinaryMessenger, background: Bool = false)
+    -> FlutterMethodChannel
+  {
     let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
-    channel.setMethodCallHandler { call, result in handle(call, result) }
-    self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      if background && ["nudgeOpened", "changesOpened", "unsortedOpened"].contains(call.method) {
+        result(false)
+        return
+      }
+      handle(call, result)
+    }
+    if !background { self.channel = channel }
+    return channel
   }
 
   /// Tells the app a tap was queued, so it applies it at once.

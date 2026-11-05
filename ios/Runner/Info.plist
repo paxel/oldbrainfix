@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>io.github.paxel.oldbrainfix.sync</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -31,6 +35,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Lets a Routine you keep ignoring ring as an alarm, even in silent mode and Focus.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_oldbrainfix._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Syncs with your paired Devices on the same Wi-Fi, such as your computer, without the internet.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voice Notes record what you say. Old Brain Fix uses the microphone only while you record.</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -56,6 +66,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

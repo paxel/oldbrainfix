@@ -58,6 +58,12 @@ abstract interface class SyncPlatform {
 
   /// Tells the periodic work that the sync it asked for is over.
   Future<void> finished();
+
+  /// Whether the periodic work hosts for paired Devices and keeps trying
+  /// for a window while the app is out of sight. The iPhone does not
+  /// (#236): there iOS grants seconds, so the work joins once and is
+  /// over, and this Device hosts only while the app is open.
+  bool get hostsOutOfSight;
 }
 
 /// No discovery and no background work: the default where none is
@@ -94,6 +100,9 @@ class NoSync implements SyncPlatform {
 
   @override
   Future<void> finished() async {}
+
+  @override
+  bool get hostsOutOfSight => true;
 }
 
 /// Android's NsdManager and WorkManager in Kotlin, behind the app's
@@ -175,6 +184,9 @@ class AndroidSync implements SyncPlatform {
   @override
   Future<void> finished() => _call('finished');
 
+  @override
+  bool get hostsOutOfSight => true;
+
   Future<void> _call(String method, [Object? arguments]) async {
     try {
       await _channel.invokeMethod<void>(method, arguments);
@@ -184,4 +196,14 @@ class AndroidSync implements SyncPlatform {
       // Likewise.
     }
   }
+}
+
+/// The iPhone's discovery and background sync (ios/Runner/SyncChannel.swift
+/// and BackgroundSync.swift): the same channel and calls as on Android,
+/// with Bonjour for NsdManager and BGTaskScheduler for WorkManager. iOS
+/// grants the background work some seconds when it sees fit, so it
+/// never hosts out of sight and joins once ([hostsOutOfSight]).
+class IosSync extends AndroidSync {
+  @override
+  bool get hostsOutOfSight => false;
 }

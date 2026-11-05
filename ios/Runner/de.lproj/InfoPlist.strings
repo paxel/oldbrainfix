@@ -3,3 +3,6 @@
 
 /* Why the app asks for the microphone (#239). */
 "NSMicrophoneUsageDescription" = "Sprachnotizen nehmen auf, was du sagst. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst.";
+
+/* Why the app asks for the local network (#240). */
+"NSLocalNetworkUsageDescription" = "Gleicht mit deinen gekoppelten Geräten im selben WLAN ab, etwa mit deinem Computer, ohne Internet.";
