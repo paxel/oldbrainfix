@@ -88,6 +88,8 @@
 	<string>Voice Notes record what you say. Old Brain Fix uses the microphone only while you record.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Saves a photo of a Note into your photos when you tap Save. Old Brain Fix only adds, it never reads your photos.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- iOS copies a file opened with the app into Documents/Inbox, which

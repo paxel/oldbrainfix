@@ -27,6 +27,12 @@ class RunnerTests: XCTestCase {
 
   /// The microphone's reason for voice Notes (#239), in English here and
   /// in German in de.lproj.
+  /// France is left out of the App Store for now (Q590 (a)), so the app
+  /// declares no non-exempt encryption (docs/agents/app-review-notes.md).
+  func testNoNonExemptEncryptionWhileFranceIsOut() {
+    XCTAssertEqual(info("ITSAppUsesNonExemptEncryption") as? Bool, false)
+  }
+
   func testTheMicrophoneIsExplained() {
     XCTAssertNotNil(info("NSMicrophoneUsageDescription") as? String)
   }

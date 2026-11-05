@@ -131,9 +131,9 @@ code meets the criteria" of § 742.15(b)
 notification and no year-end self-classification report follow from
 that. This is a reading of the regulations, not legal advice.
 
-### Decision (Q590 (b), 2026-11-05): France is included
+### Decision (Q590 (a), 2026-11-05): France is left out for now
 
-The user decided to distribute in France. Before the first submission: file the French encryption declaration (second row below); once Apple shows its code, set `ITSAppUsesNonExemptEncryption` = YES and `ITSEncryptionExportComplianceCode` = that code in `ios/Runner/Info.plist`. Until then the submission step stops with its error; TestFlight is unaffected.
+The user first chose France (b), then switched to (a) on seeing that the French declaration (ANSSI receipt) must come first: `ITSAppUsesNonExemptEncryption` = NO is set in `ios/Runner/Info.plist` (an XCTest pins it), and France must stay out of Pricing and Availability. To add France later: declare to ANSSI (demarche.numerique.gouv.fr, "Déclaration relative à un moyen de cryptologie"), upload its receipt under App Encryption Documentation, then switch to the second row below and add France to Availability.
 
 ### The two choices
 
