@@ -281,6 +281,28 @@ fn keys_go_from_cell_to_cell_and_out_into_the_text_and_back() -> TestResult {
 }
 
 #[test]
+fn leaving_the_grid_puts_no_line_in_where_a_line_follows_or_precedes() -> TestResult {
+    let (store, note) = with_note(&format!("Shop\n{TABLE}\n# Next"), MARKDOWN)?;
+    let mut harness = editor(&store, &note);
+    edit_table(&mut harness)?;
+    // Tab past the last cell: at the start of the line under the table,
+    // here a heading, which a "#" typed keeps one.
+    for _ in 0..4 {
+        key(&mut harness, Key::Tab);
+    }
+    typed(&mut harness, "#");
+    assert_eq!(field(&harness)?, format!("Shop\n{TABLE}\n## Next"));
+    // Shift+Tab before the first cell: at the end of the line above.
+    let mut harness = editor(&store, &note);
+    edit_table(&mut harness)?;
+    harness.key_press_modifiers(Modifiers::SHIFT, Key::Tab);
+    harness.run();
+    typed(&mut harness, "!");
+    assert_eq!(field(&harness)?, format!("Shop!\n{TABLE}\n# Next"));
+    Ok(())
+}
+
+#[test]
 fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
     let (store, note) = with_note(&format!("{TABLE}\n\nend"), MARKDOWN)?;
     let mut harness = editor(&store, &note);

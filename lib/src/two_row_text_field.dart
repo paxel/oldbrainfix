@@ -1332,7 +1332,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // menu work as in the field.
     final Widget gestures = _gestures.buildGestureDetector(
       behavior: HitTestBehavior.translucent,
-      child: IgnorePointer(child: _keyed(field)),
+      child: _NoPointer(child: _keyed(field)),
     );
     final region = TextFieldTapRegion(
       // The grids of the tables take their own taps and drags.
@@ -2226,4 +2226,19 @@ class _RenderCursorStrip extends RenderBox
     _clip.layer = null;
     super.dispose();
   }
+}
+
+/// Takes no pointer events, as [IgnorePointer] does, but leaves the
+/// semantics actions of what it holds: a screen reader still presses the
+/// cells and buttons of a table's grid in the field (#257).
+class _NoPointer extends SingleChildRenderObjectWidget {
+  const _NoPointer({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderNoPointer();
+}
+
+class _RenderNoPointer extends RenderProxyBox {
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) => false;
 }

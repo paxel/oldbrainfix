@@ -1486,9 +1486,11 @@ fn blank(line: &str) -> bool {
     line.trim_matches([' ', '\t']).is_empty()
 }
 
-/// `text` and where its cursor goes after `table`: on a line with a blank
-/// one between it and the table, as a line right under a table is a row
-/// of it (ADR 0033), the line breaks put in that are missing.
+/// `text` and where its cursor goes after `table`: at the start of the
+/// line right under it, which is no row of it, or of the line after a
+/// blank one; only where the table ends the text are line breaks put
+/// in, a blank line between, as a line typed right under a table is a
+/// row of it (ADR 0033).
 pub(crate) fn leave_after(text: &str, table: &Table) -> (String, usize) {
     let br = line_break(text);
     let end = table.end;
@@ -1505,12 +1507,7 @@ pub(crate) fn leave_after(text: &str, table: &Table) -> (String, usize) {
         }
         return (text.to_string(), next_end + second);
     }
-    let put = format!(
-        "{}{br}{}",
-        text.get(..next).unwrap_or_default(),
-        text.get(next..).unwrap_or_default()
-    );
-    (put, next + br.len())
+    (text.to_string(), next)
 }
 
 /// `text` and where its cursor goes before `table`: at the end of the
@@ -1702,10 +1699,10 @@ mod tests {
         let (text, at) = leave_after(&after, &first(&after));
         assert_eq!(text, after);
         assert_eq!(text.get(at..), Some("Shop"));
-        // A heading right under it gets a blank line between.
+        // A heading right under it: at its start, nothing put in.
         let heading = format!("{TABLE}\n# Shop");
         let (text, at) = leave_after(&heading, &first(&heading));
-        assert_eq!(text, format!("{TABLE}\n\n# Shop"));
+        assert_eq!(text, heading);
         assert_eq!(text.get(at..), Some("# Shop"));
         // Only a line break after it: one more.
         let broken = format!("{TABLE}\n");

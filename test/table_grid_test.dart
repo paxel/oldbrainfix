@@ -353,6 +353,21 @@ void main() {
     expect(controller.text, contains('| eggs |  |  |'));
   });
 
+  testWidgets('a screen reader presses a cell and "+" in two rows', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final controller = await pumpField(tester, shop);
+    tester.semantics.tap(find.semantics.byLabel(RegExp('^Row 2, column A')));
+    await tester.pumpAndSettle();
+    expect(cellField(1, 0), findsOneWidget);
+    tester.semantics.tap(find.semantics.byLabel('Add a row'));
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('| oat | 1 |\n|  |  |\n\nBread'));
+    expect(cellField(3, 0), findsOneWidget);
+    semantics.dispose();
+  });
+
   /// Opens the menu of [heading] and picks [item].
   Future<void> pick(WidgetTester tester, String heading, String item) async {
     await tester.tap(key(heading));
