@@ -105,6 +105,10 @@ _Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer C
 Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
 _Avoid_: Etikett, Schlagwort, Hashtag
 
+**App-Link** [App link]:
+Ein Link in einem formatierten Text, dessen Adresse das Schema der App hat, `oldbrainfix://`, etwa `[Backups](oldbrainfix://settings/backups)`: Er öffnet eine Notiz, einen Bereich oder ein Thema, die Agenda, Unsortiert, eine Seite der App oder einen Abschnitt der Einstellungen, eine Seite der Anleitung oder eine Datei des geteilten Ordners (am Computer des synchronisierten Ordners). Er öffnet ohne Nachfrage, eine Datei aber erst nach einer Frage, die sie und die App nennt, die sie öffnet, und nie eine außerhalb dieses Ordners. „Link zu…“ in der Formatleiste wählt sein Ziel, sodass niemand eine ID tippt; die IDs sind auf jedem Gerät dieselben, sodass er synchronisiert und mit seinem Text geteilt wird. Wo sein Ziel nicht zu sehen ist, sagt er „Hier nicht verfügbar“; andere Markdown-Apps zeigen seine Wörter.
+_Avoid_: Deep Link, interner Link, URL-Schema, Dateilink (ein Dateilink ist eine Art App-Link)
+
 ## Sortieren
 
 **Bereich** [Area]:
