@@ -214,8 +214,15 @@ jobs:
           [ "$blocking" -eq 0 ] || { echo "$blocking open high or critical code-scanning alerts" >&2; exit 1; }
       # Play and F-Droid take What's new from the store kit's record; a
       # tag without it would ship with none.
+      # A dry run before the store kit has written the notes checks
+      # everything else (signing included) and only warns here.
       - name: What's new for Play and F-Droid exists
         run: |
+          notes="docs/release-notes-${RELEASE_TAG#v}.md"
+          if [ "$PUBLISH" != true ] && [ ! -f "$notes" ]; then
+            echo "::warning::$notes is missing; a publishing run stops here"
+            exit 0
+          fi
           for lang in en de; do
             python3 tool/whats_new.py "docs/release-notes-${RELEASE_TAG#v}.md" "$lang" > /dev/null
           done
@@ -223,6 +230,10 @@ jobs:
       # bundle assets/help/whats_new.json, so it must hold this version.
       - name: The apps bundle this version's What's new
         run: |
+          if [ "$PUBLISH" != true ] && [ ! -f "docs/release-notes-${RELEASE_TAG#v}.md" ]; then
+            echo "::warning::no release notes yet, so no bundled What's new to check"
+            exit 0
+          fi
           python3 tool/whats_new.py --bundle --require "${RELEASE_TAG#v}"
           git diff --exit-code -- assets/help/whats_new.json
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
