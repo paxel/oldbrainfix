@@ -1578,11 +1578,11 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
         }
         final open = LinkOpenScope.of(context);
         final tap = TapGestureRecognizer()
-          ..onTap = () => unawaited(
-            appLink != null
-                ? followAppLink(context, appLink)
-                : _open(open, address!),
-          );
+          ..onTap = () => unawaited(switch ((appLink, address)) {
+            (final AppLink link, _) => followAppLink(context, link),
+            (_, final Uri uri) => _open(open, uri),
+            _ => Future<void>.value(),
+          });
         _links.add(tap);
         inner(
           style.copyWith(
