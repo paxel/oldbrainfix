@@ -19,29 +19,35 @@ frames: reused
 <!-- block id=play_notes_en limit=500 lang=en title="Release notes, en-US" where="Internal testing release" -->
 ```
 Added
-• Links in a Note open other Notes, Areas and the app's pages: Link to… in the format bar.
-• Markdown task lists such as "- [ ] milk" become boxes to tick.
-• A Note's Frog shows as a badge in the Note editor.
+• Links to Notes and app pages: Link to….
+• Markdown task lists become boxes.
+• Tallies count in sets and have a Check field.
+• Sessions list their past runs.
+• A Note's Frog shows as a badge.
 Changed
+• A Tally's bar length is set in its setup.
 • Tables are edited cell by cell.
-• The Quick start in the Area "Old Brain Fix" says where to tap for each step.
-• Deleting a Note moves its Routines and Reminders into the Trash with it.
+• The Quick start in the Area "Old Brain Fix" says where to tap.
+• Deleting a Note moves its Routines and Reminders to the Trash too.
 Fixed
-• The swipe between the Agenda and the Areas reacts at once.
+• The swipe between Agenda and Areas reacts at once.
 ```
 
 <!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
 ```
 Neu
-• Links in Notizen öffnen Notizen, Bereiche und Seiten der App: Link zu… in der Formatleiste.
-• Markdown-Aufgaben wie „- [ ] Milch“ werden Kästchen zum Abhaken.
-• Der Frosch einer Notiz zeigt sich als Abzeichen im Notiz-Editor.
+• Links auf Notizen und Seiten: Link zu….
+• Markdown-Aufgaben werden Kästchen.
+• Strichlisten zählen in Sätzen, mit Abhakfeld.
+• Einheiten zeigen bisherige Läufe.
+• Frosch einer Notiz als Abzeichen.
 Geändert
-• Tabellen werden Zelle für Zelle bearbeitet.
-• Der Schnellstart im Bereich „Old Brain Fix“ sagt, wo du tippst.
-• Eine gelöschte Notiz nimmt ihre Routinen und Erinnerungen mit in den Papierkorb.
+• Balkenlänge einer Strichliste in der Einrichtung.
+• Tabellen Zelle für Zelle bearbeiten.
+• Der Schnellstart in „Old Brain Fix“ sagt, wo du tippst.
+• Löschen einer Notiz nimmt Routinen und Erinnerungen in den Papierkorb mit.
 Behoben
-• Wischen zwischen Agenda und Bereichen reagiert sofort.
+• Wischen Agenda/Bereiche reagiert sofort.
 ```
 
 ## App Store: What's New
@@ -55,6 +61,8 @@ Notes can link to each other. A link opens another Note, an Area or Topic, the A
 A Markdown task list such as "- [ ] milk" becomes a box to tick, and a ticked box is written back as a task list. A table is edited cell by cell in the Note editor, a pasted one too. A Note's Frog shows as a badge in the Note editor, with Eat now and Remove.
 
 The Quick start in the Area "Old Brain Fix" now says where to tap for each step. Deleting a Note moves its Routines and Reminders into the Trash with it, after one question, and restoring the Note brings them back.
+
+A Tally can count in sets: with Counts in sets, each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8, and Add set starts the next one with the values of the set before. A new Check field is a box in each entry whose ticks the chart counts, such as one Tally per room for cleaning. A Tally's bar length is chosen in its setup, its target counts per bar, and the chart shows slim bars with the newest on the right. A Session lists its past runs, with each picked Tally done or not done.
 ```
 
 <!-- block id=appstore_whatsnew_de limit=4000 lang=de title="Neue Funktionen, Deutsch" where="Version information" -->
@@ -64,6 +72,8 @@ Notizen können aufeinander verlinken. Ein Link öffnet eine andere Notiz, einen
 Eine Markdown-Aufgabenliste wie „- [ ] Milch“ wird ein Kästchen zum Abhaken, und ein abgehaktes Kästchen wird wieder als Aufgabenliste geschrieben. Eine Tabelle wird im Notiz-Editor Zelle für Zelle bearbeitet, auch eine eingefügte. Der Frosch einer Notiz zeigt sich als Abzeichen im Notiz-Editor, mit Jetzt essen und Entfernen.
 
 Der Schnellstart im Bereich „Old Brain Fix“ sagt jetzt bei jedem Schritt, wo du tippst. Wer eine Notiz löscht, verschiebt ihre Routinen und Erinnerungen nach einer Frage mit in den Papierkorb; wird die Notiz wiederhergestellt, kommen sie mit zurück.
+
+Eine Strichliste kann in Sätzen zählen: Mit Zählt in Sätzen hält jeder Eintrag mehrere Sätze, etwa 60 kg × 10 und dann 65 kg × 8, und Satz hinzufügen beginnt den nächsten mit den Werten des vorigen. Ein neues Abhakfeld ist ein Kästchen in jedem Eintrag, dessen Haken das Diagramm zählt, etwa eine Strichliste je Raum fürs Putzen. Die Balkenlänge einer Strichliste wird in ihrer Einrichtung gewählt, ihr Ziel zählt je Balken, und das Diagramm zeigt schmale Balken, die neuesten rechts. Eine Einheit zeigt ihre bisherigen Läufe, mit jeder gewählten Strichliste erledigt oder nicht.
 ```
 
 ## Tester notes
@@ -74,11 +84,13 @@ What to test
 • Tap Link to… in the format bar, pick a Note, a page and a file of the shared folder, then tap each link in the Note.
 • Type "- [ ] milk" in a formatted text; tick the box; edit a table cell by cell and paste one from another app.
 • Delete a Note that has a Routine: one question, both go into the Trash; restoring the Note brings the Routine back.
+• Switch a Tally to Counts in sets, record three sets with Add set; give another Tally a Check field and bar length month; open a Session's past runs.
 • iPhone: share a link or a picture into the app, tick a box in the Agenda widget, let a Routine's Re-nag ring as an alarm.
 
 Known
 • File links were checked in tests, not yet on a device.
 • On the iPhone, sync over the local network runs only while the app is open.
+• A former multiplier Tally shows its old entries as sets of equal rows.
 ```
 
 ## Play: listing
