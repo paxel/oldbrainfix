@@ -504,6 +504,57 @@ void main() {
       expect(find.text('Highest bar: 2'), findsOneWidget);
     });
 
+    testWidgets('the New Tally page\'s kind badge makes a Check field, with '
+        'no unit and its sum; Number stays the default', (tester) async {
+      await startAtNotes(tester);
+      await tap(tester, find.byTooltip('Add here'));
+      await tap(tester, key('addFan-tally'));
+      await enter(tester, key('tally-form-name'), 'Kitchen');
+      await enter(tester, key('tally-form-field-name-0'), 'Plates');
+      await tap(tester, key('tally-form-add-field'));
+      await enter(tester, key('tally-form-field-name-1'), 'Wiped');
+      Finder badge(String badge, String text) =>
+          find.descendant(of: key(badge), matching: find.text(text));
+      expect(badge('tally-form-kind-0', 'Number'), findsOneWidget);
+      expect(badge('tally-form-kind-1', 'Number'), findsOneWidget);
+      // A unit and a rule picked first go with the kind.
+      await tap(tester, key('tally-form-unit-1'));
+      await tester.enterText(key('tally-unit-text'), 'min');
+      await tap(tester, key('badge-close'));
+      await tap(tester, key('tally-form-rule-1'));
+      await tap(tester, key('tally-rule-max'));
+      await tap(tester, key('tally-form-kind-1'));
+      await tap(tester, key('tally-field-kind-check'));
+      expect(badge('tally-form-kind-1', 'Check field'), findsOneWidget);
+      expect(key('tally-form-unit-1'), findsNothing);
+      expect(key('tally-form-rule-1'), findsNothing);
+      expect(key('tally-form-target-1'), findsOneWidget);
+      expect(badge('tally-form-kind-0', 'Number'), findsOneWidget);
+      expect(key('tally-form-unit-0'), findsOneWidget);
+      expect(key('tally-form-rule-0'), findsOneWidget);
+      await tap(tester, key('tally-form-save'));
+
+      final note = notes.all().single;
+      // Saved in one instant, the fields come in the order of their ids.
+      final fields = {
+        for (final f in tallies.byNote(note.id)!.fields) f.name: f,
+      };
+      expect(
+        [
+          for (final f in [fields['Plates']!, fields['Wiped']!])
+            (f.check, f.unit, f.rule),
+        ],
+        [(false, '', TallyRule.sum), (true, '', TallyRule.sum)],
+      );
+      await tester.longPress(find.text('Kitchen'));
+      await tester.pumpAndSettle();
+      expect(
+        badge('tally-setup-kind-${fields['Wiped']!.id}', 'Check field'),
+        findsOneWidget,
+      );
+      expect(key('tally-setup-kind-${fields['Plates']!.id}'), findsNothing);
+    });
+
     testWidgets('a Tally a multiplier made shows its entries as sets', (
       tester,
     ) async {
