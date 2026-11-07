@@ -140,9 +140,10 @@ void main() {
       expect(tallies.entries(note).single.values[minutes], 1800);
       tallies.restoreField(note, minutes);
       expect(tallies.byNote(note)!.shown.length, 2);
-      expect(values(tallies.chart(note, minutes, TallyPeriod.day, utcWall)), [
-        1800,
-      ]);
+      expect(
+        values(tallies.chart(note, minutes, utcWall, period: TallyPeriod.day)),
+        [1800],
+      );
       // A field added later has no value in older entries.
       final added = tallies.addField(note, name: 'Chapters');
       expect(tallies.entries(note).single.values.containsKey(added), isFalse);
@@ -264,9 +265,10 @@ void main() {
       tallies.add(into.id, values: {reps: 5});
       tallies.renameField(into.id, reps, 'Reps');
       expect(tallies.byNote(into.id)!.field(reps)?.name, 'Reps');
-      expect(values(tallies.chart(into.id, reps, TallyPeriod.day, utcWall)), [
-        25,
-      ]);
+      expect(
+        values(tallies.chart(into.id, reps, utcWall, period: TallyPeriod.day)),
+        [25],
+      );
       expect([for (final t in tallies.all()) t.noteId], [into.id]);
     });
 
@@ -324,7 +326,7 @@ void main() {
       add(DateTime.utc(2026, 3, 1, 8), 5, 79);
       // After today: in the table, not in the charts.
       add(DateTime.utc(2026, 3, 5, 8), 99, 99);
-      final days = tallies.chart(note, reps, TallyPeriod.day, utcWall);
+      final days = tallies.chart(note, reps, utcWall, period: TallyPeriod.day);
       expect(days.first.start, Day(2026, 1, 30));
       expect(days.last.start, Day(2026, 3, 1));
       expect(values(days).sublist(days.length - 7), [
@@ -338,153 +340,246 @@ void main() {
       ]);
       expect(days[days.length - 7].entries, 2);
       expect(
-        values(tallies.chart(note, weight, TallyPeriod.day, utcWall)).last,
+        values(tallies.chart(note, weight, utcWall, period: TallyPeriod.day))
+            .last,
         79,
       );
-      final weeks = tallies.chart(note, reps, TallyPeriod.week, utcWall);
+      final weeks = tallies.chart(
+        note,
+        reps,
+        utcWall,
+        period: TallyPeriod.week,
+      );
       expect(weeks.last.start, Day(2026, 2, 23));
       expect(weeks.last.end, Day(2026, 3, 1));
       expect(weeks.first.start, Day(2026, 1, 26));
       expect(values(weeks), [5, null, null, null, 50]);
-      final months = tallies.chart(note, reps, TallyPeriod.month, utcWall);
+      final months = tallies.chart(
+        note,
+        reps,
+        utcWall,
+        period: TallyPeriod.month,
+      );
       expect(
         [for (final b in months) b.start],
         [Day(2026, 1, 1), Day(2026, 2, 1), Day(2026, 3, 1)],
       );
       expect(months[1].end, Day(2026, 2, 28));
       expect(values(months), [5, 45, 5]);
-      expect(values(tallies.chart(note, weight, TallyPeriod.month, utcWall)), [
-        70,
-        82.5,
-        79,
-      ]);
-      expect(values(tallies.chart(note, reps, TallyPeriod.year, utcWall)), [
-        55,
-      ]);
-      expect(tallies.chart(note, 'none', TallyPeriod.day, utcWall), isEmpty);
+      expect(
+        values(tallies.chart(note, weight, utcWall, period: TallyPeriod.month)),
+        [70, 82.5, 79],
+      );
+      expect(
+        values(tallies.chart(note, reps, utcWall, period: TallyPeriod.year)),
+        [55],
+      );
+      expect(
+        tallies.chart(note, 'none', utcWall, period: TallyPeriod.day),
+        isEmpty,
+      );
     });
 
     test('at most the latest thousand bars', () {
       final tallies = Tallies(ann);
       final (note, [reps]) = tally(ann, 'Push-ups', ['times']);
       tallies.add(note, values: {reps: 1}, at: DateTime.utc(2020, 1, 1));
-      final days = tallies.chart(note, reps, TallyPeriod.day, utcWall);
+      final days = tallies.chart(note, reps, utcWall, period: TallyPeriod.day);
       expect(days.length, Tallies.maxBuckets);
       expect(days.last.start, Day(2026, 3, 1));
       expect(days.every((b) => b.value == null), isTrue);
-      expect(values(tallies.chart(note, reps, TallyPeriod.year, utcWall)), [
-        1,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-      ]);
+      expect(
+        values(tallies.chart(note, reps, utcWall, period: TallyPeriod.year)),
+        [1, null, null, null, null, null, null],
+      );
     });
   });
 
-  group('multipliers', () {
-    test('a multiplier counts its field as the product, on read', () {
+  group('sets and Check fields (#264)', () {
+    test('a former multiplier reads its entries as sets', () {
       final tallies = Tallies(ann);
-      final (note, [reps]) = tally(ann, 'Push-ups', ['reps']);
-      tallies.setTarget(note, reps, 30);
-      final old = tallies.add(
-        note,
-        values: {reps: 10},
-        at: DateTime.utc(2026, 3, 1, 7),
-      );
-      final sets = tallies.addField(note, name: 'Sets', target: 4);
-      final entry = tallies.add(
-        note,
-        values: {reps: 10, sets: 3},
-        at: DateTime.utc(2026, 3, 1, 8),
-      );
-      final plain = tallies.byNote(note)!;
-      expect(plain.field(sets)!.multiplies, isNull);
-      expect(plain.counted(entry, reps), 10);
-      expect(plain.counted(entry, sets), 3);
-
-      tallies.setMultiplies(note, sets, reps);
-      final made = tallies.byNote(note)!;
-      expect(made.field(sets)!.multiplies, reps);
-      expect(made.multipliersOf(reps).map((f) => f.id), [sets]);
-      expect(made.counting.map((f) => f.id), [reps]);
-      expect(made.shown.map((f) => f.id), [reps, sets]);
-      // The multiplier counts as no value, with no target of its own.
-      expect(made.field(sets)!.target, isNull);
-      expect(made.targets, {reps: 30});
-      expect(made.counted(entry, reps), 30);
-      expect(made.counted(entry, sets), isNull);
-      // An entry without a multiplier value counts as is.
-      expect(made.counted(old, reps), 10);
-      expect(values(tallies.chart(note, reps, TallyPeriod.day, utcWall)), [40]);
-      expect(tallies.chart(note, sets, TallyPeriod.day, utcWall), isEmpty);
-      expect(
-        ann.current(note, TallyKeys.field(sets, TallyKeys.multiplies)),
-        reps,
-      );
-
-      tallies.setMultiplies(note, sets, null);
-      final again = tallies.byNote(note)!;
-      expect(again.counted(entry, reps), 10);
-      expect(again.field(sets)!.target, 4);
-    });
-
-    test('several multipliers multiply in turn, rounded and held', () {
-      final tallies = Tallies(ann);
-      final (note, [reps, sets, rounds]) = tally(ann, 'Gym', [
+      final (note, [reps, kg, rounds]) = tally(ann, 'Gym', [
         'reps',
-        'sets',
+        'kg',
         'rounds',
       ]);
-      tallies.setMultiplies(note, sets, reps);
-      tallies.setMultiplies(note, rounds, reps);
+      expect(tallies.byNote(note)!.countsInSets, isFalse);
+      // As #200 wrote it: Rounds multiplies Reps.
+      ann.append(note, TallyKeys.field(rounds, TallyKeys.multiplies), reps);
+      final entry = tallies.add(note, values: {reps: 20, kg: 60, rounds: 3});
+      final read = tallies.byNote(note)!;
+      expect(read.countsInSets, isTrue);
+      final row = {reps: 20.0, kg: 60.0};
+      expect(read.setsOf(entry), [row, row, row]);
+      expect(read.counted(entry, reps), 60);
+      expect(read.counted(entry, kg), 60);
+      expect(read.counted(entry, rounds), isNull);
+      expect(read.numbers.map((f) => f.id), [reps, kg]);
+      // Rounded half away from zero, at least one set and at most 99.
+      for (final (times, count) in [
+        (2.5, 3),
+        (0.4, 1),
+        (-2.0, 1),
+        (1000.0, 99),
+      ]) {
+        final e = tallies.add(note, values: {reps: 1, rounds: times});
+        expect(read.setsOf(e), hasLength(count), reason: '$times');
+      }
+      // Switched off, the entries keep their sets.
+      tallies.setCountsInSets(note, false);
+      final off = tallies.byNote(note)!;
+      expect(off.countsInSets, isFalse);
+      expect(off.counted(entry, reps), 60);
+      // Changed with its sets, it holds them itself.
+      tallies.setCountsInSets(note, true);
+      tallies.editEntry(
+        entry.id,
+        more: [
+          {reps: 20},
+        ],
+      );
+      final edited = tallies.entryById(entry.id)!;
+      expect(edited.values.containsKey(rounds), isFalse);
+      expect(edited.more, [
+        {reps: 20.0},
+      ]);
+      expect(tallies.byNote(note)!.counted(edited, reps), 40);
+    });
+
+    test('sets are rows, each field totalling by its rule', () {
+      final tallies = Tallies(ann);
+      final (note, [reps, kg]) = tally(ann, 'Bench', ['reps', 'kg']);
+      tallies.setCountsInSets(note, true);
+      expect(ann.current(note, TallyKeys.sets), 'true');
       final entry = tallies.add(
         note,
-        values: {reps: 0.000003, sets: 0.5, rounds: -1},
+        values: {reps: 10, kg: 60},
+        more: [
+          {reps: 8, kg: 65},
+          {},
+          {reps: 6},
+        ],
+        at: DateTime.utc(2026, 1, 1, 7),
       );
-      final made = tallies.byNote(note)!;
-      expect(made.multipliersOf(reps).map((f) => f.id), [sets, rounds]);
-      // 0.000003 × 0.5 = 0.0000015, half away from zero, then × -1.
-      expect(made.counted(entry, reps), -0.000002);
-      final big = tallies.add(
+      // The set that holds nothing is left out.
+      expect(ann.current(entry.id, TallyKeys.setValue(2, kg)), '65');
+      expect(ann.current(entry.id, TallyKeys.setValue(3, reps)), '6');
+      final read = tallies.byNote(note)!;
+      expect(read.setsOf(entry), hasLength(3));
+      expect(read.counted(entry, reps), 24);
+      expect(read.counted(entry, kg), 65);
+      expect(values(tallies.chart(note, kg, utcWall)).first, 65);
+      // Fewer sets take the others away.
+      tallies.editEntry(
+        entry.id,
+        more: [
+          {reps: 9},
+        ],
+      );
+      expect(ann.current(entry.id, TallyKeys.setValue(3, reps)), isNull);
+      expect(read.counted(tallies.entryById(entry.id)!, reps), 19);
+      expect(
+        () => tallies.add(
+          note,
+          more: [
+            {'x': 1},
+          ],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => tallies.add(
+          note,
+          more: [
+            for (var i = 0; i < TallyKeys.maxSets; i++) {reps: 1},
+          ],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('a Check field is a tick, summed per bar', () {
+      final tallies = Tallies(ann);
+      final (note, [minutes]) = tally(ann, 'Kitchen', ['min']);
+      final done = tallies.addField(
         note,
-        values: {reps: 1e9, sets: 1e9, rounds: 1e9},
+        name: 'Wiped',
+        unit: 'kg',
+        target: 2,
+        check: true,
       );
-      expect(made.counted(big, reps), 0x7fffffffffffffff / 1000000);
+      expect(ann.current(note, TallyKeys.field(done, TallyKeys.kind)), 'check');
+      final kitchen = tallies.byNote(note)!;
+      final field = kitchen.field(done)!;
+      expect(field.check, isTrue);
+      expect(field.unit, '');
+      expect(field.rule, TallyRule.sum);
+      expect(field.target, 2);
+      expect(kitchen.targets.containsKey(done), isFalse);
+      expect(
+        () => tallies.setRule(note, done, TallyRule.max),
+        throwsStateError,
+      );
+      expect(() => tallies.setUnit(note, done, 'kg'), throwsStateError);
+      expect(() => tallies.add(note, values: {done: 2}), throwsArgumentError);
+      expect(
+        () => tallies.add(
+          note,
+          more: [
+            {done: 1},
+          ],
+        ),
+        throwsArgumentError,
+      );
+      for (final hour in [7, 9]) {
+        tallies.add(
+          note,
+          values: {done: 1, minutes: 5},
+          at: DateTime.utc(2026, 1, 1, hour),
+        );
+      }
+      final entry = tallies.add(note, values: {minutes: 5});
+      expect(kitchen.counted(entry, done), isNull);
+      expect(kitchen.setsOf(entry).every((s) => !s.containsKey(done)), isTrue);
+      expect(values(tallies.chart(note, done, utcWall)).first, 2);
     });
 
-    test('a multiplier multiplies one shown other field, never a chain', () {
+    test('the bar length lies on the Note and drives the chart', () {
       final tallies = Tallies(ann);
-      final (note, [a, b, c]) = tally(ann, 'Gym', ['a', 'b', 'c']);
-      expect(() => tallies.setMultiplies(note, a, a), throwsArgumentError);
-      expect(() => tallies.setMultiplies(note, a, 'x'), throwsArgumentError);
-      tallies.setMultiplies(note, b, a);
-      expect(tallies.byNote(note)!.multipliable(c).map((f) => f.id), [a]);
-      // A multiplier is never multiplied, and a multiplied field never
-      // multiplies.
-      expect(() => tallies.setMultiplies(note, c, b), throwsArgumentError);
-      expect(() => tallies.setMultiplies(note, a, c), throwsArgumentError);
-      expect(tallies.byNote(note)!.multipliable(a), isEmpty);
-      tallies.hideField(note, c);
-      expect(() => tallies.setMultiplies(note, b, c), throwsArgumentError);
-      // Nor does a hidden field multiply.
-      expect(() => tallies.setMultiplies(note, c, a), throwsArgumentError);
+      final (note, [pages]) = tally(ann, 'Reading', ['pages']);
+      expect(tallies.byNote(note)!.bar, TallyPeriod.day);
+      // A Monday and a Tuesday.
+      for (final day in [29, 30]) {
+        tallies.add(
+          note,
+          values: {pages: 10},
+          at: DateTime.utc(2025, 12, day, 7),
+        );
+      }
+      tallies.setBar(note, TallyPeriod.week);
+      expect(ann.current(note, TallyKeys.bar), 'week');
+      expect(tallies.byNote(note)!.bar, TallyPeriod.week);
+      expect(values(tallies.chart(note, pages, utcWall)).first, 20);
+      expect(
+        values(tallies.chart(note, pages, utcWall, period: TallyPeriod.day))
+            .first,
+        10,
+      );
+      ann.append(note, TallyKeys.bar, 'fortnight');
+      expect(tallies.byNote(note)!.bar, TallyPeriod.day);
+      expect(
+        () => tallies.setBar('note:none', TallyPeriod.year),
+        throwsArgumentError,
+      );
     });
 
-    test('hiding the multiplied field leaves the multiplier plain', () {
-      final tallies = Tallies(ann);
-      final (note, [reps, sets]) = tally(ann, 'Gym', ['reps', 'sets']);
-      tallies.setMultiplies(note, sets, reps);
-      final entry = tallies.add(note, values: {reps: 10, sets: 3});
-      tallies.hideField(note, reps);
-      final hidden = tallies.byNote(note)!;
-      expect(hidden.field(sets)!.multiplies, isNull);
-      expect(hidden.counting.map((f) => f.id), [sets]);
-      expect(hidden.counted(entry, sets), 3);
-      tallies.restoreField(note, reps);
-      expect(tallies.byNote(note)!.counted(entry, reps), 30);
+    test('only the set keys the apps write are read', () {
+      expect(TallyKeys.valueOf('v:a'), (1, 'a'));
+      expect(TallyKeys.valueOf('v2:a'), (2, 'a'));
+      expect(TallyKeys.valueOf('v99:a:b'), (99, 'a:b'));
+      for (final key in ['v1:a', 'v02:a', 'v100:a', 'v2:', 'vx:a', 'va']) {
+        expect(TallyKeys.valueOf(key), isNull, reason: key);
+      }
     });
 
     test('settings the cores read as no multiplier', () {
@@ -497,8 +592,7 @@ void main() {
       ann.append(note, TallyKeys.field(c, key), c);
       final read = tallies.byNote(note)!;
       expect([for (final f in read.fields) f.multiplies], [null, null, null]);
-      final added = tallies.addField(note, name: 'd', multiplies: c);
-      expect(tallies.byNote(note)!.field(added)!.multiplies, c);
+      expect(read.countsInSets, isFalse);
     });
   });
 
@@ -543,11 +637,20 @@ void main() {
       );
       expect(
         values(
-          tallies.chart(note, reps, TallyPeriod.day, utcWall, filter: mine),
+          tallies.chart(
+            note,
+            reps,
+            utcWall,
+            period: TallyPeriod.day,
+            filter: mine,
+          ),
         ),
         [20],
       );
-      expect(values(tallies.chart(note, reps, TallyPeriod.day, utcWall)), [50]);
+      expect(
+        values(tallies.chart(note, reps, utcWall, period: TallyPeriod.day)),
+        [50],
+      );
     });
 
     test('a Member changes only their own entries, never the fields', () {

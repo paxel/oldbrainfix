@@ -314,8 +314,10 @@ pub fn baked(text: &str, ticks: &BTreeMap<String, BoxTick>) -> String {
     out
 }
 
-/// `text` in `format` as it is saved: every bare ☐, ✅ or ❌, one not
-/// part of another emoji, becomes a box with a new id, and a box whose
+/// `text` in `format` as it is saved: in a formatted text every task
+/// list item, `- [ ] milk` or `- [x] bread`, first becomes an item with a
+/// bare ☐ or ✅ ([`markdown::task_boxes`], #263); every bare ☐, ✅ or ❌,
+/// one not part of another emoji, becomes a box with a new id, and a box whose
 /// id came up before in the text gets a new one. In a formatted text a
 /// glyph in inline code, in a code block or in a link's address stays as
 /// it is, and in any text one in a web address (#222). Each id is drawn from `new_id`, the store's maker of entity
@@ -328,6 +330,14 @@ pub fn convert(
     if format == text_format::CODE {
         return Ok(text.to_string());
     }
+    // A task list item of GFM is an item with a box (#263).
+    let tasks;
+    let text = if format == text_format::MARKDOWN {
+        tasks = markdown::task_boxes(text, 0, text.len()).text;
+        tasks.as_str()
+    } else {
+        text
+    };
     let found = scan(text);
     if found.iter().all(|b| b.id.is_some() && !b.repeated) {
         return Ok(text.to_string());

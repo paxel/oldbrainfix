@@ -17,12 +17,15 @@ import 'page_bar.dart';
   ),
   AlarmPermission.exactAlarms => (t.permExactAlarms, t.permExactAlarmsWhy),
   AlarmPermission.fullScreen => (t.permFullScreen, t.permFullScreenWhy),
+  AlarmPermission.alarms => (t.permAlarms, t.permAlarmsWhy),
 };
 
 /// Walks through the access alarms need, one step at a time (ADR 0004,
 /// adapted from Chaos Alert): once on this Device's first start, from
 /// the Agenda's red banner whenever one goes missing, and from Settings.
 /// Every step can be passed by; alarms then fall back to what is allowed.
+/// The steps are the platform's: the iPhone asks for notifications and
+/// its alarms only.
 class SetupScreen extends StatefulWidget {
   final AlarmSync alarms;
 
@@ -36,7 +39,7 @@ class SetupScreen extends StatefulWidget {
 }
 
 class _SetupScreenState extends State<SetupScreen> {
-  static const _steps = AlarmPermission.values;
+  late final List<AlarmPermission> _steps = widget.alarms.steps;
   var _step = 0;
 
   void _next() {
@@ -50,6 +53,24 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    if (_steps.isEmpty) {
+      // No alarm layer: nothing to ask, only Done.
+      return Scaffold(
+        appBar: pageBar(context, title: t.setupTitle),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: OutlinedButton(
+                onPressed: widget.onDone,
+                child: Text(t.setupDone),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final permission = _steps[_step];
     final (title, why) = permissionText(t, permission);
     final last = _step == _steps.length - 1;

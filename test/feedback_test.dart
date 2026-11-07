@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
@@ -38,6 +39,80 @@ void main() {
       expect(installMethodOf('com.aurora.store'), 'unknown (com.aurora.store)');
       expect(installMethodOf('com.android.vending', known: false), 'unknown');
       expect(installMethodOf(null, known: false), 'unknown');
+    });
+  });
+
+  group('the facts of the phone', () {
+    test('Android: its release, SDK, maker and model, the installer by '
+        'its package', () {
+      final facts = feedbackFactsOf({
+        'installer': 'com.android.vending',
+        'installerKnown': true,
+        'release': '14',
+        'sdk': 34,
+        'manufacturer': 'Google',
+        'model': 'Pixel 7',
+      }, version: '0.5.0+60');
+      expect(facts.version, '0.5.0+60');
+      expect(facts.system, 'Android 14 (SDK 34), Google Pixel 7');
+      expect(facts.install, 'Play');
+    });
+
+    test('the iPhone (#243): iOS and the model identifier, the installer '
+        'as its receipt says', () {
+      Map<Object?, Object?> iphone(String installer) => {
+        'os': 'iOS',
+        'release': '26.1',
+        'manufacturer': 'Apple',
+        'model': 'iPhone17,1',
+        'installer': installer,
+        'installerKnown': installer != 'unknown',
+      };
+      final store = feedbackFactsOf(iphone('App Store'), version: '0.5.0+60');
+      expect(store.system, 'iOS 26.1, iPhone17,1');
+      expect(store.install, 'App Store');
+      expect(
+        feedbackFactsOf(iphone('TestFlight'), version: '').install,
+        'TestFlight',
+      );
+      expect(
+        feedbackFactsOf(iphone('unknown'), version: '').install,
+        'unknown',
+      );
+      // Nothing else the channel might say is taken for a store.
+      expect(
+        feedbackFactsOf({
+          ...iphone('Play'),
+          'installerKnown': true,
+        }, version: '').install,
+        'unknown',
+      );
+      expect(
+        feedbackFactsOf({'os': 'iOS'}, version: '').system,
+        'iOS ?, device unknown',
+      );
+    });
+
+    test('read through the device channel', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      const channel = MethodChannel('io.github.paxel.oldbrainfix/device');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'facts');
+        return {
+          'os': 'iOS',
+          'release': '26.1',
+          'manufacturer': 'Apple',
+          'model': 'iPhone17,1',
+          'installer': 'TestFlight',
+          'installerKnown': true,
+        };
+      });
+      final facts = await readFeedbackFacts();
+      expect(facts.system, 'iOS 26.1, iPhone17,1');
+      expect(facts.install, 'TestFlight');
     });
   });
 

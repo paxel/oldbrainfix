@@ -59,6 +59,8 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
         "Material Icons",
         "SQLite",
         "Noto Emoji font",
+        "Noto Sans Symbols 2 font",
+        "Noto Sans Math font",
         "rusto-rs 0.",
         "egui 0.",
     ] {

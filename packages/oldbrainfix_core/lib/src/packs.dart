@@ -139,8 +139,11 @@ class PackField {
   final String? target;
   final bool hidden;
 
+  /// Whether it is a Check field (#264).
+  final bool check;
+
   /// The index of the field among the Tally's fields this one
-  /// multiplies, or null.
+  /// multiplied (#200), or null.
   final int? multiplies;
 
   const PackField({
@@ -149,6 +152,7 @@ class PackField {
     this.rule = TallyRule.sum,
     this.target,
     this.hidden = false,
+    this.check = false,
     this.multiplies,
   });
 }
@@ -219,6 +223,11 @@ class PackNote {
 
   /// The fields of its Tally; empty for none.
   final List<PackField> fields;
+
+  /// Its Tally's bar length (#264), null for a day as never set; and
+  /// whether it counts in sets.
+  final TallyPeriod? bar;
+  final bool sets;
   final PackSession? session;
 
   /// Its Routines and Reminders, as their schedules.
@@ -240,6 +249,8 @@ class PackNote {
     this.lines,
     this.shopping = false,
     this.fields = const [],
+    this.bar,
+    this.sets = false,
     this.session,
     this.routines = const [],
     this.frog = false,
@@ -605,6 +616,8 @@ extension PackTree on Pack {
             lines: notes[i].lines,
             shopping: notes[i].shopping,
             fields: notes[i].fields,
+            bar: notes[i].bar,
+            sets: notes[i].sets,
             session: switch (notes[i].session) {
               final s? => PackSession(
                 pool: [for (final t in s.pool) ?newIndex[t]],
@@ -678,10 +691,12 @@ Map<String, Object?> _noteJson(
   ];
   return {
     'area': ?n.area,
+    if (n.fields.isNotEmpty) 'bar': ?n.bar?.name,
     if (n.fields.isNotEmpty)
       'fields': [
         for (final f in n.fields)
           {
+            if (f.check) 'check': true,
             if (f.hidden) 'hidden': true,
             'multiplies': ?f.multiplies,
             'name': f.name,
@@ -728,6 +743,7 @@ Map<String, Object?> _noteJson(
         'pool': s.pool,
         'rule': s.rule.name,
       },
+    if (n.fields.isNotEmpty && n.sets) 'sets': true,
     'text': n.text,
     'topic': ?n.topic,
     if (n.version != TextFormats.version) 'v': n.version,
@@ -938,6 +954,12 @@ PackNote _note(Object? json) {
       for (final f in _optional<List<Object?>>(json, 'fields') ?? const [])
         _field(f),
     ],
+    bar: switch (_optional<String>(json, 'bar')) {
+      null => null,
+      final bar =>
+        TallyPeriod.values.asNameMap()[bar] ?? (throw const NotAPack()),
+    },
+    sets: _optional<bool>(json, 'sets') ?? false,
     session: switch (json['session']) {
       null => null,
       final s => _session(s),
@@ -971,6 +993,7 @@ PackField _field(Object? json) {
       rule: TallyRule.values.asNameMap()[rule] ?? (throw const NotAPack()),
       target: target,
       hidden: _optional<bool>(json, 'hidden') ?? false,
+      check: _optional<bool>(json, 'check') ?? false,
       multiplies: _index(json, 'multiplies'),
     );
   }
@@ -1237,9 +1260,15 @@ extension PackExport on Store {
               null => null,
             },
             hidden: f.hidden,
+            check: f.check,
             multiplies: f.multiplies == null ? null : fieldIndex[f.multiplies],
           ),
       ],
+      bar: switch (tally?.bar) {
+        null || TallyPeriod.day => null,
+        final bar => bar,
+      },
+      sets: tally?.countsInSets ?? false,
       session: setup == null
           ? null
           : PackSession(
@@ -1650,6 +1679,9 @@ extension PackImport on Store {
       if (f.hidden) {
         append(id, TallyKeys.field(field, TallyKeys.hidden), 'true');
       }
+      if (f.check) {
+        append(id, TallyKeys.field(field, TallyKeys.kind), TallyKeys.kindCheck);
+      }
     }
     for (final (j, f) in n.fields.indexed) {
       final m = f.multiplies;
@@ -1659,6 +1691,10 @@ extension PackImport on Store {
         TallyKeys.field(fieldIds[j], TallyKeys.multiplies),
         fieldIds[m],
       );
+    }
+    if (n.fields.isNotEmpty) {
+      if (n.bar case final bar?) append(id, TallyKeys.bar, bar.name);
+      if (n.sets) append(id, TallyKeys.sets, 'true');
     }
   }
 

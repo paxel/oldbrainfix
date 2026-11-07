@@ -3,7 +3,8 @@
 //! and checking one off hides the other for the day; its heading opens
 //! the Frog view with the folded "Done" section, closed until opened; a
 //! right-click deletes a Frog after one question and the trash restores
-//! it; the Note editor makes one; the row "Frogs" on the left opens the
+//! it; the Note editor makes one and shows it as its Frog badge (#259),
+//! which eats or removes it; the row "Frogs" on the left opens the
 //! Frog view too. Which two Frogs show depends on the
 //! rotation, so the tests count them rather than name them.
 
@@ -15,7 +16,11 @@ use egui::accesskit::{Role, Toggled};
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use oldbrainfix_core::{DeviceSettings, Frogs, Notes, OwnProfile, SigningKey, Store};
+use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
+use oldbrainfix_core::{
+    AreaRole, DeviceSettings, Frogs, Invite, Notes, OwnProfile, PairedDevice, PersonSettings,
+    Places, SigningKey, Store,
+};
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Selection};
 
@@ -328,6 +333,193 @@ fn the_note_editor_makes_a_frog() -> TestResult {
             .next()
             .is_none()
     );
+    Ok(())
+}
+
+/// A store `seed` of `name` whose clock ticks a second a read from Monday
+/// noon, plus the days in the second value.
+fn clocked(seed: u8, name: &str) -> Result<(Store, Arc<AtomicI64>), Box<dyn std::error::Error>> {
+    let start = DateTime::parse_from_rfc3339("2026-03-02T12:00:00Z")?.with_timezone(&Utc);
+    let ticks = Arc::new(AtomicI64::new(0));
+    let days = Arc::new(AtomicI64::new(0));
+    let later = days.clone();
+    let clock = Box::new(move || {
+        start
+            + Duration::days(later.load(Ordering::SeqCst))
+            + Duration::seconds(ticks.fetch_add(1, Ordering::SeqCst))
+    });
+    let store = Store::in_memory(clock, move || Ok(SigningKey::from_seed([seed; 32])))?;
+    store.set_local_setting("author", name)?;
+    OwnProfile::new(&store).apply_defaults(name, None)?;
+    Ok((store, days))
+}
+
+/// The Frog badge's label as the screen reader reads it, with `value`.
+fn frog_badge(t: &L10n, value: &str) -> String {
+    t.setting_badge_label(t.frog(), value)
+}
+
+/// Whether the "+" badge's menu offers a Frog; the menu closes again.
+fn plus_offers_frog(harness: &mut Harness<'_, App>, t: &L10n) -> bool {
+    harness.get_by_label(t.routine_or_reminder()).click();
+    harness.run();
+    assert!(shows(harness, t.reminder()));
+    let offers = harness
+        .query_all_by_role_and_label(Role::Button, t.frog())
+        .next()
+        .is_some();
+    harness.key_press(Key::Escape);
+    harness.run();
+    offers
+}
+
+#[test]
+fn the_frog_badge_shows_open_eats_it_and_shows_it_eaten_for_two_days() -> TestResult {
+    let (store, days) = clocked(5, "Ann")?;
+    let store = Arc::new(store);
+    let t = L10n::new("en");
+    let note = Notes::new(&store).capture("Defrost the freezer", None, None)?;
+    let mut harness = window(&store, "en");
+    let harness = &mut harness;
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert!(!shows(harness, &frog_badge(&t, t.frog_open())));
+    assert!(plus_offers_frog(harness, &t));
+    let frog = Frogs::new(&store).spawn(&note.id)?;
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert!(shows(harness, &frog_badge(&t, t.frog_open())));
+    assert!(!plus_offers_frog(harness, &t), "one open Frog at a time");
+
+    harness.get_by_label(&frog_badge(&t, t.frog_open())).click();
+    harness.run();
+    assert!(shows(harness, t.frog_remove()));
+    click(harness, t.frog_eat_now())?;
+    assert!(
+        Frogs::new(&store)
+            .by_id(&frog.id)?
+            .is_some_and(|f| f.is_done())
+    );
+    let today = frog_badge(&t, t.frog_eaten_today());
+    assert!(shows(harness, &today));
+    assert!(plus_offers_frog(harness, &t));
+    harness.get_by_label(&today).click();
+    harness.run();
+    assert!(!shows(harness, t.frog_eat_now()), "eaten already");
+    assert!(shows(harness, t.frog_remove()));
+    harness.key_press(Key::Escape);
+    harness.run();
+
+    days.store(1, Ordering::SeqCst);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert!(shows(harness, &frog_badge(&t, t.frog_eaten_yesterday())));
+    days.store(2, Ordering::SeqCst);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert!(!shows(harness, &frog_badge(&t, t.frog_eaten_yesterday())));
+    assert!(!shows(harness, &today));
+    Ok(())
+}
+
+#[test]
+fn remove_the_frog_asks_once_and_moves_it_to_the_trash() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let frog = Frogs::new(&store).open()?.remove(0);
+    let mut harness = window(&store, "en");
+    let harness = &mut harness;
+    harness.state_mut().select_note(&frog.note_id);
+    harness.run();
+    let open = frog_badge(&t, t.frog_open());
+    harness.get_by_label(&open).click();
+    harness.run();
+    click(harness, t.frog_remove())?;
+    assert!(shows(harness, t.delete_frog_question()));
+    click(harness, t.delete())?;
+    assert!(!shows(harness, t.delete_frog_question()));
+    assert!(
+        Frogs::new(&store)
+            .by_id(&frog.id)?
+            .is_some_and(|f| f.is_trashed())
+    );
+    let note = Notes::new(&store).by_id(&frog.note_id)?.ok_or("note")?;
+    assert!(!note.is_trashed(), "its Note stays");
+    assert!(!shows(harness, &open));
+    // The Note dialog stays open.
+    assert!(shows(harness, t.routine_or_reminder()));
+    Ok(())
+}
+
+#[test]
+fn in_simple_the_frog_badge_shows_and_plus_offers_no_frog() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let frog = Frogs::new(&store).open()?.remove(0);
+    Frogs::new(&store).mark_done(&frog.id, None)?;
+    PersonSettings::new(&store).set_advanced(false)?;
+    let mut harness = window(&store, "en");
+    let harness = &mut harness;
+    harness.state_mut().select_note(&frog.note_id);
+    harness.run();
+    assert!(shows(harness, &frog_badge(&t, t.frog_eaten_today())));
+    assert!(!plus_offers_frog(harness, &t));
+    Ok(())
+}
+
+#[test]
+fn a_member_eats_a_frog_but_may_not_remove_it() -> TestResult {
+    let (ann, _) = clocked(1, "Ann")?;
+    let (ben, _) = clocked(2, "Ben")?;
+    let t = L10n::new("en");
+    let house = Places::new(&ann).add_area("Household")?;
+    let note = Notes::new(&ann).capture("Defrost the freezer", Some(&house.id), None)?;
+    let frog = Frogs::new(&ann).spawn(&note.id)?;
+    let area = ann.share(&house.id)?;
+    let request = sync_request_as(
+        &ben,
+        &ann.version_vector()?,
+        "Phone",
+        &ann.device_id()?,
+        "",
+        Joining::Invited,
+    )?;
+    let invite = Invite {
+        area,
+        role: AreaRole::Member,
+    };
+    let (answer, _) =
+        answer_sync_inviting(&ann, &request, "Desk", Some(&invite))?.ok_or("an answer")?;
+    apply_answer_as(&ben, &answer, true, None)?;
+    for (store, peer) in [(&ann, &ben), (&ben, &ann)] {
+        store.remember_device(&PairedDevice {
+            id: peer.device_id()?,
+            name: String::new(),
+            fingerprint: String::new(),
+            host: None,
+            port: None,
+            last_sync: store.now(),
+            shared: true,
+        })?;
+    }
+    let ben = Arc::new(ben);
+    let mut harness = window(&ben, "en");
+    let harness = &mut harness;
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness.get_by_label(&frog_badge(&t, t.frog_open())).click();
+    harness.run();
+    assert!(!shows(harness, t.frog_remove()));
+    click(harness, t.frog_eat_now())?;
+    assert!(
+        Frogs::new(&ben)
+            .by_id(&frog.id)?
+            .is_some_and(|f| f.is_done())
+    );
+    // Nothing left a Member may do to it: it only shows.
+    let eaten = frog_badge(&t, t.frog_eaten_today());
+    let badge = harness.get_by_label(&eaten);
+    assert_eq!(badge.accesskit_node().role(), Role::Label);
     Ok(())
 }
 

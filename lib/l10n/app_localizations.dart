@@ -1352,6 +1352,18 @@ abstract class AppLocalizations {
   /// **'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.'**
   String get permFullScreenWhy;
 
+  /// No description provided for @permAlarms.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms'**
+  String get permAlarms;
+
+  /// No description provided for @permAlarmsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets a Routine you keep ignoring turn into an alarm that rings through silent mode and Focus, if you switch that on for it. Allow it in the dialog that opens, or for Old Brain Fix in Settings.'**
+  String get permAlarmsWhy;
+
   /// No description provided for @catchUpTitle.
   ///
   /// In en, this message translates to:
@@ -1478,6 +1490,24 @@ abstract class AppLocalizations {
   /// **'Escalate to a full-screen alarm'**
   String get escalationSwitch;
 
+  /// escalationSwitch on the iPhone (#244), which has no full-screen alarm: the escalated Occurrence rings as an AlarmKit alarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalate to an iPhone alarm'**
+  String get escalationSwitchIphone;
+
+  /// escalationSummary on the iPhone (#244).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{iPhone alarm after 1 ignored Re-nag} other{iPhone alarm after {count} ignored Re-nags}}'**
+  String escalationSummaryIphone(int count);
+
+  /// escalationExplain on the iPhone (#244): AlarmKit's own alarm screen with Stop and one Snooze of 10 min.
+  ///
+  /// In en, this message translates to:
+  /// **'When this one is ignored again and again, it rings as an iPhone alarm, through silent mode and Focus, also on the lock screen. Stop counts as Done; Snooze rings it again in 10 min.'**
+  String get escalationExplainIphone;
+
   /// No description provided for @escalationAfter.
   ///
   /// In en, this message translates to:
@@ -1583,7 +1613,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteLinkedDetail.
   ///
   /// In en, this message translates to:
-  /// **'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.'**
+  /// **'They stay in the trash with it for 30 days and come back when you restore it.'**
   String get deleteNoteLinkedDetail;
 
   /// No description provided for @noteInTrash.
@@ -1663,6 +1693,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
   String get bluetoothExplainBody;
+
+  /// bluetoothExplainBody on the iPhone (#241), which reads the audio route: no Nearby devices permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can note the Bluetooth device the iPhone plays sound through when you capture a Note, like your car or your headphones. It reads only the name of that device and never searches for others. The name goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
+  String get bluetoothExplainBodyIphone;
 
   /// No description provided for @bluetoothNotAllowed.
   ///
@@ -2498,6 +2534,30 @@ abstract class AppLocalizations {
   /// **'Version {version} ({build})'**
   String versionLabel(String version, String build);
 
+  /// Announced when seven taps on the version under About switched the frame-time overlay on.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame times on'**
+  String get frameTimesOn;
+
+  /// Announced when seven taps on the version under About switched the frame-time overlay off.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame times off'**
+  String get frameTimesOff;
+
+  /// First line of the frame-time overlay: the slowest build and raster of the frames drawn lately, in milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Last frames: build {build} ms, raster {raster} ms'**
+  String frameTimesLast(String build, String raster);
+
+  /// Second line of the frame-time overlay: the slowest frame of the last second, start to end, in milliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Slowest in the last second: {total} ms'**
+  String frameTimesWorst(String total);
+
   /// No description provided for @documentation.
   ///
   /// In en, this message translates to:
@@ -2617,6 +2677,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock with fingerprint or screen lock'**
   String get unlockBiometrics;
+
+  /// unlockBiometrics on the iPhone (#244); the iPhone's passcode is the fallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with Face ID or Touch ID'**
+  String get unlockBiometricsIphone;
 
   /// No description provided for @biometricsDetail.
   ///
@@ -4532,17 +4598,17 @@ abstract class AppLocalizations {
   /// **'It stays in the trash for 30 days.'**
   String get deleteNoteDetail;
 
-  /// No description provided for @deleteNoteOnly.
+  /// No description provided for @deleteNoteLinkedQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete only the Note'**
-  String get deleteNoteOnly;
+  /// **'{count, plural, =1{Delete this Note and its 1 Routine?} other{Delete this Note and its {count} Routines and Reminders?}}'**
+  String deleteNoteLinkedQuestion(int count);
 
-  /// No description provided for @deleteNoteWithLinked.
+  /// No description provided for @deleteNoteReminderQuestion.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}'**
-  String deleteNoteWithLinked(int count);
+  /// **'Delete this Note and its 1 Reminder?'**
+  String get deleteNoteReminderQuestion;
 
   /// No description provided for @removeRecordingKeepText.
   ///
@@ -5318,6 +5384,36 @@ abstract class AppLocalizations {
   /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
   String get deleteFrogQuestion;
 
+  /// The Frog badge's value in the Note editor while the Frog is not eaten (#259).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get frogOpen;
+
+  /// No description provided for @frogEatenToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaten today'**
+  String get frogEatenToday;
+
+  /// No description provided for @frogEatenYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Eaten yesterday'**
+  String get frogEatenYesterday;
+
+  /// The Frog badge's menu: checks the Frog off.
+  ///
+  /// In en, this message translates to:
+  /// **'Eat now'**
+  String get frogEatNow;
+
+  /// The Frog badge's menu: moves the Frog to the trash after asking; its Note stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the Frog'**
+  String get frogRemove;
+
   /// A Note card's menu entry that gives the Note its first Tally field (CONTEXT.md: Tally).
   ///
   /// In en, this message translates to:
@@ -5401,6 +5497,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Week of {day}: done {done} / skipped {skipped}'**
   String sessionHistoryWeek(String day, int done, int skipped);
+
+  /// A Session's past runs on its card and its page (#264): each Occurrence before today with a pick, newest first, its date and each picked Tally done or not done.
+  ///
+  /// In en, this message translates to:
+  /// **'Past runs'**
+  String get sessionRuns;
+
+  /// No description provided for @sessionRunsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No past runs yet.'**
+  String get sessionRunsNone;
+
+  /// No description provided for @sessionRunDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: done'**
+  String sessionRunDone(String name);
+
+  /// No description provided for @sessionRunNotDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: not done'**
+  String sessionRunNotDone(String name);
+
+  /// No description provided for @sessionOlderRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 older run on the Session\'s page} other{{count} older runs on the Session\'s page}}'**
+  String sessionOlderRuns(int count);
 
   /// No description provided for @checklistRenameTitle.
   ///
@@ -5759,7 +5885,7 @@ abstract class AppLocalizations {
   /// No description provided for @tallyTargetHint.
   ///
   /// In en, this message translates to:
-  /// **'Prefilled in every new entry'**
+  /// **'Per bar of the chart, prefilled in every new entry'**
   String get tallyTargetHint;
 
   /// No description provided for @tallyNotANumber.
@@ -5771,7 +5897,7 @@ abstract class AppLocalizations {
   /// No description provided for @tallyRule.
   ///
   /// In en, this message translates to:
-  /// **'A day with several entries counts'**
+  /// **'Several sets or entries in a bar count'**
   String get tallyRule;
 
   /// No description provided for @tallyRuleSum.
@@ -5852,29 +5978,71 @@ abstract class AppLocalizations {
   /// **'No target'**
   String get tallyNoTarget;
 
-  /// A Tally field's setting (#200), a badge in its setup and a heading on its page: the other field of the Tally it multiplies, such as Sets multiplying Reps.
+  /// A Tally's setting (#264), a badge in its setup: with it each entry holds several sets, each a row across the Tally's number fields (CONTEXT.md: Set).
   ///
   /// In en, this message translates to:
-  /// **'Multiplies'**
-  String get tallyMultiplies;
+  /// **'Counts in sets'**
+  String get tallyCountsInSets;
 
-  /// The value of a Tally field's Multiplies badge and the first choice on its page (#200): the field multiplies no other field and counts values of its own.
+  /// No description provided for @tallyCountsInSetsDetail.
   ///
   /// In en, this message translates to:
-  /// **'Nothing'**
-  String get tallyMultipliesNothing;
+  /// **'Each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.'**
+  String get tallyCountsInSetsDetail;
 
-  /// Under the Multiplies choices on a Tally field's page (#200).
+  /// The button under the sets of a Tally entry (#264): adds a set that starts with the values of the set before.
   ///
   /// In en, this message translates to:
-  /// **'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.'**
-  String get tallyMultipliesDetail;
+  /// **'Add set'**
+  String get tallyAddSet;
 
-  /// An entry's value of a Tally field another field multiplies (#200): the multiplier's value, a bare number, before the value with its unit, such as '3 × 10 reps'.
+  /// The heading of one set of a Tally entry (#264).
   ///
   /// In en, this message translates to:
-  /// **'{factor} × {value}'**
-  String tallyTimes(String factor, String value);
+  /// **'Set {number}'**
+  String tallySet(int number);
+
+  /// No description provided for @tallyRemoveSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove set {number}'**
+  String tallyRemoveSet(int number);
+
+  /// No description provided for @tallyFieldKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind of field'**
+  String get tallyFieldKind;
+
+  /// No description provided for @tallyFieldKindNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get tallyFieldKindNumber;
+
+  /// A Tally field that is a box in each entry, a tick counting as 1 (#264, CONTEXT.md: Check field).
+  ///
+  /// In en, this message translates to:
+  /// **'Check field'**
+  String get tallyFieldKindCheck;
+
+  /// No description provided for @tallyFieldKindCheckDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A box in each entry. A tick counts as 1, so a bar shows how often it was done. Its kind stays once it is added.'**
+  String get tallyFieldKindCheckDetail;
+
+  /// Badge of a Tally field that multiplied another field before sets replaced multipliers (#264): its value in older entries is their number of sets.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts the sets of older entries'**
+  String get tallySetCounter;
+
+  /// No description provided for @tallyBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The target counts per bar.'**
+  String get tallyBarHint;
 
   /// No description provided for @tallyFields.
   ///
@@ -7412,6 +7580,78 @@ abstract class AppLocalizations {
   /// **'Set link'**
   String get linkSet;
 
+  /// Format bar button (#261): opens the picker of the app's pages, Areas, Topics and Notes; the one picked becomes an app link on the selection or word, or is put in with its name.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to…'**
+  String get formatLinkTo;
+
+  /// Hint of the search field of the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Search Notes, Areas and pages'**
+  String get linkToSearch;
+
+  /// Heading of the app's pages in the Link to… picker (#261): the Agenda, Unsorted, Settings and its sections, All Routines and Reminders, Backups, Sync, the Profile, the Frogs, New Session and the user guide.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages'**
+  String get linkToPages;
+
+  /// Heading of the Areas and Topics in the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Areas and Topics'**
+  String get linkToPlaces;
+
+  /// Heading of the Notes in the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get linkToNotes;
+
+  /// Shown in the Link to… picker when the search finds nothing (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found.'**
+  String get linkToNothing;
+
+  /// The user guide's start page on the website, as a page of the Link to… picker (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'User guide'**
+  String get linkToGuide;
+
+  /// Said when an app link's target cannot be seen on this Device (#261): a Note or Area deleted, in the trash, in a closed locked Area or never synced here, or a file not in the shared folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available here'**
+  String get linkNotAvailable;
+
+  /// Title of the one question before a file link opens (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Open this file?'**
+  String get fileLinkTitle;
+
+  /// The one question before a file link opens (#261), naming the file and the app that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Open \"{file}\" from the shared folder with {app}?'**
+  String fileLinkQuestion(String file, String app);
+
+  /// Stands for {app} in fileLinkQuestion where the system does not tell which app opens the file (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'the app the system picks for it'**
+  String get fileLinkSomeApp;
+
+  /// Button of the question before a file link opens (#261).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get fileLinkOpen;
+
   /// Format bar button: puts a new table at the cursor, or opens the table the cursor is in full screen.
   ///
   /// In en, this message translates to:
@@ -7549,6 +7789,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The words in its cells are deleted from the Note.'**
   String get tableDeleteBody;
+
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells line up on the left (Markdown `:--`).
+  ///
+  /// In en, this message translates to:
+  /// **'Align left'**
+  String get tableAlignLeft;
+
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells are centred (Markdown `:-:`).
+  ///
+  /// In en, this message translates to:
+  /// **'Centre'**
+  String get tableAlignCenter;
+
+  /// In the menu of a column of a table edited as a grid in the editor (#257): its cells line up on the right (Markdown `--:`).
+  ///
+  /// In en, this message translates to:
+  /// **'Align right'**
+  String get tableAlignRight;
+
+  /// Button on a table edited as a grid in the editor (#257): shows the table's Markdown lines instead, to edit as text, until the cursor leaves them or Show as table is pressed.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as lines'**
+  String get tableShowLines;
+
+  /// Button beside a table shown as its Markdown lines in the editor (#257): shows it as a table again.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as table'**
+  String get tableShowGrid;
+
+  /// What a screen reader says for a cell of a table edited as a grid in the editor (#257), before the cell's words.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {number}, column {letter}'**
+  String tableCell(int number, String letter);
 
   /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
   ///
@@ -8294,53 +8570,125 @@ abstract class AppLocalizations {
   /// **'Quick start'**
   String get helpQuickStartTitle;
 
-  /// A Line of the Quick start Checklist (#180): one action, at most 12 words, no Tallies, Sessions or Frogs.
+  /// A Line of the Quick start Checklist (#180, #260): where and how on the phone, the exact place and gesture, up to about 20 words, nothing of Advanced (no Tallies, Sessions, Frogs or Topics).
   ///
   /// In en, this message translates to:
-  /// **'Capture a thought with +.'**
+  /// **'Tap the round + at the bottom right of the Agenda, then Text, type a thought and tap 1 h.'**
   String get helpQuickStart1;
 
   /// No description provided for @helpQuickStart2.
   ///
   /// In en, this message translates to:
-  /// **'File the new Note into an Area.'**
+  /// **'On the Agenda, tap \"1 Unsorted\", then the folder with an arrow under the Note, and pick an Area.'**
   String get helpQuickStart2;
 
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Give a Note a Reminder.'**
+  /// **'Tap + and Text, type a task, tap the alarm clock, then Reminder; set its time and tap Save twice.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Give a Note a Routine that repeats.'**
+  /// **'Tap + and Text, type a habit, tap the alarm clock, then Routine; choose when it repeats and tap Save twice.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
   ///
   /// In en, this message translates to:
-  /// **'Tick this Line: that is how a Checklist works.'**
+  /// **'Tap the box in front of this Line to tick it: that is how a Checklist works.'**
   String get helpQuickStart5;
 
   /// No description provided for @helpQuickStart6.
   ///
   /// In en, this message translates to:
-  /// **'Find a Note with Search and browse.'**
+  /// **'Tap the folder at the top of the Agenda, or swipe left, to search all Notes and open your Areas.'**
   String get helpQuickStart6;
 
   /// No description provided for @helpQuickStart7.
   ///
   /// In en, this message translates to:
-  /// **'Make a Backup in Settings ▸ Backups.'**
+  /// **'Tap your Profile picture at the top right of the Agenda, then \"Back up this Device\" and \"Set up Backups\".'**
   String get helpQuickStart7;
 
   /// No description provided for @helpQuickStart8.
   ///
   /// In en, this message translates to:
-  /// **'Sync with your other Device in Settings.'**
+  /// **'Tap your Profile picture, then \"Sync with another Device\", and scan the code your other Device shows.'**
   String get helpQuickStart8;
+
+  /// The first line of the Quick start's Description (#260), folded under its name: the desktop's way for each step follows, one line each.
+  ///
+  /// In en, this message translates to:
+  /// **'On the desktop (Cmd for Ctrl on macOS):'**
+  String get helpQuickStartDesktopTitle;
+
+  /// The desktop's way for the Quick start's Line of the same number (#260), a line of its Description: the step's short name, a colon, then the menus, keys and clicks; nothing of Advanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture: File ▸ New Note or Ctrl+N, type, then Ctrl+Enter.'**
+  String get helpQuickStartDesktop1;
+
+  /// No description provided for @helpQuickStartDesktop2.
+  ///
+  /// In en, this message translates to:
+  /// **'File: in Unsorted in the sidebar, drag the card onto an Area, or right-click it, File into…, and pick the Area.'**
+  String get helpQuickStartDesktop2;
+
+  /// No description provided for @helpQuickStartDesktop3.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: in the quick note, click the alarm clock, then Reminder; set its time, click Save, then Ctrl+Enter.'**
+  String get helpQuickStartDesktop3;
+
+  /// No description provided for @helpQuickStartDesktop4.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine: the same, with Routine.'**
+  String get helpQuickStartDesktop4;
+
+  /// No description provided for @helpQuickStartDesktop5.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick: click the box in front of a Line.'**
+  String get helpQuickStartDesktop5;
+
+  /// No description provided for @helpQuickStartDesktop6.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and browse: click an Area in the sidebar, or Edit ▸ Find (Ctrl+F).'**
+  String get helpQuickStartDesktop6;
+
+  /// No description provided for @helpQuickStartDesktop7.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup: Sync ▸ Backups…, then \"Set up Backups\".'**
+  String get helpQuickStartDesktop7;
+
+  /// No description provided for @helpQuickStartDesktop8.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync: Sync ▸ Pair a Device.'**
+  String get helpQuickStartDesktop8;
+
+  /// The first line of the Quick start's Description (#261): a numbered link to the place of each step follows, one line each, before the desktop's way.
+  ///
+  /// In en, this message translates to:
+  /// **'Go where each step is done:'**
+  String get helpQuickStartPlacesTitle;
+
+  /// The place of the Quick start's step 5, ticking a Line, in its list of places (#261): the Checklist itself, so no link.
+  ///
+  /// In en, this message translates to:
+  /// **'Here, in this Checklist.'**
+  String get helpQuickStartPlaceHere;
+
+  /// The last line of the help Note on icons (#261), a link to the user guide's start page.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything else is in the user guide.'**
+  String get helpIconsGuide;
 
   /// The name of the help Note listing the icons with their names and meanings (#180).
   ///
@@ -8437,6 +8785,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'rings again on its days.'**
   String get helpIconRoutineMeans;
+
+  /// No description provided for @helpIconFrog.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog'**
+  String get helpIconFrog;
+
+  /// No description provided for @helpIconFrogMeans.
+  ///
+  /// In en, this message translates to:
+  /// **'the Note\'s Frog, open or just eaten; made in Advanced.'**
+  String get helpIconFrogMeans;
 
   /// No description provided for @helpIconAdd.
   ///

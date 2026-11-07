@@ -219,6 +219,19 @@ pub fn move_column(text: &str, at: usize, from: usize, to: usize) -> Change {
     })
 }
 
+/// `text` with the column `column` of the table at `at` lining up its
+/// cells as `align` says; a column that lines up so already gives the
+/// text as it was.
+pub fn set_align(text: &str, at: usize, column: usize, align: Align) -> Change {
+    change(text, at, |grid| match grid.aligns.get_mut(column) {
+        Some(slot) if *slot != align => {
+            *slot = align;
+            true
+        }
+        _ => false,
+    })
+}
+
 /// `text` with the row `row` of the table at `at` deleted; the header
 /// row's going makes the next row the header row, and the last row's
 /// going takes the table with it.
@@ -741,6 +754,32 @@ mod tests {
             assert_eq!(all(&change.text).first().map(|t| t.rows.len()), Some(2));
         }
         assert_eq!(set_cell(text, at, 2, 0, "x").text, text);
+    }
+
+    #[test]
+    fn a_column_lines_up_as_it_is_set_to() {
+        let text = "x\n| a | b |\n|:-|-:|\n| c | d | e |\n\ny";
+        let at = 2;
+        let table = |c: Change| c.text[c.start..c.end].to_string();
+        assert_eq!(
+            table(set_align(text, at, 0, Align::Center)),
+            "| a | b |\n| :-: | --: |\n| c | d | e |"
+        );
+        assert_eq!(
+            table(set_align(text, at, 1, Align::None)),
+            "| a | b |\n| :-- | --- |\n| c | d | e |"
+        );
+        let right = set_align(text, at, 0, Align::Right);
+        assert_eq!(
+            all(&right.text).first().map(|t| t.aligns.clone()),
+            Some(vec![Align::Right, Align::Right])
+        );
+        assert_eq!(&right.text[..right.start], "x\n");
+        assert_eq!(&right.text[right.end..], "\n\ny");
+        // What cannot be done, or is so already, changes nothing.
+        assert_eq!(set_align(text, at, 0, Align::Left).text, text);
+        assert_eq!(set_align(text, at, 2, Align::Left).text, text);
+        assert_eq!(set_align(text, 0, 0, Align::Center).text, text);
     }
 
     #[test]

@@ -1,0 +1,23 @@
+/* Why the app asks for AlarmKit's alarms (#238). */
+"NSAlarmKitUsageDescription" = "Damit kann eine Routine, die du immer wieder übergehst, als Alarm klingeln – auch im Stummmodus und im Fokus.";
+
+/* Why the app asks for the microphone (#239). */
+"NSMicrophoneUsageDescription" = "Sprachnotizen nehmen auf, was du sagst. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst.";
+
+/* Why the app asks for the local network (#240). */
+"NSLocalNetworkUsageDescription" = "Gleicht mit deinen gekoppelten Geräten im selben WLAN ab, etwa mit deinem Computer, ohne Internet.";
+
+/* Why the app asks for the calendars (#241). */
+"NSCalendarsFullAccessUsageDescription" = "Zeigt die Termine der Kalender, die du auswählst, in der Agenda, notiert den Termin, der läuft, wenn du eine Notiz erfasst, und schreibt deine Routinen und Erinnerungen in einen Kalender deiner Wahl. Nur wenn du das einschaltest.";
+
+/* Why the app asks for the location (#241). */
+"NSLocationWhenInUseUsageDescription" = "Notiert, wo du eine Notiz erfasst, damit sie auch Tage später noch Sinn ergibt. Nur während du die App nutzt und nur wenn du das einschaltest.";
+
+/* Why the app asks for the camera (#243). */
+"NSCameraUsageDescription" = "Nimmt Fotos für deine Notizen auf und vom Kopplungscode eines Computers. Nur wenn du auf Foto tippst.";
+
+/* Why the app asks for Face ID (#243). */
+"NSFaceIDUsageDescription" = "Entsperrt die App und gesperrte Bereiche mit Face ID, statt die PIN einzutippen.";
+
+/* Why the app asks to add to the photos (#243). */
+"NSPhotoLibraryAddUsageDescription" = "Legt das Foto einer Notiz in deinen Fotos ab, wenn du auf Speichern tippst. Old Brain Fix fügt nur hinzu und liest deine Fotos nie.";

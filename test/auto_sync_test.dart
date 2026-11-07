@@ -91,6 +91,10 @@ class FakeSync implements SyncPlatform {
 
   @override
   Future<void> finished() async => finishes++;
+
+  /// False as on the iPhone (#236).
+  @override
+  var hostsOutOfSight = true;
 }
 
 /// The paired host as the test says: started on a port, and the session
@@ -557,6 +561,41 @@ void main() {
     });
   });
 
+  group('on the iPhone, hosting only while the app is open (#240)', () {
+    testWidgets('the periodic work out of sight joins once without '
+        'hosting, then says it is over', (tester) async {
+      pairDesk();
+      sync.hostsOutOfSight = false;
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      auto.shown();
+      await tester.pump();
+      expect(hosts.starts, 1, reason: 'hosts while it shows');
+      auto.hidden();
+      await tester.pump();
+      expect(hosts.running?.stopped, isTrue, reason: 'stops on leaving');
+      expect(sync.advertised, isNull);
+      final before = joined.length;
+      failure = SyncFailure.unreachable;
+      parked = Completer<void>();
+
+      sync.want();
+      await tester.pump();
+      expect(hosts.starts, 1, reason: 'no host out of sight');
+      expect(sync.advertised, isNull);
+      expect(joined, hasLength(before + 1));
+      expect(sync.finishes, 0, reason: 'the join still runs');
+
+      parked?.complete();
+      await wait(tester, const Duration(milliseconds: 200));
+      expect(sync.finishes, 1);
+      await wait(tester, retryEvery + const Duration(seconds: 1));
+      expect(joined, hasLength(before + 1), reason: 'not tried again');
+      expect(sync.discovering, isFalse);
+      auto.dispose();
+    });
+  });
+
   group('the whole app', () {
     late Announcements announcements;
     setUp(() => announcements = Announcements());
@@ -930,6 +969,27 @@ void main() {
       expect(joined, hasLength(9));
       expect(hosts.running?.stopped, isTrue);
       expect(sync.advertised, isNull);
+    });
+  });
+
+  group('in the background on the iPhone (#240)', () {
+    testWidgets('joins once and hosts nothing', (tester) async {
+      pairDesk();
+      sync.hostsOutOfSight = false;
+      final hosts = FakeHosts();
+      failure = SyncFailure.unreachable;
+      await backgroundSync(
+        store: phone,
+        platform: sync,
+        alarms: alarmSync(),
+        name: 'Pixel',
+        join: join,
+        host: hosts.start,
+        clock: () => now,
+      );
+      expect(hosts.starts, 0);
+      expect(sync.advertised, isNull);
+      expect(joined, hasLength(1));
     });
   });
 

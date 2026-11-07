@@ -10,7 +10,9 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::help_notes::{self, VERSION_SETTING, parse_whats_new};
 use oldbrainfix_core::{Checklists, Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::App;
-use oldbrainfix_gui::help_notes::{GROUPS, WHATS_NEW, icons_text, quick_start_lines};
+use oldbrainfix_gui::help_notes::{
+    GROUPS, WHATS_NEW, icons_text, quick_start_description, quick_start_lines,
+};
 use oldbrainfix_gui::l10n::L10n;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -73,9 +75,13 @@ fn the_first_start_files_quick_start_and_the_icons_and_no_whats_new() -> TestRes
     click(&mut harness, "Start");
     let desk = harness.state().store();
     let t = L10n::new("en");
+    // Named "Quick start", the desktop's way folded under it (#260).
     assert_eq!(
         help_texts(desk)?,
-        ["Quick start".to_string(), icons_text(&t)]
+        [
+            format!("Quick start\n{}", quick_start_description(&t)),
+            icons_text(&t)
+        ]
     );
     assert!(Notes::new(desk).unsorted()?.is_empty());
     let person = OwnProfile::new(desk).get()?.ok_or("a Profile")?.id;
@@ -125,7 +131,7 @@ fn an_ordinary_start_makes_what_was_never_made_in_its_language_once() -> TestRes
         .ok_or("the bundled German What's new of 0.4.0")?;
     let mut expected = vec![
         format!("{}\n\n{notes}", t.help_whats_new_title("0.4.0")),
-        "Schnellstart".to_string(),
+        format!("Schnellstart\n{}", quick_start_description(&t)),
         icons_text(&t),
     ];
     expected.sort();

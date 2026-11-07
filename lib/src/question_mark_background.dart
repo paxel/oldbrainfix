@@ -33,17 +33,31 @@ class ParallaxScroll extends NavigatorObserver {
     return false;
   }
 
-  /// Only the page's outermost scrollable counts: a list or text field
-  /// nested inside it (depth > 0) scrolls on its own.
+  /// Only the page's outermost vertical scrollable counts: a list or
+  /// text field nested inside it scrolls on its own. The Agenda and the
+  /// Areas list each count, inside the sideways pages they share (#258).
   bool _track(ScrollMetrics metrics, BuildContext? context, int depth) {
-    if (depth != 0 || metrics.axis != Axis.vertical || context == null) {
-      return false;
-    }
+    if (metrics.axis != Axis.vertical || context == null) return false;
+    if (depth != 0 && !_outermostVertical(context)) return false;
     final route = ModalRoute.of(context);
     if (route is! PageRoute) return false;
     _offsets[route] = metrics.pixels;
     if (route.isCurrent) offset.value = metrics.pixels;
     return false;
+  }
+
+  /// Whether the scrollable that [context] reports for has no vertical
+  /// one around it.
+  static bool _outermostVertical(BuildContext context) {
+    var outer = context.findAncestorStateOfType<ScrollableState>();
+    while (outer != null) {
+      outer = outer.context.findAncestorStateOfType<ScrollableState>();
+      if (outer != null &&
+          axisDirectionToAxis(outer.axisDirection) == Axis.vertical) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Shows [route]'s position if it is the page now on top.

@@ -822,6 +822,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.';
 
   @override
+  String get permAlarms => 'Alarme';
+
+  @override
+  String get permAlarmsWhy =>
+      'Damit kann eine Routine, die du immer wieder übergehst, zu einem Alarm werden, der auch im Stummmodus und im Fokus klingelt – wenn du das für sie einschaltest. Erlaube es im Dialog, der sich öffnet, oder für Old Brain Fix in den Einstellungen.';
+
+  @override
   String get catchUpTitle => 'Verpasst, während das Handy aus war';
 
   @override
@@ -915,6 +922,25 @@ class AppLocalizationsDe extends AppLocalizations {
   String get escalationSwitch => 'Zum Vollbild-Alarm eskalieren';
 
   @override
+  String get escalationSwitchIphone => 'Zu einem iPhone-Alarm eskalieren';
+
+  @override
+  String escalationSummaryIphone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'iPhone-Alarm, nachdem es $count-mal unbeachtet wieder geklingelt hat',
+      one: 'iPhone-Alarm, nachdem es einmal unbeachtet wieder geklingelt hat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get escalationExplainIphone =>
+      'Wird diese immer wieder übergangen, klingelt sie als iPhone-Alarm, auch im Stummmodus und im Fokus und auf dem Sperrbildschirm. Stopp zählt als erledigt; Später lässt sie in 10 Min. wieder klingeln.';
+
+  @override
   String get escalationAfter => 'Nach so oft unbeachtetem Wiederklingeln';
 
   @override
@@ -980,7 +1006,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get deleteNoteLinkedDetail =>
-      'Mitgelöschte kommen mit der Notiz zurück, wenn du sie wiederherstellst. Behaltene erinnern dich weiter.';
+      'Sie bleiben mit ihr 30 Tage im Papierkorb und kommen zurück, wenn du sie wiederherstellst.';
 
   @override
   String get noteInTrash => 'Die Notiz liegt im Papierkorb';
@@ -1025,6 +1051,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get bluetoothExplainBody =>
       'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
+
+  @override
+  String get bluetoothExplainBodyIphone =>
+      'Old Brain Fix kann notieren, über welches Bluetooth-Gerät das iPhone den Ton spielt, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Es liest nur den Namen dieses Geräts und sucht nie nach anderen. Der Name geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
   String get bluetoothNotAllowed =>
@@ -1545,6 +1575,22 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get frameTimesOn => 'Bildzeiten an';
+
+  @override
+  String get frameTimesOff => 'Bildzeiten aus';
+
+  @override
+  String frameTimesLast(String build, String raster) {
+    return 'Letzte Bilder: Aufbau $build ms, Rastern $raster ms';
+  }
+
+  @override
+  String frameTimesWorst(String total) {
+    return 'Langsamstes der letzten Sekunde: $total ms';
+  }
+
+  @override
   String get documentation => 'Dokumentation';
 
   @override
@@ -1606,6 +1652,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get unlockBiometrics =>
       'Mit Fingerabdruck oder Displaysperre entsperren';
+
+  @override
+  String get unlockBiometricsIphone => 'Mit Face ID oder Touch ID entsperren';
 
   @override
   String get biometricsDetail => 'Die PIN funktioniert immer auch.';
@@ -2819,18 +2868,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deleteNoteDetail => 'Sie bleibt 30 Tage im Papierkorb.';
 
   @override
-  String get deleteNoteOnly => 'Nur die Notiz löschen';
-
-  @override
-  String deleteNoteWithLinked(int count) {
+  String deleteNoteLinkedQuestion(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Mit ihren $count Routinen und Erinnerungen löschen',
-      one: 'Mit ihrer Routine oder Erinnerung löschen',
+      other: 'Diese Notiz und ihre $count Routinen und Erinnerungen löschen?',
+      one: 'Diese Notiz und ihre 1 Routine löschen?',
     );
     return '$_temp0';
   }
+
+  @override
+  String get deleteNoteReminderQuestion =>
+      'Diese Notiz und ihre 1 Erinnerung löschen?';
 
   @override
   String get removeRecordingKeepText => 'Aufnahme entfernen, Text behalten';
@@ -3348,6 +3398,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
 
   @override
+  String get frogOpen => 'Offen';
+
+  @override
+  String get frogEatenToday => 'Heute gegessen';
+
+  @override
+  String get frogEatenYesterday => 'Gestern gegessen';
+
+  @override
+  String get frogEatNow => 'Jetzt essen';
+
+  @override
+  String get frogRemove => 'Frosch entfernen';
+
+  @override
   String get makeTally => 'Zur Strichliste machen';
 
   @override
@@ -3401,6 +3466,33 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String sessionHistoryWeek(String day, int done, int skipped) {
     return 'Woche ab $day: $done erledigt / $skipped ausgelassen';
+  }
+
+  @override
+  String get sessionRuns => 'Bisherige Läufe';
+
+  @override
+  String get sessionRunsNone => 'Noch keine bisherigen Läufe.';
+
+  @override
+  String sessionRunDone(String name) {
+    return '$name: erledigt';
+  }
+
+  @override
+  String sessionRunNotDone(String name) {
+    return '$name: nicht erledigt';
+  }
+
+  @override
+  String sessionOlderRuns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ältere Läufe auf der Seite der Einheit',
+      one: '1 älterer Lauf auf der Seite der Einheit',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -3627,13 +3719,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyTarget => 'Ziel (optional)';
 
   @override
-  String get tallyTargetHint => 'In jedem neuen Eintrag vorausgefüllt';
+  String get tallyTargetHint =>
+      'Je Balken des Diagramms, in jedem neuen Eintrag vorausgefüllt';
 
   @override
   String get tallyNotANumber => 'Keine Zahl. Tippe sie wie 12, 2,5 oder 1:30.';
 
   @override
-  String get tallyRule => 'Ein Tag mit mehreren Einträgen zählt';
+  String get tallyRule => 'Mehrere Sätze oder Einträge in einem Balken zählen';
 
   @override
   String get tallyRuleSum => 'Ihre Summe';
@@ -3676,19 +3769,43 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyNoTarget => 'Kein Ziel';
 
   @override
-  String get tallyMultiplies => 'Multipliziert';
+  String get tallyCountsInSets => 'Zählt in Sätzen';
 
   @override
-  String get tallyMultipliesNothing => 'Nichts';
+  String get tallyCountsInSetsDetail =>
+      'Jeder Eintrag hält mehrere Sätze, etwa 60 kg × 10 und dann 65 kg × 8. Jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen: Wiederholungen als Summe, ein Gewicht als das größte.';
 
   @override
-  String get tallyMultipliesDetail =>
-      'In jedem Eintrag multipliziert sein Wert das gewählte Feld, etwa 3 Runden × 10 Liegestütze zu 30 Liegestützen. Es zählt dann keinen eigenen Wert: keine Summe, kein Diagramm, kein Ziel.';
+  String get tallyAddSet => 'Satz hinzufügen';
 
   @override
-  String tallyTimes(String factor, String value) {
-    return '$factor × $value';
+  String tallySet(int number) {
+    return 'Satz $number';
   }
+
+  @override
+  String tallyRemoveSet(int number) {
+    return 'Satz $number entfernen';
+  }
+
+  @override
+  String get tallyFieldKind => 'Art des Feldes';
+
+  @override
+  String get tallyFieldKindNumber => 'Zahl';
+
+  @override
+  String get tallyFieldKindCheck => 'Abhakfeld';
+
+  @override
+  String get tallyFieldKindCheckDetail =>
+      'Ein Kästchen in jedem Eintrag. Ein Haken zählt als 1, so zeigt ein Balken, wie oft es getan wurde. Seine Art bleibt, sobald es hinzugefügt ist.';
+
+  @override
+  String get tallySetCounter => 'Zählt die Sätze älterer Einträge';
+
+  @override
+  String get tallyBarHint => 'Das Ziel zählt je Balken.';
 
   @override
   String get tallyFields => 'Felder';
@@ -4629,6 +4746,44 @@ class AppLocalizationsDe extends AppLocalizations {
   String get linkSet => 'Link setzen';
 
   @override
+  String get formatLinkTo => 'Link zu…';
+
+  @override
+  String get linkToSearch => 'Notizen, Bereiche und Seiten suchen';
+
+  @override
+  String get linkToPages => 'Seiten';
+
+  @override
+  String get linkToPlaces => 'Bereiche und Themen';
+
+  @override
+  String get linkToNotes => 'Notizen';
+
+  @override
+  String get linkToNothing => 'Nichts gefunden.';
+
+  @override
+  String get linkToGuide => 'Anleitung';
+
+  @override
+  String get linkNotAvailable => 'Hier nicht verfügbar';
+
+  @override
+  String get fileLinkTitle => 'Diese Datei öffnen?';
+
+  @override
+  String fileLinkQuestion(String file, String app) {
+    return '„$file“ aus dem geteilten Ordner mit $app öffnen?';
+  }
+
+  @override
+  String get fileLinkSomeApp => 'der App, die das System dafür wählt';
+
+  @override
+  String get fileLinkOpen => 'Öffnen';
+
+  @override
   String get formatTable => 'Tabelle';
 
   @override
@@ -4701,6 +4856,26 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get tableDeleteBody =>
       'Die Wörter in ihren Zellen werden aus der Notiz gelöscht.';
+
+  @override
+  String get tableAlignLeft => 'Linksbündig';
+
+  @override
+  String get tableAlignCenter => 'Zentriert';
+
+  @override
+  String get tableAlignRight => 'Rechtsbündig';
+
+  @override
+  String get tableShowLines => 'Als Zeilen zeigen';
+
+  @override
+  String get tableShowGrid => 'Als Tabelle zeigen';
+
+  @override
+  String tableCell(int number, String letter) {
+    return 'Zeile $number, Spalte $letter';
+  }
 
   @override
   String get pairCodeNeedsUpdate =>
@@ -5167,32 +5342,81 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpQuickStartTitle => 'Schnellstart';
 
   @override
-  String get helpQuickStart1 => 'Erfasse einen Gedanken mit +.';
+  String get helpQuickStart1 =>
+      'Tippe unten rechts in der Agenda auf das runde +, dann auf Text, schreib einen Gedanken und tippe auf 1 Std.';
 
   @override
-  String get helpQuickStart2 => 'Lege die neue Notiz in einem Bereich ab.';
+  String get helpQuickStart2 =>
+      'Tippe in der Agenda auf „1 unsortiert“, dann unter der Notiz auf den Ordner mit Pfeil und wähl einen Bereich.';
 
   @override
-  String get helpQuickStart3 => 'Gib einer Notiz eine Erinnerung.';
+  String get helpQuickStart3 =>
+      'Tippe auf + und Text, schreib eine Aufgabe, tippe auf den Wecker und Erinnerung, stell die Zeit ein, zweimal Speichern.';
 
   @override
   String get helpQuickStart4 =>
-      'Gib einer Notiz eine Routine, die wiederkehrt.';
+      'Tippe auf + und Text, schreib eine Gewohnheit, tippe auf den Wecker und Routine, wähl, wann sie sich wiederholt, zweimal Speichern.';
 
   @override
   String get helpQuickStart5 =>
-      'Hake diese Zeile ab: So funktioniert eine Checkliste.';
+      'Tippe auf das Kästchen vor dieser Zeile, um sie abzuhaken: So funktioniert eine Checkliste.';
 
   @override
-  String get helpQuickStart6 => 'Finde eine Notiz mit „Suchen und stöbern“.';
+  String get helpQuickStart6 =>
+      'Tippe oben in der Agenda auf den Ordner oder wische nach links, durchsuche alle Notizen und öffne deine Bereiche.';
 
   @override
   String get helpQuickStart7 =>
-      'Lege unter Einstellungen ▸ Sicherungen eine Sicherung an.';
+      'Tippe oben rechts in der Agenda auf dein Profilbild, dann auf „Dieses Gerät sichern“ und „Sicherungen einrichten“.';
 
   @override
   String get helpQuickStart8 =>
-      'Synchronisiere in den Einstellungen mit deinem anderen Gerät.';
+      'Tippe auf dein Profilbild, dann auf „Mit einem anderen Gerät synchronisieren“, und scanne den Code deines anderen Geräts.';
+
+  @override
+  String get helpQuickStartDesktopTitle =>
+      'Auf dem Desktop (auf macOS Cmd statt Strg):';
+
+  @override
+  String get helpQuickStartDesktop1 =>
+      'Erfassen: Datei ▸ Neue Notiz oder Strg+N, schreiben, dann Strg+Enter.';
+
+  @override
+  String get helpQuickStartDesktop2 =>
+      'Ablegen: in der Seitenleiste unter Unsortiert die Karte auf einen Bereich ziehen, oder Rechtsklick, Ablegen in …, und den Bereich wählen.';
+
+  @override
+  String get helpQuickStartDesktop3 =>
+      'Erinnerung: in der Schnellnotiz auf den Wecker klicken, dann Erinnerung; die Zeit einstellen, Speichern klicken, dann Strg+Enter.';
+
+  @override
+  String get helpQuickStartDesktop4 => 'Routine: genauso, mit Routine.';
+
+  @override
+  String get helpQuickStartDesktop5 =>
+      'Abhaken: auf das Kästchen vor einer Zeile klicken.';
+
+  @override
+  String get helpQuickStartDesktop6 =>
+      'Suchen und stöbern: einen Bereich in der Seitenleiste anklicken, oder Bearbeiten ▸ Suchen (Strg+F).';
+
+  @override
+  String get helpQuickStartDesktop7 =>
+      'Sicherung: Synchronisieren ▸ Sicherungen …, dann „Sicherungen einrichten“.';
+
+  @override
+  String get helpQuickStartDesktop8 =>
+      'Synchronisieren: Synchronisieren ▸ Gerät koppeln.';
+
+  @override
+  String get helpQuickStartPlacesTitle =>
+      'Dorthin, wo jeder Schritt gemacht wird:';
+
+  @override
+  String get helpQuickStartPlaceHere => 'Hier, in dieser Checkliste.';
+
+  @override
+  String get helpIconsGuide => 'Alles Weitere steht in der Anleitung.';
 
   @override
   String get helpIconsTitle => 'Was die Symbole bedeuten';
@@ -5243,6 +5467,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpIconRoutineMeans => 'klingelt an ihren Tagen immer wieder.';
+
+  @override
+  String get helpIconFrog => 'Frosch';
+
+  @override
+  String get helpIconFrogMeans =>
+      'der Frosch der Notiz, offen oder gerade gegessen; angelegt in Erweitert.';
 
   @override
   String get helpIconAdd => 'Hinzufügen';

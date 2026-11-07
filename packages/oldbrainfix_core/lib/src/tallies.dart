@@ -19,8 +19,26 @@ abstract final class TallyKeys {
   static const rule = 'rule';
   static const hidden = 'hidden';
 
-  /// The id of the other field a field multiplies (#200), as stored.
+  /// The id of the other field a field multiplied (#200), as stored:
+  /// no app writes it any more, but a field it names still counts the
+  /// sets of the older entries (#264).
   static const multiplies = 'multiplies';
+
+  /// A field's kind: [kindCheck] for a Check field, absent for a number.
+  static const kind = 'kind';
+  static const kindCheck = 'check';
+
+  /// The length of a bar of the Tally's charts, a [TallyPeriod]'s name,
+  /// on the Tally's Note; absent or unknown reads as a day (#264).
+  static const bar = 'tally:bar';
+
+  /// Whether the Tally counts in sets, `true` or `false`, on the Tally's
+  /// Note; absent, it does while a field counts sets as a multiplier did
+  /// (#264).
+  static const sets = 'tally:sets';
+
+  /// How many sets an entry holds at most.
+  static const maxSets = 99;
 
   /// The key of [key] of the field [fieldId] on the Note.
   static String field(String fieldId, String key) =>
@@ -43,6 +61,27 @@ abstract final class TallyKeys {
 
   static String value(String fieldId) => '$valuePrefix$fieldId';
 
+  /// The value of a field in the set [set] of an entry, counting from 1:
+  /// the first under `v:<field id>`, each further one under
+  /// `v<set>:<field id>` (#264).
+  static String setValue(int set, String fieldId) =>
+      set == 1 ? value(fieldId) : 'v$set:$fieldId';
+
+  /// The set and the field id [key] holds a value of, or null: `v:` for
+  /// the first, `v2:` to `v99:`, without a leading zero, for the others.
+  static (int, String)? valueOf(String key) {
+    if (key.startsWith(valuePrefix)) {
+      return (1, key.substring(valuePrefix.length));
+    }
+    final match = _setKey.firstMatch(key);
+    if (match == null) return null;
+    final (set, id) = (match.group(1), match.group(2));
+    if (set == null || id == null) return null;
+    return (int.parse(set), id);
+  }
+
+  static final _setKey = RegExp(r'^v([2-9]|[1-9][0-9]):(.+)$');
+
   /// The entry's free text line.
   static const line = 'line';
 
@@ -61,14 +100,19 @@ class TallyField {
   /// A known unit's code ([TallyUnits.known]) or the unit as typed.
   final String unit;
 
-  /// The target in the base unit, or null for none; a multiplier has
-  /// none.
+  /// The target in the base unit, per bar of the Tally's charts, or null
+  /// for none; a field that counts sets has none.
   final double? target;
   final TallyRule rule;
   final bool hidden;
 
-  /// The id of the other field this one multiplies (#200), or null while
-  /// it is a field of its own: a multiplier counts as no value.
+  /// Whether it is a Check field (#264): a box per entry, a tick counting
+  /// as 1, summed.
+  final bool check;
+
+  /// The id of the field this one multiplied (#200), or null: such a
+  /// field counts the sets of the entries that hold no sets of their own
+  /// (#264) and counts no value of its own.
   final String? multiplies;
 
   /// The id of the field its setting names, read or not.
@@ -91,6 +135,7 @@ class TallyField {
     required this.hidden,
     required this.hasEntries,
     required this.added,
+    this.check = false,
     this.multiplies,
     this._stored,
   });
@@ -108,12 +153,13 @@ class TallyField {
     hidden: hidden,
     hasEntries: hasEntries,
     added: added,
+    check: check,
     multiplies: multiplies,
     stored: _stored,
   );
 
   /// This field with [multiplies] as read, without its target while it
-  /// multiplies.
+  /// counts sets.
   TallyField _multiplying(String? multiplies) => TallyField(
     id: id,
     noteId: noteId,
@@ -124,6 +170,7 @@ class TallyField {
     hidden: hidden,
     hasEntries: hasEntries,
     added: added,
+    check: check,
     multiplies: multiplies,
     stored: _stored,
   );
@@ -136,7 +183,18 @@ class Tally {
   /// Every field, the hidden ones included, in the order they were added.
   final List<TallyField> fields;
 
-  const Tally(this.noteId, this.fields);
+  /// How long a bar of its charts is; its targets count per bar (#264).
+  final TallyPeriod bar;
+
+  /// Whether its entry form has "+ Set" (#264).
+  final bool countsInSets;
+
+  const Tally(
+    this.noteId,
+    this.fields, {
+    this.bar = TallyPeriod.day,
+    this.countsInSets = false,
+  });
 
   /// The fields that show: those not hidden.
   List<TallyField> get shown => [
@@ -152,63 +210,92 @@ class Tally {
     return null;
   }
 
-  /// The fields shown that count values of their own: all but the
-  /// multipliers (#200). Totals, targets and charts are theirs.
+  /// The fields shown that count values of their own: all but those that
+  /// count sets as a multiplier did (#264). Totals, targets and charts
+  /// are theirs.
   List<TallyField> get counting => [
     for (final field in shown)
       if (field.multiplies == null) field,
   ];
 
-  /// What the entry form starts with: the target of every field shown
-  /// that has one, by field id; a multiplier has none.
-  Map<String, double> get targets => {
-    for (final field in shown) field.id: ?field.target,
-  };
-
-  /// The fields that multiply the field [id], in their order.
-  List<TallyField> multipliersOf(String id) => [
-    for (final field in fields)
-      if (field.multiplies == id) field,
+  /// The number fields of [counting]: a set is a row across them.
+  List<TallyField> get numbers => [
+    for (final field in counting)
+      if (!field.check) field,
   ];
 
-  /// The fields the field [id], or a new one when null, may multiply:
-  /// the other fields shown whose own setting names no other field shown;
-  /// none while it is hidden or another multiplies it.
-  List<TallyField> multipliable(String? id) {
-    if (id != null &&
-        (field(id)?.hidden == true || multipliersOf(id).isNotEmpty)) {
-      return const [];
-    }
-    return [
-      for (final field in shown)
-        if (field.id != id && !_wouldMultiply(field)) field,
+  /// The Check fields of [counting]: ticked once per entry, above its
+  /// sets.
+  List<TallyField> get checks => [
+    for (final field in counting)
+      if (field.check) field,
+  ];
+
+  /// What the entry form starts with: the target of every number field
+  /// shown that has one, by field id; a Check field starts unticked.
+  Map<String, double> get targets => {
+    for (final field in shown)
+      if (!field.check) field.id: ?field.target,
+  };
+
+  /// The sets of [entry] (#264), each a row of values by field id across
+  /// its number fields, hidden ones included, in the base unit; none when
+  /// it holds no number. An entry without sets of its own written that a
+  /// field counting sets holds a value for reads as that many sets of its
+  /// values: the first such field in their order, its value rounded half
+  /// away from zero, at least 1 and at most [TallyKeys.maxSets].
+  List<Map<String, double>> setsOf(TallyEntry entry) {
+    Map<String, double> row(Map<String, double> values) => {
+      for (final field in fields)
+        if (!field.check && field.multiplies == null)
+          field.id: ?values[field.id],
+    };
+    final first = row(entry.values);
+    final rows = [
+      if (first.isNotEmpty) first,
+      for (final more in entry.more)
+        if (row(more) case final held when held.isNotEmpty) held,
     ];
+    if (entry.more.isNotEmpty || first.isEmpty) return rows;
+    for (final field in fields) {
+      if (field.multiplies == null) continue;
+      final micro = switch (entry.values[field.id]) {
+        final value? => tallyMicro(value),
+        null => null,
+      };
+      if (micro == null) continue;
+      final whole = _round(micro);
+      final count = whole < 1
+          ? 1
+          : whole > TallyKeys.maxSets
+          ? TallyKeys.maxSets
+          : whole;
+      return [for (var i = 0; i < count; i++) first];
+    }
+    return rows;
   }
 
-  /// What [entry] counts for the field [id] (#200): its value times the
-  /// value of each multiplier of it the entry holds, one held none
-  /// counting as 1; null for a multiplier or a value it does not hold.
+  /// What [entry] counts for the field [id]: a Check field its tick, a
+  /// number field its rule over the entry's sets, the sum or the largest
+  /// (#264); null for a field counting sets or a value it does not hold.
   double? counted(TallyEntry entry, String id) {
     final micro = countedMicro(entry, id);
     return micro == null ? null : micro / 1000000;
   }
 
-  /// [counted] in millionths: each product rounded half away from zero
-  /// and held at the 64-bit limits, as in both cores.
+  /// [counted] in millionths, sums held at the 64-bit limits, as in both
+  /// cores.
   int? countedMicro(TallyEntry entry, String id) {
     final field = this.field(id);
     if (field == null || field.multiplies != null) return null;
-    final value = entry.values[id];
-    final held = value == null ? null : tallyMicro(value);
-    if (held == null) return null;
-    var micro = held;
-    for (final multiplier in multipliersOf(id)) {
-      final factor = entry.values[multiplier.id];
-      final factorMicro = factor == null ? null : tallyMicro(factor);
-      if (factorMicro == null) continue;
-      micro = _times(micro, factorMicro);
+    if (field.check) {
+      final value = entry.values[id];
+      return value == null ? null : tallyMicro(value);
     }
-    return micro;
+    return Tallies._fold([
+      for (final set in setsOf(entry))
+        if (set[id] case final value?) ?tallyMicro(value),
+    ], field.rule);
   }
 
   /// Whether the setting of [field] names a shown field other than it:
@@ -229,21 +316,12 @@ class Tally {
         : null;
   }
 
-  /// [micro] × [factor] millionths, rounded half away from zero and held
-  /// at the largest and smallest 64-bit numbers.
-  static int _times(int micro, int factor) {
-    final million = BigInt.from(1000000);
-    final product = BigInt.from(micro) * BigInt.from(factor);
-    var whole = product ~/ million;
-    final rest = product.remainder(million).abs();
-    if (rest * BigInt.two >= million) {
-      whole += product.isNegative ? -BigInt.one : BigInt.one;
-    }
-    final max = BigInt.from(0x7fffffffffffffff);
-    final min = -max - BigInt.one;
-    if (whole > max) return max.toInt();
-    if (whole < min) return min.toInt();
-    return whole.toInt();
+  /// [micro] millionths as a whole number, rounded half away from zero.
+  static int _round(int micro) {
+    final whole = micro ~/ 1000000;
+    final rest = (micro - whole * 1000000).abs();
+    if (rest * 2 < 1000000) return whole;
+    return micro < 0 ? whole - 1 : whole + 1;
   }
 }
 
@@ -260,9 +338,13 @@ class TallyEntry {
   /// When it counts for.
   final DateTime at;
 
-  /// The values by field id, in the base unit; a field added later has
-  /// none.
+  /// The values by field id, in the base unit, of its first set and its
+  /// Check fields; a field added later has none.
   final Map<String, double> values;
+
+  /// The values of its further sets (#264), in their order, each by field
+  /// id in the base unit; as stored, read as [Tally.setsOf] says.
+  final List<Map<String, double>> more;
   final String line;
 
   /// When it was removed, or null.
@@ -274,6 +356,7 @@ class TallyEntry {
     required this.at,
     required this.values,
     required this.line,
+    this.more = const [],
     this.trashed,
   });
 
@@ -315,29 +398,42 @@ class Tallies {
   static const maxBuckets = 1000;
 
   /// The Tally of the Note [noteId], with the fields of the Notes merged
-  /// into it, or null while it has no field.
+  /// into it, or null while it has no field. Its bar length and whether
+  /// it counts in sets lie on its own Note.
   Tally? byNote(String noteId) {
     final shape = _shapes()[noteId];
     if (shape == null) return null;
     final counted = _counted()[noteId] ?? const <String>{};
-    return _multiplied(
+    final fields = _multiplied(
       Tally(noteId, [
-        for (final field in shape) field._counting(counted.contains(field.id)),
+        for (final field in shape.fields)
+          field._counting(counted.contains(field.id)),
       ]),
+    );
+    return Tally(
+      noteId,
+      fields,
+      bar: TallyPeriod.values.asNameMap()[shape.bar] ?? TallyPeriod.day,
+      countsInSets: switch (shape.sets) {
+        'true' => true,
+        'false' => false,
+        _ => fields.any((f) => f.multiplies != null),
+      },
     );
   }
 
-  /// [tally] with the multipliers its settings make (#200): a field
-  /// whose setting names a shown other field multiplies it, unless that
-  /// field's own setting names a shown other field too. A hidden field
-  /// multiplies nothing and is multiplied by nothing.
-  static Tally _multiplied(Tally tally) => Tally(tally.noteId, [
+  /// The fields of [tally] with the multipliers its settings make (#200):
+  /// a field whose setting names a shown other field multiplied it, unless
+  /// that field's own setting names a shown other field too. A hidden
+  /// field multiplies nothing and is multiplied by nothing. Such a field
+  /// now counts sets (#264).
+  static List<TallyField> _multiplied(Tally tally) => [
     for (final field in tally.fields)
       field._multiplying(switch (tally._named(field)) {
         final other? when !tally._wouldMultiply(other) => other.id,
         _ => null,
       }),
-  ]);
+  ];
 
   /// Whether the Note [noteId] is a Tally: told by its fields alone,
   /// without reading its entries (#216).
@@ -354,9 +450,9 @@ class Tallies {
 
   /// Adds a field to the Note [noteId], which makes it a Tally the first
   /// time and takes it out of Unsorted; returns the field's id. [target]
-  /// is in the base unit; [rule] defaults by the kind of [unit]; it
-  /// multiplies the field [multiplies] when given, as [setMultiplies]
-  /// allows. A Note that is a list, such as a Checklist, is never a
+  /// is in the base unit, per bar; [rule] defaults by the kind of [unit].
+  /// A [check] field (#264) has no unit and sums its ticks, and stays a
+  /// Check field. A Note that is a list, such as a Checklist, is never a
   /// Tally too.
   String addField(
     String noteId, {
@@ -364,7 +460,7 @@ class Tallies {
     String unit = '',
     double? target,
     TallyRule? rule,
-    String? multiplies,
+    bool check = false,
   }) {
     final note = Notes(store).byId(noteId);
     if (note == null || note.isTrashed || note.isMerged) {
@@ -377,9 +473,8 @@ class Tallies {
       throw StateError('may not change $noteId');
     }
     final named = _name(name);
-    final typed = unit.trim();
+    final typed = check ? '' : unit.trim();
     final goal = target == null ? null : encodeTallyNumber(target);
-    if (multiplies != null) _requireMultipliable(noteId, null, multiplies);
     final id = Store.newId();
     store.batch(() {
       store.append(noteId, TallyKeys.field(id, TallyKeys.name), named);
@@ -387,16 +482,19 @@ class Tallies {
       store.append(
         noteId,
         TallyKeys.field(id, TallyKeys.rule),
-        (rule ?? TallyUnits.defaultRule(TallyUnits.kindOf(typed))).name,
+        (check
+                ? TallyRule.sum
+                : rule ?? TallyUnits.defaultRule(TallyUnits.kindOf(typed)))
+            .name,
       );
       if (goal != null) {
         store.append(noteId, TallyKeys.field(id, TallyKeys.target), goal);
       }
-      if (multiplies != null) {
+      if (check) {
         store.append(
           noteId,
-          TallyKeys.field(id, TallyKeys.multiplies),
-          multiplies,
+          TallyKeys.field(id, TallyKeys.kind),
+          TallyKeys.kindCheck,
         );
       }
       if (!note.spawned) {
@@ -415,9 +513,10 @@ class Tallies {
       _set(noteId, fieldId, TallyKeys.name, _name(name));
 
   /// Sets the unit of the field [fieldId]: to one of another kind only
-  /// while no entry holds a value for it.
+  /// while no entry holds a value for it; a Check field has none.
   void setUnit(String noteId, String fieldId, String unit) {
     final field = _requireField(noteId, fieldId);
+    if (field.check) throw StateError('$fieldId is a Check field');
     final typed = unit.trim();
     if (field.hasEntries && TallyUnits.kindOf(typed) != field.kind) {
       throw StateError('the kind of unit of $fieldId is fixed by its entries');
@@ -434,26 +533,40 @@ class Tallies {
     target == null ? null : encodeTallyNumber(target),
   );
 
-  /// Sets how the field [fieldId] counts a day with several entries.
-  void setRule(String noteId, String fieldId, TallyRule rule) =>
-      _set(noteId, fieldId, TallyKeys.rule, rule.name);
-
-  /// Makes the field [fieldId] multiply the field [other] of the same
-  /// Tally (#200), or a field of its own again when null. [other] is a
-  /// field shown, not [fieldId], that multiplies nothing; [fieldId] is
-  /// multiplied by none.
-  void setMultiplies(String noteId, String fieldId, String? other) {
-    if (other != null) _requireMultipliable(noteId, fieldId, other);
-    _set(noteId, fieldId, TallyKeys.multiplies, other);
+  /// Sets how the field [fieldId] counts the sets of an entry and a bar
+  /// with several entries; a Check field always sums.
+  void setRule(String noteId, String fieldId, TallyRule rule) {
+    if (_requireField(noteId, fieldId).check) {
+      throw StateError('$fieldId is a Check field');
+    }
+    _set(noteId, fieldId, TallyKeys.rule, rule.name);
   }
 
-  /// Refuses [other] as what the field [fieldId], or a new one when
-  /// null, of the Tally of [noteId] multiplies.
-  void _requireMultipliable(String noteId, String? fieldId, String other) {
-    final allowed = byNote(noteId)?.multipliable(fieldId) ?? const [];
-    if (!allowed.any((f) => f.id == other)) {
-      throw ArgumentError.value(other, 'other', 'not a field it may multiply');
+  /// Sets how long a bar of the charts of the Tally of [noteId] is
+  /// (#264), on its Note; its targets count per bar.
+  void setBar(String noteId, TallyPeriod bar) =>
+      _setOnTally(noteId, TallyKeys.bar, bar.name);
+
+  /// Switches whether the Tally of [noteId] counts in sets (#264): its
+  /// entry form has "+ Set" then. The entries keep their sets either way.
+  void setCountsInSets(String noteId, bool on) =>
+      _setOnTally(noteId, TallyKeys.sets, on ? 'true' : 'false');
+
+  /// Writes [value] under [key] on the Note of the Tally [noteId], unless
+  /// it holds that already.
+  void _setOnTally(String noteId, String key, String value) {
+    final note = Notes(store).byId(noteId);
+    if (byNote(noteId) == null ||
+        note == null ||
+        note.isTrashed ||
+        note.isMerged) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Tally in the lists');
     }
+    if (!store.mayChange(noteId)) {
+      throw StateError('may not change $noteId');
+    }
+    if (store.current(noteId, key) == value) return;
+    store.append(noteId, key, value);
   }
 
   /// Hides the field [fieldId]: its values stay stored and return when
@@ -466,12 +579,15 @@ class Tallies {
       _set(noteId, fieldId, TallyKeys.hidden, null);
 
   /// Records an entry in the Tally of [noteId]: [values] by field id, in
-  /// the base unit, and a text [line], counting for [at] or the store's
-  /// now. Anyone with a role in its Area may. [within] writes more in
-  /// the same batch, given the entry's id.
+  /// the base unit, its first set and its Check fields' ticks (1), the
+  /// further sets [more] (#264), each by number field id, and a text
+  /// [line], counting for [at] or the store's now. A set that holds
+  /// nothing is left out. Anyone with a role in its Area may. [within]
+  /// writes more in the same batch, given the entry's id.
   TallyEntry add(
     String noteId, {
     Map<String, double> values = const {},
+    List<Map<String, double>> more = const [],
     String line = '',
     DateTime? at,
     void Function(String id)? within,
@@ -485,8 +601,11 @@ class Tallies {
       throw StateError('no role in the Shared Area of $noteId');
     }
     final encoded = _encoded(tally, values);
+    final sets = _encodedSets(tally, more);
     final text = line.trim();
-    if (encoded.values.every((v) => v == null) && text.isEmpty) {
+    if (encoded.values.every((v) => v == null) &&
+        sets.isEmpty &&
+        text.isEmpty) {
       throw ArgumentError.value(values, 'values', 'an entry holds something');
     }
     final id = '${TallyKeys.entryPrefix}${Store.newId()}';
@@ -505,6 +624,11 @@ class Tallies {
           store.append(id, TallyKeys.value(key), value, date: now);
         }
       }
+      for (final (i, set) in sets.indexed) {
+        for (final MapEntry(:key, :value) in set.entries) {
+          store.append(id, TallyKeys.setValue(i + 2, key), value, date: now);
+        }
+      }
       if (text.isNotEmpty) {
         store.append(id, TallyKeys.line, text, date: now);
       }
@@ -515,11 +639,14 @@ class Tallies {
   }
 
   /// Changes the entry [id]: the values given (null takes one away), the
-  /// text line and when it counts for. Only what differs is written; only
-  /// its author, or a Manager of its Area, may.
+  /// further sets when [more] is given (#264), which then replace those
+  /// it held and take away the values of the fields that counted its
+  /// sets as multipliers, the text line and when it counts for. Only what
+  /// differs is written; only its author, or a Manager of its Area, may.
   void editEntry(
     String id, {
     Map<String, double?> values = const {},
+    List<Map<String, double>>? more,
     String? line,
     DateTime? at,
   }) {
@@ -527,6 +654,7 @@ class Tallies {
     final tally = byNote(_shownUnder()[entry.noteId] ?? entry.noteId);
     if (tally == null) throw ArgumentError.value(id, 'id', 'not a Tally');
     final encoded = _encoded(tally, values);
+    final sets = more == null ? null : _encodedSets(tally, more);
     store.batch(() {
       if (at != null && !at.isAtSameMomentAs(entry.at)) {
         store.append(id, TallyKeys.at, at.toUtc().toIso8601String());
@@ -535,6 +663,24 @@ class Tallies {
         final held = entry.values[key];
         if (value == (held == null ? null : encodeTallyNumber(held))) continue;
         store.append(id, TallyKeys.value(key), value);
+      }
+      if (sets != null) {
+        for (final field in tally.fields) {
+          if (field.multiplies != null &&
+              !encoded.containsKey(field.id) &&
+              entry.values.containsKey(field.id)) {
+            store.append(id, TallyKeys.value(field.id), null);
+          }
+        }
+        final held = store.currentFields(id);
+        for (var set = 2; set <= TallyKeys.maxSets; set++) {
+          for (final field in tally.fields) {
+            final key = TallyKeys.setValue(set, field.id);
+            final want = set - 2 < sets.length ? sets[set - 2][field.id] : null;
+            if (held[key] == want) continue;
+            store.append(id, key, want);
+          }
+        }
       }
       if (line != null && line.trim() != entry.line) {
         store.append(id, TallyKeys.line, line.trim());
@@ -580,17 +726,20 @@ class Tallies {
     final noteId = fields[TallyKeys.note];
     final at = DateTime.tryParse(fields[TallyKeys.at] ?? '');
     if (noteId == null || at == null) return null;
+    final values = <String, double>{};
+    final more = <int, Map<String, double>>{};
+    for (final MapEntry(:key, :value) in fields.entries) {
+      final (set, field) = TallyKeys.valueOf(key) ?? (0, '');
+      final number = decodeTallyNumber(value);
+      if (set == 0 || number == null) continue;
+      (set == 1 ? values : more.putIfAbsent(set, () => {}))[field] = number;
+    }
     return TallyEntry(
       id: id,
       noteId: noteId,
       at: at.toUtc(),
-      values: {
-        for (final MapEntry(:key, :value) in fields.entries)
-          if (key.startsWith(TallyKeys.valuePrefix))
-            key.substring(TallyKeys.valuePrefix.length): ?decodeTallyNumber(
-              value,
-            ),
-      },
+      values: values,
+      more: [for (final set in more.keys.toList()..sort()) ?more[set]],
       line: fields[TallyKeys.line] ?? '',
       trashed: DateTime.tryParse(fields[TallyKeys.trashed] ?? '')?.toUtc(),
     );
@@ -631,21 +780,23 @@ class Tallies {
   }
 
   /// The chart of the field [fieldId] of the Tally of [noteId]: one bar
-  /// per [period] on [wallClock], weeks from Monday, from the first with
-  /// a value to today's, at most [maxBuckets] of the latest. Each bar
-  /// holds the sum or the largest of the values in it, by the field's
-  /// rule, a multiplied field's values multiplied (#200); a multiplier
-  /// has none. Entries after today stay out.
+  /// per the Tally's bar length, or [period] when given, on [wallClock],
+  /// weeks from Monday, from the first with a value to today's, at most
+  /// [maxBuckets] of the latest. Each bar holds the sum or the largest of
+  /// what its entries count ([Tally.counted]), by the field's rule; a
+  /// Check field sums its ticks, a field counting sets has none. Entries
+  /// after today stay out.
   List<TallyBucket> chart(
     String noteId,
     String fieldId,
-    TallyPeriod period,
     WallClock wallClock, {
+    TallyPeriod? period,
     PersonFilter filter = PersonFilter.everyone,
   }) {
     final tally = byNote(noteId);
     final field = tally?.field(fieldId);
     if (tally == null || field == null) return const [];
+    period ??= tally.bar;
     final today = Day.today(store.clock(), wallClock);
     final last = _bucketStart(today, period);
     final micros = <Day, List<int>>{};
@@ -671,15 +822,18 @@ class Tallies {
         TallyBucket(
           start: start,
           end: _nextBucket(start, period).addDays(-1),
-          value: _bar(micros[start], field.rule),
+          value: switch (_fold(micros[start] ?? const [], field.rule)) {
+            final micro? => micro / 1000000,
+            null => null,
+          },
           entries: micros[start]?.length ?? 0,
         ),
     ];
   }
 
   /// What [rule] makes of [micros], or null for none.
-  static double? _bar(List<int>? micros, TallyRule rule) {
-    if (micros == null || micros.isEmpty) return null;
+  static int? _fold(List<int> micros, TallyRule rule) {
+    if (micros.isEmpty) return null;
     var held = micros.first;
     for (final micro in micros.skip(1)) {
       held = switch (rule) {
@@ -687,7 +841,7 @@ class Tallies {
         TallyRule.max => micro > held ? micro : held,
       };
     }
-    return held / 1000000;
+    return held;
   }
 
   /// [a] + [b], held at the largest and smallest 64-bit numbers.
@@ -760,9 +914,13 @@ class Tallies {
     Tally tally,
     Map<String, double?> values,
   ) {
-    for (final id in values.keys) {
-      if (tally.field(id) == null) {
+    for (final MapEntry(key: id, :value) in values.entries) {
+      final field = tally.field(id);
+      if (field == null) {
         throw ArgumentError.value(id, 'values', 'not a field of the Tally');
+      }
+      if (field.check && value != null && value != 1) {
+        throw ArgumentError.value(value, 'values', 'a tick counts as 1');
       }
     }
     return {
@@ -775,34 +933,72 @@ class Tallies {
     };
   }
 
+  /// The further sets [more] as the log keeps them, each by number field
+  /// in the order of the fields of [tally], those that hold nothing left
+  /// out; a value for a Check field, a field counting sets or no field of
+  /// it is refused, as are more than [TallyKeys.maxSets] sets in all.
+  static List<Map<String, String>> _encodedSets(
+    Tally tally,
+    List<Map<String, double>> more,
+  ) {
+    final sets = <Map<String, String>>[];
+    for (final set in more) {
+      for (final id in set.keys) {
+        final field = tally.field(id);
+        if (field == null || field.check || field.multiplies != null) {
+          throw ArgumentError.value(id, 'more', 'not a number field of it');
+        }
+      }
+      final encoded = {
+        for (final field in tally.fields)
+          if (set[field.id] case final value?)
+            field.id: encodeTallyNumber(value),
+      };
+      if (encoded.isNotEmpty) sets.add(encoded);
+    }
+    if (sets.length >= TallyKeys.maxSets) {
+      throw ArgumentError.value(more, 'more', 'too many sets');
+    }
+    return sets;
+  }
+
   /// The fields of every Tally, by its Note, in the order they were
   /// added, each as if it had no entries: read from the Notes alone, not
   /// from the entries, and kept until the log changes (#216). Shared by
   /// every caller, so nobody changes it.
-  Map<String, List<TallyField>> _shapes() => store.workedOut(
-    (Tallies, #shapes),
-    () {
-      final holders = <String, List<String>>{};
-      for (final MapEntry(key: holder, value: note) in _shownUnder().entries) {
-        (holders[note] ??= []).add(holder);
+  Map<String, ({List<TallyField> fields, String? bar, String? sets})>
+  _shapes() => store.workedOut((Tallies, #shapes), () {
+    final holders = <String, List<String>>{};
+    for (final MapEntry(key: holder, value: note) in _shownUnder().entries) {
+      (holders[note] ??= []).add(holder);
+    }
+    final shapes =
+        <String, ({List<TallyField> fields, String? bar, String? sets})>{};
+    for (final MapEntry(key: note, value: on) in holders.entries) {
+      final fields = <TallyField>[];
+      String? bar;
+      String? sets;
+      for (final holder in on..sort()) {
+        final current = store.currentFields(holder);
+        fields.addAll(_fieldsOn(holder, current));
+        if (holder == note) {
+          bar = current[TallyKeys.bar];
+          sets = current[TallyKeys.sets];
+        }
       }
-      final shapes = <String, List<TallyField>>{};
-      for (final MapEntry(key: note, value: on) in holders.entries) {
-        final fields = [for (final holder in on..sort()) ..._fieldsOn(holder)];
-        if (fields.isEmpty) continue;
-        fields.sort((a, b) {
-          final byAdded = a.added.compareTo(b.added);
-          return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
-        });
-        shapes[note] = fields;
-      }
-      return shapes;
-    },
-  );
+      if (fields.isEmpty) continue;
+      fields.sort((a, b) {
+        final byAdded = a.added.compareTo(b.added);
+        return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
+      });
+      shapes[note] = (fields: fields, bar: bar, sets: sets);
+    }
+    return shapes;
+  });
 
-  /// The fields lying on the Note [holder], as if none had entries.
-  List<TallyField> _fieldsOn(String holder) {
-    final fields = store.currentFields(holder);
+  /// The fields lying on the Note [holder], as if none had entries, its
+  /// current [fields] given.
+  List<TallyField> _fieldsOn(String holder, Map<String, String?> fields) {
     final added = <String, DateTime>{};
     for (final e in store.history(holder)) {
       final id = _fieldId(e.field, TallyKeys.name);
@@ -813,26 +1009,40 @@ class Tallies {
     return [
       for (final MapEntry(key: id, value: date) in added.entries)
         if (fields[TallyKeys.field(id, TallyKeys.name)] case final name?)
-          TallyField(
-            id: id,
-            noteId: holder,
-            name: name,
-            unit: fields[TallyKeys.field(id, TallyKeys.unit)] ?? '',
-            target: decodeTallyNumber(
-              fields[TallyKeys.field(id, TallyKeys.target)],
-            ),
-            rule:
-                TallyRule.values.asNameMap()[fields[TallyKeys.field(
+          _readField(holder, id, name, date, fields),
+    ];
+  }
+
+  /// The field [id] on [holder], named [name] and added at [date], as its
+  /// current [fields] hold it; a Check field always sums.
+  static TallyField _readField(
+    String holder,
+    String id,
+    String name,
+    DateTime date,
+    Map<String, String?> fields,
+  ) {
+    final check =
+        fields[TallyKeys.field(id, TallyKeys.kind)] == TallyKeys.kindCheck;
+    return TallyField(
+      id: id,
+      noteId: holder,
+      name: name,
+      unit: fields[TallyKeys.field(id, TallyKeys.unit)] ?? '',
+      target: decodeTallyNumber(fields[TallyKeys.field(id, TallyKeys.target)]),
+      rule: check
+          ? TallyRule.sum
+          : TallyRule.values.asNameMap()[fields[TallyKeys.field(
                   id,
                   TallyKeys.rule,
                 )]] ??
                 TallyRule.sum,
-            hidden: fields[TallyKeys.field(id, TallyKeys.hidden)] == 'true',
-            hasEntries: false,
-            added: date.toUtc(),
-            stored: fields[TallyKeys.field(id, TallyKeys.multiplies)],
-          ),
-    ];
+      hidden: fields[TallyKeys.field(id, TallyKeys.hidden)] == 'true',
+      check: check,
+      hasEntries: false,
+      added: date.toUtc(),
+      stored: fields[TallyKeys.field(id, TallyKeys.multiplies)],
+    );
   }
 
   /// The field id in [key] when it is the [part] of a field on a Note.
@@ -860,9 +1070,9 @@ class Tallies {
         for (final MapEntry(key: id, value: fields)
             in store.currentFieldsOfType(TallyKeys.typeEntry).entries) {
           if (_entryFrom(id, fields) case final entry?) {
-            (counted[shownUnder[entry.noteId] ?? entry.noteId] ??= {}).addAll(
-              entry.values.keys,
-            );
+            (counted[shownUnder[entry.noteId] ?? entry.noteId] ??= {})
+              ..addAll(entry.values.keys)
+              ..addAll([for (final set in entry.more) ...set.keys]);
           }
         }
         return counted;

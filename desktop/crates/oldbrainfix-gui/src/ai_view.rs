@@ -363,6 +363,23 @@ fn change_line(
                 .to_string()
             }));
         }
+        (note_keys::TYPE_NOTE, tally_keys::BAR) => {
+            return Ok(words(t.tally_period().to_string(), &|v| {
+                let bar = v
+                    .and_then(oldbrainfix_core::TallyPeriod::parse)
+                    .unwrap_or(oldbrainfix_core::TallyPeriod::Day);
+                crate::tally_view::period_label(t, bar).to_string()
+            }));
+        }
+        (note_keys::TYPE_NOTE, tally_keys::SETS) => {
+            return Ok(words(t.tally_counts_in_sets().to_string(), &|v| {
+                match v {
+                    Some("true") => t.setting_on(),
+                    _ => t.setting_off(),
+                }
+                .to_string()
+            }));
+        }
         (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::COUNT) => {
             return Ok(words(t.session_count().to_string(), &|v| {
                 v.unwrap_or("1").to_string()
@@ -537,6 +554,10 @@ fn tally_change(
                 None => v.to_string(),
             },
             (tally_keys::RULE, Some("max")) => t.tally_rule_max().to_string(),
+            (tally_keys::KIND, Some(tally_keys::KIND_CHECK)) => {
+                t.tally_field_kind_check().to_string()
+            }
+            (tally_keys::KIND, _) => t.tally_field_kind_number().to_string(),
             (tally_keys::RULE, _) => t.tally_rule_sum().to_string(),
             (_, Some(v)) => v.to_string(),
             (_, None) => t.conflict_empty().to_string(),
@@ -547,6 +568,7 @@ fn tally_change(
         tally_keys::UNIT => t.tally_unit(),
         tally_keys::TARGET => t.tally_target_badge(),
         tally_keys::RULE => t.tally_rule(),
+        tally_keys::KIND => t.tally_field_kind(),
         tally_keys::HIDDEN => {
             return Ok(Some(shown(match change.after {
                 Some(_) => label(t.tally_field_hidden()),

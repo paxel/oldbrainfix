@@ -73,3 +73,7 @@ The detailed view of its card (#189) shows the pool and today's picks of each Ro
 - ADR 0038: the Session is a kind, read after the Tally and before the lists; the kind badge offers it from a Plain Note and back.
 - ADR 0013: a Member sets up a Session on a Note of their own.
 - ADR 0026: `make_session` and `set_session` work on the Note.
+
+## Past runs (#264)
+
+Amended by #264: the card's detailed view and the Session's page in the Note editor list its past runs (`runs`, `Sessions::runs`), newest first, by Routine on the same moment: every Occurrence of its Routines before today that holds a pick, with its date and time and each Tally of the current pick done or not by the entries recorded for it, read from the marks that count as above. The card shows the latest five and how many older ones the page lists. There is no chart of them (Q609).

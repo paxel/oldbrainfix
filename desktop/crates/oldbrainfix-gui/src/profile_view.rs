@@ -351,6 +351,7 @@ pub fn header(
             .hint_text(t.profile_no_name())
             .desired_width(320.0),
     );
+    crate::text_menu::show(ui, t, &field, &view.name);
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.profile_name()));
     if profile.is_some() && field.lost_focus() {
         actions.push(ProfileAction::Rename(view.name.clone()));
@@ -409,6 +410,7 @@ pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<
             .id(Id::new("profile card link"))
             .desired_width(320.0),
     );
+    crate::text_menu::show(ui, t, &field, &form.link);
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_add_link()));
     let typed = !form.link.trim().is_empty();
     if typed && field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {

@@ -113,7 +113,9 @@ Future<void> _openAndRun(Directory dir) async {
       navigatorKey: _navigator,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
-      alarms: AndroidAlarms(),
+      // The one place the platform picks the alarm layer; its answers,
+      // such as the setup's steps, do the rest (#238).
+      alarms: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       photos: AndroidPhotos(),
       voice: AndroidVoice(),
       context: const AndroidContext(),
@@ -125,7 +127,8 @@ Future<void> _openAndRun(Directory dir) async {
       appointments: const AndroidAppointments(),
       lock: const AndroidBiometrics(),
       pairing: const AndroidPairing(),
-      sync: AndroidSync(),
+      // Hosts only while the app is open on the iPhone (#240).
+      sync: Platform.isIOS ? IosSync() : AndroidSync(),
       pairedHost: startPairedHosting,
       folders: const AndroidFolders(),
       // The automatic sync in an isolate of its own, so the app keeps
@@ -153,11 +156,13 @@ Future<void> _openAndRun(Directory dir) async {
 /// hosted for and joined, and the shared folder, the same store, the
 /// weekly Backup when it is due, the alarms armed with the texts in the
 /// Device's language, and the work told when it is over. A database a
-/// newer version saved is left alone: nothing syncs.
+/// newer version saved is left alone: nothing syncs. On the iPhone
+/// BGTaskScheduler's task starts it the same way
+/// (ios/Runner/BackgroundSync.swift), and it hosts nothing (#240).
 @pragma('vm:entry-point')
 Future<void> backgroundSyncMain() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final sync = AndroidSync();
+  final sync = Platform.isIOS ? IosSync() : AndroidSync();
   try {
     final dir = await getApplicationSupportDirectory();
     final Store store;
@@ -168,7 +173,7 @@ Future<void> backgroundSyncMain() async {
     }
     final alarms = AlarmSync(
       store: store,
-      platform: AndroidAlarms(),
+      platform: Platform.isIOS ? IosAlarms() : AndroidAlarms(),
       wallClock: deviceWallClock,
     );
     try {

@@ -28,11 +28,15 @@ class _FieldDraft {
   var rulePicked = false;
   var targetText = '';
 
+  /// Whether it is a Check field (#264): no unit and no rule.
+  var check = false;
+
   /// Set by a Save that found the target no number.
   var targetInvalid = false;
 
-  /// The unit as it is stored.
-  String unit(UnitSystem system) => picked ?? unitOfTyped(unitText, system);
+  /// The unit as it is stored; a Check field has none.
+  String unit(UnitSystem system) =>
+      check ? '' : picked ?? unitOfTyped(unitText, system);
 
   /// The target in the base unit; null for none or no number.
   double? target(UnitSystem system) {
@@ -51,8 +55,9 @@ class _FieldDraft {
 /// A new Tally made from the browser's "+" (#161), on one page with
 /// Save in the top bar: its name, then a row per field, one at first,
 /// and "Add field" for the next. A field's row is its name and its
-/// settings as badges, how a day with several entries counts ("Σ Sum"),
-/// its unit and its target, each opening its small editor; the unit is
+/// settings as badges, its kind (#264), a number or a Check field, how
+/// several sets or entries in a bar count ("Σ Sum") and its unit, which a
+/// Check field has not, and its target, each opening its small editor; the unit is
 /// typed with the known units it may mean as suggestions (#159), and the
 /// rule follows its kind until it is picked. Save files the Tally into
 /// [place], Unsorted for none, with every row that has a name; rows left
@@ -152,12 +157,54 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
           name: field.name.text.trim(),
           unit: field.unit(_system),
           target: field.target(_system),
-          rule: field.rule,
+          rule: field.check ? TallyRule.sum : field.rule,
+          check: field.check,
         );
       }
       return note.id;
     });
     Navigator.of(context).pop(id);
+  }
+
+  /// The kind's editor: a number or a Check field; a pick closes it.
+  Future<void> _editKind(_FieldDraft field) async {
+    final t = context.t;
+    final picked = await showDialog<bool>(
+      context: context,
+      builder: (context) => BadgeDialog(
+        setting: t.tallyFieldKind,
+        icon: Icons.check_box_outlined,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ChoiceChips<bool>(
+              key: const ValueKey('tally-field-kind'),
+              value: field.check,
+              onChanged: (check) => Navigator.of(context).pop(check),
+              options: [
+                RadioOption(
+                  key: const ValueKey('tally-field-kind-number'),
+                  value: false,
+                  title: Text(t.tallyFieldKindNumber),
+                ),
+                RadioOption(
+                  key: const ValueKey('tally-field-kind-check'),
+                  value: true,
+                  title: Text(t.tallyFieldKindCheck),
+                ),
+              ],
+            ),
+            Text(
+              t.tallyFieldKindCheckDetail,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => field.check = picked);
   }
 
   /// The rule's editor: its two choices as radio buttons; a pick closes
@@ -252,22 +299,33 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
             runSpacing: 8,
             children: [
               SettingBadge(
-                key: ValueKey('tally-form-rule-$index'),
-                setting: t.tallyRule,
-                icon: Icons.functions,
-                value: field.rule == TallyRule.sum
-                    ? t.tallyRuleSumShort
-                    : t.tallyRuleMaxShort,
-                valueIcon: tallyRuleIcon(field.rule),
-                onTap: (_) => _editRule(field),
+                key: ValueKey('tally-form-kind-$index'),
+                setting: t.tallyFieldKind,
+                icon: Icons.check_box_outlined,
+                value: field.check
+                    ? t.tallyFieldKindCheck
+                    : t.tallyFieldKindNumber,
+                onTap: (_) => _editKind(field),
               ),
-              SettingBadge(
-                key: ValueKey('tally-form-unit-$index'),
-                setting: t.tallyUnit,
-                icon: Icons.straighten,
-                value: unit.isEmpty ? t.tallyNoUnit : unit,
-                onTap: (_) => _editUnit(field),
-              ),
+              if (!field.check)
+                SettingBadge(
+                  key: ValueKey('tally-form-rule-$index'),
+                  setting: t.tallyRule,
+                  icon: Icons.functions,
+                  value: field.rule == TallyRule.sum
+                      ? t.tallyRuleSumShort
+                      : t.tallyRuleMaxShort,
+                  valueIcon: tallyRuleIcon(field.rule),
+                  onTap: (_) => _editRule(field),
+                ),
+              if (!field.check)
+                SettingBadge(
+                  key: ValueKey('tally-form-unit-$index'),
+                  setting: t.tallyUnit,
+                  icon: Icons.straighten,
+                  value: unit.isEmpty ? t.tallyNoUnit : unit,
+                  onTap: (_) => _editUnit(field),
+                ),
               SettingBadge(
                 key: ValueKey('tally-form-target-$index'),
                 setting: t.tallyTargetBadge,

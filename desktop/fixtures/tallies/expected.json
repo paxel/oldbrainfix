@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:03:17.000Z",
+  "now": "2026-01-02T10:04:21.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -95,11 +95,11 @@
     },
     {
       "id": "note:0000000000000000000000000000001f",
-      "text": "Steps",
+      "text": "Bench",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:02:58.000Z",
+      "captured": "2026-01-01T10:03:04.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -110,7 +110,7 @@
       },
       "place": null,
       "importance": "normal",
-      "trashed": "2026-01-01T10:03:12.000Z",
+      "trashed": null,
       "mergedInto": null,
       "spawned": true,
       "photos": [],
@@ -124,12 +124,42 @@
       "wordless": "photo"
     },
     {
-      "id": "note:00000000000000000000000000000022",
+      "id": "note:00000000000000000000000000000027",
+      "text": "Steps",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:04:02.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:04:16.000Z",
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002a",
       "text": "Unsorted thought",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:03:14.000Z",
+      "captured": "2026-01-01T10:04:18.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -155,19 +185,21 @@
     }
   ],
   "all": [
-    "note:00000000000000000000000000000022",
+    "note:0000000000000000000000000000002a",
+    "note:0000000000000000000000000000001f",
     "note:00000000000000000000000000000011",
     "note:00000000000000000000000000000001"
   ],
   "unsorted": [
-    "note:00000000000000000000000000000022"
+    "note:0000000000000000000000000000002a"
   ],
   "trashed": [
-    "note:0000000000000000000000000000001f"
+    "note:00000000000000000000000000000027"
   ],
   "inside": {},
   "sections": {
-    "note:00000000000000000000000000000022": [],
+    "note:0000000000000000000000000000002a": [],
+    "note:0000000000000000000000000000001f": [],
     "note:00000000000000000000000000000011": [
       {
         "id": "note:0000000000000000000000000000000e",
@@ -198,17 +230,23 @@
       }
     ],
     "note:00000000000000000000000000000001": [],
-    "note:0000000000000000000000000000001f": []
+    "note:00000000000000000000000000000027": []
   },
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
   "shares": {
-    "note:00000000000000000000000000000022": {
+    "note:0000000000000000000000000000002a": {
       "html": null,
       "photos": [],
       "recordings": [],
       "text": "Unsorted thought"
+    },
+    "note:0000000000000000000000000000001f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Bench"
     },
     "note:00000000000000000000000000000011": {
       "html": null,
@@ -222,7 +260,7 @@
       "recordings": [],
       "text": "Gym"
     },
-    "note:0000000000000000000000000000001f": {
+    "note:00000000000000000000000000000027": {
       "html": null,
       "photos": [],
       "recordings": [],
@@ -231,7 +269,8 @@
   },
   "search": {
     "": [
-      "note:00000000000000000000000000000022",
+      "note:0000000000000000000000000000002a",
+      "note:0000000000000000000000000000001f",
       "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000001"
     ],
@@ -244,7 +283,8 @@
     "called": [],
     "loop": [],
     " e ": [
-      "note:00000000000000000000000000000022",
+      "note:0000000000000000000000000000002a",
+      "note:0000000000000000000000000000001f",
       "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000001"
     ],

@@ -38,6 +38,8 @@ class AndroidPairing implements PairingPlatform {
       return await _channel.invokeMethod<String>('readQr', photo);
     } on PlatformException {
       return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 
@@ -46,6 +48,8 @@ class AndroidPairing implements PairingPlatform {
     try {
       return await _channel.invokeMethod<String>('deviceName') ?? '';
     } on PlatformException {
+      return '';
+    } on MissingPluginException {
       return '';
     }
   }

@@ -758,6 +758,7 @@ impl SyncHost {
                         .desired_width(f32::INFINITY),
                 )
                 .labelled_by(label.id);
+            crate::text_menu::show(ui, t, &field, &self.code);
             if let Some(message) = &self.code_error {
                 ui.label(RichText::new(message).color(error));
             }

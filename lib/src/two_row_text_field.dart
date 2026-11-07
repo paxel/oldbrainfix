@@ -7,8 +7,10 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_links.dart';
 import 'box_ids.dart';
 import 'l10n.dart';
+import 'table_grid.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
 
@@ -130,11 +132,19 @@ String _breakAt(String text, int at) {
 /// that each table of [before] stays whole: what is typed right before or
 /// after one goes on a line of its own, a line break the table needs is
 /// kept, and an edit that takes part of a table takes all of it, its line
-/// with it, after asking when its cells hold words.
-TablesKept keepTables(TextEditingValue before, TextEditingValue after) {
+/// with it, after asking when its cells hold words. The table [raw], by
+/// its place among the tables, shows as its lines and is edited as text.
+TablesKept keepTables(
+  TextEditingValue before,
+  TextEditingValue after, {
+  int? raw,
+}) {
   final old = before.text;
   if (old == after.text) return (value: after, asked: null);
-  final tables = MarkdownTables.all(old);
+  final tables = [
+    for (final (i, table) in MarkdownTables.all(old).indexed)
+      if (i != raw) table,
+  ];
   if (tables.isEmpty) return (value: after, asked: null);
   final (a, b, typed) = _editOf(before, after);
   final inside = [
@@ -236,13 +246,40 @@ class _KeepTables extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (controller case TagTextController(markdown: true)) {
-      final kept = keepTables(oldValue, newValue);
+    if (controller case TagTextController(markdown: true, :final rawTable)) {
+      final kept = keepTables(oldValue, newValue, raw: rawTable);
       if (kept.asked case final whole?) ask(whole);
       return kept.value;
     }
     return newValue;
   }
+}
+
+/// Where a field shows what rides on the keyboard above it when it has
+/// no overlay of its own ([TwoRowTextField.barHost]): a field inside the
+/// text of another one, a table's cell (#257), moves from cell to cell,
+/// and what shows it stays where it is.
+class TwoRowBarHost extends ChangeNotifier {
+  WidgetBuilder? _builder;
+  bool _disposed = false;
+
+  void _attach(WidgetBuilder? builder) {
+    if (builder == _builder || _disposed) return;
+    _builder = builder;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed) notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  /// What rides on the keyboard above the field, in an overlay.
+  Widget build(BuildContext context) =>
+      _builder?.call(context) ?? const SizedBox.shrink();
 }
 
 /// A button a field puts on the bar above the keyboard: [key] for its
@@ -284,12 +321,16 @@ typedef FieldAction = ({
 /// of a formatted text shows the source of the cursor's line.
 ///
 /// With [lineFormats], the bar also has the formats of whole lines and
-/// the table button, which puts a new table at the cursor or opens the
-/// table the cursor is in full screen ([openTable]); a tap on a table of
-/// a formatted text opens it too. A table's cell is edited without them.
-/// A table of a formatted text shows as its grid, one block the cursor
-/// passes and an edit keeps whole ([keepTables]); in two rows the bottom
-/// row shows it as a table's sign.
+/// the table button, which puts a new table at the cursor. A table of a
+/// formatted text shows as the grid it is edited in ([TableGrid], #257):
+/// a tap on a cell edits it there, and the cursor goes into the grid
+/// with ◀ ▶ and the arrow keys rather than past it, also with the table
+/// button. Outside the grid it is one block the cursor passes and an edit
+/// keeps whole ([keepTables]); in two rows the bottom row shows it as a
+/// table's sign. Shown as its lines, it is text until the cursor leaves
+/// them, "Show as table" is pressed or the field loses the focus. A
+/// table's cell is edited without the formats of lines; [onNext] is what
+/// ↵ of the keyboard does in it.
 ///
 /// A [TagTextController] holding a Code text (#213) has no bar of
 /// formats: its text shows in monospace, unwrapped, on the grey ground of
@@ -302,7 +343,8 @@ typedef FieldAction = ({
 ///
 /// [actions] put buttons of the field's own on the same bar, first, such
 /// as a Line's "in" and "out" (#141). With [focusNode] the field takes
-/// the focus its owner moves; it stays the owner's to dispose.
+/// the focus its owner moves; it stays the owner's to dispose. With
+/// [barHost] what rides on the keyboard shows where that puts it.
 class TwoRowTextField extends StatefulWidget {
   /// The height of the bottom row.
   static const rowHeight = 56.0;
@@ -333,6 +375,8 @@ class TwoRowTextField extends StatefulWidget {
   final VoidCallback? onCodePasted;
   final List<FieldAction> actions;
   final FocusNode? focusNode;
+  final VoidCallback? onNext;
+  final TwoRowBarHost? barHost;
 
   const TwoRowTextField({
     super.key,
@@ -351,6 +395,8 @@ class TwoRowTextField extends StatefulWidget {
     this.onCodePasted,
     this.actions = const [],
     this.focusNode,
+    this.onNext,
+    this.barHost,
   });
 
   /// The height of what rides on the keyboard above a field that types
@@ -414,6 +460,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// Whether the text was formatted when last drawn.
   bool _markdown = false;
 
+  /// The grids of the text's tables, by their place among its tables; the
+  /// focus their cells' fields take theirs under; the table shown as its
+  /// lines when last drawn.
+  final _gridKeys = <int, GlobalKey<TableGridState>>{};
+  FocusNode? _scope;
+  int? _raw;
+  ModalRoute<Object?>? _route;
+
   @override
   void initState() {
     super.initState();
@@ -421,6 +475,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     _focus.addListener(_focusChanged);
     widget.controller.addListener(_changed);
     _markdown = _formatting?.markdown ?? false;
+    _drawGrids(widget.controller);
+    widget.barHost?._attach(_aboveKeyboard);
     _row.show();
   }
 
@@ -428,6 +484,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _keyboard = _readKeyboard();
+    _scope = FocusScope.of(context);
+    _route = ModalRoute.of(context);
+  }
+
+  /// Whether the field edits the tables of its text in their grids.
+  bool get _grids => _formatting != null && widget.lineFormats;
+
+  /// Has [controller] draw the tables as grids, or no longer.
+  void _drawGrids(TextEditingController controller) {
+    if (controller is! TagTextController) return;
+    if (_grids && identical(controller, widget.controller)) {
+      controller.grid = _gridOf;
+    } else if (controller.grid == _gridOf) {
+      controller.grid = null;
+    }
   }
 
   @override
@@ -439,12 +510,18 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_changed);
+      _drawGrids(oldWidget.controller);
       widget.controller.addListener(_changed);
       _formatters = _formattersOf(widget.controller);
       _before = '';
       _now = widget.controller.text;
     }
     _markdown = _formatting?.markdown ?? false;
+    _drawGrids(widget.controller);
+    if (oldWidget.barHost != widget.barHost) {
+      oldWidget.barHost?._attach(null);
+      widget.barHost?._attach(_aboveKeyboard);
+    }
   }
 
   @override
@@ -452,6 +529,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     _repeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_changed);
+    widget.barHost?._attach(null);
+    final controller = widget.controller;
+    if (controller is TagTextController && controller.grid == _gridOf) {
+      controller.grid = null;
+    }
     _focus.removeListener(_focusChanged);
     _ownFocus.dispose();
     super.dispose();
@@ -477,6 +559,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     if (!_focus.hasFocus) {
       _stopRepeat();
       _selecting = false;
+      // A table shown as its lines is a grid again; not for a dialog or a
+      // menu, after which the field has the focus back.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _focus.hasFocus) return;
+        final primary = FocusManager.instance.primaryFocus?.context;
+        if (primary != null && ModalRoute.of(primary) != _route) return;
+        _formatting?.rawTable = null;
+      });
     }
     setState(() {});
   }
@@ -493,6 +583,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
     final markdown = _formatting?.markdown ?? false;
     if (markdown != _markdown) setState(() => _markdown = markdown);
+    // A table shown as its lines is a grid again once the cursor leaves
+    // them.
+    final controller = _formatting;
+    if (controller?.rawTable case final index? when controller != null) {
+      final table = MarkdownTables.all(text).elementAtOrNull(index);
+      final selection = controller.selection;
+      if (table == null ||
+          !selection.isValid ||
+          selection.start < table.start ||
+          selection.end > table.end) {
+        controller.rawTable = null;
+      }
+    }
+    final raw = controller?.rawTable;
+    if (raw != _raw) setState(() => _raw = raw);
   }
 
   bool get _keyboardOpen =>
@@ -503,7 +608,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// Whether the field has the bar of formats, ☐ or its own buttons.
   bool get _hasBar =>
       (widget.bar && (_formatting != null || _inserts)) ||
-      (widget.actions.isNotEmpty && !widget.readOnly);
+      (widget.actions.isNotEmpty && !widget.readOnly) ||
+      _raw != null;
 
   bool get _barShown => _hasBar && _keyboardOpen;
 
@@ -524,13 +630,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// A change the user made, typed or pasted: a plain text becomes
   /// formatted with a format typed as Markdown or pasted (ADR 0033); a
   /// pasted text that looks like code goes to [TwoRowTextField.onCodePasted]
-  /// instead (#213).
+  /// instead (#213). In a formatted text, a task list item on the lines
+  /// it touched becomes an item with a box (#263), so `- [ ] ` typed
+  /// turns into `- ☐ ` at its space.
   void _userChanged(String text) {
     final onCode = widget.onCodePasted;
     final controller = _formatting;
-    if (onCode == null && (controller == null || controller.markdown)) {
-      return;
-    }
+    if (onCode == null && controller == null) return;
     final before = _before;
     final most = math.min(before.length, text.length);
     var head = 0;
@@ -551,12 +657,24 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       onCode();
       return;
     }
-    if (controller == null || controller.markdown) return;
-    final selection = controller.selection;
-    final cursor = selection.isValid ? selection.extentOffset : text.length;
-    if (Markdown.shortcutAt(text, cursor) ||
-        (inserted.length > 1 && Markdown.uses(inserted))) {
-      _becomeFormatted(controller);
+    if (controller == null) return;
+    if (!controller.markdown) {
+      final selection = controller.selection;
+      final cursor = selection.isValid ? selection.extentOffset : text.length;
+      if (Markdown.shortcutAt(text, cursor) ||
+          (inserted.length > 1 && Markdown.uses(inserted))) {
+        _becomeFormatted(controller);
+      }
+    }
+    // A table's cell is no line of items.
+    if (controller.markdown && widget.lineFormats) {
+      final change = Markdown.taskBoxes(text, head, text.length - tail);
+      if (change.text != text) {
+        controller.value = TextEditingValue(
+          text: change.text,
+          selection: TextSelection.collapsed(offset: change.end),
+        );
+      }
     }
   }
 
@@ -614,6 +732,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     _focus.requestFocus();
     _format(
       (text, start, end) => Markdown.link(text, start, end, address),
+      at: selection,
+    );
+  }
+
+  /// Asks which of the app's pages, Areas, Topics or Notes an app link
+  /// on the selection or the word at the cursor opens (#261); without
+  /// either, the link goes in with the target's name.
+  Future<void> _linkTo(LinkPick pick) async {
+    final selection = widget.controller.selection;
+    final target = await pick(context);
+    if (!mounted || target == null) return;
+    _focus.requestFocus();
+    _format(
+      (text, start, end) =>
+          Markdown.link(text, start, end, target.link.url, label: target.label),
       at: selection,
     );
   }
@@ -720,6 +853,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       passed = -1;
     } else {
       final at = selection.baseOffset;
+      // A table is gone into, its grid edited, rather than passed.
+      for (final table in _grids ? _tables : const <MarkdownTable>[]) {
+        if (at == (forward ? table.start : table.end)) {
+          _enterTable(_indexOf(table), atEnd: !forward);
+          return false;
+        }
+      }
       final to = forward ? graphemeAfter(text, at) : graphemeBefore(text, at);
       if (to == at) return false;
       next = TextSelection.collapsed(offset: to);
@@ -759,12 +899,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   void _press({required bool forward}) {
     _stopRepeat();
-    _step(forward: forward);
     _repeatPause = TwoRowTextField.firstRepeat;
     _repeat = Timer(
       TwoRowTextField.holdDelay,
       () => _repeating(forward: forward),
     );
+    // Going into a table's grid stops the repeat.
+    _step(forward: forward);
   }
 
   /// Each repeat comes a little sooner than the one before.
@@ -886,34 +1027,159 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     );
   }
 
-  /// Opens the table of a formatted text at [at] (global) full screen,
-  /// if there is one there; whether there was.
-  bool _tappedTable(Offset at) {
-    final controller = _formatting;
-    if (controller == null || !controller.markdown || !widget.lineFormats) {
-      return false;
-    }
-    final editable = _editable()?.renderEditable;
-    if (editable == null) return false;
-    final local = editable.globalToLocal(at);
-    for (final table in MarkdownTables.all(controller.text)) {
-      final boxes = editable.getBoxesForSelection(
-        TextSelection(baseOffset: table.start, extentOffset: table.end),
-      );
-      if (boxes.any((box) => box.toRect().contains(local))) {
-        unawaited(_openTable(table.start));
-        return true;
-      }
-    }
-    return false;
+  /// Where [table] is among the tables of the text.
+  int _indexOf(MarkdownTable table) =>
+      MarkdownTables.all(widget.controller.text)
+          .indexWhere((t) => t.start == table.start);
+
+  /// The grid of the table [index] of the text, [table], in [style].
+  Widget _gridOf(int index, MarkdownTable table, TextStyle? style) {
+    final controller = widget.controller;
+    return TableGrid(
+      key: _gridKeys.putIfAbsent(index, () => GlobalKey<TableGridState>()),
+      text: controller.text,
+      table: table,
+      style: style,
+      ticking: switch (controller) {
+        final TagTextController controller => controller.boxes,
+        _ => null,
+      },
+      bar: widget.bar,
+      focusParent: _scope,
+      onChange: _writeTable,
+      onLeave: ({required forward}) => _leaveTable(index, forward: forward),
+      onShowLines: () => _showLines(index),
+    );
   }
 
-  /// The table button: the table the cursor is in opens full screen; else
-  /// a new one goes in at the cursor and opens with its first cell being
-  /// edited.
+  /// The grids drawn now, which take their own taps.
+  List<RenderBox> _gridBoxes() => [
+    for (final key in _gridKeys.values)
+      if (key.currentContext?.findRenderObject() case final RenderBox box) box,
+  ];
+
+  /// Writes [change] of a table's grid into the field, the cursor after
+  /// the table, as one step to undo.
+  GridWritten _writeTable(MarkdownChange change) {
+    final controller = widget.controller;
+    final index = MarkdownTables.all(change.text)
+        .indexWhere((table) => table.start == change.start);
+    controller.value = TextEditingValue(
+      text: change.text,
+      selection: TextSelection.collapsed(offset: change.end),
+    );
+    // Found again as the same one of the tables of the text now.
+    final now = MarkdownTables.all(controller.text);
+    return (
+      text: controller.text,
+      at: index >= 0 && index < now.length ? now[index].start : change.start,
+    );
+  }
+
+  /// Starts editing the table [index] in its grid: from before it at the
+  /// start of its first cell, [atEnd] from after it at the end of its
+  /// last; [later], once its grid is drawn.
+  void _enterTable(int index, {required bool atEnd, bool later = false}) {
+    _stopRepeat();
+    if (_selecting) setState(() => _selecting = false);
+    void start() {
+      if (!mounted) return;
+      final table = MarkdownTables.all(widget.controller.text)
+          .elementAtOrNull(index);
+      if (table == null) return;
+      _gridKeys[index]?.currentState?.edit(
+        atEnd
+            ? (row: table.rows.length - 1, column: table.columns - 1)
+            : (row: 0, column: 0),
+        atEnd: atEnd,
+      );
+    }
+
+    if (later) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => start());
+    } else {
+      start();
+    }
+  }
+
+  /// The cursor left the grid of the table [index]: it goes on in the
+  /// text after it or, not [forward], before it.
+  void _leaveTable(int index, {required bool forward}) {
+    final controller = widget.controller;
+    final table = MarkdownTables.all(controller.text).elementAtOrNull(index);
+    if (table != null) {
+      controller.selection = TextSelection.collapsed(
+        offset: forward ? table.end : table.start,
+      );
+    }
+    _focus.requestFocus();
+  }
+
+  /// Shows the table [index] as its lines, the cursor at their start.
+  void _showLines(int index) {
+    final controller = _formatting;
+    if (controller == null) return;
+    final table = MarkdownTables.all(controller.text).elementAtOrNull(index);
+    if (table == null) return;
+    controller.selection = TextSelection.collapsed(offset: table.start);
+    controller.rawTable = index;
+    _focus.requestFocus();
+  }
+
+  /// Shows the table shown as its lines as a grid again.
+  void _showGrid() => _formatting?.rawTable = null;
+
+  /// A key of the field: an arrow that would step onto a table goes into
+  /// its grid instead, from before it at its first cell, from after it at
+  /// its last.
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
+    if ((event is! KeyDownEvent && event is! KeyRepeatEvent) || !_grids) {
+      return KeyEventResult.ignored;
+    }
+    final keys = HardwareKeyboard.instance;
+    if (keys.isShiftPressed ||
+        keys.isControlPressed ||
+        keys.isAltPressed ||
+        keys.isMetaPressed) {
+      return KeyEventResult.ignored;
+    }
+    final value = widget.controller.value;
+    final selection = value.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      return KeyEventResult.ignored;
+    }
+    final at = selection.baseOffset;
+    final line = Markdown.lineAt(value.text, at);
+    final key = event.logicalKey;
+    for (final table in _tables) {
+      final bool? atEnd = switch (key) {
+        LogicalKeyboardKey.arrowRight when at == table.start => false,
+        LogicalKeyboardKey.arrowDown
+            when at == table.start || line == table.firstLine - 1 =>
+          false,
+        LogicalKeyboardKey.arrowLeft when at == table.end => true,
+        LogicalKeyboardKey.arrowUp
+            when at == table.end || line == table.lastLine + 1 =>
+          true,
+        _ => null,
+      };
+      if (atEnd == null) continue;
+      _enterTable(_indexOf(table), atEnd: atEnd);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// The table button: a table shown as its lines shows as a grid again;
+  /// the table at the cursor is gone into; else a new one goes in at the
+  /// cursor, its first cell edited.
   void _table() {
     final controller = _formatting;
     if (controller == null) return;
+    if (controller.rawTable != null) {
+      _showGrid();
+      return;
+    }
     final value = controller.value;
     final text = value.text;
     final cursor = (value.selection.isValid ? value.selection.start : 0).clamp(
@@ -921,7 +1187,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       text.length,
     );
     if (MarkdownTables.at(text, cursor) case final table?) {
-      unawaited(_openTable(table.start));
+      _enterTable(_indexOf(table), atEnd: cursor >= table.end);
       return;
     }
     final change = MarkdownTables.insert(text, cursor);
@@ -931,38 +1197,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // same one of the tables of the text now.
     final index = MarkdownTables.all(change.text)
         .indexWhere((table) => table.start == change.start);
-    final now = MarkdownTables.all(controller.text);
-    final at = index >= 0 && index < now.length
-        ? now[index].start
-        : change.start;
-    unawaited(_openTable(at, cell: (row: 0, column: 0)));
-  }
-
-  /// Opens the table at [at] full screen, [cell] being edited; what it
-  /// changes comes back into the field, the cursor after the table.
-  Future<void> _openTable(int at, {({int row, int column})? cell}) async {
-    final controller = _formatting;
-    if (controller == null) return;
-    if (_selecting) setState(() => _selecting = false);
-    await openTable(
-      context,
-      text: controller.text,
-      at: at,
-      cell: cell,
-      ticking: controller.boxes,
-      edit: TableEditing(
-        twoRows: widget.twoRows,
-        write: (change) {
-          final end =
-              MarkdownTables.at(change.text, change.start)?.end ?? change.start;
-          controller.value = TextEditingValue(
-            text: change.text,
-            selection: TextSelection.collapsed(offset: end),
-          );
-          return change.text;
-        },
-      ),
-    );
+    if (index < 0) return;
+    _enterTable(index, atEnd: false, later: true);
   }
 
   /// Puts ☐ in at the cursor, also in the middle of a word, or before
@@ -1063,15 +1299,19 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         onChanged: _userChanged,
         inputFormatters: _formatters,
         scrollPadding: scrollPadding,
+        textInputAction: _nextAction,
+        onEditingComplete: _onEditingComplete,
+        onSubmitted: _onSubmitted,
         onTap: widget.onBox != null || _formatting != null
             ? () {
                 if (_down case final at?) {
-                  if (!_tappedBox(at)) _tappedTable(at);
+                  _tappedBox(at);
                 }
               }
             : null,
       );
-      final Widget shown = _code ? _sideways(context, field) : field;
+      final keyed = _keyed(field);
+      final Widget shown = _code ? _sideways(context, keyed) : keyed;
       final Widget tapped = widget.onBox == null && _formatting == null
           ? shown
           // The field tells its tap, not where it was.
@@ -1079,11 +1319,14 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
               onPointerDown: (event) => _down = event.position,
               child: shown,
             );
-      if (!_hasBar) return tapped;
+      final Widget hits = _grids
+          ? GridHits(grids: _gridBoxes, child: tapped)
+          : tapped;
+      if (!_hasBar || widget.barHost != null) return hits;
       return OverlayPortal(
         controller: _row,
         overlayChildBuilder: _aboveKeyboard,
-        child: tapped,
+        child: hits,
       );
     }
     final field = TextField(
@@ -1107,23 +1350,51 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       selectionControls: _handles,
       contextMenuBuilder: _menu,
       scrollPadding: scrollPadding,
+      textInputAction: _nextAction,
+      onEditingComplete: _onEditingComplete,
+      onSubmitted: _onSubmitted,
     );
     // The field's own gestures would let a sideways drag move the cursor:
     // they are switched off, and these, which drag nothing, take their
     // place. Long-press selection, the handles of a selection and the
     // menu work as in the field.
-    final region = TextFieldTapRegion(
-      child: _gestures.buildGestureDetector(
-        behavior: HitTestBehavior.translucent,
-        child: IgnorePointer(child: field),
-      ),
+    final Widget gestures = _gestures.buildGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      child: _NoPointer(child: _keyed(field)),
     );
+    final region = TextFieldTapRegion(
+      // The grids of the tables take their own taps and drags.
+      child: _grids ? GridHits(grids: _gridBoxes, child: gestures) : gestures,
+    );
+    final Widget shown = _code ? _sideways(context, region) : region;
+    if (widget.barHost != null) return shown;
     return OverlayPortal(
       controller: _row,
       overlayChildBuilder: _aboveKeyboard,
-      child: _code ? _sideways(context, region) : region,
+      child: shown,
     );
   }
+
+  /// [field] with the keys that go into a table's grid ([_key]).
+  Widget _keyed(Widget field) => _grids
+      ? Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onKeyEvent: _key,
+          child: field,
+        )
+      : field;
+
+  /// What ↵ of the keyboard shows and does with [TwoRowTextField.onNext].
+  TextInputAction? get _nextAction =>
+      widget.onNext == null ? null : TextInputAction.next;
+
+  VoidCallback? get _onEditingComplete => widget.onNext == null ? null : () {};
+
+  ValueChanged<String>? get _onSubmitted => switch (widget.onNext) {
+    final next? => (_) => next(),
+    null => null,
+  };
 
   /// A Code text's [field] (#213): as wide as its longest line and at
   /// least as the room, on the grey ground of code, moved sideways.
@@ -1199,6 +1470,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           label: action.label,
           icon: (_) => Icon(action.icon),
           run: action.run,
+        ),
+      if (controller?.rawTable != null)
+        _Format(
+          key: 'table-show-grid',
+          label: t.tableShowGrid,
+          icon: (_) => const Icon(Icons.grid_on),
+          run: _showGrid,
         ),
       if (_inserts && widget.bar)
         _Format(
@@ -1282,6 +1560,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.url != null,
           run: () => unawaited(_link(at.url)),
         ),
+        if (AppLinkScope.pickOf(context) case final pick?)
+          _Format(
+            key: 'format-link-to',
+            label: t.formatLinkTo,
+            icon: (_) => const Icon(Icons.add_link),
+            run: () => unawaited(_linkTo(pick)),
+          ),
         _Format(
           key: 'format-code',
           label: t.formatCode,
@@ -1417,8 +1702,6 @@ class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
   void onSingleTapUp(TapDragUpDetails details) {
     // A box opens its menu; the cursor stays where it was.
     if (_field._tappedBox(details.globalPosition)) return;
-    // A table opens full screen; the cursor stays where it was.
-    if (_field._tappedTable(details.globalPosition)) return;
     super.onSingleTapUp(details);
     _field._tapped();
   }
@@ -1978,4 +2261,19 @@ class _RenderCursorStrip extends RenderBox
     _clip.layer = null;
     super.dispose();
   }
+}
+
+/// Takes no pointer events, as [IgnorePointer] does, but leaves the
+/// semantics actions of what it holds: a screen reader still presses the
+/// cells and buttons of a table's grid in the field (#257).
+class _NoPointer extends SingleChildRenderObjectWidget {
+  const _NoPointer({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderNoPointer();
+}
+
+class _RenderNoPointer extends RenderProxyBox {
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) => false;
 }

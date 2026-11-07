@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -177,12 +178,18 @@ void main() {
       }
       await tester.pumpWidget(OldBrainFixApp(store: store));
       expect(painter(tester).shift, 0);
-      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      // The Agenda's list, inside the pages it shares with the Areas list.
+      final list = find
+          .descendant(
+            of: find.byType(AgendaScreen),
+            matching: find.byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            ),
+          )
+          .first;
+      await tester.drag(list, const Offset(0, -600));
       await tester.pumpAndSettle();
-      return tester
-          .state<ScrollableState>(find.byType(Scrollable))
-          .position
-          .pixels;
+      return tester.state<ScrollableState>(list).position.pixels;
     }
 
     testWidgets('the marks move slower than the page', (tester) async {
@@ -356,6 +363,68 @@ void main() {
       box.hitTestChildren(BoxHitTestResult(), position: const Offset(1, 1)),
       isFalse,
     );
+  });
+
+  group('pushed pages (#243)', () {
+    test('slide in as on iOS on the iPhone; Android keeps its own', () {
+      final builders = lookTheme(Brightness.light)
+          .pageTransitionsTheme
+          .builders;
+      expect(
+        builders[TargetPlatform.iOS],
+        isA<CupertinoPageTransitionsBuilder>(),
+      );
+      expect(
+        builders[TargetPlatform.android].runtimeType,
+        const PageTransitionsTheme()
+            .builders[TargetPlatform.android]
+            .runtimeType,
+      );
+    });
+
+    /// A page pushed over a first one, as the app pushes its pages, and
+    /// a drag from the left edge to the right.
+    Future<void> swipeBackFromTheEdge(
+      WidgetTester tester,
+      TargetPlatform platform,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: lookTheme(Brightness.light).copyWith(platform: platform),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        const Scaffold(body: Center(child: Text('pushed'))),
+                  ),
+                ),
+                child: const Text('first'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('first'));
+      await tester.pumpAndSettle();
+      expect(find.text('pushed'), findsOneWidget);
+      await tester.dragFrom(const Offset(5, 300), const Offset(500, 0));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('go back with the edge swipe on the iPhone', (tester) async {
+      await swipeBackFromTheEdge(tester, TargetPlatform.iOS);
+      expect(find.text('pushed'), findsNothing);
+      expect(find.text('first'), findsOneWidget);
+    });
+
+    testWidgets('stay on Android, where the system takes the back gesture', (
+      tester,
+    ) async {
+      await swipeBackFromTheEdge(tester, TargetPlatform.android);
+      expect(find.text('pushed'), findsOneWidget);
+    });
   });
 }
 

@@ -1,11 +1,10 @@
 //! Tables in formatted text in the window (#128, ADR 0033): a table reads
-//! as a grid without its pipes, a click on it opens it full screen, back
-//! leaves it; a cell is edited on one line, Enter writes it, Tab goes on,
-//! Esc leaves it as it was; a row's or column's heading opens its menu;
-//! the empty row adds one; the format bar puts a new table in; a cell's
-//! box ticks in place, its text as it was; a Section's table is edited
-//! as the Note's by who may edit the Section (#183), and opens to read
-//! only in the trash.
+//! as a grid without its pipes, a click on it on a card opens it full
+//! screen, back leaves it; a cell is edited on one line, Enter writes it,
+//! Tab goes on, Esc leaves it as it was; a row's or column's heading opens
+//! its menu; the empty row adds one; a cell's box ticks in place, its
+//! text as it was; a table of a Note in the trash opens to read only. The
+//! editor edits a table as a grid in place (#257, tests/table_grid.rs).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -49,6 +48,24 @@ fn editor(store: &Arc<Store>, note: &str) -> Harness<'static, App> {
     let mut app = App::new(store.clone(), "en");
     app.select(Selection::Unsorted);
     app.select_note(note);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1000.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness
+}
+
+/// The window over `store` in English showing every Note's card, none
+/// open in the editor.
+fn cards(store: &Arc<Store>) -> Harness<'static, App> {
+    let mut app = App::new(store.clone(), "en");
+    app.select(Selection::All);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1000.0))
         .build_ui_state(
@@ -125,8 +142,8 @@ fn a_table_reads_as_a_grid_without_its_pipes() -> TestResult {
 
 #[test]
 fn a_click_opens_the_table_full_screen_and_back_leaves_it() -> TestResult {
-    let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let (store, _) = with_note(TABLE, MARKDOWN)?;
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     assert_eq!(harness.state().shown_table(), Some(TABLE));
     // The rows' numbers and the columns' letters, where it may change.
@@ -144,7 +161,7 @@ fn a_click_opens_the_table_full_screen_and_back_leaves_it() -> TestResult {
 #[test]
 fn a_cell_is_written_on_enter_and_left_as_it_was_on_esc() -> TestResult {
     let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     click(&mut harness, "milk")?;
     // The cursor at the end of its words.
@@ -164,7 +181,7 @@ fn a_cell_is_written_on_enter_and_left_as_it_was_on_esc() -> TestResult {
 #[test]
 fn tab_writes_the_cell_and_goes_on_to_the_next() -> TestResult {
     let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     click(&mut harness, "milk")?;
     typed(&mut harness, "s");
@@ -181,7 +198,7 @@ fn tab_writes_the_cell_and_goes_on_to_the_next() -> TestResult {
 #[test]
 fn the_empty_row_adds_a_row_when_typed_into() -> TestResult {
     let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     // The "+" beside the empty row, drawn after its cells, which say the
     // same: it edits the row's first cell.
@@ -198,7 +215,7 @@ fn the_empty_row_adds_a_row_when_typed_into() -> TestResult {
 #[test]
 fn a_row_holding_words_is_deleted_after_asking() -> TestResult {
     let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     press(&mut harness, "Row 2")?;
     press(&mut harness, "Delete row")?;
@@ -213,7 +230,7 @@ fn a_row_holding_words_is_deleted_after_asking() -> TestResult {
 #[test]
 fn the_first_columns_menu_marks_it_as_headings() -> TestResult {
     let (store, note) = with_note(TABLE, MARKDOWN)?;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open the table")?;
     press(&mut harness, "Column A")?;
     harness
@@ -230,37 +247,10 @@ fn the_first_columns_menu_marks_it_as_headings() -> TestResult {
 }
 
 #[test]
-fn the_format_bar_puts_a_new_table_in_and_edits_its_first_cell() -> TestResult {
-    let (store, note) = with_note("Shop", "plain")?;
-    let mut harness = editor(&store, &note);
-    // The Note's bar, the first; "Add to Note" has one too.
-    harness
-        .query_all_by_role_and_label(Role::Button, "Table")
-        .next()
-        .ok_or("Table")?
-        .click_accesskit();
-    harness.run();
-    let new = "|  |  |\n| --- | --- |\n|  |  |";
-    // A field never typed into has its cursor at the start: before it.
-    assert_eq!(
-        stored(&store, &note)?,
-        (format!("{new}\n\nShop"), MARKDOWN.into())
-    );
-    assert!(harness.state().shown_table().is_some());
-    typed(&mut harness, "Item");
-    key(&mut harness, Key::Enter);
-    assert_eq!(
-        stored(&store, &note)?.0,
-        "| Item |  |\n| --- | --- |\n|  |  |\n\nShop"
-    );
-    Ok(())
-}
-
-#[test]
 fn a_cells_box_ticks_in_place() -> TestResult {
     let (store, note) = with_note("| ☐ milk | 2 |\n| --- | --- |", MARKDOWN)?;
     let before = stored(&store, &note)?.0;
-    let mut harness = editor(&store, &note);
+    let mut harness = cards(&store);
     press(&mut harness, "Open")?;
     press(&mut harness, "✅ Check")?;
     // A tick beside the text, which stays as it was.
@@ -280,30 +270,14 @@ fn a_cells_box_ticks_in_place() -> TestResult {
 }
 
 #[test]
-fn a_sections_table_is_edited_as_the_notes_and_read_only_in_the_trash() -> TestResult {
+fn a_table_in_the_trash_opens_to_read_only() -> TestResult {
     let (store, note) = with_note("Shop", MARKDOWN)?;
     let notes = Notes::new(&store);
-    let amend = notes.amend_as(&note, TABLE, MARKDOWN)?.id;
+    notes.amend_as(&note, TABLE, MARKDOWN)?;
+    notes.trash(&note)?;
     let mut harness = editor(&store, &note);
-    // The Section is this Device's: its table is edited in place (#183).
     press(&mut harness, "Open the table")?;
     assert_eq!(harness.state().shown_table(), Some(TABLE));
-    assert_eq!(buttons(&harness, "Row 1"), 1);
-    click(&mut harness, "milk")?;
-    typed(&mut harness, "s");
-    key(&mut harness, Key::Enter);
-    let section = notes.section_by_id(&amend)?.ok_or("the Amend")?;
-    assert_eq!(section.text, "| Item | Qty |\n| --- | --- |\n| milks | 2 |");
-    assert!(section.modified.is_some());
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowLeft);
-    harness.run();
-    assert_eq!(harness.state().shown_table(), None);
-    // In the trash it opens to read only.
-    notes.trash(&note)?;
-    harness.state_mut().select_note(&note);
-    harness.run();
-    press(&mut harness, "Open the table")?;
-    assert!(harness.state().shown_table().is_some());
     assert_eq!(buttons(&harness, "Row 1"), 0);
     assert_eq!(buttons(&harness, "Add a row"), 0);
     Ok(())

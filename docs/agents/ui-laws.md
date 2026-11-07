@@ -227,8 +227,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
   and how many are open ("4 open"), a Tally its name and each field's
-  but a multiplier's total today, a multiplied field's the product
-  (#200), against its target ("Steps 7000 / 10000 steps"), in a
+  but one counting sets total of the current bar, today's for a Tally
+  of days (#264), against its target ("Steps 7000 / 10000 steps"), in a
   Shared Area of the user's own entries, as its detailed view counts at
   first (#190), a Session
   its name, the next run of any of its Routines and "done 4 / skipped 1
@@ -241,11 +241,13 @@ replace a law of Both apps where they say so. A desktop law marked
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
   "Add entry", in a Shared Area "Show entries" (Mine at first,
-  Everyone's, or one person's), "One bar per" Day, Week, Month or Year
-  as choice chips, kept per Note on this Device, a chart per field
-  shown but its multipliers (#200), then its entries (a multiplied
-  field's value after its multipliers', "Reps 3 × 10 reps"), newest
-  first, the latest five and the older
+  Everyone's, or one person's), a chart per field shown but those
+  counting sets, a bar per the Tally's bar length with no choice of it
+  here (#264): slim bars of a fixed width with gaps, the newest on the
+  right, as many as fit, the target as a thin line, never scrolled
+  sideways; then its entries (ticks as "✓ Wiped", several sets a line
+  each, "1. Weight 60 kg · Reps 10"), newest first, the latest five and
+  the older
   folded under how many ("12 older entries") until a tap shows them,
   kept open per Note on this Device; a tap on an entry edits it, a long
   press offers Edit and Delete, and the folded "Removed entries" restore.
@@ -254,7 +256,9 @@ replace a law of Both apps where they say so. A desktop law marked
   name and description its pool, then today's picks of each of its
   Routines under the Routine's time, each pick opening its entry form
   and offering "Another one" as on the Agenda, then "done N / skipped
-  M" for each of the last four weeks, this week first; a Session
+  M" for each of the last four weeks, this week first, then its latest
+  five past runs (#264), each its date and time and each pick "done" or
+  "not done", with how many older ones its page lists; a Session
   without a Routine shows its pool alone.
 - **A card ticks today's Occurrences of its Note** (#215): in either
   view, under where it is filed and over its text, a box with the time
@@ -324,22 +328,30 @@ replace a law of Both apps where they say so. A desktop law marked
   "50 pages", "Reps"). **Never an icon plus the same word.** The
   desktop draws the same Material icons as the phone. Importance; Area and Topic in one; Captured (time, place,
   calendar event, Bluetooth device, app); each Routine and Reminder with
-  its schedule; the kind, Plain Note included (#188); the text format of
+  its schedule; its Frog (#259) while one is open or was eaten today or
+  yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
+  in Simple too, its tap offering at the finger Eat now while it is open
+  and this Device may check it off and "Remove the Frog" for who may
+  manage it, which asks once as the Frog view does; for a Member an
+  eaten one only shows; the kind, Plain Note included (#188); the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
   a Pack brought the Note unclaimed (#164), `inventory_2` with the
   name, its tap asking to remove it. A Tally's setup
-  is its fields (#190), each its name with its rule, unit and target as
-  badges, as on the Tally page, what it multiplies (#200) while it does
-  or may ("Multiplies: Reps", "Nothing"), a multiplier without its rule
-  and target, and "Hidden" while it is hidden, a tap
+  is the Tally's own badges, "One bar per" and "Counts in sets" (#264),
+  each opening its small editor, then its fields (#190), each its name
+  with its rule, unit and target as badges, as on the Tally page, a
+  Check field its kind and target, a field that counted sets as a
+  multiplier did "Counts the sets of older entries" without its rule and
+  target, and "Hidden" while it is hidden, a tap
   on the name or a badge opening the field's page, then "Add field"; the
   editor shows no chart and no entries. A Session's setup (#191) is its
   pool, a list of checkboxes ending in "New Tally" as on its "+" page,
   and how many it picks with − and +, then its rule and its weekdays'
   counts as badges; each of its Routines is a Routine badge, and the
-  Routine editor of one holds only its schedule. A setting that does not apply has no badge. A tap
+  Routine editor of one holds only its schedule; its past runs (#264)
+  follow the badges. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same setting icon and the
   setting's name, its values in words, which changes it at once: Importance as choice chips (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the
@@ -356,7 +368,8 @@ replace a law of Both apps where they say so. A desktop law marked
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
   whose menu at the finger offers Routine, Reminder, Frog and Session,
-  there only for who may set them up; on a Session it offers no
+  there only for who may set them up; no Frog while the Note has an open
+  one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
   recordings and the Sections stay the page's content; the editor has no
   "Make it a Checklist" or "Make it a Shopping List" button of its own,
@@ -436,14 +449,24 @@ replace a law of Both apps where they say so. A desktop law marked
 - Destructive actions (deleting a Note, an Area, a Routine) confirm
   once, in a dialog whose confirm button carries the verb and the error
   colour.
+- Deleting a Note takes its Routines and Reminders into the trash with
+  it, on every path and in both apps (#262): the one question names
+  them ("Delete this Note and its 1 Routine?", "… its 1 Reminder?",
+  "… its 3 Routines and Reminders?") and offers only Cancel and Delete;
+  restoring the Note brings them back. There is no "Delete only the
+  Note". All Routines and Reminders marks one whose Note is in the
+  trash or deleted.
 
 ### Text editor
 
 - **The format bar goes with the field**: ☐, bold, italic,
-  strike-through, two headings, bullets, numbers, quote, link, code,
+  strike-through, two headings, bullets, numbers, quote, link, "Link
+  to…" (#261: a picker of the app's pages, Areas, Topics and Notes with
+  a search, never an id typed), code,
   code block (on the lines touched, or taking a block's fences off), in
   and out, each on the selection or the word at the cursor, and table,
-  which puts a new table at the cursor or opens the one it is in. On the phone
+  which puts a new table at the cursor and edits its first cell, or goes
+  into the one at the cursor. On the phone
   it sits directly above the bottom row while the keyboard is open, and
   the buttons without room go into ⋮ at its end, opening at the finger.
   On the desktop it sits above the field, which shows a formatted text's
@@ -452,7 +475,26 @@ replace a law of Both apps where they say so. A desktop law marked
 - **In Simple there is no format bar** (#197): no ☐ and no formats
   over any field, while a field's own buttons, such as a Line's in and
   out, stay. Typed and pasted Markdown still formats, a formatted text
-  shows formatted and a table still opens.
+  shows formatted and a table is still edited as its grid, with its +,
+  menus and Show as lines.
+- **In the editor a table is edited as its grid** (#257), on both apps,
+  pasted tables included: a tap or click on a cell edits it in place;
+  Tab and Shift+Tab go to the next and previous cell row by row, Enter
+  to the cell below, and the arrow keys at a cell's edge to the cell
+  beside it, past the grid's edge into the text before or after it; the
+  arrow keys from the text go into it. "+" after the last row and after
+  the last column adds one. A row's number and a column's letter open
+  its menu: insert, move, delete (asking once while it holds words; the
+  last one deletes the table), for a column Align left, Centre and Align
+  right, and for the first column First column as headings. While a
+  cell is edited, the format bar, where the field has one, holds only ☐,
+  bold, italic, strike-through, link and code, on the cell's words.
+  Every change writes the table's lines anew (ADR 0033); the Markdown
+  stays the source. **Show as lines** on the grid shows that table's
+  lines as text until the cursor leaves them, the field loses focus or
+  Show as table is pressed. Column widths are the view's only, never
+  stored. Cards and texts that are only read show the grid and open the
+  table full screen.
 - **A Code text has no format bar and no ☐** (#213): the field shows it
   in the fixed-width font on the grey ground of code, unwrapped, and it
   moves sideways. **A paste that looks like code** into a Plain Note's
@@ -616,6 +658,18 @@ replace a law of Both apps where they say so. A desktop law marked
   right goes back** one level (Topic, Area, Areas list, Agenda) and
   **swipe left goes forward** into the last selected Area or Topic, if
   there is one. The last selected Area and Topic are highlighted.
+- **The Agenda and the Areas list are two pages of one `PageView`**
+  (#258), side by side: the platform's own drag and fling
+  (`PageScrollPhysics`), counted from the touch-down so a quick short
+  flick switches both ways; letting go past the middle or with a fling
+  switches, otherwise they spring back. The Areas list is built with
+  the Agenda and kept, so a swipe builds neither page. Back on the
+  Areas list, by the system or its bar's arrow, and the folder move
+  between them; nothing else does, and the lock goes back to the
+  Agenda. An Area, a Topic and their Notes are pages pushed on top, as
+  is the Areas list of a tag's search. On iOS a drag that starts at the
+  left edge moves neither page (Q570). With the system's animations off
+  the pages still follow the finger, and letting go lands at once.
 - **In an Area, a Topic and All Notes "+" fans out** its kinds (#161),
   each an icon with its words, upward from the button as the Agenda's
   fan does.
@@ -629,6 +683,12 @@ replace a law of Both apps where they say so. A desktop law marked
   bare `http://` or `https://` address (#222), opens that link instead; a
   long press on it is still the card's. A tap on a row or card never
   opens a menu.
+- **An app link opens its place without asking** (#261, ADR 0046): a
+  Note, an Area or Topic, the Agenda, Unsorted or one of the app's
+  pages, as its own menu opens it. A target this Device cannot see is an
+  announcement, "Not available here", never an error dialog. A file link
+  is the one link that asks first, once, naming the file and the app
+  that opens it, and opens only a file of the shared folder.
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
@@ -636,9 +696,15 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
-  sideways, as its bar does, and a Code text in the Note editor (#213),
+  sideways, as its bar does, a table wider than the editor's field
+  (#257), which a drag on it moves sideways, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
   off at the edge instead.
+- **On the iPhone a pushed page goes back with the edge swipe** (#243,
+  Q570), iOS's own, from the left edge; a browser level goes back with
+  a swipe right anywhere, as on Android. A page that holds its leaving,
+  such as one asking to keep changes, takes no edge swipe. A long-press
+  on a Note card gives the iPhone's haptic where Android vibrates.
 
 ### Capture
 
@@ -657,6 +723,18 @@ replace a law of Both apps where they say so. A desktop law marked
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **On the iPhone a share waits for the app** (#241): iOS lets no Share
+  extension open its app, so "Old Brain Fix" in the share sheet keeps
+  the text, links, pictures or the app's own files and says so on a small
+  card with OK. The next time the app opens or comes back, each share
+  opens Capture as on Android, and a Pack, Profile card, Sent Item or
+  bundle opens as "Open with" opens it. A share carries no source app on
+  the iPhone.
+- **On the iPhone iOS's own prompts may come beside Capture** (#243,
+  #244): the first Photo asks iOS's camera permission, and Paste may
+  show iOS's own "Allow Paste" prompt each time it reads the clipboard.
+  Both are iOS's, not the app's, and are allowed beside "Capture never
+  asks anything"; the app itself still asks nothing there.
 - **The quick note is uncluttered** (#142): by default it shows the
   text field, Photo, Voice, Gallery and Paste, the Nudge buttons,
   **To full editor** and the alarm clock beside it (#223), whose menu
@@ -754,6 +832,19 @@ replace a law of Both apps where they say so. A desktop law marked
   headings and the other headings have no box; every other tap opens
   the app. Masked rows show as on the Agenda and the lock screen.
   Nothing of an appointment is kept for the widget either.
+- **On the iPhone the Agenda widget** (#242) is medium or large and
+  differs where WidgetKit decides: it does not scroll, so it shows the
+  rows from the top as far as its height allows, never a heading as its
+  last row, and "+n" for the rows left out, which opens the app like
+  every other tap. With Fat fingers fewer rows fit. A box ticks without
+  opening the app and shows checked at once; the app applies it the
+  next time it opens or comes back. The appointments show while the app
+  has full access to the calendars. Capture there is one small Capture
+  widget, its button opening voice, text or photo as chosen when the
+  widget is edited (text until then), the same widget on the lock
+  screen, and a Control Center control each for voice, text and photo;
+  each opens its capture screen directly, as Android's widgets and
+  tiles do.
 
 ### Cards
 
@@ -810,12 +901,16 @@ replace a law of Both apps where they say so. A desktop law marked
   end.
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
-- **On the phone a table in the field is its grid**, the same as on the
-  card, never its Markdown; a tap opens it full screen. It is one block:
-  the cursor and a selection never end inside it, the bottom row shows
-  it as a table's sign, what is typed right before or after it goes on
-  a line of its own, and deleting any of it deletes all of it, asking
-  first while its cells hold words.
+- **On the phone a table in the field is its grid**, never its
+  Markdown, edited in place (see "In the editor a table is edited as
+  its grid"); a grid wider than the field moves sideways with a drag
+  on it. For the text around it, it is one block: the cursor and a
+  selection never end inside its lines, ◀ and ▶ go into its first or
+  last cell, what is typed right before or after it goes on a line of
+  its own, and deleting any of it deletes all of it, asking first while
+  its cells hold words. While a cell is edited the bottom row is hidden,
+  the cell's own field shows its words, and Show as table sits on the
+  bar above the keyboard while the cursor is in a table shown as lines.
 
 ### Checklist and Shopping List Lines
 
@@ -849,6 +944,22 @@ replace a law of Both apps where they say so. A desktop law marked
 - An Occurrence from a locked Area whose Area is set to Masked never
   shows its title in a notification or on the Agenda, and stays
   checkable.
+- **On the iPhone** (#238) the alarm laws differ where iOS decides:
+  - There is no full-screen alarm page. An escalated Occurrence rings
+    as an AlarmKit alarm, through silent mode and Focus, and AlarmKit's
+    own alarm screen replaces the page: its Stop answers Done, and its
+    one Snooze waits 10 min, as there is room for one only. Without the
+    Alarms permission it comes as a time-sensitive notification.
+  - An Occurrence's notification is time-sensitive and offers Done and
+    the three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h")
+    at once, not Snooze and then its choices; each Re-nag is a
+    notification of its own in the Occurrence's group.
+  - The setup asks for Notifications and Alarms only; exact and
+    full-screen alarms do not exist there.
+  - iOS rings only what was handed to it beforehand, at most 64 rings
+    ahead; every plan, tap and answer hands over the next 64. There is
+    no Catch-up Notification; the Missed Summary shows what was Missed
+    when the app opens.
 
 ## Desktop
 
@@ -919,7 +1030,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A right-click is the desktop's long press** (draft, #196): it opens
   the same menu as ⋮ where there is one, on a Note card, an Occurrence
   row and a Checklist Line's words, and the thing's menu on an Area, a
-  Topic, a Frog, a Tally entry, a table and a photo. Like the long
+  Topic, a Frog, a Tally entry, a table and a photo, and in a text field
+  the field's menu (#253, see Text editor and Lines). Like the long
   press, it never changes data by itself.
 - **Hover only shows** (draft, #196): what a click opens turns the
   pointer into a hand, an icon-only button gets its rounded background
@@ -970,9 +1082,15 @@ replace a law of Both apps where they say so. A desktop law marked
   another place drop the selection. A double-click or Edit opens the
   Note dialog.
 - **In the Note dialog a text that is only read selects with the
-  mouse** and copies with Ctrl+C (Cmd on macOS): the Note's and a
-  Section's (#183); a Section this Device may edit has its own field and
-  format bar there. "Copy as text" in a card's right-click menu, the
+  mouse** and copies with Ctrl+C (Cmd on macOS): another person's text,
+  the Note's in the trash, a Section's (#183), a Transcript, a Photo
+  Text and the History (#255). A drag selects, over its lines and
+  formats, which it keeps; a click on a link, a box, a tag or a table in
+  it still does what it does. A right-click on it opens Copy, greyed
+  while nothing is selected, and Select all, which selects that whole
+  text; the right-click and the menu keep the selection. The cards in
+  the list stay click-to-select. A Section this Device may edit has its
+  own field and format bar there. "Copy as text" in a card's right-click menu, the
   Note menu and the dialog is the desktop's "Copy text": the Note and
   its Sections as they show.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
@@ -1013,10 +1131,30 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Text editor and Lines
 
 - The desktop keeps its own field, not the phone's two rows. The
-  desktop's field shows a table's Markdown.
+  desktop's field shows a formatted text's Markdown, except a table,
+  which it shows as its grid (see "In the editor a table is edited as
+  its grid"), whose column widths are dragged at their borders. As on
+  the phone, what is typed right before or after a table goes on a line
+  of its own, so the table keeps its rows.
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.
+- **A right-click in a text field opens its menu at the pointer**
+  (#253): every field one types into has Cut, Copy, Paste and Select
+  all, Cut and Copy greyed without a selection or in a password field,
+  Select all in an empty field. With a selection in a formatted text,
+  and in the quick note and Add to Note while their format bar shows,
+  the menu also has the bar's Bold, Italic, Code, Link and Code block,
+  as far as the bar has them (the quick note no Link). A right-click on
+  the selection keeps it, and the field keeps the cursor through the
+  menu, so nothing it does on losing the cursor happens. Cut, Copy and
+  Paste work as their keys do. No spelling entries.
+- **A selection scrolls while it is dragged** (#256): in every text
+  field and in the Note dialog's texts that are only read, while the
+  button is held the wheel scrolls and the selection follows the
+  pointer, and a drag past the top or bottom edge of the view scrolls by
+  itself, faster the further out the pointer is. The selection stays
+  when its start scrolls out of view.
 
 ### Settings
 

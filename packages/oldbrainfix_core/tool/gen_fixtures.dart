@@ -775,17 +775,18 @@ final _scenarios = <Scenario>[
           rule: Recurrence(frequency: Frequency.daily),
         ),
       );
-      routines.trashNote(walk.id, withRoutines: true);
+      routines.trashNote(walk.id);
       routines.restoreNote(walk.id);
       final flyer = notes.capture('Flyer for the fair');
       routines.spawn(
         flyer.id,
         Schedule(start: Day(2026, 4, 1), times: [_at(10)]),
       );
-      routines.trashNote(flyer.id, withRoutines: false);
+      // Left behind as "Delete only the Note" did before #262.
+      routines.store.batch(() => notes.trash(flyer.id));
       final car = notes.capture('Car inspection');
       routines.spawn(car.id, Schedule(start: Day(2026, 5, 1)));
-      routines.trashNote(car.id, withRoutines: true);
+      routines.trashNote(car.id);
       notes.capture('Unsorted thought', nudgeIn: const Duration(minutes: 10));
       notes.capture('Another thought');
     },
@@ -835,12 +836,17 @@ final _scenarios = <Scenario>[
         'another unit of their kind, their target taken away, their rule '
         'changed, hidden and hidden and restored; a Tally merged into '
         'another Note and recorded in there; a Tally in the trash; '
-        'multipliers (#200): one added multiplying a field, with entries '
-        'of whole, fractional, negative and rounded products and one '
-        'without the multiplier, one whose multiplied field is hidden, one '
+        'multipliers as #200 wrote them, read as sets (#264): one '
+        'multiplying a field, with entries of whole, fractional, negative '
+        'and rounded counts and one without the multiplier, one of them '
+        'changed with its sets, one whose multiplied field is hidden, one '
         'on the Note a Tally was merged into multiplying a field of the '
-        'merged one, and settings no app writes: one naming a multiplier, '
-        'one itself; an Unsorted Note beside them.',
+        'merged one, the Tally switched out of sets, and settings no app '
+        'writes: one naming a multiplier, one itself; a Tally counting in '
+        'sets (#264) with a Check field and weekly bars, entries with sets, '
+        'one set holding nothing, one changed with fewer sets, one only '
+        'ticked, set keys no app writes and a bar length nobody knows; an '
+        'Unsorted Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final tallies = Tallies(store);
@@ -928,23 +934,89 @@ final _scenarios = <Scenario>[
       final evenings = notes.capture('Evenings').id;
       notes.merge(reading, evenings);
       tallies.add(evenings, values: {pages: 8}, line: 'Novel');
-      final sets = tallies.addField(gym, name: 'Sets', multiplies: reps);
-      tallies.add(gym, values: {reps: 10, sets: 3}, line: 'Sets');
+      // As #200 wrote a multiplier.
+      final sets = tallies.addField(gym, name: 'Sets');
+      store.append(gym, TallyKeys.field(sets, TallyKeys.multiplies), reps);
+      final legacy = tallies.add(
+        gym,
+        values: {reps: 10, sets: 3},
+        line: 'Sets',
+      );
       tallies.add(gym, values: {reps: 2.5, sets: 1.5});
       tallies.add(gym, values: {reps: -3, sets: 0.5});
       tallies.add(gym, values: {reps: 0.000003, sets: 0.5});
       tallies.add(gym, values: {sets: 4});
       final laps = tallies.addField(gym, name: 'Laps', unit: 'laps');
-      tallies.setMultiplies(gym, laps, run);
+      store.append(gym, TallyKeys.field(laps, TallyKeys.multiplies), run);
       tallies.add(gym, values: {run: 400, laps: 2});
+      tallies.editEntry(
+        legacy.id,
+        more: [
+          {reps: 10},
+          {reps: 8},
+        ],
+      );
       tallies.hideField(gym, run);
       final odd = tallies.addField(gym, name: 'Rounds');
       store.append(gym, TallyKeys.field(odd, TallyKeys.multiplies), sets);
       final self = tallies.addField(gym, name: 'Self');
       store.append(gym, TallyKeys.field(self, TallyKeys.multiplies), self);
       final books = tallies.addField(evenings, name: 'Books');
-      tallies.setMultiplies(evenings, books, pages);
+      store.append(
+        evenings,
+        TallyKeys.field(books, TallyKeys.multiplies),
+        pages,
+      );
       tallies.add(evenings, values: {pages: 8, books: 2});
+      tallies.setCountsInSets(gym, false);
+      store.append(evenings, TallyKeys.bar, 'fortnight');
+      store.append(reading, TallyKeys.bar, 'year');
+      final press = notes.capture('Bench').id;
+      final weight = tallies.addField(
+        press,
+        name: 'Weight',
+        unit: 'kg',
+        rule: TallyRule.max,
+      );
+      final times = tallies.addField(press, name: 'Reps', target: 30);
+      final warm = tallies.addField(
+        press,
+        name: 'Warmed up',
+        target: 2,
+        check: true,
+      );
+      tallies.setCountsInSets(press, true);
+      tallies.setBar(press, TallyPeriod.week);
+      final heavy = tallies.add(
+        press,
+        values: {weight: 60, times: 10, warm: 1},
+        more: [
+          {weight: 65, times: 8},
+          {},
+          {weight: 65, times: 6},
+        ],
+        line: 'Heavy',
+        at: DateTime.utc(2025, 12, 30, 18),
+      );
+      tallies.add(
+        press,
+        values: {weight: 50, times: 12},
+        at: DateTime.utc(2026, 1, 2, 18),
+      );
+      tallies.add(press, values: {warm: 1});
+      tallies.editEntry(
+        heavy.id,
+        values: {times: 9},
+        more: [
+          {weight: 70, times: 5},
+        ],
+      );
+      // As a modified app would.
+      final light = tallies.add(press, values: {weight: 40, times: 15});
+      store.append(light.id, 'v02:$times', '1');
+      store.append(light.id, 'v1:$times', '2');
+      store.append(light.id, 'v5:$times', '4');
+      store.append(light.id, TallyKeys.setValue(2, warm), '1');
       final steps = notes.capture('Steps').id;
       final count = tallies.addField(steps, name: 'Steps', unit: 'steps');
       tallies.add(steps, values: {count: 8000});
@@ -2188,6 +2260,20 @@ Map<String, Object?> _sessions(Store store) {
             'heldBy': setup.heldBy,
             'runs': [for (final s in sessions.ofNote(id)) s.id],
             'picksFrom': sessions.pool(setup),
+            'pastRuns': [
+              for (final days in const [0, 4])
+                [
+                  for (final run in sessions.runs(id, _frogDay(days)))
+                    {
+                      'routine': run.routineId,
+                      'occurrence': run.occurrence.key,
+                      'picks': [
+                        for (final p in run.picks)
+                          {'noteId': p.noteId, 'done': p.done},
+                      ],
+                    },
+                ],
+            ],
           },
     ],
     'sessions': [
@@ -2600,6 +2686,10 @@ Map<String, Object?> _tallies(Store store) {
     'counted': {
       for (final f in tally.fields) f.id: ?tally.countedMicro(e, f.id),
     },
+    'sets': [
+      for (final set in tally.setsOf(e))
+        {for (final id in set.keys.toList()..sort()) id: number(set[id])},
+    ],
     'line': e.line,
     'trashed': e.trashed?.toIso8601String(),
     'author': store.authorOf(e.id)?.id,
@@ -2619,11 +2709,17 @@ Map<String, Object?> _tallies(Store store) {
                 'target': number(f.target),
                 'rule': f.rule.name,
                 'hidden': f.hidden,
+                'check': f.check,
                 'multiplies': f.multiplies,
                 'hasEntries': f.hasEntries,
                 'added': f.added.toIso8601String(),
               },
           ],
+    },
+    'settings': {
+      for (final id in noteIds)
+        if (tallies.byNote(id) case final tally?)
+          id: {'bar': tally.bar.name, 'countsInSets': tally.countsInSets},
     },
     'all': [for (final tally in tallies.all()) tally.noteId],
     'entries': {
@@ -2659,8 +2755,8 @@ Map<String, Object?> _tallies(Store store) {
                   for (final bar in tallies.chart(
                     tally.noteId,
                     field.id,
-                    period,
                     _europe,
+                    period: period,
                   ))
                     {
                       'start': '${bar.start}',
@@ -3896,7 +3992,12 @@ final _helpEnglish = HelpTexts(
   areaName: 'Old Brain Fix',
   quickStartTitle: 'Quick start',
   quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
-  iconsText: 'What the icons mean\n\nKind: what the Note is',
+  quickStartDescription:
+      'Go there:\n1. [Agenda](oldbrainfix://agenda)\n\n'
+      'On the desktop:\nCapture: Ctrl+N',
+  iconsText:
+      'What the icons mean\n\nKind: what the Note is\n\n'
+      '[User guide](oldbrainfix://guide)',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]),
   ],
@@ -3909,7 +4010,12 @@ final _helpGerman = HelpTexts(
     'Einen Gedanken mit + erfassen',
     'Ihn in einen Bereich einsortieren',
   ],
-  iconsText: 'Was die Symbole bedeuten\n\nArt: was die Notiz ist',
+  quickStartDescription:
+      'Hingehen:\n1. [Agenda](oldbrainfix://agenda)\n\n'
+      'Auf dem Desktop:\nErfassen: Strg+N',
+  iconsText:
+      'Was die Symbole bedeuten\n\nArt: was die Notiz ist\n\n'
+      '[Anleitung](oldbrainfix://guide)',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2]),
   ],
@@ -6622,10 +6728,13 @@ void _packFixture(Directory root) {
     final tallies = Tallies(ada);
     final count = tallies.addField(laps.id, name: 'Laps', target: 10);
     final rounds = tallies.addField(laps.id, name: 'Rounds');
-    tallies.setMultiplies(laps.id, rounds, count);
+    // As #200 wrote a multiplier.
+    ada.append(laps.id, TallyKeys.field(rounds, TallyKeys.multiplies), count);
     tallies.add(laps.id, values: {count: 4, rounds: 2}, line: 'Windy');
     final digging = notes.capture('Digging', place: garden.id);
     tallies.addField(digging.id, name: 'Minutes', unit: 'min');
+    tallies.addField(digging.id, name: 'Watered', check: true);
+    tallies.setBar(digging.id, TallyPeriod.month);
     tallies.add(digging.id, values: {}, line: 'Beds');
     final training = notes.capture('Training', place: running.id);
     Sessions(ada).spawn(
@@ -7454,6 +7563,7 @@ Map<String, Object?> _textBoxes() {
     '😀☐🧠✅\r\n❌\r☐',
     'Ünïcode ☐ Straße ✅ 👩‍👧 ❌',
     'https://x.org/☐ ☐ (https://x.org/✅) ❌',
+    '- [ ] milk\n1. [x] ☐ two\n```\n- [X] code\n```\n- `[ ]` x',
   ];
   return {
     'cases': [for (final text in texts) _textBoxesOf(text)],
@@ -7946,6 +8056,15 @@ Map<String, Object?> _markdown() {
         r'*https://f.org*, https://g.org/\_x (https://h.org).'
         '\n```\nhttps://i.org #no\n```\n| https://j.org/#k | b |\n|---|---|\n'
         '> https://k.org/☐ ☐ #q\n# https://l.org',
+    // Task list items (#263), taken in and written back.
+    '- [ ] milk\n* [x] bread\n+ [X] **eggs**\n1. [ ] call\n  - [x] in\n'
+        '- [ ]\n- [ ]x\n- [y] no\n- [  ] no\n[ ] no\n> - [ ] no\n'
+        r'- \[ ] no'
+        '\n- `[ ] no`\n- [ ](https://x.org) no\n```\n- [ ] code\n```\n'
+        '| - [ ] a |\n|---|\n🧠\r\n- [x] 日記',
+    '- ☐ milk\n2. ✅ bread\n  * ❌ call Ann  \n- ❌ \n- ❌ ~~gone~~\n'
+        '- ❌ **a** b\n☐ line\n- ☐\n- ☐x\n- x ☐ y\n> ☐ q\n```\n- ☐ c\n```\n'
+        '| ☐ b |\n|---|\n- ❌ 🧠 ü',
   ];
   int cp(String text, int offset) => text.substring(0, offset).runes.length;
   int u16(String text, int point) =>
@@ -8006,17 +8125,25 @@ Map<String, Object?> _markdown() {
           Markdown.toggle(text, u16(text, start), u16(text, end), kind),
         ),
       });
-  void link(String text, int start, int end, String url) => edits.add({
-    'op': 'link',
-    'start': start,
-    'end': end,
-    'text': text,
-    'url': url,
-    'result': change(
-      text,
-      Markdown.link(text, u16(text, start), u16(text, end), url),
-    ),
-  });
+  void link(String text, int start, int end, String url, [String? label]) =>
+      edits.add({
+        'op': 'link',
+        'start': start,
+        'end': end,
+        'text': text,
+        'url': url,
+        'label': ?label,
+        'result': change(
+          text,
+          Markdown.link(
+            text,
+            u16(text, start),
+            u16(text, end),
+            url,
+            label: label,
+          ),
+        ),
+      });
   void line(String text, int start, int end, MarkdownBlockKind kind) =>
       edits.add({
         'kind': kind.name,
@@ -8039,6 +8166,27 @@ Map<String, Object?> _markdown() {
       Markdown.codeBlock(text, u16(text, start), u16(text, end)),
     ),
   });
+  void taskBoxes(String text, int start, int end) => edits.add({
+    'op': 'taskBoxes',
+    'start': start,
+    'end': end,
+    'text': text,
+    'result': change(
+      text,
+      Markdown.taskBoxes(text, u16(text, start), u16(text, end)),
+    ),
+  });
+  for (final (text, start, end) in [
+    ('- [ ] a\n- [x] b\n- [ ] c', 6, 6),
+    ('- [ ] a\n- [x] b\n- [ ] c', 8, 16),
+    ('- [ ] a\n- [x] b\n- [ ] c', 23, 0),
+    ('x\n- [ ] ', 8, 8),
+    ('🧠\n- [X] ü', 9, 9),
+    ('- [ ]', 5, 5),
+    ('```\n- [ ] a\n```', 9, 9),
+  ]) {
+    taskBoxes(text, start, end);
+  }
   void indent(String text, int start, int end, bool out) => edits.add({
     'op': out ? 'outdent' : 'indent',
     'start': start,
@@ -8084,6 +8232,9 @@ Map<String, Object?> _markdown() {
   link('see [docs](https://x.org) here', 4, 25, '');
   link('see ', 4, 4, 'https://x.org/*x*');
   link('', 0, 0, r'https://x.org/[a]\]');
+  // "Link to…" puts an app link with its target's name (#261).
+  link('go ', 3, 3, 'oldbrainfix://unsorted', 'Unsorted [all] *');
+  link('see Frogs', 6, 6, 'oldbrainfix://frogs', 'Frogs');
   link('see', 1, 1, '  ');
   link('one two\nthree', 4, 13, 'u');
   link('🧠 x', 2, 3, 'https://x.org/ ü');
@@ -8181,6 +8332,22 @@ Map<String, Object?> _markdown() {
       'index': index,
     }, (at) => MarkdownTables.deleteColumn(grid, at, index));
   }
+  for (final (column, align) in [
+    (0, MarkdownAlign.center),
+    (1, MarkdownAlign.none),
+    (0, MarkdownAlign.left),
+    (1, MarkdownAlign.right),
+    (2, MarkdownAlign.left),
+  ]) {
+    tableEdit('setAlign', grid, 5, {
+      'align': align.name,
+      'column': column,
+    }, (at) => MarkdownTables.setAlign(grid, at, column, align));
+  }
+  tableEdit('setAlign', flagged, 40, {
+    'align': MarkdownAlign.right.name,
+    'column': 1,
+  }, (at) => MarkdownTables.setAlign(flagged, at, 1, MarkdownAlign.right));
   for (final (from, to) in [(0, 2), (2, 0), (1, 1), (0, 3)]) {
     tableEdit('moveRow', grid, 5, {
       'from': from,
@@ -8285,6 +8452,9 @@ Map<String, Object?> _markdown() {
               },
           ],
           'tables': [for (final t in MarkdownTables.all(text)) table(text, t)],
+          // Task list items as boxes and boxes as task list items (#263).
+          'taskBoxes': Markdown.taskBoxes(text, 0, text.length).text,
+          'taskLists': Markdown.taskLists(text),
           // Web addresses (#222), in it formatted and as a plain text, and
           // its tags as a plain text.
           'autolinks': [
@@ -8326,8 +8496,57 @@ Map<String, Object?> _markdown() {
         ' https://x.org',
         'ʜttps://x.org',
         '',
+        'oldbrainfix://note/note:a',
+        'OldBrainFix://settings/backups',
+        'oldbrainfix://file/a/b.pdf',
+        'oldbrainfix://file/../b.pdf',
+        'oldbrainfix://capture/voice',
+        'oldbrainfix://x',
       ])
         url: Markdown.mayOpen(url),
+    },
+    // App links (#261, ADR 0046): what each reads as, null for none,
+    // and the link it writes back.
+    'appLinks': {
+      for (final url in [
+        'oldbrainfix://note/note:3f2a',
+        'oldbrainfix://area/topic:x%20y%2F%C3%BC',
+        'oldbrainfix://area/topic:x y',
+        'oldbrainfix://agenda',
+        'OLDBRAINFIX://unsorted',
+        'oldbrainfix://settings',
+        'oldbrainfix://settings/alarms',
+        'oldbrainfix://settings/backups',
+        'oldbrainfix://settings/sync',
+        'oldbrainfix://settings/nothing',
+        'oldbrainfix://routines',
+        'oldbrainfix://profile',
+        'oldbrainfix://frogs',
+        'oldbrainfix://session/new',
+        'oldbrainfix://guide',
+        'oldbrainfix://guide/getting-started',
+        'oldbrainfix://guide/getting-started#set-up',
+        'oldbrainfix://guide/Getting',
+        'oldbrainfix://file/Scans/Tax%202026.pdf',
+        'oldbrainfix://file/a%3Ab',
+        'oldbrainfix://file/a/%2E%2E/b',
+        'oldbrainfix://note/%C3',
+        'oldbrainfix://agenda#x',
+        'oldbrainfix://agenda?x',
+        'oldbrainfix://capture/voice',
+      ])
+        url: switch (AppLink.parse(url)) {
+          null => null,
+          final link => {
+            'anchor': link.anchor,
+            'guide': link.kind == AppLinkKind.guide
+                ? link.guideAddress('de')
+                : null,
+            'kind': link.kind.name,
+            'target': link.target,
+            'url': link.url,
+          },
+        },
     },
     // Whether a pasted text looks like code (#213).
     'looksLikeCode': {
@@ -9014,7 +9233,8 @@ Future<void> main(List<String> args) async {
     'ticked on, without ids, and as it reads, offsets counted in code '
     'points; glyphs mid-word, with variation selectors, joined into '
     'another emoji, other boxes and ticks, ids twice, ids of another '
-    'shape and alone, in inline code, a link, a table and a web address, and astral '
+    'shape and alone, in inline code, a link, a table and a web address, '
+    'task list items saved formatted and plain (#263), and astral '
     'characters and line breaks of every kind.\n'
     '- `text_tags.json`: tags in texts: for each text the tags found, each '
     'as written, as searched and where it lies, counted in code points; in '
@@ -9033,8 +9253,9 @@ Future<void> main(List<String> args) async {
     'tables with their rows and cells, its tags but those in code, link '
     'destinations and web addresses, its web addresses (#222) and those '
     'it holds as a plain text with the tags outside them, the offsets '
-    'where a typed shortcut ends, and the line and the word at every '
-    'offset; '
+    'where a typed shortcut ends, the text with its task list items as '
+    'boxes and its boxes as task list items (#263), and the line and the '
+    'word at every offset; '
     'bold, italic, strike-through, code, links, headings, quotes, bulleted '
     'and numbered items one level in, tables with ragged rows, escaped '
     'pipes, alignment and the line marking the first column as headings, '
@@ -9043,7 +9264,8 @@ Future<void> main(List<String> args) async {
     'put on and taken off at a cursor, on a word, a selection and lines, '
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
-    'moved and deleted, its first column marked, a new table put in, with '
+    'moved and deleted, its first column marked, a new table put in, the '
+    'task list items of the lines a selection touches made boxes, with '
     'the text and the selection they gave; which link destinations '
     'may be opened; and which pasted texts look like code (#213): a '
     'shebang, lines of code punctuation or indented, and lists, prose, '

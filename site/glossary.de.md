@@ -25,11 +25,11 @@ Der Rest des Textes einer Notiz jeder Art außer der einfachen Notiz, nach ihrem
 _Avoid_: Inhalt, Notizen, Details
 
 **Kompaktansicht** [Compact view]:
-Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Einheit ihren Namen, den nächsten Lauf einer ihrer Routinen und die Läufe dieser Woche aller ihrer Routinen, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
+Wie die Karte einer Notiz sie in einer Liste auf einen Blick zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihre erste Zeile und die zwei Zeilen danach, eine Checkliste ihren Namen und wie viele ihrer Zeilen offen sind („3 von 7 offen“), eine Einkaufsliste ihren Namen und wie viele offen sind („4 offen“), eine Strichliste ihren Namen und je Feld die Summe des aktuellen Balkens gegen ihr Ziel, bei einer Strichliste von Tagen die von heute („Schritte 7000 / 10000 Schritte“), in einem geteilten Bereich aus den eigenen Einträgen, eine Einheit ihren Namen, den nächsten Lauf einer ihrer Routinen und die Läufe dieser Woche aller ihrer Routinen, erledigt und ausgelassen. Sie hat keinen Erfassungskontext und keine der Schaltflächen unten an der Karte; ihr ⋮ sitzt oben rechts und bietet Ablegen in … und Zusammenführen mit … an. Der Schalter der Liste zeigt alle Karten kompakt oder ausführlich; ein Tippen auf eine Karte (am Desktop ihr Ansichtsknopf) wechselt diese Karte, und dieses Gerät behält das, bis der Schalter der Liste wieder wechselt.
 _Avoid_: eingeklappte Karte, Kurzansicht, Zusammenfassung
 
 **Detailansicht** [Detailed view]:
-Wie die Karte einer Notiz sie in einer Liste ganz zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihren ganzen Text, ihre Ergänzungen, Fotos und Aufnahmen, eine Checkliste alle Zeilen mit ihren Kästchen, abhakbar, in ihren Gruppen, eine Einkaufsliste ihre offenen Zeilen, abhakbar, die durchgestrichenen darunter eingeklappt, eine Strichliste „Eintrag hinzufügen“, ihre Diagramme und ihre Einträge, die älteren unter den letzten fünf eingeklappt, eine Einheit ihren Vorrat, die heutige Auswahl jeder ihrer Routinen, dort eingetragen wie in der Agenda, und wie oft sie in jeder der letzten vier Wochen erledigt und ausgelassen wurde; jeder Teil mit seinem Erfassungskontext als eine Zeile unter seinem Text, die Schaltflächen unten an der Karte. Die Voreinstellung jeder Liste.
+Wie die Karte einer Notiz sie in einer Liste ganz zeigt, so wie ihre Art es festlegt: eine einfache Notiz ihren ganzen Text, ihre Ergänzungen, Fotos und Aufnahmen, eine Checkliste alle Zeilen mit ihren Kästchen, abhakbar, in ihren Gruppen, eine Einkaufsliste ihre offenen Zeilen, abhakbar, die durchgestrichenen darunter eingeklappt, eine Strichliste „Eintrag hinzufügen“, ihre Diagramme und ihre Einträge, die älteren unter den letzten fünf eingeklappt, eine Einheit ihren Vorrat, die heutige Auswahl jeder ihrer Routinen, dort eingetragen wie in der Agenda, wie oft sie in jeder der letzten vier Wochen erledigt und ausgelassen wurde und ihre letzten bisherigen Läufe; jeder Teil mit seinem Erfassungskontext als eine Zeile unter seinem Text, die Schaltflächen unten an der Karte. Die Voreinstellung jeder Liste.
 _Avoid_: volle Karte, aufgeklappte Ansicht, Langansicht
 
 **Erfassen** [Capture]:
@@ -94,7 +94,7 @@ Die Reihe von Tasten, die die Auswahl oder das Wort am Cursor formatiert, oder d
 _Avoid_: Werkzeugleiste, Symbolleiste
 
 **Tabelle** [Table]:
-Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Vollbild geöffnet, um ihre Zellen zu bearbeiten und Reihen und Spalten einzufügen, zu verschieben und zu löschen.
+Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Editor an Ort und Stelle bearbeitet, Zelle für Zelle, und dort werden Reihen und Spalten eingefügt, verschoben und gelöscht und Spalten ausgerichtet; von einer Karte oder einem Text, der nur gelesen wird, öffnet sie sich im Vollbild.
 _Avoid_: Tabellenkalkulation, Raster
 
 **Statuskästchen** [Box]:
@@ -104,6 +104,10 @@ _Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer C
 **#Wort** [Tag]:
 Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
 _Avoid_: Etikett, Schlagwort, Hashtag
+
+**App-Link** [App link]:
+Ein Link in einem formatierten Text, dessen Adresse das Schema der App hat, `oldbrainfix://`, etwa `[Backups](oldbrainfix://settings/backups)`: Er öffnet eine Notiz, einen Bereich oder ein Thema, die Agenda, Unsortiert, eine Seite der App oder einen Abschnitt der Einstellungen, eine Seite der Anleitung oder eine Datei des geteilten Ordners (am Computer des synchronisierten Ordners). Er öffnet ohne Nachfrage, eine Datei aber erst nach einer Frage, die sie und die App nennt, die sie öffnet, und nie eine außerhalb dieses Ordners. „Link zu…“ in der Formatleiste wählt sein Ziel, sodass niemand eine ID tippt; die IDs sind auf jedem Gerät dieselben, sodass er synchronisiert und mit seinem Text geteilt wird. Wo sein Ziel nicht zu sehen ist, sagt er „Hier nicht verfügbar“; andere Markdown-Apps zeigen seine Wörter.
+_Avoid_: Deep Link, interner Link, URL-Schema, Dateilink (ein Dateilink ist eine Art App-Link)
 
 ## Sortieren
 
@@ -196,16 +200,24 @@ Die Seite des Telefons für seine Kalender: „Aus deinem Kalender lesen“, das
 ## Strichlisten
 
 **Strichliste** [Tally]:
-Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt. Ein Feld kann stattdessen ein anderes ihrer Felder multiplizieren (#200), wie Runden Liegestütze: Das andere Feld zählt dann in jedem Eintrag das Produkt, und der Multiplikator zählt keinen eigenen Wert.
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel je Balken und einer Regel für mehrere Sätze oder Einträge in einem Balken (ihre Summe oder der größte), oder ein Abhakfeld, und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld gezeigt, ein Balken je ihrer Balkenlänge, Tag, Woche, Monat oder Jahr, mit der Strichliste eingerichtet. Mit „Zählt in Sätzen“ hält jeder Eintrag Sätze. Eine Strichliste, deren Feld früher ein anderes multiplizierte (#200), zählt in Sätzen.
 _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 
 **Eintrag** [Entry]:
-Ein Datensatz einer Strichliste: ein Wert für einige ihrer Felder, ein Datum, eine Zeile Text und sein Verfasser.
-_Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz, Satz
+Ein Datensatz einer Strichliste: ein Haken für einige ihrer Abhakfelder, ein Wert für einige ihrer Zahlenfelder in jedem ihrer Sätze (eine Reihe, wenn die Strichliste nicht in Sätzen zählt), ein Datum, eine Zeile Text und sein Verfasser.
+_Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz
+
+**Satz** [Set]:
+Eine Reihe eines Eintrags über die Zahlenfelder seiner Strichliste, etwa 60 kg × 10 und dann 65 kg × 8, in einer Strichliste, die in Sätzen zählt; „Satz hinzufügen“ beginnt einen mit den Werten des Satzes davor, und jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen, Wiederholungen als Summe, ein Gewicht als das größte. Ein Eintrag, der festgehalten wurde, als ein Feld ein anderes multiplizierte, etwa 3 Runden × 20 Liegestütze, liest sich als so viele Sätze.
+_Avoid_: Runde, Wiederholung, Multiplikator
+
+**Abhakfeld** [Check field]:
+Ein Feld einer Strichliste, das in jedem Eintrag ein Kästchen ist, einmal je Eintrag über seinen Sätzen abgehakt; ein Haken zählt als 1, so zeigt ein Balken, wie oft es getan wurde, etwa eine Strichliste je Raum für eine Einheit fürs Putzen.
+_Avoid_: Checkbox, Statuskästchen (ein Statuskästchen ist ein ☐ in einem Text), Zeile
 
 **Einheit** [Session]:
-Eine Notiz, die für jede Fälligkeit ihrer Routinen einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Notiz hält den Vorrat, die Anzahl und die Regel; jede ihrer Routinen, etwa Montag und Mittwoch um 7:00 und Samstag um 10:00, sagt nur, wann sie läuft, und Reihum macht von einem Lauf zum nächsten weiter, auch über die Routinen hinweg. Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst.
-_Avoid_: Workout, Training, Playlist, Satz
+Eine Notiz, die für jede Fälligkeit ihrer Routinen einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Notiz hält den Vorrat, die Anzahl und die Regel; jede ihrer Routinen, etwa Montag und Mittwoch um 7:00 und Samstag um 10:00, sagt nur, wann sie läuft, und Reihum macht von einem Lauf zum nächsten weiter, auch über die Routinen hinweg. Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst. Ihre Karte und ihre Seite listen ihre bisherigen Läufe, der neueste zuerst, jede Auswahl erledigt oder nicht erledigt.
+_Avoid_: Workout, Training, Playlist, Satz (der gehört zu einem Eintrag)
 
 ## Checklisten und Einkaufslisten
 

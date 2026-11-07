@@ -166,11 +166,12 @@ class BrowserTrail {
   }
 }
 
-/// The page of a browser level (Areas list, Area, Topic): it slides in
-/// from the right while the level it covers slides out to the left, side
-/// by side, since the pages are transparent over the question marks. A
-/// swipe moves both with the finger ([BrowserSwipes]). With the
-/// system's animations off the change is immediate.
+/// The page of a browser level (Area, Topic, and the Areas list of a
+/// tag's search): it slides in from the right while the level it covers
+/// slides out to the left, side by side, since the pages are transparent
+/// over the question marks. A swipe moves both with the finger
+/// ([BrowserSwipes]). With the system's animations off the change is
+/// immediate.
 class BrowserRoute<T> extends MaterialPageRoute<T> {
   static const _duration = Duration(milliseconds: 300);
   static const _curve = Curves.easeInOutCubic;
@@ -304,13 +305,14 @@ class BrowserRoute<T> extends MaterialPageRoute<T> {
   }
 }
 
-/// The app's first page, the Agenda's, under the notes browser's first
-/// level: it slides out to the left as that level comes in, as a
-/// [BrowserRoute] does. It does so in its own transitions, which keep
-/// their shape whatever comes on top, rather than in the level's
-/// delegated one, which wraps the Agenda in one more widget when the
-/// level is pushed: moving the page into it built the whole Agenda anew
-/// in the frame the finger let go (#210).
+/// The app's first page, the Agenda and the Areas list side by side
+/// (#258), under the browser levels pushed from it, an Area's first: it
+/// slides out to the left as such a level comes in, as a [BrowserRoute]
+/// does. It does so in its own transitions, which keep their shape
+/// whatever comes on top, rather than in the level's delegated one,
+/// which wraps the page in one more widget when the level is pushed:
+/// moving the page into it built the whole Agenda anew in the frame the
+/// finger let go (#210).
 class BrowserHomeRoute<T> extends MaterialPageRoute<T> {
   BrowserHomeRoute({required super.builder, super.settings});
 
@@ -372,9 +374,9 @@ class _Followed extends Animation<double>
 }
 
 /// Swipe right goes back one level, swipe left forward into the last
-/// selected Area or Topic, when there is one. The Agenda is the level
-/// above the Areas list: there swipe left opens it and swipe right,
-/// with [back] false, does nothing. Wraps a level's whole page.
+/// selected Area or Topic, when there is one. Wraps a level's whole
+/// page. The Areas list beside the Agenda takes only swipe left, with
+/// [back] false: swipe right there is the pages' own (#258).
 ///
 /// The pages follow the finger; letting go past a third of the way or
 /// with a fling completes the change, otherwise it springs back. Going back
@@ -394,7 +396,8 @@ class BrowserSwipes extends StatefulWidget {
   /// lets go: a closed locked Area asks for the PIN first.
   final VoidCallback? onForward;
 
-  /// Whether swipe right leaves this level.
+  /// Whether swipe right leaves this level; when false this does not
+  /// take swipe right at all.
   final bool back;
   final Widget child;
 
@@ -585,17 +588,24 @@ class _BrowserSwipesState extends State<BrowserSwipes>
   }
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => RawGestureDetector(
     // Empty space swipes too, not only the cards and rows.
     behavior: HitTestBehavior.opaque,
-    // The way to the touch slop counts: the pages start where the finger
-    // is, and a quick flick that passes the slop with its last move
-    // before letting go still knows its way.
-    dragStartBehavior: DragStartBehavior.down,
-    onHorizontalDragStart: _started,
-    onHorizontalDragUpdate: _updated,
-    onHorizontalDragEnd: _ended,
-    onHorizontalDragCancel: _cancelled,
+    gestures: {
+      _SwipeDrag: GestureRecognizerFactoryWithHandlers<_SwipeDrag>(
+        () => _SwipeDrag(debugOwner: this),
+        (drag) => drag
+          ..rightToo = widget.back
+          // The way to the touch slop counts: the pages start where the
+          // finger is, and a quick flick that passes the slop with its
+          // last move before letting go still knows its way.
+          ..dragStartBehavior = DragStartBehavior.down
+          ..onStart = _started
+          ..onUpdate = _updated
+          ..onEnd = _ended
+          ..onCancel = _cancelled,
+      ),
+    },
     child: Stack(
       fit: StackFit.expand,
       children: [
@@ -613,6 +623,25 @@ class _BrowserSwipesState extends State<BrowserSwipes>
       ],
     ),
   );
+}
+
+/// A sideways drag; with [rightToo] false only one to the left, one to
+/// the right left to the pages around (#258).
+class _SwipeDrag extends HorizontalDragGestureRecognizer {
+  var rightToo = true;
+
+  _SwipeDrag({super.debugOwner});
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) =>
+      (rightToo || globalDistanceMoved < 0) &&
+      super.hasSufficientGlobalDistanceToAccept(
+        pointerDeviceKind,
+        deviceTouchSlop,
+      );
 }
 
 /// The search field on top of a browser level, with ✕ to clear it.

@@ -121,6 +121,30 @@ fn the_editor_copies_formatted_text_with_html_beside_it_and_says_nothing() -> Te
 }
 
 #[test]
+fn the_editor_copies_boxes_as_task_list_items() -> TestResult {
+    let store = store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture_as("- [ ] milk\n- [x] bread", text_format::MARKDOWN, None, None)?;
+    let copied = Copied::default();
+    let mut app = App::new(store, "en");
+    app.set_clipboard(Box::new(FakeClipboard(copied.clone())));
+    app.select(Selection::All);
+    app.select_note(&note.id);
+    let mut harness = window(app);
+    click(&mut harness, "Copy as text")?;
+    let copied = copied.borrow();
+    let [(text, html)] = copied.as_slice() else {
+        return Err(format!("{copied:?}").into());
+    };
+    assert_eq!(text, "- [ ] milk\n- [x] bread");
+    assert_eq!(
+        html.as_deref(),
+        Some("<ul><li>☐ milk</li><li>✅ bread</li></ul>\n")
+    );
+    Ok(())
+}
+
+#[test]
 fn without_the_systems_clipboard_the_card_copies_plain_text_through_the_window() -> TestResult {
     let store = store()?;
     Notes::new(&store).capture("Milk\nEggs", None, None)?;

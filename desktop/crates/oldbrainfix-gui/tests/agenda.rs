@@ -617,7 +617,7 @@ fn the_advanced_editor_refuses_what_it_cannot_read() -> TestResult {
 }
 
 #[test]
-fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> TestResult {
+fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() -> TestResult {
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
@@ -625,10 +625,8 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     harness.run();
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(shows(&harness, "Delete this Note?"));
-    harness
-        .get_by_label("Delete with its Routine or Reminder")
-        .click();
+    assert!(shows(&harness, "Delete this Note and its 1 Routine?"));
+    harness.get_by_label("Delete").click();
     harness.run();
     let walk = find_note(harness.state(), "Walk the dog")?;
     assert!(
@@ -691,7 +689,7 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
 }
 
 #[test]
-fn deleting_a_note_with_routines_from_the_editor_asks_and_cancel_keeps_it() -> TestResult {
+fn deleting_a_note_with_routines_from_the_editor_asks_once_and_takes_them_along() -> TestResult {
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
@@ -708,26 +706,26 @@ fn deleting_a_note_with_routines_from_the_editor_asks_and_cancel_keeps_it() -> T
     // Cancel keeps the Note and its Routine.
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(shows(&harness, "Delete this Note?"));
+    assert!(shows(&harness, "Delete this Note and its 1 Routine?"));
     assert!(shows(
         &harness,
-        "Deleted ones come back with the Note when you restore it. Kept ones go on reminding you."
+        "They stay in the trash with it for 30 days and come back when you restore it."
     ));
-    assert!(!shows(&harness, "Yes"));
-    assert!(!shows(&harness, "No"));
+    // No way to delete the Note alone (#262).
+    assert!(!shows(&harness, "Delete only the Note"));
     harness.get_by_label("Cancel").click();
     harness.run();
-    assert!(!shows(&harness, "Delete this Note?"));
+    assert!(!shows(&harness, "Delete this Note and its 1 Routine?"));
     assert!(!trashed(&harness)?);
     assert!(routine_of(harness.state(), "Walk the dog").is_ok());
 
-    // Deleting only the Note keeps its Routine reminding.
+    // Delete takes its Routine along into the trash.
     harness.get_by_label("Move to trash").click();
     harness.run();
-    harness.get_by_label("Delete only the Note").click();
+    harness.get_by_label("Delete").click();
     harness.run();
     assert!(trashed(&harness)?);
-    assert!(routine_of(harness.state(), "Walk the dog").is_ok());
+    assert!(routine_of(harness.state(), "Walk the dog").is_err());
     Ok(())
 }
 

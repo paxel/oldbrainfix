@@ -401,7 +401,8 @@ void main() {
       expect(find.text('Buy milk'), findsNothing);
     });
 
-    testWidgets('Delete offers to keep the Note\'s Routines', (tester) async {
+    testWidgets('Delete takes the Note\'s Routines along, after one '
+        'question', (tester) async {
       final note = notes.capture('Dentist');
       final routines = Routines(store);
       routines.spawn(
@@ -410,11 +411,14 @@ void main() {
       );
       await menu(tester, 'Dentist');
       await pick(tester, 'note-delete');
-      await tester.tap(find.text('Delete only the Note'));
+      expect(find.text('Delete this Note and its 1 Reminder?'), findsOneWidget);
+      expect(find.text('Delete only the Note'), findsNothing);
+      await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
 
       expect(notes.byId(note.id)!.isTrashed, isTrue);
-      expect(routines.ofNote(note.id), hasLength(1));
+      expect(routines.ofNote(note.id), isEmpty);
+      expect(routines.all(), isEmpty);
     });
 
     testWidgets('Cancel keeps the Note', (tester) async {

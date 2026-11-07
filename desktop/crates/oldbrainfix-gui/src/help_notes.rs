@@ -3,6 +3,8 @@
 //! pictures, so either app makes the same Notes. The pictures and the
 //! What's new are the phone's assets, bundled at build time.
 
+use oldbrainfix_core::app_link::AppLink;
+use oldbrainfix_core::markdown;
 use oldbrainfix_core::{HelpNotes, HelpTexts, Result, Store, parse_whats_new};
 
 use crate::l10n::L10n;
@@ -36,6 +38,7 @@ pub static GROUPS: [Group; 3] = [
             (L10n::help_icon_captured, L10n::help_icon_captured_means),
             (L10n::help_icon_reminder, L10n::help_icon_reminder_means),
             (L10n::help_icon_routine, L10n::help_icon_routine_means),
+            (L10n::help_icon_frog, L10n::help_icon_frog_means),
             (L10n::help_icon_add, L10n::help_icon_add_means),
         ],
         pictures: [
@@ -99,8 +102,58 @@ pub fn quick_start_lines(t: &L10n) -> Vec<String> {
     .to_vec()
 }
 
+/// The Quick start's Description in `t`'s language (#260), as the phone
+/// writes it: a link to the place of each Line, in the Lines' order
+/// (#261), then "On the desktop" and the desktop's way for each Line, one
+/// line each.
+pub fn quick_start_description(t: &L10n) -> String {
+    let mut lines = vec![t.help_quick_start_places_title().to_string()];
+    for (i, place) in quick_start_places(t).iter().enumerate() {
+        lines.push(format!("{}. {place}", i + 1));
+    }
+    lines.push(String::new());
+    lines.extend(
+        [
+            t.help_quick_start_desktop_title(),
+            t.help_quick_start_desktop1(),
+            t.help_quick_start_desktop2(),
+            t.help_quick_start_desktop3(),
+            t.help_quick_start_desktop4(),
+            t.help_quick_start_desktop5(),
+            t.help_quick_start_desktop6(),
+            t.help_quick_start_desktop7(),
+            t.help_quick_start_desktop8(),
+        ]
+        .map(str::to_string),
+    );
+    lines.join("\n")
+}
+
+/// `label` as a Markdown link to `to`, as "Link to…" writes one.
+fn linked(label: &str, to: &AppLink) -> String {
+    markdown::link_labelled("", 0, 0, &to.url(), Some(label)).text
+}
+
+/// Where each Quick start Line is done, as links (#261): the Agenda,
+/// Unsorted, All Routines and Reminders twice, this Checklist itself
+/// (no link), the Agenda, Backups and Sync.
+pub fn quick_start_places(t: &L10n) -> [String; 8] {
+    let routines = linked(t.all_routines_title(), &AppLink::Routines);
+    [
+        linked(t.agenda(), &AppLink::Agenda),
+        linked(t.unsorted(), &AppLink::Unsorted),
+        routines.clone(),
+        routines,
+        markdown::escape(t.help_quick_start_place_here()),
+        linked(t.agenda(), &AppLink::Agenda),
+        linked(t.backups_title(), &AppLink::Backups),
+        linked(t.sync_title(), &AppLink::Sync),
+    ]
+}
+
 /// The text of "What the icons mean", as the phone writes it: its name,
-/// then each group's heading and its icons, "name: meaning" one per line.
+/// then each group's heading and its icons, "name: meaning" one per line,
+/// then a link to the user guide.
 pub fn icons_text(t: &L10n) -> String {
     let mut out = t.help_icons_title().to_string();
     for group in &GROUPS {
@@ -110,6 +163,9 @@ pub fn icons_text(t: &L10n) -> String {
             out.push_str(&format!("\n{}: {}", name(t), means(t)));
         }
     }
+    // A link to the guide's start page last (#261).
+    out.push_str("\n\n");
+    out.push_str(&linked(t.help_icons_guide(), &AppLink::Guide(None, None)));
     out
 }
 
@@ -132,6 +188,7 @@ pub fn make_due(store: &Store, t: &L10n, version: &str, fresh: bool) -> Result<V
         area_name: t.help_area_name().to_string(),
         quick_start_title: t.help_quick_start_title().to_string(),
         quick_start_lines: quick_start_lines(t),
+        quick_start_description: quick_start_description(t),
         icons_text: icons_text(t),
         icon_pictures: pictures(t),
         whats_new_title: Box::new(|v| t.help_whats_new_title(v)),
@@ -190,7 +247,10 @@ mod tests {
                 let (slug, rest) = rest.split_once("', ").ok_or("a slug")?;
                 let heading = rest.split(',').next().ok_or("a heading")?;
                 groups.push((slug.to_string(), key(heading)?, Vec::new()));
-            } else if let Some(rest) = line.strip_prefix("HelpIcon(") {
+            } else if let Some(rest) = line
+                .strip_prefix("HelpIcon(")
+                .or_else(|| line.strip_prefix("HelpIcon.drawn("))
+            {
                 let parts: Vec<&str> = rest.trim_end_matches("),").split(", ").collect();
                 let [_, name, means] = parts[..] else {
                     return Err(format!("an icon: {line}").into());
@@ -288,5 +348,77 @@ mod tests {
             quick_start_lines(&L10n::new("en")).len(),
             quick_start_lines(&L10n::new("de")).len()
         );
+    }
+
+    /// As the phone's test: the Description is "On the desktop" and the
+    /// desktop's way for each Line, and neither teaches Advanced (#260).
+    #[test]
+    fn the_quick_start_description_has_a_desktop_way_per_line_and_nothing_advanced() {
+        // As the phone's test: each place but the Checklist's own is a
+        // link that opens (#261).
+        let t = L10n::new("en");
+        let links: Vec<String> = oldbrainfix_core::markdown::parse(&quick_start_description(&t))
+            .into_iter()
+            .flat_map(|block| block.spans)
+            .filter(|span| span.kind == oldbrainfix_core::markdown::SpanKind::Link)
+            .map(|span| span.url)
+            .collect();
+        assert_eq!(
+            links,
+            [
+                "oldbrainfix://agenda",
+                "oldbrainfix://unsorted",
+                "oldbrainfix://routines",
+                "oldbrainfix://routines",
+                "oldbrainfix://agenda",
+                "oldbrainfix://settings/backups",
+                "oldbrainfix://settings/sync",
+            ]
+        );
+        assert_eq!(quick_start_places(&t)[4], "Here, in this Checklist.");
+        assert_eq!(
+            icons_text(&t).lines().last(),
+            Some("[Everything else is in the user guide.](oldbrainfix://guide)")
+        );
+        let advanced = [
+            "tally",
+            "session",
+            "frog",
+            "topic",
+            "format bar",
+            "role",
+            "strichliste",
+            "einheit",
+            "frosch",
+            "thema",
+            "formatleiste",
+            "rolle",
+        ];
+        for lang in ["en", "de"] {
+            let t = L10n::new(lang);
+            let description = quick_start_description(&t);
+            let lines: Vec<&str> = description.split('\n').collect();
+            let count = quick_start_lines(&t).len();
+            // A link to each Line's place first (#261), then the
+            // desktop's way for each Line.
+            assert_eq!(lines[0], t.help_quick_start_places_title());
+            let places: Vec<String> = quick_start_places(&t)
+                .iter()
+                .enumerate()
+                .map(|(i, place)| format!("{}. {place}", i + 1))
+                .collect();
+            assert_eq!(lines[1..=count], places, "{lang}");
+            assert_eq!(lines[count + 1], "");
+            assert_eq!(lines[count + 2], t.help_quick_start_desktop_title());
+            assert_eq!(lines.len() - count - 3, count, "{lang}");
+            for line in lines
+                .iter()
+                .copied()
+                .chain(quick_start_lines(&t).iter().map(String::as_str))
+            {
+                let lower = line.to_lowercase();
+                assert!(!advanced.iter().any(|w| lower.contains(w)), "{line}");
+            }
+        }
     }
 }

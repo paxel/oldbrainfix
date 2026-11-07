@@ -306,7 +306,7 @@ class AutoSync extends ChangeNotifier {
     final want =
         start != null &&
         !_disposed &&
-        (_open || _window) &&
+        (_open || (_window && platform.hostsOutOfSight)) &&
         store.autoSyncWanted &&
         await platform.onLocalNetwork();
     final running = _hosting;
@@ -348,8 +348,9 @@ class AutoSync extends ChangeNotifier {
   /// The periodic work came due. While the app shows, every Device is
   /// synced now; out of sight, this Device also hosts and looks for
   /// [hostWindow], or until every Device that syncs on its own synced,
-  /// the work keeping the app running meanwhile. Then the work hears it
-  /// is over.
+  /// the work keeping the app running meanwhile. Where the platform does
+  /// not host out of sight (the iPhone, #240), every Device is synced
+  /// once, without hosting. Then the work hears it is over.
   void _wanted() {
     if (_disposed) return;
     if (_open || _window) {
@@ -366,7 +367,8 @@ class AutoSync extends ChangeNotifier {
     _host();
     unawaited(platform.startDiscovery());
     _wantAll();
-    final until = clock().add(hostWindow);
+    final out = platform.hostsOutOfSight;
+    final until = clock().add(out ? hostWindow : Duration.zero);
     var retry = clock().add(retryEvery);
     while (!_disposed && !_open && clock().isBefore(until) && !_allSynced()) {
       await Future<void>.delayed(const Duration(seconds: 1));
@@ -377,6 +379,10 @@ class AutoSync extends ChangeNotifier {
         clock(),
       );
       unawaited(_run());
+    }
+    // Without a window, the one round has to end before the work does.
+    while (!out && _running && !_disposed) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     _window = false;
     if (_disposed) return;
@@ -547,7 +553,9 @@ class AutoSync extends ChangeNotifier {
 /// Device is; Conflicts they brought are kept to be announced when the
 /// app opens; and the alarms are armed anew, so a Done on another Device
 /// silences the alarm here. A weekly Backup due is written through
-/// [workDir] (ADR 0016). [alarms] has its texts already.
+/// [workDir] (ADR 0016). [alarms] has its texts already. Where the
+/// platform does not host out of sight (the iPhone, #240), nothing is
+/// hosted and the paired Devices are tried once: iOS grants seconds.
 Future<void> backgroundSync({
   required Store store,
   required SyncPlatform platform,
@@ -562,6 +570,7 @@ Future<void> backgroundSync({
   String? workDir,
 }) async {
   await alarms.refresh();
+  final out = platform.hostsOutOfSight;
   if (store.autoSyncWanted && await platform.onLocalNetwork()) {
     await _lanInBackground(
       store,
@@ -569,8 +578,8 @@ Future<void> backgroundSync({
       name,
       join,
       look,
-      host,
-      clock().add(window),
+      out ? host : null,
+      clock().add(out ? window : Duration.zero),
       clock,
     );
   }

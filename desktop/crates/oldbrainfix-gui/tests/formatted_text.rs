@@ -388,6 +388,73 @@ fn a_paste_with_a_format_makes_a_plain_text_formatted() -> TestResult {
     Ok(())
 }
 
+/// The text of `note` as it shows, its boxes without their ids.
+fn shown(store: &Store, note: &str) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(Notes::new(store)
+        .by_id(note)?
+        .ok_or("the Note")?
+        .shown_text())
+}
+
+#[test]
+fn a_task_list_item_typed_becomes_a_box_at_its_space() -> TestResult {
+    let (store, note) = with_note("Shop", "plain")?;
+    let mut harness = editor(&store, &note);
+    focus_field(&mut harness, "Shop")?;
+    // "- " makes it formatted, then the mark is typed.
+    harness.event(egui::Event::Text("\n- ".into()));
+    harness.run();
+    harness.event(egui::Event::Text("[ ]".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- [ ]"));
+    harness.event(egui::Event::Text(" ".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- ☐ "));
+    // The cursor stays after the box.
+    harness.event(egui::Event::Text("milk\n1. [x] eggs".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n- ☐ milk\n1. ✅ eggs"));
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    assert_eq!(shown(&store, &note)?, "Shop\n- ☐ milk\n1. ✅ eggs");
+    let boxes = Notes::new(&store).by_id(&note)?.ok_or("the Note")?.boxes;
+    assert_eq!(boxes.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn pasted_task_list_items_become_boxes_but_in_code() -> TestResult {
+    let (store, note) = with_note("Shop", MARKDOWN)?;
+    let mut harness = editor(&store, &note);
+    harness
+        .query_all_by_role_and_label(Role::Button, "Edit")
+        .last()
+        .ok_or("the text")?
+        .click_accesskit();
+    harness.run();
+    focus_field(&mut harness, "Shop")?;
+    harness.event(egui::Event::Key {
+        key: Key::End,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::COMMAND,
+    });
+    harness.run();
+    harness.event(egui::Event::Paste(
+        "\n- [ ] milk\n- [X] bread\n```\n- [ ] code\n```\n`- [ ] x`".into(),
+    ));
+    harness.run();
+    let both = "Shop\n- ☐ milk\n- ✅ bread\n```\n- [ ] code\n```\n`- [ ] x`";
+    assert!(field(&harness, both));
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    let note = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(note.shown_text(), both);
+    assert_eq!(note.boxes.len(), 2);
+    Ok(())
+}
+
 #[test]
 fn a_plain_paste_keeps_a_plain_text_plain() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;
@@ -457,32 +524,6 @@ fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
     assert_eq!(sections[0].text, added);
     assert_eq!(sections[0].text_format, MARKDOWN);
     assert_eq!(amend_field(&harness).as_deref(), Some(""));
-    Ok(())
-}
-
-#[test]
-fn a_table_of_add_to_note_is_edited_full_screen_and_goes_back_into_the_field() -> TestResult {
-    let (store, note) = with_note("Shop", "plain")?;
-    let mut harness = editor(&store, &note);
-    amend_format(&mut harness, "Table")?;
-    assert!(harness.state().shown_table().is_some());
-    harness.event(egui::Event::Text("Item".into()));
-    harness.run();
-    harness.key_press(Key::Enter);
-    harness.run();
-    // Its arrow back, "Close", over the Note dialog's cross, leaves it.
-    harness
-        .query_all_by_role_and_label(Role::Button, "Close")
-        .last()
-        .ok_or("the arrow back")?
-        .click_accesskit();
-    harness.run();
-    assert!(harness.state().shown_table().is_none());
-    let added = amend_field(&harness).ok_or("the Amend field")?;
-    assert!(added.starts_with("| Item |  |\n| --- | --- |"), "{added}");
-    // Nothing of it in the Note until it is added.
-    assert_eq!(stored(&store, &note)?, ("Shop".into(), "plain".into()));
-    assert!(Notes::new(&store).sections(&note)?.is_empty());
     Ok(())
 }
 

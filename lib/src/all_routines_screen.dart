@@ -34,7 +34,8 @@ Future<void> openAllRoutines(
 /// of closed locked Areas stay out, of the file too. Each card carries
 /// its Area's colour and icon, as on the Agenda. Those whose schedule a
 /// newer version of the app saved follow, saying so, a tap opening their
-/// Note (ADR 0034); they are in no file.
+/// Note (ADR 0034); they are in no file. One whose Note is in the trash
+/// or deleted says so, so it is easy to find and delete (#262).
 class AllRoutinesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -52,9 +53,9 @@ class AllRoutinesScreen extends StatefulWidget {
 class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
   late final _routines = Routines(widget.notes.store);
 
-  /// Each with the name it shows and its Note's Area, read once per
-  /// change.
-  List<(Routine, String, Area?)>? _rows;
+  /// Each with the name it shows, its Note's Area and, when its Note is
+  /// in the trash or deleted, the line saying so, read once per change.
+  List<(Routine, String, Area?, String?)>? _rows;
 
   /// Those whose schedule a newer version of the app saved, with the
   /// name and Area of their Note, which a tap opens.
@@ -74,16 +75,17 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
       for (final r in _routines.all())
         if (!(lock?.hidesRoutine(r) ?? false))
           r: switch (_routines.note(r)) {
-            null => (t.noteGone, null),
+            null => (t.noteGone, null, t.noteDeleted),
             final note => (
               noteText(t, note),
               placeNote(widget.places, note).area,
+              note.isTrashed ? t.noteInTrash : null,
             ),
           },
     };
     _rows = [
       for (final r in routinesByName(shown.keys, (r) => shown[r]?.$1 ?? ''))
-        (r, shown[r]?.$1 ?? '', shown[r]?.$2),
+        (r, shown[r]?.$1 ?? '', shown[r]?.$2, shown[r]?.$3),
     ];
     _newer = [
       for (final r in _routines.newer())
@@ -111,16 +113,16 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
     setState(_load);
   }
 
-  Future<void> _export(List<(Routine, String, Area?)> rows) =>
+  Future<void> _export(List<(Routine, String, Area?, String?)> rows) =>
       shareRoutinesFile(context, _routines, [
-        for (final (routine, _, _) in rows) routine,
+        for (final (routine, _, _, _) in rows) routine,
       ]);
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
-    final rows = _rows ?? const <(Routine, String, Area?)>[];
+    final rows = _rows ?? const <(Routine, String, Area?, String?)>[];
     return Scaffold(
       appBar: pageBar(
         context,
@@ -149,7 +151,7 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
           if (rows.isEmpty && _newer.isEmpty)
             BrowserEmpty(text: t.allRoutinesEmpty)
           else ...[
-            for (final (routine, name, area) in rows)
+            for (final (routine, name, area, mark) in rows)
               _RoutineCard(
                 key: ValueKey('routine-${routine.id}'),
                 icon: routine.isReminder
@@ -158,6 +160,7 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
                 name: name,
                 area: area,
                 schedule: scheduleText(t, locale, routine.schedule),
+                mark: mark,
                 onTap: () => _open(routine),
               ),
             for (final (routine, note, name, area) in _newer)
@@ -178,13 +181,15 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
 
 /// One Routine or Reminder as an embossed card: its kind, its name, its
 /// schedule, and its Area's colour down the side and its icon, as the
-/// Agenda's rows show them.
+/// Agenda's rows show them, and under the schedule [mark] in the error
+/// colour when its Note is in the trash or deleted.
 class _RoutineCard extends StatelessWidget {
   /// Its kind: a Routine's, a Reminder's, or one a newer version saved.
   final IconData icon;
   final String name;
   final Area? area;
   final String schedule;
+  final String? mark;
   final VoidCallback onTap;
 
   const _RoutineCard({
@@ -193,6 +198,7 @@ class _RoutineCard extends StatelessWidget {
     required this.name,
     required this.area,
     required this.schedule,
+    this.mark,
     required this.onTap,
   });
 
@@ -216,7 +222,22 @@ class _RoutineCard extends StatelessWidget {
               child: ListTile(
                 leading: Icon(icon),
                 title: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                subtitle: Text(schedule),
+                subtitle: switch (mark) {
+                  null => Text(schedule),
+                  final mark => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(schedule),
+                      Text(
+                        mark,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                },
+                isThreeLine: mark != null,
                 trailing: switch (areaIconData(area?.icon)) {
                   final icon? => Icon(icon, size: 20, color: colour),
                   null => null,

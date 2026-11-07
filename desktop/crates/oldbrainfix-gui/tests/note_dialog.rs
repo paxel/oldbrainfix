@@ -663,8 +663,21 @@ fn a_tally_with_its_fields_takes_one_page_and_one_save_in_their_order() -> TestR
     assert!(shows(&harness, "Unit: kg"));
     assert!(shows(
         &harness,
-        "A day with several entries counts: Largest"
+        "Several sets or entries in a bar count: Largest"
     ));
+    // A row's kind (#264): a Check field has no unit and no rule.
+    let units = harness.query_all_by_label("Unit: No unit").count();
+    harness
+        .get_all_by_label("Kind of field: Number")
+        .last()
+        .ok_or("the last row's kind")?
+        .click();
+    harness.run();
+    // A pick closes the small editor.
+    click(&mut harness, "Check field");
+    assert!(shows(&harness, "Kind of field: Check field"));
+    let left = harness.query_all_by_label("Unit: No unit").count();
+    assert_eq!(left, units - 1);
     click(&mut harness, "Save");
     let morning = Notes::new(&store)
         .all()?

@@ -4,7 +4,7 @@ Routines and Reminders are never standalone: each one is spawned from a Note and
 
 ## Consequences
 
-Deleting a Note that spawned Routines asks whether to trash them too; if not, they stay and their back-link shows the Note as trashed or deleted.
+Deleting a Note that spawned Routines trashes them with it, after one question naming them, and restoring the Note brings them back (amended by #262; see below). A Routine left without its Note shows it as trashed or deleted.
 
 ## Frogs (ADR 0027)
 
@@ -21,3 +21,7 @@ Amended by ADR 0029 (#104): a Session is a kind of Routine, spawned from a Note 
 ## A Note is its kind (ADR 0038)
 
 Amended by ADR 0038 (#188): a Note has one kind, Plain Note, Checklist, Shopping List or Tally, and for every kind but the Plain Note the kind's content is the page: the text shows as its name, heading it, and its description, folded under it. Nothing is rewritten for it.
+
+## Deleting a Note takes its Routines along (#262)
+
+Amended by #262: every deletion of a Note, from the editor, the card's ⋮, the desktop's dialog, an Area or Topic deleted with its Notes into the trash, and the AI port, moves its Routines and Reminders into the trash with it; restoring the Note brings them back. "Delete only the Note" is gone: a Routine without its Note has no use, so there is nothing to keep it for. Routines left behind before, their Note in the trash or deleted, stay as they are; All Routines and Reminders marks them "The Note is in the trash" or "The Note was deleted", and nothing deletes them on the person's behalf. Nothing in the format changes: a Note trashed by an older version without its Routines still reads as before.

@@ -8,9 +8,11 @@ import 'text_format.dart';
 /// its own gives its Photo Texts and then its Transcripts instead, in the
 /// order its photos and recordings were added; one without either is
 /// left out. When any of these texts is formatted, [text] holds them as
-/// written, the Markdown source among them, and [html] the whole as HTML
-/// ([Markdown.html]), the plain texts and the dates in it as they read;
-/// else [html] is null. [photos] and [recordings] are the hashes of the
+/// written, the Markdown source among them with each item that starts
+/// with a box written as a task list item ([Markdown.taskLists], #263),
+/// and [html] the whole as HTML ([Markdown.html]), its boxes as their
+/// glyphs, the plain texts and the dates in it as they read; else [html]
+/// is null. [photos] and [recordings] are the hashes of the
 /// Note's and then its Sections' photos and recordings, each once, for
 /// the app to hand along as files.
 class NoteShare {
@@ -73,7 +75,12 @@ class NoteShare {
           : [for (final t in part.generated) (t, false)];
       if (words.isEmpty) continue;
       formatted = formatted || words.any((w) => w.$2);
-      written.add([?part.date, for (final w in words) w.$1].join('\n'));
+      written.add(
+        [
+          ?part.date,
+          for (final (t, md) in words) md ? Markdown.taskLists(t) : t,
+        ].join('\n'),
+      );
       source.add(
         [
           if (part.date case final d?) Markdown.escape(d),

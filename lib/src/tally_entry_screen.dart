@@ -32,10 +32,18 @@ Future<bool> recordTallyEntry(
   BuildContext context,
   Notes notes,
   String noteId,
-  void Function(Map<String, double> values, String line) record,
+  TallyRecord record,
 ) => _open(
   context,
   TallyEntryScreen(notes: notes, noteId: noteId, record: record),
+);
+
+/// Saves a new entry: its first set's values and its Check fields' ticks
+/// by field id in the base unit, its further sets (#264) and its line.
+typedef TallyRecord = void Function(
+  Map<String, double> values,
+  List<Map<String, double>> more,
+  String line,
 );
 
 Future<bool> _open(BuildContext context, Widget screen) async =>
@@ -43,10 +51,40 @@ Future<bool> _open(BuildContext context, Widget screen) async =>
         .push<bool>(MaterialPageRoute(builder: (_) => screen)) ??
     false;
 
-/// One entry of a Tally on a full-screen page, Save in the top bar: a
-/// value per field shown, a new entry's prefilled with the field's
-/// target, so that saving the targets is one tap; the date it counts
-/// for, today for a new one; and one line of text. A value left empty is
+/// One set of the entry page as it is typed: a value per number field.
+class _SetDraft {
+  final Map<String, TextEditingController> values;
+  final Map<String, FocusNode> focus;
+
+  _SetDraft(List<TallyField> fields, Map<String, String> texts)
+    : values = {
+        for (final field in fields)
+          field.id: TextEditingController(text: texts[field.id] ?? ''),
+      },
+      focus = {for (final field in fields) field.id: FocusNode()};
+
+  Map<String, String> get texts => {
+    for (final MapEntry(:key, :value) in values.entries) key: value.text,
+  };
+
+  void dispose() {
+    for (final controller in values.values) {
+      controller.dispose();
+    }
+    for (final node in focus.values) {
+      node.dispose();
+    }
+  }
+}
+
+/// One entry of a Tally on a full-screen page, Save in the top bar: a box
+/// per Check field (#264), ticked once per entry above the sets; a value
+/// per number field shown, a new entry's prefilled with the field's
+/// target, so that saving the targets is one tap. A Tally that counts in
+/// sets shows each set as a row of those values with "Add set" under
+/// them, which adds one that starts with the values of the set before;
+/// a set after the first can be removed. Then the date it counts for,
+/// today for a new one, and one line of text. A value left empty is
 /// none. An entry that exists has Delete in the bar, which asks once; it
 /// can be restored. Leaving without Save changes nothing.
 ///
@@ -60,9 +98,8 @@ class TallyEntryScreen extends StatefulWidget {
   /// The entry shown; null for a new one.
   final String? entryId;
 
-  /// Saves a new entry's values, by field id in the base unit, and its
-  /// line; null to add it to the Tally as any.
-  final void Function(Map<String, double> values, String line)? record;
+  /// Saves a new entry; null to add it to the Tally as any.
+  final TallyRecord? record;
 
   const TallyEntryScreen({
     super.key,
@@ -84,15 +121,17 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final id? => _tallies.entryById(id),
     null => null,
   };
-  late final List<TallyField> _fields = _tally?.shown ?? const [];
-  late final _values = {
-    for (final field in _fields) field.id: TextEditingController(),
+  late final List<TallyField> _fields = _tally?.numbers ?? const [];
+  late final List<TallyField> _checks = _tally?.checks ?? const [];
+  late final _ticked = {
+    for (final field in _checks)
+      field.id: _entry?.values.containsKey(field.id) ?? false,
   };
+  final _sets = <_SetDraft>[];
 
-  /// The values as the page opened, to write only those that changed.
-  final _asOpened = <String, String>{};
+  /// The sets as the page opened, to write only what changed.
+  var _asOpened = const <Map<String, String>>[];
   late final _line = TextEditingController(text: _entry?.line ?? '');
-  late final _focus = {for (final field in _fields) field.id: FocusNode()};
   final _lineFocus = FocusNode();
 
   /// The day the entry counts for, on this Device's clock.
@@ -100,6 +139,8 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     (_entry?.at ?? widget.notes.store.clock()).toLocal(),
   );
   late final DateTime _dayAsOpened;
+
+  /// The values that are no number, as `<set>:<field id>`.
   var _invalid = <String>{};
   var _empty = false;
   var _started = false;
@@ -120,21 +161,24 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     _started = true;
     final decimal = decimalSign(context);
     final entry = _entry;
-    for (final field in _fields) {
-      final base = entry == null ? field.target : entry.values[field.id];
-      final text = typedValue(base, field.unit, _system, decimal);
-      _asOpened[field.id] = text;
-      _values[field.id]?.text = text;
-    }
+    final tally = _tally;
+    final rows = entry == null || tally == null
+        ? [tally?.targets ?? const <String, double>{}]
+        : tally.setsOf(entry);
+    _asOpened = [
+      for (final row in rows.isEmpty ? [const <String, double>{}] : rows)
+        {
+          for (final field in _fields)
+            field.id: typedValue(row[field.id], field.unit, _system, decimal),
+        },
+    ];
+    _sets.addAll([for (final texts in _asOpened) _SetDraft(_fields, texts)]);
   }
 
   @override
   void dispose() {
-    for (final controller in _values.values) {
-      controller.dispose();
-    }
-    for (final node in _focus.values) {
-      node.dispose();
+    for (final set in _sets) {
+      set.dispose();
     }
     _line.dispose();
     _lineFocus.dispose();
@@ -150,6 +194,22 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     );
     if (picked == null || !mounted) return;
     setState(() => _day = _dayOf(picked));
+  }
+
+  /// "Add set": a set that starts with the values of the set before.
+  void _addSet() {
+    final set = _SetDraft(_fields, _sets.last.texts);
+    setState(() => _sets.add(set));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _fields.isEmpty) return;
+      if (set.focus[_fields.first.id] case final node?) showField(node);
+    });
+  }
+
+  void _removeSet(int index) {
+    final set = _sets[index];
+    setState(() => _sets.removeAt(index));
+    set.dispose();
   }
 
   /// The instant the entry counts for: its own, or now for a new one, on
@@ -168,33 +228,41 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
   }
 
   void _save() {
-    final parsed = <String, double?>{};
+    final parsed = <Map<String, double?>>[];
     final invalid = <String>{};
-    for (final field in _fields) {
-      final text = _values[field.id]?.text.trim() ?? '';
-      if (text.isEmpty) {
-        parsed[field.id] = null;
-        continue;
+    for (final (i, set) in _sets.indexed) {
+      final row = <String, double?>{};
+      for (final field in _fields) {
+        final text = set.values[field.id]?.text.trim() ?? '';
+        if (text.isEmpty) {
+          row[field.id] = null;
+          continue;
+        }
+        final value = TallyUnits.parseShown(text, field.unit, _system);
+        if (value == null) invalid.add('$i:${field.id}');
+        row[field.id] = value;
       }
-      final value = TallyUnits.parseShown(text, field.unit, _system);
-      if (value == null) invalid.add(field.id);
-      parsed[field.id] = value;
+      parsed.add(row);
     }
     final line = _line.text.trim();
     final entry = _entry;
     final empty =
         entry == null &&
         line.isEmpty &&
-        parsed.values.every((value) => value == null);
+        !_ticked.values.any((on) => on) &&
+        parsed.every((row) => row.values.every((value) => value == null));
     setState(() {
       _invalid = invalid;
       _empty = empty && invalid.isEmpty;
     });
     // The field to fix comes into view.
     if (invalid.isNotEmpty) {
-      if (_focus[_fields.firstWhere((f) => invalid.contains(f.id)).id]
-          case final node?) {
-        showField(node);
+      for (final (i, set) in _sets.indexed) {
+        for (final field in _fields) {
+          if (!invalid.contains('$i:${field.id}')) continue;
+          if (set.focus[field.id] case final node?) showField(node);
+          return;
+        }
       }
       return;
     }
@@ -202,23 +270,43 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
       showField(_lineFocus);
       return;
     }
-    final values = {
-      for (final MapEntry(:key, :value) in parsed.entries) key: ?value,
+    Map<String, double> held(Map<String, double?> row) => {
+      for (final MapEntry(:key, :value) in row.entries) key: ?value,
+    };
+    final first = parsed.first;
+    final more = [for (final row in parsed.skip(1)) held(row)];
+    final ticks = {
+      for (final MapEntry(:key, :value) in _ticked.entries)
+        if (value) key: 1.0,
     };
     if (entry == null) {
+      final values = {...held(first), ...ticks};
       if (widget.record case final record?) {
-        record(values, line);
+        record(values, more, line);
       } else {
-        _tallies.add(widget.noteId, values: values, line: line, at: _at());
+        _tallies.add(
+          widget.noteId,
+          values: values,
+          more: more,
+          line: line,
+          at: _at(),
+        );
       }
     } else {
+      final opened = _asOpened.first;
       _tallies.editEntry(
         entry.id,
-        // Only those typed anew: one shown rounded stays as it is.
         values: {
-          for (final MapEntry(:key, :value) in parsed.entries)
-            if ((_values[key]?.text.trim() ?? '') != _asOpened[key]) key: value,
+          // Only those typed anew: one shown rounded stays as it is.
+          for (final MapEntry(:key, :value) in first.entries)
+            if ((_sets.first.values[key]?.text.trim() ?? '') != opened[key])
+              key: value,
+          for (final field in _checks)
+            if (_ticked[field.id] != entry.values.containsKey(field.id))
+              field.id: (_ticked[field.id] ?? false) ? 1 : null,
         },
+        // The further sets as typed, while there were or are several.
+        more: _sets.length > 1 || _asOpened.length > 1 ? more : null,
         line: line,
         at: _at(),
       );
@@ -232,12 +320,67 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     Navigator.of(context).pop(true);
   }
 
+  /// The values of the set [index], under its heading while the Tally
+  /// counts in sets or the entry holds several.
+  List<Widget> _setFields(int index, bool inSets) {
+    final t = context.t;
+    final set = _sets[index];
+    return [
+      if (inSets)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.tallySet(index + 1),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              if (index > 0)
+                IconButton(
+                  key: ValueKey('tally-set-remove-$index'),
+                  tooltip: t.tallyRemoveSet(index + 1),
+                  onPressed: () => _removeSet(index),
+                  icon: const Icon(Icons.remove_circle_outline),
+                ),
+            ],
+          ),
+        ),
+      for (final field in _fields)
+        EditorPanel(
+          child: TextField(
+            key: ValueKey(
+              index == 0
+                  ? 'tally-value-${field.id}'
+                  : 'tally-value-$index-${field.id}',
+            ),
+            controller: set.values[field.id],
+            focusNode: set.focus[field.id],
+            keyboardType: const TextInputType.numberWithOptions(
+              signed: true,
+              decimal: true,
+            ),
+            decoration: InputDecoration(
+              labelText: field.name,
+              suffixText: shownUnit(field.unit, _system),
+              errorText: _invalid.contains('$index:${field.id}')
+                  ? t.tallyNotANumber
+                  : null,
+            ),
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final entry = _entry;
     final store = widget.notes.store;
     final date = DateFormat.yMMMEd(Localizations.localeOf(context).toString());
+    final countsInSets = _tally?.countsInSets ?? false;
+    final inSets = countsInSets || _sets.length > 1;
     return Scaffold(
       appBar: pageBar(
         context,
@@ -263,22 +406,39 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final field in _fields)
+            if (_checks.isNotEmpty)
               EditorPanel(
-                child: TextField(
-                  key: ValueKey('tally-value-${field.id}'),
-                  controller: _values[field.id],
-                  focusNode: _focus[field.id],
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Column(
+                    children: [
+                      for (final field in _checks)
+                        CheckboxListTile(
+                          key: ValueKey('tally-check-${field.id}'),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(field.name),
+                          value: _ticked[field.id] ?? false,
+                          onChanged: (on) =>
+                              setState(() => _ticked[field.id] = on ?? false),
+                        ),
+                    ],
                   ),
-                  decoration: InputDecoration(
-                    labelText: field.name,
-                    suffixText: shownUnit(field.unit, _system),
-                    errorText: _invalid.contains(field.id)
-                        ? t.tallyNotANumber
+                ),
+              ),
+            for (var i = 0; i < _sets.length; i++) ..._setFields(i, inSets),
+            if (countsInSets && _fields.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    key: const ValueKey('tally-add-set'),
+                    onPressed: _sets.length < TallyKeys.maxSets
+                        ? _addSet
                         : null,
+                    icon: const Icon(Icons.add),
+                    label: Text(t.tallyAddSet),
                   ),
                 ),
               ),

@@ -32,7 +32,9 @@ class NoProfilePlatform implements ProfilePlatform {
 }
 
 /// Android's own settings and picture picker behind the app's method
-/// channel; no permission, no Google library.
+/// channel; no permission, no Google library. On the iPhone the same
+/// channel answers with the system's photo picker
+/// (ios/Runner/DeviceChannel.swift, #243).
 class AndroidProfile implements ProfilePlatform {
   static const _channel = MethodChannel('io.github.paxel.oldbrainfix/profile');
 
@@ -41,6 +43,8 @@ class AndroidProfile implements ProfilePlatform {
     try {
       return await _channel.invokeMethod<String>('deviceName') ?? '';
     } on PlatformException {
+      return '';
+    } on MissingPluginException {
       return '';
     }
   }
@@ -53,6 +57,8 @@ class AndroidProfile implements ProfilePlatform {
     try {
       return await _channel.invokeMethod<Uint8List>('pick');
     } on PlatformException {
+      return null;
+    } on MissingPluginException {
       return null;
     }
   }

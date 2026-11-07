@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'announcements.dart';
+import 'frame_times.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
@@ -35,6 +37,8 @@ Future<void> openExternally(Uri url) async {
 
 /// Who made the app, where its documentation and source live, how to
 /// reach the developer, and the licences (adapted from Chaos Alert).
+/// Tapping the version seven times switches the frame times on or off
+/// (#258).
 class AboutScreen extends StatefulWidget {
   /// The version to show; read from the platform when null.
   final Future<PackageInfo>? version;
@@ -51,6 +55,19 @@ class AboutScreen extends StatefulWidget {
 class _AboutScreenState extends State<AboutScreen> {
   late final Future<PackageInfo> _version =
       widget.version ?? PackageInfo.fromPlatform();
+
+  /// How many times the version was tapped towards the next switch.
+  var _taps = 0;
+
+  void _versionTapped() {
+    final frameTimes = FrameTimesScope.maybeOf(context);
+    if (frameTimes == null || ++_taps < 7) return;
+    _taps = 0;
+    frameTimes.toggle();
+    final t = context.t;
+    AnnouncementsScope.of(context)
+        ?.announce(frameTimes.value ? t.frameTimesOn : t.frameTimesOff);
+  }
 
   Future<void> _open(String url) async {
     try {
@@ -85,10 +102,15 @@ class _AboutScreenState extends State<AboutScreen> {
               future: _version,
               builder: (context, snapshot) {
                 final info = snapshot.data;
-                return Text(
-                  info == null
-                      ? ''
-                      : t.versionLabel(info.version, info.buildNumber),
+                return GestureDetector(
+                  key: const ValueKey('version'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _versionTapped,
+                  child: Text(
+                    info == null
+                        ? ''
+                        : t.versionLabel(info.version, info.buildNumber),
+                  ),
                 );
               },
             ),
@@ -120,7 +142,14 @@ class _AboutScreenState extends State<AboutScreen> {
               _feedbackMail,
               'mailto:$_feedbackMail?subject=Old%20Brain%20Fix%20feedback',
             ),
-            (Icons.coffee_outlined, t.buyCoffee, t.coffeeSubtitle, _donateUrl),
+            // Not on the iPhone: App Store guideline 3.1.1 (Q591).
+            if (defaultTargetPlatform != TargetPlatform.iOS)
+              (
+                Icons.coffee_outlined,
+                t.buyCoffee,
+                t.coffeeSubtitle,
+                _donateUrl,
+              ),
           ])
             ListTile(
               leading: Icon(icon),

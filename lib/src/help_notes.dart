@@ -5,16 +5,22 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'frogs_screen.dart' show FrogIcon;
 import 'note_editor_screen.dart' show kindBadgeIcon;
 
 /// One icon the help Note "What the icons mean" explains (#180): the icon
 /// the app draws, its name and what it means, in words.
 class HelpIcon {
-  final IconData icon;
+  /// The icon, or null where [drawn] draws one that is no [IconData],
+  /// such as the frog.
+  final IconData? icon;
+  final Widget? drawn;
   final String Function(AppLocalizations t) name;
   final String Function(AppLocalizations t) means;
 
-  const HelpIcon(this.icon, this.name, this.means);
+  const HelpIcon(IconData this.icon, this.name, this.means) : drawn = null;
+
+  const HelpIcon.drawn(Widget this.drawn, this.name, this.means) : icon = null;
 }
 
 /// A group of [HelpIcon]s: a heading of the Note and one picture.
@@ -42,6 +48,8 @@ String _reminder(AppLocalizations t) => t.helpIconReminder;
 String _reminderMeans(AppLocalizations t) => t.helpIconReminderMeans;
 String _routine(AppLocalizations t) => t.helpIconRoutine;
 String _routineMeans(AppLocalizations t) => t.helpIconRoutineMeans;
+String _frog(AppLocalizations t) => t.helpIconFrog;
+String _frogMeans(AppLocalizations t) => t.helpIconFrogMeans;
 String _add(AppLocalizations t) => t.helpIconAdd;
 String _addMeans(AppLocalizations t) => t.helpIconAddMeans;
 String _browse(AppLocalizations t) => t.helpIconBrowse;
@@ -77,6 +85,7 @@ const helpIconGroups = [
     HelpIcon(Icons.schedule, _captured, _capturedMeans),
     HelpIcon(Icons.notifications_outlined, _reminder, _reminderMeans),
     HelpIcon(Icons.repeat, _routine, _routineMeans),
+    HelpIcon.drawn(FrogIcon(size: 28), _frog, _frogMeans),
     HelpIcon(Icons.add, _add, _addMeans),
   ]),
   HelpIconGroup('agenda', _agenda, [
@@ -106,9 +115,47 @@ List<String> quickStartLines(AppLocalizations t) => [
   t.helpQuickStart8,
 ];
 
+/// The Quick start's Description in [t]'s language (#260), folded under
+/// its name: a link to the place of each Line, in the Lines' order
+/// (#261), then "On the desktop" and the desktop's way for each Line, one
+/// line each.
+String quickStartDescription(AppLocalizations t) => [
+  t.helpQuickStartPlacesTitle,
+  for (final (i, place) in quickStartPlaces(t).indexed) '${i + 1}. $place',
+  '',
+  t.helpQuickStartDesktopTitle,
+  t.helpQuickStartDesktop1,
+  t.helpQuickStartDesktop2,
+  t.helpQuickStartDesktop3,
+  t.helpQuickStartDesktop4,
+  t.helpQuickStartDesktop5,
+  t.helpQuickStartDesktop6,
+  t.helpQuickStartDesktop7,
+  t.helpQuickStartDesktop8,
+].join('\n');
+
+/// [label] as a Markdown link to [to], as "Link to…" writes one.
+String _linked(String label, AppLink to) =>
+    Markdown.link('', 0, 0, to.url, label: label).text;
+
+/// Where each Quick start Line is done, as links (#261): the Agenda,
+/// Unsorted, All Routines and Reminders twice, this Checklist itself
+/// (no link), the Agenda, Backups and Sync. The desktop's
+/// `help_notes.rs` writes the same.
+List<String> quickStartPlaces(AppLocalizations t) => [
+  _linked(t.agenda, const AppLink(AppLinkKind.agenda)),
+  _linked(t.unsorted, const AppLink(AppLinkKind.unsorted)),
+  _linked(t.allRoutinesTitle, const AppLink(AppLinkKind.routines)),
+  _linked(t.allRoutinesTitle, const AppLink(AppLinkKind.routines)),
+  Markdown.escape(t.helpQuickStartPlaceHere),
+  _linked(t.agenda, const AppLink(AppLinkKind.agenda)),
+  _linked(t.backupsTitle, const AppLink(AppLinkKind.backups)),
+  _linked(t.syncTitle, const AppLink(AppLinkKind.sync)),
+];
+
 /// The text of "What the icons mean": its name, then each group's
 /// heading and its icons, "name: meaning" one per line, so search finds
-/// what the pictures show.
+/// what the pictures show, then a link to the user guide (#261).
 String helpIconsText(AppLocalizations t) {
   final out = StringBuffer(t.helpIconsTitle);
   for (final group in helpIconGroups) {
@@ -117,6 +164,10 @@ String helpIconsText(AppLocalizations t) {
       out.write('\n${icon.name(t)}: ${icon.means(t)}');
     }
   }
+  // A link to the guide's start page last (#261).
+  out.write(
+    '\n\n${_linked(t.helpIconsGuide, const AppLink(AppLinkKind.guide))}',
+  );
   return out.toString();
 }
 
@@ -193,6 +244,7 @@ Future<List<String>> makeHelpNotes(
       areaName: t.helpAreaName,
       quickStartTitle: t.helpQuickStartTitle,
       quickStartLines: quickStartLines(t),
+      quickStartDescription: quickStartDescription(t),
       iconsText: helpIconsText(t),
       iconPictures: pictures,
       whatsNewTitle: (v) => t.helpWhatsNewTitle(v),
@@ -246,7 +298,21 @@ class HelpIconsPicture extends StatelessWidget {
                 height: rowHeight,
                 child: Row(
                   children: [
-                    Icon(icon.icon, size: 28, color: scheme.primary),
+                    switch (icon.drawn) {
+                      // In the icons' square; the picture has no Material
+                      // to give its text a style.
+                      final drawn? => SizedBox.square(
+                        dimension: 28,
+                        child: FittedBox(
+                          child: DefaultTextStyle(
+                            style:
+                                theme.textTheme.bodyMedium ?? const TextStyle(),
+                            child: drawn,
+                          ),
+                        ),
+                      ),
+                      null => Icon(icon.icon, size: 28, color: scheme.primary),
+                    },
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(

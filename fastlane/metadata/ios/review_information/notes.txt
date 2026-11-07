@@ -1,0 +1,29 @@
+Old Brain Fix is a note and reminder app. It has no account, no login and no server, so no demo account is needed: every feature works right after the first start. All data stays on the iPhone and on Devices the user pairs with it (other phones and the user's computer, which runs the desktop app).
+
+How to test
+Steps 1 to 3 take about a minute; step 4 takes about ten.
+1. Start the app, tap "New to Old Brain Fix", pick Simple and tap Start. Tap "Not now" on the speech model offer. On "Set up alarms", tap Allow on each step (Notifications, then Alarms) and Next, and Done on the last.
+2. Tap the round + at the bottom right of the Agenda, tap Text, type a thought and tap 1 h. The Note is saved in Unsorted.
+3. Tap the alarm clock on the Agenda ("New Routine or Reminder"), type what is to be done, tap Once, add a time two minutes ahead and tap Save. A time-sensitive notification comes at that minute, with Done and Snooze.
+4. To see the AlarmKit alarm: in the same editor open Re-nag and pick 5 min under "This one", then open Escalation, switch on "Escalate to an iPhone alarm" and pick 1. Leave the notifications alone: the first comes at the set time, the Re-nag 5 minutes later, and about 10 minutes after the set time it rings as an iPhone alarm with Stop and Snooze.
+
+AlarmKit
+The app uses AlarmKit only for Routines and Reminders the user has set up, and only when the user has switched on Escalation for that one: after the set number of ignored notifications it rings as an alarm, through silent mode and Focus, so a reminder the user keeps missing is not missed again. Stop counts as Done; Snooze rings it again in 10 minutes. Without Escalation every Routine and Reminder is a time-sensitive notification.
+
+Local network
+The app syncs with the user's own paired Devices on the same Wi-Fi, directly and encrypted with TLS, without the internet. It announces itself by Bonjour (_oldbrainfix._tcp) only while it is open, carrying a random device id and no name. Pairing is done once by scanning or typing a code another Device shows. The app works fully without a second Device; the review does not need one.
+
+Calendars (full access)
+Only when the user switches it on: the Agenda shows the appointments of the calendars the user picks, a Note records the event running when it was captured, and the user's Routines and Reminders can be written into one calendar the user chooses. Showing appointments needs to read events, which iOS grants only with full access. Nothing read from the calendars leaves the iPhone.
+
+Share extension
+"Old Brain Fix" in the share sheet takes text, links, pictures and the app's own files. It keeps them in the App Group shared with the app and shows a short card that they were kept; it does not open the app. They appear in Capture the next time the app is opened.
+
+Widgets and Control Center
+An Agenda widget (medium and large), a Capture widget (home screen and lock screen) and three Control Center controls (Voice note, Text note, Photo note) open the app on the matching page.
+
+Other permissions, each asked only when the feature is used: microphone for voice Notes, camera for photo Notes and pair codes, adding photos to Photos when the user taps Save, location while in use for where a Note was captured, Face ID for the optional App Lock, notifications.
+
+The network is used only for the local sync and for downloading the speech model (148 MB, from the app's own GitHub release) when the user asks for it. There is no analytics, no advertising and no tracking.
+
+The app is free and open source (Apache-2.0 or MIT): https://github.com/paxel/oldbrainfix

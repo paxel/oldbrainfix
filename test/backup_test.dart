@@ -106,6 +106,12 @@ class DirFolders implements FolderPlatform {
 
   @override
   Future<void> setAutoBackup(bool on) async => optedIn = on;
+
+  @override
+  Future<String?> fileApp(String folder, String path) async => null;
+
+  @override
+  Future<bool> openFile(String folder, String path) async => false;
 }
 
 /// Reads the QR the test says is in the photo.

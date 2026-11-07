@@ -14,8 +14,8 @@
   "notes": [
     {
       "id": "note:help-00000000000000000000000000000001-icons",
-      "text": "What the icons mean\n\nKind: what the Note is",
-      "textFormat": "plain",
+      "text": "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)",
+      "textFormat": "markdown",
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:25.000Z",
@@ -46,8 +46,8 @@
     },
     {
       "id": "note:help-00000000000000000000000000000001-quick-start",
-      "text": "Quick start",
-      "textFormat": "plain",
+      "text": "Quick start\nGo there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N",
+      "textFormat": "markdown",
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:07.000Z",
@@ -198,12 +198,12 @@
       "text": "What's new in 0.5.0\n\nAdded\n• More."
     },
     "note:help-00000000000000000000000000000001-icons": {
-      "html": null,
+      "html": "<p>What the icons mean</p>\n<p>Kind: what the Note is</p>\n<p>User guide</p>\n",
       "photos": [
         "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85"
       ],
       "recordings": [],
-      "text": "What the icons mean\n\nKind: what the Note is"
+      "text": "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)"
     },
     "note:help-00000000000000000000000000000001-whats-new-0.4.1": {
       "html": null,
@@ -218,10 +218,10 @@
       "text": "What's new in 0.4.0\n\nAdded\n• Help Notes."
     },
     "note:help-00000000000000000000000000000001-quick-start": {
-      "html": null,
+      "html": "<p>Quick start<br>Go there:</p>\n<ol><li>Agenda</li></ol>\n<p>On the desktop:<br>Capture: Ctrl+N</p>\n",
       "photos": [],
       "recordings": [],
-      "text": "Quick start"
+      "text": "Quick start\nGo there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N"
     }
   },
   "search": {

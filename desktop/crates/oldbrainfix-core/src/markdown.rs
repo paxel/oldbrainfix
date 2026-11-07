@@ -363,8 +363,9 @@ pub fn plain(text: &str) -> String {
 /// code block is a `<pre><code>`, `class="language-…"` its language when
 /// it has one, each line of its content followed by a line break. Bold
 /// is `<strong>`, italic `<em>`, strike-through `<del>`, code
-/// `<code>`; a link is an `<a>` only when [`may_open`] allows its
-/// destination, else its label alone. Every character of the text is
+/// `<code>`; a link is an `<a>` only when its destination is a web or
+/// e-mail address [`may_open`] allows, else its label alone, an app
+/// link's too (ADR 0046). Every character of the text is
 /// escaped, so nothing in it is markup; status marks and tags are text. A
 /// line break follows each part at the top.
 pub fn html(text: &str) -> String {
@@ -542,7 +543,7 @@ fn html_spans(out: &mut String, spans: &[Span]) {
                 html_escape(out, &s.text);
                 out.push_str("</code>");
             }
-            SpanKind::Link if may_open(&s.url) => {
+            SpanKind::Link if web_or_mail(&s.url) => {
                 out.push_str("<a href=\"");
                 html_escape(out, &s.url);
                 out.push_str("\">");
@@ -769,9 +770,17 @@ pub fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
 
 /// Whether a link to `url` may be opened: a web address, `http://` or
 /// `https://`, or an e-mail address, `mailto:`, in any case of ASCII
-/// letters. A text may come from another person's Device, so nothing
-/// else is opened from it: no file, no app's own address, no script.
+/// letters, or an app link [`crate::app_link::parse`] reads (#261, ADR
+/// 0046). A text may come from another person's Device, so nothing else
+/// is opened from it: no file outside the shared folder, no other app's
+/// address, no script.
 pub fn may_open(url: &str) -> bool {
+    web_or_mail(url) || crate::app_link::parse(url).is_some()
+}
+
+/// Whether `url` is a web or an e-mail address, which another app can
+/// open too.
+fn web_or_mail(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();
     lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:")
 }
@@ -906,6 +915,18 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
 /// %-encoded, `(`, `)` and `\` escaped. A code block's lines stay as
 /// they are.
 pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
+    link_labelled(text, start, end, url, None)
+}
+
+/// [`link`], with `label` in place of `url` as the label of a link put
+/// at a cursor without a word, as "Link to…" puts one (#261).
+pub fn link_labelled(
+    text: &str,
+    start: usize,
+    end: usize,
+    url: &str,
+    label: Option<&str>,
+) -> Change {
     let (s, e) = ordered(text, start, end);
     let blocks = parse(text);
     let Some(block) = blocks.get(line_at(text, s)) else {
@@ -941,7 +962,7 @@ pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
     };
     if from == to {
         // A `]` would end the label.
-        let label = escape(address).replace(']', "\\]");
+        let label = escape(label.unwrap_or(address)).replace(']', "\\]");
         return Change {
             text: format!(
                 "{}[{label}]({destination}){}",
@@ -1219,6 +1240,107 @@ pub fn shortcut_at(text: &str, cursor: usize) -> bool {
             .any(|s| (s.kind != SpanKind::Text && s.end == at) || ends(&s.children, at))
     }
     ends(&block.spans, at)
+}
+
+/// `text` with every task list item of GFM on the lines the selection
+/// `start..end` touches made an item with a box (#263): a bulleted or
+/// numbered item whose content starts with `[ ]`, `[x]` or `[X]` and a
+/// space gets ☐ for `[ ]` and ✅ for the others in place of those three
+/// characters. A selection ending at a line's start leaves that line
+/// out. A code block's and a table's lines are no items, so they stay as
+/// they are. The selection keeps what it selected, a cursor right after
+/// a mark going after its glyph. Both glyphs are three bytes, as the
+/// marks are, so no offset after them moves.
+pub fn task_boxes(text: &str, start: usize, end: usize) -> Change {
+    let (s, e) = ordered(text, start, end);
+    let blocks = parse(text);
+    let (first, last) = touched(text, &blocks, s, e);
+    let edits: Vec<Edit> = blocks
+        .get(first..=last)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|b| {
+            task_mark(text, b).map(|glyph| Edit {
+                at: b.content_start,
+                remove: 3,
+                insert: glyph.to_string(),
+                after: true,
+            })
+        })
+        .collect();
+    if edits.is_empty() {
+        return unchanged(text, s, e);
+    }
+    apply(text, edits, s, e)
+}
+
+/// The glyph of the box a task list item `block` of `text` becomes, or
+/// `None` when it is none.
+fn task_mark(text: &str, block: &Block) -> Option<&'static str> {
+    let at = block.content_start;
+    if !block.kind.listed() || at + 4 > block.end {
+        return None;
+    }
+    match text.as_bytes().get(at..at + 4)? {
+        [b'[', b' ', b']', b' '] => Some("☐"),
+        [b'[', b'x' | b'X', b']', b' '] => Some("✅"),
+        _ => None,
+    }
+}
+
+/// `text`, a formatted text as it shows ([`crate::text_boxes::shown`]),
+/// with each bulleted or numbered item whose content starts with a box
+/// and a space written as a task list item of GFM (#263), so another
+/// Markdown app reads it: ☐ as `[ ]`, ✅ as `[x]`, and ❌ as `[x]` with
+/// the rest of its content struck through, `~~` around it without the
+/// spaces at its ends, unless it is one strike-through already or empty.
+/// Any other box, a code block's lines and a table's stay as they are.
+pub fn task_lists(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut edits = Vec::new();
+    let mark = |at: usize, insert: &str| Edit {
+        at,
+        remove: 3,
+        insert: insert.to_string(),
+        after: false,
+    };
+    let around = |at: usize| Edit {
+        at,
+        remove: 0,
+        insert: "~~".to_string(),
+        after: false,
+    };
+    for b in parse(text) {
+        let at = b.content_start;
+        if !b.kind.listed() || at + 4 > b.end || bytes.get(at + 3) != Some(&b' ') {
+            continue;
+        }
+        match slice(text, at, at + 3) {
+            "☐" => edits.push(mark(at, "[ ]")),
+            "✅" => edits.push(mark(at, "[x]")),
+            "❌" => {
+                edits.push(mark(at, "[x]"));
+                let from = skip_blank(bytes, at + 4, b.end);
+                let mut to = b.end;
+                while to > from && bytes.get(to - 1).is_some_and(|&c| blank(c)) {
+                    to -= 1;
+                }
+                let struck = b
+                    .spans
+                    .iter()
+                    .any(|s| s.kind == SpanKind::Strike && s.start == from && s.end == to);
+                if from < to && !struck {
+                    edits.push(around(from));
+                    edits.push(around(to));
+                }
+            }
+            _ => {}
+        }
+    }
+    if edits.is_empty() {
+        return text.to_string();
+    }
+    apply(text, edits, 0, 0).text
 }
 
 /// `text` from `start` to `end`, empty where they are no character
@@ -2262,9 +2384,27 @@ mod tests {
     }
 
     #[test]
-    fn only_a_web_or_e_mail_address_is_opened_from_a_link() {
+    fn only_a_web_or_e_mail_address_or_an_app_link_is_opened() {
         assert!(may_open("HTTPS://x.org") && may_open("mailto:a@x.org"));
+        assert!(may_open("oldbrainfix://settings/backups"));
+        assert_eq!(
+            html("[Backups](oldbrainfix://settings/backups)"),
+            "<p>Backups</p>\n"
+        );
+        assert_eq!(
+            link_labelled(
+                "go ",
+                3,
+                3,
+                "oldbrainfix://unsorted",
+                Some("Unsorted [all]")
+            )
+            .text,
+            "go [Unsorted \\[all\\]](oldbrainfix://unsorted)"
+        );
         for url in [
+            "oldbrainfix://x",
+            "oldbrainfix://file/../a",
             "javascript:x",
             "file:///etc",
             "intent://x",
@@ -2552,5 +2692,90 @@ mod tests {
             code_block("```\na\n```\nb", 4, 11).text,
             "````\n```\na\n```\nb\n````"
         );
+    }
+
+    #[test]
+    fn a_task_list_item_becomes_an_item_with_a_box() {
+        let boxes = |text: &str| task_boxes(text, 0, text.len()).text;
+        assert_eq!(
+            boxes("- [ ] milk\n* [x] bread\n+ [X] eggs\n1. [ ] call\n  - [x] in"),
+            "- ☐ milk\n* ✅ bread\n+ ✅ eggs\n1. ☐ call\n  - ✅ in"
+        );
+        for text in [
+            "- [ ]",
+            "- [ ]milk",
+            "- [y] milk",
+            "- [  ] milk",
+            "[ ] milk",
+            "> - [ ] milk",
+            "- \\[ ] milk",
+            "- `[ ] milk`",
+            "- [ ](https://x.org) milk",
+            "```\n- [ ] milk\n```",
+            "| a |\n|---|\n| - [ ] b |",
+            "- ☐ milk",
+        ] {
+            assert_eq!(boxes(text), text, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn task_boxes_only_on_the_lines_touched_with_offsets_kept() {
+        let text = "- [ ] a\n- [x] b\n- [ ] c";
+        assert_eq!(
+            task_boxes(text, 6, 6),
+            change("- ☐ a\n- [x] b\n- [ ] c", 6, 6)
+        );
+        assert_eq!(
+            task_boxes(text, 8, 16),
+            change("- [ ] a\n- ✅ b\n- [ ] c", 8, 16)
+        );
+        assert_eq!(task_boxes("x\n- [ ] ", 8, 8), change("x\n- ☐ ", 8, 8));
+        assert_eq!(task_boxes("- [ ]", 5, 5).text, "- [ ]");
+    }
+
+    #[test]
+    fn a_box_at_an_items_start_is_written_back_as_a_task_list_item() {
+        assert_eq!(
+            task_lists("- ☐ milk\n2. ✅ bread\n  * ❌ call Ann  \n- ❌ "),
+            "- [ ] milk\n2. [x] bread\n  * [x] ~~call Ann~~  \n- [x] "
+        );
+        assert_eq!(task_lists("- ❌ ~~gone~~"), "- [x] ~~gone~~");
+        assert_eq!(task_lists("- ❌ **a** b"), "- [x] ~~**a** b~~");
+        for text in [
+            "☐ milk",
+            "buy ☐ milk",
+            "- ☐",
+            "- ☐milk",
+            "- x ☐ milk",
+            "> ☐ milk",
+            "```\n- ☐ milk\n```",
+            "| a |\n|---|\n| ☐ b |",
+        ] {
+            assert_eq!(task_lists(text), text, "{text:?}");
+        }
+        let shown = "# Shop\n- ☐ milk\n- ✅ bread";
+        let back = task_lists(shown);
+        assert_eq!(task_boxes(&back, 0, back.len()).text, shown);
+    }
+
+    #[test]
+    fn saving_a_formatted_text_gives_its_task_list_items_boxes() -> Result<()> {
+        let mut n = 0;
+        let mut new_id = || {
+            n += 1;
+            Ok(format!("id:{n}"))
+        };
+        let text = "- [ ] milk\n- [x] bread\n```\n- [ ] code\n```";
+        let saved = crate::text_boxes::convert(text, crate::text_format::MARKDOWN, &mut new_id)?;
+        assert_eq!(
+            crate::text_boxes::strip(&saved),
+            "- ☐ milk\n- ✅ bread\n```\n- [ ] code\n```"
+        );
+        assert_eq!(crate::text_boxes::find(&saved).len(), 2);
+        for format in [crate::text_format::PLAIN, crate::text_format::CODE] {
+            assert_eq!(crate::text_boxes::convert(text, format, &mut new_id)?, text);
+        }
+        Ok(())
     }
 }

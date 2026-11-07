@@ -87,3 +87,7 @@ Amended by ADR 0038: `read_note` reports a Note's name and description beside it
 ## Code text (#213)
 
 Amended by #213: `list_notes` and `read_note` report the format of a Note's text (`textFormat`: `plain`, `markdown` or `code`), and `set_text_format` sets the format of a Plain Note's text as a Pending Change through `Notes::set_format` (ADR 0018): a plain or formatted text becomes code and back, a formatted text never plain, and a Note of another kind is refused; `make_list`, `make_tally` and `make_session` refuse a Note whose text is code. It writes the Note's `text`, as `edit_note` does, so no trust rule changed; the review shows it with the other text changes.
+
+## Sets and Check fields (#264)
+
+Amended by #264 (ADR 0028): `read_note` reports a Tally's `bar` and `sets` and each field's `check` and `countsSets` instead of what it multiplies; `read_tally_entries` reports each entry's `sets`, a row of values per set, and what it counts per field, without factors. `make_tally` and the new `set_tally` take `bar` and `sets`, `add_tally_field` takes `check`; no tool sets `multiplies`. An AI Task may write `tally:bar`, `tally:sets` and a field's `kind`, no longer its `multiplies`.

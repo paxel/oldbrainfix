@@ -11,6 +11,7 @@ final english = HelpTexts(
   areaName: 'Old Brain Fix',
   quickStartTitle: 'Quick start',
   quickStartLines: const ['Capture a thought with +', 'File it into an Area'],
+  quickStartDescription: 'On the desktop:\nCapture: Ctrl+N\nFile: drag it',
   iconsText: 'What the icons mean\n\nKind: what the Note is',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1]),
@@ -26,6 +27,7 @@ final german = HelpTexts(
     'Einen Gedanken mit + erfassen',
     'Ihn in einen Bereich einsortieren',
   ],
+  quickStartDescription: 'Auf dem Desktop:\nErfassen: Strg+N\nAblegen: ziehen',
   iconsText: 'Was die Symbole bedeuten',
   iconPictures: [
     Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 2]),
@@ -93,7 +95,24 @@ void main() {
       }
       expect(Notes(ann).unsorted(), isEmpty);
       final list = Checklists(ann).byNote(HelpNotes.quickStartId(p))!;
-      expect(Notes(ann).byId(HelpNotes.quickStartId(p))!.text, 'Quick start');
+      // Named "Quick start", the desktop's way folded under it (#260).
+      final text = Notes(ann).byId(HelpNotes.quickStartId(p))!.text;
+      expect(
+        text,
+        'Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it',
+      );
+      // Formatted, so the links of its steps open (#261); so is What the
+      // icons mean.
+      expect(
+        Notes(ann).byId(HelpNotes.quickStartId(p))!.textFormat,
+        TextFormats.markdown,
+      );
+      expect(
+        Notes(ann).byId(HelpNotes.iconsId(p))!.textFormat,
+        TextFormats.markdown,
+      );
+      expect(NoteKinds.name(text), english.quickStartTitle);
+      expect(NoteKinds.description(text), english.quickStartDescription);
       expect([for (final l in list.lines) l.text], english.quickStartLines);
       expect(
         [for (final l in list.lines) l.id],
@@ -229,8 +248,20 @@ void main() {
         expect(
           [title, ...words],
           anyOf(
-            equals([english.quickStartTitle, ...english.quickStartLines]),
-            equals([german.quickStartTitle, ...german.quickStartLines]),
+            equals([
+              NoteKinds.join(
+                english.quickStartTitle,
+                english.quickStartDescription,
+              ),
+              ...english.quickStartLines,
+            ]),
+            equals([
+              NoteKinds.join(
+                german.quickStartTitle,
+                german.quickStartDescription,
+              ),
+              ...german.quickStartLines,
+            ]),
           ),
         );
       }

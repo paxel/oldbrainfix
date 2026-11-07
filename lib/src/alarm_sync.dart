@@ -22,12 +22,13 @@ import 'unit_system.dart';
 /// count was tapped. The Changes Nudge (#109) is armed anew when a
 /// Profile changes, and when [replan] says changes were sent.
 class AlarmSync extends ChangeNotifier {
-  /// The permissions whose absence the red banner always shows; the
-  /// full-screen one counts as well while any Routine escalates.
-  static const needed = [
-    AlarmPermission.notifications,
-    AlarmPermission.exactAlarms,
-  ];
+  /// The permissions only Escalation needs: their absence shows in the
+  /// red banner only while any Routine escalates; that of the platform's
+  /// other [AlarmPlatform.steps] always does.
+  static const forEscalation = {
+    AlarmPermission.fullScreen,
+    AlarmPermission.alarms,
+  };
 
   final Store store;
   final AlarmPlatform platform;
@@ -104,14 +105,17 @@ class AlarmSync extends ChangeNotifier {
   /// the platform has answered.
   bool granted(AlarmPermission permission) => _granted[permission] ?? true;
 
-  /// The [needed] permissions missing, for the red banner, and the
-  /// full-screen one while any Routine escalates; none where there is no
-  /// alarm layer.
+  /// The platform's permissions missing, for the red banner, those
+  /// [forEscalation] only while any Routine escalates; none where there
+  /// is no alarm layer.
   List<AlarmPermission> get missing => [
     if (platform.available)
-      for (final p in [...needed, if (_escalating) AlarmPermission.fullScreen])
-        if (!granted(p)) p,
+      for (final p in platform.steps)
+        if ((_escalating || !forEscalation.contains(p)) && !granted(p)) p,
   ];
+
+  /// The permissions the setup walks through, in order.
+  List<AlarmPermission> get steps => platform.steps;
 
   /// The Occurrence ringing as a full-screen alarm, as of the last
   /// [refresh]; null when none rings.

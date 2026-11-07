@@ -359,7 +359,7 @@
       "html": "<h1>Shopping</h1>\n<ul><li><strong>milk</strong> and <del>bread</del></li><li>☐ eggs</li></ul>\n",
       "photos": [],
       "recordings": [],
-      "text": "# Shopping\n- **milk** and ~~bread~~\n- ☐ eggs"
+      "text": "# Shopping\n- **milk** and ~~bread~~\n- [ ] eggs"
     },
     "note:00000000000000000000000000000007": {
       "html": "<h1>Empty</h1>\n",

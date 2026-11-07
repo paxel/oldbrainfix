@@ -6,7 +6,9 @@
 //! `AllRoutinesScreen`.
 //! Each card carries its Area's colour and icon, as on the Agenda. Those
 //! whose schedule a newer version of the app saved follow, saying so, a
-//! click opening their Note (ADR 0034); they are in no file.
+//! click opening their Note (ADR 0034); they are in no file. One whose
+//! Note is in the trash or deleted says so, so it is easy to find and
+//! delete (#262).
 
 use std::collections::HashMap;
 
@@ -32,9 +34,10 @@ pub enum AllRoutinesAction {
     Export,
 }
 
-/// A Routine or Reminder as the page lists it: with its name and its
-/// Note's Area.
-pub type Row = (Routine, String, Option<Area>);
+/// A Routine or Reminder as the page lists it: with its name, its Note's
+/// Area and, when its Note is in the trash or deleted, the line saying
+/// so.
+pub type Row = (Routine, String, Option<Area>, Option<&'static str>);
 
 /// A Routine or Reminder whose schedule a newer version of the app saved
 /// (ADR 0034), as the page lists it.
@@ -115,14 +118,15 @@ pub fn page(
     list_scroll(ui, "all routines", |ui| {
         ui.spacing_mut().item_spacing.y = 12.0;
         ui.add_space(4.0);
-        for (routine, name, area) in rows {
+        for (routine, name, area, mark) in rows {
             let icon = if routine.is_reminder() {
                 icons::REMINDER
             } else {
                 icons::REPEAT
             };
             let when = schedule_text(t, &routine.schedule);
-            if card(ui, tones, (&routine.id, name, area.as_ref()), icon, &when) {
+            let shown = (routine.id.as_str(), name.as_str(), area.as_ref());
+            if card(ui, tones, shown, icon, (&when, *mark)) {
                 actions.push(AllRoutinesAction::Open(routine.id.clone()));
             }
         }
@@ -133,7 +137,7 @@ pub fn page(
                 tones,
                 (&row.id, &row.name, row.area.as_ref()),
                 icons::HISTORY,
-                when,
+                (when, None),
             ) {
                 actions.push(AllRoutinesAction::OpenNote(row.note.clone()));
             }
@@ -142,14 +146,15 @@ pub fn page(
 }
 
 /// One Routine or Reminder as a card: `icon` for its kind, its name and
-/// `when` below it, its Area's colour down its side and its icon at the
-/// end. Whether it was clicked.
+/// `when` below it, then `mark` in the error colour when its Note is in
+/// the trash or deleted, its Area's colour down its side and its icon at
+/// the end. Whether it was clicked.
 fn card(
     ui: &mut Ui,
     tones: Tones,
     (routine, name, area): (&str, &str, Option<&Area>),
     icon: char,
-    when: &str,
+    (when, mark): (&str, Option<&str>),
 ) -> bool {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -164,6 +169,10 @@ fn card(
                 ui.set_max_width(width);
                 ui.add(egui::Label::new(RichText::new(first).size(15.0).color(text)).truncate());
                 ui.label(RichText::new(when).small().color(weak));
+                if let Some(mark) = mark {
+                    let error = ui.visuals().error_fg_color;
+                    ui.label(RichText::new(mark).small().color(error));
+                }
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(icon) = area.and_then(|a| icons::area_icon(a.icon.as_deref())) {

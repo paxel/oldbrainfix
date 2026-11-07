@@ -62,7 +62,7 @@ use crate::capture_choices::{
 };
 use crate::cli::note_text;
 use crate::enrich::Enricher;
-use crate::format_bar;
+use crate::format_bar::{self, Format};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::{Clipboard, Recorder};
@@ -72,6 +72,7 @@ use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::speech::SpeechModel;
 use crate::tally_view::{FieldForm, FormIntent, TallyForm};
+use crate::text_menu::{self, Pick};
 use crate::theme;
 
 /// The popup's size, and its size while a page shows.
@@ -585,6 +586,19 @@ impl CapturePopup {
                         .font(FontId::proportional(18.0))
                         .desired_width(f32::INFINITY),
                 );
+                // Its right-click menu, with the bar's formats while the
+                // bar shows (#253); Paste as the capture's Paste (#130).
+                let formats: &[Format] = if quick.format_bar {
+                    &Format::CAPTURE
+                } else {
+                    &[]
+                };
+                match text_menu::menu(ui, &t, &field, &self.text, formats) {
+                    Some(Pick::Format(format)) => format_bar::put(ui, id, &mut self.text, format),
+                    Some(Pick::Paste) if has_clipboard => self.paste(ui, id, None),
+                    Some(pick) => text_menu::apply(ui, id, &self.text, pick),
+                    None => {}
+                }
                 name_field(ui, &field, t.capture_field_name());
                 if field.changed() {
                     self.paste_empty = false;

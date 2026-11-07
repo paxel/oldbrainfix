@@ -81,7 +81,7 @@
   <strong>detailed view</strong>. The detailed view, the default, shows the Note whole; the
   compact view shows a glance by its kind: a Plain Note its first line and the two lines after it,
   a Checklist its name and "3 of 7 open", a Shopping List its name and "4 open", a Tally its name
-  and each field's total today against its target, such as "Pages 30 / 50 pages", in a Shared
+  and each field's total of the current bar, today's for a Tally of days, against its target, such as "Pages 30 / 50 pages", in a Shared
   Area of your own entries, and a Session its name, the next run of any of its Routines and
   "done 4 / skipped 1 this week" over all of them. The compact view has no Capture Context and none
   of the buttons at the bottom of the card; its ⋮ sits top right and offers <strong>File
@@ -309,8 +309,9 @@
   A Tally is a Note that records how much of something was done, such as push-ups, pages read or
   minutes of video. Tallies are made in Advanced. The New Tally page holds its
   <strong>Name</strong>, then a row per field, one at first, and <strong>Add field</strong> for the
-  next. A field's row is its name and three badges: how a day with several entries counts, Sum or
-  Largest, shown as an icon, its unit and its target. A tap on a badge opens its small editor.
+  next. A field's row is its name and its badges: its kind, a number or a Check field; how several
+  sets or entries in a bar count, Sum or Largest, shown as an icon; its unit; and its target. A
+  Check field has no unit and no rule. A tap on a badge opens its small editor.
   <strong>Save</strong> makes the Tally with every field that has a name; rows left without one are
   dropped; Save asks for a Name, at least one field with a name and targets that are numbers.
   <strong>Make it a Tally</strong> in the ⋮ of a Note's card, or of the capture screen, opens the
@@ -318,9 +319,9 @@
 </p>
 <p>
   A field has a <strong>Name</strong>, a <strong>Unit</strong>, an optional
-  <strong>Target</strong>, prefilled in every new entry, and how "A day with several entries counts":
-  <strong>Their sum</strong> or <strong>The largest</strong>, which follows the kind of unit until
-  it is picked. The unit is typed into one field. Under it, the known units of time, distance, mass,
+  <strong>Target</strong> per bar of the chart, prefilled in every new entry, and how "Several sets
+  or entries in a bar count": <strong>Their sum</strong> or <strong>The largest</strong>, which
+  follows the kind of unit until it is picked. The unit is typed into one field. Under it, the known units of time, distance, mass,
   speed, temperature and angle that match what is typed show as suggestions, by their symbol or
   their name in English or German: "k" offers kg, km and km/h, "min" offers min. A tap on a
   suggestion picks that known unit; anything else typed, such as "pages", stays a unit of your own,
@@ -331,21 +332,28 @@
   and come back with <strong>Show field again</strong>.
 </p>
 <p>
-  <strong>Multiplies</strong> makes a field the factor of another field of the same Tally, such as
-  Rounds of Push-ups. In each entry the other field then counts as the two values multiplied:
-  3 rounds of 10 push-ups count as 30 in the totals, the targets and the charts, and the entry shows
-  "Push-ups 3 × 10 times". An entry without a value for the multiplier counts the other field as it
-  is. The multiplier counts no value of its own: it has no total, no chart and no target, and its
-  page shows neither. This applies to older entries too. A field multiplies one other field shown,
-  never itself, one that multiplies, or while another field multiplies it; hiding the field it
-  multiplies makes it a field of its own again. <strong>Nothing</strong> does so too.
+  A new field's <strong>Kind of field</strong> is <strong>Number</strong> or
+  <strong>Check field</strong>. A Check field is a box in each entry; a tick counts as 1, so its
+  chart shows how often it was done, such as one Tally per room, Bathroom and Kitchen, for a
+  cleaning Session to pick. Its kind stays once it is added.
 </p>
 <p>
-  The Note's editor holds the setup: under "Fields" each field's name with its rule, unit and target
-  as badges, the rule as its icon, the unit and target as text, such as "pages" and "50 pages", what
-  it multiplies while it does or may, such as "Push-ups" or "Nothing", a multiplier without its rule
-  and target, and "Hidden" while it is hidden. A tap on the name or a badge opens the field's page;
-  <strong>Add field</strong> opens the page of a new one. The editor shows no chart and no entries.
+  The Note's editor holds the setup. Under "Fields" first two badges of the Tally itself:
+  <strong>One bar per</strong> <strong>Day</strong>, <strong>Week</strong>, <strong>Month</strong>
+  or <strong>Year</strong>, the length of a bar of its charts, a day at first; its targets count per
+  bar, so a target of 2 on a Tally of months is 2 a month. And <strong>Counts in sets</strong>, off
+  at first: switched on, each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8, and
+  each field totals the sets of an entry by its rule, reps by their sum, a weight by the largest.
+  Both are kept with the Tally, on all your Devices and for everyone in a Shared Area. Then each
+  field's name with its rule, unit and target as badges, the rule as its icon, the unit and target
+  as text, such as "pages" and "50 pages", a Check field its kind and target, and "Hidden" while it
+  is hidden. A tap on the name or a badge opens the field's page; <strong>Add field</strong> opens
+  the page of a new one. The editor shows no chart and no entries.
+</p>
+<p>
+  A Tally whose field multiplied another one in an earlier version, such as 3 Rounds of 20
+  Push-ups, counts in sets: that entry shows as three sets of 20 push-ups. The field that multiplied
+  says "Counts the sets of older entries" and shows no more in the entry form.
 </p>
 <p>
   On the desktop the New Tally page is a dialog over the window, with <strong>Save</strong> and
@@ -362,36 +370,37 @@
 <guide-box name="tally-entry">
 <h2>Record what you did in a Tally</h2>
 <p>Add an entry and see it in the Tally's chart.</p>
-<box-tab device="phone" alt="The detailed card of a Tally of pages read: Add entry, one bar per day, and its chart with the target as a line">
+<box-tab device="phone" alt="The detailed card of a Tally of pages read: Add entry and its chart of slim bars, the newest on the right, with the target as a line">
 <li>Tap <strong>Add entry</strong> on the Tally's card.</li>
-<li>Type the values.</li>
+<li>Type the values and tick the boxes.</li>
+<li>Tap <strong>Add set</strong> for each further set.</li>
 <li>Tap <strong>Save</strong>.</li>
-<li>Tap <strong>Day</strong>, <strong>Week</strong>, <strong>Month</strong> or <strong>Year</strong> for the bars.</li>
 </box-tab>
-<box-tab device="desktop" alt="The detailed card of a Tally of pages read: Add entry, One bar per Day, Week, Month or Year, and its chart with the target as a line">
+<box-tab device="desktop" alt="The detailed card of a Tally of pages read: Add entry and its chart of slim bars, the newest on the right, with the target as a line">
 <li>Click <strong>Add entry</strong> on the Tally's card.</li>
-<li>Type the values.</li>
+<li>Type the values and tick the boxes.</li>
+<li>Click <strong>Add set</strong> for each further set.</li>
 <li>Click <strong>Save</strong>.</li>
-<li>Click <strong>Day</strong>, <strong>Week</strong>, <strong>Month</strong> or <strong>Year</strong> for the bars.</li>
 </box-tab>
 <box-more>
 <p>
   The Tally shows on its card in the detailed view: under its name <strong>Add entry</strong>, then
-  "One bar per" <strong>Day</strong>, <strong>Week</strong>, <strong>Month</strong> or
-  <strong>Year</strong>, one chart per field shown, and the entries, newest first. The latest five
-  show; the older ones are folded under how many they are, such as "12 older entries", which a tap
-  shows and hides again. The length of a bar and the older entries shown are kept per Tally on this
-  Device. On the phone <strong>Add entry</strong> is also in the ⋮ of the Tally's card.
+  one chart per field shown, a bar per the Tally's "One bar per", and the entries, newest first. The
+  latest five show; the older ones are folded under how many they are, such as "12 older entries",
+  which a tap shows and hides again, kept per Tally on this Device. On the phone
+  <strong>Add entry</strong> is also in the ⋮ of the Tally's card.
 </p>
 <ul>
-  <li>An entry holds a value per field, prefilled with the targets, so saving the targets is one tap; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30.</li>
-  <li>Each chart shows a bar per day, week, month or year, as many as fit the width, the target as a line, the days the bars cover and the highest bar's value.</li>
+  <li>An entry holds a box per Check field, ticked once per entry above the sets; a value per number field, prefilled with the targets, so saving the targets is one tap; the <strong>Date</strong> it counts for, today for a new one; and one <strong>Line of text</strong>. A value left empty is none. Numbers are typed like 12, 2.5 or 1:30.</li>
+  <li>In a Tally that counts in sets the values come as "Set 1", "Set 2" and so on, a row across the number fields each. <strong>Add set</strong> adds a set that starts with the values of the set before; a set after the first can be removed. The entry shows each set on a line of its own, such as "1. Weight 60 kg · Reps 10".</li>
+  <li>Each chart shows slim bars of a fixed width with gaps, the newest on the right and as many as fit the width, the target as a thin line, the days the bars cover and the highest bar's value. A single bar stays slim. Older values are in the entries; the chart does not scroll sideways.</li>
+  <li>The compact card shows each field's total of the current bar against its target, today's for a Tally of days.</li>
   <li>A tap on an entry opens it to change; a long press offers <strong>Edit</strong> and <strong>Delete</strong>. Delete asks once; the entry can be restored under the folded "Removed entries".</li>
   <li>In a Shared Area, "Show entries" chooses <strong>Mine</strong>, <strong>Everyone's</strong> or one person's; your own show at first.</li>
 </ul>
 <p>
   On the desktop a Tally's card shows the same in its detailed view as on the phone; its buttons,
-  chips, radio buttons and entries take their own click, a click beside them selects the card. A click on
+  radio buttons and entries take their own click, a click beside them selects the card. A click on
   an entry opens it; a right-click offers <strong>Edit</strong> and <strong>Delete</strong>. The
   card's ⋮ has no Add entry. The entry's Date has buttons for the day before and the day after.
 </p>
@@ -452,8 +461,10 @@
 </ul>
 <p>
   The detailed view of a Session's card shows its pool, today's picks of each of its Routines, to be
-  recorded there as on the Agenda, and how often it was done and skipped in each of the last four
-  weeks. Each Routine has its own Streak and Adherence.
+  recorded there as on the Agenda, how often it was done and skipped in each of the last four
+  weeks, and its latest five past runs, newest first: the date and time of each and each picked
+  Tally, done or not done, such as "Push-ups: done". Its page in the Note editor lists all of its
+  past runs under its badges. Each Routine has its own Streak and Adherence.
 </p>
 <p>
   <strong>On the Agenda</strong>: today's row of each Routine of a Session lists its picks indented
@@ -522,6 +533,14 @@
   box unchecks it. A long press offers <strong>Delete</strong>, which asks once; the Frog goes to
   the Trash and its Note stays. In a Shared Area a Manager makes and deletes Frogs, and anyone with
   a role checks them off; a Frog one person eats is eaten for everyone.
+</p>
+<p>
+  The Note editor shows a Note's Frog as a <strong>Frog</strong> badge with the frog: Open while it
+  is not eaten, then Eaten today or Eaten yesterday, after which the badge goes; it shows in Simple
+  too. A tap offers <strong>Eat now</strong>, which checks it off, while it is open, and
+  <strong>Remove the Frog</strong>, which asks once as Delete does and moves it to the Trash; its Note
+  stays. In a Shared Area anyone with a role may eat it and a Manager may remove it. On the desktop
+  the badge sits in the Note dialog and a click opens the same menu.
 </p>
 <p>
   On the desktop <strong>Frogs</strong> on the left, below All Notes, and <strong>View ▸

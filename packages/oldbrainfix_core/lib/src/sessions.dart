@@ -172,6 +172,23 @@ class SessionOccurrence {
   bool get complete => picks.isNotEmpty && picks.every((p) => p.done);
 }
 
+/// One past run of a Session (#264): an Occurrence of one of its
+/// Routines with its pick.
+class SessionRun {
+  final String routineId;
+  final Occurrence occurrence;
+
+  /// The Tallies picked, as their Notes in the pick's order, each with
+  /// whether an entry not removed was recorded for it in the run.
+  final List<({String noteId, bool done})> picks;
+
+  const SessionRun({
+    required this.routineId,
+    required this.occurrence,
+    required this.picks,
+  });
+}
+
 /// What a Session's Routine holds of its picks and of the entries
 /// recorded for them, by Occurrence key, only what counts: in a Shared
 /// Area what the roles allow (ADR 0013), anywhere else what the user's
@@ -537,6 +554,42 @@ class Sessions {
     return Session(routine: routine, setup: setup);
   }
 
+  /// The past runs of the Session [noteId] (#264): every Occurrence of
+  /// its Routines before today on [wallClock] that holds a pick, newest
+  /// first, by Routine on the same moment, each Tally of the pick done or
+  /// not by the entries recorded for it.
+  List<SessionRun> runs(String noteId, WallClock wallClock) {
+    final today = Day.today(store.clock(), wallClock);
+    final runs = <SessionRun>[];
+    for (final session in ofNote(noteId)) {
+      final marks = SessionMarks.of(store, session.id);
+      for (final MapEntry(:key, value: picks) in marks.picks.entries) {
+        final occurrence = Occurrence.tryParse(key);
+        if (occurrence == null || !(occurrence.day < today)) continue;
+        runs.add(
+          SessionRun(
+            routineId: session.id,
+            occurrence: occurrence,
+            picks: [
+              for (final pick in picks)
+                (
+                  noteId: pick,
+                  done: marks.entriesFor(store, key, pick).isNotEmpty,
+                ),
+            ],
+          ),
+        );
+      }
+    }
+    runs.sort((a, b) {
+      final byOccurrence = b.occurrence.compareTo(a.occurrence);
+      return byOccurrence != 0
+          ? byOccurrence
+          : a.routineId.compareTo(b.routineId);
+    });
+    return runs;
+  }
+
   /// Whether the Routine [id] runs a Session.
   bool isSession(String id) => byId(id) != null;
 
@@ -662,14 +715,15 @@ class Sessions {
   }
 
   /// Records an entry in the Tally of [noteId] picked for [occurrence]
-  /// of the Session [id], with [values] by field id in the base unit and
-  /// a text [line]. Once every pick has one, the Occurrence is Done for
-  /// everyone the Session reaches.
+  /// of the Session [id], with [values] by field id in the base unit, its
+  /// further sets [more] (#264) and a text [line]. Once every pick has
+  /// one, the Occurrence is Done for everyone the Session reaches.
   TallyEntry record(
     String id,
     Occurrence occurrence,
     String noteId, {
     Map<String, double> values = const {},
+    List<Map<String, double>> more = const [],
     String line = '',
   }) {
     final session = _requireDue(id, occurrence);
@@ -683,6 +737,7 @@ class Sessions {
     return Tallies(store).add(
       noteId,
       values: values,
+      more: more,
       line: line,
       within: (entryId) {
         _writePick(id, occurrence, wanted, marks);

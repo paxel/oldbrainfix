@@ -3,7 +3,8 @@
   Old Brain Fix has no sync over the internet of its own. Devices far apart sync through a shared
   folder that another app carries between them: Syncthing from device to device, or Autosync through
   a cloud such as Google Drive, Dropbox or OneDrive. Everything Old Brain Fix writes into the folder
-  is encrypted. Each box below shows the steps on the phone and on the desktop.
+  is encrypted. Each box below shows the steps on the phone and on the desktop. On the iPhone, iCloud
+  Drive or Möbius Sync carries the folder.
 </p>
 
 <guide-box name="syncthing-own">
@@ -30,6 +31,14 @@
   from it and is updated; it is on F-Droid and on Google Play. On the computer, syncthing.net lists
   Syncthing for Linux, Windows and macOS: Linux distributions package it, and for Windows and macOS it
   names installers such as Syncthing Windows Setup, SyncTrayzor and syncthing-macos.
+</p>
+<p>
+  On the iPhone, Möbius Sync, by Pickup Infinity, is a Syncthing app from the App Store. It is free
+  for up to 20 MB of files in total; a one-time in-app purchase lifts the limit. Its folders show in
+  the Files app, so <strong>Choose folder</strong> in Old Brain Fix can pick one. iOS lets Möbius Sync
+  sync only while it is open, for a short time after, and when iOS wakes it; its FAQ says syncing may
+  take 24 hours to start and then runs about 1 to 2 hours a day. Open Möbius Sync now and then to
+  bring changes in sooner.
 </p>
 <p>
   Pair your Devices once in person first (see
@@ -111,6 +120,17 @@
   On the computer, the clouds' own desktop apps sync a real folder: the Nextcloud desktop app on
   Linux, Windows and macOS, the Dropbox folder in File Explorer or Finder and on Linux, and Google
   Drive for desktop, which mirrors My Drive into a folder on Windows and macOS.
+</p>
+<p>
+  On the iPhone, iCloud Drive needs no other app: tap <strong>Choose folder</strong> and pick a folder
+  in iCloud Drive. A Mac reaches the same folder in the Finder, and a Windows PC with iCloud for
+  Windows, which keeps iCloud Drive in <code>C:\Users\&lt;name&gt;\iCloud Drive</code>. Apple has
+  no iCloud Drive app for Android or Linux, only iCloud.com in the browser, which keeps no folder in
+  sync: with an Android phone or a Linux computer, use Syncthing, with Möbius Sync on the iPhone.
+</p>
+<p>
+  Old Brain Fix on the iPhone syncs through the folder while it is open. In the background it syncs
+  only when iOS gives it time, and iOS decides when that is.
 </p>
 </box-more>
 </guide-box>

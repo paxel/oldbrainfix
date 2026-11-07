@@ -1,0 +1,11 @@
+/* While the share is being kept (#241). */
+"keeping" = "Wird für Old Brain Fix aufbewahrt …";
+
+/* The share waits in the App Group until the app opens (#241). */
+"kept" = "Für Old Brain Fix aufbewahrt. Es öffnet sich dort, wenn du die App das nächste Mal öffnest.";
+
+/* Nothing could be kept (#241). */
+"notKept" = "Old Brain Fix konnte das nicht aufbewahren. Es wurde nichts geändert.";
+
+/* Closes the share sheet's card (#241). */
+"ok" = "OK";

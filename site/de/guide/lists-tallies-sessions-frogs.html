@@ -84,7 +84,7 @@
   <strong>Detailansicht</strong>. Die Detailansicht, die Voreinstellung, zeigt die Notiz ganz; die
   Kompaktansicht zeigt einen Blick nach ihrer Art: eine einfache Notiz ihre erste Zeile und die zwei
   Zeilen danach, eine Checkliste ihren Namen und „3 von 7 offen“, eine Einkaufsliste ihren Namen und
-  „4 offen“, eine Strichliste ihren Namen und je Feld die Summe von heute gegen ihr Ziel, etwa
+  „4 offen“, eine Strichliste ihren Namen und je Feld die Summe des aktuellen Balkens, bei einer Strichliste von Tagen die von heute, gegen ihr Ziel, etwa
   „Seiten 30 / 50 Seiten“, in einem geteilten Bereich aus deinen eigenen Einträgen, und eine Einheit
   ihren Namen, den nächsten Lauf einer ihrer Routinen und „diese Woche 4 erledigt / 1 ausgelassen“
   über alle. Die Kompaktansicht hat keinen Erfassungskontext und keine der Schaltflächen unten an der
@@ -323,9 +323,11 @@
   Eine Strichliste ist eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze,
   gelesene Seiten oder Minuten Video. Strichlisten werden in Erweitert angelegt. Die Seite Neue
   Strichliste enthält ihren <strong>Namen</strong>, dann eine Reihe je Feld, anfangs eine, und
-  <strong>Feld hinzufügen</strong> für das nächste. Die Reihe eines Felds ist sein Name mit drei
-  Plaketten: wie ein Tag mit mehreren Einträgen zählt, Summe oder Größter Wert, als Symbol gezeigt,
-  seine Maßeinheit und sein Ziel. Ein Tippen auf eine Plakette öffnet ihren kleinen Editor.
+  <strong>Feld hinzufügen</strong> für das nächste. Die Reihe eines Felds ist sein Name mit seinen
+  Plaketten: seine Art, eine Zahl oder ein Abhakfeld; wie mehrere Sätze oder Einträge in einem
+  Balken zählen, Summe oder Größter Wert, als Symbol gezeigt; seine Maßeinheit; und sein Ziel. Ein
+  Abhakfeld hat keine Maßeinheit und keine Regel. Ein Tippen auf eine Plakette öffnet ihren kleinen
+  Editor.
   <strong>Speichern</strong> legt die Strichliste mit jedem Feld an, das einen Namen hat; Reihen
   ohne Namen fallen weg; Speichern verlangt einen Namen, mindestens ein Feld mit Namen und Ziele,
   die Zahlen sind. <strong>Zur Strichliste machen</strong> im ⋮ der Karte einer Notiz oder des
@@ -334,9 +336,9 @@
 </p>
 <p>
   Ein Feld hat einen <strong>Namen</strong>, eine <strong>Maßeinheit</strong>, ein freiwilliges
-  <strong>Ziel</strong>, das in jedem neuen Eintrag vorausgefüllt ist, und wie „Ein Tag mit mehreren
-  Einträgen zählt“: <strong>Ihre Summe</strong> oder <strong>Den größten Wert</strong>, was der Art
-  der Maßeinheit folgt, bis es gewählt ist. Die Maßeinheit wird in ein Feld getippt. Darunter
+  <strong>Ziel</strong> je Balken des Diagramms, das in jedem neuen Eintrag vorausgefüllt ist, und
+  wie „Mehrere Sätze oder Einträge in einem Balken zählen“: <strong>Ihre Summe</strong> oder
+  <strong>Den größten Wert</strong>, was der Art der Maßeinheit folgt, bis es gewählt ist. Die Maßeinheit wird in ein Feld getippt. Darunter
   erscheinen die bekannten Maßeinheiten für Zeit, Strecke, Masse, Geschwindigkeit, Temperatur und
   Winkel, die zum Getippten passen, als Vorschläge, nach ihrem Kürzel oder ihrem deutschen oder
   englischen Namen: „k“ schlägt kg, km und km/h vor, „min“ schlägt min vor. Ein Tippen auf einen
@@ -349,25 +351,32 @@
   gespeichert und kommen mit <strong>Feld wieder zeigen</strong> zurück.
 </p>
 <p>
-  <strong>Multipliziert</strong> macht ein Feld zum Faktor eines anderen Felds derselben
-  Strichliste, etwa Runden von Liegestützen. In jedem Eintrag zählt das andere Feld dann als die
-  beiden Werte multipliziert: 3 Runden zu 10 Liegestützen zählen als 30 in den Summen, den Zielen
-  und den Diagrammen, und der Eintrag zeigt „Liegestütze 3 × 10 mal“. Ein Eintrag ohne Wert für den
-  Multiplikator zählt das andere Feld, wie es ist. Der Multiplikator zählt keinen eigenen Wert: Er
-  hat keine Summe, kein Diagramm und kein Ziel, und seine Seite zeigt beides nicht. Das gilt auch
-  für ältere Einträge. Ein Feld multipliziert ein anderes gezeigtes Feld, nie sich selbst, keines,
-  das multipliziert, und nicht, solange ein anderes Feld es multipliziert; wird das Feld, das es
-  multipliziert, ausgeblendet, ist es wieder ein eigenes Feld. <strong>Nichts</strong> macht es
-  ebenso.
+  Die <strong>Art des Feldes</strong> eines neuen Felds ist <strong>Zahl</strong> oder
+  <strong>Abhakfeld</strong>. Ein Abhakfeld ist ein Kästchen in jedem Eintrag; ein Haken zählt als
+  1, so zeigt sein Diagramm, wie oft es getan wurde, etwa eine Strichliste je Raum, Bad und Küche,
+  aus denen eine Einheit fürs Putzen auswählt. Seine Art bleibt, sobald es hinzugefügt ist.
 </p>
 <p>
-  Der Editor der Notiz enthält die Einrichtung: unter „Felder“ den Namen jedes Felds mit seiner
-  Regel, seiner Maßeinheit und seinem Ziel als Plaketten, die Regel als ihr Symbol, Maßeinheit und
-  Ziel als Text, etwa „Seiten“ und „50 Seiten“, was es multipliziert, solange es das tut oder kann,
-  etwa „Liegestütze“ oder „Nichts“, ein Multiplikator ohne Regel und Ziel, und „Ausgeblendet“,
-  solange es ausgeblendet ist. Ein Tippen auf den Namen oder eine Plakette öffnet die Seite des
-  Felds; <strong>Feld hinzufügen</strong> öffnet die Seite eines neuen. Der Editor zeigt kein
-  Diagramm und keine Einträge.
+  Der Editor der Notiz enthält die Einrichtung. Unter „Felder“ stehen zuerst zwei Plaketten der
+  Strichliste selbst: <strong>Ein Balken pro</strong> <strong>Tag</strong>,
+  <strong>Woche</strong>, <strong>Monat</strong> oder <strong>Jahr</strong>, die Länge eines
+  Balkens ihrer Diagramme, anfangs ein Tag; ihre Ziele zählen je Balken, ein Ziel von 2 auf einer
+  Strichliste von Monaten ist also 2 im Monat. Und <strong>Zählt in Sätzen</strong>, anfangs aus:
+  eingeschaltet hält jeder Eintrag mehrere Sätze, etwa 60 kg × 10 und dann 65 kg × 8, und jedes Feld
+  fasst die Sätze eines Eintrags nach seiner Regel zusammen, Wiederholungen als Summe, ein Gewicht
+  als das größte. Beides gehört zur Strichliste, auf allen deinen Geräten und für alle in einem
+  geteilten Bereich. Dann der Name jedes Felds mit seiner Regel, seiner Maßeinheit und seinem Ziel
+  als Plaketten, die Regel als ihr Symbol, Maßeinheit und Ziel als Text, etwa „Seiten“ und „50
+  Seiten“, ein Abhakfeld mit seiner Art und seinem Ziel, und „Ausgeblendet“, solange es
+  ausgeblendet ist. Ein Tippen auf den Namen oder eine Plakette öffnet die Seite des Felds;
+  <strong>Feld hinzufügen</strong> öffnet die Seite eines neuen. Der Editor zeigt kein Diagramm und
+  keine Einträge.
+</p>
+<p>
+  Eine Strichliste, deren Feld in einer früheren Version ein anderes multiplizierte, etwa 3 Runden
+  zu 20 Liegestützen, zählt in Sätzen: Dieser Eintrag zeigt sich als drei Sätze zu 20 Liegestützen.
+  Das Feld, das multiplizierte, sagt „Zählt die Sätze älterer Einträge“ und steht nicht mehr im
+  Eintragsformular.
 </p>
 <p>
   Auf dem Desktop ist die Seite Neue Strichliste ein Dialog über dem Fenster, mit
@@ -385,37 +394,38 @@
 <guide-box name="tally-entry">
 <h2>In einer Strichliste festhalten, was du getan hast</h2>
 <p>Füge einen Eintrag hinzu und sieh ihn im Diagramm der Strichliste.</p>
-<box-tab device="phone" alt="Die Detailansicht der Karte einer Strichliste gelesener Seiten: Eintrag hinzufügen, ein Balken pro Tag und ihr Diagramm mit dem Ziel als Linie">
+<box-tab device="phone" alt="Die Detailansicht der Karte einer Strichliste gelesener Seiten: Eintrag hinzufügen und ihr Diagramm aus schmalen Balken, der neueste rechts, mit dem Ziel als Linie">
 <li>Tippe <strong>Eintrag hinzufügen</strong> auf der Karte der Strichliste.</li>
-<li>Tippe die Werte ein.</li>
+<li>Tippe die Werte ein und hake die Kästchen ab.</li>
+<li>Tippe <strong>Satz hinzufügen</strong> für jeden weiteren Satz.</li>
 <li>Tippe <strong>Speichern</strong>.</li>
-<li>Tippe <strong>Tag</strong>, <strong>Woche</strong>, <strong>Monat</strong> oder <strong>Jahr</strong> für die Balken.</li>
 </box-tab>
-<box-tab device="desktop" alt="Die Detailansicht der Karte einer Strichliste gelesener Seiten: Eintrag hinzufügen, Ein Balken pro Tag, Woche, Monat oder Jahr und ihr Diagramm mit dem Ziel als Linie">
+<box-tab device="desktop" alt="Die Detailansicht der Karte einer Strichliste gelesener Seiten: Eintrag hinzufügen und ihr Diagramm aus schmalen Balken, der neueste rechts, mit dem Ziel als Linie">
 <li>Klicke <strong>Eintrag hinzufügen</strong> auf der Karte der Strichliste.</li>
-<li>Tippe die Werte ein.</li>
+<li>Tippe die Werte ein und hake die Kästchen ab.</li>
+<li>Klicke <strong>Satz hinzufügen</strong> für jeden weiteren Satz.</li>
 <li>Klicke <strong>Speichern</strong>.</li>
-<li>Klicke <strong>Tag</strong>, <strong>Woche</strong>, <strong>Monat</strong> oder <strong>Jahr</strong> für die Balken.</li>
 </box-tab>
 <box-more>
 <p>
   Die Strichliste steht auf ihrer Karte in der Detailansicht: unter ihrem Namen <strong>Eintrag
-  hinzufügen</strong>, dann „Ein Balken pro“ <strong>Tag</strong>, <strong>Woche</strong>,
-  <strong>Monat</strong> oder <strong>Jahr</strong>, ein Diagramm je gezeigtem Feld und die
-  Einträge, der neueste zuerst. Die letzten fünf stehen da; die älteren sind darunter eingeklappt,
-  mit ihrer Anzahl, etwa „12 ältere Einträge“, was ein Tippen zeigt und wieder verbirgt. Die Länge
-  eines Balkens und die gezeigten älteren Einträge behält dieses Gerät je Strichliste. Auf dem
-  Handy steht <strong>Eintrag hinzufügen</strong> auch im ⋮ der Karte der Strichliste.
+  hinzufügen</strong>, dann ein Diagramm je gezeigtem Feld, ein Balken je „Ein Balken pro“ der
+  Strichliste, und die Einträge, der neueste zuerst. Die letzten fünf stehen da; die älteren sind
+  darunter eingeklappt, mit ihrer Anzahl, etwa „12 ältere Einträge“, was ein Tippen zeigt und
+  wieder verbirgt, behalten von diesem Gerät je Strichliste. Auf dem Handy steht
+  <strong>Eintrag hinzufügen</strong> auch im ⋮ der Karte der Strichliste.
 </p>
 <ul>
-  <li>Ein Eintrag hat einen Wert je Feld, mit den Zielen vorausgefüllt, sodass das Speichern der Ziele ein Tipp ist; das <strong>Datum</strong>, für das er zählt, bei einem neuen heute; und eine <strong>Textzeile</strong>. Ein leer gelassener Wert ist keiner. Zahlen werden wie 12, 2,5 oder 1:30 getippt.</li>
-  <li>Jedes Diagramm zeigt einen Balken je Tag, Woche, Monat oder Jahr, so viele, wie in die Breite passen, das Ziel als Linie, die Tage, die die Balken abdecken, und den Wert des höchsten Balkens.</li>
+  <li>Ein Eintrag hat ein Kästchen je Abhakfeld, einmal je Eintrag über den Sätzen abgehakt; einen Wert je Zahlenfeld, mit den Zielen vorausgefüllt, sodass das Speichern der Ziele ein Tipp ist; das <strong>Datum</strong>, für das er zählt, bei einem neuen heute; und eine <strong>Textzeile</strong>. Ein leer gelassener Wert ist keiner. Zahlen werden wie 12, 2,5 oder 1:30 getippt.</li>
+  <li>In einer Strichliste, die in Sätzen zählt, kommen die Werte als „Satz 1“, „Satz 2“ und so weiter, jeder eine Reihe über die Zahlenfelder. <strong>Satz hinzufügen</strong> fügt einen Satz an, der mit den Werten des Satzes davor beginnt; ein Satz nach dem ersten lässt sich entfernen. Der Eintrag zeigt jeden Satz in einer eigenen Zeile, etwa „1. Gewicht 60 kg · Wiederholungen 10“.</li>
+  <li>Jedes Diagramm zeigt schmale Balken fester Breite mit Lücken, den neuesten rechts und so viele, wie in die Breite passen, das Ziel als dünne Linie, die Tage, die die Balken abdecken, und den Wert des höchsten Balkens. Ein einzelner Balken bleibt schmal. Ältere Werte stehen in den Einträgen; das Diagramm lässt sich nicht seitwärts schieben.</li>
+  <li>Die Kompaktansicht zeigt je Feld die Summe des aktuellen Balkens gegen sein Ziel, bei einer Strichliste von Tagen die von heute.</li>
   <li>Ein Tipp auf einen Eintrag öffnet ihn zum Ändern; langes Drücken bietet <strong>Bearbeiten</strong> und <strong>Löschen</strong>. Löschen fragt einmal nach; der Eintrag lässt sich unter dem eingeklappten „Entfernte Einträge“ wiederherstellen.</li>
   <li>In einem geteilten Bereich wählt „Einträge zeigen“ <strong>Meine</strong>, <strong>Alle</strong> oder die einer Person; zuerst stehen die eigenen da.</li>
 </ul>
 <p>
   Auf dem Desktop zeigt die Karte einer Strichliste in der Detailansicht dasselbe wie auf dem Handy;
-  ihre Knöpfe, Chips, Auswahlknöpfe und Einträge nehmen ihren eigenen Klick, ein Klick daneben wählt die
+  ihre Knöpfe, Auswahlknöpfe und Einträge nehmen ihren eigenen Klick, ein Klick daneben wählt die
   Karte. Ein Klick auf einen Eintrag öffnet ihn; ein Rechtsklick bietet <strong>Bearbeiten</strong>
   und <strong>Löschen</strong>. Das ⋮ der Karte hat kein Eintrag hinzufügen. Das Datum eines
   Eintrags hat Knöpfe für den Tag davor und den Tag danach.
@@ -482,8 +492,11 @@
 </ul>
 <p>
   Die Detailansicht der Karte einer Einheit zeigt ihren Vorrat, die heutige Auswahl jeder ihrer
-  Routinen, dort einzutragen wie in der Agenda, und wie oft sie in jeder der letzten vier Wochen
-  erledigt und ausgelassen wurde. Jede Routine hat ihre eigene Serie und Einhaltung.
+  Routinen, dort einzutragen wie in der Agenda, wie oft sie in jeder der letzten vier Wochen
+  erledigt und ausgelassen wurde, und ihre letzten fünf bisherigen Läufe, der neueste zuerst: Datum
+  und Uhrzeit jedes Laufs und jede ausgewählte Strichliste, erledigt oder nicht erledigt, etwa
+  „Liegestütze: erledigt“. Ihre Seite im Notiz-Editor listet unter ihren Plaketten alle ihre
+  bisherigen Läufe. Jede Routine hat ihre eigene Serie und Einhaltung.
 </p>
 <p>
   <strong>In der Agenda</strong>: Die heutige Zeile jeder Routine einer Einheit listet ihre Auswahl
@@ -560,6 +573,15 @@
   <strong>Löschen</strong>, das einmal nachfragt; der Frosch kommt in den Papierkorb, seine Notiz
   bleibt. In einem geteilten Bereich legt ein Verwalter Frösche an und löscht sie, und jeder mit
   einer Rolle hakt sie ab; ein Frosch, den einer isst, ist für alle gegessen.
+</p>
+<p>
+  Der Notiz-Editor zeigt den Frosch einer Notiz als Plakette <strong>Frosch</strong> mit dem Frosch:
+  Offen, solange er nicht gegessen ist, danach Heute gegessen oder Gestern gegessen, dann
+  verschwindet die Plakette; sie steht auch in Einfach da. Ein Tippen bietet <strong>Jetzt
+  essen</strong>, das ihn abhakt, solange er offen ist, und <strong>Frosch entfernen</strong>, das wie
+  Löschen einmal nachfragt und ihn in den Papierkorb legt; seine Notiz bleibt. In einem geteilten
+  Bereich darf jeder mit einer Rolle ihn essen und ein Verwalter ihn entfernen. Auf dem Desktop steht
+  die Plakette im Notiz-Dialog, und ein Klick öffnet dasselbe Menü.
 </p>
 <p>
   Auf dem Desktop öffnen <strong>Frösche</strong> links, unter Alle Notizen, und <strong>Ansicht ▸

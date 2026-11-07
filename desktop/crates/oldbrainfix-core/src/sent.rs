@@ -2407,7 +2407,7 @@ mod tests {
 
         // In his trash: the cancellation finds nothing, an update brings
         // it back, its Reminder with it.
-        Routines::new(&ben).trash_note(&got, true)?;
+        Routines::new(&ben).trash_note(&got)?;
         let cancel = ben
             .open_sent_item(&ann.send_note(&note.id, None, true)?)?
             .map_err(|_| "cancel")?;

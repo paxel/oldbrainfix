@@ -48,17 +48,18 @@ Future<bool> openPick(
     return editTallyEntry(context, notes, pick.noteId, entry.id);
   }
   final store = notes.store;
-  return recordTallyEntry(context, notes, pick.noteId, (values, line) {
+  return recordTallyEntry(context, notes, pick.noteId, (values, more, line) {
     try {
       Sessions(store).record(
         today.session.id,
         today.occurrence,
         pick.noteId,
         values: values,
+        more: more,
         line: line,
       );
     } on ArgumentError {
-      Tallies(store).add(pick.noteId, values: values, line: line);
+      Tallies(store).add(pick.noteId, values: values, more: more, line: line);
     }
   });
 }

@@ -21,6 +21,7 @@ typedef TallyFieldChoice = ({
   String unit,
   double? target,
   TallyRule rule,
+  bool check,
 });
 
 /// A Routine, Reminder or Session set up on a capture screen before its

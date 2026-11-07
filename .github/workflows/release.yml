@@ -36,8 +36,22 @@
 #                    before the bundle is uploaded
 #   screenshots    — desktop screenshots, drawn by kittest from demo data,
 #                    attached to the Release (the metainfo points at them)
+#   appstore-screenshots — the App Store's iPhone frames (1320 × 2868, en-US
+#                    and de-DE), drawn by the Flutter screenshot test as on
+#                    iOS and attached to the run; not a gate (#244)
 #   build-windows  — Rust desktop: zip with oldbrainfix.exe
 #   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
+#   ios            — the iPhone app built unsigned and its XCTest target
+#                    run on a simulator (ios.yml, the same job as on every
+#                    push to summer and a release branch); a gate: the
+#                    Release needs it
+#   testflight     — the iPhone app signed for the App Store and, when
+#                    publishing, uploaded to TestFlight; without the Apple
+#                    secrets below it skips with a notice and passes. Only
+#                    a manual dispatch with publish and submit_app_store
+#                    then submits that build for App Store review with
+#                    the listing in fastlane/metadata/ios/ (#245); a tag
+#                    never does
 #   render-channels — Homebrew cask + formula and Scoop manifest rendered from
 #                    the artifacts, uploaded as an artifact on every run
 #   fdroid         — the arm64 APK, the store listing and the same What's
@@ -49,9 +63,11 @@
 # The Whisper model is not part of any of this: the app downloads it from
 # the separate `whisper-model-v1` release, which no tag here touches.
 #
-# Publishing (Play, F-Droid, the Release, the tap and the bucket) happens on a tag, or on a manual
+# Publishing (Play, TestFlight, F-Droid, the Release, the tap and the bucket) happens on a tag, or on a manual
 # dispatch that says publish=true. A dispatch without it is the dry run:
-# every artifact is built and uploaded, nothing leaves GitHub.
+# every artifact is built and uploaded, nothing leaves GitHub. The App
+# Store submission needs both publish=true and submit_app_store=true on a
+# dispatch; a tag uploads to TestFlight and submits nothing.
 #
 # One-time setup (repository secrets):
 #   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD — upload keystore,
@@ -62,6 +78,16 @@
 #   CHANNEL_PAT_FDROID — PAT with push access to paxel/fdroid
 #   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
 #                 the same one cat(a)log and Chaos Alert use
+#   ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8 — App Store Connect API key
+#                 (the .p8 base64), for the TestFlight upload and the
+#                 App Store submission
+#   IOS_DIST_CERT_P12 / IOS_DIST_CERT_PASSWORD — Apple Distribution
+#                 certificate (.p12 base64) and its export password
+#   IOS_PROFILE — App Store provisioning profile (.mobileprovision base64)
+#   IOS_PROFILE_SHARE — the Share extension's App Store provisioning
+#                 profile (.mobileprovision base64, #241)
+#   APPLE_TEAM_ID — the Apple Developer team id
+#                 (steps: docs/agents/ios-release.md)
 #
 # No Flathub: its generative AI policy forbids AI-written manifests and
 # AI-opened pull requests, and this project is written by agents.
@@ -79,7 +105,13 @@ on:
         description: "Release tag (e.g. v0.1.0)"
         required: true
       publish:
-        description: "Publish (release, Play, F-Droid, tap, bucket); off = dry run"
+        description: "Publish (release, Play, TestFlight, F-Droid, tap, bucket); off = dry run"
+        type: boolean
+        default: false
+      # The user decides each App Store submission (#245): only this
+      # input, with publish, submits; a tag never does.
+      submit_app_store:
+        description: "Also submit the iPhone build for App Store review (needs publish)"
         type: boolean
         default: false
 
@@ -182,8 +214,15 @@ jobs:
           [ "$blocking" -eq 0 ] || { echo "$blocking open high or critical code-scanning alerts" >&2; exit 1; }
       # Play and F-Droid take What's new from the store kit's record; a
       # tag without it would ship with none.
+      # A dry run before the store kit has written the notes checks
+      # everything else (signing included) and only warns here.
       - name: What's new for Play and F-Droid exists
         run: |
+          notes="docs/release-notes-${RELEASE_TAG#v}.md"
+          if [ "$PUBLISH" != true ] && [ ! -f "$notes" ]; then
+            echo "::warning::$notes is missing; a publishing run stops here"
+            exit 0
+          fi
           for lang in en de; do
             python3 tool/whats_new.py "docs/release-notes-${RELEASE_TAG#v}.md" "$lang" > /dev/null
           done
@@ -191,6 +230,10 @@ jobs:
       # bundle assets/help/whats_new.json, so it must hold this version.
       - name: The apps bundle this version's What's new
         run: |
+          if [ "$PUBLISH" != true ] && [ ! -f "docs/release-notes-${RELEASE_TAG#v}.md" ]; then
+            echo "::warning::no release notes yet, so no bundled What's new to check"
+            exit 0
+          fi
           python3 tool/whats_new.py --bundle --require "${RELEASE_TAG#v}"
           git diff --exit-code -- assets/help/whats_new.json
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -236,9 +279,9 @@ jobs:
           node-version: 22
       - name: Site — unit tests
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor and whisper pin tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin and App Store listing tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
@@ -577,6 +620,31 @@ jobs:
           name: screenshots
           path: screenshots/*.png
 
+  # The App Store's iPhone frames (#244, docs/agents/store-kit.md), drawn
+  # by the Flutter screenshot test with the iOS platform and safe area,
+  # not by the iOS simulator: the same frames a Linux machine draws, ready
+  # to upload in App Store Connect. The Release does not wait for them.
+  appstore-screenshots:
+    name: App Store screenshots
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Render the iPhone frames from the seeded data
+        run: |
+          flutter pub get
+          flutter test test/screenshots --run-skipped --concurrency=1 --plain-name 'iphone screenshots'
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: appstore-screenshots
+          path: fastlane/metadata/ios/
+
   build-windows:
     name: Windows desktop
     needs: [gate, gate-desktop]
@@ -634,6 +702,242 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}
           path: dist/*
+
+  # The same build and XCTest as on every push (#237), here a gate of
+  # the release (#231).
+  ios:
+    name: iOS
+    needs: [gate, gate-desktop]
+    uses: ./.github/workflows/ios.yml
+    permissions:
+      contents: read
+
+  # Signed with the distribution certificate and the App Store profile,
+  # and uploaded to App Store Connect, where TestFlight offers the build
+  # once Apple has processed it. Until the user has added the Apple
+  # secrets (docs/agents/ios-release.md) every step skips and the job
+  # passes with a notice: the release does not wait for the iPhone.
+  testflight:
+    name: iOS to TestFlight
+    needs: ios
+    runs-on: macos-26
+    steps:
+      - name: Apple secrets present
+        id: secrets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
+          IOS_PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
+          IOS_PROFILE_WIDGETS: ${{ secrets.IOS_PROFILE_WIDGETS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD IOS_PROFILE IOS_PROFILE_SHARE IOS_PROFILE_WIDGETS APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice title=TestFlight skipped::Missing repository secrets:$missing. The steps are in docs/agents/ios-release.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: recursive
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      # RustO and whisper.cpp for the device, as in ios.yml (#239).
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        with:
+          targets: aarch64-apple-ios
+      - name: Native libraries
+        if: steps.secrets.outputs.ready == 'true'
+        run: sh tool/ios-native.sh iphoneos
+      # A keychain of its own for the certificate, and the profiles where
+      # Xcode looks: the app's, the Share extension's (#241) and the
+      # Widgets extension's (#242); each UUID and team come from the
+      # profile itself.
+      - name: Install the certificate and the profiles
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROFILE }}
+          PROFILE_SHARE: ${{ secrets.IOS_PROFILE_SHARE }}
+          PROFILE_WIDGETS: ${{ secrets.IOS_PROFILE_WIDGETS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(openssl rand -base64 24)
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/dist.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm "$RUNNER_TEMP/dist.p12"
+          # install <base64 profile> <bundle id> <secret name>: its UUID
+          # in $installed.
+          install() {
+            file="$RUNNER_TEMP/$2.mobileprovision"
+            printf '%s' "$1" | base64 --decode > "$file"
+            security cms -D -i "$file" > "$RUNNER_TEMP/$2.plist"
+            app_id=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/$2.plist")
+            if [ "$app_id" != "$APPLE_TEAM_ID.$2" ]; then
+              echo "::error::$3 is for $app_id, not $APPLE_TEAM_ID.$2"
+              exit 1
+            fi
+            uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/$2.plist")
+            for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+              mkdir -p "$dir"
+              cp "$file" "$dir/$uuid.mobileprovision"
+            done
+            installed=$uuid
+          }
+          install "$PROFILE" io.github.paxel.oldbrainfix IOS_PROFILE
+          echo "PROFILE_UUID=$installed" >> "$GITHUB_ENV"
+          install "$PROFILE_SHARE" io.github.paxel.oldbrainfix.ShareExtension IOS_PROFILE_SHARE
+          echo "PROFILE_SHARE_UUID=$installed" >> "$GITHUB_ENV"
+          install "$PROFILE_WIDGETS" io.github.paxel.oldbrainfix.Widgets IOS_PROFILE_WIDGETS
+          echo "PROFILE_WIDGETS_UUID=$installed" >> "$GITHUB_ENV"
+      # Manual signing for the Release configurations of the Runner, of
+      # the Share extension (#241) and of the Widgets extension (#242),
+      # each with its own profile, on this runner; the committed project
+      # keeps automatic signing for local builds. Each extension's
+      # xcconfig is its own, so the Runner's profile never reaches it.
+      - name: Sign the Release build with them
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          {
+            echo 'CODE_SIGN_STYLE = Manual'
+            echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID"
+            echo 'CODE_SIGN_IDENTITY = Apple Distribution'
+            echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_UUID"
+          } >> ios/Flutter/Release.xcconfig
+          {
+            echo 'CODE_SIGN_STYLE = Manual'
+            echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID"
+            echo 'CODE_SIGN_IDENTITY = Apple Distribution'
+            echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_SHARE_UUID"
+          } >> ios/ShareExtension/Release.xcconfig
+          {
+            echo 'CODE_SIGN_STYLE = Manual'
+            echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID"
+            echo 'CODE_SIGN_IDENTITY = Apple Distribution'
+            echo 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution'
+            echo "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_WIDGETS_UUID"
+          } >> ios/Widgets/Release.xcconfig
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>export</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>io.github.paxel.oldbrainfix</key>
+              <string>$PROFILE_UUID</string>
+              <key>io.github.paxel.oldbrainfix.ShareExtension</key>
+              <string>$PROFILE_SHARE_UUID</string>
+              <key>io.github.paxel.oldbrainfix.Widgets</key>
+              <string>$PROFILE_WIDGETS_UUID</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+      # $GITHUB_RUN_NUMBER of this workflow is the build number, as it is
+      # Android's version code.
+      - name: Build the signed ipa
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          flutter pub get
+          flutter build ipa --release --build-number=$GITHUB_RUN_NUMBER --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
+          ls build/ios/ipa/*.ipa
+      - name: Upload to TestFlight
+        if: steps.secrets.outputs.ready == 'true' && env.PUBLISH == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$HOME/private_keys"
+          printf '%s' "$ASC_KEY_P8" | base64 --decode > "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8"
+          for ipa in build/ios/ipa/*.ipa; do
+            xcrun altool --upload-app --type ios --file "$ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          done
+      # The App Store submission (#245, docs/agents/app-review-notes.md):
+      # fastlane deliver, preinstalled on the macOS image, uploads the
+      # listing and the App Review notes from fastlane/metadata/ios/,
+      # waits until Apple has processed the build just uploaded (the
+      # ipa names its version and build number), selects it and submits
+      # it for review, released by hand after approval. Screenshots are
+      # uploaded by hand (docs/agents/store-kit.md), so they are skipped.
+      # The build is the one this run uploaded, so nobody has answered its
+      # export-compliance question yet: only ITSAppUsesNonExemptEncryption
+      # in ios/Runner/Info.plist answers it, and deliver refuses to submit
+      # without an answer. The key waits for the user's France decision
+      # (docs/agents/app-review-notes.md); until it is set, this step
+      # stops first, with that reason.
+      - name: Submit for App Store review
+        if: >-
+          steps.secrets.outputs.ready == 'true' && env.PUBLISH == 'true'
+          && github.event_name == 'workflow_dispatch' && github.event.inputs.submit_app_store == 'true'
+        timeout-minutes: 90
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if ! /usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' ios/Runner/Info.plist > /dev/null 2>&1; then
+            echo "::error title=App Store submission::ios/Runner/Info.plist has no ITSAppUsesNonExemptEncryption; the export-compliance decision is in docs/agents/app-review-notes.md."
+            exit 1
+          fi
+          python3 tool/appstore_listing.py
+          key="$RUNNER_TEMP/asc_api_key.json"
+          jq -n --arg id "$ASC_KEY_ID" --arg issuer "$ASC_ISSUER_ID" --arg key "$ASC_KEY_P8" \
+            '{key_id: $id, issuer_id: $issuer, key: $key, is_key_content_base64: true, in_house: false, duration: 1200}' > "$key"
+          fastlane --version
+          ipa=$(ls build/ios/ipa/*.ipa | head -n 1)
+          fastlane deliver \
+            --api_key_path "$key" \
+            --app_identifier io.github.paxel.oldbrainfix \
+            --platform ios \
+            --ipa "$ipa" \
+            --skip_binary_upload true \
+            --metadata_path fastlane/metadata/ios \
+            --skip_screenshots true \
+            --submit_for_review true \
+            --automatic_release false \
+            --precheck_include_in_app_purchases false \
+            --force true
+      - name: Remove the keychain and the key
+        if: always() && steps.secrets.outputs.ready == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -rf "$HOME/private_keys" "$RUNNER_TEMP/asc_api_key.json"
 
   render-channels:
     name: Render cask, formula and manifest
@@ -739,7 +1043,7 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-android, build-linux, build-flatpak, screenshots, build-windows, build-macos]
+    needs: [build-android, build-linux, build-flatpak, screenshots, build-windows, build-macos, ios, testflight]
     if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:

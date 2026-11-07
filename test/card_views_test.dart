@@ -406,7 +406,8 @@ void main() {
 
       expect(key('tally-card'), findsOneWidget);
       expect(key('tally-chart-$pages'), findsOneWidget);
-      expect(key('tally-period'), findsOneWidget);
+      // The bar length is the Tally's, set in its setup (#264).
+      expect(key('tally-period'), findsNothing);
       expect(find.text('Pages 30 pages\non the train'), findsOneWidget);
       expect(key('tally-add-entry'), findsOneWidget);
       // The setup stays in the editor.

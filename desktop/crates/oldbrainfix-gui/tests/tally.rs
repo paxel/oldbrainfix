@@ -31,7 +31,7 @@ use oldbrainfix_core::lan::{sync_request, sync_request_as};
 use oldbrainfix_core::tally_units::KNOWN;
 use oldbrainfix_core::{
     AreaRole, Day, DeviceSettings, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey,
-    Store, Tallies, TallyRule, UnitSystem,
+    Store, Tallies, TallyPeriod, TallyRule, UnitSystem,
 };
 use oldbrainfix_gui::app::region_of;
 use oldbrainfix_gui::tally_view::moved_to;
@@ -198,7 +198,10 @@ fn make_it_a_tally_asks_for_a_name_and_saves_the_first_field() -> TestResult {
     // The editor shows its setup instead of "Make it a Tally" (#190).
     assert!(!shows(&harness, "New field"));
     assert!(shows(&harness, "Fields"));
-    assert!(shows(&harness, "A day with several entries counts: Sum"));
+    assert!(shows(
+        &harness,
+        "Several sets or entries in a bar count: Sum"
+    ));
     assert!(shows(&harness, "Unit: times"));
     assert!(shows(&harness, "Target: 20 times"));
     assert!(shows(&harness, "Add field"));
@@ -206,7 +209,9 @@ fn make_it_a_tally_asks_for_a_name_and_saves_the_first_field() -> TestResult {
     // Its chart, its entries and "Add entry" are the card's, once each.
     assert_eq!(harness.query_all_by_label("Add entry").count(), 1);
     assert_eq!(harness.query_all_by_label("No entries yet.").count(), 1);
-    assert_eq!(harness.query_all_by_label("One bar per").count(), 1);
+    // The bar length is the setup's (#264), not the card's.
+    assert!(shows(&harness, "One bar per: Day"));
+    assert!(!shows(&harness, "One bar per"));
     Ok(())
 }
 
@@ -598,7 +603,7 @@ fn once_entries_hold_values_only_units_of_the_same_kind_are_offered() -> TestRes
 }
 
 #[test]
-fn the_bars_follow_the_length_picked_kept_per_note_and_older_entries_fold() -> TestResult {
+fn the_bars_follow_the_tallys_length_and_older_entries_fold() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     let pages = tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -611,7 +616,6 @@ fn the_bars_follow_the_length_picked_kept_per_note_and_older_entries_fold() -> T
     }
     // On its detailed card.
     let mut harness = window(&store, None);
-    assert!(radio_on(&harness, "Day"));
     assert!(shows(&harness, "Chart of Pages, 10 bars"));
     assert!(shows(&harness, "Highest bar: 4 pages"));
     // Newest first, the latest five, the older folded under how many:
@@ -636,25 +640,16 @@ fn the_bars_follow_the_length_picked_kept_per_note_and_older_entries_fold() -> T
         store.local_setting(&format!("tallyEntriesShown:{note}"))?,
         None
     );
-    harness
-        .get_by_role_and_label(Role::RadioButton, "Month")
-        .click();
-    harness.run();
+    // The bar length lies on the Note (#264); the Device's former
+    // setting is read no more.
+    store.set_local_setting(&format!("tallyPeriod:{note}"), "year")?;
+    tallies.set_bar(&note, TallyPeriod::Month)?;
+    let again = window(&store, None);
     // From the 21st of February to the 2nd of March.
-    assert!(shows(&harness, "Chart of Pages, 2 bars"));
-    assert!(shows(&harness, "Feb 2026 to Mar 2026"));
-    assert!(shows(&harness, "Highest bar: 24 pages"));
-    // Kept per Note on this Device, the phone's.
-    assert_eq!(
-        store
-            .local_setting(&format!("tallyPeriod:{note}"))?
-            .as_deref(),
-        Some("month")
-    );
-    let mut again = window(&store, None);
-    assert!(radio_on(&again, "Month"));
-    click_radio(&mut again, "Day");
-    assert_eq!(store.local_setting(&format!("tallyPeriod:{note}"))?, None);
+    assert!(shows(&again, "Chart of Pages, 2 bars"));
+    assert!(shows(&again, "Feb 2026 to Mar 2026"));
+    assert!(shows(&again, "Highest bar: 24 pages"));
+    assert!(!shows(&again, "Month"));
     Ok(())
 }
 
@@ -694,71 +689,121 @@ fn the_note_dialog_holds_only_the_setup_and_a_badge_opens_the_field() -> TestRes
 }
 
 #[test]
-fn the_field_page_makes_a_field_multiply_another_without_a_rule_or_target() -> TestResult {
+fn the_setups_badges_set_the_bar_length_and_whether_it_counts_in_sets() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
-    let reps = tallies.add_field(&note, "Reps", "reps", Some(30.0), None)?;
-    let sets = tallies.add_field(&note, "Sets", "", Some(4.0), None)?;
+    tallies.add_field(&note, "Reps", "", None, None)?;
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let mut harness = window(&store, Some(&note));
-    // Each may multiply the other; the second row is Sets'.
-    assert_eq!(harness.query_all_by_label("Multiplies: Nothing").count(), 2);
-    click(&mut harness, "Multiplies: Nothing")?;
-    assert!(shows(&harness, "Field"));
-    let itself = harness.query_all_by_role_and_label(Role::RadioButton, "Sets");
-    assert_eq!(itself.count(), 0, "not itself");
-    click_radio(&mut harness, "Reps");
-    // A multiplier has no target and no rule.
+    click_button(&mut harness, "One bar per: Day");
+    click_radio(&mut harness, "Week");
+    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
+    assert_eq!(tally.bar, TallyPeriod::Week);
+    assert!(shows(&harness, "One bar per: Week"));
+    click_button(&mut harness, "Counts in sets: Off");
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Counts in sets")
+        .click_accesskit();
+    harness.run();
+    assert!(tallies.by_note(&note)?.ok_or("a Tally")?.counts_in_sets);
+    Ok(())
+}
+
+#[test]
+fn add_set_starts_with_the_set_before_and_each_field_totals_its_sets_by_its_rule() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let weight = tallies.add_field(&note, "Weight", "kg", None, Some(TallyRule::Max))?;
+    let reps = tallies.add_field(&note, "Reps", "", None, None)?;
+    tallies.set_counts_in_sets(&note, true)?;
+    let mut harness = window(&store, None);
+    click_button(&mut harness, "Add entry");
+    assert!(shows(&harness, "Set 1"));
+    type_into(&mut harness, "Weight", "60");
+    type_into(&mut harness, "Reps", "10");
+    click_button(&mut harness, "Add set");
+    assert!(shows(&harness, "Set 2"));
+    // The new set starts with the values of the one before.
+    assert_eq!(holds(&harness, "Reps").as_deref(), Some("10"));
+    type_into(&mut harness, "Reps", "8");
+    click_button(&mut harness, "Add set");
+    click_button(&mut harness, "Remove set 3");
+    assert!(!shows(&harness, "Set 3"));
+    click_button(&mut harness, "Save");
+    let entry = tallies
+        .entries(&note, &Default::default())?
+        .pop()
+        .ok_or("an entry")?;
+    assert_eq!(
+        entry.values,
+        BTreeMap::from([(weight.clone(), 60.0), (reps.clone(), 10.0)])
+    );
+    assert_eq!(
+        entry.more,
+        vec![BTreeMap::from([(weight, 60.0), (reps, 8.0)])]
+    );
+    assert!(shows_part(&harness, "1. Weight 60 kg · Reps 10"));
+    assert!(shows_part(&harness, "2. Weight 60 kg · Reps 8"));
+    assert!(shows(&harness, "Highest bar: 18"));
+    assert!(shows(&harness, "Highest bar: 60 kg"));
+    Ok(())
+}
+
+#[test]
+fn a_check_field_is_a_box_per_entry_and_charts_its_ticks() -> TestResult {
+    let (store, note) = with_note()?;
+    let mut harness = window(&store, Some(&note));
+    click_button(&mut harness, "Make it a Tally");
+    type_into(&mut harness, "Name", "Wiped");
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Check field")
+        .click_accesskit();
+    harness.run();
     assert!(
         harness
-            .query_all_by_role_and_label(Role::TextInput, "Target (optional)")
+            .query_all_by_role_and_label(Role::TextInput, "Unit")
             .next()
             .is_none()
     );
     assert!(!shows(&harness, "Their sum"));
     click_button(&mut harness, "Save");
-    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
-    assert_eq!(
-        tally.field(&sets).ok_or("sets")?.multiplies.as_ref(),
-        Some(&reps)
-    );
-    assert!(shows(&harness, "Multiplies: Reps"));
-    assert!(!shows(&harness, "Target: 4"));
-    // The field multiplied multiplies nothing itself.
-    assert!(!shows(&harness, "Multiplies: Nothing"));
-    assert!(shows(&harness, "Target: 30 reps"));
-    // Nothing again: a field of its own, its target back.
-    click_button(&mut harness, "Multiplies: Reps");
-    click_radio(&mut harness, "Nothing");
-    click_button(&mut harness, "Save");
-    let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
-    assert_eq!(tally.field(&sets).ok_or("sets")?.multiplies, None);
-    assert!(shows(&harness, "Target: 4"));
+    let tallies = Tallies::new(&store);
+    let field = tallies.by_note(&note)?.ok_or("a Tally")?.fields[0].clone();
+    assert!(field.check);
+    assert!(shows(&harness, "Kind of field: Check field"));
+    let ticked = BTreeMap::from([(field.id.clone(), 1.0)]);
+    tallies.add(&note, &ticked, "", None)?;
+    let mut card = window(&store, None);
+    click_button(&mut card, "Add entry");
+    card.get_by_role_and_label(Role::CheckBox, "Wiped")
+        .click_accesskit();
+    card.run();
+    click_button(&mut card, "Save");
+    assert_eq!(tallies.entries(&note, &Default::default())?.len(), 2);
+    assert!(shows_part(&card, "✓ Wiped"));
+    assert!(shows(&card, "Highest bar: 2"));
     Ok(())
 }
 
 #[test]
-fn an_entry_shows_3_times_10_reps_and_counts_30_in_the_chart_and_the_compact_total() -> TestResult {
+fn a_tally_a_multiplier_made_shows_its_entries_as_sets() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     let reps = tallies.add_field(&note, "Reps", "reps", Some(50.0), None)?;
-    let sets = tallies.add_field(&note, "Sets", "", None, None)?;
-    let both = BTreeMap::from([(reps.clone(), 10.0), (sets.clone(), 3.0)]);
+    let rounds = tallies.add_field(&note, "Rounds", "", None, None)?;
+    // As #200 wrote it.
+    let key = oldbrainfix_core::tallies::keys::field(&rounds, "multiplies");
+    store.append(&note, &key, Some(&reps), None)?;
+    let both = BTreeMap::from([(reps.clone(), 20.0), (rounds, 3.0)]);
     tallies.add(&note, &both, "", None)?;
-    // Recorded before it multiplied: counted on read alike.
-    tallies.set_multiplies(&note, &sets, Some(&reps))?;
-    tallies.add(&note, &BTreeMap::from([(reps, 5.0)]), "", None)?;
     let harness = window(&store, None);
-    assert!(shows_part(&harness, "Reps 3 × 10 reps"));
-    assert!(shows_part(&harness, "Reps 5 reps"));
-    assert!(shows(&harness, "Chart of Reps, 1 bars"));
-    assert!(shows(&harness, "Highest bar: 35 reps"));
-    assert!(!shows_part(&harness, "Chart of Sets"));
-    assert!(!shows_part(&harness, "Sets 3"));
+    assert!(shows_part(&harness, "1. Reps 20 reps"));
+    assert!(shows_part(&harness, "3. Reps 20 reps"));
+    assert!(shows(&harness, "Highest bar: 60 reps"));
+    assert!(!shows_part(&harness, "Chart of Rounds"));
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let compact = window(&store, None);
-    assert!(shows(&compact, "Reps 35 / 50 reps"));
-    assert!(!shows_part(&compact, "Sets"));
+    assert!(shows(&compact, "Reps 60 / 50 reps"));
     Ok(())
 }
 

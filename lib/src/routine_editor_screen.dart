@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 
 import 'calendar_platform.dart';
 import 'capture_choices.dart';
+import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
@@ -850,16 +851,16 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         collapsedShape: const Border(),
         title: Text(t.escalationHeading),
         subtitle: Text(
-          after == null ? t.escalationOff : t.escalationSummary(after),
+          after == null ? t.escalationOff : t.escalationSummaryHere(after),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t.escalationExplain),
+          Text(t.escalationExplainHere),
           SwitchBelow(
             switchKey: const ValueKey('escalationOn'),
             padding: const EdgeInsets.symmetric(vertical: 8),
-            title: Text(t.escalationSwitch),
+            title: Text(t.escalationSwitchHere),
             value: after != null,
             onChanged: (on) =>
                 setState(() => _escalation = on ? defaultEscalation : null),

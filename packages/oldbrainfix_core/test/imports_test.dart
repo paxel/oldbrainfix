@@ -63,6 +63,22 @@ void main() {
       expect(store.history(earlier).map((e) => e.date).toSet(), {march});
     });
 
+    test('a Markdown file\'s task list items become boxes (#263)', () {
+      final summary = imports.folder('From Notes', [
+        file('Shop.md', '- [ ] milk\n- [x] bread', march),
+        file('Plain.txt', '- [ ] milk', may),
+      ]);
+      final inside = notes.inside(summary.areaId!);
+      expect(inside.map((n) => n.shownText), [
+        'Plain\n- [ ] milk',
+        '# Shop\n- ☐ milk\n- ✅ bread',
+      ]);
+      expect(inside.last.boxes.map((b) => b.state), [
+        BoxState.open,
+        BoxState.done,
+      ]);
+    });
+
     test('nothing of it is Unsorted or Nudged', () {
       final summary = imports.folder('From Notes', [
         file('a.txt', 'a', march),

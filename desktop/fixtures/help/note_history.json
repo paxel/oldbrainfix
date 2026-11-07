@@ -38,8 +38,8 @@
           "entity": "note:help-00000000000000000000000000000001-icons",
           "kind": "captured",
           "before": null,
-          "after": "What the icons mean\n\nKind: what the Note is",
-          "format": "plain",
+          "after": "What the icons mean\n\nKind: what the Note is\n\n[User guide](oldbrainfix://guide)",
+          "format": "markdown",
           "by": "Ada",
           "mayUse": false
         }
@@ -73,8 +73,8 @@
           "entity": "note:help-00000000000000000000000000000001-quick-start",
           "kind": "captured",
           "before": null,
-          "after": "Quick start",
-          "format": "plain",
+          "after": "Quick start\nGo there:\n1. [Agenda](oldbrainfix://agenda)\n\nOn the desktop:\nCapture: Ctrl+N",
+          "format": "markdown",
           "by": "Ada",
           "mayUse": false
         },

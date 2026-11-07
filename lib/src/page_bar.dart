@@ -100,19 +100,24 @@ class _BarMore extends StatelessWidget {
 /// with no button at all, neither a way back nor an action, keeps its
 /// title on the one row: an empty row above it would hold nothing.
 /// [titleIcon], at most 36 wide, stands before the title. The [SyncLine]
-/// runs along its bottom while this Device syncs (#225).
+/// runs along its bottom while this Device syncs (#225). [onBack] is the
+/// way back of a page that is no route of its own, the Areas list beside
+/// the Agenda (#258).
 AppBar pageBar(
   BuildContext context, {
   required String title,
   Widget? titleIcon,
   List<Widget> actions = const [],
+  VoidCallback? onBack,
 }) {
   // Only whether it can go back, not the whole route: a page coming on
   // top does not build this page again (#210).
-  final back = ModalRoute.canPopOf(context) ?? false;
+  final back = onBack != null || (ModalRoute.canPopOf(context) ?? false);
+  final leading = onBack == null ? null : BackButton(onPressed: onBack);
   final width = MediaQuery.sizeOf(context).width;
   if (width >= wideScreenWidth || (actions.isEmpty && !back)) {
     return AppBar(
+      leading: leading,
       title: titleIcon == null
           ? Text(title)
           : Row(
@@ -166,6 +171,7 @@ AppBar pageBar(
     overflow: TextOverflow.ellipsis,
   );
   return AppBar(
+    leading: leading,
     actions: barActions(actions, (room / slot).floor()),
     flexibleSpace: const SyncLine(),
     bottom: PreferredSize(

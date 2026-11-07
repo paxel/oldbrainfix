@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::Result;
 use crate::checklists::{self, NewLine, order, write_line_as};
 use crate::entry::dart_iso;
+use crate::note_kinds;
 use crate::notes::keys as note_keys;
 use crate::places::{Places, keys as place_keys};
 use crate::profile::OwnProfile;
@@ -40,11 +41,15 @@ pub type WhatsNew = BTreeMap<String, BTreeMap<String, String>>;
 pub struct HelpTexts<'a> {
     /// The Area's name, "Old Brain Fix".
     pub area_name: String,
-    /// "Quick start" and its Lines, the steps to try.
+    /// "Quick start" and its Lines, the steps to try, and its Description
+    /// (#260), folded under the name: a link to each step's place (#261)
+    /// and the desktop's way for each step, Markdown.
     pub quick_start_title: String,
     pub quick_start_lines: Vec<String>,
-    /// "What the icons mean" in full, its title the first line, and the
-    /// pictures of the icons, one per group.
+    pub quick_start_description: String,
+    /// "What the icons mean" in full, its title the first line, Markdown
+    /// with a link to the guide (#261), and the pictures of the icons, one
+    /// per group.
     pub icons_text: String,
     pub icon_pictures: Vec<&'a [u8]>,
     /// The title of a What's new Note for a version.
@@ -185,7 +190,7 @@ impl<'a> HelpNotes<'a> {
                 let into = self.area_once(&mut area, &person, &persons, &texts.area_name)?;
                 self.note(
                     &icons_id(&person),
-                    &into,
+                    (&into, text_format::MARKDOWN),
                     &texts.icons_text,
                     &texts.icon_pictures,
                 )?;
@@ -203,7 +208,12 @@ impl<'a> HelpNotes<'a> {
                 };
                 let into = self.area_once(&mut area, &person, &persons, &texts.area_name)?;
                 let text = format!("{}\n\n{text}", (texts.whats_new_title)(v));
-                self.note(&whats_new_id(&person, v), &into, &text, &[])?;
+                self.note(
+                    &whats_new_id(&person, v),
+                    (&into, text_format::PLAIN),
+                    &text,
+                    &[],
+                )?;
                 made.push(whats_new_id(&person, v));
             }
             s.set_local_setting(VERSION_SETTING, version)?;
@@ -265,9 +275,17 @@ impl<'a> HelpNotes<'a> {
         Ok(id)
     }
 
-    /// Writes the plain Note `id` with `text` and `photos`, filed into
-    /// `area`, with no Nudge.
-    fn note(&self, id: &str, area: &str, text: &str, photos: &[&[u8]]) -> Result<()> {
+    /// Writes the Note `id` with `text` in `format` and `photos`, filed
+    /// into `area`, with no Nudge. Quick start and What the icons mean
+    /// are formatted, so their app links open (#261); a What's new is
+    /// plain.
+    fn note(
+        &self,
+        id: &str,
+        (area, format): (&str, &str),
+        text: &str,
+        photos: &[&[u8]],
+    ) -> Result<()> {
         let s = self.store;
         let now = s.now();
         let at = Some(now);
@@ -277,7 +295,7 @@ impl<'a> HelpNotes<'a> {
             .collect::<Result<Vec<_>>>()?;
         s.append(id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
         s.append(id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
-        let text = StoredText::of(text_format::PLAIN, text, text_format::VERSION).encode();
+        let text = StoredText::of(format, text, text_format::VERSION).encode();
         s.append(id, note_keys::TEXT, Some(&text), at)?;
         s.append(id, note_keys::PLACE, Some(area), at)?;
         for hash in &hashes {
@@ -286,15 +304,17 @@ impl<'a> HelpNotes<'a> {
         Ok(())
     }
 
-    /// Writes the Quick start: a Checklist whose Lines are the steps to
-    /// try, under ids fixed by the person and the Line's place, shown on
-    /// the Agenda as one row with its count.
+    /// Writes the Quick start: a Checklist named `quick_start_title` with
+    /// its Description, whose Lines are the steps to try, under ids fixed
+    /// by the person and the Line's place, shown on the Agenda as one row
+    /// with its count.
     fn quick_start(&self, person: &str, area: &str, texts: &HelpTexts) -> Result<()> {
         let s = self.store;
         let id = quick_start_id(person);
         let making = quick_start_making(person);
         let now = s.now();
-        self.note(&id, area, &texts.quick_start_title, &[])?;
+        let text = note_kinds::join(&texts.quick_start_title, &texts.quick_start_description);
+        self.note(&id, (area, text_format::MARKDOWN), &text, &[])?;
         let kind = checklists::keys::kind_of(&making);
         s.append(&id, checklists::keys::KIND, Some(&kind), Some(now))?;
         s.append(&id, note_keys::SPAWNED, Some(&dart_iso(now)), Some(now))?;
@@ -395,6 +415,7 @@ mod tests {
                 "Capture a thought with +".into(),
                 "File it into an Area".into(),
             ],
+            quick_start_description: "On the desktop:\nCapture: Ctrl+N\nFile: drag it".into(),
             icons_text: "What the icons mean\n\nKind: what the Note is".into(),
             icon_pictures: vec![PICTURE],
             whats_new_title: Box::new(|v| format!("What's new in {v}")),
@@ -437,6 +458,23 @@ mod tests {
         assert_eq!(area.icon.as_deref(), Some(AREA_ICON));
         let notes = Notes::new(&ann);
         assert!(notes.unsorted()?.is_empty());
+        // Named "Quick start", the desktop's way folded under it (#260).
+        let text = notes.by_id(&quick_start_id(&p))?.ok_or("the Note")?.text;
+        assert_eq!(
+            text,
+            "Quick start\nOn the desktop:\nCapture: Ctrl+N\nFile: drag it"
+        );
+        // Formatted, so the links of its steps open (#261); so is What
+        // the icons mean.
+        for id in [quick_start_id(&p), icons_id(&p)] {
+            let note = notes.by_id(&id)?.ok_or("the Note")?;
+            assert_eq!(note.text_format, text_format::MARKDOWN, "{id}");
+        }
+        assert_eq!(crate::note_kinds::name(&text), "Quick start");
+        assert_eq!(
+            crate::note_kinds::description(&text),
+            english().quick_start_description
+        );
         let list = Checklists::new(&ann)
             .by_note(&quick_start_id(&p))?
             .ok_or("a list")?;

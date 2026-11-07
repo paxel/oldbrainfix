@@ -43,7 +43,7 @@ use crate::shopping_lists::{
     ListOnAgenda, Reappear, ReappearUnit, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys,
 };
 use crate::store::Store;
-use crate::tallies::{Tallies, Tally};
+use crate::tallies::{Tallies, Tally, TallyPeriod};
 use crate::tally_units::{self, TallyRule, UnitSystem};
 use crate::text_boxes::ShownBox;
 use crate::text_format;
@@ -284,12 +284,9 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "trash_note",
-            "Moves a Note to the trash, with the Routines and Reminders spawned from it unless told otherwise; it can be restored for 30 days.",
+            "Moves a Note to the trash with the Routines and Reminders spawned from it; restoring it within 30 days brings them back.",
             false,
-            json!({
-                "id": id("Note"),
-                "withRoutines": {"description": "Its Routines and Reminders too; true when left out", "type": "boolean"},
-            }),
+            json!({"id": id("Note")}),
             &["id"],
         ),
         tool(
@@ -398,16 +395,20 @@ pub fn tools() -> Vec<Value> {
 /// A Tally's field as a tool takes it.
 fn field_properties() -> Value {
     json!({
+        "check": {"description": "A Check field: a box per entry, a tick counting as 1, summed; it has no unit and no rule, and stays a Check field. A number field when left out", "type": "boolean"},
         "name": string("The field's name, such as Push-ups"),
-        "rule": {"description": "How a day with several entries counts: their sum or the largest; by the kind of unit when left out", "enum": ["sum", "max"], "type": "string"},
-        "target": {"description": "The target per day, in the field's unit; none when left out", "type": "number"},
+        "rule": {"description": "How the sets of an entry and a bar with several entries count: their sum or the largest; by the kind of unit when left out", "enum": ["sum", "max"], "type": "string"},
+        "target": {"description": "The target per bar of the Tally's charts (a day, week, month or year, as the Tally's bar says), in the field's unit; none when left out", "type": "number"},
         "unit": string("The unit: one the app knows (kg, g, km, m, cm, km/h, °C, °, h, min, s) or any word; none when left out"),
     })
 }
 
-/// What a Tally's field multiplies (#200), as a tool takes it.
-fn multiplies_property() -> Value {
-    json!({"description": "The id of another field of the same Tally this field multiplies, such as Sets multiplying Reps, or null for none: not itself, not a field that multiplies, and not while another field multiplies this one", "type": ["string", "null"]})
+/// A Tally's own settings (#264), as a tool takes them.
+fn tally_properties() -> Value {
+    json!({
+        "bar": {"description": "How long a bar of its charts is; its targets count per bar. A day when never set", "enum": ["day", "week", "month", "year"], "type": "string"},
+        "sets": {"description": "Whether it counts in sets: an entry then holds several sets, each a row across its number fields, such as 60 kg × 10 and then 65 kg × 8", "type": "boolean"},
+    })
 }
 
 /// The day range of a tool that reads the user's own data.
@@ -434,23 +435,39 @@ fn set_up_tools() -> Vec<Value> {
     vec![
         tool(
             "make_tally",
-            "Makes a Note a Tally with the fields given, which takes it out of Unsorted. A Checklist or Shopping List is never a Tally.",
+            "Makes a Note a Tally with the fields given, which takes it out of Unsorted, with its bar length and whether it counts in sets when given. A Checklist or Shopping List is never a Tally.",
             false,
-            json!({
-                "fields": {"description": "At least one field", "items": {"properties": field_properties(), "required": ["name"], "type": "object"}, "type": "array"},
-                "id": id("Note"),
-            }),
+            {
+                let mut properties = tally_properties();
+                if let Some(all) = properties.as_object_mut() {
+                    all.insert("fields".into(), json!({"description": "At least one field", "items": {"properties": field_properties(), "required": ["name"], "type": "object"}, "type": "array"}));
+                    all.insert("id".into(), id("Note"));
+                }
+                properties
+            },
             &["id", "fields"],
         ),
         tool(
+            "set_tally",
+            "Sets a Tally's bar length or whether it counts in sets; what is left out stays.",
+            false,
+            {
+                let mut properties = tally_properties();
+                if let Some(all) = properties.as_object_mut() {
+                    all.insert("id".into(), id("Note"));
+                }
+                properties
+            },
+            &["id"],
+        ),
+        tool(
             "add_tally_field",
-            "Adds a field to a Tally, or makes a Note a Tally with its first field. With multiplies it is a multiplier of that other field, such as Sets of Reps: an entry then counts that field as the multiplier's value times its own, and the multiplier counts as no value of its own.",
+            "Adds a field to a Tally, a number or a Check field, or makes a Note a Tally with its first field.",
             false,
             {
                 let mut properties = field_properties();
                 if let Some(all) = properties.as_object_mut() {
                     all.insert("id".into(), id("Note"));
-                    all.insert("multiplies".into(), multiplies_property());
                 }
                 properties
             },
@@ -465,14 +482,13 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "set_tally_field",
-            "Sets the unit, the target, the rule or what a field of a Tally multiplies; what is left out stays. A unit of another kind is refused while entries hold values for the field.",
+            "Sets the unit, the target or the rule of a field of a Tally; what is left out stays. A unit of another kind is refused while entries hold values for the field, and a Check field takes only a target.",
             false,
             json!({
                 "field": id("field"),
                 "id": id("Note"),
-                "multiplies": multiplies_property(),
                 "rule": {"enum": ["sum", "max"], "type": "string"},
-                "target": {"description": "The target per day in the field's unit, or null for none", "type": ["number", "null"]},
+                "target": {"description": "The target per bar of the Tally's charts in the field's unit, or null for none", "type": ["number", "null"]},
                 "unit": string("The new unit"),
             }),
             &["id", "field"],
@@ -622,7 +638,7 @@ fn data_tools() -> Vec<Value> {
     vec![
         tool(
             "read_tally_entries",
-            "Reads the entries of a Tally, newest first, everyone's: when each counts for, its values in each field's unit and its line of text. A field another one multiplies shows what it counts, the product, with the multipliers' values as its factors; a multiplier shows no value of its own.",
+            "Reads the entries of a Tally, newest first, everyone's: when each counts for, what it counts for each field in the field's unit (a number field its rule over the entry's sets, a Check field 1 when ticked), its sets, each a row across the number fields, and its line of text.",
             true,
             range_properties(json!({"note": id("Note of the Tally")})),
             &["note"],
@@ -851,15 +867,6 @@ fn strings_arg(args: &Value, key: &str) -> Result<Vec<String>> {
         .collect()
 }
 
-/// The field `multiplies` names, or `None` for null.
-fn multiplies_arg(other: &Value) -> Result<Option<&str>> {
-    match other {
-        Value::Null => Ok(None),
-        Value::String(id) => Ok(Some(id.as_str())),
-        _ => Err(Error::Invalid("multiplies is no field id".into())),
-    }
-}
-
 fn rule_arg(args: &Value) -> Result<Option<TallyRule>> {
     match optional_text(args, "rule") {
         None => Ok(None),
@@ -943,9 +950,10 @@ fn tally_json(tally: &Tally) -> Value {
         .iter()
         .map(|f| {
             json!({
+                "check": f.check,
+                "countsSets": f.multiplies.is_some(),
                 "hasEntries": f.has_entries,
                 "id": f.id,
-                "multiplies": f.multiplies,
                 "name": f.name,
                 "removed": f.hidden,
                 "rule": f.rule.name(),
@@ -954,7 +962,7 @@ fn tally_json(tally: &Tally) -> Value {
             })
         })
         .collect();
-    json!({"fields": fields})
+    json!({"bar": tally.bar.name(), "fields": fields, "sets": tally.counts_in_sets})
 }
 
 /// The Boxes of a text, each with its state and its latest tick.
@@ -1391,29 +1399,27 @@ impl Store {
                         .iter()
                         .filter_map(|f| {
                             let base = tally.counted(&entry, &f.id)?;
-                            let mut value = json!({
+                            Some(json!({
                                 "field": f.id,
                                 "name": f.name,
                                 "unit": f.unit,
                                 "value": shown(base, &f.unit),
-                            });
-                            let factors: Vec<Value> = tally
-                                .multipliers_of(&f.id)
-                                .into_iter()
-                                .filter_map(|m| {
-                                    let factor = *entry.values.get(&m.id)?;
-                                    Some(json!({
-                                        "field": m.id,
-                                        "name": m.name,
-                                        "value": shown(factor, &m.unit),
-                                    }))
+                            }))
+                        })
+                        .collect();
+                    let sets: Vec<Value> = tally
+                        .sets_of(&entry)
+                        .iter()
+                        .map(|set| {
+                            let row: serde_json::Map<String, Value> = tally
+                                .fields
+                                .iter()
+                                .filter_map(|f| {
+                                    let base = *set.get(&f.id)?;
+                                    Some((f.id.clone(), json!(shown(base, &f.unit))))
                                 })
                                 .collect();
-                            if let (false, Some(all)) = (factors.is_empty(), value.as_object_mut())
-                            {
-                                all.insert("factors".into(), json!(factors));
-                            }
-                            Some(value)
+                            Value::Object(row)
                         })
                         .collect();
                     let value = json!({
@@ -1421,6 +1427,7 @@ impl Store {
                         "day": day(entry.at).to_string(),
                         "id": entry.id,
                         "line": entry.line,
+                        "sets": sets,
                         "values": values,
                     });
                     found.push((entry.at, value));
@@ -1668,8 +1675,7 @@ impl Store {
                 id()?.to_string()
             }
             "trash_note" => {
-                let with = args.get("withRoutines").and_then(Value::as_bool) != Some(false);
-                routines.trash_note(id()?, with)?;
+                routines.trash_note(id()?)?;
                 id()?.to_string()
             }
             "restore_note" => {
@@ -1774,6 +1780,7 @@ impl Store {
                     .iter()
                     .map(|f| self.ai_add_field(note, f))
                     .collect::<Result<Vec<_>>>()?;
+                self.ai_set_tally(note, args)?;
                 json!({"fields": made, "id": note, "pending": PENDING})
             }
             "add_tally_field" => {
@@ -1813,14 +1820,21 @@ impl Store {
                     tallies.set_rule(note, field, rule)?;
                     set = true;
                 }
-                if let Some(other) = args.get("multiplies") {
-                    tallies.set_multiplies(note, field, multiplies_arg(other)?)?;
-                    set = true;
-                }
                 if !set {
                     return Err(Error::Invalid(
-                        "nothing to set: give a unit, a target, a rule or what it multiplies"
-                            .into(),
+                        "nothing to set: give a unit, a target or a rule".into(),
+                    ));
+                }
+                done(note)
+            }
+            "set_tally" => {
+                let note = id()?;
+                if !tallies.is_tally(note)? {
+                    return Err(Error::Invalid(format!("not a Tally: {note}")));
+                }
+                if !self.ai_set_tally(note, args)? {
+                    return Err(Error::Invalid(
+                        "nothing to set: give a bar or whether it counts in sets".into(),
                     ));
                 }
                 done(note)
@@ -2105,18 +2119,37 @@ impl Store {
                 UnitSystem::Metric,
             )),
         };
-        let multiplies = match field.get("multiplies") {
-            Some(other) => multiplies_arg(other)?,
-            None => None,
-        };
-        Tallies::new(self).add_field_multiplying(
-            note,
-            name,
-            unit,
-            target,
-            rule_arg(field)?,
-            multiplies,
-        )
+        let tallies = Tallies::new(self);
+        match field.get("check") {
+            None | Some(Value::Bool(false)) => {
+                tallies.add_field(note, name, unit, target, rule_arg(field)?)
+            }
+            Some(Value::Bool(true)) => tallies.add_check(note, name, target),
+            Some(_) => Err(Error::Invalid("check is no true or false".into())),
+        }
+    }
+
+    /// Sets the bar length and whether it counts in sets of the Tally of
+    /// `note` as `args` give them; whether they gave any.
+    fn ai_set_tally(&self, note: &str, args: &Value) -> Result<bool> {
+        let tallies = Tallies::new(self);
+        let mut set = false;
+        if let Some(bar) = args.get("bar") {
+            let bar = bar
+                .as_str()
+                .and_then(TallyPeriod::parse)
+                .ok_or_else(|| Error::Invalid("bar is no day, week, month or year".into()))?;
+            tallies.set_bar(note, bar)?;
+            set = true;
+        }
+        if let Some(sets) = args.get("sets") {
+            let on = sets
+                .as_bool()
+                .ok_or_else(|| Error::Invalid("sets is no true or false".into()))?;
+            tallies.set_counts_in_sets(note, on)?;
+            set = true;
+        }
+        Ok(set)
     }
 
     /// The list the Line `line` belongs to: [`CHECKLIST`] or
@@ -2581,26 +2614,18 @@ mod tests {
         )?;
         lands_as_pending(
             "add_tally_field",
-            |s| {
-                let (id, reps) = tally(s, "Push-ups")?;
-                Ok(json!({"id": id, "multiplies": reps, "name": "Sets"}))
-            },
+            |s| Ok(json!({"check": true, "id": tally(s, "Kitchen")?.0, "name": "Wiped"})),
             |s, a| {
                 let tally = Tallies::new(s).by_note(&arg(a, "id")?)?.ok_or("a Tally")?;
-                Ok(tally.fields.len() == 2
-                    && tally.fields[1].multiplies.as_ref() == Some(&tally.fields[0].id))
+                Ok(tally.fields.len() == 2 && tally.fields[1].check)
             },
         )?;
         lands_as_pending(
-            "set_tally_field",
-            |s| {
-                let (id, reps) = tally(s, "Squats")?;
-                let sets = Tallies::new(s).add_field(&id, "Sets", "", None, None)?;
-                Ok(json!({"field": sets, "id": id, "multiplies": reps}))
-            },
+            "set_tally",
+            |s| Ok(json!({"bar": "week", "id": tally(s, "Squats")?.0, "sets": true})),
             |s, a| {
                 let tally = Tallies::new(s).by_note(&arg(a, "id")?)?.ok_or("a Tally")?;
-                Ok(tally.fields[1].multiplies.as_ref() == Some(&tally.fields[0].id))
+                Ok(tally.bar == TallyPeriod::Week && tally.counts_in_sets)
             },
         )?;
         lands_as_pending(
@@ -2937,6 +2962,7 @@ mod tests {
             "trash_routine",
             "restore_routine",
             "make_tally",
+            "set_tally",
             "add_tally_field",
             "rename_tally_field",
             "set_tally_field",
@@ -3198,37 +3224,34 @@ mod tests {
     }
 
     #[test]
-    fn a_multiplied_field_reads_as_the_product_with_its_factors() -> TestResult {
+    fn an_entry_reads_with_its_sets_and_what_each_field_counts() -> TestResult {
         let store = store();
         let (note, reps) = tally(&store, "Push-ups")?;
         let tallies = Tallies::new(&store);
-        let sets = tallies.add_field(&note, "Sets", "", None, None)?;
-        tallies.add(
+        let done = tallies.add_check(&note, "Stretched", None)?;
+        tallies.set_counts_in_sets(&note, true)?;
+        tallies.add_with(
             &note,
-            &BTreeMap::from([(reps.clone(), 10.0), (sets.clone(), 3.0)]),
+            &BTreeMap::from([(reps.clone(), 10.0), (done.clone(), 1.0)]),
+            &[BTreeMap::from([(reps.clone(), 8.0)])],
             "",
             None,
+            |_| Ok(()),
         )?;
-        tallies.set_multiplies(&note, &sets, Some(&reps))?;
         let task = store.open_ai_task()?;
         let read = |name: &str, args: Value| json_of(&call(&store, &task, name, &args)?);
         let entries = read("read_tally_entries", json!({"note": note}))?;
         assert_eq!(entries.pointer("/0/values/0/field"), Some(&json!(reps)));
-        assert_eq!(entries.pointer("/0/values/0/value"), Some(&json!(30.0)));
+        assert_eq!(entries.pointer("/0/values/0/value"), Some(&json!(18.0)));
+        assert_eq!(entries.pointer("/0/values/1/value"), Some(&json!(1.0)));
         assert_eq!(
-            entries.pointer("/0/values/0/factors/0"),
-            Some(&json!({"field": sets, "name": "Sets", "value": 3.0}))
+            entries.pointer("/0/sets"),
+            Some(&json!([{reps.as_str(): 10.0}, {reps.as_str(): 8.0}]))
         );
-        assert_eq!(entries.pointer("/0/values/1"), None, "no value of its own");
         let shown = read("read_note", json!({"id": note}))?;
-        assert_eq!(
-            shown.pointer("/tally/fields/1/multiplies"),
-            Some(&json!(reps))
-        );
-        assert_eq!(
-            shown.pointer("/tally/fields/0/multiplies"),
-            Some(&Value::Null)
-        );
+        assert_eq!(shown.pointer("/tally/sets"), Some(&json!(true)));
+        assert_eq!(shown.pointer("/tally/bar"), Some(&json!("day")));
+        assert_eq!(shown.pointer("/tally/fields/1/check"), Some(&json!(true)));
         Ok(())
     }
 

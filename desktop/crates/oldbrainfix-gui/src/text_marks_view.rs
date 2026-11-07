@@ -48,6 +48,7 @@ use egui::{
     Color32, FontId, FontSelection, Id, Modifiers, Popup, Pos2, Rect, RichText, Sense, Stroke,
     TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
+use oldbrainfix_core::app_link::{self, AppLink};
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
 use oldbrainfix_core::markdown::{self, Block, BlockKind, CodeBlock, Span, SpanKind};
 use oldbrainfix_core::text_boxes::{self, FoundBox};
@@ -118,14 +119,24 @@ pub struct TableSpot {
     pub rect: Rect,
 }
 
+/// A cell of a table of a formatted text as it is drawn: the table's
+/// [`TableSpot::at`], the cell's row and column, and where it lies.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CellSpot {
+    pub at: usize,
+    pub cell: (usize, usize),
+    pub rect: Rect,
+}
+
 /// The boxes, the tags, the links and the tables of a text as it is
-/// drawn.
+/// drawn, and the tables' cells.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spots {
     pub boxes: Vec<BoxSpot>,
     pub tags: Vec<TagSpot>,
     pub links: Vec<LinkSpot>,
     pub tables: Vec<TableSpot>,
+    pub cells: Vec<CellSpot>,
 }
 
 impl Spots {
@@ -135,6 +146,17 @@ impl Spots {
         self.tags.extend(other.tags);
         self.links.extend(other.links);
         self.tables.extend(other.tables);
+        self.cells.extend(other.cells);
+    }
+
+    /// The cell of the table at `at` drawn under `pos`, by row and
+    /// column.
+    pub fn cell_at(&self, at: usize, pos: Option<Pos2>) -> Option<(usize, usize)> {
+        let pos = pos?;
+        self.cells
+            .iter()
+            .find(|spot| spot.at == at && spot.rect.contains(pos))
+            .map(|spot| spot.cell)
     }
 }
 
@@ -247,7 +269,7 @@ pub fn marked_label(
             rich = rich.size(size);
         }
         let label = egui::Label::new(rich);
-        ui.add(if truncate { label.truncate() } else { label });
+        crate::read_text::label(ui, if truncate { label.truncate() } else { label });
         return Spots::default();
     }
     let wrap = if truncate {
@@ -264,7 +286,7 @@ pub fn marked_label(
         ui.available_width(),
         FontSelection::Default,
     );
-    let response = ui.add(egui::Label::new(galley.clone()));
+    let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
     line_spots(&galley, response.rect.min, &line)
 }
 
@@ -345,7 +367,7 @@ pub fn code_text_label(
     let format = TextFormat::simple(FontId::monospace(look.font.size * 0.9), look.colour);
     let job = LayoutJob::single_section(text_boxes::strip(part), format);
     if truncate {
-        ui.add(egui::Label::new(job).truncate());
+        crate::read_text::label(ui, egui::Label::new(job).truncate());
         return;
     }
     egui::Frame::NONE
@@ -357,7 +379,9 @@ pub fn code_text_label(
             if sideways {
                 egui::ScrollArea::horizontal()
                     .id_salt(("code text", from))
-                    .show(ui, |ui| ui.add(egui::Label::new(job).extend()));
+                    .show(ui, |ui| {
+                        crate::read_text::label(ui, egui::Label::new(job).extend())
+                    });
                 return;
             }
             // Cut off at the edge, every line kept.
@@ -399,7 +423,7 @@ fn code_label(
         .inner_margin(egui::Margin::symmetric(8, 6))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.add(egui::Label::new(job).wrap());
+            crate::read_text::label(ui, egui::Label::new(job).wrap());
         });
 }
 
@@ -826,7 +850,7 @@ fn block_label(
             ui.available_width(),
             FontSelection::Default,
         );
-        let response = ui.add(egui::Label::new(galley.clone()));
+        let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
         let origin = response.rect.min;
         if line.bold && ui.is_rect_visible(response.rect) {
             let mut ghost = std::mem::take(&mut line.ghost);
@@ -1028,6 +1052,11 @@ fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &
             let left = aligned(align, width, words.x, pad.x);
             let pos = egui::pos2(x + left, y + pad.y);
             spots.extend(cell.paint(&mut cells, pos, scaled.colour, true));
+            spots.cells.push(CellSpot {
+                at: table.start,
+                cell: (r, c),
+                rect: at,
+            });
             if ui.is_rect_visible(at) {
                 ui.painter()
                     .rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
@@ -1118,6 +1147,7 @@ fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
             })
             .collect(),
         tables: Vec::new(),
+        cells: Vec::new(),
     }
 }
 
@@ -1142,9 +1172,24 @@ fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
     out
 }
 
+/// Where a clicked app link waits for the window to follow it (#261).
+fn app_link_id() -> Id {
+    Id::new("app link clicked")
+}
+
+/// The app link clicked this frame, which the window follows once;
+/// `None` when there is none.
+pub fn take_app_link(ctx: &egui::Context) -> Option<AppLink> {
+    ctx.data_mut(|d| d.remove_temp::<Option<AppLink>>(app_link_id()))
+        .flatten()
+}
+
 /// Takes the links `spots` of the text `of`, by id, as links over what
-/// was drawn under them; a click opens one in the system's browser or
-/// mail program. Only web and e-mail addresses are ever among them.
+/// was drawn under them; a click opens a web or e-mail address in the
+/// system's browser or mail program, and hands an app link (ADR 0046) to
+/// the window ([`take_app_link`]): these texts are drawn in many places
+/// that know nothing of the window. Only what `markdown::may_open`
+/// allows is ever among them.
 pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
     for spot in spots {
         for (i, rect) in spot.rects.iter().enumerate() {
@@ -1156,7 +1201,13 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
                 .clicked()
                 && markdown::may_open(&spot.url)
             {
-                ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url));
+                match app_link::parse(&spot.url) {
+                    Some(link) => {
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(app_link_id(), Some(link)));
+                    }
+                    None => ui.ctx().open_url(egui::OpenUrl::new_tab(&spot.url)),
+                }
             }
         }
     }

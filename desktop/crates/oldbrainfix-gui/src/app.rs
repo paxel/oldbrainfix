@@ -75,6 +75,7 @@ use egui::{
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::ai_port::{AiPort, Reach, docker_bridge};
+use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
@@ -105,6 +106,7 @@ use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
 use crate::all_routines_view::{self, AllRoutinesAction};
+use crate::app_links;
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
@@ -122,7 +124,7 @@ use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
-use crate::frogs_view::{self, FrogAction, FrogShown};
+use crate::frogs_view::{self, FrogAction, FrogShown, NoteFrog};
 use crate::help_notes;
 use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
@@ -146,6 +148,7 @@ use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::photo_out;
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
+use crate::read_text;
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
@@ -163,12 +166,14 @@ use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
 };
+use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
-    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyShown, Whose,
+    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
+use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -578,9 +583,9 @@ struct View {
     /// How many of them a newer version of the app saved the schedule of,
     /// which shows only that (ADR 0034).
     newer_routines: usize,
-    /// The Frogs the selected Note spawned, oldest first, each with
-    /// whether this Device may check it off.
-    note_frogs: Vec<(Frog, bool)>,
+    /// The Frog the selected Note's badge shows (#259): its open one, or
+    /// one eaten today or yesterday.
+    note_frog: Option<NoteFrog>,
     /// The Tally of the selected Note, while it is one (#103).
     tally: Option<TallyShown>,
     /// The Checklist of the selected Note, while it is one, and whether
@@ -600,6 +605,8 @@ struct View {
     /// whether this Device may make it one, change its setup or make it
     /// a plain Note again: as it may change the Note, in the lists.
     session_setup: Option<SessionSetup>,
+    /// The past runs of the selected Session Note (#264), for its page.
+    session_runs: Vec<session_view::RunShown>,
     makes_session: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
@@ -608,7 +615,7 @@ struct View {
     frogs_done_open: bool,
     /// Every Routine and Reminder in alphabetical order with its name
     /// and its Note's Area, while their page shows (#115).
-    all_routines: Vec<(Routine, String, Option<Area>)>,
+    all_routines: Vec<all_routines_view::Row>,
     /// Those whose schedule a newer version of the app saved, with the
     /// name and Area of their Note, which a click opens (ADR 0034).
     all_newer: Vec<all_routines_view::NewerRow>,
@@ -692,6 +699,19 @@ enum Dialog {
         amend: bool,
         /// The Section whose field's text it goes on (#183).
         section: Option<String>,
+        /// "Link to…" (#261): the picker shown in place of the address.
+        picker: Option<app_links::Picker>,
+        /// The name an app link picked is put in with where no words
+        /// are selected (#261).
+        label: Option<String>,
+    },
+    /// The one question before a file link opens (#261): the file, its
+    /// path inside the synced folder, and the app that opens it, "" when
+    /// the system does not tell.
+    FileLink {
+        file: std::path::PathBuf,
+        path: String,
+        app: String,
     },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
@@ -714,10 +734,11 @@ enum Dialog {
         query: String,
         others: Vec<(String, String)>,
     },
-    /// Whether the selected Note goes to the trash, and with it its
-    /// `linked` Routines and Reminders.
+    /// Whether the selected Note goes to the trash with its Routines and
+    /// Reminders, as `question` names them; `linked` while it has any.
     TrashNote {
-        linked: i64,
+        question: String,
+        linked: bool,
     },
     /// Whether the edited Routine or Reminder goes to the trash.
     DeleteRoutine {
@@ -929,6 +950,9 @@ enum NoteBadge {
     /// A Session's rule and its weekdays' own counts (#191).
     SessionRule,
     SessionWeekdays,
+    /// A Tally's bar length and whether it counts in sets (#264).
+    TallyBar,
+    TallySets,
     /// The reappear time of the Shopping List's Line in `reappear_line`
     /// (#195).
     Reappear,
@@ -1167,13 +1191,21 @@ enum Action {
         url: Option<String>,
         amend: bool,
         section: Option<String>,
+        /// "Link to…" (#261): the picker of the app's pages, Areas,
+        /// Topics and Notes in place of the address.
+        pick: bool,
     },
     /// Puts the link asked for on the text it was asked for.
     SetLink,
+    /// Puts an app link to the target picked in "Link to…" on the text
+    /// it was asked for (#261).
+    PickLink(app_links::Target),
+    /// Opens what the app link clicked names (#261, ADR 0046).
+    FollowLink(AppLink),
+    /// Opens the file of the synced folder a file link named, after its
+    /// question (#261).
+    OpenLinkedFile(std::path::PathBuf),
     Amend,
-    /// Opens the table of the Amend field's text at this byte full
-    /// screen, putting a new one in there when there is none.
-    AmendTable(usize),
     Importance(Importance),
     /// Files these Notes into the Area or Topic `place`, together; the
     /// ones this Device may not move stay (#148).
@@ -1247,8 +1279,8 @@ enum Action {
     Editor(Intent),
     /// Deletes the edited Routine, asked.
     DeleteRoutine,
-    /// Deletes the selected Note, with or without its Routines, asked.
-    TrashNote(bool),
+    /// Deletes the selected Note with its Routines and Reminders, asked.
+    TrashNote,
     RestoreRoutine(String),
     /// Something asked of a Frog or the Frog view (#101).
     Frog(FrogAction),
@@ -1501,6 +1533,10 @@ enum Setting {
 /// Opens an address in the browser; tests hand in one that keeps it.
 pub type UrlOpener = Box<dyn Fn(&str)>;
 
+/// Opens a file of the synced folder with the system's app, whether it
+/// could be started (#261); tests hand in one that keeps the path.
+pub type LinkedFileOpener = Box<dyn Fn(&std::path::Path) -> bool>;
+
 /// The wall clock the window shows days on.
 pub type Wall = Arc<dyn Fn(DateTime<Utc>) -> NaiveDateTime + Send + Sync>;
 
@@ -1527,9 +1563,6 @@ pub struct App {
     viewer: Option<Viewer>,
     /// The table shown full screen over the window, while one is (#128).
     table: Option<TableView>,
-    /// Whether that table is in the Amend field's text, which it is
-    /// written back into, instead of a Note's.
-    table_amends: bool,
     /// Where back and forward lead through the places the list showed
     /// (#145).
     nav: Navigation<Selection>,
@@ -1557,6 +1590,8 @@ pub struct App {
     /// `open_url` when none.
     open_url: Option<String>,
     url_opener: Option<UrlOpener>,
+    /// Who opens a file link's file; `app_links::open_file` when none.
+    linked_file_opener: Option<LinkedFileOpener>,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
     capture: String,
@@ -1750,6 +1785,10 @@ pub struct App {
     /// click on that notice opens it; a later notice says something else
     /// and leaves it closed.
     notice_dialog: Option<(String, Dialog)>,
+    /// The section of the Settings an app link opened them at (#261),
+    /// scrolled to for the frames it is kept, while the dialog finds its
+    /// size.
+    settings_section: Option<(String, u8)>,
     /// Syncs that need an update of the app here or on another Device,
     /// and settings a newer version saved that were kept (ADR 0034), each
     /// announced once, which Device behind the click (ADR 0019).
@@ -2025,7 +2064,6 @@ impl App {
             scrolled: 0.0,
             viewer: None,
             table: None,
-            table_amends: false,
             nav: Navigation::default(),
             pages: Vec::new(),
             last_field: None,
@@ -2039,6 +2077,7 @@ impl App {
             zoom_shown: false,
             open_url: None,
             url_opener: None,
+            linked_file_opener: None,
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
             edit_wanted: None,
@@ -2147,6 +2186,7 @@ impl App {
             handed: None,
             notice: None,
             notice_dialog: None,
+            settings_section: None,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -4433,6 +4473,12 @@ impl App {
         self.url_opener = Some(opener);
     }
 
+    /// Opens a file link's file with `opener` instead of the system's
+    /// app (#261).
+    pub fn set_linked_file_opener(&mut self, opener: LinkedFileOpener) {
+        self.linked_file_opener = Some(opener);
+    }
+
     /// Opens the Note `id` in the Note dialog (#146).
     pub fn select_note(&mut self, id: &str) {
         self.apply(Action::SelectNote(id.to_string()));
@@ -4959,15 +5005,12 @@ impl App {
                 }
             }
         }
-        let mut note_frogs = Vec::new();
-        if let Some((p, _)) = &detail
-            && !p.note.is_trashed()
-        {
-            for frog in frogs.of_note(&p.note.id)? {
-                let may_check = store.may_check_off(&frog.id)?;
-                note_frogs.push((frog, may_check));
+        let note_frog = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => {
+                frogs_view::note_frog(store, &p.note.id, &*self.wall)?
             }
-        }
+            _ => None,
+        };
         let tally = match &detail {
             Some((p, _)) if !p.note.is_trashed() => tally_view::read(
                 store,
@@ -5020,6 +5063,10 @@ impl App {
                 session_notes.setup_of(&p.note.id)?
             }
             _ => None,
+        };
+        let session_runs = match &session_setup {
+            Some(setup) => session_view::runs(store, &self.t, &setup.note_id, &*self.wall)?,
+            None => Vec::new(),
         };
         let makes_session = match &detail {
             Some((p, _)) => may.changes && !p.note.is_trashed() && !p.note.is_merged(),
@@ -5116,11 +5163,15 @@ impl App {
             let name = |r: &Routine| names.get(&r.id).cloned().unwrap_or_default();
             for routine in routines_by_name(all, name) {
                 let name = names.get(&routine.id).cloned().unwrap_or_default();
-                let area = match routines.note(&routine)? {
-                    Some(note) => place(note)?.area,
-                    None => None,
+                // One whose Note is in the trash or deleted says so (#262).
+                let (area, mark) = match routines.note(&routine)? {
+                    Some(note) => {
+                        let mark = note.is_trashed().then(|| self.t.note_in_trash());
+                        (place(note)?.area, mark)
+                    }
+                    None => (None, Some(self.t.note_deleted())),
                 };
-                all_routines.push((routine, name, area));
+                all_routines.push((routine, name, area, mark));
             }
         }
         let mut all_newer = Vec::new();
@@ -5208,7 +5259,7 @@ impl App {
             open,
             card_today,
             newer_routines,
-            note_frogs,
+            note_frog,
             tally,
             checklist,
             makes_checklist,
@@ -5217,6 +5268,7 @@ impl App {
             switches_list,
             kind,
             session_setup,
+            session_runs,
             makes_session,
             frogs_open,
             all_routines,
@@ -5576,7 +5628,16 @@ impl App {
                 url,
                 amend,
                 section,
+                pick,
             } => {
+                let picker = if pick {
+                    Some(app_links::Picker {
+                        search: String::new(),
+                        targets: app_links::targets(&self.store, &self.t, self.view.advanced)?,
+                    })
+                } else {
+                    None
+                };
                 self.dialog = Some(Dialog::Link {
                     linked: url.is_some(),
                     address: url.unwrap_or_default(),
@@ -5584,8 +5645,28 @@ impl App {
                     end,
                     amend,
                     section,
+                    picker,
+                    label: None,
                 });
                 self.focus = true;
+            }
+            Action::PickLink(target) => {
+                if let Some(Dialog::Link { address, label, .. }) = &mut self.dialog {
+                    *address = target.link.url();
+                    *label = Some(target.label);
+                }
+                self.act(Action::SetLink)?;
+            }
+            Action::FollowLink(link) => self.follow_link(link)?,
+            Action::OpenLinkedFile(file) => {
+                self.dialog = None;
+                let opened = match &self.linked_file_opener {
+                    Some(open) => open(&file),
+                    None => app_links::open_file(&file),
+                };
+                if !opened {
+                    self.notice = Some(self.t.link_not_available().to_string());
+                }
             }
             Action::SetLink => {
                 if let Some(Dialog::Link {
@@ -5593,12 +5674,14 @@ impl App {
                     start,
                     end,
                     amend: true,
+                    label,
                     ..
                 }) = &self.dialog
                 {
                     // Into the Amend field, kept with the Section.
                     let url = format_bar::address(address);
-                    let linked = markdown::link(&self.amend, *start, *end, &url);
+                    let linked =
+                        markdown::link_labelled(&self.amend, *start, *end, &url, label.as_deref());
                     self.amend = linked.text;
                     self.amend_select = Some((linked.start, linked.end));
                     self.amend_focus = true;
@@ -5608,6 +5691,7 @@ impl App {
                     start,
                     end,
                     section: Some(section),
+                    label,
                     ..
                 }) = &self.dialog
                 {
@@ -5615,7 +5699,13 @@ impl App {
                     let section = section.clone();
                     let url = format_bar::address(address);
                     if let Some(field) = self.section_texts.get_mut(&section) {
-                        let linked = markdown::link(&field.text, *start, *end, &url);
+                        let linked = markdown::link_labelled(
+                            &field.text,
+                            *start,
+                            *end,
+                            &url,
+                            label.as_deref(),
+                        );
                         field.text = linked.text;
                         field.select = Some((linked.start, linked.end));
                         field.editing = true;
@@ -5627,11 +5717,13 @@ impl App {
                     address,
                     start,
                     end,
+                    label,
                     ..
                 }) = self.dialog.take()
                 {
                     let url = format_bar::address(&address);
-                    let linked = markdown::link(&self.text, start, end, &url);
+                    let linked =
+                        markdown::link_labelled(&self.text, start, end, &url, label.as_deref());
                     self.text = linked.text;
                     self.text_select = Some((linked.start, linked.end));
                     self.text_editing = true;
@@ -5649,42 +5741,26 @@ impl App {
                 notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
             }
-            Action::AmendTable(at) => {
-                let opening = match markdown::table::at(&self.amend, at) {
-                    Some(table) => Opening {
-                        note: Some(selected),
-                        text: self.amend.clone(),
-                        at: table.start,
-                        cell: None,
-                        tags: true,
-                        boxes: None,
-                    },
-                    None => {
-                        let change = markdown::table::insert(&self.amend, at);
-                        self.amend = change.text;
-                        Opening {
-                            note: Some(selected),
-                            text: self.amend.clone(),
-                            at: change.start,
-                            cell: Some((0, 0)),
-                            tags: true,
-                            boxes: None,
-                        }
-                    }
-                };
-                // Edited there, it is written back into the field.
-                self.table = Some(TableView::new(opening));
-                self.table_amends = true;
-            }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
             Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
             Action::Trash => {
                 self.save_text()?;
-                let linked = Routines::new(&self.store).of_note(&selected)?.len() as i64;
-                self.dialog = Some(Dialog::TrashNote { linked });
+                let linked = Routines::new(&self.store).of_note(&selected)?;
+                let question = match linked.as_slice() {
+                    [] => self.t.delete_note_question().to_string(),
+                    [one] if one.is_reminder() => {
+                        self.t.delete_note_reminder_question().to_string()
+                    }
+                    _ => self.t.delete_note_linked_question(linked.len() as i64),
+                };
+                self.dialog = Some(Dialog::TrashNote {
+                    question,
+                    linked: !linked.is_empty(),
+                });
             }
-            Action::TrashNote(with_routines) => {
-                Routines::new(&self.store).trash_note(&selected, with_routines)?;
+            Action::TrashNote => {
+                // Its Routines and Reminders always go with it (#262).
+                Routines::new(&self.store).trash_note(&selected)?;
                 self.dialog = None;
             }
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
@@ -5791,7 +5867,7 @@ impl App {
                 let routines = Routines::new(&self.store);
                 routines.mark_done(&routine, &occurrence, None)?;
                 // The Reminder goes with it, and comes back with it.
-                routines.trash_note(&selected, true)?;
+                routines.trash_note(&selected)?;
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -6558,6 +6634,11 @@ impl App {
     /// when all of them are empty.
     /// Does what was asked of a Frog or the Frog view (#101).
     fn frog_action(&mut self, asked: FrogAction) -> oldbrainfix_core::Result<()> {
+        // What was typed into the Note dialog first, as its Frog badge
+        // eats or removes from there (#259).
+        if matches!(asked, FrogAction::Toggle(_) | FrogAction::AskDelete(_)) {
+            self.save_text()?;
+        }
         let frogs = Frogs::new(&self.store);
         match asked {
             FrogAction::Toggle(id) => {
@@ -6914,7 +6995,6 @@ impl App {
     /// shown goes in first, and the view holds the text as stored, at the
     /// same table.
     fn open_table(&mut self, mut opening: Opening) -> oldbrainfix_core::Result<()> {
-        self.table_amends = false;
         if let Some(note) = opening.note.take() {
             if self.text_of.as_deref() == Some(note.as_str())
                 || self.section_texts.contains_key(&note)
@@ -6948,10 +7028,6 @@ impl App {
                     self.write_table(&text)?;
                 }
                 self.table = None;
-                // The Amend field has the keyboard again.
-                if std::mem::take(&mut self.table_amends) {
-                    self.amend_focus = true;
-                }
             }
             table_view::Asked::SearchFor(tag) => {
                 self.table_asked(table_view::Asked::Close)?;
@@ -6978,12 +7054,6 @@ impl App {
     /// change it as it is stored now; a text left blank is not kept. The
     /// field of the Note or Section shown then holds it.
     fn write_table(&mut self, text: &str) -> oldbrainfix_core::Result<()> {
-        // A table of the Amend field goes back into it, kept with the
-        // Section.
-        if self.table_amends && self.table.is_some() {
-            self.amend = text.to_string();
-            return Ok(());
-        }
         let Some(note) = self
             .table
             .as_ref()
@@ -7075,10 +7145,6 @@ impl App {
                 self.save_text()?;
                 self.editor = None;
                 let form = FieldForm::new(&note, field, system, &self.t);
-                let form = match &tally {
-                    Some(tally) => form.multiplying(tally),
-                    None => form,
-                };
                 self.tally_form = Some(TallyForm::Field(form));
             }
             TallyAction::AddEntry | TallyAction::EditEntry(_) => {
@@ -7111,15 +7177,14 @@ impl App {
             TallyAction::Whose(whose) => {
                 self.tally_whose.insert(note, whose);
             }
-            TallyAction::Period(period) => {
-                let setting = tally_view::period_setting(&note);
-                if period == oldbrainfix_core::TallyPeriod::Day {
-                    self.store.remove_local_setting(&setting)?;
-                } else {
-                    self.store
-                        .set_local_setting(&setting, tally_view::period_name(period))?;
-                }
+            TallyAction::Badge(open) => {
+                self.badge = Some(match open {
+                    TallyBadge::Bar => NoteBadge::TallyBar,
+                    TallyBadge::Sets => NoteBadge::TallySets,
+                });
             }
+            TallyAction::Bar(bar) => tallies.set_bar(&note, bar)?,
+            TallyAction::Sets(on) => tallies.set_counts_in_sets(&note, on)?,
             TallyAction::AllShown(shown) => {
                 let setting = tally_view::entries_shown_setting(&note);
                 if shown {
@@ -7365,6 +7430,64 @@ impl App {
             Selection::Place(id) => Some(id.clone()),
             _ => None,
         }
+    }
+
+    /// Opens what `link` names (#261, ADR 0046): a Note in the Note
+    /// dialog, an Area or Topic, the Agenda, Unsorted, All Routines and
+    /// Reminders and the Frogs in the list, the Settings (at a section),
+    /// Backups, Sync and the Profile as their dialogs, New Session as "+"
+    /// makes one (in Advanced), a guide page in the browser, and a file of
+    /// the synced folder after one question. A Note or place this Device
+    /// does not hold, or holds in the trash or merged, a file the folder
+    /// does not hold, and New Session in Simple say "Not available here".
+    fn follow_link(&mut self, link: AppLink) -> oldbrainfix_core::Result<()> {
+        let gone = self.t.link_not_available().to_string();
+        match link {
+            AppLink::Note(id) => match Notes::new(&self.store).by_id(&id)? {
+                Some(note) if !note.is_trashed() && !note.is_merged() => {
+                    self.act(Action::SelectNote(id))?;
+                }
+                _ => self.notice = Some(gone),
+            },
+            AppLink::Place(id) => {
+                let places = Places::new(&self.store);
+                if places.area_by_id(&id)?.is_some() || places.topic_by_id(&id)?.is_some() {
+                    self.act(Action::Select(Selection::Place(id)))?;
+                } else {
+                    self.notice = Some(gone);
+                }
+            }
+            AppLink::Agenda => self.act(Action::Select(Selection::Agenda))?,
+            AppLink::Unsorted => self.act(Action::Select(Selection::Unsorted))?,
+            AppLink::Routines => self.act(Action::Select(Selection::AllRoutines))?,
+            AppLink::Frogs => self.act(Action::Select(Selection::Frogs))?,
+            AppLink::Settings(section) => {
+                self.settings_section = section.map(|s| (s, 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+            AppLink::Backups => self.act(Action::OpenPage(Page::Backups))?,
+            AppLink::Sync => self.act(Action::OpenPage(Page::Sync))?,
+            AppLink::Profile => self.act(Action::OpenPage(Page::Profile))?,
+            AppLink::NewSession if self.view.advanced => {
+                self.act(Action::Add(NewKind::Session))?;
+            }
+            AppLink::NewSession => self.notice = Some(gone),
+            guide @ AppLink::Guide(..) => self.open_url = guide.guide_address(self.t.locale()),
+            AppLink::File(path) => {
+                let found = self
+                    .store
+                    .sync_folder()?
+                    .and_then(|folder| app_links::file_in(std::path::Path::new(&folder), &path));
+                match found {
+                    Some(file) => {
+                        let app = app_links::file_app(&file);
+                        self.dialog = Some(Dialog::FileLink { file, path, app });
+                    }
+                    None => self.notice = Some(gone),
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Makes `kind` as "+" asked, each on its own form: the Note through
@@ -8331,6 +8454,12 @@ impl App {
             }
         }
         self.dragged(ui.ctx(), tones);
+        // The menu of a text only shown, over everything (#255).
+        read_text::menu(ui.ctx(), &self.t);
+        // An app link clicked in any text this frame (#261).
+        if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
+            actions.push(Action::FollowLink(link));
+        }
         for action in actions {
             self.apply(action);
         }
@@ -8617,7 +8746,11 @@ impl App {
             return None;
         }
         let may = self.view.may;
-        let frog_open = self.view.note_frogs.iter().any(|(f, _)| !f.is_done());
+        let frog_open = self
+            .view
+            .note_frog
+            .as_ref()
+            .is_some_and(|f| !f.frog.is_done());
         // A Code text becomes no Tally or Session (#213).
         let code = note.text_format == text_format::CODE;
         let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
@@ -9100,8 +9233,10 @@ impl App {
             && self.badge.is_none()
             && self.viewer.is_none()
             && self.table.is_none();
+        // In a cell of a table's grid (#257) it leaves the cell.
         if top
             && !egui::Popup::is_any_open(ctx)
+            && !table_grid::cell_had_keyboard(ctx)
             && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
         {
             actions.push(Action::CloseNote);
@@ -9364,6 +9499,42 @@ impl App {
                     _ => true,
                 }
             }
+            // A pick written at once, closing, as on the phone (#264).
+            NoteBadge::TallyBar => match &self.view.tally {
+                Some(shown) => {
+                    let setting = t.tally_period();
+                    let bar = shown.tally.bar;
+                    badge_dialog(ctx, (&t, tones), (icons::TALLY_BAR, None), setting, |ui| {
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.tally_bar_hint()).small().color(weak));
+                        let mut picked = bar;
+                        let options = oldbrainfix_core::TallyPeriod::ALL
+                            .map(|p| (p, tally_view::period_label(&t, p).to_string()));
+                        if radio_column(ui, &mut picked, options) {
+                            if picked != bar {
+                                actions.push(Action::Tally(TallyAction::Bar(picked)));
+                            }
+                            actions.push(Action::Badge(None));
+                        }
+                    })
+                }
+                None => true,
+            },
+            NoteBadge::TallySets => match &self.view.tally {
+                Some(shown) => {
+                    let setting = t.tally_counts_in_sets();
+                    let mut on = shown.tally.counts_in_sets;
+                    badge_dialog(ctx, (&t, tones), (icons::TALLY_SETS, None), setting, |ui| {
+                        let weak = ui.visuals().weak_text_color();
+                        let detail = t.tally_counts_in_sets_detail();
+                        ui.label(RichText::new(detail).small().color(weak));
+                        if badge_switch(ui, &t, setting, &mut on) {
+                            actions.push(Action::Tally(TallyAction::Sets(on)));
+                        }
+                    })
+                }
+                None => true,
+            },
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();
@@ -9657,6 +9828,21 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            // Its right-click menu, with the bar's formats while the
+            // bar shows (#253); Paste as the capture's Paste (#130).
+            let formats: &[Format] = if quick.format_bar {
+                &Format::CAPTURE
+            } else {
+                &[]
+            };
+            match text_menu::menu(ui, &t, &field, &self.capture, formats) {
+                Some(MenuPick::Format(format)) => {
+                    format_bar::put(ui, id, &mut self.capture, format)
+                }
+                Some(MenuPick::Paste) if has_clipboard => self.paste(ui, id, None),
+                Some(pick) => text_menu::apply(ui, id, &self.capture, pick),
+                None => {}
+            }
             name_field(ui, &field, t.capture_field_name());
             // File ▸ New Note: after the field, so the menu's click does
             // not take it out again; asked again past the dialog's first,
@@ -9825,6 +10011,7 @@ impl App {
                         .text_color(text)
                         .desired_width(ui.available_width() - 32.0),
                 );
+                text_menu::show(ui, &self.t, &field, &self.query);
                 // Edit ▸ Find: after the field, so the menu's click does
                 // not take it out again.
                 if std::mem::take(&mut self.search_focus) {
@@ -10147,7 +10334,7 @@ impl App {
         let makes_session = self.view.makes_session;
         let session_draft = &mut self.session_draft;
         let typed = &mut self.lines;
-        let note_frogs = &self.view.note_frogs;
+        let note_frog = self.view.note_frog.as_ref();
         let may = self.view.may;
         let t = self.t;
         let note = &placed.note;
@@ -10243,22 +10430,26 @@ impl App {
                         // A Code text moves sideways (#213).
                         if note.text_format == text_format::CODE {
                             let look = (Some(18.0), text);
-                            text_marks_view::code_text_label(
-                                ui,
-                                &note.text,
-                                all,
-                                look,
-                                (false, true),
-                            );
+                            read_text::shown(ui, |ui| {
+                                text_marks_view::code_text_label(
+                                    ui,
+                                    &note.text,
+                                    all,
+                                    look,
+                                    (false, true),
+                                )
+                            });
                             return;
                         }
-                        let spots = text_marks_view::formatted_label(
-                            ui,
-                            (&note.text, &note.text_format, boxes),
-                            all,
-                            (Some(18.0), text),
-                            false,
-                        );
+                        let spots = read_text::shown(ui, |ui| {
+                            text_marks_view::formatted_label(
+                                ui,
+                                (&note.text, &note.text_format, boxes),
+                                all,
+                                (Some(18.0), text),
+                                false,
+                            )
+                        });
                         let of = Id::new(("text", &note.id));
                         // Its tables open to read (#128).
                         if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
@@ -10352,10 +10543,18 @@ impl App {
                     ticks: has_boxes.then_some(show_ticks),
                     session: session_setup.map(|s| (s, makes_session)),
                     may,
-                    frog_open: note_frogs.iter().any(|(f, _)| !f.is_done()),
+                    frog: note_frog,
                     advanced: self.view.advanced,
                 };
                 note_badges(ui, (&t, tones), &shown, actions);
+                // A Session's past runs (#264), under its settings.
+                if session_setup.is_some() {
+                    embossed(ui, tones, false, None, |ui| {
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.session_runs()).strong().color(text));
+                        session_view::draw_runs(ui, &t, &self.view.session_runs, None);
+                    });
+                }
                 let media = [
                     &note.photos,
                     &note.recordings,
@@ -10424,13 +10623,15 @@ impl App {
                             ui.style_mut().interaction.selectable_labels = true;
                             let all = (0, section.text.len());
                             let shown = (None, text);
-                            let spots = text_marks_view::formatted_label(
-                                ui,
-                                (&section.text, &section.text_format, look),
-                                all,
-                                shown,
-                                false,
-                            );
+                            let spots = read_text::shown(ui, |ui| {
+                                text_marks_view::formatted_label(
+                                    ui,
+                                    (&section.text, &section.text_format, look),
+                                    all,
+                                    shown,
+                                    false,
+                                )
+                            });
                             let of = Id::new(("text", &section.id));
                             if let Some(at) =
                                 text_marks_view::table_clicks(ui, &t, of, &spots.tables)
@@ -10516,15 +10717,30 @@ impl App {
                     // Note's text puts in.
                     let id = Id::new("amend");
                     let focused = ui.memory(|m| m.has_focus(id));
+                    // Its tables as grids, as in the Note's text (#257).
+                    let unticked = BoxLook::default();
+                    let body = egui::TextStyle::Body.resolve(ui.style());
+                    let grids = markdown::uses(amend).then(|| {
+                        let look = GridLook {
+                            size: body.size,
+                            colour: text,
+                            boxes: &unticked,
+                        };
+                        Grids::prepare(ui, (id, "amend"), amend, look)
+                    });
+                    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
                     let selected = format_bar::selection(ui, id, amend);
-                    let at = format_bar::At::of(amend, selected, markdown::uses(amend));
+                    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+                        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+                        None => format_bar::At::of(amend, selected, markdown::uses(amend)),
+                    };
                     let formats = &Format::ALL[1..];
                     // Only in Advanced (#197).
                     let mut picked = match self.view.advanced {
                         true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
                         false => None,
                     };
-                    if focused {
+                    if focused || in_cell {
                         ui.input_mut(|i| {
                             if i.consume_key(Modifiers::COMMAND, Key::B) {
                                 picked = Some(Format::Bold);
@@ -10539,23 +10755,81 @@ impl App {
                             None => ui.memory_mut(|m| m.request_focus(id)),
                         }
                     }
-                    ui.add(
-                        TextEdit::multiline(amend)
-                            .id(id)
-                            .hint_text(t.amend_hint())
-                            .text_color(text)
-                            .desired_rows(1)
-                            .desired_width(f32::INFINITY)
-                            .frame(Frame::NONE),
-                    );
+                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                        let typed = typed.as_str();
+                        let format = egui::TextFormat::simple(body.clone(), text);
+                        let mut job =
+                            egui::text::LayoutJob::single_section(typed.to_string(), format);
+                        if let Some(grids) = &grids {
+                            job = grids.hide(typed, job);
+                        }
+                        job.wrap.max_width = width;
+                        ui.fonts_mut(|f| f.layout_job(job))
+                    };
+                    let output = TextEdit::multiline(amend)
+                        .id(id)
+                        .hint_text(t.amend_hint())
+                        .text_color(text)
+                        .layouter(&mut layouter)
+                        .desired_rows(1)
+                        .desired_width(f32::INFINITY)
+                        .frame(Frame::NONE)
+                        .show(ui);
+                    let field = output.response.response.clone();
+                    if let Some(grids) = grids {
+                        let shown = (&output, &mut *amend);
+                        let ticks: table_grid::Ticks<'_> = (false, &|_| false);
+                        let grid = grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
+                        if grid.took {
+                            picked = None;
+                        }
+                        if let Some((start, end, url)) = grid.link {
+                            actions.push(Action::AskLink {
+                                start,
+                                end,
+                                url,
+                                amend: true,
+                                section: None,
+                                pick: false,
+                            });
+                        }
+                    }
+                    // Its right-click menu, with the bar's formats while
+                    // the bar shows (#253).
+                    let offered: &[Format] = if self.view.advanced { formats } else { &[] };
+                    match text_menu::menu(ui, &t, &field, amend, offered) {
+                        Some(MenuPick::Format(format)) => picked = Some(format),
+                        Some(pick) => text_menu::apply(ui, id, amend, pick),
+                        None => {}
+                    }
                     match picked {
-                        Some(Format::Table) => actions.push(Action::AmendTable(selected.0)),
+                        // As in the Note's text (#257).
+                        Some(Format::Table) => match markdown::table::at(amend, selected.0) {
+                            Some(table) => {
+                                let cell = table_grid::cell_at(amend, &table, selected.0);
+                                table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
+                            }
+                            None => {
+                                let change = markdown::table::insert(amend, selected.0);
+                                *amend = change.text;
+                                table_grid::edit(ui, (id, "amend"), amend, change.start, (0, 0));
+                            }
+                        },
                         Some(Format::Link) => actions.push(Action::AskLink {
                             start: selected.0,
                             end: selected.1,
                             url: at.url.clone(),
                             amend: true,
                             section: None,
+                            pick: false,
+                        }),
+                        Some(Format::LinkTo) => actions.push(Action::AskLink {
+                            start: selected.0,
+                            end: selected.1,
+                            url: None,
+                            amend: true,
+                            section: None,
+                            pick: true,
                         }),
                         Some(format) => match format_bar::change(format, amend, selected) {
                             Some(changed) => {
@@ -10715,8 +10989,34 @@ impl App {
                         }
                     }
                     Dialog::Link {
+                        picker: Some(picker),
+                        ..
+                    } => match app_links::picker(ui, &t, picker, focus) {
+                        Some(app_links::Picked::Target(target)) => {
+                            actions.push(Action::PickLink(target));
+                        }
+                        Some(app_links::Picked::Cancel) => actions.push(Action::CloseDialog),
+                        None => {}
+                    },
+                    Dialog::Link {
                         address, linked, ..
                     } => link_form(ui, &t, (address, focus), *linked, actions),
+                    Dialog::FileLink { file, path, app } => {
+                        title(ui, t.file_link_title());
+                        let shown = if app.is_empty() {
+                            t.file_link_some_app()
+                        } else {
+                            app.as_str()
+                        };
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.file_link_question(path, shown)).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if theme::primary(ui, true, t.file_link_open()).clicked() {
+                                actions.push(Action::OpenLinkedFile(file.clone()));
+                            }
+                        });
+                    }
                     Dialog::NewPlace { area, name } => {
                         let title = if area.is_some() {
                             t.new_topic()
@@ -10744,29 +11044,19 @@ impl App {
                     Dialog::Merge { query, others } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
-                    Dialog::TrashNote { linked } => {
-                        let linked = *linked;
-                        title(ui, t.delete_note_question());
+                    Dialog::TrashNote { question, linked } => {
+                        title(ui, question);
                         let text = ui.visuals().text_color();
-                        let detail = if linked == 0 {
-                            t.delete_note_detail()
-                        } else {
+                        let detail = if *linked {
                             t.delete_note_linked_detail()
+                        } else {
+                            t.delete_note_detail()
                         };
                         ui.label(RichText::new(detail).color(text));
-                        ui.horizontal_wrapped(|ui| {
+                        ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
-                            if linked == 0 {
-                                if destructive(ui, t.delete()) {
-                                    actions.push(Action::TrashNote(false));
-                                }
-                            } else {
-                                if destructive(ui, t.delete_note_only()) {
-                                    actions.push(Action::TrashNote(false));
-                                }
-                                if destructive(ui, &t.delete_note_with_linked(linked)) {
-                                    actions.push(Action::TrashNote(true));
-                                }
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::TrashNote);
                             }
                         });
                     }
@@ -12047,6 +12337,21 @@ impl App {
             .unwrap_or(false);
         let quick = self.view.capture_quick;
         let advanced = self.view.advanced;
+        // The section an app link opened the Settings at (#261).
+        let section = self.settings_section.as_ref().map(|(s, _)| s.clone());
+        self.settings_section = self
+            .settings_section
+            .take()
+            .and_then(|(s, frames)| (frames > 1).then_some((s, frames - 1)));
+        let heading = |ui: &mut Ui, words: &str, slug: &str| {
+            let shown = ui.label(RichText::new(words).strong().color(text));
+            if section.as_deref() == Some(slug) {
+                shown.scroll_to_me_animation(
+                    Some(egui::Align::TOP),
+                    egui::style::ScrollAnimation::none(),
+                );
+            }
+        };
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -12054,7 +12359,7 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_computer()).strong().color(text));
+                    heading(ui, t.settings_computer(), "computer");
                     let mut on = alerts;
                     if theme::checkbox(ui, &mut on, RichText::new(t.alerts_switch()).color(text))
                         .changed()
@@ -12123,7 +12428,7 @@ impl App {
                     });
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_alarms()).strong().color(text));
+                    heading(ui, t.settings_alarms(), "alarms");
                     let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
                     if !choices.contains(&renag) {
                         choices.push(renag);
@@ -12142,6 +12447,7 @@ impl App {
                                 .text_color(text)
                                 .desired_width(60.0),
                         );
+                        text_menu::show(ui, &t, &field, all_day_text);
                         if field.changed()
                             && let Some(time) = ClockTime::parse(all_day_text.trim())
                             && time != all_day_from
@@ -12158,7 +12464,7 @@ impl App {
                     alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_nudges()).strong().color(text));
+                    heading(ui, t.settings_nudges(), "nudges");
                     ui.label(
                         RichText::new(t.nudge_settings_explain())
                             .small()
@@ -12195,6 +12501,7 @@ impl App {
                                     .text_color(text)
                                     .desired_width(60.0),
                             );
+                            text_menu::show(ui, &t, &field, value);
                             if field.changed()
                                 && let Some(time) = ClockTime::parse(value.trim())
                             {
@@ -12225,7 +12532,7 @@ impl App {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_units()).strong().color(text));
+                    heading(ui, t.settings_units(), "units");
                     ui.label(RichText::new(t.settings_units_detail()).small().color(weak));
                     let region = match region_units {
                         UnitSystem::Metric => t.unit_system_metric_name(),
@@ -12245,7 +12552,7 @@ impl App {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_agenda()).strong().color(text));
+                    heading(ui, t.settings_agenda(), "agenda");
                     let mut on = hides_checked;
                     if theme::checkbox(
                         ui,
@@ -12278,7 +12585,7 @@ impl App {
                     );
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.settings_history()).strong().color(text));
+                    heading(ui, t.settings_history(), "history");
                     let mut on = streaks;
                     if theme::checkbox(
                         ui,
@@ -12294,7 +12601,7 @@ impl App {
                 // Simple or Advanced, the person's (#197), last, so
                 // the settings of this computer come first.
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.features()).strong().color(text));
+                    heading(ui, t.features(), "features");
                     let mut picked = advanced;
                     if starter_set_view::features_choice(ui, &t, &mut picked) {
                         actions.push(Action::Setting(Setting::Advanced(picked)));
@@ -12515,18 +12822,30 @@ fn note_change(
     actions: &mut Vec<Action>,
 ) {
     ui.vertical(|ui| {
-        ui.label(RichText::new(&row.title).strong().color(text));
-        ui.label(RichText::new(&row.said).small().color(weak));
-        if let Some(before) = &row.before {
-            ui.label(RichText::new(t.note_history_before()).small().color(weak));
-            ui.add(egui::Label::new(RichText::new(before).color(text)).wrap());
-        }
-        if let Some(after) = &row.after {
-            if row.before.is_some() {
-                ui.label(RichText::new(t.note_history_after()).small().color(weak));
+        // What it says selects to be copied (#255).
+        read_text::shown(ui, |ui| {
+            let says = |ui: &mut Ui, said: RichText| {
+                read_text::label(ui, egui::Label::new(said).wrap());
+            };
+            says(ui, RichText::new(&row.title).strong().color(text));
+            says(ui, RichText::new(&row.said).small().color(weak));
+            if let Some(before) = &row.before {
+                says(
+                    ui,
+                    RichText::new(t.note_history_before()).small().color(weak),
+                );
+                says(ui, RichText::new(before).color(text));
             }
-            ui.add(egui::Label::new(RichText::new(after).color(text)).wrap());
-        }
+            if let Some(after) = &row.after {
+                if row.before.is_some() {
+                    says(
+                        ui,
+                        RichText::new(t.note_history_after()).small().color(weak),
+                    );
+                }
+                says(ui, RichText::new(after).color(text));
+            }
+        });
         if row.may_use
             && ui
                 .button(RichText::new(t.use_this_version()).color(text))
@@ -12546,6 +12865,7 @@ fn title(ui: &mut Ui, title: &str) {
 /// A dialog's text field, taking the keyboard when `focus` says so.
 fn focused_field(
     ui: &mut Ui,
+    t: &L10n,
     (value, focus): (&mut String, bool),
     id: &str,
     hint: &str,
@@ -12558,6 +12878,7 @@ fn focused_field(
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
+    text_menu::show(ui, t, &field, value);
     if focus {
         field.request_focus();
     }
@@ -12837,7 +13158,7 @@ fn name_form(
     actions: &mut Vec<Action>,
 ) {
     title(ui, heading);
-    let field = focused_field(ui, (&mut *name, focus), "name", t.name_hint());
+    let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
     let ready = !name.trim().is_empty();
     if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         actions.push(done.clone());
@@ -12860,7 +13181,7 @@ fn link_form(
     actions: &mut Vec<Action>,
 ) {
     title(ui, t.format_link());
-    let field = focused_field(ui, (&mut *address, focus), "link", t.link_address());
+    let field = focused_field(ui, t, (&mut *address, focus), "link", t.link_address());
     if linked {
         let weak = ui.visuals().weak_text_color();
         ui.label(RichText::new(t.link_remove_hint()).small().color(weak));
@@ -13785,7 +14106,13 @@ fn merge_form(
 ) {
     let weak = ui.visuals().weak_text_color();
     title(ui, t.merge_into());
-    let field = focused_field(ui, (&mut *query, focus), "merge query", t.search_all_hint());
+    let field = focused_field(
+        ui,
+        t,
+        (&mut *query, focus),
+        "merge query",
+        t.search_all_hint(),
+    );
     if field.changed() {
         actions.push(Action::MergeQuery);
     }
@@ -13859,6 +14186,7 @@ fn quick_capture_card(
                 .text_color(text)
                 .desired_width(180.0),
         );
+        text_menu::show(ui, t, &field, typed);
         chord = typed.parse::<Chord>().ok();
         // Kept once typed out, so no key on the way is grabbed.
         if field.lost_focus()
@@ -15224,7 +15552,7 @@ fn embossed_inside(
 /// its kind with whether it may go back to a plain Note, Show on the
 /// Agenda of a Checklist or a Shopping List and Show ticks where they
 /// apply, a Session's setup, what this Device may do to it and whether it
-/// has an open Frog.
+/// has a Frog to show (#259).
 struct BadgesShown<'a> {
     placed: &'a Placed,
     routines: &'a [Routine],
@@ -15237,7 +15565,8 @@ struct BadgesShown<'a> {
     /// whether this Device may change them (#191).
     session: Option<(&'a SessionSetup, bool)>,
     may: NoteMay,
-    frog_open: bool,
+    /// Its open Frog, or one eaten today or yesterday (#259).
+    frog: Option<&'a NoteFrog>,
     /// Whether Frogs and Sessions are offered under "+": only in
     /// Advanced (#197).
     advanced: bool,
@@ -15366,10 +15695,11 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// otherwise (#192), in the phone's order:
 /// the Importance; Area and Topic in one, opening File into…; Captured,
 /// to read its details; each Routine and Reminder with its schedule,
-/// opening its editor, and those a newer version saved, only shown; the
-/// kind; a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog and, on a
-/// plain Note, Session, for who may set them up. A setting that does not
+/// opening its editor, and those a newer version saved, only shown; its
+/// Frog, open or eaten today or yesterday, offering Eat now and Remove
+/// the Frog (#259); the kind; a Session's rule and weekdays' counts (#191); Show on the
+/// Agenda; Show ticks; and "+" with Routine, Reminder, Frog while none is
+/// open and, on a plain Note, Session, for who may set them up. A setting that does not
 /// apply has no badge; one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
@@ -15441,6 +15771,9 @@ fn note_badges(
             let icon = (icons::REPEAT, None);
             let newer = Some(BadgeValue::Text(t.newer_version_needed()));
             badge(ui, look, icon, t.routine(), newer, false);
+        }
+        if let Some(frog) = shown.frog {
+            frog_badge(ui, look, frog, actions);
         }
         // Every Note has its kind, a plain Note too (#188); it opens
         // where there is another to make it.
@@ -15547,7 +15880,8 @@ fn note_badges(
             ];
             // A Note has one open Frog at a time; Frogs and Sessions are
             // made only in Advanced (#197).
-            if shown.advanced && !shown.frog_open {
+            let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
+            if shown.advanced && !frog_open {
                 entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
             }
             // Only a plain Note becomes a Session, and no Code text
@@ -15569,6 +15903,45 @@ fn note_badges(
                 }
             }
         });
+    });
+}
+
+/// The Frog's badge (#259): the frog, then Open, or Eaten today or
+/// yesterday; a click offers Eat now while it is open and this Device may
+/// check it off, and Remove the Frog for who may manage it (ADR 0013),
+/// which asks once, as the Frog view does. It only shows for others.
+fn frog_badge(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &NoteFrog,
+    actions: &mut Vec<Action>,
+) {
+    let frog = &shown.frog;
+    let eats = !frog.is_done() && shown.may_check;
+    let value = if !frog.is_done() {
+        t.frog_open()
+    } else if shown.eaten_today {
+        t.frog_eaten_today()
+    } else {
+        t.frog_eaten_yesterday()
+    };
+    let value = Some(BadgeValue::Text(value));
+    let active = eats || shown.manages;
+    let icon = (icons::FROG, None);
+    let badge = badge(ui, (t, tones), icon, t.frog(), value, active);
+    if !active {
+        return;
+    }
+    let text = ui.visuals().text_color();
+    egui::Popup::menu(&badge).show(|ui| {
+        if eats && menu_entry(ui, (icons::PICK_DONE, text), t.frog_eat_now()).clicked() {
+            actions.push(Action::Frog(FrogAction::Toggle(frog.id.clone())));
+            ui.close();
+        }
+        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
+            actions.push(Action::Frog(FrogAction::AskDelete(frog.id.clone())));
+            ui.close();
+        }
     });
 }
 
@@ -15654,7 +16027,7 @@ fn editor_media(
         recordings,
         transcripts,
         (playing, transcribing, speed),
-        can_play,
+        (can_play, true),
         &|hash| offering.offers(id, hash, false),
     );
     match asked {
@@ -15670,6 +16043,7 @@ fn editor_media(
         (removed_photos, photo_texts),
         (removed_recordings, transcripts),
         &|hash, photo| offering.offers(id, hash, photo),
+        true,
     ) {
         actions.push(text(asked, photo));
     }
@@ -15915,8 +16289,19 @@ fn edited_text(
     let format_text = || Action::FormatText(edit.section.then(|| edit.of.to_string()));
     let id = edit.id;
     let of = edit.of;
+    let as_code = edit.code;
     let focused = ui.memory(|m| m.has_focus(id));
-    if focused {
+    // Its tables as grids while it is edited (#257).
+    let grids = (formatted && !as_code && (*editing || focused)).then(|| {
+        let look = GridLook {
+            size,
+            colour: written,
+            boxes,
+        };
+        Grids::prepare(ui, (id, of), edited, look)
+    });
+    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
+    if focused || in_cell {
         *editing = true;
         if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
             actions.push(Action::SaveText);
@@ -15924,16 +16309,19 @@ fn edited_text(
     }
     // The format bar above the field (#127), on its
     // selection as the field last had it; Ctrl+B and
-    // Ctrl+I as its bold and italic while typing.
+    // Ctrl+I as its bold and italic while typing. In a
+    // cell of a grid, on the cell's words.
     let selected = format_bar::selection(ui, id, edited);
-    let at = format_bar::At::of(edited, selected, formatted);
+    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+        None => format_bar::At::of(edited, selected, formatted),
+    };
     // A Code text has none (#213).
-    let as_code = edit.code;
     let mut picked = match as_code || !edit.bar {
         true => None,
         false => format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL),
     };
-    if focused && !as_code {
+    if (focused || in_cell) && !as_code {
         ui.input_mut(|i| {
             if i.consume_key(Modifiers::COMMAND, Key::B) {
                 picked = Some(Format::Bold);
@@ -15942,6 +16330,7 @@ fn edited_text(
             }
         });
     }
+    let mut took = false;
     if formatted && !*editing {
         // As it reads; a click on it edits its source.
         let all = (0, edited.len());
@@ -15963,17 +16352,13 @@ fn edited_text(
         }
         let spots = shown.inner;
         let marked = Id::new(("field", of));
-        // A click on a table opens it full screen, to
-        // edit (#128).
+        // A click on a table edits the cell clicked in its
+        // grid (#257).
         if let Some(at) = text_marks_view::table_clicks(ui, &t, marked, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: Some(of.to_string()),
-                text: edited.clone(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(of.to_string()),
-            }));
+            let pointer = ui.input(|i| i.pointer.interact_pos());
+            let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
+            *editing = true;
+            table_grid::edit(ui, (id, of), edited, at, cell);
         }
         // A tick is no edit: what is typed stays.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, edit.ticks) {
@@ -16013,6 +16398,9 @@ fn edited_text(
                 galley.size().x + 8.0
             };
             let mut job = text_marks_view::field_job(job, boxes, &gap);
+            if let Some(grids) = &grids {
+                job = grids.hide(typed, job);
+            }
             job.wrap.max_width = width;
             ui.fonts_mut(|f| f.layout_job(job))
         };
@@ -16095,13 +16483,60 @@ fn edited_text(
                     .inner
             }
         };
+        // Its right-click menu, with the bar's formats for a selection
+        // in a formatted text (#253).
+        let offered: &[Format] = if formatted && edit.bar && !as_code {
+            &Format::ALL
+        } else {
+            &[]
+        };
+        match text_menu::menu(ui, &t, &output.response.response, edited, offered) {
+            Some(MenuPick::Format(format)) => picked = Some(format),
+            Some(pick) => text_menu::apply(ui, id, edited, pick),
+            None => {}
+        }
         text_marks_view::guard_cursor(ui, id, edited);
         if cut {
             ui.ctx().request_repaint();
         }
         name_field(ui, &output.response.response, edit.name);
-        // A click on the bar keeps the field being edited.
-        if output.response.response.lost_focus() && picked.is_none() {
+        // With Show ticks, who ticked each box, after it; a
+        // click on a box ticks it, no edit of the text (ADR
+        // 0035). The grids take those in their cells.
+        let place = (&output.galley, output.galley_pos);
+        let mut spots =
+            text_marks_view::field_spots(&output.galley, output.galley_pos, edited, boxes);
+        let mut grid = table_grid::Outcome::default();
+        if let Some(grids) = grids {
+            spots = grids.outside(&output, edited, spots);
+            let outside = grids.look_outside(edited, boxes);
+            text_marks_view::paint_after(ui, place, (edited, &outside), (small.clone(), weak));
+            let shown = (&output, &mut *edited);
+            grid = grids.show(ui, (&t, tones), shown, (picked, boxes, edit.ticks));
+        } else {
+            text_marks_view::paint_after(ui, place, (edited, boxes), (small.clone(), weak));
+        }
+        if grid.took {
+            took = true;
+        }
+        if let Some((start, end, url)) = grid.link.take() {
+            actions.push(Action::AskLink {
+                start,
+                end,
+                url,
+                amend: false,
+                section: edit.section.then(|| of.to_string()),
+                pick: false,
+            });
+        }
+        if let Some(asked) = grid.boxes.take() {
+            actions.push(box_action(of.to_string(), asked));
+        }
+        // A click on the bar keeps the field being edited,
+        // and so does the keyboard going into a cell of its
+        // grids or back.
+        let lost = output.response.response.lost_focus() && picked.is_none() && !grid.holds;
+        if lost || grid.left {
             *editing = false;
             actions.push(Action::SaveText);
         }
@@ -16120,31 +16555,48 @@ fn edited_text(
                 actions.push(format_text());
             }
         }
-        // With Show ticks, who ticked each box, after it.
-        let place = (&output.galley, output.galley_pos);
-        text_marks_view::paint_after(ui, place, (edited, boxes), (small, weak));
-        // A click on a box ticks it, no edit of the text
-        // (ADR 0035).
-        let spots = text_marks_view::field_spots(&output.galley, output.galley_pos, edited, boxes);
+        // A task list item typed or pasted into a formatted text becomes
+        // an item with a box (#263), on the lines up to the cursor that
+        // the change touched: typed, `- [ ] ` turns into `- ☐ ` at its
+        // space.
+        if output.response.response.changed() && (formatted || pasted) && !as_code {
+            let (_, cursor) = format_bar::selection(ui, id, edited);
+            let brought: usize = ui.input(|i| {
+                i.events
+                    .iter()
+                    .map(|e| match e {
+                        egui::Event::Paste(p) => p.len(),
+                        _ => 0,
+                    })
+                    .sum()
+            });
+            let change = markdown::task_boxes(edited, cursor.saturating_sub(brought), cursor);
+            if change.text != *edited {
+                *edited = change.text;
+                // Both glyphs are as many bytes as the marks they replace.
+                format_bar::select(ui, id, edited, (cursor, cursor));
+                ui.ctx().request_repaint();
+            }
+        }
         let marked = Id::new(("field", of));
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots, edit.ticks) {
             actions.push(box_action(of.to_string(), asked));
         }
     }
+    // What the bar did in a cell of a grid is done.
+    let picked = if took { None } else { picked };
     match picked {
-        // In a table it opens it; elsewhere it puts a new
-        // one in and edits its first cell (#128), the
-        // text formatted from then on.
+        // In a table shown as lines it shows it as a grid;
+        // elsewhere it puts a new one in and edits its first
+        // cell in its grid (#257), the text formatted from
+        // then on.
         Some(Format::Table) => {
-            let opening = match markdown::table::at(edited, selected.0) {
-                Some(table) => Opening {
-                    note: Some(of.to_string()),
-                    text: edited.clone(),
-                    at: table.start,
-                    cell: None,
-                    tags: true,
-                    boxes: Some(of.to_string()),
-                },
+            *editing = true;
+            match markdown::table::at(edited, selected.0) {
+                Some(table) => {
+                    let cell = table_grid::cell_at(edited, &table, selected.0);
+                    table_grid::edit(ui, (id, of), edited, table.start, cell);
+                }
                 None => {
                     let change = markdown::table::insert(edited, selected.0);
                     *edited = change.text;
@@ -16153,17 +16605,9 @@ fn edited_text(
                     } else {
                         format_text()
                     });
-                    Opening {
-                        note: Some(of.to_string()),
-                        text: edited.clone(),
-                        at: change.start,
-                        cell: Some((0, 0)),
-                        tags: true,
-                        boxes: Some(of.to_string()),
-                    }
+                    table_grid::edit(ui, (id, of), edited, change.start, (0, 0));
                 }
-            };
-            actions.push(Action::OpenTable(opening));
+            }
         }
         Some(Format::Link) => {
             *editing = true;
@@ -16173,6 +16617,18 @@ fn edited_text(
                 url: at.url.clone(),
                 amend: false,
                 section: edit.section.then(|| of.to_string()),
+                pick: false,
+            });
+        }
+        Some(Format::LinkTo) => {
+            *editing = true;
+            actions.push(Action::AskLink {
+                start: selected.0,
+                end: selected.1,
+                url: None,
+                amend: false,
+                section: edit.section.then(|| of.to_string()),
+                pick: true,
             });
         }
         Some(format) => {
@@ -16262,7 +16718,9 @@ fn kinded_text(
         let mut spots = Spots::default();
         if named > 0 {
             let heading = (Some(NAME_SIZE), text);
-            let label = text_marks_view::formatted_label(ui, look, (0, named), heading, false);
+            let label = read_text::shown(ui, |ui| {
+                text_marks_view::formatted_label(ui, look, (0, named), heading, false)
+            });
             spots.extend(label);
         }
         let description = note_kinds::description(whole);
@@ -16277,7 +16735,9 @@ fn kinded_text(
             };
             let small = (Some(DESCRIPTION_SIZE), weak);
             let drawn = folded_row(ui, open, |ui| {
-                text_marks_view::formatted_label(ui, look, range, small, !open)
+                read_text::shown(ui, |ui| {
+                    text_marks_view::formatted_label(ui, look, range, small, !open)
+                })
             });
             if description_fold(ui, &t, (drawn.response.rect, id), open) {
                 ui.data_mut(|d| d.insert_temp(id, !open));
@@ -16352,6 +16812,7 @@ fn kinded_text(
                 .desired_width(f32::INFINITY)
                 .frame(Frame::NONE),
         );
+        text_menu::show(ui, &t, &field, edited);
         name_field(ui, &field, t.note_description());
         if field.has_focus() {
             *editing = true;
@@ -16431,6 +16892,7 @@ fn name_edit(
         .return_key(None)
         .frame(Frame::NONE)
         .show(ui);
+    text_menu::show(ui, t, &output.response.response, name);
     text_marks_view::guard_cursor(ui, id, name);
     if cut {
         ui.ctx().request_repaint();
@@ -16917,7 +17379,7 @@ fn note_card(
                 &note.recordings,
                 &note.transcripts,
                 (None, transcribing, 1.0),
-                false,
+                (false, false),
                 &|_| Offers::default(),
             );
             media_view::removed_texts(
@@ -16926,6 +17388,7 @@ fn note_card(
                 (&note.removed_photos, &note.photo_texts),
                 (&note.removed_recordings, &note.transcripts),
                 &|_, _| Offers::default(),
+                false,
             );
         });
         let rect = card.rect;

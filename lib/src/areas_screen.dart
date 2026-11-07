@@ -36,12 +36,18 @@ class AreasScreen extends StatefulWidget {
   final BrowserTrail trail;
   final String query;
 
+  /// Back to the Agenda, when this is the page beside it rather than a
+  /// route of its own (#258): swipe right is then the pages', not this
+  /// page's.
+  final VoidCallback? onBack;
+
   const AreasScreen({
     super.key,
     required this.notes,
     required this.places,
     required this.trail,
     this.query = '',
+    this.onBack,
   });
 
   @override
@@ -351,12 +357,14 @@ class _AreasScreenState extends State<AreasScreen>
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       onForward: _forward,
+      back: widget.onBack == null,
       child: TagSearchScope(
         onSearch: _searchTag,
         child: Scaffold(
           appBar: pageBar(
             context,
             title: t.areasTitle,
+            onBack: widget.onBack,
             actions: [
               // Only the search's hits are Notes on this level.
               if (searching) ...[

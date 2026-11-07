@@ -50,6 +50,7 @@
 /// box.
 library;
 
+import 'app_link.dart';
 import 'text_tags.dart';
 
 part 'markdown_table.dart';
@@ -351,7 +352,8 @@ abstract final class Markdown {
   /// `class="language-…"` its language when it has one, each line of its
   /// content followed by a line break. Bold is `<strong>`, italic `<em>`,
   /// strike-through `<del>`, code `<code>`; a link is an `<a>` only when
-  /// [mayOpen] allows its destination, else its label alone. Every
+  /// its destination is a web or e-mail address [mayOpen] allows, else
+  /// its label alone, an app link's too (ADR 0046). Every
   /// character of the text is escaped, so nothing in it is markup;
   /// status marks and tags are text. A line break follows each part at
   /// the top.
@@ -492,7 +494,7 @@ abstract final class Markdown {
           out.write(_htmlEscape(s.text));
         case MarkdownSpanKind.code:
           out.write('<code>${_htmlEscape(s.text)}</code>');
-        case MarkdownSpanKind.link when mayOpen(s.url):
+        case MarkdownSpanKind.link when _webOrMail(s.url):
           out.write('<a href="${_htmlEscape(s.url)}">');
           _htmlSpans(out, s.children);
           out.write('</a>');
@@ -740,9 +742,16 @@ abstract final class Markdown {
 
   /// Whether a link to [url] may be opened: a web address, `http://` or
   /// `https://`, or an e-mail address, `mailto:`, in any case of ASCII
-  /// letters. A text may come from another person's Device, so nothing
-  /// else is opened from it: no file, no app's own address, no script.
-  static bool mayOpen(String url) {
+  /// letters, or an app link [AppLink.parse] reads (#261, ADR 0046). A
+  /// text may come from another person's Device, so nothing else is
+  /// opened from it: no file outside the shared folder, no other app's
+  /// address, no script.
+  static bool mayOpen(String url) =>
+      _webOrMail(url) || AppLink.parse(url) != null;
+
+  /// Whether [url] is a web or an e-mail address, which another app can
+  /// open too.
+  static bool _webOrMail(String url) {
     final lower = String.fromCharCodes([
       for (final c in url.codeUnits) c >= 0x41 && c <= 0x5A ? c | 0x20 : c,
     ]);
@@ -878,11 +887,17 @@ abstract final class Markdown {
   /// [text] with a link to [url] on the selection from [start] to [end]
   /// on its first line, or on the word at a cursor. In a link already,
   /// its destination becomes [url], and a blank [url] takes the link
-  /// off. Without a word, the link is put at the cursor with [url] as
-  /// its label, selected. Spaces and control characters in [url] are
-  /// written %-encoded, `(`, `)` and `\` escaped. A code block's lines
-  /// stay as they are.
-  static MarkdownChange link(String text, int start, int end, String url) {
+  /// off. Without a word, the link is put at the cursor with [label],
+  /// or [url] without one, as its label, selected. Spaces and control
+  /// characters in [url] are written %-encoded, `(`, `)` and `\`
+  /// escaped. A code block's lines stay as they are.
+  static MarkdownChange link(
+    String text,
+    int start,
+    int end,
+    String url, {
+    String? label,
+  }) {
     var (s, e) = _ordered(text, start, end);
     final block = parse(text)[lineAt(text, s)];
     if (block.code != null) return (text: text, start: s, end: e);
@@ -913,11 +928,11 @@ abstract final class Markdown {
     final (from, to) = s == e ? wordAt(text, s) : _trimmed(text, s, e);
     if (from == to) {
       // A `]` would end the label.
-      final label = escape(address).replaceAll(']', r'\]');
+      final shown = escape(label ?? address).replaceAll(']', r'\]');
       return (
-        text: text.replaceRange(s, s, '[$label]($destination)'),
+        text: text.replaceRange(s, s, '[$shown]($destination)'),
         start: s + 1,
-        end: s + 1 + label.length,
+        end: s + 1 + shown.length,
       );
     }
     return _apply(
@@ -1122,6 +1137,90 @@ abstract final class Markdown {
           (s.kind != MarkdownSpanKind.text && s.end == at) || ends(s.children),
     );
     return ends(block.spans);
+  }
+
+  /// [text] with every task list item of GFM on the lines the selection
+  /// from [start] to [end] touches made an item with a box (#263): a
+  /// bulleted or numbered item whose content starts with `[ ]`, `[x]` or
+  /// `[X]` and a space gets ☐ for `[ ]` and ✅ for the others in place of
+  /// those three characters. A selection ending at a line's start leaves
+  /// that line out. A code block's and a table's lines are no items, so
+  /// they stay as they are. The selection keeps what it selected, a
+  /// cursor right after a mark going after its glyph.
+  static MarkdownChange taskBoxes(String text, int start, int end) {
+    final (s, e) = _ordered(text, start, end);
+    final blocks = parse(text);
+    final (first, last) = _touched(text, blocks, s, e);
+    final edits = <_Edit>[
+      for (final b in blocks.sublist(first, last + 1))
+        if (_taskMark(text, b) case final glyph?)
+          _Edit(b.contentStart, 3, glyph, after: true),
+    ];
+    if (edits.isEmpty) return (text: text, start: s, end: e);
+    return _apply(text, edits, s, e);
+  }
+
+  /// The glyph of the box a task list item [block] of [text] becomes, or
+  /// null when it is none.
+  static String? _taskMark(String text, MarkdownBlock block) {
+    final at = block.contentStart;
+    if (!_listed(block.kind) ||
+        at + 4 > block.end ||
+        text.codeUnitAt(at) != 0x5B ||
+        text.codeUnitAt(at + 2) != 0x5D ||
+        text.codeUnitAt(at + 3) != _space) {
+      return null;
+    }
+    return switch (text.codeUnitAt(at + 1)) {
+      _space => '☐',
+      0x78 || 0x58 => '✅',
+      _ => null,
+    };
+  }
+
+  /// [text], a formatted text as it shows ([TextBoxes.shown]), with each
+  /// bulleted or numbered item whose content starts with a box and a
+  /// space written as a task list item of GFM (#263), so another
+  /// Markdown app reads it: ☐ as `[ ]`, ✅ as `[x]`, and ❌ as `[x]` with
+  /// the rest of its content struck through, `~~` around it without the
+  /// spaces at its ends, unless it is one strike-through already or
+  /// empty. Any other box, a code block's lines and a table's stay as
+  /// they are.
+  static String taskLists(String text) {
+    final edits = <_Edit>[];
+    for (final b in parse(text)) {
+      final at = b.contentStart;
+      if (!_listed(b.kind) ||
+          at + 2 > b.end ||
+          text.codeUnitAt(at + 1) != _space) {
+        continue;
+      }
+      switch (text.codeUnitAt(at)) {
+        case 0x2610:
+          edits.add(_Edit(at, 1, '[ ]'));
+        case 0x2705:
+          edits.add(_Edit(at, 1, '[x]'));
+        case 0x274C:
+          edits.add(_Edit(at, 1, '[x]'));
+          final from = _skipBlank(text, at + 2, b.end);
+          var to = b.end;
+          while (to > from && _blank(text.codeUnitAt(to - 1))) {
+            to--;
+          }
+          final struck = b.spans.any(
+            (s) =>
+                s.kind == MarkdownSpanKind.strike &&
+                s.start == from &&
+                s.end == to,
+          );
+          if (from < to && !struck) {
+            edits
+              ..add(_Edit(from, 0, '~~'))
+              ..add(_Edit(to, 0, '~~'));
+          }
+      }
+    }
+    return edits.isEmpty ? text : _apply(text, edits, 0, 0).text;
   }
 
   static const _inline = {

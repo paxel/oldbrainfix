@@ -578,6 +578,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         unit: tally.unit,
         target: tally.target,
         rule: tally.rule,
+        check: tally.check,
       );
     }
     for (final choice in _schedules) {

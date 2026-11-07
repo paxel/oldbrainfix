@@ -295,10 +295,15 @@ void main() {
       // Tomorrow's row; [tap] scrolls it to the top of the week.
       await tap(tester, find.text('pills').at(1));
       await tap(tester, find.text('Save'));
+      // The Agenda's own list, not the PageView around it (#258).
       await tester.scrollUntilVisible(
         card,
         -100,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            )
+            .first,
       );
       expect(inCard(find.text('pills · 2 times')), findsOneWidget);
     });

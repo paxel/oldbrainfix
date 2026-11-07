@@ -10,6 +10,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:05.000Z"
@@ -25,6 +26,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:15.000Z"
@@ -40,6 +42,7 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:25.000Z"
@@ -55,11 +58,30 @@
         "target": "10",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:35.000Z"
       }
     ]
+  },
+  "settings": {
+    "note:00000000000000000000000000000001": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000003": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000005": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000007": {
+      "bar": "day",
+      "countsInSets": false
+    }
   },
   "all": [
     "note:00000000000000000000000000000007",

@@ -396,6 +396,16 @@ void main() {
       const bell = 'content://media/internal/audio/media/42';
       final tile = find.byKey(const ValueKey('alarmSound'));
 
+      testWidgets('is no choice on the iPhone, which has no sound picker', (
+        tester,
+      ) async {
+        await start(tester);
+        alarms.choosesSound = false;
+        await openDeviceSettings(tester);
+        expect(tile, findsNothing);
+        expect(find.byKey(const ValueKey('renagDevice')), findsOneWidget);
+      });
+
       testWidgets('is the app\'s own until another is picked, which is kept '
           'on this Device and armed', (tester) async {
         await start(tester);
@@ -618,6 +628,26 @@ void main() {
       );
     });
 
+    testWidgets('offers no Ko-fi on the iPhone (Q591)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await about(tester);
+        // The row would sit right under this one: scroll it into view so
+        // a Ko-fi row would be built if there were one.
+        await tester.scrollUntilVisible(
+          find.text('Write to the developer'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
+        await tester.pumpAndSettle();
+        expect(find.text('Write to the developer'), findsOneWidget);
+        expect(find.text('Buy me a coffee', skipOffstage: false), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
     testWidgets('links the German docs and privacy policy in German', (
       tester,
     ) async {
@@ -790,6 +820,20 @@ void main() {
       await start(tester);
       await openDeviceSettings(tester);
       expect(find.text('Import a folder'), findsNothing);
+    });
+
+    testWidgets('a Markdown file\'s task list items come in as boxes (#263)', (
+      tester,
+    ) async {
+      folders.put('Shop.md', march, utf8.encode('- [ ] milk\n- [x] bread'));
+      await importFrom(tester);
+
+      final area = Places(store)
+          .areas()
+          .singleWhere((a) => a.name == 'From Notes');
+      final note = Notes(store).inside(area.id).single;
+      expect(note.shownText, '# Shop\n- ☐ milk\n- ✅ bread');
+      expect(note.boxes.map((b) => b.state), [BoxState.open, BoxState.done]);
     });
 
     testWidgets('makes Notes of the Markdown and text files of a folder and '

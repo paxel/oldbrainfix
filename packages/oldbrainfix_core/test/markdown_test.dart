@@ -375,12 +375,14 @@ void main() {
       expect(inserted.url, r'https://x.org/[a]\]');
     });
 
-    test('only a web or e-mail address is opened from a link', () {
+    test('only a web or e-mail address or an app link is opened', () {
       for (final url in [
         'https://x.org',
         'HTTP://x.org/a',
         'mailto:ann@x.org',
         'MailTo:ann@x.org',
+        'oldbrainfix://note/note:a',
+        'OLDBRAINFIX://settings/backups',
       ]) {
         expect(Markdown.mayOpen(url), isTrue, reason: url);
       }
@@ -389,6 +391,7 @@ void main() {
         'file:///etc/passwd',
         'intent://x#Intent;end',
         'oldbrainfix://x',
+        'oldbrainfix://file/../a',
         'tel:123',
         'data:text/html,x',
         'x.org',
@@ -769,6 +772,37 @@ void main() {
         MarkdownTables.deleteRow(text, at, 2),
         MarkdownTables.deleteColumn(text, at, 2),
         MarkdownTables.insertRow(text, 0, 0),
+      ]) {
+        expect(change.text, text);
+      }
+    });
+
+    test('a column lines up as it is set to', () {
+      const text = 'x\n| a | b |\n|:-|-:|\n| c | d | e |\n\ny';
+      final at = text.indexOf('|');
+      String table(MarkdownChange change) =>
+          change.text.substring(change.start, change.end);
+      expect(
+        table(MarkdownTables.setAlign(text, at, 0, MarkdownAlign.center)),
+        '| a | b |\n| :-: | --: |\n| c | d | e |',
+      );
+      expect(
+        table(MarkdownTables.setAlign(text, at, 1, MarkdownAlign.none)),
+        '| a | b |\n| :-- | --- |\n| c | d | e |',
+      );
+      final right = MarkdownTables.setAlign(text, at, 0, MarkdownAlign.right);
+      expect(MarkdownTables.all(right.text).single.aligns, [
+        MarkdownAlign.right,
+        MarkdownAlign.right,
+      ]);
+      expect(right.text.substring(0, right.start), 'x\n');
+      expect(right.text.substring(right.end), '\n\ny');
+      // What cannot be done, or is so already, changes nothing.
+      for (final change in [
+        MarkdownTables.setAlign(text, at, 0, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, at, 2, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, at, -1, MarkdownAlign.left),
+        MarkdownTables.setAlign(text, 0, 0, MarkdownAlign.center),
       ]) {
         expect(change.text, text);
       }
@@ -1290,5 +1324,125 @@ void main() {
         '````\n```\na\n```\nb\n````',
       );
     });
+  });
+
+  group('task lists (#263)', () {
+    test('a task list item becomes an item with a box', () {
+      String boxes(String text) =>
+          Markdown.taskBoxes(text, 0, text.length).text;
+      expect(
+        boxes('- [ ] milk\n* [x] bread\n+ [X] eggs\n1. [ ] call\n  - [x] in'),
+        '- ☐ milk\n* ✅ bread\n+ ✅ eggs\n1. ☐ call\n  - ✅ in',
+      );
+      for (final text in [
+        '- [ ]',
+        '- [ ]milk',
+        '- [y] milk',
+        '- [  ] milk',
+        '[ ] milk',
+        '> - [ ] milk',
+        r'- \[ ] milk',
+        '- `[ ] milk`',
+        '- [ ](https://x.org) milk',
+        '```\n- [ ] milk\n```',
+        '| a |\n|---|\n| - [ ] b |',
+        '- ☐ milk',
+      ]) {
+        expect(boxes(text), text, reason: text);
+      }
+    });
+
+    test('only the lines the selection touches, the cursor after the box', () {
+      const text = '- [ ] a\n- [x] b\n- [ ] c';
+      expect(Markdown.taskBoxes(text, 6, 6), (
+        text: '- ☐ a\n- [x] b\n- [ ] c',
+        start: 4,
+        end: 4,
+      ));
+      // A selection ending at a line's start leaves that line out.
+      expect(Markdown.taskBoxes(text, 8, 16), (
+        text: '- [ ] a\n- ✅ b\n- [ ] c',
+        start: 8,
+        end: 14,
+      ));
+      // A mark typed: the cursor right after its space stays after it.
+      expect(Markdown.taskBoxes('x\n- [ ] ', 8, 8), (
+        text: 'x\n- ☐ ',
+        start: 6,
+        end: 6,
+      ));
+      expect(Markdown.taskBoxes('- [ ]', 5, 5).text, '- [ ]');
+    });
+
+    test('a box at an item\'s start is written back as a task list item', () {
+      expect(
+        Markdown.taskLists('- ☐ milk\n2. ✅ bread\n  * ❌ call Ann  \n- ❌ '),
+        '- [ ] milk\n2. [x] bread\n  * [x] ~~call Ann~~  \n- [x] ',
+      );
+      expect(Markdown.taskLists('- ❌ ~~gone~~'), '- [x] ~~gone~~');
+      expect(Markdown.taskLists('- ❌ **a** b'), '- [x] ~~**a** b~~');
+      for (final text in [
+        '☐ milk',
+        'buy ☐ milk',
+        '- ☐',
+        '- ☐milk',
+        '- x ☐ milk',
+        '> ☐ milk',
+        '```\n- ☐ milk\n```',
+        '| a |\n|---|\n| ☐ b |',
+      ]) {
+        expect(Markdown.taskLists(text), text, reason: text);
+      }
+    });
+
+    test('written back and taken in again gives the same boxes', () {
+      const shown = '# Shop\n- ☐ milk\n- ✅ bread';
+      final back = Markdown.taskLists(shown);
+      expect(Markdown.taskBoxes(back, 0, back.length).text, shown);
+    });
+
+    test('saving a formatted text gives its task list items boxes', () {
+      var n = 0;
+      String newId() => 'id:${n++}';
+      const text = '- [ ] milk\n- [x] bread\n```\n- [ ] code\n```';
+      final saved = TextBoxes.convert(
+        text,
+        format: TextFormats.markdown,
+        newId: newId,
+      );
+      expect(
+        TextBoxes.strip(saved),
+        '- ☐ milk\n- ✅ bread\n```\n- [ ] code\n```',
+      );
+      expect(TextBoxes.find(saved).map((b) => b.state), [
+        BoxState.open,
+        BoxState.done,
+      ]);
+      // Neither a plain text nor a Code text (#213).
+      for (final format in [TextFormats.plain, TextFormats.code]) {
+        expect(
+          TextBoxes.convert(text, format: format, newId: newId),
+          text,
+          reason: format,
+        );
+      }
+    });
+
+    test(
+      'a task list item captured into a formatted Note is a box to tick',
+      () {
+        final store = Store.inMemory(clock: ticking());
+        addTearDown(store.close);
+        final notes = Notes(store);
+        final note = notes.capture(
+          '- [ ] milk\n- [x] bread',
+          format: TextFormats.markdown,
+        );
+        final got = notes.byId(note.id)!;
+        expect(got.shownText, '- ☐ milk\n- ✅ bread');
+        Boxes(store).tick(note.id, got.boxes.first.id, BoxState.failed);
+        expect(notes.byId(note.id)!.shownText, '- ❌ milk\n- ✅ bread');
+      },
+    );
   });
 }

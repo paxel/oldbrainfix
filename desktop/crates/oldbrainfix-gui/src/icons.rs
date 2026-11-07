@@ -5,6 +5,14 @@
 use egui::{Align2, Color32, FontFamily, FontId, Painter, Rect, Ui};
 
 static MATERIAL_ICONS: &[u8] = include_bytes!("../assets/MaterialIcons-Regular.otf");
+/// Arrows, triangles, ballot boxes and other symbols egui's own fonts
+/// lack (#254).
+static NOTO_SYMBOLS_2: &[u8] = include_bytes!("../assets/NotoSansSymbols2-Regular.ttf");
+/// Arrows, the vertical ellipsis and the math operators (#254).
+static NOTO_MATH: &[u8] = include_bytes!("../assets/NotoSansMath-Regular.ttf");
+
+/// The symbol fonts, in the order the text falls back to them.
+const SYMBOL_FONTS: [&str; 2] = ["noto-sans-math", "noto-sans-symbols-2"];
 
 /// The font family the icons live in.
 pub const FAMILY: &str = "icons";
@@ -96,6 +104,8 @@ pub const FORMAT_BULLETS: char = '\u{e2b8}';
 pub const FORMAT_NUMBERS: char = '\u{e2b9}';
 pub const FORMAT_QUOTE: char = '\u{e2bc}';
 pub const LINK: char = '\u{e380}';
+/// The format bar's "Link to…" (#261), as the phone's `Icons.add_link`.
+pub const ADD_LINK: char = '\u{e053}';
 pub const CODE: char = '\u{e176}';
 /// The format bar's code block (#212), as the phone's: `data_object`.
 pub const CODE_BLOCK: char = '\u{f04e6}';
@@ -134,8 +144,12 @@ pub const TALLY_UNIT: char = '\u{e60e}';
 pub const TALLY_TARGET: char = '\u{f07b}';
 /// A Tally field hidden (#190), `visibility_off_outlined`.
 pub const TALLY_HIDDEN: char = '\u{f4a0}';
-/// What a Tally field multiplies (#200), `calculate_outlined`.
-pub const TALLY_MULTIPLIES: char = '\u{ef10}';
+/// A Tally's bar length (#264), `bar_chart`, as [`TALLY`].
+pub const TALLY_BAR: char = TALLY;
+/// Whether a Tally counts in sets (#264), `autorenew`, as [`REAPPEAR`].
+pub const TALLY_SETS: char = REAPPEAR;
+/// A Tally's Check field (#264), a checked box, as [`CHECKED`].
+pub const TALLY_CHECK: char = CHECKED;
 pub const SESSION_COUNT: char = '\u{e640}';
 pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';
@@ -192,9 +206,35 @@ pub fn area_icon(key: Option<&str>) -> Option<char> {
     })
 }
 
-/// The fonts: egui's own, plus the icon font in a family of its own.
+/// The fonts: egui's own, the symbol fonts as the text's fallbacks right
+/// after egui's text font, Hack last for box drawing, and the icon font
+/// in a family of its own.
 pub fn fonts() -> egui::FontDefinitions {
     let mut fonts = egui::FontDefinitions::default();
+    for (name, bytes) in [
+        (SYMBOL_FONTS[0], NOTO_MATH),
+        (SYMBOL_FONTS[1], NOTO_SYMBOLS_2),
+    ] {
+        fonts.font_data.insert(
+            name.into(),
+            std::sync::Arc::new(egui::FontData::from_static(bytes)),
+        );
+    }
+    for family in [FontFamily::Proportional, FontFamily::Monospace] {
+        let chain = fonts.families.entry(family).or_default();
+        // After Ubuntu Light, the proportional text font and the
+        // monospace one's own fallback, before the emoji fonts.
+        let at = chain
+            .iter()
+            .position(|f| f == "Ubuntu-Light")
+            .map_or(chain.len(), |i| i + 1);
+        chain.splice(at..at, SYMBOL_FONTS.iter().map(|f| f.to_string()));
+    }
+    // Hack, already bundled as the monospace font, last: box drawing,
+    // which neither the text font nor the symbol fonts have.
+    if let Some(chain) = fonts.families.get_mut(&FontFamily::Proportional) {
+        chain.push("Hack".into());
+    }
     fonts.font_data.insert(
         "material-icons".into(),
         std::sync::Arc::new(egui::FontData::from_static(MATERIAL_ICONS)),
@@ -256,5 +296,129 @@ mod tests {
         }
         assert_eq!(area_icon(Some("rocket")), None);
         assert_eq!(area_icon(None), None);
+    }
+
+    /// The faces of `family`'s chain, in order, by name.
+    fn chain<'a>(
+        defs: &'a egui::FontDefinitions,
+        family: &FontFamily,
+    ) -> Vec<(&'a str, ttf_parser::Face<'a>)> {
+        defs.families[family]
+            .iter()
+            .map(|name| {
+                let data = &defs.font_data[name];
+                let face = ttf_parser::Face::parse(&data.font, data.index).expect(name);
+                (name.as_str(), face)
+            })
+            .collect()
+    }
+
+    /// Every file under `dir` whose name ends in `suffix`, recursively.
+    fn files(dir: &std::path::Path, suffix: &str) -> Vec<std::path::PathBuf> {
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(dir).expect("a directory").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                found.extend(files(&path, suffix));
+            } else if path.to_string_lossy().ends_with(suffix) {
+                found.push(path);
+            }
+        }
+        found
+    }
+
+    /// Code points that draw nothing: spaces, joiners, variation
+    /// selectors and the tag characters of a box's id.
+    fn invisible(c: char) -> bool {
+        c.is_whitespace()
+            || c.is_control()
+            || matches!(c, '\u{ad}' | '\u{200b}'..='\u{200f}' | '\u{2060}'..='\u{206f}')
+            || matches!(c, '\u{fe00}'..='\u{fe0f}' | '\u{feff}' | '\u{e0000}'..='\u{e007f}')
+    }
+
+    /// Every symbol the desktop draws as text: the non-ASCII characters
+    /// other than letters of the strings (the help Notes among them), the
+    /// gui's own code, the guide and the docs a Note may hold, the boxes,
+    /// the frog, and the arrows, quotes and dashes of everyday text.
+    fn symbols() -> std::collections::BTreeSet<char> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let mut sources = files(&root.join("lib/l10n"), ".arb");
+        sources.extend(files(&root.join("desktop/l10n"), ".arb"));
+        sources.extend(files(&root.join("docs/agents"), ".md"));
+        sources.extend(files(
+            &root.join("desktop/crates/oldbrainfix-gui/src"),
+            ".rs",
+        ));
+        for site in std::fs::read_dir(root.join("site"))
+            .expect("the site")
+            .flatten()
+        {
+            let guide = site.path().join("guide");
+            if guide.is_dir() {
+                sources.extend(files(&guide, ".html"));
+            }
+        }
+        assert!(sources.len() > 20, "{sources:?}");
+        let mut all: std::collections::BTreeSet<char> = sources
+            .iter()
+            .flat_map(|path| {
+                std::fs::read_to_string(path)
+                    .expect("a text")
+                    .chars()
+                    .collect::<Vec<_>>()
+            })
+            .filter(|&c| !c.is_ascii() && !c.is_alphabetic() && !invisible(c))
+            .collect();
+        all.extend(oldbrainfix_core::text_boxes::BoxState::ALL.map(|b| b.glyph()));
+        all.extend(crate::frogs_view::FROG.chars());
+        all.extend("→←↑↓⇄▸◂⋮×·…–—„“”‚‘’".chars());
+        all
+    }
+
+    /// The code points of `range` that are characters.
+    fn range(range: std::ops::RangeInclusive<u32>) -> impl Iterator<Item = char> {
+        range.filter_map(char::from_u32)
+    }
+
+    /// The symbols of `wanted` no font of `family`'s chain has a glyph for.
+    fn lacking(
+        defs: &egui::FontDefinitions,
+        family: &FontFamily,
+        wanted: impl IntoIterator<Item = char>,
+    ) -> String {
+        let chain = chain(defs, family);
+        wanted
+            .into_iter()
+            .filter(|&c| {
+                !chain
+                    .iter()
+                    .any(|(_, face)| face.glyph_index(c).is_some_and(|g| g.0 != 0))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_symbol_of_the_app_and_its_texts_has_a_glyph() {
+        let defs = fonts();
+        let symbols = symbols();
+        // Arrows, math operators, box drawing and geometric shapes, whole.
+        let blocks = || {
+            range(0x2190..=0x21ff)
+                .chain(range(0x2200..=0x22ff))
+                .chain(range(0x2500..=0x257f))
+                .chain(range(0x25a0..=0x25ff))
+        };
+        for family in [FontFamily::Proportional, FontFamily::Monospace] {
+            let wanted = symbols.iter().copied().chain(blocks());
+            let missing = lacking(&defs, &family, wanted);
+            assert!(missing.is_empty(), "{family:?} lacks {missing:?}");
+        }
+        // The check itself: egui's own fonts lack the arrow (#254).
+        let before = lacking(
+            &egui::FontDefinitions::default(),
+            &FontFamily::Proportional,
+            symbols,
+        );
+        assert!(before.contains('→'), "{before:?}");
     }
 }

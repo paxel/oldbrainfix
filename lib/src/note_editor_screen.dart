@@ -147,21 +147,21 @@ Future<bool> amendNote(
 
 /// Asks once whether the Note [noteId] goes to the trash, with the verb
 /// on the button in the error colour, and moves it there; whether it
-/// did. When it spawned Routines or Reminders, the dialog offers to
-/// delete the Note only or with them; they never go as a side effect.
+/// did. Its Routines and Reminders always go with it, and the question
+/// names them (#262).
 Future<bool> deleteNote(
   BuildContext context,
   Notes notes,
   String noteId,
 ) async {
   final book = Routines(notes.store);
-  final linked = book.ofNote(noteId).length;
-  final withRoutines = await showDialog<bool>(
+  final linked = book.ofNote(noteId);
+  final delete = await showDialog<bool>(
     context: context,
     builder: (context) => _DeleteNoteDialog(linked: linked),
   );
-  if (withRoutines == null) return false;
-  book.trashNote(noteId, withRoutines: withRoutines);
+  if (delete != true) return false;
+  book.trashNote(noteId);
   return true;
 }
 
@@ -593,6 +593,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Those whose schedule a newer version of the app saved (ADR 0034).
   List<NewerRoutine> _newerRoutines = const [];
 
+  /// The Frog its badge shows (#259): the open one, or one eaten today or
+  /// yesterday; none in the trash.
+  Frog? _frog;
+
   /// The photos and recordings, by the Note or Section they belong to,
   /// that this Device may remove while their texts stay.
   Set<(String, String)> _removable = const {};
@@ -629,6 +633,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Whether the Note shows its ticks on this Device (ADR 0035).
   bool _showsTicks = false;
   late final _routineBook = Routines(widget.notes.store);
+  late final _frogs = Frogs(widget.notes.store);
 
   /// Whether this Device may Amend the Note: anywhere it holds a role.
   bool _amends = true;
@@ -866,6 +871,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               if (widget.notes.store.mayCheckOff(open.routine.id)) open,
           ];
     _newerRoutines = _routineBook.newerOfNote(widget.noteId);
+    _frog = note == null || note.isTrashed
+        ? null
+        : badgeFrog(_frogs, widget.noteId, deviceWallClock);
     final notes = widget.notes;
     final store = notes.store;
     final files = [
@@ -1492,8 +1500,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The "+" badge's menu at the finger [at]: Routine, Reminder, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
-  /// Session, as a Routine of it runs it already (#191); in Simple only
-  /// Routine and Reminder (#197).
+  /// Session, as a Routine of it runs it already (#191); no Frog while
+  /// one is open (#259); in Simple only Routine and Reminder (#197).
   Future<void> _addMenu(Offset at) async {
     final t = context.t;
     final advanced = widget.notes.store.advanced;
@@ -1514,8 +1522,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             const Icon(Icons.notifications_outlined),
             t.reminder,
           ),
-          // Frogs and Sessions are made only in Advanced (#197).
-          if (advanced) (Spawn.frog, const FrogIcon(), t.frog),
+          // Frogs and Sessions are made only in Advanced (#197); a Note
+          // has one open Frog at a time (#259).
+          if (advanced && (_frog?.isDone ?? true))
+            (Spawn.frog, const FrogIcon(), t.frog),
           // A Code text becomes no Session (#213).
           if (advanced &&
               _kind != NoteKind.session &&
@@ -1671,6 +1681,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.repeat,
             value: t.newerVersionNeeded,
           ),
+        // Its open Frog, or one eaten today or yesterday (#259).
+        if (_frog case final frog?) _frogBadge(frog),
         // Every Note has a kind (#188); with nothing to change it to,
         // the badge only shows it.
         SettingBadge(
@@ -1738,6 +1750,86 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
       ],
     );
+  }
+
+  /// The Frog's badge (#259): the frog, then Open, or Eaten today or
+  /// yesterday; a tap offers what this Device may do to it.
+  Widget _frogBadge(Frog frog) {
+    final t = context.t;
+    final store = widget.notes.store;
+    final eats = !frog.isDone && store.mayCheckOff(frog.id);
+    final removes = store.mayManage(store.areaOf(frog.id));
+    final done = frog.done;
+    return SettingBadge(
+      key: const ValueKey('badge-frog'),
+      setting: t.frog,
+      iconWidget: const FrogIcon(size: 18),
+      value: done == null
+          ? t.frogOpen
+          : Day.today(done, deviceWallClock) ==
+                Day.today(store.clock(), deviceWallClock)
+          ? t.frogEatenToday
+          : t.frogEatenYesterday,
+      onTap: eats || removes
+          ? (at) => _frogMenu(frog, at, eats: eats, removes: removes)
+          : null,
+    );
+  }
+
+  /// The Frog badge's menu at the finger [at]: Eat now while it is open
+  /// and this Device may check it off, Remove the Frog for who may
+  /// manage it (ADR 0013), which asks once, as the Frog view does.
+  Future<void> _frogMenu(
+    Frog frog,
+    Offset at, {
+    required bool eats,
+    required bool removes,
+  }) async {
+    final t = context.t;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final picked = await showMenu<bool>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (eats)
+          PopupMenuItem(
+            key: const ValueKey('frog-eat-now'),
+            value: true,
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline),
+                const SizedBox(width: 12),
+                Flexible(child: Text(t.frogEatNow)),
+              ],
+            ),
+          ),
+        if (removes)
+          PopupMenuItem(
+            key: const ValueKey('frog-remove'),
+            value: false,
+            child: Row(
+              children: [
+                const Icon(Icons.delete_outline),
+                const SizedBox(width: 12),
+                Flexible(child: Text(t.frogRemove)),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    _saveText();
+    if (picked) {
+      _frogs.markDone(frog.id);
+    } else if (!await trashFrog(context, _frogs, frog) || !mounted) {
+      return;
+    }
+    _reload();
   }
 
   Future<void> _file() async {
@@ -2132,7 +2224,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _reload();
       return;
     }
-    if (!trashed) _routineBook.trashNote(widget.noteId, withRoutines: true);
+    if (!trashed) _routineBook.trashNote(widget.noteId);
     Navigator.of(context).pop();
   }
 
@@ -2342,6 +2434,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             // A list's or Tally's panel keeps its own space under it.
             if (!_named) const SizedBox(height: 16),
             _badges(placed, when, place, colour),
+            // Its past runs (#264), under its settings.
+            if (_sessionDraft != null) ...[
+              const SizedBox(height: 16),
+              EditorPanel(
+                heading: context.t.sessionRuns,
+                child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
+              ),
+            ],
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
               NotePhoto(
@@ -2673,40 +2773,37 @@ class EditorPanel extends StatelessWidget {
   );
 }
 
-/// Asks once whether a Note goes to the trash: true to delete its
-/// [linked] Routines and Reminders with it, false to delete the Note
-/// only, null to cancel.
+/// Asks once whether a Note goes to the trash with its [linked]
+/// Routines and Reminders: true to delete, null to cancel.
 class _DeleteNoteDialog extends StatelessWidget {
-  final int linked;
+  final List<Routine> linked;
 
   const _DeleteNoteDialog({required this.linked});
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    Widget destructive(String label, bool value) => TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.error,
-      ),
-      onPressed: () => Navigator.of(context).pop(value),
-      child: Text(label),
-    );
     return AlertDialog(
-      title: Text(t.deleteNoteQuestion),
+      title: Text(switch (linked) {
+        [] => t.deleteNoteQuestion,
+        [final one] when one.isReminder => t.deleteNoteReminderQuestion,
+        _ => t.deleteNoteLinkedQuestion(linked.length),
+      }),
       content: Text(
-        linked == 0 ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
+        linked.isEmpty ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(t.cancel),
         ),
-        if (linked == 0)
-          destructive(t.delete, false)
-        else ...[
-          destructive(t.deleteNoteOnly, false),
-          destructive(t.deleteNoteWithLinked(linked), true),
-        ],
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(t.delete),
+        ),
       ],
     );
   }

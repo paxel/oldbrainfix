@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -290,12 +291,14 @@ void main() {
       await away(tester, const Duration(minutes: 2));
       expect(lockScreen, findsOneWidget);
       expect(find.byType(AllNotesScreen, skipOffstage: false), findsNothing);
-      expect(find.byType(AreasScreen, skipOffstage: false), findsNothing);
+      // Only the Areas list beside the Agenda, hidden under the lock.
+      expect(find.byType(AreasScreen, skipOffstage: false), findsOneWidget);
       expect(find.text('secret plan'), findsNothing);
 
       await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
       await tap(tester, find.byKey(const ValueKey('unlockPin')));
       expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
     });
 
     testWidgets('locks at once when the Device says so', (tester) async {
@@ -345,7 +348,8 @@ void main() {
       await away(tester, const Duration(minutes: 5));
       expect(find.byType(CaptureScreen), findsOneWidget);
       expect(find.byType(AllNotesScreen, skipOffstage: false), findsNothing);
-      expect(find.byType(AreasScreen, skipOffstage: false), findsNothing);
+      // Only the Areas list beside the Agenda, hidden under the lock.
+      expect(find.byType(AreasScreen, skipOffstage: false), findsOneWidget);
 
       await back(tester);
       expect(lockScreen, findsOneWidget);
@@ -859,6 +863,21 @@ void main() {
       await start(tester);
       await openSettings(tester);
       expect(find.byKey(const ValueKey('biometrics')), findsNothing);
+    });
+
+    testWidgets('name Face ID and Touch ID on the iPhone (#244)', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        biometrics.can = true;
+        await start(tester);
+        await openSettings(tester);
+        expect(find.text('Unlock with Face ID or Touch ID'), findsOneWidget);
+        expect(find.text(en.unlockBiometrics), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('switch biometrics on with the PIN, once they work', (
