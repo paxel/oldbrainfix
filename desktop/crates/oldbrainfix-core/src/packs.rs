@@ -46,7 +46,7 @@ use crate::sessions::{SessionRule, Sessions, keys as session_keys};
 use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
 use crate::signing::{SigningKey, verify_signature};
 use crate::store::{Fields, Store};
-use crate::tallies::{Tallies, keys as tally_keys};
+use crate::tallies::{Tallies, TallyPeriod, keys as tally_keys};
 use crate::tally_units::{TallyRule, decode_number, encode_number};
 use crate::text_format::{self, StoredText};
 use crate::transcript_prompts::dart_trim;
@@ -148,8 +148,10 @@ pub struct PackField {
     /// The target as the log keeps it ([`encode_number`]), or none.
     pub target: Option<String>,
     pub hidden: bool,
+    /// Whether it is a Check field (#264).
+    pub check: bool,
     /// The index of the field among the Tally's fields this one
-    /// multiplies, or none.
+    /// multiplied (#200), or none.
     pub multiplies: Option<usize>,
 }
 
@@ -199,6 +201,10 @@ pub struct PackNote {
     pub shopping: bool,
     /// The fields of its Tally; empty for none.
     pub fields: Vec<PackField>,
+    /// Its Tally's bar length (#264), none for a day as never set; and
+    /// whether it counts in sets.
+    pub bar: Option<TallyPeriod>,
+    pub sets: bool,
     pub session: Option<PackSession>,
     /// Its Routines and Reminders, as their schedules.
     pub routines: Vec<Schedule>,
@@ -720,6 +726,8 @@ impl Pack {
                 lines: n.lines.clone(),
                 shopping: n.shopping,
                 fields: n.fields.clone(),
+                bar: n.bar,
+                sets: n.sets,
                 session: n.session.as_ref().map(|s| PackSession {
                     pool: s
                         .pool
@@ -817,12 +825,20 @@ fn note_json(n: &PackNote, files: Option<&BytesOf>) -> Result<Value> {
     if let Some(area) = n.area {
         pairs.push(("area", json!(area)));
     }
+    if !n.fields.is_empty()
+        && let Some(bar) = n.bar
+    {
+        pairs.push(("bar", json!(bar.name())));
+    }
     if !n.fields.is_empty() {
         let fields = n
             .fields
             .iter()
             .map(|f| {
                 let mut field = Vec::new();
+                if f.check {
+                    field.push(("check", json!(true)));
+                }
                 if f.hidden {
                     field.push(("hidden", json!(true)));
                 }
@@ -908,6 +924,9 @@ fn note_json(n: &PackNote, files: Option<&BytesOf>) -> Result<Value> {
         session.push(("pool", json!(s.pool)));
         session.push(("rule", json!(s.rule.name())));
         pairs.push(("session", object(session)));
+    }
+    if !n.fields.is_empty() && n.sets {
+        pairs.push(("sets", json!(true)));
     }
     pairs.push(("text", json!(n.text)));
     if let Some(topic) = n.topic {
@@ -1212,6 +1231,11 @@ fn note(json: &Value) -> Option<PackNote> {
         .iter()
         .map(field)
         .collect::<Option<_>>()?;
+    let bar = match optional_str(json, "bar")? {
+        None => None,
+        Some(bar) => Some(TallyPeriod::parse(bar)?),
+    };
+    let sets = optional_bool(json, "sets")?.unwrap_or(false);
     let session = match present(json, "session") {
         None => None,
         Some(s) => Some(session(s)?),
@@ -1240,6 +1264,8 @@ fn note(json: &Value) -> Option<PackNote> {
         lines,
         shopping,
         fields,
+        bar,
+        sets,
         session,
         routines,
         frog,
@@ -1265,6 +1291,7 @@ fn field(json: &Value) -> Option<PackField> {
         rule: TallyRule::parse(rule)?,
         target: target.map(str::to_string),
         hidden: optional_bool(json, "hidden")?.unwrap_or(false),
+        check: optional_bool(json, "check")?.unwrap_or(false),
         multiplies: index(json, "multiplies")?,
     })
 }
@@ -1519,6 +1546,11 @@ impl Store {
             NoteKind::Tally => Tallies::new(self).by_note(id)?,
             _ => None,
         };
+        let bar = tally
+            .as_ref()
+            .map(|t| t.bar)
+            .filter(|b| *b != TallyPeriod::Day);
+        let sets = tally.as_ref().is_some_and(|t| t.counts_in_sets);
         let fields = tally.map(|t| t.fields).unwrap_or_default();
         let field_index: HashMap<&str, usize> = fields
             .iter()
@@ -1606,12 +1638,15 @@ impl Store {
                     rule: f.rule,
                     target: f.target.and_then(encode_number),
                     hidden: f.hidden,
+                    check: f.check,
                     multiplies: f
                         .multiplies
                         .as_deref()
                         .and_then(|m| field_index.get(m).copied()),
                 })
                 .collect(),
+            bar,
+            sets,
             session,
             routines: routines.into_iter().map(|r| r.schedule).collect(),
             frog: Frogs::new(self).of_note(id)?.iter().any(|f| !f.is_done()),
@@ -2027,6 +2062,14 @@ impl Store {
             if f.hidden {
                 self.append(id, &key(tally_keys::HIDDEN), Some("true"), None)?;
             }
+            if f.check {
+                self.append(
+                    id,
+                    &key(tally_keys::KIND),
+                    Some(tally_keys::KIND_CHECK),
+                    None,
+                )?;
+            }
         }
         for (j, (f, own)) in n.fields.iter().zip(&field_ids).enumerate() {
             let Some(m) = f.multiplies.filter(|m| *m != j) else {
@@ -2037,6 +2080,14 @@ impl Store {
             };
             let key = tally_keys::field(own, tally_keys::MULTIPLIES);
             self.append(id, &key, Some(other), None)?;
+        }
+        if !n.fields.is_empty() {
+            if let Some(bar) = n.bar {
+                self.append(id, tally_keys::BAR, Some(bar.name()), None)?;
+            }
+            if n.sets {
+                self.append(id, tally_keys::SETS, Some("true"), None)?;
+            }
         }
         Ok(())
     }

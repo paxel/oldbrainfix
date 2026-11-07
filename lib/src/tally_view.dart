@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
+
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -75,10 +77,14 @@ abstract final class _Whose {
 /// An entry with who wrote it: null for the user's own (ADR 0017).
 typedef _ShownEntry = ({TallyEntry entry, Profile? author, bool changes});
 
-/// The setting of this Device that keeps the length of a bar of the
-/// Tally of [noteId] (#190), the name of its [TallyPeriod]; nothing kept
-/// means a day.
-String tallyPeriodSetting(String noteId) => 'tallyPeriod:$noteId';
+/// The name of [period] as a bar's length.
+String tallyPeriodName(AppLocalizations t, TallyPeriod period) =>
+    switch (period) {
+      TallyPeriod.day => t.tallyPeriodDay,
+      TallyPeriod.week => t.tallyPeriodWeek,
+      TallyPeriod.month => t.tallyPeriodMonth,
+      TallyPeriod.year => t.tallyPeriodYear,
+    };
 
 /// The setting of this Device that keeps all entries of the Tally of
 /// [noteId] shown on its card (#190); nothing kept means folded after
@@ -97,11 +103,13 @@ PersonFilter tallyDefaultFilter(Store store, String noteId) {
 }
 
 /// The setup of a Note's Tally in its editor (#190), nothing while the
-/// Note is no Tally: a row per field, its name and its settings as badges
-/// as on the New Tally page (#161), how a day with several entries counts,
-/// its unit and its target, the other field it multiplies (#200) while it
-/// does or may, a multiplier without a rule or a target, "Hidden" while
-/// it is hidden; a tap on the
+/// Note is no Tally: the Tally's own settings as badges (#264), the length
+/// of a bar of its charts and whether it counts in sets; then a row per
+/// field, its name and its settings as badges as on the New Tally page
+/// (#161), how several sets or entries in a bar count, its unit and its
+/// target, a Check field its kind and its target, a field that counted
+/// sets as a multiplier did (#200) that it counts the sets of older
+/// entries, "Hidden" while it is hidden; a tap on the
 /// name or a badge opens the field's page for who may change the Note,
 /// and "Add field" the page of a new one. The chart and the entries show
 /// on the card, not here. It follows the log as it changes.
@@ -143,14 +151,76 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     setState(_load);
   }
 
+  /// The length of a bar: a dialog of the four lengths, the one chosen
+  /// written at once.
+  Future<void> _pickBar(Tally tally) => showDialog<void>(
+    context: context,
+    builder: (context) {
+      final t = context.t;
+      return BadgeDialog(
+        setting: t.tallyPeriod,
+        icon: Icons.bar_chart,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.tallyBarHint),
+            RadioColumn<TallyPeriod>(
+              key: const ValueKey('tally-bar'),
+              value: tally.bar,
+              onChanged: (bar) {
+                _tallies.setBar(widget.noteId, bar);
+                Navigator.of(context).pop();
+              },
+              options: [
+                for (final period in TallyPeriod.values)
+                  RadioOption(
+                    key: ValueKey('tally-bar-${period.name}'),
+                    value: period,
+                    title: Text(tallyPeriodName(t, period)),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    },
+  ).then((_) => mounted ? setState(_load) : null);
+
+  /// Whether it counts in sets: a dialog with the switch, written at once.
+  Future<void> _pickSets(Tally tally) => showDialog<void>(
+    context: context,
+    builder: (context) {
+      final t = context.t;
+      return BadgeDialog(
+        setting: t.tallyCountsInSets,
+        icon: Icons.repeat,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.tallyCountsInSetsDetail),
+            const SizedBox(height: 8),
+            BadgeSwitch(
+              key: const ValueKey('tally-sets'),
+              setting: t.tallyCountsInSets,
+              on: tally.countsInSets,
+              toggle: () => _tallies.setCountsInSets(
+                widget.noteId,
+                !(_tallies.byNote(widget.noteId)?.countsInSets ?? false),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  ).then((_) => mounted ? setState(_load) : null);
+
   Widget _fieldRow(Tally tally, TallyField field, String decimal) {
     final t = context.t;
     final unit = shownUnit(field.unit, _system);
     final target = field.target;
-    final multiplies = switch (field.multiplies) {
-      final id? => tally.field(id),
-      null => null,
-    };
+    final countsSets = field.multiplies != null;
     final open = widget.notes.store.mayChange(field.noteId)
         ? () => _openField(field.id)
         : null;
@@ -175,8 +245,23 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
             spacing: 8,
             runSpacing: 8,
             children: [
-              // A multiplier counts no value: no rule, no target (#200).
-              if (multiplies == null)
+              if (field.check)
+                SettingBadge(
+                  key: ValueKey('tally-setup-kind-${field.id}'),
+                  setting: t.tallyFieldKind,
+                  icon: Icons.check_box_outlined,
+                  value: t.tallyFieldKindCheck,
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              if (countsSets)
+                SettingBadge(
+                  key: ValueKey('tally-setup-counts-sets-${field.id}'),
+                  setting: t.tallyCountsInSets,
+                  icon: Icons.repeat,
+                  value: t.tallySetCounter,
+                ),
+              // A field counting sets counts no value: no rule, no target.
+              if (!countsSets && !field.check)
                 SettingBadge(
                   key: ValueKey('tally-setup-rule-${field.id}'),
                   setting: t.tallyRule,
@@ -187,14 +272,15 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   valueIcon: tallyRuleIcon(field.rule),
                   onTap: open == null ? null : (_) => open(),
                 ),
-              SettingBadge(
-                key: ValueKey('tally-setup-unit-${field.id}'),
-                setting: t.tallyUnit,
-                icon: Icons.straighten,
-                value: unit.isEmpty ? t.tallyNoUnit : unit,
-                onTap: open == null ? null : (_) => open(),
-              ),
-              if (multiplies == null)
+              if (!field.check)
+                SettingBadge(
+                  key: ValueKey('tally-setup-unit-${field.id}'),
+                  setting: t.tallyUnit,
+                  icon: Icons.straighten,
+                  value: unit.isEmpty ? t.tallyNoUnit : unit,
+                  onTap: open == null ? null : (_) => open(),
+                ),
+              if (!countsSets)
                 SettingBadge(
                   key: ValueKey('tally-setup-target-${field.id}'),
                   setting: t.tallyTargetBadge,
@@ -202,14 +288,6 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   value: target == null
                       ? t.tallyNoTarget
                       : shownValue(target, field.unit, _system, decimal),
-                  onTap: open == null ? null : (_) => open(),
-                ),
-              if (multiplies != null || tally.multipliable(field.id).isNotEmpty)
-                SettingBadge(
-                  key: ValueKey('tally-setup-multiplies-${field.id}'),
-                  setting: t.tallyMultiplies,
-                  icon: Icons.calculate_outlined,
-                  value: multiplies?.name ?? t.tallyMultipliesNothing,
                   onTap: open == null ? null : (_) => open(),
                 ),
               if (field.hidden)
@@ -234,6 +312,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     if (tally == null) return const SizedBox.shrink();
     final t = context.t;
     final decimal = decimalSign(context);
+    final changes = widget.notes.store.mayChange(widget.noteId);
     return EditorPanel(
       key: const ValueKey('tally-fields'),
       heading: t.tallyFields,
@@ -242,6 +321,30 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SettingBadge(
+                    key: const ValueKey('tally-setup-bar'),
+                    setting: t.tallyPeriod,
+                    icon: Icons.bar_chart,
+                    value: tallyPeriodName(t, tally.bar),
+                    onTap: changes ? (_) => _pickBar(tally) : null,
+                  ),
+                  SettingBadge(
+                    key: const ValueKey('tally-setup-sets'),
+                    setting: t.tallyCountsInSets,
+                    icon: Icons.repeat,
+                    value: tally.countsInSets ? t.settingOn : t.settingOff,
+                    valueIcon: switchIcon(tally.countsInSets),
+                    onTap: changes ? (_) => _pickSets(tally) : null,
+                  ),
+                ],
+              ),
+            ),
             for (final field in tally.fields) _fieldRow(tally, field, decimal),
             if (widget.notes.store.mayChange(widget.noteId))
               FilledButton.tonalIcon(
@@ -259,10 +362,10 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
 
 /// A Tally on its Note's detailed card (#190), nothing while the Note is
 /// no Tally: "Add entry" for who may add one; in a Shared Area the choice
-/// of whose entries show, the user's own by default; the length of a bar,
-/// kept per Note on this Device; one chart per field shown but the
-/// multipliers, a multiplied field's of the products (#200); the entries,
-/// newest first, the latest [shownEntries] and the older folded under
+/// of whose entries show, the user's own by default; one chart per field
+/// shown but those counting sets, a bar per the Tally's bar length
+/// (#264), a Check field's of its ticks; the entries, newest first, each
+/// with its ticks and its sets, the latest [shownEntries] and the older folded under
 /// how many they are until a tap shows them, kept per Note on this
 /// Device; each tapped to edit it and long-pressed for a menu at the
 /// finger; and a folded "Removed entries" with Restore, closed until
@@ -290,7 +393,6 @@ class _CardTallyState extends State<CardTally> {
   Tally? _tally;
   var _shared = false;
   var _whose = _Whose.mine;
-  var _period = TallyPeriod.day;
   var _allShown = false;
   List<_ShownEntry> _entries = const [];
   List<_ShownEntry> _removed = const [];
@@ -311,10 +413,6 @@ class _CardTallyState extends State<CardTally> {
     _shared = area != null && store.isShared(area);
     // Outside a Shared Area every entry is the user's own.
     _whose = _shared ? _Whose.mine : _Whose.everyone;
-    _period = TallyPeriod.values.firstWhere(
-      (p) => p.name == store.localSetting(tallyPeriodSetting(widget.noteId)),
-      orElse: () => TallyPeriod.day,
-    );
     _allShown =
         store.localSetting(tallyEntriesShownSetting(widget.noteId)) == 'true';
     _load();
@@ -363,7 +461,6 @@ class _CardTallyState extends State<CardTally> {
         field.id: _tallies.chart(
           widget.noteId,
           field.id,
-          _period,
           deviceWallClock,
           filter: filter,
         ),
@@ -384,17 +481,6 @@ class _CardTallyState extends State<CardTally> {
     _whose = whose;
     _load();
   });
-
-  void _setPeriod(TallyPeriod period) {
-    final setting = tallyPeriodSetting(widget.noteId);
-    period == TallyPeriod.day
-        ? _store.removeLocalSetting(setting)
-        : _store.setLocalSetting(setting, period.name);
-    setState(() {
-      _period = period;
-      _load();
-    });
-  }
 
   void _toggleAll() {
     final setting = tallyEntriesShownSetting(widget.noteId);
@@ -474,33 +560,29 @@ class _CardTallyState extends State<CardTally> {
     await run();
   }
 
-  /// What [entry] holds for the fields shown, one after the other; a
-  /// multiplied field's value after the values of its multipliers the
-  /// entry holds, as bare numbers ("Reps 3 × 10 reps"), and a multiplier
-  /// not on its own (#200).
-  String _values(Tally tally, TallyEntry entry, String decimal) {
-    final t = context.t;
-    String times(TallyField field, double value) {
-      var text = shownValue(value, field.unit, _system, decimal);
-      for (final multiplier in tally.multipliersOf(field.id).reversed) {
-        if (entry.values[multiplier.id] case final factor?) {
-          final number = TallyUnits.formatShown(
-            factor,
-            multiplier.unit,
-            _system,
-            decimal: decimal,
-          );
-          text = t.tallyTimes(number, text);
-        }
-      }
-      return text;
-    }
-
+  /// What [entry] holds for the fields shown (#264): the Check fields it
+  /// ticks, then its sets, each a line of its values one after the other,
+  /// numbered while there are several ("1. Weight 60 kg · Reps 10").
+  List<String> _values(Tally tally, TallyEntry entry, String decimal) {
+    final ticked = [
+      for (final field in tally.checks)
+        if (entry.values.containsKey(field.id)) '✓ ${field.name}',
+    ];
+    final sets = [
+      for (final set in tally.setsOf(entry))
+        [
+          for (final field in tally.numbers)
+            if (set[field.id] case final value?)
+              '${field.name} ${shownValue(value, field.unit, _system, decimal)}',
+        ].join(' · '),
+    ].where((line) => line.isNotEmpty).toList();
     return [
-      for (final field in tally.counting)
-        if (entry.values[field.id] case final value?)
-          '${field.name} ${times(field, value)}',
-    ].join(' · ');
+      if (ticked.isNotEmpty) ticked.join(' · '),
+      if (sets.length == 1)
+        sets.single
+      else
+        for (final (i, line) in sets.indexed) '${i + 1}. $line',
+    ];
   }
 
   Widget _entryRow(
@@ -512,10 +594,9 @@ class _CardTallyState extends State<CardTally> {
   }) {
     final t = context.t;
     final (:entry, :author, :changes) = shown;
-    final values = _values(tally, entry, decimal);
     final lines = [
       if (author != null) profileDisplayName(t, author.name),
-      if (values.isNotEmpty) values,
+      ..._values(tally, entry, decimal),
       if (entry.line.isNotEmpty) entry.line,
     ];
     final tile = ListTile(
@@ -614,25 +695,6 @@ class _CardTallyState extends State<CardTally> {
               ],
             ),
           ],
-          _heading(t.tallyPeriod),
-          ChoiceChips<TallyPeriod>(
-            key: const ValueKey('tally-period'),
-            value: _period,
-            onChanged: _setPeriod,
-            options: [
-              for (final (period, label) in [
-                (TallyPeriod.day, t.tallyPeriodDay),
-                (TallyPeriod.week, t.tallyPeriodWeek),
-                (TallyPeriod.month, t.tallyPeriodMonth),
-                (TallyPeriod.year, t.tallyPeriodYear),
-              ])
-                RadioOption(
-                  key: ValueKey('tally-period-${period.name}'),
-                  value: period,
-                  title: Text(label),
-                ),
-            ],
-          ),
           for (final field in tally.counting)
             Column(
               key: ValueKey('tally-chart-${field.id}'),
@@ -646,7 +708,7 @@ class _CardTallyState extends State<CardTally> {
                   name: field.name,
                   buckets: _charts[field.id] ?? const [],
                   target: field.target,
-                  period: _period,
+                  period: tally.bar,
                   format: (value) =>
                       shownValue(value, field.unit, _system, decimal),
                 ),
@@ -753,10 +815,12 @@ Future<bool> deleteTallyEntry(
   return true;
 }
 
-/// One field's chart: a bar per day, week, month or year, the latest
-/// that fit the width, never scrolled sideways (a horizontal swipe only
-/// navigates); the target as a line; under it the days the bars cover
-/// and the highest bar's value.
+/// One field's chart (#264): a slim bar of a fixed width per day, week,
+/// month or year, with gaps, the newest on the right and as many of the
+/// latest as fit the width, never scrolled sideways (a horizontal swipe
+/// only navigates; older values are in the entries); the target per bar
+/// as a thin line; under it the days the bars cover and the highest
+/// bar's value.
 class TallyChart extends StatelessWidget {
   /// The field's name, for the chart's label.
   final String name;
@@ -767,8 +831,11 @@ class TallyChart extends StatelessWidget {
   /// A value in the base unit as shown, with its unit.
   final String Function(double value) format;
 
-  /// How wide a bar is at least, with the gap after it.
-  static const slot = 10.0;
+  /// How wide a bar is, with the gap after it.
+  static const slot = 12.0;
+
+  /// How wide the gap after a bar is.
+  static const gap = 4.0;
 
   /// How tall the bars are at most.
   static const height = 120.0;
@@ -813,7 +880,6 @@ class TallyChart extends StatelessWidget {
                   painter: _BarsPainter(
                     values: [for (final bucket in shown) bucket.value],
                     target: target,
-                    slots: math.max(shown.length, 7),
                     bar: scheme.primary,
                     line: scheme.tertiary,
                     axis: scheme.outlineVariant,
@@ -841,14 +907,12 @@ class TallyChart extends StatelessWidget {
   }
 }
 
-/// Bars from a zero line, scaled to the largest of the values and the
-/// target, negative ones below it.
+/// Bars of [TallyChart.slot] from a zero line, the last at the right
+/// edge, scaled to the largest of the values and the target, negative
+/// ones below it.
 class _BarsPainter extends CustomPainter {
   final List<double?> values;
   final double? target;
-
-  /// How many bars the width is cut into; the bars sit at the start.
-  final int slots;
   final Color bar;
   final Color line;
   final Color axis;
@@ -856,7 +920,6 @@ class _BarsPainter extends CustomPainter {
   _BarsPainter({
     required this.values,
     required this.target,
-    required this.slots,
     required this.bar,
     required this.line,
     required this.axis,
@@ -878,16 +941,16 @@ class _BarsPainter extends CustomPainter {
         ..color = axis
         ..strokeWidth = 1,
     );
-    final width = size.width / slots;
+    const slot = TallyChart.slot;
     final fill = Paint()..color = bar;
     for (final (i, value) in values.indexed) {
       if (value == null) continue;
-      final left = i * width;
+      final right = size.width - (values.length - 1 - i) * slot;
       canvas.drawRect(
         Rect.fromLTRB(
-          left + 1,
+          right - slot + TallyChart.gap,
           math.min(zero, y(value)),
-          left + width - 1,
+          right,
           math.max(zero, y(value)),
         ),
         fill,
@@ -900,7 +963,7 @@ class _BarsPainter extends CustomPainter {
         Offset(size.width, at),
         Paint()
           ..color = line
-          ..strokeWidth = 2,
+          ..strokeWidth = 1,
       );
     }
   }
@@ -908,7 +971,6 @@ class _BarsPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BarsPainter old) =>
       old.target != target ||
-      old.slots != slots ||
       old.bar != bar ||
       old.line != line ||
       old.axis != axis ||

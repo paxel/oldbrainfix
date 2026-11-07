@@ -10,6 +10,7 @@
         "target": "20",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": true,
         "added": "2026-01-01T10:00:05.000Z"
@@ -25,6 +26,7 @@
         "target": "25",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:15.000Z"
@@ -40,6 +42,7 @@
         "target": "15",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:25.000Z"
@@ -55,6 +58,7 @@
         "target": "60",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": true,
         "added": "2026-01-01T10:00:35.000Z"
@@ -70,6 +74,7 @@
         "target": "45",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:45.000Z"
@@ -85,6 +90,7 @@
         "target": "12",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:00:55.000Z"
@@ -100,11 +106,42 @@
         "target": "3600",
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": true,
         "added": "2026-01-01T10:01:05.000Z"
       }
     ]
+  },
+  "settings": {
+    "note:00000000000000000000000000000001": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000003": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000005": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000007": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:00000000000000000000000000000009": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:0000000000000000000000000000000b": {
+      "bar": "day",
+      "countsInSets": false
+    },
+    "note:0000000000000000000000000000000d": {
+      "bar": "day",
+      "countsInSets": false
+    }
   },
   "all": [
     "note:0000000000000000000000000000000d",
@@ -126,6 +163,11 @@
         "counted": {
           "00000000000000000000000000000002": 20000000
         },
+        "sets": [
+          {
+            "00000000000000000000000000000002": "20"
+          }
+        ],
         "line": "",
         "trashed": null,
         "author": null
@@ -139,6 +181,7 @@
         "at": "2026-01-01T10:02:23.000Z",
         "values": {},
         "counted": {},
+        "sets": [],
         "line": "Shaky",
         "trashed": null,
         "author": null
@@ -151,6 +194,7 @@
         "at": "2026-01-01T10:02:29.000Z",
         "values": {},
         "counted": {},
+        "sets": [],
         "line": "Late",
         "trashed": null,
         "author": null
@@ -165,6 +209,11 @@
         "counted": {
           "00000000000000000000000000000008": 60000000
         },
+        "sets": [
+          {
+            "00000000000000000000000000000008": "60"
+          }
+        ],
         "line": "",
         "trashed": null,
         "author": null
@@ -178,6 +227,7 @@
         "at": "2026-01-01T10:01:59.000Z",
         "values": {},
         "counted": {},
+        "sets": [],
         "line": "Novel",
         "trashed": null,
         "author": null
@@ -194,6 +244,11 @@
         "counted": {
           "0000000000000000000000000000000e": 3600000000
         },
+        "sets": [
+          {
+            "0000000000000000000000000000000e": "3600"
+          }
+        ],
         "line": "",
         "trashed": null,
         "author": null
@@ -229,6 +284,7 @@
         "at": "2026-01-01T10:02:48.000Z",
         "values": {},
         "counted": {},
+        "sets": [],
         "line": "Too much",
         "trashed": "2026-01-01T10:02:54.000Z",
         "author": null

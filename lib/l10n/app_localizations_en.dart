@@ -3431,6 +3431,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sessionRuns => 'Past runs';
+
+  @override
+  String get sessionRunsNone => 'No past runs yet.';
+
+  @override
+  String sessionRunDone(String name) {
+    return '$name: done';
+  }
+
+  @override
+  String sessionRunNotDone(String name) {
+    return '$name: not done';
+  }
+
+  @override
+  String sessionOlderRuns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count older runs on the Session\'s page',
+      one: '1 older run on the Session\'s page',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get checklistRenameTitle => 'Rename Line';
 
   @override
@@ -3655,13 +3682,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyTarget => 'Target (optional)';
 
   @override
-  String get tallyTargetHint => 'Prefilled in every new entry';
+  String get tallyTargetHint =>
+      'Per bar of the chart, prefilled in every new entry';
 
   @override
   String get tallyNotANumber => 'Not a number. Type it like 12, 2.5 or 1:30.';
 
   @override
-  String get tallyRule => 'A day with several entries counts';
+  String get tallyRule => 'Several sets or entries in a bar count';
 
   @override
   String get tallyRuleSum => 'Their sum';
@@ -3704,19 +3732,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyNoTarget => 'No target';
 
   @override
-  String get tallyMultiplies => 'Multiplies';
+  String get tallyCountsInSets => 'Counts in sets';
 
   @override
-  String get tallyMultipliesNothing => 'Nothing';
+  String get tallyCountsInSetsDetail =>
+      'Each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.';
 
   @override
-  String get tallyMultipliesDetail =>
-      'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.';
+  String get tallyAddSet => 'Add set';
 
   @override
-  String tallyTimes(String factor, String value) {
-    return '$factor × $value';
+  String tallySet(int number) {
+    return 'Set $number';
   }
+
+  @override
+  String tallyRemoveSet(int number) {
+    return 'Remove set $number';
+  }
+
+  @override
+  String get tallyFieldKind => 'Kind of field';
+
+  @override
+  String get tallyFieldKindNumber => 'Number';
+
+  @override
+  String get tallyFieldKindCheck => 'Check field';
+
+  @override
+  String get tallyFieldKindCheckDetail =>
+      'A box in each entry. A tick counts as 1, so a bar shows how often it was done. Its kind stays once it is added.';
+
+  @override
+  String get tallySetCounter => 'Counts the sets of older entries';
+
+  @override
+  String get tallyBarHint => 'The target counts per bar.';
 
   @override
   String get tallyFields => 'Fields';

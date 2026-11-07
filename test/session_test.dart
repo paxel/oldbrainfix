@@ -104,6 +104,48 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
+  group('past runs (#264)', () {
+    testWidgets('the card and the page list the past runs, newest first, '
+        'each pick done or not done', (tester) async {
+      final pushUps = tally('Push-ups');
+      final wallSit = tally('Wall sit', unit: 'min', target: 60);
+      final made = session([pushUps, wallSit]);
+      DateTime wall(DateTime utc) => utc.toLocal();
+      sessions.pickToday(wall);
+      sessions.record(made.id, today, pushUps, line: 'Morning');
+      // The next day, the run of yesterday is past; today's is not.
+      now = now.add(const Duration(days: 1));
+      sessions.pickToday(wall);
+      await start(tester);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await reveal(tester, key('session-runs'));
+      expect(key('session-run-0'), findsOneWidget);
+      expect(key('session-run-1'), findsNothing);
+      expect(
+        find.descendant(
+          of: key('session-run-0'),
+          matching: find.text('Push-ups: done'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: key('session-run-0'),
+          matching: find.text('Wall sit: not done'),
+        ),
+        findsOneWidget,
+      );
+
+      // Its page too, from the Agenda.
+      await tester.pumpWidget(const SizedBox());
+      await start(tester);
+      await edit(tester, made.noteId);
+      await reveal(tester, key('session-runs'));
+      expect(find.text('Push-ups: done'), findsOneWidget);
+    });
+  });
+
   group('where a Session starts', () {
     testWidgets('the Note editor\'s "+" offers Routine, Reminder, Frog and '
         'Session; Session opens the editor the card\'s menu opens', (

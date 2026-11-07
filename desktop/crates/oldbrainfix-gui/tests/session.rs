@@ -219,6 +219,36 @@ fn the_agenda_lists_todays_picks_with_targets_and_later_days_how_many() -> TestR
 }
 
 #[test]
+fn the_card_and_the_page_list_the_past_runs_each_pick_done_or_not() -> TestResult {
+    use oldbrainfix_core::sessions::keys;
+    let device = device()?;
+    let store = &device.store;
+    // Every day from yesterday, its pick of yesterday as a Device wrote it.
+    let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
+    let from = today().add_days(-1);
+    let schedule = Schedule::new(from, &[], Some(rule)).ok_or("a schedule")?;
+    let (pool, count) = (&device.tallies, 2);
+    let made =
+        Sessions::new(store).spawn(&device.sport, &schedule, pool, count, SessionRule::Rolling)?;
+    let id = made.routine.id;
+    let yesterday = Occurrence::new(from, None);
+    let picked = format!("{},{}", device.tallies[0], device.tallies[1]);
+    store.append(&id, &keys::pick(&yesterday), Some(&picked), None)?;
+    let entry = Tallies::new(store).add(&device.tallies[0], &BTreeMap::new(), "Done", None)?;
+    let mark = keys::entry(&yesterday, &entry.id);
+    store.append(&id, &mark, Some(&device.tallies[0]), None)?;
+    let t = L10n::new("en");
+    let harness = window(store, Some(&device.sport));
+    // On its card, and on its page in the Note dialog.
+    assert_eq!(harness.query_all_by_label(t.session_runs()).count(), 2);
+    let done = t.session_run_done("Push-ups");
+    assert_eq!(harness.query_all_by_label(&done).count(), 2);
+    let not_done = t.session_run_not_done("Wall sit");
+    assert_eq!(harness.query_all_by_label(&not_done).count(), 2);
+    Ok(())
+}
+
+#[test]
 fn a_click_on_a_pick_records_an_entry_prefilled_with_its_targets() -> TestResult {
     let device = device()?;
     let id = spawn(&device)?;

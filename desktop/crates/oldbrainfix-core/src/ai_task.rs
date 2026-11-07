@@ -44,7 +44,7 @@ pub const AI_TASK_KIND: &str = "ai-task";
 /// Override, a Sent Item's link, a Profile, nor a photo or recording; and
 /// none of the user's own data: no check-off, Tally entry, tick of a Line
 /// or Box, Session pick nor eaten Frog.
-const NOTE_FIELDS: [&str; 13] = [
+const NOTE_FIELDS: [&str; 15] = [
     note_keys::TYPE,
     note_keys::CAPTURED,
     note_keys::TEXT,
@@ -58,6 +58,8 @@ const NOTE_FIELDS: [&str; 13] = [
     session_keys::POOL,
     session_keys::COUNT,
     session_keys::RULE,
+    tally_keys::BAR,
+    tally_keys::SETS,
 ];
 /// The keys of a Tally's field on its Note, `tally:<field id>:<key>`.
 const TALLY_FIELD_KEYS: [&str; 6] = [
@@ -66,7 +68,7 @@ const TALLY_FIELD_KEYS: [&str; 6] = [
     tally_keys::TARGET,
     tally_keys::RULE,
     tally_keys::HIDDEN,
-    tally_keys::MULTIPLIES,
+    tally_keys::KIND,
 ];
 const SECTION_FIELDS: [&str; 4] = [
     note_keys::TYPE,

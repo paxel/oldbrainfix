@@ -74,3 +74,7 @@ The desktop core reads and writes the same bytes (`packs.rs`), and the desktop s
 
 - The `pack` fixture holds a Health with every kind, a Session picking a Tally of another Area, Routines ending after three times, a Reminder to come and one past, an open and an eaten Frog, a photo and a recording with their texts; the tree with its keys, kinds, sizes and ticks; a Pack as the tree starts with both files, one of everything signed with Ada's Profile, each added by Ben, claimed and not, beside a Health of his own; and a changed Pack, one of a later format and one from a person blocked, all refused. Both cores write the same files and the same logs, byte for byte.
 - A Pack can be large: photos travel in it base64. The tree says the size before anything is written.
+
+## Sets and Check fields (#264)
+
+Amended by #264 (ADR 0028): a Tally's field carries `"check":true` when it is a Check field, and the Note its Tally's `"bar"` when it is not a day and `"sets":true` when it counts in sets; an unknown bar is no Pack. What a field multiplied still travels as before, so a former multiplier Tally arrives counting in sets.

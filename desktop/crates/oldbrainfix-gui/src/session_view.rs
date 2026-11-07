@@ -2,8 +2,9 @@
 //! today its picks with their targets, drawn under the row's heading as
 //! entries with boxes (#208), on later days how many it picks. A Session
 //! Note's detailed card (#191, ADR 0039) shows the picks for today
-//! under each of its Routines' times, after its pool, and how often it was
-//! Done and skipped in each of the last four weeks.
+//! under each of its Routines' times, after its pool, how often it was
+//! Done and skipped in each of the last four weeks, and its latest past
+//! runs (#264), which its page in the Note dialog lists all of.
 
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{
@@ -20,6 +21,81 @@ use crate::tally_view::{decimal_sign, shown_value};
 
 /// How many weeks of its history a Session Note's card shows (#191).
 pub const CARD_WEEKS: i64 = 4;
+
+/// How many past runs a Session Note's card shows (#264).
+pub const CARD_RUNS: usize = 5;
+
+/// One past run of a Session as it shows (#264): its day and time, and
+/// each picked Tally's name with whether it was done.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunShown {
+    pub when: String,
+    pub picks: Vec<(String, bool)>,
+}
+
+/// The past runs of the Session `note_id`, newest first, as the phone's
+/// `SessionRuns` shows them; read with the card or the Note, never while
+/// drawn.
+pub fn runs(
+    store: &Store,
+    t: &L10n,
+    note_id: &str,
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<Vec<RunShown>> {
+    let notes = Notes::new(store);
+    let mut out = Vec::new();
+    for run in Sessions::new(store).runs(note_id, wall)? {
+        let mut picks = Vec::new();
+        for (note, done) in &run.picks {
+            picks.push((row_title(t, notes.by_id(note)?.as_ref()), *done));
+        }
+        out.push(RunShown {
+            when: format!(
+                "{} · {}",
+                day_text(t, run.occurrence.day),
+                occurrence_time(t, &run.occurrence)
+            ),
+            picks,
+        });
+    }
+    Ok(out)
+}
+
+/// Draws the past runs `shown`, at most `limit` when given with how many
+/// older ones the Session's page shows; "No past runs yet." for none.
+pub fn draw_runs(ui: &mut Ui, t: &L10n, shown: &[RunShown], limit: Option<usize>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    if shown.is_empty() {
+        ui.label(RichText::new(t.session_runs_none()).color(weak));
+        return;
+    }
+    let count = limit.map_or(shown.len(), |l| l.min(shown.len()));
+    for run in shown.iter().take(count) {
+        ui.label(RichText::new(&run.when).strong().color(text));
+        for (name, done) in &run.picks {
+            ui.horizontal(|ui| {
+                let icon = if *done {
+                    icons::CHECKED
+                } else {
+                    icons::UNCHECKED
+                };
+                icons::show(ui, icon, 18.0, if *done { text } else { weak });
+                let words = if *done {
+                    t.session_run_done(name)
+                } else {
+                    t.session_run_not_done(name)
+                };
+                ui.add(egui::Label::new(RichText::new(words).color(text)).wrap());
+            });
+        }
+    }
+    let older = shown.len() - count;
+    if older > 0 {
+        let words = t.session_older_runs(older as i64);
+        ui.label(RichText::new(words).small().color(weak));
+    }
+}
 
 /// Today's Occurrence of a Session as its row shows it: the text of each
 /// pick, whether each opens its entry form here, and whether they swap.
@@ -67,6 +143,8 @@ pub struct SessionCardShown {
     pub setup: String,
     pub today: Vec<(String, PicksShown)>,
     pub weeks: Vec<String>,
+    /// Its past runs, newest first (#264).
+    pub runs: Vec<RunShown>,
 }
 
 impl SessionCardShown {
@@ -103,6 +181,7 @@ impl SessionCardShown {
             setup: setup_line,
             today: shown,
             weeks,
+            runs: self::runs(store, t, &setup.note_id, wall)?,
         })
     }
 }
@@ -193,6 +272,9 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<S
             ui.label(RichText::new(week).color(text));
         }
     }
+    ui.add_space(4.0);
+    ui.label(RichText::new(t.session_runs()).strong().color(text));
+    draw_runs(ui, t, &shown.runs, Some(CARD_RUNS));
 }
 
 /// What shows under a Session's title on the Agenda.

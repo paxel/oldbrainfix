@@ -3469,6 +3469,33 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get sessionRuns => 'Bisherige Läufe';
+
+  @override
+  String get sessionRunsNone => 'Noch keine bisherigen Läufe.';
+
+  @override
+  String sessionRunDone(String name) {
+    return '$name: erledigt';
+  }
+
+  @override
+  String sessionRunNotDone(String name) {
+    return '$name: nicht erledigt';
+  }
+
+  @override
+  String sessionOlderRuns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ältere Läufe auf der Seite der Einheit',
+      one: '1 älterer Lauf auf der Seite der Einheit',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get checklistRenameTitle => 'Zeile umbenennen';
 
   @override
@@ -3692,13 +3719,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyTarget => 'Ziel (optional)';
 
   @override
-  String get tallyTargetHint => 'In jedem neuen Eintrag vorausgefüllt';
+  String get tallyTargetHint =>
+      'Je Balken des Diagramms, in jedem neuen Eintrag vorausgefüllt';
 
   @override
   String get tallyNotANumber => 'Keine Zahl. Tippe sie wie 12, 2,5 oder 1:30.';
 
   @override
-  String get tallyRule => 'Ein Tag mit mehreren Einträgen zählt';
+  String get tallyRule => 'Mehrere Sätze oder Einträge in einem Balken zählen';
 
   @override
   String get tallyRuleSum => 'Ihre Summe';
@@ -3741,19 +3769,43 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyNoTarget => 'Kein Ziel';
 
   @override
-  String get tallyMultiplies => 'Multipliziert';
+  String get tallyCountsInSets => 'Zählt in Sätzen';
 
   @override
-  String get tallyMultipliesNothing => 'Nichts';
+  String get tallyCountsInSetsDetail =>
+      'Jeder Eintrag hält mehrere Sätze, etwa 60 kg × 10 und dann 65 kg × 8. Jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen: Wiederholungen als Summe, ein Gewicht als das größte.';
 
   @override
-  String get tallyMultipliesDetail =>
-      'In jedem Eintrag multipliziert sein Wert das gewählte Feld, etwa 3 Runden × 10 Liegestütze zu 30 Liegestützen. Es zählt dann keinen eigenen Wert: keine Summe, kein Diagramm, kein Ziel.';
+  String get tallyAddSet => 'Satz hinzufügen';
 
   @override
-  String tallyTimes(String factor, String value) {
-    return '$factor × $value';
+  String tallySet(int number) {
+    return 'Satz $number';
   }
+
+  @override
+  String tallyRemoveSet(int number) {
+    return 'Satz $number entfernen';
+  }
+
+  @override
+  String get tallyFieldKind => 'Art des Feldes';
+
+  @override
+  String get tallyFieldKindNumber => 'Zahl';
+
+  @override
+  String get tallyFieldKindCheck => 'Abhakfeld';
+
+  @override
+  String get tallyFieldKindCheckDetail =>
+      'Ein Kästchen in jedem Eintrag. Ein Haken zählt als 1, so zeigt ein Balken, wie oft es getan wurde. Seine Art bleibt, sobald es hinzugefügt ist.';
+
+  @override
+  String get tallySetCounter => 'Zählt die Sätze älterer Einträge';
+
+  @override
+  String get tallyBarHint => 'Das Ziel zählt je Balken.';
 
   @override
   String get tallyFields => 'Felder';

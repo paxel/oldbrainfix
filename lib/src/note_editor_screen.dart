@@ -2434,6 +2434,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             // A list's or Tally's panel keeps its own space under it.
             if (!_named) const SizedBox(height: 16),
             _badges(placed, when, place, colour),
+            // Its past runs (#264), under its settings.
+            if (_sessionDraft != null) ...[
+              const SizedBox(height: 16),
+              EditorPanel(
+                heading: context.t.sessionRuns,
+                child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
+              ),
+            ],
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
               NotePhoto(

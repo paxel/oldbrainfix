@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 
 use oldbrainfix_core::{
-    Day, Occurrence, Result, Routines, Sessions, Store, Tallies, TallyField, TallyPeriod,
-    UnitSystem, WallClock,
+    Day, Occurrence, Result, Routines, Sessions, Store, Tallies, TallyField, UnitSystem, WallClock,
 };
 
 use crate::history_view;
@@ -15,9 +14,9 @@ use crate::schedule_text::{day_text, occurrence_time};
 use crate::tally_view::{self, decimal_sign, shown_value, typed_value};
 
 /// The lines of each Note of `listed` that is a Tally or a Session, by
-/// its id: a Tally's fields shown but its multipliers, each with its
-/// total today, a multiplied field's the products (#200), and its target
-/// ("Pages 30 / 50 pages"), of the user's own entries in a Shared
+/// its id: a Tally's fields shown but those counting sets, each with
+/// its total of the current bar of the Tally's bar length (#264), today's
+/// for a day, and its target per bar ("Pages 30 / 50 pages"), of the user's own entries in a Shared
 /// Area as its detailed view counts unless another choice is picked
 /// (#190); else of a Session Note (#191) the next run of any of its
 /// Routines not Done and how many runs of all of them were Done and
@@ -45,13 +44,14 @@ pub fn read(
                 let bars = tallies.chart(
                     id,
                     &field.id,
-                    TallyPeriod::Day,
+                    None,
                     wall,
                     &tally_view::default_filter(store, id)?,
                 )?;
+                // The current bar's total (#264): today's for a day.
                 let total = bars
                     .last()
-                    .filter(|b| b.start == today)
+                    .filter(|b| b.start <= today && today <= b.end)
                     .and_then(|b| b.value)
                     .unwrap_or(0.0);
                 lines.push(field_line(t, field, total, system, decimal));

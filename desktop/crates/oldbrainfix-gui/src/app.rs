@@ -170,7 +170,7 @@ use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
-    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyShown, Whose,
+    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Pick as MenuPick};
@@ -605,6 +605,8 @@ struct View {
     /// whether this Device may make it one, change its setup or make it
     /// a plain Note again: as it may change the Note, in the lists.
     session_setup: Option<SessionSetup>,
+    /// The past runs of the selected Session Note (#264), for its page.
+    session_runs: Vec<session_view::RunShown>,
     makes_session: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
@@ -948,6 +950,9 @@ enum NoteBadge {
     /// A Session's rule and its weekdays' own counts (#191).
     SessionRule,
     SessionWeekdays,
+    /// A Tally's bar length and whether it counts in sets (#264).
+    TallyBar,
+    TallySets,
     /// The reappear time of the Shopping List's Line in `reappear_line`
     /// (#195).
     Reappear,
@@ -5059,6 +5064,10 @@ impl App {
             }
             _ => None,
         };
+        let session_runs = match &session_setup {
+            Some(setup) => session_view::runs(store, &self.t, &setup.note_id, &*self.wall)?,
+            None => Vec::new(),
+        };
         let makes_session = match &detail {
             Some((p, _)) => may.changes && !p.note.is_trashed() && !p.note.is_merged(),
             None => false,
@@ -5259,6 +5268,7 @@ impl App {
             switches_list,
             kind,
             session_setup,
+            session_runs,
             makes_session,
             frogs_open,
             all_routines,
@@ -7135,10 +7145,6 @@ impl App {
                 self.save_text()?;
                 self.editor = None;
                 let form = FieldForm::new(&note, field, system, &self.t);
-                let form = match &tally {
-                    Some(tally) => form.multiplying(tally),
-                    None => form,
-                };
                 self.tally_form = Some(TallyForm::Field(form));
             }
             TallyAction::AddEntry | TallyAction::EditEntry(_) => {
@@ -7171,15 +7177,14 @@ impl App {
             TallyAction::Whose(whose) => {
                 self.tally_whose.insert(note, whose);
             }
-            TallyAction::Period(period) => {
-                let setting = tally_view::period_setting(&note);
-                if period == oldbrainfix_core::TallyPeriod::Day {
-                    self.store.remove_local_setting(&setting)?;
-                } else {
-                    self.store
-                        .set_local_setting(&setting, tally_view::period_name(period))?;
-                }
+            TallyAction::Badge(open) => {
+                self.badge = Some(match open {
+                    TallyBadge::Bar => NoteBadge::TallyBar,
+                    TallyBadge::Sets => NoteBadge::TallySets,
+                });
             }
+            TallyAction::Bar(bar) => tallies.set_bar(&note, bar)?,
+            TallyAction::Sets(on) => tallies.set_counts_in_sets(&note, on)?,
             TallyAction::AllShown(shown) => {
                 let setting = tally_view::entries_shown_setting(&note);
                 if shown {
@@ -9494,6 +9499,42 @@ impl App {
                     _ => true,
                 }
             }
+            // A pick written at once, closing, as on the phone (#264).
+            NoteBadge::TallyBar => match &self.view.tally {
+                Some(shown) => {
+                    let setting = t.tally_period();
+                    let bar = shown.tally.bar;
+                    badge_dialog(ctx, (&t, tones), (icons::TALLY_BAR, None), setting, |ui| {
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.tally_bar_hint()).small().color(weak));
+                        let mut picked = bar;
+                        let options = oldbrainfix_core::TallyPeriod::ALL
+                            .map(|p| (p, tally_view::period_label(&t, p).to_string()));
+                        if radio_column(ui, &mut picked, options) {
+                            if picked != bar {
+                                actions.push(Action::Tally(TallyAction::Bar(picked)));
+                            }
+                            actions.push(Action::Badge(None));
+                        }
+                    })
+                }
+                None => true,
+            },
+            NoteBadge::TallySets => match &self.view.tally {
+                Some(shown) => {
+                    let setting = t.tally_counts_in_sets();
+                    let mut on = shown.tally.counts_in_sets;
+                    badge_dialog(ctx, (&t, tones), (icons::TALLY_SETS, None), setting, |ui| {
+                        let weak = ui.visuals().weak_text_color();
+                        let detail = t.tally_counts_in_sets_detail();
+                        ui.label(RichText::new(detail).small().color(weak));
+                        if badge_switch(ui, &t, setting, &mut on) {
+                            actions.push(Action::Tally(TallyAction::Sets(on)));
+                        }
+                    })
+                }
+                None => true,
+            },
             NoteBadge::Ticks => {
                 let mut on = self.view.show_ticks.contains(&note.id);
                 let setting = t.box_show_ticks();
@@ -10506,6 +10547,14 @@ impl App {
                     advanced: self.view.advanced,
                 };
                 note_badges(ui, (&t, tones), &shown, actions);
+                // A Session's past runs (#264), under its settings.
+                if session_setup.is_some() {
+                    embossed(ui, tones, false, None, |ui| {
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.session_runs()).strong().color(text));
+                        session_view::draw_runs(ui, &t, &self.view.session_runs, None);
+                    });
+                }
                 let media = [
                     &note.photos,
                     &note.recordings,

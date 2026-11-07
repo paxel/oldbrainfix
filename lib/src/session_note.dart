@@ -271,11 +271,130 @@ List<SessionWeek> sessionWeeks(
   ];
 }
 
+/// A Session's past runs (#264), newest first: each Occurrence of its
+/// Routines before today that holds a pick, with its date and time and
+/// each picked Tally done or not done. At most [limit] when given, the
+/// older ones counted under them as on the Session's page; "No past runs
+/// yet." while there are none. It reads them when it is built anew,
+/// never while building.
+class SessionRuns extends StatefulWidget {
+  final Notes notes;
+  final String noteId;
+  final int? limit;
+
+  /// How many runs the card shows.
+  static const onCard = 5;
+
+  const SessionRuns({
+    super.key,
+    required this.notes,
+    required this.noteId,
+    this.limit,
+  });
+
+  @override
+  State<SessionRuns> createState() => _SessionRunsState();
+}
+
+class _SessionRunsState extends State<SessionRuns> {
+  List<SessionRun> _runs = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(SessionRuns old) {
+    super.didUpdateWidget(old);
+    _load();
+  }
+
+  void _load() =>
+      _runs = Sessions(widget.notes.store).runs(widget.noteId, deviceWallClock);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final locale = Localizations.localeOf(context).toString();
+    final limit = widget.limit;
+    final shown = limit == null || _runs.length <= limit
+        ? _runs
+        : _runs.take(limit).toList();
+    final older = _runs.length - shown.length;
+    return Column(
+      key: const ValueKey('session-runs'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_runs.isEmpty) Text(t.sessionRunsNone, style: text.bodyMedium),
+        for (final (i, run) in shown.indexed)
+          Padding(
+            key: ValueKey('session-run-$i'),
+            padding: const EdgeInsets.only(top: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${dayText(locale, run.occurrence.day)} · '
+                  '${occurrenceTime(t, locale, run.occurrence)}',
+                  style: text.labelLarge,
+                ),
+                for (final pick in run.picks)
+                  Row(
+                    children: [
+                      Icon(
+                        pick.done
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked,
+                        size: 18,
+                        color: pick.done
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          switch (widget.notes.byId(pick.noteId)) {
+                            final note? when pick.done => t.sessionRunDone(
+                              noteText(t, note),
+                            ),
+                            final note? => t.sessionRunNotDone(
+                              noteText(t, note),
+                            ),
+                            null when pick.done => t.sessionRunDone(t.noteGone),
+                            null => t.sessionRunNotDone(t.noteGone),
+                          },
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        if (older > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              t.sessionOlderRuns(older),
+              style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// A Session on its Note's detailed card (#191), nothing while the Note
 /// is no Session: its pool, how many it picks and how; today's picks of
 /// each of its Routines, each recorded or swapped there as on the
-/// Agenda; and how often it was Done and skipped in each of the last four
-/// weeks. A Session without Routines shows its pool and its setup only.
+/// Agenda; how often it was Done and skipped in each of the last four
+/// weeks; and its latest past runs (#264). A Session without Routines
+/// shows its pool and its setup only.
 /// It reads the Session when the card is built anew and after a change
 /// of its own, never while building.
 class CardSession extends StatefulWidget {
@@ -449,6 +568,13 @@ class _CardSessionState extends State<CardSession> {
                 ),
               ),
           ],
+          const SizedBox(height: 12),
+          Text(t.sessionRuns, style: text.titleSmall),
+          SessionRuns(
+            notes: widget.notes,
+            noteId: widget.noteId,
+            limit: SessionRuns.onCard,
+          ),
         ],
       ),
     );

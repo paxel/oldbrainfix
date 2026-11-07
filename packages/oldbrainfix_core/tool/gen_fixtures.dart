@@ -836,12 +836,17 @@ final _scenarios = <Scenario>[
         'another unit of their kind, their target taken away, their rule '
         'changed, hidden and hidden and restored; a Tally merged into '
         'another Note and recorded in there; a Tally in the trash; '
-        'multipliers (#200): one added multiplying a field, with entries '
-        'of whole, fractional, negative and rounded products and one '
-        'without the multiplier, one whose multiplied field is hidden, one '
+        'multipliers as #200 wrote them, read as sets (#264): one '
+        'multiplying a field, with entries of whole, fractional, negative '
+        'and rounded counts and one without the multiplier, one of them '
+        'changed with its sets, one whose multiplied field is hidden, one '
         'on the Note a Tally was merged into multiplying a field of the '
-        'merged one, and settings no app writes: one naming a multiplier, '
-        'one itself; an Unsorted Note beside them.',
+        'merged one, the Tally switched out of sets, and settings no app '
+        'writes: one naming a multiplier, one itself; a Tally counting in '
+        'sets (#264) with a Check field and weekly bars, entries with sets, '
+        'one set holding nothing, one changed with fewer sets, one only '
+        'ticked, set keys no app writes and a bar length nobody knows; an '
+        'Unsorted Note beside them.',
     build: (store) {
       final notes = Notes(store);
       final tallies = Tallies(store);
@@ -929,23 +934,89 @@ final _scenarios = <Scenario>[
       final evenings = notes.capture('Evenings').id;
       notes.merge(reading, evenings);
       tallies.add(evenings, values: {pages: 8}, line: 'Novel');
-      final sets = tallies.addField(gym, name: 'Sets', multiplies: reps);
-      tallies.add(gym, values: {reps: 10, sets: 3}, line: 'Sets');
+      // As #200 wrote a multiplier.
+      final sets = tallies.addField(gym, name: 'Sets');
+      store.append(gym, TallyKeys.field(sets, TallyKeys.multiplies), reps);
+      final legacy = tallies.add(
+        gym,
+        values: {reps: 10, sets: 3},
+        line: 'Sets',
+      );
       tallies.add(gym, values: {reps: 2.5, sets: 1.5});
       tallies.add(gym, values: {reps: -3, sets: 0.5});
       tallies.add(gym, values: {reps: 0.000003, sets: 0.5});
       tallies.add(gym, values: {sets: 4});
       final laps = tallies.addField(gym, name: 'Laps', unit: 'laps');
-      tallies.setMultiplies(gym, laps, run);
+      store.append(gym, TallyKeys.field(laps, TallyKeys.multiplies), run);
       tallies.add(gym, values: {run: 400, laps: 2});
+      tallies.editEntry(
+        legacy.id,
+        more: [
+          {reps: 10},
+          {reps: 8},
+        ],
+      );
       tallies.hideField(gym, run);
       final odd = tallies.addField(gym, name: 'Rounds');
       store.append(gym, TallyKeys.field(odd, TallyKeys.multiplies), sets);
       final self = tallies.addField(gym, name: 'Self');
       store.append(gym, TallyKeys.field(self, TallyKeys.multiplies), self);
       final books = tallies.addField(evenings, name: 'Books');
-      tallies.setMultiplies(evenings, books, pages);
+      store.append(
+        evenings,
+        TallyKeys.field(books, TallyKeys.multiplies),
+        pages,
+      );
       tallies.add(evenings, values: {pages: 8, books: 2});
+      tallies.setCountsInSets(gym, false);
+      store.append(evenings, TallyKeys.bar, 'fortnight');
+      store.append(reading, TallyKeys.bar, 'year');
+      final press = notes.capture('Bench').id;
+      final weight = tallies.addField(
+        press,
+        name: 'Weight',
+        unit: 'kg',
+        rule: TallyRule.max,
+      );
+      final times = tallies.addField(press, name: 'Reps', target: 30);
+      final warm = tallies.addField(
+        press,
+        name: 'Warmed up',
+        target: 2,
+        check: true,
+      );
+      tallies.setCountsInSets(press, true);
+      tallies.setBar(press, TallyPeriod.week);
+      final heavy = tallies.add(
+        press,
+        values: {weight: 60, times: 10, warm: 1},
+        more: [
+          {weight: 65, times: 8},
+          {},
+          {weight: 65, times: 6},
+        ],
+        line: 'Heavy',
+        at: DateTime.utc(2025, 12, 30, 18),
+      );
+      tallies.add(
+        press,
+        values: {weight: 50, times: 12},
+        at: DateTime.utc(2026, 1, 2, 18),
+      );
+      tallies.add(press, values: {warm: 1});
+      tallies.editEntry(
+        heavy.id,
+        values: {times: 9},
+        more: [
+          {weight: 70, times: 5},
+        ],
+      );
+      // As a modified app would.
+      final light = tallies.add(press, values: {weight: 40, times: 15});
+      store.append(light.id, 'v02:$times', '1');
+      store.append(light.id, 'v1:$times', '2');
+      store.append(light.id, 'v5:$times', '4');
+      store.append(light.id, TallyKeys.setValue(2, warm), '1');
       final steps = notes.capture('Steps').id;
       final count = tallies.addField(steps, name: 'Steps', unit: 'steps');
       tallies.add(steps, values: {count: 8000});
@@ -2189,6 +2260,20 @@ Map<String, Object?> _sessions(Store store) {
             'heldBy': setup.heldBy,
             'runs': [for (final s in sessions.ofNote(id)) s.id],
             'picksFrom': sessions.pool(setup),
+            'pastRuns': [
+              for (final days in const [0, 4])
+                [
+                  for (final run in sessions.runs(id, _frogDay(days)))
+                    {
+                      'routine': run.routineId,
+                      'occurrence': run.occurrence.key,
+                      'picks': [
+                        for (final p in run.picks)
+                          {'noteId': p.noteId, 'done': p.done},
+                      ],
+                    },
+                ],
+            ],
           },
     ],
     'sessions': [
@@ -2601,6 +2686,10 @@ Map<String, Object?> _tallies(Store store) {
     'counted': {
       for (final f in tally.fields) f.id: ?tally.countedMicro(e, f.id),
     },
+    'sets': [
+      for (final set in tally.setsOf(e))
+        {for (final id in set.keys.toList()..sort()) id: number(set[id])},
+    ],
     'line': e.line,
     'trashed': e.trashed?.toIso8601String(),
     'author': store.authorOf(e.id)?.id,
@@ -2620,11 +2709,17 @@ Map<String, Object?> _tallies(Store store) {
                 'target': number(f.target),
                 'rule': f.rule.name,
                 'hidden': f.hidden,
+                'check': f.check,
                 'multiplies': f.multiplies,
                 'hasEntries': f.hasEntries,
                 'added': f.added.toIso8601String(),
               },
           ],
+    },
+    'settings': {
+      for (final id in noteIds)
+        if (tallies.byNote(id) case final tally?)
+          id: {'bar': tally.bar.name, 'countsInSets': tally.countsInSets},
     },
     'all': [for (final tally in tallies.all()) tally.noteId],
     'entries': {
@@ -2660,8 +2755,8 @@ Map<String, Object?> _tallies(Store store) {
                   for (final bar in tallies.chart(
                     tally.noteId,
                     field.id,
-                    period,
                     _europe,
+                    period: period,
                   ))
                     {
                       'start': '${bar.start}',
@@ -6633,10 +6728,13 @@ void _packFixture(Directory root) {
     final tallies = Tallies(ada);
     final count = tallies.addField(laps.id, name: 'Laps', target: 10);
     final rounds = tallies.addField(laps.id, name: 'Rounds');
-    tallies.setMultiplies(laps.id, rounds, count);
+    // As #200 wrote a multiplier.
+    ada.append(laps.id, TallyKeys.field(rounds, TallyKeys.multiplies), count);
     tallies.add(laps.id, values: {count: 4, rounds: 2}, line: 'Windy');
     final digging = notes.capture('Digging', place: garden.id);
     tallies.addField(digging.id, name: 'Minutes', unit: 'min');
+    tallies.addField(digging.id, name: 'Watered', check: true);
+    tallies.setBar(digging.id, TallyPeriod.month);
     tallies.add(digging.id, values: {}, line: 'Beds');
     final training = notes.capture('Training', place: running.id);
     Sessions(ada).spawn(

@@ -144,8 +144,12 @@ pub const TALLY_UNIT: char = '\u{e60e}';
 pub const TALLY_TARGET: char = '\u{f07b}';
 /// A Tally field hidden (#190), `visibility_off_outlined`.
 pub const TALLY_HIDDEN: char = '\u{f4a0}';
-/// What a Tally field multiplies (#200), `calculate_outlined`.
-pub const TALLY_MULTIPLIES: char = '\u{ef10}';
+/// A Tally's bar length (#264), `bar_chart`, as [`TALLY`].
+pub const TALLY_BAR: char = TALLY;
+/// Whether a Tally counts in sets (#264), `autorenew`, as [`REAPPEAR`].
+pub const TALLY_SETS: char = REAPPEAR;
+/// A Tally's Check field (#264), a checked box, as [`CHECKED`].
+pub const TALLY_CHECK: char = CHECKED;
 pub const SESSION_COUNT: char = '\u{e640}';
 pub const SESSION_RULE: char = '\u{e5a1}';
 pub const SESSION: char = '\u{f04fb}';

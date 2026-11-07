@@ -1,9 +1,10 @@
 //! The New Tally page (#161), as the phone's `tally_form_screen.dart`
 //! draws it, in a dialog over the window: its name, then a row per
 //! field, one at first, with "Add field" for the next. A field's row is
-//! its name and its settings as badges ([`crate::setting_badges`]): how
-//! a day with several entries counts, its unit and its target, each
-//! opening its small editor. The unit is typed with the known units it
+//! its name and its settings as badges ([`crate::setting_badges`]): its
+//! kind (#264), a number or a Check field, how several sets or entries
+//! in a bar count and its unit, which a Check field has not, and its
+//! target, each opening its small editor. The unit is typed with the known units it
 //! may mean as suggestions under it (#159), and the rule follows its kind
 //! until it is picked. Save files the Tally where the page was opened
 //! from, Unsorted for none, with every row that has a name; rows left
@@ -31,6 +32,7 @@ pub enum PageIntent {
 /// The setting of a field whose small editor is open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Editing {
+    Kind,
     Rule,
     Unit,
     Target,
@@ -50,6 +52,8 @@ struct FieldDraft {
     picked: Option<&'static str>,
     rule: TallyRule,
     rule_picked: bool,
+    /// Whether it is a Check field (#264): no unit and no rule.
+    check: bool,
     target: String,
     /// Set by a Save that found the target no number.
     target_invalid: bool,
@@ -64,13 +68,17 @@ impl FieldDraft {
             picked: None,
             rule: TallyRule::Sum,
             rule_picked: false,
+            check: false,
             target: String::new(),
             target_invalid: false,
         }
     }
 
-    /// The unit as it is stored.
+    /// The unit as it is stored; a Check field has none.
     fn unit(&self, system: UnitSystem) -> String {
+        if self.check {
+            return String::new();
+        }
         match self.picked {
             Some(code) => code.to_string(),
             None => tally_unit_match::unit_of_typed(&self.unit_text, system),
@@ -195,13 +203,17 @@ impl TallyPage {
             let note = Notes::new(store).capture(&name, place, None)?;
             let tallies = Tallies::new(store);
             for field in &fields {
-                tallies.add_field(
-                    &note.id,
-                    field.name.trim(),
-                    &field.unit(system),
-                    field.target(system),
-                    Some(field.rule),
-                )?;
+                if field.check {
+                    tallies.add_check(&note.id, field.name.trim(), field.target(system))?;
+                } else {
+                    tallies.add_field(
+                        &note.id,
+                        field.name.trim(),
+                        &field.unit(system),
+                        field.target(system),
+                        Some(field.rule),
+                    )?;
+                }
             }
             Ok(note.id)
         })?;
@@ -293,22 +305,38 @@ impl TallyPage {
                         };
                         let shown = (t, tones);
                         let mut opened = None;
+                        let kind = BadgeValue::Text(if field.check {
+                            t.tally_field_kind_check()
+                        } else {
+                            t.tally_field_kind_number()
+                        });
                         badge_row(ui, |ui| {
-                            let badges = [
-                                (icons::TALLY_RULE, t.tally_rule(), rule, Editing::Rule),
-                                (
+                            let mut badges = vec![(
+                                icons::TALLY_CHECK,
+                                t.tally_field_kind(),
+                                kind,
+                                Editing::Kind,
+                            )];
+                            if !field.check {
+                                badges.push((
+                                    icons::TALLY_RULE,
+                                    t.tally_rule(),
+                                    rule,
+                                    Editing::Rule,
+                                ));
+                                badges.push((
                                     icons::TALLY_UNIT,
                                     t.tally_unit(),
                                     BadgeValue::Text(&unit_value),
                                     Editing::Unit,
-                                ),
-                                (
-                                    icons::TALLY_TARGET,
-                                    t.tally_target_badge(),
-                                    BadgeValue::Text(&target_value),
-                                    Editing::Target,
-                                ),
-                            ];
+                                ));
+                            }
+                            badges.push((
+                                icons::TALLY_TARGET,
+                                t.tally_target_badge(),
+                                BadgeValue::Text(&target_value),
+                                Editing::Target,
+                            ));
                             for (icon, setting, value, editing) in badges {
                                 if badge(ui, shown, (icon, None), setting, Some(value), true)
                                     .clicked()
@@ -361,6 +389,24 @@ impl TallyPage {
         let shown = (t, tones);
         let mut done = false;
         let closed = match editing {
+            Editing::Kind => badge_dialog(
+                ctx,
+                shown,
+                (icons::TALLY_CHECK, None),
+                t.tally_field_kind(),
+                |ui| {
+                    let options = [
+                        (false, t.tally_field_kind_number().to_string()),
+                        (true, t.tally_field_kind_check().to_string()),
+                    ];
+                    if chip_row(ui, &mut field.check, options) {
+                        done = true;
+                    }
+                    let weak = ui.visuals().weak_text_color();
+                    let detail = t.tally_field_kind_check_detail();
+                    ui.label(RichText::new(detail).small().color(weak));
+                },
+            ),
             Editing::Rule => badge_dialog(
                 ctx,
                 shown,

@@ -10,11 +10,18 @@
         "target": null,
         "rule": "sum",
         "hidden": false,
+        "check": false,
         "multiplies": null,
         "hasEntries": false,
         "added": "2026-01-01T10:01:42.000Z"
       }
     ]
+  },
+  "settings": {
+    "note:0000000000000000000000000000000f": {
+      "bar": "day",
+      "countsInSets": false
+    }
   },
   "all": [
     "note:0000000000000000000000000000000f"

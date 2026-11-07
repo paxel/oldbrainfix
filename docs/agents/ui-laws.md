@@ -227,8 +227,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Note its first line and the two lines after it, a Checklist its name
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
   and how many are open ("4 open"), a Tally its name and each field's
-  but a multiplier's total today, a multiplied field's the product
-  (#200), against its target ("Steps 7000 / 10000 steps"), in a
+  but one counting sets total of the current bar, today's for a Tally
+  of days (#264), against its target ("Steps 7000 / 10000 steps"), in a
   Shared Area of the user's own entries, as its detailed view counts at
   first (#190), a Session
   its name, the next run of any of its Routines and "done 4 / skipped 1
@@ -241,11 +241,13 @@ replace a law of Both apps where they say so. A desktop law marked
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
   "Add entry", in a Shared Area "Show entries" (Mine at first,
-  Everyone's, or one person's), "One bar per" Day, Week, Month or Year
-  as choice chips, kept per Note on this Device, a chart per field
-  shown but its multipliers (#200), then its entries (a multiplied
-  field's value after its multipliers', "Reps 3 × 10 reps"), newest
-  first, the latest five and the older
+  Everyone's, or one person's), a chart per field shown but those
+  counting sets, a bar per the Tally's bar length with no choice of it
+  here (#264): slim bars of a fixed width with gaps, the newest on the
+  right, as many as fit, the target as a thin line, never scrolled
+  sideways; then its entries (ticks as "✓ Wiped", several sets a line
+  each, "1. Weight 60 kg · Reps 10"), newest first, the latest five and
+  the older
   folded under how many ("12 older entries") until a tap shows them,
   kept open per Note on this Device; a tap on an entry edits it, a long
   press offers Edit and Delete, and the folded "Removed entries" restore.
@@ -254,7 +256,9 @@ replace a law of Both apps where they say so. A desktop law marked
   name and description its pool, then today's picks of each of its
   Routines under the Routine's time, each pick opening its entry form
   and offering "Another one" as on the Agenda, then "done N / skipped
-  M" for each of the last four weeks, this week first; a Session
+  M" for each of the last four weeks, this week first, then its latest
+  five past runs (#264), each its date and time and each pick "done" or
+  "not done", with how many older ones its page lists; a Session
   without a Routine shows its pool alone.
 - **A card ticks today's Occurrences of its Note** (#215): in either
   view, under where it is filed and over its text, a box with the time
@@ -335,16 +339,19 @@ replace a law of Both apps where they say so. A desktop law marked
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
   a Pack brought the Note unclaimed (#164), `inventory_2` with the
   name, its tap asking to remove it. A Tally's setup
-  is its fields (#190), each its name with its rule, unit and target as
-  badges, as on the Tally page, what it multiplies (#200) while it does
-  or may ("Multiplies: Reps", "Nothing"), a multiplier without its rule
-  and target, and "Hidden" while it is hidden, a tap
+  is the Tally's own badges, "One bar per" and "Counts in sets" (#264),
+  each opening its small editor, then its fields (#190), each its name
+  with its rule, unit and target as badges, as on the Tally page, a
+  Check field its kind and target, a field that counted sets as a
+  multiplier did "Counts the sets of older entries" without its rule and
+  target, and "Hidden" while it is hidden, a tap
   on the name or a badge opening the field's page, then "Add field"; the
   editor shows no chart and no entries. A Session's setup (#191) is its
   pool, a list of checkboxes ending in "New Tally" as on its "+" page,
   and how many it picks with − and +, then its rule and its weekdays'
   counts as badges; each of its Routines is a Routine badge, and the
-  Routine editor of one holds only its schedule. A setting that does not apply has no badge. A tap
+  Routine editor of one holds only its schedule; its past runs (#264)
+  follow the badges. A setting that does not apply has no badge. A tap
   opens its small editor, a dialog with the same setting icon and the
   setting's name, its values in words, which changes it at once: Importance as choice chips (only
   here, not in the card's ⋮, #182), a Shopping List's Show on the

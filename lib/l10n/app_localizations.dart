@@ -5498,6 +5498,36 @@ abstract class AppLocalizations {
   /// **'Week of {day}: done {done} / skipped {skipped}'**
   String sessionHistoryWeek(String day, int done, int skipped);
 
+  /// A Session's past runs on its card and its page (#264): each Occurrence before today with a pick, newest first, its date and each picked Tally done or not done.
+  ///
+  /// In en, this message translates to:
+  /// **'Past runs'**
+  String get sessionRuns;
+
+  /// No description provided for @sessionRunsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No past runs yet.'**
+  String get sessionRunsNone;
+
+  /// No description provided for @sessionRunDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: done'**
+  String sessionRunDone(String name);
+
+  /// No description provided for @sessionRunNotDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: not done'**
+  String sessionRunNotDone(String name);
+
+  /// No description provided for @sessionOlderRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 older run on the Session\'s page} other{{count} older runs on the Session\'s page}}'**
+  String sessionOlderRuns(int count);
+
   /// No description provided for @checklistRenameTitle.
   ///
   /// In en, this message translates to:
@@ -5855,7 +5885,7 @@ abstract class AppLocalizations {
   /// No description provided for @tallyTargetHint.
   ///
   /// In en, this message translates to:
-  /// **'Prefilled in every new entry'**
+  /// **'Per bar of the chart, prefilled in every new entry'**
   String get tallyTargetHint;
 
   /// No description provided for @tallyNotANumber.
@@ -5867,7 +5897,7 @@ abstract class AppLocalizations {
   /// No description provided for @tallyRule.
   ///
   /// In en, this message translates to:
-  /// **'A day with several entries counts'**
+  /// **'Several sets or entries in a bar count'**
   String get tallyRule;
 
   /// No description provided for @tallyRuleSum.
@@ -5948,29 +5978,71 @@ abstract class AppLocalizations {
   /// **'No target'**
   String get tallyNoTarget;
 
-  /// A Tally field's setting (#200), a badge in its setup and a heading on its page: the other field of the Tally it multiplies, such as Sets multiplying Reps.
+  /// A Tally's setting (#264), a badge in its setup: with it each entry holds several sets, each a row across the Tally's number fields (CONTEXT.md: Set).
   ///
   /// In en, this message translates to:
-  /// **'Multiplies'**
-  String get tallyMultiplies;
+  /// **'Counts in sets'**
+  String get tallyCountsInSets;
 
-  /// The value of a Tally field's Multiplies badge and the first choice on its page (#200): the field multiplies no other field and counts values of its own.
+  /// No description provided for @tallyCountsInSetsDetail.
   ///
   /// In en, this message translates to:
-  /// **'Nothing'**
-  String get tallyMultipliesNothing;
+  /// **'Each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.'**
+  String get tallyCountsInSetsDetail;
 
-  /// Under the Multiplies choices on a Tally field's page (#200).
+  /// The button under the sets of a Tally entry (#264): adds a set that starts with the values of the set before.
   ///
   /// In en, this message translates to:
-  /// **'In each entry its value multiplies the field picked, such as 3 rounds × 10 push-ups counting 30 push-ups. It then counts no value of its own: no total, no chart, no target.'**
-  String get tallyMultipliesDetail;
+  /// **'Add set'**
+  String get tallyAddSet;
 
-  /// An entry's value of a Tally field another field multiplies (#200): the multiplier's value, a bare number, before the value with its unit, such as '3 × 10 reps'.
+  /// The heading of one set of a Tally entry (#264).
   ///
   /// In en, this message translates to:
-  /// **'{factor} × {value}'**
-  String tallyTimes(String factor, String value);
+  /// **'Set {number}'**
+  String tallySet(int number);
+
+  /// No description provided for @tallyRemoveSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove set {number}'**
+  String tallyRemoveSet(int number);
+
+  /// No description provided for @tallyFieldKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind of field'**
+  String get tallyFieldKind;
+
+  /// No description provided for @tallyFieldKindNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get tallyFieldKindNumber;
+
+  /// A Tally field that is a box in each entry, a tick counting as 1 (#264, CONTEXT.md: Check field).
+  ///
+  /// In en, this message translates to:
+  /// **'Check field'**
+  String get tallyFieldKindCheck;
+
+  /// No description provided for @tallyFieldKindCheckDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A box in each entry. A tick counts as 1, so a bar shows how often it was done. Its kind stays once it is added.'**
+  String get tallyFieldKindCheckDetail;
+
+  /// Badge of a Tally field that multiplied another field before sets replaced multipliers (#264): its value in older entries is their number of sets.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts the sets of older entries'**
+  String get tallySetCounter;
+
+  /// No description provided for @tallyBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The target counts per bar.'**
+  String get tallyBarHint;
 
   /// No description provided for @tallyFields.
   ///

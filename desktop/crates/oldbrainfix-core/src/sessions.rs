@@ -193,6 +193,17 @@ impl SessionOccurrence {
     }
 }
 
+/// One past run of a Session (#264): an Occurrence of one of its
+/// Routines with its pick.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SessionRun {
+    pub routine_id: String,
+    pub occurrence: Occurrence,
+    /// The Tallies picked, as their Notes in the pick's order, each with
+    /// whether an entry not removed was recorded for it in the run.
+    pub picks: Vec<(String, bool)>,
+}
+
 /// What a Session's Routine holds of its picks and of the entries
 /// recorded for them, by Occurrence key, only what counts: in a Shared
 /// Area what the roles allow (ADR 0013), anywhere else what the user's
@@ -746,6 +757,39 @@ impl<'a> Sessions<'a> {
         Ok(out)
     }
 
+    /// The past runs of the Session `note_id` (#264): every Occurrence of
+    /// its Routines before today on `wall` that holds a pick, newest
+    /// first, by Routine on the same moment, each Tally of the pick done
+    /// or not by the entries recorded for it.
+    pub fn runs(&self, note_id: &str, wall: &WallClock) -> Result<Vec<SessionRun>> {
+        let today = Day::today(self.store.now(), wall);
+        let mut runs = Vec::new();
+        for session in self.of_note(note_id)? {
+            let marks = SessionMarks::of(self.store, &session.routine.id)?;
+            for (key, picks) in &marks.picks {
+                let Some(occurrence) = Occurrence::parse(key).filter(|o| o.day < today) else {
+                    continue;
+                };
+                let mut done = Vec::new();
+                for pick in picks {
+                    let entries = marks.entries_for(self.store, key, pick)?;
+                    done.push((pick.clone(), !entries.is_empty()));
+                }
+                runs.push(SessionRun {
+                    routine_id: session.routine.id.clone(),
+                    occurrence,
+                    picks: done,
+                });
+            }
+        }
+        runs.sort_by(|a, b| {
+            b.occurrence
+                .cmp(&a.occurrence)
+                .then_with(|| utf16_cmp(&a.routine_id, &b.routine_id))
+        });
+        Ok(runs)
+    }
+
     /// The Routines not in the trash spawned from the Session `note_id`,
     /// each running it, by id; none while the Note is no Session.
     pub fn of_note(&self, note_id: &str) -> Result<Vec<Session>> {
@@ -912,6 +956,19 @@ impl<'a> Sessions<'a> {
         values: &BTreeMap<String, f64>,
         line: &str,
     ) -> Result<TallyEntry> {
+        self.record_sets(id, occurrence, note_id, values, &[], line)
+    }
+
+    /// [`Sessions::record`] with the entry's further sets `more` (#264).
+    pub fn record_sets(
+        &self,
+        id: &str,
+        occurrence: &Occurrence,
+        note_id: &str,
+        values: &BTreeMap<String, f64>,
+        more: &[BTreeMap<String, f64>],
+        line: &str,
+    ) -> Result<TallyEntry> {
         let session = self.require_due(id, occurrence)?;
         self.require_check_off(id)?;
         let marks = SessionMarks::of(self.store, id)?;
@@ -921,7 +978,7 @@ impl<'a> Sessions<'a> {
         if !wanted.iter().any(|w| w == note_id) {
             return Err(Error::Invalid(format!("not picked then: {note_id}")));
         }
-        Tallies::new(self.store).add_with(note_id, values, line, None, |entry_id| {
+        Tallies::new(self.store).add_with(note_id, values, more, line, None, |entry_id| {
             self.write_pick(id, occurrence, &wanted, &marks)?;
             self.store
                 .append(id, &keys::entry(occurrence, entry_id), Some(note_id), None)
@@ -1766,7 +1823,7 @@ mod tests {
         // the pick is trimmed by one without.
         let desk = of(&[0, 1, 4]).join(",");
         ann.append(s.id(), &keys::pick(&today), Some(&desk), None)?;
-        tallies.add_with(&t[4], &BTreeMap::new(), "Desk", None, |id| {
+        tallies.add_with(&t[4], &BTreeMap::new(), &[], "Desk", None, |id| {
             ann.append(s.id(), &keys::entry(&today, id), Some(&t[4]), None)
                 .map(drop)
         })?;

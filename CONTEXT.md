@@ -27,11 +27,11 @@ The rest of the text of a Note of any Kind but a Plain Note, after its Name: sho
 _Avoid_: body, notes, details
 
 **Compact view**:
-How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total today against its target ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Session its Name, the next run of any of its Routines and this week's runs of all of them done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
+How a Note's card shows it in a list for a glance, as its Kind defines it: a Plain Note its first line and the two lines after it, a Checklist its Name and how many of its Lines are open ("3 of 7 open"), a Shopping List its Name and how many are open ("4 open"), a Tally its Name and each field's total of the current bar against its target, today's for a Tally of days ("Steps 7000 / 10000 steps"), in a Shared Area of the user's own entries, a Session its Name, the next run of any of its Routines and this week's runs of all of them done and skipped. It has no Capture Context and none of the buttons at the bottom of the card; its ⋮ sits top right and offers File into… and Merge into…. The list's switch shows every card compact or detailed; a tap on a card (on the desktop its view button) switches that card, and this Device keeps it so until the list's switch changes again. German: Kompaktansicht.
 _Avoid_: folded card, short view, summary
 
 **Detailed view**:
-How a Note's card shows it whole in a list, as its Kind defines it: a Plain Note its whole text, its Amends, photos and recordings, a Checklist all its Lines with their boxes, tickable, in their groups, a Shopping List its open Lines, tickable, the struck ones folded under them, a Tally "Add entry", its charts and its entries, the older folded under the latest five, a Session its pool, today's picks of each of its Routines, recorded there as on the Agenda, and how often it was done and skipped in each of the last four weeks; each part with its Capture Context as one line under its text, the buttons at the bottom of the card. The default of every list. German: Detailansicht.
+How a Note's card shows it whole in a list, as its Kind defines it: a Plain Note its whole text, its Amends, photos and recordings, a Checklist all its Lines with their boxes, tickable, in their groups, a Shopping List its open Lines, tickable, the struck ones folded under them, a Tally "Add entry", its charts and its entries, the older folded under the latest five, a Session its pool, today's picks of each of its Routines, recorded there as on the Agenda, how often it was done and skipped in each of the last four weeks and its latest past runs; each part with its Capture Context as one line under its text, the buttons at the bottom of the card. The default of every list. German: Detailansicht.
 _Avoid_: full card, expanded view, long view
 
 **Capture**:
@@ -202,16 +202,24 @@ The phone's page for its calendars: "Read from your calendar", which shows the a
 ### Tallies
 
 **Tally**:
-A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. A field may instead multiply another of its fields (#200), as Rounds multiply Push-ups: the other field then counts the product in each entry, and the multiplier counts no value of its own. German: Strichliste.
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target per bar and a rule for several Sets or entries in a bar (their sum or the largest), or a Check field, and its entries, listed as rows, newest first, and shown as one chart per field, a bar per its bar length, a day, week, month or year, set up with the Tally. With "Counts in sets" each entry holds Sets. A Tally whose field multiplied another one before (#200) counts in Sets. German: Strichliste.
 _Avoid_: tracker, log, workout, exercise, habit
 
 **Entry**:
-One record of a Tally: a value for some of its fields, a date, one line of text and its author. German: Eintrag.
-_Avoid_: Section (a Section is a dated part of a Note's text), record, set
+One record of a Tally: a tick for some of its Check fields, a value for some of its number fields in each of its Sets (one row when the Tally counts in no Sets), a date, one line of text and its author. German: Eintrag.
+_Avoid_: Section (a Section is a dated part of a Note's text), record
+
+**Set**:
+One row of an Entry across its Tally's number fields, such as 60 kg × 10 and then 65 kg × 8, in a Tally that counts in Sets; "Add set" starts one with the values of the Set before, and each field totals the Sets of an Entry by its rule, reps by their sum, a weight by the largest. An Entry recorded while a field multiplied another, such as 3 Rounds × 20 Push-ups, reads as that many Sets. German: Satz.
+_Avoid_: round, repetition, multiplier
+
+**Check field**:
+A field of a Tally that is a box in each Entry, ticked once per Entry above its Sets; a tick counts as 1, so a bar shows how often it was done, such as one Tally per room for a cleaning Session. German: Abhakfeld.
+_Avoid_: checkbox, Box (a Box is a ☐ in a text), Line
 
 **Session**:
-A Note that picks a few Tallies from its pool for each Occurrence of its Routines, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The Note holds the pool, the count and the rule; each of its Routines, such as Monday and Wednesday at 7:00 and Saturday at 10:00, only says when it runs, and Rolling goes on from one Routine's run to the next. The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. German: Einheit.
-_Avoid_: workout, training, playlist, set
+A Note that picks a few Tallies from its pool for each Occurrence of its Routines, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The Note holds the pool, the count and the rule; each of its Routines, such as Monday and Wednesday at 7:00 and Saturday at 10:00, only says when it runs, and Rolling goes on from one Routine's run to the next. The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. Its card and its page list its past runs, newest first, each pick done or not done. German: Einheit.
+_Avoid_: workout, training, playlist, Set (that is an Entry's)
 
 ### Checklists and Shopping Lists
 

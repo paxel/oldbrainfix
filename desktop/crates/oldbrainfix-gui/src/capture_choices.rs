@@ -124,6 +124,8 @@ pub struct TallyFieldChoice {
     pub unit: String,
     pub target: Option<f64>,
     pub rule: TallyRule,
+    /// Whether it is a Check field (#264).
+    pub check: bool,
 }
 
 /// Everything set up for the Note being captured.
@@ -201,13 +203,18 @@ impl CaptureChoices {
             Notes::new(store).set_importance(note_id, self.importance)?;
         }
         if let Some(tally) = &self.tally {
-            Tallies::new(store).add_field(
-                note_id,
-                &tally.name,
-                &tally.unit,
-                tally.target,
-                Some(tally.rule),
-            )?;
+            let tallies = Tallies::new(store);
+            if tally.check {
+                tallies.add_check(note_id, &tally.name, tally.target)?;
+            } else {
+                tallies.add_field(
+                    note_id,
+                    &tally.name,
+                    &tally.unit,
+                    tally.target,
+                    Some(tally.rule),
+                )?;
+            }
         }
         for schedule in &self.schedules {
             schedule.spawn_from(store, note_id)?;

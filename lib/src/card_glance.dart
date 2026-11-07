@@ -10,9 +10,9 @@ import 'unit_system.dart';
 
 /// What the compact view of a card says under the Note's name of its
 /// Tally or of its Session (#189), read once per list: a Tally's
-/// fields shown but its multipliers, each with its total today, a
-/// multiplied field's the products (#200), and its target ("Pages 30 / 50
-/// pages"), of the user's own entries in a Shared Area as its detailed
+/// fields shown but those counting sets, each with its total of the
+/// current bar of the Tally's bar length (#264), today's for a day, and
+/// its target per bar ("Pages 30 / 50 pages"), of the user's own entries in a Shared Area as its detailed
 /// view counts unless another choice is picked (#190); else of a Session
 /// Note (#191) the next run of any of its Routines not Done and how many
 /// runs of all of them were Done and Missed this week, weeks from
@@ -95,18 +95,19 @@ class CardGlances {
     ];
   }
 
-  /// [field]'s total today against its target.
+  /// [field]'s total of the current bar against its target.
   String _fieldLine(String noteId, TallyField field) {
     final today = Day.today(store.clock(), deviceWallClock);
     final bars = _tallies.chart(
       noteId,
       field.id,
-      TallyPeriod.day,
       deviceWallClock,
       filter: tallyDefaultFilter(store, noteId),
     );
     final last = bars.isEmpty ? null : bars.last;
-    final total = last != null && last.start == today ? last.value ?? 0 : 0.0;
+    final total = last != null && last.start <= today && today <= last.end
+        ? last.value ?? 0
+        : 0.0;
     final target = field.target;
     return target == null
         ? t.tallyCardTotalOnly(
