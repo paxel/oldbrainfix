@@ -6,5 +6,9 @@
   "0.5.0": {
     "de": "Neu\n• Links auf Notizen und Seiten: Link zu….\n• Markdown-Aufgaben werden Kästchen.\n• Strichlisten zählen in Sätzen, mit Abhakfeld.\n• Einheiten zeigen bisherige Läufe.\n• Frosch einer Notiz als Abzeichen.\nGeändert\n• Balkenlänge einer Strichliste in der Einrichtung.\n• Tabellen Zelle für Zelle bearbeiten.\n• Der Schnellstart in „Old Brain Fix“ sagt, wo du tippst.\n• Löschen einer Notiz nimmt Routinen und Erinnerungen in den Papierkorb mit.\nBehoben\n• Wischen Agenda/Bereiche reagiert sofort.",
     "en": "Added\n• Links to Notes and app pages: Link to….\n• Markdown task lists become boxes.\n• Tallies count in sets and have a Check field.\n• Sessions list their past runs.\n• A Note's Frog shows as a badge.\nChanged\n• A Tally's bar length is set in its setup.\n• Tables are edited cell by cell.\n• The Quick start in the Area \"Old Brain Fix\" says where to tap.\n• Deleting a Note moves its Routines and Reminders to the Trash too.\nFixed\n• The swipe between Agenda and Areas reacts at once."
+  },
+  "0.5.1": {
+    "de": "Behoben\n• Das iPhone zeigt das eigene Symbol der App.",
+    "en": "Fixed\n• The iPhone shows the app's own icon."
   }
 }

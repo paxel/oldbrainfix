@@ -279,9 +279,9 @@ jobs:
           node-version: 22
       - name: Site — unit tests
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin and App Store listing tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing and iPhone icon tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
