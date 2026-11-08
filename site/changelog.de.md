@@ -2,7 +2,13 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.5.0]
+## [0.5.1]
+
+### Behoben
+
+- Auf dem iPhone zeigt die App das Symbol von Old Brain Fix, Frage- und Ausrufezeichen über einem Kästchen, auf dem Startbildschirm und im App Store statt eines Platzhalter-Logos.
+
+## [0.5.0] - 2026-11-07
 
 ### Neu
 
