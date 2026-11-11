@@ -1,6 +1,14 @@
 # The Android release pipeline, copied from cat(a)log's and adapted. A
 # `v*` tag (or the manual dispatch button) runs it:
 #
+#   tested         — whether the tagged commit is the merge of a pull
+#                    request whose head has the same tree and passed every
+#                    check (#234); then the two gates below run their
+#                    cheap checks only, as that tree passed the rest
+#                    before the merge, else everything
+#   sonar-gate     — SonarQube Cloud's quality gate of the tagged commit,
+#                    waited for while summer's analysis is pending; the
+#                    jobs that publish need it
 #   gate           — every gate CI has, and more (#231): tag = pubspec
 #                    version = desktop Cargo version, a CHANGELOG
 #                    section for the version, no open high or
@@ -43,8 +51,8 @@
 #   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
 #   ios            — the iPhone app built unsigned and its XCTest target
 #                    run on a simulator (ios.yml, the same job as on every
-#                    push to summer and a release branch); a gate: the
-#                    Release needs it
+#                    push to a branch but summer); a gate: the Release
+#                    needs it
 #   testflight     — the iPhone app signed for the App Store and, when
 #                    publishing, uploaded to TestFlight; without the Apple
 #                    secrets below it skips with a notice and passes. Only
@@ -125,12 +133,74 @@ permissions:
   contents: read
 
 jobs:
+  # Q696 of #234: whether the tagged commit is the merge of a pull request
+  # whose head commit has the same tree and passed every check, the
+  # required ones included. Then the two gates below run no tests: that
+  # tree passed them before the merge. Anything else (no such pull
+  # request, a tag made by the Actions button on a commit that never was
+  # one, a check that failed or still runs, an error asking GitHub) runs
+  # the full test gate. The step never fails the job; without an answer the
+  # output is empty, and the tests run.
+  tested:
+    name: Tested before the merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+    outputs:
+      tested: ${{ steps.lookup.outputs.tested }}
+      head_ref: ${{ steps.lookup.outputs.head_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tool
+      - name: The pull request merged into the tagged commit, and its head's checks
+        id: lookup
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tool/tested_tree.py "$GITHUB_SHA"
+
+  # SonarQube Cloud's quality gate of the tagged commit (Q696 of #234):
+  # sonar.yml analyses summer after each merge, and a tag sits on such a
+  # merge, so this waits while that analysis is pending (it takes up to
+  # about 45 minutes) and fails when the gate does. Beside the gates, not
+  # before them: only the jobs that publish (the Android job's Play
+  # upload, TestFlight, and through them F-Droid and the Release) need
+  # it. A dry run looks once and only warns, as its commit is often one
+  # Sonar never analysed.
+  sonar-gate:
+    name: Sonar quality gate (tagged commit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tool
+      - name: The quality gate of the tagged commit's analysis passed
+        env:
+          SONAR_TOKEN: ${{ secrets.SQ_TOKEN }}
+        run: |
+          if [ "$PUBLISH" = true ]; then
+            python3 tool/sonar_gate.py "$GITHUB_SHA" --wait-minutes 75
+          else
+            python3 tool/sonar_gate.py "$GITHUB_SHA" --warn-only
+          fi
+
   gate:
     name: Gate (tests)
+    needs: tested
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: read
+    # The cheap checks run always; every step from the Flutter setup on
+    # runs only when the tagged tree was not tested before the merge (the
+    # job "Tested before the merge"): CI, Pages and Sonar ran each of them
+    # on the pull request's head.
+    env:
+      TESTED_BEFORE_MERGE: ${{ needs.tested.outputs.tested }}
     steps:
       # The full history, so the code-scanning step finds the branches
       # that hold the tagged commit.
@@ -183,13 +253,21 @@ jobs:
       # branch that holds this commit is listed, and one of severity high
       # or critical (security severity, or rule severity error) stops the
       # release. A branch CodeQL never analysed is skipped; none analysed
-      # at all stops it too.
+      # at all stops it too. After a merge summer is analysed weekly only
+      # (#234), so the merged pull request's head branch is asked too,
+      # while it exists: CodeQL analysed the merged tree there on push.
       - name: No open high or critical code-scanning alert
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ needs.tested.outputs.head_ref }}
         run: |
           sha=$(git rev-parse HEAD)
           branches=$(git branch -r --contains "$sha" --format='%(refname:lstrip=3)' | grep -vx HEAD || true)
+          # GitHub answers an empty list for a branch that is gone, so
+          # the head branch counts only while it exists.
+          if [ -n "$HEAD_REF" ] && git rev-parse --verify -q "refs/remotes/origin/$HEAD_REF" > /dev/null; then
+            branches=$(printf '%s\n%s\n' "$branches" "$HEAD_REF" | grep -v '^$' | sort -u)
+          fi
           analysed=0
           blocking=0
           for b in $branches; do
@@ -237,10 +315,12 @@ jobs:
           python3 tool/whats_new.py --bundle --require "${RELEASE_TAG#v}"
           git diff --exit-code -- assets/help/whats_new.json
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           channel: stable
           cache: true
       - name: Core — analyze and test
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: packages/oldbrainfix_core
         run: |
           dart pub get
@@ -249,6 +329,7 @@ jobs:
           dart run tool/no_null_assertions.dart lib ../../lib
           dart test
       - name: App — analyze and test
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           flutter pub get
           flutter analyze --fatal-infos
@@ -256,43 +337,54 @@ jobs:
       # The app, the core and the tools, after both pub gets: the
       # package config sets the language version, and with it the style.
       - name: Dart format
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: dart format --output=none --set-exit-if-changed .
       - name: No untranslated strings
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
       # The generated lib/l10n/app_localizations*.dart are committed; the
       # runner regenerates them, so a stale copy would pass unseen.
       - name: The generated localizations are current
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           flutter gen-l10n
           git diff --exit-code -- lib/l10n
           test -z "$(git status --porcelain -- lib/l10n)"
       - name: The guide's phone frames match their screens
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: flutter test test/screenshots/screenshots_test.dart --run-skipped --concurrency=1 --plain-name 'guide frames'
       - name: The fixture corpus the desktop core is tested against is current
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: packages/oldbrainfix_core
         run: |
           dart run tool/gen_fixtures.dart ../../desktop/fixtures
           git diff --exit-code -- ../../desktop/fixtures
           test -z "$(git status --porcelain -- ../../desktop/fixtures)"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           node-version: 22
       - name: Site — unit tests
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: node --test "tool/site/*.test.js"
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing and iPhone icon tools — unit tests
+      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree and Sonar gate tools — unit tests
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate
       # The Flatpak's files, as CI checks them: cargo-sources.json current,
       # and the metainfo, desktop file and manifest past Flathub's linters
       # (without the network: the screenshots exist once the Release does).
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           python-version: '3.12'
       - name: cargo-sources.json is current with desktop/Cargo.lock
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
       - name: appstreamcli, desktop-file-validate and flatpak-builder-lint
+        if: env.TESTED_BEFORE_MERGE != 'true'
         env:
           LINT_IMAGE: ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0
         run: |
@@ -309,38 +401,51 @@ jobs:
       # that rose is raised there on the runner only; raise it with a
       # local run of tool/coverage.sh and commit it.
       - name: Coverage floors — Dart core and Flutter app
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: tool/coverage.sh dart-core flutter-app
 
   gate-desktop:
     name: Gate (desktop and OCR, Rust)
+    needs: tested
     runs-on: ubuntu-latest
     permissions:
       contents: read
     # As in CI: forty test binaries with full debug info fill the
-    # runner's disk; line tables keep backtraces readable.
+    # runner's disk; line tables keep backtraces readable. Every step
+    # runs only when the tagged tree was not tested before the merge, as
+    # in the gate above: CI and Sonar ran each of them on the pull
+    # request's head, and the job then passes without a step.
     env:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      TESTED_BEFORE_MERGE: ${{ needs.tested.outputs.tested }}
     steps:
       - name: Room on the runner's disk (its preinstalled SDKs are not used here)
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           submodules: recursive
       - name: System libraries (ALSA for the microphone, cmake for whisper.cpp, lavapipe for the guide's frames)
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ mesa-vulkan-drivers libvulkan1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           components: rustfmt, clippy, llvm-tools-preview
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           workspaces: desktop
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: env.TESTED_BEFORE_MERGE != 'true'
         with:
           channel: stable
           cache: true
       - name: The third-party licence lists are current
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           cargo install cargo-about --locked --version 0.9.2 --features cli
           flutter pub get
@@ -349,6 +454,7 @@ jobs:
           test -z "$(git status --porcelain -- licenses)"
       # Its own lints (#229) with -D warnings, as for the desktop.
       - name: OCR library — format, lint and unit tests
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: android/ocr
         run: |
           cargo fmt --check
@@ -357,17 +463,20 @@ jobs:
       # Clippy enforces the workspace lints (#229): no unsafe outside the
       # FFI modules, no unwrap, expect, panic or indexing outside tests.
       - name: Desktop — format, lint and test
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: desktop
         run: |
           cargo fmt --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
       - name: The guide's desktop frames match their screens
+        if: env.TESTED_BEFORE_MERGE != 'true'
         working-directory: desktop
         run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored guide_frames
       # Coverage floors (#232), the Rust half: the core and the GUI below
       # their floor in tool/coverage-floors.txt stop the release.
       - name: Coverage floors — Rust core and Rust GUI
+        if: env.TESTED_BEFORE_MERGE != 'true'
         run: |
           cargo install cargo-llvm-cov --locked --version 0.9.1
           tool/coverage.sh rust-core rust-gui
@@ -405,7 +514,7 @@ jobs:
 
   build-android:
     name: Android APKs and bundle
-    needs: [gate, gate-desktop]
+    needs: [gate, gate-desktop, sonar-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -719,7 +828,7 @@ jobs:
   # passes with a notice: the release does not wait for the iPhone.
   testflight:
     name: iOS to TestFlight
-    needs: ios
+    needs: [ios, sonar-gate]
     runs-on: macos-26
     steps:
       - name: Apple secrets present

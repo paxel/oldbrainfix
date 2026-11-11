@@ -18,6 +18,19 @@ every release.
 - F-Droid: the tag pipeline copies `fastlane/metadata/android/` into the
   repo's F-Droid metadata, screenshots included.
 
+## Tag pipeline
+
+A tag on `summer`'s merge of a pull request whose head commit has the same
+tree and passed every check runs the release's two test gates without
+their tests (#234): that tree passed them before the merge. Any other tag,
+one the Actions button makes on a commit that never was a pull request
+included, runs them in full. The cheap checks run on every tag: tag and
+versions, the CHANGELOG section, the release notes record and the bundled
+What's new, OSV, the whisper.cpp pin and the open CodeQL alerts. The jobs
+that publish wait for SonarQube Cloud's quality gate of the tagged commit,
+up to 75 minutes while `summer`'s analysis of the merge runs, and stop when
+it fails.
+
 ## Locales
 
 `en-US` and `de-DE`, from `lib/l10n/app_en.arb` and `lib/l10n/app_de.arb`,
