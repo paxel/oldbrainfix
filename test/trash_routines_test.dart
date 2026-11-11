@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -77,66 +78,43 @@ void main() {
   }
 
   group('deleting a Note that spawned Routines', () {
-    testWidgets('asks one plain question, with their count; cancel keeps '
-        'everything', (tester) async {
+    testWidgets('asks nothing; the announcement at the top undoes it with '
+        'its Routines (#268)', (tester) async {
       final pills = notes.capture('pills');
       routines.spawn(pills.id, daily([at(8)]));
       routines.spawn(pills.id, daily([at(20)]));
       await start(tester);
       await openNote(tester, 'pills');
       await tap(tester, find.byTooltip('Move to trash'));
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(
-        find.text('Delete this Note and its 2 Routines and Reminders?'),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          'They stay in the trash with it for 30 days and come back when '
-          'you restore it.',
-        ),
-        findsOneWidget,
-      );
-      // No way to delete the Note alone (#262).
-      expect(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.byType(TextButton),
-        ),
-        findsNWidgets(2),
-      );
-      expect(find.text('Delete only the Note'), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(notes.byId(pills.id)?.isTrashed, isTrue);
+      expect(routines.all(), isEmpty);
+      expect(find.text('Moved to the Trash'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
 
-      await tap(tester, find.text('Cancel'));
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      await tap(tester, find.text('Moved to the Trash'));
+      expect(find.text('Moved to the Trash'), findsNothing);
       expect(notes.byId(pills.id)?.isTrashed, isFalse);
       expect(routines.all(), hasLength(2));
+      // The list it was left for shows it again.
+      expect(find.text('pills'), findsOneWidget);
     });
 
-    testWidgets('names one Reminder as such, and counts it as linked', (
-      tester,
-    ) async {
-      final dentist = notes.capture('dentist');
-      routines.spawn(
-        dentist.id,
-        Schedule(start: Day(2026, 10, 27), times: [at(9)]),
-      );
+    testWidgets('left alone, the announcement goes by itself and the Note '
+        'stays in the trash', (tester) async {
+      final pills = notes.capture('pills');
+      routines.spawn(pills.id, daily([at(8)]));
       await start(tester);
-      await openNote(tester, 'dentist');
+      await openNote(tester, 'pills');
       await tap(tester, find.byTooltip('Move to trash'));
-      expect(find.text('Delete this Note and its 1 Reminder?'), findsOneWidget);
-      await tap(tester, find.text('Cancel'));
-
-      routines.spawn(dentist.id, daily([at(8)]));
-      await tester.pageBack();
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text('Moved to the Trash'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
-      await tester.longPress(find.text('dentist'));
-      await tester.pumpAndSettle();
-      await tap(tester, find.byTooltip('Move to trash'));
-      expect(
-        find.text('Delete this Note and its 2 Routines and Reminders?'),
-        findsOneWidget,
-      );
+      expect(find.text('Moved to the Trash'), findsNothing);
+      expect(notes.byId(pills.id)?.isTrashed, isTrue);
+      expect(routines.all(), isEmpty);
     });
 
     testWidgets(
@@ -149,11 +127,6 @@ void main() {
         expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
         await openNote(tester, 'pills');
         await tap(tester, find.byTooltip('Move to trash'));
-        expect(
-          find.text('Delete this Note and its 1 Routine?'),
-          findsOneWidget,
-        );
-        await tap(tester, find.text('Delete'));
         expect(find.byType(NoteEditorScreen), findsNothing);
         expect(notes.byId(pills.id)?.isTrashed, isTrue);
         expect(routines.all(), isEmpty);
@@ -224,7 +197,6 @@ void main() {
       await tap(tester, find.text('pills'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       await tap(tester, find.byTooltip('Move to trash'));
-      await tap(tester, find.text('Delete'));
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(find.byType(Checkbox), findsNothing);
@@ -254,60 +226,41 @@ void main() {
       await start(tester);
       await openNote(tester, 'dentist');
       await tap(tester, find.byTooltip('Move to trash'));
-      expect(find.text('Delete this Note and its 1 Routine?'), findsOneWidget);
-      await tap(tester, find.text('Delete'));
       expect(notes.byId(dentist.id)?.isTrashed, isTrue);
       expect(routines.all(), isEmpty);
     });
 
-    testWidgets('a Note without Routines asks too, like its card; cancel '
-        'keeps it', (tester) async {
+    testWidgets('a Note without Routines goes at once too, like from its '
+        'card', (tester) async {
       final milk = notes.capture('milk');
       await start(tester);
       await openNote(tester, 'milk');
       await tap(tester, find.byTooltip('Move to trash'));
-      expect(find.text('Delete this Note?'), findsOneWidget);
-      expect(find.text('It stays in the trash for 30 days.'), findsOneWidget);
-      final delete = tester.widget<TextButton>(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.widgetWithText(TextButton, 'Delete'),
-        ),
-      );
-      expect(
-        delete.style?.foregroundColor?.resolve({}),
-        Theme.of(tester.element(find.byType(AlertDialog))).colorScheme.error,
-      );
-
-      await tap(tester, find.text('Cancel'));
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(notes.byId(milk.id)?.isTrashed, isFalse);
-
-      await tap(tester, find.byTooltip('Move to trash'));
-      await tap(tester, find.text('Delete'));
+      expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(notes.byId(milk.id)?.isTrashed, isTrue);
+      expect(find.text('Moved to the Trash'), findsOneWidget);
     });
   });
 
   group('deleting a Routine on its own', () {
-    testWidgets('it goes to the trash after a confirm and can be restored', (
-      tester,
-    ) async {
+    testWidgets('it goes to the trash without asking, the announcement '
+        'undoes it, and the trash restores it', (tester) async {
       final routine = routines.create('pills', daily([at(20)]));
       await startWeek(tester);
       await tap(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
-      expect(
-        find.text(
-          'Delete this Routine? It stays in the trash for 30 days. '
-          'Its Note stays.',
-        ),
-        findsOneWidget,
-      );
-      await tap(tester, find.text('Delete').last);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(routines.byId(routine.id)?.isTrashed, isTrue);
       expect(find.byType(Checkbox), findsNothing);
+      await tap(tester, find.text('Routine moved to the Trash'));
+      expect(routines.byId(routine.id)?.isTrashed, isFalse);
+      expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
+
+      await tap(tester, find.text('pills').first);
+      await tap(tester, find.byTooltip('Delete'));
+      expect(routines.byId(routine.id)?.isTrashed, isTrue);
 
       now = now.add(const Duration(days: 10));
       await openTrash(tester);
@@ -322,6 +275,58 @@ void main() {
       expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
     });
 
+    testWidgets('the undo brings its badge back in the Note editor it was '
+        'opened from', (tester) async {
+      final pills = notes.capture('pills');
+      final routine = routines.spawn(pills.id, daily([at(20)]));
+      await start(tester);
+      await openNote(tester, 'pills');
+      final badge = find.byKey(ValueKey('badge-routine-${routine.id}'));
+      await tester.ensureVisible(badge);
+      await tester.pumpAndSettle();
+      await tap(tester, badge);
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      await tap(tester, find.byTooltip('Delete'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(badge, findsNothing);
+      await tap(tester, find.text('Routine moved to the Trash'));
+      expect(routines.byId(routine.id)?.isTrashed, isFalse);
+      expect(badge, findsOneWidget);
+    });
+
+    testWidgets('All Routines and Reminders shows what the undo brought '
+        'back', (tester) async {
+      final pills = notes.capture('pills');
+      final routine = routines.spawn(pills.id, daily([at(20)]));
+      await start(tester);
+      await tap(tester, find.byKey(const ValueKey('allRoutines')));
+      final card = find.byKey(ValueKey('routine-${routine.id}'));
+      await tap(tester, card);
+      await tap(tester, find.byTooltip('Delete'));
+      expect(find.byType(AllRoutinesScreen), findsOneWidget);
+      expect(card, findsNothing);
+      await tap(tester, find.text('Routine moved to the Trash'));
+      expect(card, findsOneWidget);
+
+      // Its Note deleted from there and brought back: no longer "in the
+      // trash".
+      await tap(tester, card);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(RoutineEditorScreen),
+          matching: find.text('pills'),
+        ),
+      );
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      await tap(tester, find.byTooltip('Move to trash'));
+      expect(find.byType(RoutineEditorScreen), findsNothing);
+      expect(card, findsNothing);
+      await tap(tester, find.text('Moved to the Trash'));
+      expect(card, findsOneWidget);
+      expect(find.text('The Note is in the trash'), findsNothing);
+    });
+
     testWidgets('after 30 days the trash has purged it', (tester) async {
       final routine = routines.create('pills', daily([at(20)]));
       routines.trash(routine.id);
@@ -333,7 +338,7 @@ void main() {
     });
   });
 
-  testWidgets('the question and the trash fit a phone in German', (
+  testWidgets('the announcement and the trash fit a phone in German', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1080, 2340);
@@ -353,11 +358,8 @@ void main() {
     // On a phone the bar's last actions overflow into its ⋮.
     await tap(tester, find.byTooltip('Mehr').last);
     await tap(tester, find.text('In den Papierkorb'));
-    expect(
-      find.text('Diese Notiz und ihre 2 Routinen und Erinnerungen löschen?'),
-      findsOneWidget,
-    );
-    await tap(tester, find.text('Löschen'));
+    expect(find.text('In den Papierkorb verschoben'), findsOneWidget);
+    expect(find.text('Rückgängig'), findsOneWidget);
     await tap(tester, find.byType(BackButton).last);
     await tap(tester, find.byTooltip('Papierkorb'));
     expect(find.text('Blumen gießen'), findsOneWidget);

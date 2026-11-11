@@ -5769,4 +5769,37 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get feedbackNotSentTitle => 'Feedback nicht geteilt';
+
+  @override
+  String get undo => 'Rückgängig';
+
+  @override
+  String get undoNoteTrashed => 'In den Papierkorb verschoben';
+
+  @override
+  String get undoLineDeleted => 'Zeile gelöscht';
+
+  @override
+  String get undoEntryDeleted => 'Eintrag gelöscht';
+
+  @override
+  String get undoFrogTrashed => 'Frosch in den Papierkorb verschoben';
+
+  @override
+  String get undoRoutineTrashed => 'Routine in den Papierkorb verschoben';
+
+  @override
+  String get undoReminderTrashed => 'Erinnerung in den Papierkorb verschoben';
+
+  @override
+  String get undoPackFromRemoved => '„Von“ entfernt';
+
+  @override
+  String get undoTranscriptRemoved => 'Transkript entfernt';
+
+  @override
+  String get undoPhotoTextRemoved => 'Fototext entfernt';
+
+  @override
+  String get linesRemoved => 'Entfernte Zeilen';
 }

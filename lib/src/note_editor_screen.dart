@@ -145,24 +145,34 @@ Future<bool> amendNote(
   return true;
 }
 
-/// Asks once whether the Note [noteId] goes to the trash, with the verb
-/// on the button in the error colour, and moves it there; whether it
-/// did. Its Routines and Reminders always go with it, and the question
-/// names them (#262).
-Future<bool> deleteNote(
-  BuildContext context,
-  Notes notes,
-  String noteId,
-) async {
+/// Moves the Note [noteId] to the trash without asking and offers to
+/// undo it at the top (#268); whether it went. Its Routines and Reminders
+/// always go with it (#262), and the undo brings them back with it.
+bool deleteNote(BuildContext context, Notes notes, String noteId) {
+  final note = notes.byId(noteId);
+  if (note == null || note.isTrashed || !notes.store.mayChange(noteId)) {
+    return false;
+  }
   final book = Routines(notes.store);
-  final linked = book.ofNote(noteId);
-  final delete = await showDialog<bool>(
-    context: context,
-    builder: (context) => _DeleteNoteDialog(linked: linked),
-  );
-  if (delete != true) return false;
   book.trashNote(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoNoteTrashed, () {
+    // The Trash, a purge or a sync may have got there first.
+    if (notes.byId(noteId)?.isTrashed != true) return;
+    if (!notes.store.mayChange(noteId)) return;
+    book.restoreNote(noteId);
+  });
   return true;
+}
+
+/// Removes the "From …" badge of the Note [noteId] (#164) without asking
+/// and offers to undo it at the top (#268), which brings it back.
+void removePackFrom(BuildContext context, Store store, String noteId) {
+  if (store.packFrom(noteId) == null || !store.mayChange(noteId)) return;
+  store.removePackFrom(noteId);
+  AnnouncementsScope.of(context)?.offerUndo(context.t.undoPackFromRemoved, () {
+    if (store.packFrom(noteId) != null || !store.mayChange(noteId)) return;
+    store.restorePackFrom(noteId);
+  });
 }
 
 /// Asks once whether the photo ([photo]) or voice recording [hash] of
@@ -197,36 +207,47 @@ Future<bool> removeMedia(
   return true;
 }
 
-/// Asks once whether the Photo Text ([photo]) or Transcript of the photo
-/// or voice recording [hash] of the Note or Section [noteId] goes while
-/// the file stays, with the verb on the button in the error colour, and
-/// removes it; whether it did (ADR 0025).
-Future<bool> removeGeneratedText(
+/// Removes the Photo Text ([photo]) or Transcript of the photo or voice
+/// recording [hash] of the Note or Section [noteId] while the file stays,
+/// without asking, and offers to undo it at the top (#268); whether it
+/// did (ADR 0025). The undo writes the text back.
+bool removeGeneratedText(
   BuildContext context,
   Notes notes,
   String noteId,
   String hash, {
   required bool photo,
-}) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => _RemoveDialog(
-      title: photo
-          ? context.t.removePhotoTextQuestion
-          : context.t.removeTranscriptQuestion,
-      detail: context.t.removeGeneratedTextDetail,
-    ),
-  );
-  // A sync while the dialog was open may have taken it already.
+}) {
   final allowed = photo
       ? notes.mayRemovePhotoText(noteId, hash)
       : notes.mayRemoveTranscript(noteId, hash);
-  if (confirmed != true || !allowed) return false;
+  final note = notes.byId(noteId);
+  final text = photo ? note?.photoTexts[hash] : note?.transcripts[hash];
+  if (!allowed || text == null) return false;
   if (photo) {
     notes.removePhotoText(noteId, hash);
   } else {
     notes.removeTranscript(noteId, hash);
   }
+  final t = context.t;
+  AnnouncementsScope.of(context)
+      ?.offerUndo(photo ? t.undoPhotoTextRemoved : t.undoTranscriptRemoved, () {
+        // Made again meanwhile, or the file gone: nothing to bring back.
+        final now = notes.byId(noteId);
+        final removed = photo
+            ? now != null &&
+                  now.photos.contains(hash) &&
+                  now.removedPhotoTexts.contains(hash)
+            : now != null &&
+                  now.recordings.contains(hash) &&
+                  now.removedTranscripts.contains(hash);
+        if (!removed || !notes.store.mayChange(noteId)) return;
+        if (photo) {
+          notes.setPhotoText(noteId, hash, text);
+        } else {
+          notes.setTranscript(noteId, hash, text);
+        }
+      });
   return true;
 }
 
@@ -297,7 +318,7 @@ NoteActions noteActions(
     onRemovePackFrom: from == null || !placed.changes
         ? null
         : () {
-            notes.store.removePackFrom(id);
+            removePackFrom(context, notes.store, id);
             changed();
           },
     // Copied says nothing: the text is on the screen (UI laws).
@@ -368,7 +389,9 @@ NoteActions noteActions(
     },
     showTicks: () => showTicksEntry(notes, id, changed),
     onDelete: placed.changes
-        ? () => then(deleteNote(context, notes, id))
+        ? () {
+            if (deleteNote(context, notes, id)) changed();
+          }
         : null,
   );
 }
@@ -676,8 +699,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     unawaited(_restoreDraft());
   }
 
+  /// The app's announcements, whose undos this editor follows (#268).
+  Announcements? _announcements;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final announcements = AnnouncementsScope.of(context);
+    if (announcements == _announcements) return;
+    _announcements?.undone.removeListener(_undone);
+    _announcements = announcements?..undone.addListener(_undone);
+  }
+
+  /// An undo at the top may have brought back what this editor shows: a
+  /// Routine's or the Frog's badge, a Transcript, the "From …" badge.
+  void _undone() {
+    if (!mounted) return;
+    _saveText();
+    _reload();
+  }
+
   @override
   void dispose() {
+    _announcements?.undone.removeListener(_undone);
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
@@ -1580,28 +1624,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// Asks to remove the Note's "From …" badge (#164), and removes it.
-  Future<void> _removePackFrom(String name) async {
-    final t = context.t;
-    final remove = await showDialog<bool>(
+  /// The "From …" badge's menu at the finger [at]: Remove “From [name]”,
+  /// which removes it (#164) without asking; the announcement at the top
+  /// undoes it (#268).
+  Future<void> _removePackFrom(String name, Offset at) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final remove = await showMenu<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        content: Text(t.removePackFrom(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            key: const ValueKey('remove-pack-from'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.remove),
-          ),
-        ],
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
       ),
+      items: [
+        PopupMenuItem(
+          key: const ValueKey('remove-pack-from'),
+          value: true,
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline),
+              const SizedBox(width: 12),
+              Flexible(child: Text(context.t.removePackFrom(name))),
+            ],
+          ),
+        ),
+      ],
     );
     if (remove != true || !mounted) return;
-    widget.notes.store.removePackFrom(widget.noteId);
+    removePackFrom(context, widget.notes.store, widget.noteId);
     setState(() {});
   }
 
@@ -1661,7 +1712,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.inventory_2_outlined,
             value: t.packFrom(profileDisplayName(t, from.name)),
             onTap: changes
-                ? (_) => _removePackFrom(profileDisplayName(t, from.name))
+                ? (at) => _removePackFrom(profileDisplayName(t, from.name), at)
                 : null,
           ),
         for (final routine in _routines)
@@ -1778,7 +1829,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The Frog badge's menu at the finger [at]: Eat now while it is open
   /// and this Device may check it off, Remove the Frog for who may
-  /// manage it (ADR 0013), which asks once, as the Frog view does.
+  /// manage it (ADR 0013), which the announcement at the top undoes, as
+  /// in the Frog view (#268).
   Future<void> _frogMenu(
     Frog frog,
     Offset at, {
@@ -1826,7 +1878,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     if (picked) {
       _frogs.markDone(frog.id);
-    } else if (!await trashFrog(context, _frogs, frog) || !mounted) {
+    } else if (!trashFrog(context, _frogs, frog)) {
       return;
     }
     _reload();
@@ -1960,18 +2012,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
-  /// or Section [id] after asking once; the file stays.
-  Future<void> _removeGenerated(String id, String hash, bool photo) async {
+  /// or Section [id] without asking; the file stays, and the announcement
+  /// at the top undoes it (#268).
+  void _removeGenerated(String id, String hash, bool photo) {
     _saveText();
-    final removed = await removeGeneratedText(
-      context,
-      widget.notes,
-      id,
-      hash,
-      photo: photo,
-    );
-    if (!mounted || !removed) return;
-    _reload();
+    if (removeGeneratedText(context, widget.notes, id, hash, photo: photo)) {
+      _reload();
+    }
   }
 
   /// Reads the photo ([photo]) or transcribes the recording [hash] of the
@@ -2206,11 +2253,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// Asks once whether the Note goes to the trash, with the same dialog
-  /// as the card's Delete, and closes the editor when it went.
-  Future<void> _trash() async {
-    if (!await deleteNote(context, widget.notes, widget.noteId)) return;
-    if (!mounted) return;
+  /// Moves the Note to the trash as the card's Delete does, without
+  /// asking, and closes the editor; the announcement at the top undoes it
+  /// (#268).
+  void _trash() {
+    if (!deleteNote(context, widget.notes, widget.noteId)) return;
     Navigator.of(context).pop();
   }
 
@@ -2771,42 +2818,6 @@ class EditorPanel extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// Asks once whether a Note goes to the trash with its [linked]
-/// Routines and Reminders: true to delete, null to cancel.
-class _DeleteNoteDialog extends StatelessWidget {
-  final List<Routine> linked;
-
-  const _DeleteNoteDialog({required this.linked});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    return AlertDialog(
-      title: Text(switch (linked) {
-        [] => t.deleteNoteQuestion,
-        [final one] when one.isReminder => t.deleteNoteReminderQuestion,
-        _ => t.deleteNoteLinkedQuestion(linked.length),
-      }),
-      content: Text(
-        linked.isEmpty ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.cancel),
-        ),
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(t.delete),
-        ),
-      ],
-    );
-  }
 }
 
 /// Asks once whether a photo or voice recording goes while its text

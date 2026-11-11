@@ -11,6 +11,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Geändert
 
 - Auf dem Handy und dem Desktop wählt „Synchronisieren“ das Gerät eines Bündels oder „Alles“ mit Optionsfeldern statt mit einer Auswahlliste.
+- Auf dem Handy fragt das Löschen von allem, was sich wiederherstellen lässt, nicht mehr vorher nach: Eine Notiz in den Papierkorb, eine Routine oder Erinnerung, ein Frosch, ein Eintrag einer Strichliste, eine Zeile, das „Von …“, ein Transkript oder ein Fototext geht sofort, und die Meldung oben macht es 10 Sekunden lang mit einem Tippen rückgängig. Eine Checkliste und eine Einkaufsliste zeigen ihre gelöschten Zeilen im Notiz-Editor unter dem eingeklappten „Entfernte Zeilen“, jede mit Wiederherstellen.
 
 ### Behoben
 

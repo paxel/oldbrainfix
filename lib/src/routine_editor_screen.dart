@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'announcements.dart';
 import 'calendar_platform.dart';
 import 'capture_choices.dart';
 import 'iphone_words.dart';
@@ -504,32 +505,23 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _delete() async {
+  /// Moves the Routine or Reminder to the trash without asking and
+  /// closes; the announcement at the top undoes it (#268).
+  void _delete() {
     final routine = _routine;
-    if (routine == null) return;
+    if (routine == null || routine.isTrashed) return;
+    final routines = _routines;
+    final store = widget.notes.store;
+    routines.trash(routine.id);
     final t = context.t;
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(
-          routine.isReminder
-              ? t.deleteReminderQuestion
-              : t.deleteRoutineQuestion,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.delete),
-          ),
-        ],
-      ),
+    AnnouncementsScope.of(context)?.offerUndo(
+      routine.isReminder ? t.undoReminderTrashed : t.undoRoutineTrashed,
+      () {
+        if (routines.byId(routine.id)?.isTrashed != true) return;
+        if (!store.mayChangeRoutine(routine.id)) return;
+        routines.restore(routine.id);
+      },
     );
-    if (!mounted || sure != true) return;
-    _routines.trash(routine.id);
     Navigator.of(context).pop(true);
   }
 

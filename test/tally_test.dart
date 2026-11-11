@@ -725,8 +725,9 @@ void main() {
       expect(store.localSetting(tallyEntriesShownSetting(note.id)), isNull);
     });
 
-    testWidgets('tapping an entry edits it; a long press deletes it after '
-        'asking once, and "Removed entries" restores it', (tester) async {
+    testWidgets('tapping an entry edits it; a long press deletes it without '
+        'asking, the announcement at the top undoes it, and "Removed '
+        'entries" restores it (#268)', (tester) async {
       final note = notes.capture('Pages');
       final id = tallies.addField(note.id, name: 'Pages');
       final entry = tallies.add(note.id, values: {id: 12});
@@ -740,33 +741,51 @@ void main() {
       expect(tallies.entryById(entry.id)!.values[id], 30);
       expect(find.text('Pages 30'), findsOneWidget);
 
-      await reveal(tester, key('tally-entry-${entry.id}'));
-      await tester.longPress(key('tally-entry-${entry.id}'));
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
-      await tap(tester, key('tally-entry-delete'));
-      expect(
-        find.text(
-          'Delete this entry? It can be restored under "Removed entries".',
-        ),
-        findsOneWidget,
-      );
-      final confirm = tester.widget<TextButton>(key('tally-delete-confirm'));
-      expect(
-        confirm.style?.foregroundColor?.resolve({}),
-        Theme.of(tester.element(key('tally-delete-confirm'))).colorScheme.error,
-      );
-      await tap(tester, key('tally-delete-confirm'));
-      expect(tallies.entryById(entry.id)!.isTrashed, isTrue);
-      expect(tallies.entries(note.id), isEmpty);
-      expect(find.text('No entries yet.'), findsOneWidget);
+      Future<void> delete() async {
+        await reveal(tester, key('tally-entry-${entry.id}'));
+        await tester.longPress(key('tally-entry-${entry.id}'));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        await tap(tester, key('tally-entry-delete'));
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tallies.entryById(entry.id)!.isTrashed, isTrue);
+        expect(tallies.entries(note.id), isEmpty);
+        expect(find.text('No entries yet.'), findsOneWidget);
+      }
 
+      await delete();
+      await tap(tester, find.text('Entry deleted'));
+      expect(tallies.entryById(entry.id)!.isTrashed, isFalse);
+      expect(find.text('Pages 30'), findsOneWidget);
+
+      await delete();
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.text('Entry deleted'), findsNothing);
       await tap(tester, key('tally-removed'));
       expect(store.localSetting('tallyRemovedOpen'), 'true');
       await tap(tester, key('tally-restore-${entry.id}'));
       expect(tallies.entryById(entry.id)!.isTrashed, isFalse);
       expect(key('tally-removed'), findsNothing);
       expect(find.text('Pages 30'), findsOneWidget);
+    });
+
+    testWidgets('the entry page\'s Delete closes it without asking; the '
+        'announcement at the top undoes it (#268)', (tester) async {
+      final note = notes.capture('Pages');
+      final id = tallies.addField(note.id, name: 'Pages');
+      final entry = tallies.add(note.id, values: {id: 12});
+      await startAtNotes(tester);
+      await tap(tester, key('tally-entry-${entry.id}'));
+      await tester.ensureVisible(key('tally-entry-trash'));
+      await tester.pumpAndSettle();
+      await tap(tester, key('tally-entry-trash'));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(TallyEntryScreen), findsNothing);
+      expect(tallies.entryById(entry.id)!.isTrashed, isTrue);
+      await tap(tester, find.text('Entry deleted'));
+      expect(tallies.entryById(entry.id)!.isTrashed, isFalse);
+      expect(find.text('Pages 12'), findsOneWidget);
     });
 
     testWidgets('a new entry counts for the day picked', (tester) async {

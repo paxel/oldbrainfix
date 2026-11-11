@@ -9271,6 +9271,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Feedback not shared'**
   String get feedbackNotSentTitle;
+
+  /// At the end of an announcement whose tap undoes what was just done (#268), and the screen reader's hint for that tap.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// Announced after a Note was moved to the Trash without asking; its tap brings it back with its Routines and Reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the Trash'**
+  String get undoNoteTrashed;
+
+  /// Announced after a Line of a Checklist or Shopping List was deleted without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Line deleted'**
+  String get undoLineDeleted;
+
+  /// Announced after a Tally entry was deleted without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry deleted'**
+  String get undoEntryDeleted;
+
+  /// Announced after a Frog was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Frog moved to the Trash'**
+  String get undoFrogTrashed;
+
+  /// Announced after a Routine was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine moved to the Trash'**
+  String get undoRoutineTrashed;
+
+  /// Announced after a Reminder was moved to the Trash without asking; its tap restores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder moved to the Trash'**
+  String get undoReminderTrashed;
+
+  /// Announced after a Note's “From …” label was removed without asking; its tap brings it back. No name: values never go into an announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'“From” label removed'**
+  String get undoPackFromRemoved;
+
+  /// Announced after a Transcript was removed without asking; its tap brings it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript removed'**
+  String get undoTranscriptRemoved;
+
+  /// Announced after a Photo Text was removed without asking; its tap brings it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Text removed'**
+  String get undoPhotoTextRemoved;
+
+  /// Folded heading under a Checklist's or Shopping List's Lines in the Note editor: the deleted Lines, each with Restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed Lines'**
+  String get linesRemoved;
 }
 
 class _AppLocalizationsDelegate

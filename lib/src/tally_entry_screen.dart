@@ -314,9 +314,10 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _delete(TallyEntry entry) async {
-    if (!await deleteTallyEntry(context, _tallies, entry.id)) return;
-    if (!mounted) return;
+  /// Removes the entry without asking and closes; the announcement at
+  /// the top undoes it (#268).
+  void _delete(TallyEntry entry) {
+    if (!deleteTallyEntry(context, _tallies, entry.id)) return;
     Navigator.of(context).pop(true);
   }
 

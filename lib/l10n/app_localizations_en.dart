@@ -5699,4 +5699,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedbackNotSentTitle => 'Feedback not shared';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get undoNoteTrashed => 'Moved to the Trash';
+
+  @override
+  String get undoLineDeleted => 'Line deleted';
+
+  @override
+  String get undoEntryDeleted => 'Entry deleted';
+
+  @override
+  String get undoFrogTrashed => 'Frog moved to the Trash';
+
+  @override
+  String get undoRoutineTrashed => 'Routine moved to the Trash';
+
+  @override
+  String get undoReminderTrashed => 'Reminder moved to the Trash';
+
+  @override
+  String get undoPackFromRemoved => '“From” label removed';
+
+  @override
+  String get undoTranscriptRemoved => 'Transcript removed';
+
+  @override
+  String get undoPhotoTextRemoved => 'Photo Text removed';
+
+  @override
+  String get linesRemoved => 'Removed Lines';
 }

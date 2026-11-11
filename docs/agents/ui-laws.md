@@ -65,9 +65,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - An announcement goes by itself or by a tap; it is never swiped away.
   A horizontal swipe stays navigation only.
 - An announcement says only that a job finished, failed or waits; the
-  tap opens the details. Values never go into an announcement.
+  tap opens the details, or, on an offer to undo, undoes. Values never
+  go into an announcement.
 - A quick local success the screen already shows (copied, saved) gets
-  no announcement.
+  no announcement. The one exception is the phone's offer to undo what
+  was just deleted (#268; see Phone, "Announcements").
 - A failure's tap opens a dialog with cause, fix and the full text,
   Close and Report; the page it belongs to is a line inside, not a
   third button.
@@ -332,13 +334,15 @@ replace a law of Both apps where they say so. A desktop law marked
   yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
   in Simple too, its tap offering at the finger Eat now while it is open
   and this Device may check it off and "Remove the Frog" for who may
-  manage it, which asks once as the Frog view does; for a Member an
+  manage it, which asks nothing and is undone as the Frog view's Delete
+  is (#268); for a Member an
   eaten one only shows; the kind, Plain Note included (#188); the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
   Shopping List (#186); Show ticks while it has a box; "From Ann" while
   a Pack brought the Note unclaimed (#164), `inventory_2` with the
-  name, its tap asking to remove it. A Tally's setup
+  name, its tap offering "Remove “From Ann”" at the finger, which asks
+  nothing and is undone (#268). A Tally's setup
   is the Tally's own badges, "One bar per" and "Counts in sets" (#264),
   each opening its small editor, then its fields (#190), each its name
   with its rule, unit and target as badges, as on the Tally page, a
@@ -446,16 +450,25 @@ replace a law of Both apps where they say so. A desktop law marked
   open Area, nothing ticked at first. Nothing leaves without the
   preview and a tap.
 - Two sentences at most in a dialog body. Concrete nouns, no metaphors.
-- Destructive actions (deleting a Note, an Area, a Routine) confirm
-  once, in a dialog whose confirm button carries the verb and the error
-  colour.
+- **Deleting for good confirms once; what can be restored is undone
+  instead** (#268, Q646 (c)). Emptying the Trash, deleting from the
+  Trash, deleting an Area, a Topic or a Named Place ask once, in a
+  dialog whose confirm button carries the verb and the error colour.
+  Deleting what comes back asks nothing: a Note moved to the Trash, a
+  Routine or Reminder, a Frog, a Tally entry, a Checklist or Shopping
+  List Line, the "From …" label, and a Transcript or Photo Text, which
+  can be made again. It goes at once and is undone at the moment of the
+  mistake: on the phone by the announcement at the top, on the desktop
+  by Ctrl+Z and Edit ▸ Undo. Done that moves a Note to the Trash
+  ("Done and move to trash", #211) is a check-off, not a delete: it
+  offers no undo on the phone, and the Note comes back from the Trash. The undo uses the restore that exists and writes
+  nothing more than it does; where it has nothing left to bring back,
+  it does nothing.
 - Deleting a Note takes its Routines and Reminders into the trash with
-  it, on every path and in both apps (#262): the one question names
-  them ("Delete this Note and its 1 Routine?", "… its 1 Reminder?",
-  "… its 3 Routines and Reminders?") and offers only Cancel and Delete;
-  restoring the Note brings them back. There is no "Delete only the
-  Note". All Routines and Reminders marks one whose Note is in the
-  trash or deleted.
+  it, on every path and in both apps (#262), and its undo, as restoring
+  the Note, brings them back. There is no "Delete only the Note". All
+  Routines and Reminders marks one whose Note is in the trash or
+  deleted.
 
 ### Text editor
 
@@ -552,6 +565,13 @@ replace a law of Both apps where they say so. A desktop law marked
   has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, Delete); a long press in a
   Line's text selects, as in any field.
+- **"Removed Lines"** (#268) folds under a list's Lines in the Note
+  editor while it has deleted Lines, as a Tally's "Removed entries":
+  each deleted Line's text, the last deleted first, with Restore below
+  it where this Device may change the Line, which brings it back where
+  it was; open or folded as last left, on this Device. A Line goes
+  there by ⋮ Delete, and, without an announcement, by emptying or
+  joining it while typing, with the text it last had stored.
 - **A Shopping List's Line ends in its reappear time badge** (#195),
   before ⋮, in the editor: short text, "—" for none, "Once", "4w",
   "3m", read as "Reappear time: 4 weeks". A tap opens its dialog: None,
@@ -705,6 +725,19 @@ replace a law of Both apps where they say so. A desktop law marked
   a swipe right anywhere, as on Android. A page that holds its leaving,
   such as one asking to keep changes, takes no edge swipe. A long-press
   on a Note card gives the iPhone's haptic where Android vibrates.
+
+### Announcements
+
+- **An offer to undo** (#268): what was just deleted on the phone and
+  can be restored says so at the top at once ("Moved to the Trash",
+  "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
+  label removed", "Transcript removed"), with "Undo" at its end; its
+  tap undoes it, and a screen reader hears "Undo" as the tap's hint. It
+  shows before what waits, a newer one takes the place of the one
+  before, and left alone it goes by itself after 10 seconds, undoing
+  nothing. What it deleted stays where it always went: the Trash,
+  "Removed entries", "Removed Lines", or "again" under its file; a
+  "From …" label has no such place and stays gone.
 
 ### Capture
 
@@ -931,7 +964,8 @@ replace a law of Both apps where they say so. A desktop law marked
   gives such an action as a `BarAction`; the bar counts a button 48
   wide, 1.3 times with Fat fingers (#224).
 - A destructive action has no special place: last in the order, on the
-  bar when there is room; its confirm dialog is the guard.
+  bar when there is room; the offer to undo at the top is the guard, or
+  for what goes for good its confirm dialog.
 - An action in ⋮ shows its icon and its words, as it does on the bar.
 - Labelled buttons (Save) and buttons that open a menu of their own
   never overflow.

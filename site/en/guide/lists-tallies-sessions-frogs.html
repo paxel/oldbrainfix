@@ -172,7 +172,7 @@
   <li>In the detailed view every Line has its checkbox; a checked Line is struck through in place. The compact view shows "3 of 5 open".</li>
   <li>A Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks the Line above it, checking that Line checks its whole group, and unchecking one Line of the group unchecks it again. A group shows in a frame with the Line it is under.</li>
   <li>In the editor the Lines are edited as one block of text, every Line starting with its box; a new list starts with one empty Line. Return adds a new Line with an empty box under the cursor's Line; in the middle of a Line it moves the rest of the Line into the new one. Backspace at the start of a Line joins it with the Line above, which keeps its box and whether it is checked; the joined Line's checks stay in the log. An empty Line simply goes. <strong>Put under the Line above</strong> and <strong>Back to the top level</strong> on the bar above the keyboard move the Line with the cursor into a group and out.</li>
-  <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>, which asks "Delete this Line?" first.</li>
+  <li>Everything typed is kept on leaving the editor; Lines left empty are dropped. ⋮ on a Line offers <strong>Move up</strong>, <strong>Move down</strong>, <strong>Put under the Line above</strong> or <strong>Back to the top level</strong>, and <strong>Delete</strong>. On the phone Delete asks nothing: the announcement at the top, "Line deleted", brings the Line back with a tap, and the folded "Removed Lines" under the Lines restores each deleted Line with <strong>Restore</strong>. The desktop asks "Delete this Line?" first.</li>
   <li><strong>Uncheck all</strong> shows while a Line is checked, to use the list again. <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Checklist" turn it back: every Line becomes a line of the Note's text, a checked one marked "✓ ".</li>
   <li>In a Shared Area anyone with a role adds and checks Lines; renaming, moving and deleting a Line stay with the author of the Note or of the Line and the Managers.</li>
 </ul>
@@ -269,7 +269,7 @@
   <li>Each Line has its <strong>Reappear time</strong> on a badge at its end: "—" for none, "Once", or a number with a unit, such as "4w" or "3m". The badge is on the Lines in the Note editor, not on the card. A tap on it opens it: <strong>None</strong>, <strong>Once</strong> or <strong>After</strong>, with a number from 1 to 99 and day, week, month or year, 1 week at first; each choice is kept at once. A new Line has none: once checked it stays struck until a time is set, which then counts from its check. A Line comes back as many days or weeks on, or on the same day of the month as many months or years on (on the last day of a shorter month), by the Device's clock. A Line Once is gone when checked.</li>
   <li>In the editor the Lines are edited as on a Checklist: one block of text, every Line starting with its box, Return for a new Line, Backspace at the start to join a Line with the one above. The Lines stay in the order they were typed in, also the next time. While the editor is open a Line checked there stays in its row; the next time it shows below the open ones.</li>
   <li>A name the list already has adds nothing, whatever its case and spaces around it: a struck or gone Line of that name comes back at once, and an open one stays.</li>
-  <li>A Line left empty is dropped on leaving. ⋮ on a Line offers <strong>Delete</strong>, which asks once.</li>
+  <li>A Line left empty is dropped on leaving. ⋮ on a Line offers <strong>Delete</strong>; on the phone it asks nothing and is undone as on a Checklist, with "Removed Lines" under the Lines, and the desktop asks once.</li>
   <li>In the detailed view the open Lines show with their checkboxes; the struck ones are folded under them as "2 struck through", which a tap shows and hides again; the phone keeps them shown until they are folded again. The compact view shows "3 open". <strong>Back to a plain Note</strong>, in the ⋮ of the card, and <strong>Plain Note</strong> behind the editor's badge "Shopping List" write the Lines into the text, the struck ones marked "✓ ".</li>
 </ul>
 <p>
@@ -395,7 +395,7 @@
   <li>In a Tally that counts in sets the values come as "Set 1", "Set 2" and so on, a row across the number fields each. <strong>Add set</strong> adds a set that starts with the values of the set before; a set after the first can be removed. The entry shows each set on a line of its own, such as "1. Weight 60 kg · Reps 10".</li>
   <li>Each chart shows slim bars of a fixed width with gaps, the newest on the right and as many as fit the width, the target as a thin line, the days the bars cover and the highest bar's value. A single bar stays slim. Older values are in the entries; the chart does not scroll sideways.</li>
   <li>The compact card shows each field's total of the current bar against its target, today's for a Tally of days.</li>
-  <li>A tap on an entry opens it to change; a long press offers <strong>Edit</strong> and <strong>Delete</strong>. Delete asks once; the entry can be restored under the folded "Removed entries".</li>
+  <li>A tap on an entry opens it to change; a long press offers <strong>Edit</strong> and <strong>Delete</strong>. On the phone Delete asks nothing: the announcement at the top, "Entry deleted", brings it back with a tap; the desktop asks once. Either way the entry can be restored under the folded "Removed entries".</li>
   <li>In a Shared Area, "Show entries" chooses <strong>Mine</strong>, <strong>Everyone's</strong> or one person's; your own show at first.</li>
 </ul>
 <p>
@@ -530,16 +530,16 @@
 <p>
   The Frog view lists the open Frogs, oldest first, each with its box, and below them the folded
   "Done" section with those checked off, the latest first, each with its date ("Done on …"); its
-  box unchecks it. A long press offers <strong>Delete</strong>, which asks once; the Frog goes to
-  the Trash and its Note stays. In a Shared Area a Manager makes and deletes Frogs, and anyone with
+  box unchecks it. A long press offers <strong>Delete</strong>; the Frog goes to the Trash and its
+  Note stays. On the phone it asks nothing, and the announcement at the top, "Frog moved to the
+  Trash", brings it back with a tap; the desktop asks once. In a Shared Area a Manager makes and deletes Frogs, and anyone with
   a role checks them off; a Frog one person eats is eaten for everyone.
 </p>
 <p>
   The Note editor shows a Note's Frog as a <strong>Frog</strong> badge with the frog: Open while it
   is not eaten, then Eaten today or Eaten yesterday, after which the badge goes; it shows in Simple
   too. A tap offers <strong>Eat now</strong>, which checks it off, while it is open, and
-  <strong>Remove the Frog</strong>, which asks once as Delete does and moves it to the Trash; its Note
-  stays. In a Shared Area anyone with a role may eat it and a Manager may remove it. On the desktop
+  <strong>Remove the Frog</strong>, which moves it to the Trash as Delete does; its Note stays. In a Shared Area anyone with a role may eat it and a Manager may remove it. On the desktop
   the badge sits in the Note dialog and a click opens the same menu.
 </p>
 <p>

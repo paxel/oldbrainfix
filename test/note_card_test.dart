@@ -374,35 +374,25 @@ void main() {
       expect(notes.sections(note.id).single.text, 'and bread');
     });
 
-    testWidgets('Delete asks once, the verb in the error colour, and moves '
-        'the Note to the trash', (tester) async {
+    testWidgets('Delete moves the Note to the trash without asking; the '
+        'announcement at the top brings it back (#268)', (tester) async {
       final note = notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
       await pick(tester, 'note-delete');
 
-      expect(find.text('Delete this Note?'), findsOneWidget);
-      final delete = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.widgetWithText(TextButton, 'Delete'),
-      );
-      final context = tester.element(delete);
-      expect(
-        tester
-            .widget<TextButton>(delete)
-            .style
-            ?.foregroundColor
-            ?.resolve(const {}),
-        Theme.of(context).colorScheme.error,
-      );
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-
+      expect(find.byType(AlertDialog), findsNothing);
       expect(notes.byId(note.id)!.isTrashed, isTrue);
       expect(find.text('Buy milk'), findsNothing);
+      expect(find.text('Moved to the Trash'), findsOneWidget);
+
+      await tester.tap(find.text('Moved to the Trash'));
+      await tester.pumpAndSettle();
+      expect(notes.byId(note.id)!.isTrashed, isFalse);
+      expect(find.text('Buy milk'), findsOneWidget);
     });
 
-    testWidgets('Delete takes the Note\'s Routines along, after one '
-        'question', (tester) async {
+    testWidgets('Delete takes the Note\'s Routines along, and the undo '
+        'brings them back', (tester) async {
       final note = notes.capture('Dentist');
       final routines = Routines(store);
       routines.spawn(
@@ -411,25 +401,27 @@ void main() {
       );
       await menu(tester, 'Dentist');
       await pick(tester, 'note-delete');
-      expect(find.text('Delete this Note and its 1 Reminder?'), findsOneWidget);
-      expect(find.text('Delete only the Note'), findsNothing);
-      await tester.tap(find.text('Delete'));
-      await tester.pumpAndSettle();
 
       expect(notes.byId(note.id)!.isTrashed, isTrue);
       expect(routines.ofNote(note.id), isEmpty);
       expect(routines.all(), isEmpty);
+      await tester.tap(find.text('Moved to the Trash'));
+      await tester.pumpAndSettle();
+      expect(routines.ofNote(note.id), hasLength(1));
     });
 
-    testWidgets('Cancel keeps the Note', (tester) async {
+    testWidgets('the undo does nothing once the trash restored it', (
+      tester,
+    ) async {
       final note = notes.capture('Buy milk');
       await menu(tester, 'Buy milk');
       await pick(tester, 'note-delete');
-      await tester.tap(find.text('Cancel'));
+      // As the Trash's Restore does.
+      Routines(store).restoreNote(note.id);
+      await tester.tap(find.text('Moved to the Trash'));
       await tester.pumpAndSettle();
-
       expect(notes.byId(note.id)!.isTrashed, isFalse);
-      expect(find.text('Buy milk'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -1536,5 +1536,16 @@
   "feedbackTooLongForMail": "Zu lang für einen Mail-Link. Teilen sendet alles.",
   "feedbackPackNotInMail": "Ein Mail-Link kann das Paket nicht mitnehmen. Teilen sendet es mit: Wähle dort deine Mail-App.",
   "feedbackNotSent": "Das Feedback wurde nicht geteilt.",
-  "feedbackNotSentTitle": "Feedback nicht geteilt"
+  "feedbackNotSentTitle": "Feedback nicht geteilt",
+  "undo": "Rückgängig",
+  "undoNoteTrashed": "In den Papierkorb verschoben",
+  "undoLineDeleted": "Zeile gelöscht",
+  "undoEntryDeleted": "Eintrag gelöscht",
+  "undoFrogTrashed": "Frosch in den Papierkorb verschoben",
+  "undoRoutineTrashed": "Routine in den Papierkorb verschoben",
+  "undoReminderTrashed": "Erinnerung in den Papierkorb verschoben",
+  "undoPackFromRemoved": "„Von“ entfernt",
+  "undoTranscriptRemoved": "Transkript entfernt",
+  "undoPhotoTextRemoved": "Fototext entfernt",
+  "linesRemoved": "Entfernte Zeilen"
 }

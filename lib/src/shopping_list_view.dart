@@ -428,6 +428,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
   ShoppingList? _list;
   var _checks = false;
   Set<String> _editable = const {};
+  List<DeletedLine> _removed = const [];
 
   @override
   Store get log => widget.notes.store;
@@ -484,6 +485,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
       for (final line in list?.lines ?? const <ShoppingLine>[])
         if (_lists.mayEdit(line.id)) line.id,
     };
+    _removed = _lists.deletedLines(widget.noteId);
     rows = rowsInPlace(switch (list) {
       final list? => [
         for (final line in list.lines)
@@ -613,10 +615,24 @@ class _ShoppingSectionState extends State<ShoppingSection>
     if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
       case _ShopStep.delete:
-        if (!await confirmLineDelete(context)) return;
-        if (!mounted || !linesWritable || !showsLine(id)) return;
         _lists.delete(id);
+        offerLineUndo(
+          context,
+          _lists.deletedLines,
+          _lists.mayEdit,
+          _lists.restore,
+          widget.noteId,
+          id,
+        );
     }
+    setState(_load);
+  }
+
+  /// Brings the deleted Line [id] back from "Removed Lines".
+  void _restore(String id) {
+    if (!linesWritable || !_lists.mayEdit(id)) return;
+    if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
+    _lists.restore(id);
     setState(_load);
   }
 
@@ -647,35 +663,48 @@ class _ShoppingSectionState extends State<ShoppingSection>
       child: EditorPanel(
         key: const ValueKey('shopping'),
         heading: t.shoppingHeading,
-        child: ChecklistLines(
-          lines: [for (final row in rows) shownRow(row)],
-          onCheck: _checks ? _check : null,
-          onMenu: _menu,
-          editable: withMenus(_editable),
-          trailing: (shown) => switch (list.line(shown.id)) {
-            final line? => reappearBadge(
-              t,
-              line.id,
-              line.reappear,
-              onTap: _editable.contains(line.id)
-                  ? () => _reappear(shown.id)
-                  : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ChecklistLines(
+              lines: [for (final row in rows) shownRow(row)],
+              onCheck: _checks ? _check : null,
+              onMenu: _menu,
+              editable: withMenus(_editable),
+              trailing: (shown) => switch (list.line(shown.id)) {
+                final line? => reappearBadge(
+                  t,
+                  line.id,
+                  line.reappear,
+                  onTap: _editable.contains(line.id)
+                      ? () => _reappear(shown.id)
+                      : null,
+                ),
+                // A new Line has none yet; a tap stores it first.
+                null => reappearBadge(
+                  t,
+                  shown.id,
+                  Reappear.unset,
+                  onTap: _checks ? () => _reappear(shown.id) : null,
+                ),
+              },
+              field: (shown) => typedField(
+                shown,
+                prefix: 'shopping',
+                editable: _editable,
+                twoRows: _twoRows,
+              ),
+              compact: true,
             ),
-            // A new Line has none yet; a tap stores it first.
-            null => reappearBadge(
-              t,
-              shown.id,
-              Reappear.unset,
-              onTap: _checks ? () => _reappear(shown.id) : null,
-            ),
-          },
-          field: (shown) => typedField(
-            shown,
-            prefix: 'shopping',
-            editable: _editable,
-            twoRows: _twoRows,
-          ),
-          compact: true,
+            if (_removed.isNotEmpty)
+              RemovedLines(
+                store: widget.notes.store,
+                lines: _removed,
+                onRestore: linesWritable
+                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                    : (_) => null,
+              ),
+          ],
         ),
       ),
     );
