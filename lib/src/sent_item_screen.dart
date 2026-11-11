@@ -24,7 +24,8 @@ import 'text_marks_view.dart';
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
 /// and offers it to the app the user picks. A Note sent before goes as
-/// an update, or as its cancellation. Announces a failure when no file
+/// an update, or as its cancellation, and starts at the person this
+/// Device last sent it to (#288). Announces a failure when no file
 /// could be written or no app takes it, why behind the tap.
 Future<void> sendNoteFile(
   BuildContext context,
@@ -49,6 +50,7 @@ Future<void> sendNoteFile(
     builder: (_) => SendNoteDialog(
       recipients: sentItemRecipients(store),
       update: wasSent(store, noteId),
+      sentTo: lastSentTo(store, noteId),
     ),
   );
   if (picked == null) return;

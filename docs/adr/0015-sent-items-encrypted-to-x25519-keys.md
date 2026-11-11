@@ -44,3 +44,7 @@ Amended by #91: a Sent Item whose sender's Profile is not kept here (unknown, no
 ## Profile cards (ADR 0017)
 
 Amended for #107: known people also include every other person whose Profile is kept here and binds a key pinned here, unless they are blocked. A person added from a Profile card is one: the card pins the key of the Device that made it, so a Sent Item to them is sealed for that Device at once, and theirs previews as known, not held as a stranger's.
+
+## Whom a Note went to (#288)
+
+The send dialog picks nobody at first, and an update starts at the person this Device last sent the Note to. That person is kept as a local setting of the Device (ADR 0008), `sentTo:<note id>` = the recipient's id as the list of recipients names it: never synced and in no Backup, so the `sent:<device>` link stays `{"id":…,"version":…}` and the log never says whom a Note went to. A send to a person writes it, a cancellation as well; a file to anyone removes it. It is read only while sending the Note again is an update, so a new send starts at nobody, and only while that person is still listed.

@@ -234,9 +234,8 @@ void main() {
       expect(cancel.item.cancel, isTrue);
     });
 
-    testWidgets('picks nobody at first, so Send waits for a pick (#288)', (
-      tester,
-    ) async {
+    testWidgets('picks nobody at first, an update the person it went to '
+        '(#288)', (tester) async {
       final bea = Store.inMemory(clock: () => now)
         ..applyProfileDefaults(name: 'Bea');
       addTearDown(bea.close);
@@ -268,11 +267,22 @@ void main() {
       expect(openSentItem(bea, bytes).item.text, 'Surprise party');
       expect(() => openSentItem(ann, bytes), throwsA(isA<SentItemNotForUs>()));
 
-      // Sent before: still nobody, never the first one listed, while
-      // this Device does not know whom it went to.
+      // An update starts at Bea, whom it went to, not at the first one
+      // listed.
       await tester.tap(find.byTooltip('Send to a person'));
       await tester.pumpAndSettle();
       expect(find.text('Send an update'), findsOneWidget);
+      expect(picked(), 1);
+      expect(sendable(), isTrue);
+      await tester.tap(find.byKey(const ValueKey('send-to-anyone')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('send-note')));
+      await tester.pumpAndSettle();
+      expect(files.shared, hasLength(2));
+
+      // Sent to anyone last: nobody again.
+      await tester.tap(find.byTooltip('Send to a person'));
+      await tester.pumpAndSettle();
       expect(picked(), isNull);
       expect(sendable(), isFalse);
     });

@@ -228,6 +228,38 @@ void main() {
       expect(() => openSentItem(eve, file), throwsA(isA<SentItemNotForUs>()));
     });
 
+    test('this Device remembers whom it last sent a Note to (#288)', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      _pairByInvite(ann, ben);
+      final to = sentItemRecipients(ann).single;
+      final note = Notes(ann).capture('Secret plan');
+      expect(lastSentTo(ann, note.id), isNull);
+      sendNote(ann, note.id, to: to);
+      // A local setting, the same key and value as the desktop core's.
+      expect(ann.localSetting('sentTo:${note.id}'), ben.deviceId);
+      expect(lastSentTo(ann, note.id), ben.deviceId);
+      // The log does not say whom it went to.
+      final link = ann.current(note.id, 'sent:${ann.deviceId}') ?? '';
+      expect((jsonDecode(link) as Map).keys, ['id', 'version']);
+      expect([
+        for (final e in ann.allEntries())
+          if ((e.value ?? '').contains(ben.deviceId)) e.field,
+      ], isEmpty);
+      // A cancellation to the person keeps them.
+      sendNote(ann, note.id, to: to, cancel: true);
+      expect(lastSentTo(ann, note.id), ben.deviceId);
+      // To anyone: nobody.
+      sendNote(ann, note.id);
+      expect(ann.localSetting('sentTo:${note.id}'), isNull);
+      expect(lastSentTo(ann, note.id), isNull);
+      // A Note this Device did not send before starts at nobody.
+      final other = Notes(ann).capture('Other');
+      ann.setLocalSetting('sentTo:${other.id}', ben.deviceId);
+      expect(lastSentTo(ann, other.id), isNull);
+    });
+
     test('a key that is not known is not offered', () {
       final clock = ticking();
       final ann = device(clock, 'Ann');

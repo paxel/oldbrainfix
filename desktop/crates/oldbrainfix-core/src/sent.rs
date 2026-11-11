@@ -106,6 +106,11 @@ pub mod keys {
     }
 }
 
+/// Whom this Device last sent a Note to (#288): a local setting (ADR
+/// 0008) `sentTo:<note id>` = the [`Recipient::id`], so no person's id
+/// goes into the log; none after a file to anyone.
+pub const SENT_TO_PREFIX: &str = "sentTo:";
+
 /// The name a Sent Item written on `day` (`YYYY-MM-DD`) goes by.
 pub fn file_name(day: &str) -> String {
     format!("oldbrainfix-note-{day}.{EXTENSION}")
@@ -662,6 +667,8 @@ impl Store {
 
     /// Writes the file the Note `note_id` goes out as: encrypted to the
     /// keys of `to`, else signed only; with `cancel` as its cancellation.
+    /// Remembers `to` as the person this Device last sent the Note to,
+    /// or forgets it for a file to anyone ([`Store::last_sent_to`]).
     pub fn send_note(
         &self,
         note_id: &str,
@@ -672,11 +679,28 @@ impl Store {
         self.refuse_while_paused()?;
         let item = self.sent_item_of(note_id, cancel)?;
         let keys = to.map(|r| r.keys.clone()).unwrap_or_default();
-        encode(&item, &self.signing_key()?, &keys, &mut |n| {
+        let file = encode(&item, &self.signing_key()?, &keys, &mut |n| {
             let mut out = vec![0u8; n];
             getrandom::fill(&mut out).map_err(|e| Error::Invalid(format!("random: {e}")))?;
             Ok(out)
-        })
+        })?;
+        let key = format!("{SENT_TO_PREFIX}{note_id}");
+        match to {
+            Some(to) => self.set_local_setting(&key, &to.id)?,
+            None => self.remove_local_setting(&key)?,
+        }
+        Ok(file)
+    }
+
+    /// The [`Recipient::id`] of the person this Device last sent the Note
+    /// `note_id` to, for an update to start at (#288); none when it went
+    /// to anyone last, or when sending it now is no update
+    /// ([`Store::was_sent`]), so a new send starts at nobody.
+    pub fn last_sent_to(&self, note_id: &str) -> Result<Option<String>> {
+        if !self.was_sent(note_id)? {
+            return Ok(None);
+        }
+        self.local_setting(&format!("{SENT_TO_PREFIX}{note_id}"))
     }
 
     /// Whether `item` comes from a person the user blocked: its Profile's
@@ -2530,6 +2554,47 @@ mod tests {
         })
         .to_string()
         .into_bytes())
+    }
+
+    #[test]
+    fn this_device_remembers_whom_it_last_sent_a_note_to() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        invite(&ann, &ben, "Ben")?;
+        let to = ann.sent_item_recipients()?;
+        let to = to.first().ok_or("a recipient")?;
+        let note = Notes::new(&ann).capture("Secret plan", None, None)?;
+        let ben_id = ben.device_id()?;
+        assert_eq!(ann.last_sent_to(&note.id)?, None);
+        ann.send_note(&note.id, Some(to), false)?;
+        // A local setting, the same key and value as the Dart core's.
+        let key = format!("sentTo:{}", note.id);
+        assert_eq!(ann.local_setting(&key)?, Some(ben_id.clone()));
+        assert_eq!(ann.last_sent_to(&note.id)?, Some(ben_id.clone()));
+        // The log does not say whom it went to.
+        let link = ann
+            .current(&note.id, &format!("sent:{}", ann.device_id()?))?
+            .ok_or("link")?;
+        let link: Value = serde_json::from_str(&link)?;
+        let fields: Vec<&String> = link.as_object().ok_or("object")?.keys().collect();
+        assert_eq!(fields, ["id", "version"]);
+        assert!(
+            ann.all_entries()?
+                .iter()
+                .all(|e| !e.value.as_deref().unwrap_or("").contains(&ben_id))
+        );
+        // A cancellation to the person keeps them.
+        ann.send_note(&note.id, Some(to), true)?;
+        assert_eq!(ann.last_sent_to(&note.id)?, Some(ben_id.clone()));
+        // To anyone: nobody.
+        ann.send_note(&note.id, None, false)?;
+        assert_eq!(ann.local_setting(&key)?, None);
+        assert_eq!(ann.last_sent_to(&note.id)?, None);
+        // A Note this Device did not send before starts at nobody.
+        let other = Notes::new(&ann).capture("Other", None, None)?;
+        ann.set_local_setting(&format!("sentTo:{}", other.id), &ben_id)?;
+        assert_eq!(ann.last_sent_to(&other.id)?, None);
+        Ok(())
     }
 
     #[test]
