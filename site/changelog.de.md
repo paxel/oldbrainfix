@@ -4,8 +4,13 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.6.0]
 
+### Geändert
+
+- Auf dem Handy wählt die Seite „Synchronisieren“ das Gerät eines Bündels oder „Alles“ mit Optionsfeldern statt mit einer Auswahlliste.
+
 ### Behoben
 
+- Auf dem Handy wählt das Senden einer Notiz an eine Person nicht mehr die erste Person der Liste: Niemand ist gewählt, bis du wählst, damit eine private Notiz nicht an die falsche Person geht.
 - Auf dem Desktop hält die App keinen Prozessorkern mehr beschäftigt, während sie im Infobereich wartet oder nichts tut: Die Linie unter der Menüleiste bewegt sich in gleichmäßigem Takt und hört nach zwei Minuten auf, wenn ein Abgleich hängt, bei verstecktem Fenster wird nichts gezeichnet, und der KI-Port beantwortet einen Werkzeugaufruf, wenn er kommt, statt zehnmal in der Sekunde nachzusehen.
 
 ## [0.5.1] - 2026-11-08

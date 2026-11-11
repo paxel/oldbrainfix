@@ -446,22 +446,28 @@ class _SyncScreenState extends State<SyncScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.bundleIntro),
       ),
-      ControlBelow(
-        padding: EdgeInsets.zero,
-        title: Text(t.bundleFor),
-        control: DropdownButton<String?>(
-          key: const ValueKey('bundle-for'),
-          isExpanded: true,
-          value: chosen,
-          items: [
-            for (final device in _paired)
-              DropdownMenuItem(value: device.id, child: Text(device.name)),
-            DropdownMenuItem(child: Text(t.bundleEverything)),
-          ],
-          onChanged: _bundleBusy
-              ? null
-              : (id) => setState(() => _bundleFor = id),
-        ),
+      Text(t.bundleFor),
+      // Device names are the user's own: radio buttons (UI laws,
+      // "Dialogs and pages"); "" stands for everything.
+      RadioColumn<String>(
+        key: const ValueKey('bundle-for'),
+        value: chosen ?? '',
+        options: [
+          for (final device in _paired)
+            RadioOption(
+              key: ValueKey('bundle-for-${device.id}'),
+              value: device.id,
+              title: Text(device.name),
+            ),
+          RadioOption(
+            key: const ValueKey('bundle-for-everything'),
+            value: '',
+            title: Text(t.bundleEverything),
+          ),
+        ],
+        onChanged: _bundleBusy
+            ? null
+            : (id) => setState(() => _bundleFor = id.isEmpty ? null : id),
       ),
       const SizedBox(height: 8),
       Wrap(

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -181,6 +182,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ann, encrypted'), findsOneWidget);
       expect(find.textContaining('Not encrypted: whoever'), findsNothing);
+      await tester.tap(find.text('Ann, encrypted'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('send-note')));
       await tester.pumpAndSettle();
       final bytes = File(files.shared.single).readAsBytesSync();
@@ -229,6 +232,87 @@ void main() {
       );
       expect(cancel.item.version, 3);
       expect(cancel.item.cancel, isTrue);
+    });
+
+    testWidgets('picks nobody at first, so Send waits for a pick (#288)', (
+      tester,
+    ) async {
+      final bea = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Bea');
+      addTearDown(bea.close);
+      meet(phone, ann, 'Ann');
+      meet(phone, bea, 'Bea');
+      final note = Notes(phone).capture('Surprise party');
+      await edit(tester, note);
+      await tester.tap(find.byTooltip('Send to a person'));
+      await tester.pumpAndSettle();
+      bool sendable() => tester
+          .widget<TextButton>(find.byKey(const ValueKey('send-note')))
+          .enabled;
+      int? picked() => tester
+          .widget<RadioGroup<int>>(find.byType(RadioGroup<int>))
+          .groupValue;
+      expect(picked(), isNull);
+      expect(sendable(), isFalse);
+      expect(find.textContaining('Not encrypted: whoever'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('send-note')));
+      await tester.pumpAndSettle();
+      expect(files.shared, isEmpty);
+
+      await tester.tap(find.text('Bea, encrypted'));
+      await tester.pumpAndSettle();
+      expect(sendable(), isTrue);
+      await tester.tap(find.byKey(const ValueKey('send-note')));
+      await tester.pumpAndSettle();
+      final bytes = File(files.shared.single).readAsBytesSync();
+      expect(openSentItem(bea, bytes).item.text, 'Surprise party');
+      expect(() => openSentItem(ann, bytes), throwsA(isA<SentItemNotForUs>()));
+
+      // Sent before: still nobody, never the first one listed, while
+      // this Device does not know whom it went to.
+      await tester.tap(find.byTooltip('Send to a person'));
+      await tester.pumpAndSettle();
+      expect(find.text('Send an update'), findsOneWidget);
+      expect(picked(), isNull);
+      expect(sendable(), isFalse);
+    });
+
+    testWidgets('an update starts at the person it went to before (#288)', (
+      tester,
+    ) async {
+      final people = [
+        Recipient(id: 'ann', name: 'Ann', keys: const []),
+        Recipient(id: 'bea', name: 'Bea', keys: const []),
+      ];
+      Future<void> dialog({String? sentTo, List<Recipient>? to}) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: SendNoteDialog(
+              key: UniqueKey(),
+              recipients: to ?? people,
+              update: true,
+              sentTo: sentTo,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      int? picked() => tester
+          .widget<RadioGroup<int>>(find.byType(RadioGroup<int>))
+          .groupValue;
+      await dialog(sentTo: 'bea');
+      expect(picked(), 1);
+      // Gone from the list meanwhile: nobody.
+      await dialog(sentTo: 'cem');
+      expect(picked(), isNull);
+      // Nobody known: anyone is all there is.
+      await dialog(sentTo: 'bea', to: const []);
+      expect(picked(), -1);
+      expect(find.textContaining('Not encrypted: whoever'), findsOneWidget);
     });
 
     testWidgets('a Note never sent offers no cancellation', (tester) async {

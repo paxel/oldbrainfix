@@ -76,15 +76,21 @@ typedef _Pick = ({Recipient? to, bool cancel});
 /// Asks who gets a Note: anyone, signed only, with a hint that whoever
 /// holds the file can read it, or one of the people whose keys are
 /// known here, encrypted to them. For a Note sent before ([update]) it
-/// sends an update, or a cancellation instead.
+/// sends an update, or a cancellation instead. Nobody is picked at
+/// first, so a private Note never goes to whoever is listed first
+/// (#288): an update starts at the person it went to before
+/// ([sentTo], a [Recipient.id]) while they are listed, and with nobody
+/// listed only anyone is left. Send waits for a pick.
 class SendNoteDialog extends StatefulWidget {
   final List<Recipient> recipients;
   final bool update;
+  final String? sentTo;
 
   const SendNoteDialog({
     super.key,
     required this.recipients,
     this.update = false,
+    this.sentTo,
   });
 
   @override
@@ -92,8 +98,13 @@ class SendNoteDialog extends StatefulWidget {
 }
 
 class _SendNoteDialogState extends State<SendNoteDialog> {
-  /// The index of the person picked; -1 for anyone.
-  late var _picked = widget.recipients.isEmpty ? -1 : 0;
+  /// The index of the person picked; -1 for anyone, null for nobody yet.
+  late int? _picked = widget.recipients.isEmpty
+      ? -1
+      : switch (widget.recipients.indexWhere((r) => r.id == widget.sentTo)) {
+          -1 => null,
+          final i => i,
+        };
   var _cancel = false;
 
   @override
@@ -105,7 +116,7 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
       content: SingleChildScrollView(
         child: RadioGroup<int>(
           groupValue: _picked,
-          onChanged: (i) => setState(() => _picked = i ?? -1),
+          onChanged: (i) => setState(() => _picked = i),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,7 +137,7 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
                 title: Text(t.sendAnyone),
                 secondary: const Icon(Icons.lock_open),
               ),
-              if (_picked < 0) Text(t.sendPlainHint),
+              if (_picked == -1) Text(t.sendPlainHint),
               if (widget.update)
                 CheckboxListTile(
                   key: const ValueKey('send-cancel'),
@@ -149,10 +160,13 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
         ),
         TextButton(
           key: const ValueKey('send-note'),
-          onPressed: () => Navigator.of(context).pop<_Pick>((
-            to: _picked < 0 ? null : recipients[_picked],
-            cancel: _cancel,
-          )),
+          onPressed: switch (_picked) {
+            null => null,
+            final picked => () => Navigator.of(context).pop<_Pick>((
+              to: picked < 0 ? null : recipients[picked],
+              cancel: _cancel,
+            )),
+          },
           child: Text(t.sendAction),
         ),
       ],
