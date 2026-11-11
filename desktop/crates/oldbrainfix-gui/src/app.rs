@@ -74,7 +74,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, PopupCloseBehavior,
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
-use oldbrainfix_core::ai_port::{AiPort, Reach, docker_bridge};
+use oldbrainfix_core::ai_port::{AiPort, Reach, Wake, docker_bridge};
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
@@ -1835,6 +1835,9 @@ pub struct App {
     /// The AI port while it is open (#112, ADR 0026): closed by "Done,
     /// review" or when the window goes.
     ai_port: Option<AiPort>,
+    /// Wakes the window from another thread, so what arrives there is
+    /// answered without the window polling for it (#292).
+    redraw: Option<Wake>,
     /// The client whose config was copied last while the port is open.
     ai_copied: Option<Client>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
@@ -2208,6 +2211,7 @@ impl App {
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
             ai_port: None,
+            redraw: None,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
             sound_rung: None,
@@ -4195,7 +4199,11 @@ impl App {
         match asked {
             AiAction::Open => {
                 if self.ai_port.is_none() {
-                    match AiPort::open(&self.store) {
+                    let opened = match &self.redraw {
+                        Some(redraw) => AiPort::open_waking(&self.store, redraw.clone()),
+                        None => AiPort::open(&self.store),
+                    };
+                    match opened {
                         Ok(port) => self.ai_port = Some(port),
                         // The card says so; nothing opened.
                         Err(oldbrainfix_core::Error::NoDockerBridge) => return Ok(()),
@@ -4287,6 +4295,12 @@ impl App {
     pub fn watch_changes(&mut self, changes: Arc<AtomicU64>) {
         self.seen_changes = changes.load(Ordering::SeqCst);
         self.changes = Some(changes);
+    }
+
+    /// How another thread wakes the window: the AI port's tool calls
+    /// are then answered when they come, not polled for.
+    pub fn set_redraw(&mut self, redraw: Wake) {
+        self.redraw = Some(redraw);
     }
 
     /// Tells `wake` after every change made here.
@@ -8132,13 +8146,16 @@ impl App {
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
         // The AI port's tool calls are answered on this thread, while the
-        // window idles too; what they drafted shows at once.
+        // window idles too; what they drafted shows at once. The port wakes
+        // the window for each call; without a way to wake it, it is polled.
         if let Some(port) = &self.ai_port {
             if port.answer_waiting(&self.store, &*self.wall) > 0 {
                 self.refresh();
             }
-            ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(100));
+            if self.redraw.is_none() {
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100));
+            }
         }
         // A typed code being joined, also after leaving the Sync dialogs: its
         // answer is taken in when it comes.

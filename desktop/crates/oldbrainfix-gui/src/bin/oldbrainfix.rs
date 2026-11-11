@@ -339,6 +339,8 @@ impl Shell {
         let mut app = App::new(self.store.clone(), self.locale);
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
+        let window = self.window.clone();
+        app.set_redraw(Arc::new(move || wake(&window)));
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_syncing(self.syncing.clone());
         let agenda = self.agenda_store.clone();

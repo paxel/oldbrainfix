@@ -186,6 +186,68 @@ fn a_tool_call_is_answered_while_the_window_idles_and_kept_on_accept() -> TestRe
 }
 
 #[test]
+fn with_a_wake_the_open_port_is_not_polled_and_a_call_wakes_the_window() -> TestResult {
+    use std::sync::atomic::AtomicUsize;
+    let store = device()?;
+    let t = L10n::new("en");
+    let woken = Arc::new(AtomicUsize::new(0));
+    let mut app = App::new(store.clone(), "en");
+    {
+        let woken = woken.clone();
+        app.set_redraw(Arc::new(move || {
+            woken.fetch_add(1, Ordering::SeqCst);
+        }));
+    }
+    app.open(Page::Settings);
+    let mut harness = window(app);
+    click(&mut harness, t.ai_port_open());
+    // Idle with the port open: no frame asks for the next within a second.
+    harness.run_steps(3);
+    let delay = harness.output().viewport_output[&egui::ViewportId::ROOT].repaint_delay;
+    assert!(
+        delay > StdDuration::from_secs(1),
+        "the open port is polled: next frame in {delay:?}"
+    );
+    let (url, token) = {
+        let port = harness.state().ai_port().ok_or("the port is open")?;
+        (port.url(), port.token().to_string())
+    };
+    let call = json!({
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": "add_area", "arguments": {"name": "Garden"}},
+    });
+    let client = std::thread::spawn(move || -> Result<u16, String> {
+        let config = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .build();
+        let res = ureq::Agent::new_with_config(config)
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {token}"))
+            .send(call.to_string())
+            .map_err(|e| e.to_string())?;
+        Ok(res.status().as_u16())
+    });
+    // The window draws only once woken, as the event loop would.
+    let deadline = Instant::now() + StdDuration::from_secs(20);
+    let mut seen = 0;
+    while !client.is_finished() {
+        assert!(Instant::now() < deadline, "the call was not answered");
+        let now = woken.load(Ordering::SeqCst);
+        if now != seen {
+            seen = now;
+            harness.step();
+        }
+        std::thread::sleep(StdDuration::from_millis(5));
+    }
+    assert_eq!(client.join().map_err(|_| "client")??, 200);
+    assert_eq!(seen, 1, "one wake for one call");
+    Ok(())
+}
+
+#[test]
 fn reject_all_asks_once_and_keeps_nothing() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");

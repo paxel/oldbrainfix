@@ -199,6 +199,29 @@ pub fn bridge_address(route: &str, trie: &str, iface: &str) -> Option<Ipv4Addr> 
     None
 }
 
+/// Told from the port's threads whenever a tool call is queued, so the
+/// app can answer it without polling (#292).
+pub type Wake = Arc<dyn Fn() + Send + Sync>;
+
+/// Where the port's threads queue the tool calls, telling [`Wake`] if
+/// there is one.
+#[derive(Clone)]
+struct Calls {
+    tx: Sender<AiCall>,
+    wake: Option<Wake>,
+}
+
+impl Calls {
+    /// Queues `call`; false once the port is closing.
+    fn send(&self, call: AiCall) -> bool {
+        let queued = self.tx.send(call).is_ok();
+        if queued && let Some(wake) = &self.wake {
+            wake();
+        }
+        queued
+    }
+}
+
 /// The open port.
 pub struct AiPort {
     task: String,
@@ -248,11 +271,26 @@ impl AiPort {
             Reach::Docker if cfg!(target_os = "linux") => docker_bridge(),
             _ => None,
         };
-        AiPort::open_at(store, &reach.endpoint(bridge)?)
+        AiPort::open_with(store, &reach.endpoint(bridge)?, None)
+    }
+
+    /// Opens the port as [`AiPort::open`] does, telling `wake` from the
+    /// port's threads whenever a tool call waits to be answered.
+    pub fn open_waking(store: &Store, wake: Wake) -> Result<AiPort> {
+        let reach = store.ai_reach()?;
+        let bridge = match reach {
+            Reach::Docker if cfg!(target_os = "linux") => docker_bridge(),
+            _ => None,
+        };
+        AiPort::open_with(store, &reach.endpoint(bridge)?, Some(wake))
     }
 
     /// Opens the port on `endpoint`, as [`AiPort::open`] does.
     pub fn open_at(store: &Store, endpoint: &Endpoint) -> Result<AiPort> {
+        AiPort::open_with(store, endpoint, None)
+    }
+
+    fn open_with(store: &Store, endpoint: &Endpoint, wake: Option<Wake>) -> Result<AiPort> {
         let task = store.open_ai_task()?;
         let token = store.ai_port_token()?;
         let kept: u16 = store
@@ -275,7 +313,8 @@ impl AiPort {
             let stop = stop.clone();
             let digest = Sha256::digest(token.as_bytes()).to_vec();
             let hosts = endpoint.hosts.clone();
-            std::thread::spawn(move || accept_loop(listener, tx, digest, hosts, stop))
+            let calls = Calls { tx, wake };
+            std::thread::spawn(move || accept_loop(listener, calls, digest, hosts, stop))
         };
         Ok(AiPort {
             task,
@@ -380,7 +419,7 @@ pub fn bridged_client_config(url: &str, token: &str) -> String {
 
 fn accept_loop(
     listener: TcpListener,
-    tx: Sender<AiCall>,
+    calls: Calls,
     digest: Vec<u8>,
     hosts: Vec<String>,
     stop: Arc<AtomicBool>,
@@ -390,11 +429,11 @@ fn accept_loop(
     while !stop.load(Ordering::Relaxed) {
         match listener.accept() {
             Ok((stream, peer)) => {
-                let tx = tx.clone();
+                let calls = calls.clone();
                 let digest = digest.clone();
                 let hosts = hosts.clone();
                 std::thread::spawn(move || {
-                    drop(serve_connection(stream, peer, &tx, &digest, &hosts));
+                    drop(serve_connection(stream, peer, &calls, &digest, &hosts));
                 });
             }
             Err(_) => std::thread::sleep(Duration::from_millis(50)),
@@ -456,7 +495,7 @@ fn allowed_host(host: Option<&str>, hosts: &[String]) -> bool {
 fn serve_connection(
     stream: TcpStream,
     peer: SocketAddr,
-    tx: &Sender<AiCall>,
+    calls: &Calls,
     digest: &[u8],
     hosts: &[String],
 ) -> std::io::Result<()> {
@@ -484,7 +523,7 @@ fn serve_connection(
                 refused.headers.push(("Allow".into(), "POST".into()));
                 refused
             } else {
-                answer(&request.body, tx)
+                answer(&request.body, calls)
             }
         }
         Ok(None) => Response::status(413),
@@ -507,7 +546,7 @@ fn rpc_error(id: &Value, code: i64, message: &str) -> Response {
 }
 
 /// The answer to one JSON-RPC message.
-fn answer(body: &[u8], tx: &Sender<AiCall>) -> Response {
+fn answer(body: &[u8], calls: &Calls) -> Response {
     let Ok(message) = serde_json::from_slice::<Value>(body) else {
         return Response::json(
             400,
@@ -555,7 +594,7 @@ fn answer(body: &[u8], tx: &Sender<AiCall>) -> Response {
                 arguments,
                 reply,
             };
-            if tx.send(call).is_err() {
+            if !calls.send(call) {
                 return rpc_error(id, -32603, "the port is closing");
             }
             match replied.recv() {
@@ -596,6 +635,41 @@ mod tests {
 
     fn rpc(method: &str, params: Value) -> Value {
         json!({"id": 1, "jsonrpc": "2.0", "method": method, "params": params})
+    }
+
+    #[test]
+    fn a_tool_call_wakes_the_app_so_it_needs_no_polling() -> TestResult {
+        use std::sync::atomic::AtomicUsize;
+        let store = store();
+        Notes::new(&store).capture("Milk", None, None)?;
+        let woken = Arc::new(AtomicUsize::new(0));
+        let port = {
+            let woken = woken.clone();
+            AiPort::open_waking(
+                &store,
+                Arc::new(move || {
+                    woken.fetch_add(1, Ordering::SeqCst);
+                }),
+            )?
+        };
+        let (url, token) = (port.url(), port.token().to_string());
+        let call = rpc("tools/call", json!({"name": "list_notes", "arguments": {}}));
+        let (answered, status) = std::thread::scope(|s| {
+            let client = s.spawn(|| post(&url, Some(&token), &call).map_err(|e| e.to_string()));
+            // Nothing is polled: the call is taken only once the wake came.
+            while woken.load(Ordering::SeqCst) == 0 && !client.is_finished() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let answered = port.next_call().map(|call| call.refuse("seen"));
+            (answered.is_some(), client.join())
+        });
+        assert!(answered, "the call waited when the wake came");
+        assert_eq!(status.map_err(|_| "the client")??.0, 200);
+        assert_eq!(woken.load(Ordering::SeqCst), 1, "one wake for one call");
+        // Calls that need no answer from the app wake nothing.
+        post(&url, Some(&token), &rpc("ping", json!({})))?;
+        assert_eq!(woken.load(Ordering::SeqCst), 1);
+        Ok(())
     }
 
     #[test]
