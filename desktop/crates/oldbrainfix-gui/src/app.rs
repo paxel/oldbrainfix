@@ -790,12 +790,12 @@ enum Dialog {
         area: String,
     },
     /// Sending the Note `note`: to one of `recipients`, encrypted, or to
-    /// anyone (`None`), signed only. One sent before (`update`) goes as
-    /// an update, or as its cancellation with `cancel`.
+    /// anyone, signed only. One sent before (`update`) goes as an update,
+    /// or as its cancellation with `cancel`.
     Send {
         note: String,
         recipients: Vec<Recipient>,
-        picked: Option<usize>,
+        picked: SendTo,
         update: bool,
         cancel: bool,
     },
@@ -1016,6 +1016,32 @@ enum ChangesSent {
     Paused,
     /// Not saved: whose, and the full text of why.
     Failed(String),
+}
+
+/// Whom the send dialog sends a Note to: nobody picked yet, so Send
+/// waits (#288), anyone, signed only, or the person at this index of
+/// its recipients, encrypted to them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendTo {
+    Nobody,
+    Anyone,
+    Person(usize),
+}
+
+impl SendTo {
+    /// Where the dialog starts: with nobody listed only anyone is left;
+    /// an update starts at the person this Device last sent the Note to
+    /// (`sent_to`, a [`Recipient::id`]) while they are listed, else at
+    /// nobody, so a private Note never goes to whoever is listed first.
+    fn first(recipients: &[Recipient], sent_to: Option<&str>) -> Self {
+        if recipients.is_empty() {
+            return Self::Anyone;
+        }
+        recipients
+            .iter()
+            .position(|r| Some(r.id.as_str()) == sent_to)
+            .map_or(Self::Nobody, Self::Person)
+    }
 }
 
 /// A person in People an Area can go to from afar (#108): with a Device
@@ -3574,8 +3600,18 @@ impl App {
     }
 
     /// Saves the Note of the send dialog as a Sent Item where the user
-    /// says: encrypted to the person picked, else signed only.
+    /// says: encrypted to the person picked, else signed only; nothing
+    /// while nobody is picked, the dialog stays.
     fn send_note(&mut self) -> oldbrainfix_core::Result<()> {
+        if matches!(
+            self.dialog,
+            Some(Dialog::Send {
+                picked: SendTo::Nobody,
+                ..
+            })
+        ) {
+            return Ok(());
+        }
         let Some(Dialog::Send {
             note,
             recipients,
@@ -3599,7 +3635,10 @@ impl App {
         if path.extension().is_none_or(|e| e != sent::EXTENSION) {
             path.set_extension(sent::EXTENSION);
         }
-        let to = picked.and_then(|i| recipients.get(i));
+        let to = match picked {
+            SendTo::Person(i) => recipients.get(i),
+            SendTo::Nobody | SendTo::Anyone => None,
+        };
         let bytes = self.store.send_note(&note, to, cancel)?;
         let t = self.t;
         match std::fs::write(&path, bytes) {
@@ -6253,7 +6292,8 @@ impl App {
             Action::StartSend(id) => {
                 self.save_text()?;
                 let recipients = self.store.sent_item_recipients()?;
-                let picked = (!recipients.is_empty()).then_some(0);
+                let sent_to = self.store.last_sent_to(&id)?;
+                let picked = SendTo::first(&recipients, sent_to.as_deref());
                 let update = self.store.was_sent(&id)?;
                 self.dialog = Some(Dialog::Send {
                     note: id,
@@ -13521,12 +13561,12 @@ fn area_offer_form(
 
 /// Asks whom a Note is sent to: one of the people whose keys are known
 /// here, encrypted to them, or anyone, signed only, with a hint that
-/// whoever holds the file can read it.
+/// whoever holds the file can read it. Send waits for a pick (#288).
 fn send_form(
     ui: &mut Ui,
     t: &L10n,
     recipients: &[Recipient],
-    (picked, update, cancelling): (&mut Option<usize>, bool, &mut bool),
+    (picked, update, cancelling): (&mut SendTo, bool, &mut bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -13543,12 +13583,16 @@ fn send_form(
     for (i, r) in recipients.iter().enumerate() {
         ui.radio_value(
             picked,
-            Some(i),
+            SendTo::Person(i),
             RichText::new(t.send_encrypted(profile_view::display_name(t, &r.name))).color(text),
         );
     }
-    ui.radio_value(picked, None, RichText::new(t.send_anyone()).color(text));
-    if picked.is_none() {
+    ui.radio_value(
+        picked,
+        SendTo::Anyone,
+        RichText::new(t.send_anyone()).color(text),
+    );
+    if *picked == SendTo::Anyone {
         ui.label(RichText::new(t.send_plain_hint()).color(text));
     }
     if update {
@@ -13558,10 +13602,8 @@ fn send_form(
     ui.label(RichText::new(t.send_what()).small().color(weak));
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.send_action()).color(text))
-            .clicked()
-        {
+        let send = egui::Button::new(RichText::new(t.send_action()).color(text));
+        if ui.add_enabled(*picked != SendTo::Nobody, send).clicked() {
             actions.push(Action::SendNote);
         }
     });
