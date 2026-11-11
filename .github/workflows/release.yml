@@ -947,7 +947,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: "{linux-*,windows,macos-*}"
           path: dist
@@ -972,7 +972,7 @@ jobs:
           path: app
       # Channel-repo pattern: the index and APK live in paxel/fdroid (own
       # Pages), not in this repo's history.
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: android
           path: apks
@@ -1054,7 +1054,7 @@ jobs:
           submodules: recursive
       # Not the rendered channel files, which render-channels may be
       # uploading meanwhile.
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: "{android,linux-*,flatpak-*,screenshots,windows,macos-*}"
           path: dist
@@ -1091,7 +1091,7 @@ jobs:
     if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: channels
           path: out
