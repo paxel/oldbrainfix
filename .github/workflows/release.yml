@@ -485,7 +485,7 @@ jobs:
           mv "$d/app-armeabi-v7a-release.apk" "dist/oldbrainfix-$v-android-armeabi-v7a.apk"
           mv "$d/app-release.apk"             "dist/oldbrainfix-$v-android-universal.apk"
           mv build/app/outputs/bundle/release/app-release.aab "dist/oldbrainfix-$v-android-playstore.aab"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android
           path: dist/*
@@ -543,7 +543,7 @@ jobs:
         run: |
           v="${RELEASE_TAG#v}"
           desktop/packaging/linux/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-${{ matrix.arch }}
           path: dist/*
@@ -588,7 +588,7 @@ jobs:
             -v "$PWD/desktop/packaging/flatpak/ci-lint-exceptions.json:/exceptions.json:ro" \
             ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0 \
             --exceptions --user-exceptions /exceptions.json repo /repo
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-${{ matrix.arch }}
           path: dist/*
@@ -615,7 +615,7 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ github.workspace }}/screenshots
         run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored render_the_screenshots
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: screenshots
           path: screenshots/*.png
@@ -640,7 +640,7 @@ jobs:
         run: |
           flutter pub get
           flutter test test/screenshots --run-skipped --concurrency=1 --plain-name 'iphone screenshots'
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: appstore-screenshots
           path: fastlane/metadata/ios/
@@ -665,7 +665,7 @@ jobs:
         run: |
           $v = $env:RELEASE_TAG.TrimStart("v")
           desktop\packaging\windows\pack.ps1 -Version $v -Binary desktop\target\release\oldbrainfix.exe -Dist dist
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
           path: dist/*
@@ -698,7 +698,7 @@ jobs:
         run: |
           v="${RELEASE_TAG#v}"
           desktop/packaging/macos/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-${{ matrix.arch }}
           path: dist/*
@@ -954,7 +954,7 @@ jobs:
           merge-multiple: true
       - name: Render from the templates with the artifacts' checksums
         run: desktop/packaging/render-channels.sh "${RELEASE_TAG#v}" dist out
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: channels
           path: out/*

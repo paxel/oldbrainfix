@@ -44,7 +44,7 @@ jobs:
         run: flutter test test/screenshots/screenshots_test.dart --run-skipped --concurrency=1 --plain-name 'guide frames'
       - name: The changed phone frames, for a look
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guide-frames-phone
           path: build/guide-frames
@@ -145,7 +145,7 @@ jobs:
         run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored guide_frames
       - name: The changed desktop frames, for a look
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guide-frames-desktop
           path: build/guide-frames
