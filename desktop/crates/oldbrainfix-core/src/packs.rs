@@ -22,6 +22,7 @@
 //! payload. A later format writes `format`; only an absent one or the
 //! whole number 1 is this version's (ADR 0034).
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use base64::Engine;
@@ -33,7 +34,7 @@ use crate::cards::check_profile_card;
 use crate::checklists::{
     Checklists, NewLine, keys as checklist_keys, order as line_order, write_line,
 };
-use crate::entry::dart_iso;
+use crate::entry::{Entry, dart_iso};
 use crate::frogs::{Frogs, keys as frog_keys};
 use crate::note_kinds::NoteKind;
 use crate::notes::{Note, Notes, keys as note_keys};
@@ -2166,6 +2167,40 @@ impl Store {
         }
         self.append(note_id, keys::FROM, None, None).map(drop)
     }
+
+    /// Brings back the "From `<name>`" badge of the Note `note_id` that
+    /// [`Store::remove_pack_from`] took away, as the user's own Devices
+    /// last wrote it (#268). Nothing while it shows, or when it never had
+    /// one.
+    pub fn restore_pack_from(&self, note_id: &str) -> Result<()> {
+        let mut own = HashMap::new();
+        if self.own_current(note_id, keys::FROM, &mut own)?.is_some() {
+            return Ok(());
+        }
+        let mut last: Option<Entry> = None;
+        for e in self.logged_history(note_id)? {
+            if e.field != keys::FROM
+                || e.value.is_none()
+                || !self.written_by_own_in(&e.device, &mut own)?
+            {
+                continue;
+            }
+            if last
+                .as_ref()
+                .is_none_or(|l| Store::latest_wins(&e, l) == Ordering::Greater)
+            {
+                last = Some(e);
+            }
+        }
+        let Some(last) = last else {
+            return Ok(());
+        };
+        if !self.may_change(note_id)? {
+            return Err(Error::Invalid(format!("may not change {note_id}")));
+        }
+        self.append(note_id, keys::FROM, last.value.as_deref(), None)
+            .map(drop)
+    }
 }
 
 /// `name`, or with ` (<suffix>)` after it when `taken` holds it, or the
@@ -2751,9 +2786,17 @@ mod tests {
             id: own_id(&ann)?,
             name: "Ann".into(),
         };
-        assert_eq!(ben.pack_from(&note.id)?, Some(badge));
+        assert_eq!(ben.pack_from(&note.id)?, Some(badge.clone()));
         ben.remove_pack_from(&note.id)?;
         assert_eq!(ben.pack_from(&note.id)?, None);
+        // Undone (#268): the badge comes back as it was, in one entry.
+        let before = ben.all_entries()?.len();
+        ben.restore_pack_from(&note.id)?;
+        assert_eq!(ben.pack_from(&note.id)?, Some(badge.clone()));
+        assert_eq!(ben.all_entries()?.len(), before + 1);
+        ben.restore_pack_from(&note.id)?;
+        assert_eq!(ben.all_entries()?.len(), before + 1);
+        ben.remove_pack_from(&note.id)?;
         add(&ben, &open, true)?;
         for n in texts(&ben)? {
             assert_eq!(ben.pack_from(&n.id)?, None);
@@ -2786,11 +2829,19 @@ mod tests {
         assert_eq!(ben.pack_from(&badged)?, Some(badge.clone()));
         assert_eq!(ben.pack_from(&own)?, None);
         ben.insert(&cy.append(&badged, keys::FROM, None, later(2))?.wire())?;
-        assert_eq!(ben.pack_from(&badged)?, Some(badge));
+        assert_eq!(ben.pack_from(&badged)?, Some(badge.clone()));
         ben.remove_pack_from(&badged)?;
         assert_eq!(ben.pack_from(&badged)?, None);
         ben.remove_pack_from(&own)?;
         assert_eq!(ben.current(&own, keys::FROM)?, Some(from));
+        // Undone, it is Ann's again, never Cy's; a Note that never had
+        // one gets none.
+        ben.restore_pack_from(&badged)?;
+        assert_eq!(ben.pack_from(&badged)?, Some(badge));
+        let before = ben.all_entries()?.len();
+        ben.restore_pack_from(&own)?;
+        assert_eq!(ben.pack_from(&own)?, None);
+        assert_eq!(ben.all_entries()?.len(), before);
         Ok(())
     }
 

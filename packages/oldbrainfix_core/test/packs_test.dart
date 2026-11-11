@@ -503,6 +503,14 @@ void main() {
       expect(ben.packFrom(note.id), (id: ann.ownProfile!.id, name: 'Ann'));
       ben.removePackFrom(note.id);
       expect(ben.packFrom(note.id), isNull);
+      // Undone (#268): the badge comes back as it was, in one entry.
+      final before = ben.allEntries().length;
+      ben.restorePackFrom(note.id);
+      expect(ben.packFrom(note.id), (id: ann.ownProfile!.id, name: 'Ann'));
+      expect(ben.allEntries().length, before + 1);
+      ben.restorePackFrom(note.id);
+      expect(ben.allEntries().length, before + 1);
+      ben.removePackFrom(note.id);
       ben.addPack(
         opened,
         opened.pack.allKeys(),
@@ -548,6 +556,14 @@ void main() {
       expect(ben.packFrom(badged), isNull);
       ben.removePackFrom(own);
       expect(ben.current(own, PackKeys.from), from('Cy'));
+      // Undone, it is Ann's again, never Cy's; a Note that never had
+      // one gets none.
+      ben.restorePackFrom(badged);
+      expect(ben.packFrom(badged), badge);
+      final before = ben.allEntries().length;
+      ben.restorePackFrom(own);
+      expect(ben.packFrom(own), isNull);
+      expect(ben.allEntries().length, before);
     });
 
     test('a help Note arrives under a new id', () {

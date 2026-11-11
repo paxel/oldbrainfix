@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use crate::checklists::{
-    Checklists, NewLine, keys as checklist_keys, line_text, order, parse_line_in, parse_list_kind,
-    split_lines, write_line,
+    Checklists, DeletedLine, NewLine, deleted_lines_of, keys as checklist_keys, line_text, order,
+    parse_line_in, parse_list_kind, split_lines, write_line,
 };
 use crate::entry::{Entry, dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
@@ -1098,6 +1098,13 @@ impl<'a> ShoppingLists<'a> {
             .map(drop)
     }
 
+    /// The deleted Lines of the Shopping List of `note_id` that
+    /// [`ShoppingLists::restore`] brings back, the last deleted first;
+    /// none when it is no Shopping List.
+    pub fn deleted_lines(&self, note_id: &str) -> Result<Vec<DeletedLine>> {
+        deleted_lines_of(self.store, note_id, self.making(note_id)?.as_deref())
+    }
+
     /// Checks the Line `line_id`: it is struck through and goes to the end
     /// until the start of the day its reappear time brings it back on
     /// ([`Reappear::back_from`]), by `wall`, or until a time is set for one
@@ -2082,6 +2089,31 @@ mod tests {
         assert_eq!(plain.text, "Shop\nEggs\n✓ Oat milk");
         lists.make(&note)?;
         assert_eq!(shown(&ann, &note)?, ["Eggs", "~Oat milk"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_deleted_lines_are_listed_the_last_deleted_first_while_a_restore_brings_them_back()
+    -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nTea", None)?;
+        let lists = ShoppingLists::new(&ann);
+        assert!(lists.deleted_lines(&note)?.is_empty());
+        let milk = id_of(&ann, &note, "Milk")?;
+        let tea = id_of(&ann, &note, "Tea")?;
+        lists.delete(&milk)?;
+        lists.delete(&tea)?;
+        let texts = |lists: Vec<DeletedLine>| -> Vec<String> {
+            lists.into_iter().map(|l| l.text).collect()
+        };
+        assert_eq!(texts(lists.deleted_lines(&note)?), ["Tea", "Milk"]);
+        lists.restore(&milk)?;
+        assert_eq!(texts(lists.deleted_lines(&note)?), ["Tea"]);
+        assert!(Checklists::new(&ann).deleted_lines(&note)?.is_empty());
+        lists.to_plain(&note, &wall)?;
+        lists.make(&note)?;
+        assert!(lists.deleted_lines(&note)?.is_empty());
         Ok(())
     }
 

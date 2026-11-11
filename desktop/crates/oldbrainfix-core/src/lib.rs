@@ -89,7 +89,7 @@ pub use alarms::{Alarms, MissedSummary, OpenOccurrence, PlannedAlarm};
 pub use boxes::Boxes;
 pub use cards::{CardOpened, CardTaken};
 pub use checklists::{
-    Checklist, ChecklistAgendaRow, Checklists, Line, LineChecks, RoutineOccurrence,
+    Checklist, ChecklistAgendaRow, Checklists, DeletedLine, Line, LineChecks, RoutineOccurrence,
 };
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};

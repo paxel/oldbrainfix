@@ -182,6 +182,51 @@ class Line {
   bool get inGroup => parent != null;
 }
 
+/// A deleted Line of a Checklist or Shopping List (#268), for its folded
+/// "Removed Lines": it can be restored.
+class DeletedLine {
+  /// Entity id, `line:<id>`.
+  final String id;
+  final String text;
+
+  /// When it was deleted.
+  final DateTime deleted;
+
+  const DeletedLine({
+    required this.id,
+    required this.text,
+    required this.deleted,
+  });
+}
+
+/// The deleted Lines of the Note [noteId] of the list [making], those a
+/// restore brings back, the last deleted first; none without a list.
+List<DeletedLine> deletedLinesOf(Store store, String noteId, String? making) {
+  if (making == null) return const [];
+  final found = <DeletedLine>[];
+  for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
+    final fields = store.currentFields(id);
+    if (fields[ChecklistKeys.note] != noteId ||
+        fields[ChecklistKeys.made] != making) {
+      continue;
+    }
+    final deleted = DateTime.tryParse(fields[ChecklistKeys.trashed] ?? '');
+    if (deleted == null) continue;
+    found.add(
+      DeletedLine(
+        id: id,
+        text: StoredText.read(fields[ChecklistKeys.text]).text,
+        deleted: deleted.toUtc(),
+      ),
+    );
+  }
+  found.sort((a, b) {
+    final byDeleted = b.deleted.compareTo(a.deleted);
+    return byDeleted != 0 ? byDeleted : a.id.compareTo(b.id);
+  });
+  return found;
+}
+
 /// An Occurrence of the Routine [routineId]: one a Checklist is checked
 /// for.
 typedef RoutineOccurrence = ({String routineId, Occurrence occurrence});
@@ -657,6 +702,11 @@ class Checklists {
     if (!mayEdit(lineId)) throw StateError('may not change $lineId');
     store.append(lineId, ChecklistKeys.trashed, null);
   }
+
+  /// The deleted Lines of the Checklist of [noteId] that [restore]
+  /// brings back, the last deleted first; none when it is no Checklist.
+  List<DeletedLine> deletedLines(String noteId) =>
+      deletedLinesOf(store, noteId, _making(noteId));
 
   /// Moves the Line [lineId], with its group, to just before the Line
   /// [before], or to the end. A single Line moved before a Line of a

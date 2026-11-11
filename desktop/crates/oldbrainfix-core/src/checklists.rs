@@ -299,6 +299,46 @@ impl Checklist {
     }
 }
 
+/// A deleted Line of a Checklist or Shopping List (#268), for its folded
+/// "Removed Lines": it can be restored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeletedLine {
+    /// Entity id, `line:<id>`.
+    pub id: String,
+    pub text: String,
+    /// When it was deleted.
+    pub deleted: DateTime<Utc>,
+}
+
+/// The deleted Lines of the Note `note_id` of the list `making`, those a
+/// restore brings back, the last deleted first; none without a list.
+pub(crate) fn deleted_lines_of(
+    store: &Store,
+    note_id: &str,
+    making: Option<&str>,
+) -> Result<Vec<DeletedLine>> {
+    let Some(making) = making else {
+        return Ok(Vec::new());
+    };
+    let mut found = Vec::new();
+    for id in store.entities_of_type(keys::TYPE_LINE)? {
+        let fields = store.current_fields(&id)?;
+        if fields.get(keys::NOTE) != Some(note_id) || fields.get(keys::MADE) != Some(making) {
+            continue;
+        }
+        let Some(Ok(deleted)) = fields.get(keys::TRASHED).map(parse_time) else {
+            continue;
+        };
+        found.push(DeletedLine {
+            text: StoredText::read(fields.get(keys::TEXT)).text,
+            id,
+            deleted,
+        });
+    }
+    found.sort_by(|a, b| b.deleted.cmp(&a.deleted).then_with(|| a.id.cmp(&b.id)));
+    Ok(found)
+}
+
 /// One line of a text as it becomes a Line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedLine {
@@ -1120,6 +1160,13 @@ impl<'a> Checklists<'a> {
         self.store
             .append(line_id, keys::TRASHED, None, None)
             .map(drop)
+    }
+
+    /// The deleted Lines of the Checklist of `note_id` that
+    /// [`Checklists::restore`] brings back, the last deleted first; none
+    /// when it is no Checklist.
+    pub fn deleted_lines(&self, note_id: &str) -> Result<Vec<DeletedLine>> {
+        deleted_lines_of(self.store, note_id, self.making(note_id)?.as_deref())
     }
 
     /// Moves the Line `line_id`, with its group, to just before the Line
@@ -1949,6 +1996,46 @@ pub(crate) mod tests {
         assert!(lists.indent(&line("Map")?, true).is_err());
         lists.delete(&line("Bath")?)?;
         assert_eq!(shown(&ann, &trip)?, ["Map", "  Tent", "Soap", "Towel"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_deleted_lines_are_listed_the_last_deleted_first_while_a_restore_brings_them_back()
+    -> TestResult {
+        let ann = device(1, "Ann")?;
+        let lists = Checklists::new(&ann);
+        let note = checklist(&ann, "Shop\nMilk\nEggs\nTea", None)?;
+        assert!(lists.deleted_lines(&note)?.is_empty());
+        let milk = id_of(&ann, &note, "Milk")?;
+        let tea = id_of(&ann, &note, "Tea")?;
+        lists.delete(&milk)?;
+        lists.delete(&tea)?;
+        let listed = |lists: Vec<DeletedLine>| -> Vec<(String, String)> {
+            lists.into_iter().map(|l| (l.id, l.text)).collect()
+        };
+        assert_eq!(
+            listed(lists.deleted_lines(&note)?),
+            [
+                (tea.clone(), "Tea".to_string()),
+                (milk.clone(), "Milk".to_string())
+            ]
+        );
+        lists.restore(&tea)?;
+        assert_eq!(
+            listed(lists.deleted_lines(&note)?),
+            [(milk, "Milk".to_string())]
+        );
+        // Another list's Lines are not its own.
+        assert!(
+            crate::ShoppingLists::new(&ann)
+                .deleted_lines(&note)?
+                .is_empty()
+        );
+        // Made anew, the Lines of the old making are gone for good.
+        lists.to_plain(&note)?;
+        assert!(lists.deleted_lines(&note)?.is_empty());
+        lists.make(&note)?;
+        assert!(lists.deleted_lines(&note)?.is_empty());
         Ok(())
     }
 

@@ -270,6 +270,31 @@ void main() {
       expect(() => lists.restore(milk), throwsArgumentError);
     });
 
+    test('the deleted Lines are listed for "Removed Lines", the last '
+        'deleted first, as long as a restore brings them back', () {
+      final note = checklist(ann, 'Shop\nMilk\nEggs\nTea');
+      final lists = Checklists(ann);
+      expect(lists.deletedLines(note), isEmpty);
+      final milk = idOf(ann, note, 'Milk');
+      final tea = idOf(ann, note, 'Tea');
+      // The clock ticks a second at every read.
+      lists.delete(milk);
+      lists.delete(tea);
+      expect(lists.deletedLines(note).map((l) => (l.id, l.text)), [
+        (tea, 'Tea'),
+        (milk, 'Milk'),
+      ]);
+      lists.restore(tea);
+      expect(lists.deletedLines(note).map((l) => l.text), ['Milk']);
+      // Another list's Lines and a Shopping List's are not its own.
+      expect(ShoppingLists(ann).deletedLines(note), isEmpty);
+      // Made anew, the Lines of the old making are gone for good.
+      lists.toPlain(note);
+      expect(lists.deletedLines(note), isEmpty);
+      lists.make(note);
+      expect(lists.deletedLines(note), isEmpty);
+    });
+
     test('Lines move, a group along with its parent, and indent', () {
       final note = checklist(ann, 'Trip\nBath\n  Soap\n  Towel\nTent\nMap');
       final lists = Checklists(ann);

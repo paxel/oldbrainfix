@@ -1737,6 +1737,23 @@ extension PackImport on Store {
     if (!mayChange(noteId)) throw StateError('may not change $noteId');
     append(noteId, PackKeys.from, null);
   }
+
+  /// Brings back the "From …" badge of the Note [noteId] that
+  /// [removePackFrom] took away, as the user's own Devices last wrote it
+  /// (#268). Nothing while it shows, or when it never had one.
+  void restorePackFrom(String noteId) {
+    if (currentByOwn(noteId, PackKeys.from) != null) return;
+    final own = <String, bool>{};
+    final written = [
+      for (final e in loggedHistory(noteId))
+        if (e.field == PackKeys.from && e.value != null)
+          if (own.putIfAbsent(e.device, () => writtenByOwn(e.device))) e,
+    ];
+    if (written.isEmpty) return;
+    if (!mayChange(noteId)) throw StateError('may not change $noteId');
+    final last = written.reduce((a, b) => Store.latestWins(a, b) > 0 ? a : b);
+    append(noteId, PackKeys.from, last.value);
+  }
 }
 
 /// [name], or with ` (<suffix>)` after it when [taken] holds it, or the

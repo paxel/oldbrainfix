@@ -786,6 +786,12 @@ class ShoppingLists {
     store.append(lineId, ChecklistKeys.trashed, null);
   }
 
+  /// The deleted Lines of the Shopping List of [noteId] that [restore]
+  /// brings back, the last deleted first; none when it is no Shopping
+  /// List.
+  List<DeletedLine> deletedLines(String noteId) =>
+      deletedLinesOf(store, noteId, making(noteId));
+
   /// Checks the Line [lineId]: it is struck through and goes to the end
   /// until the start of the day its reappear time brings it back on
   /// ([Reappear.backFrom]), by [wallClock], or until a time is set for one

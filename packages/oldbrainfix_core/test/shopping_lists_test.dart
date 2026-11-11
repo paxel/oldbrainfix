@@ -611,6 +611,27 @@ void main() {
       expect(() => lists.restore(milk), throwsArgumentError);
     });
 
+    test('the deleted Lines are listed for "Removed Lines", the last '
+        'deleted first, as long as a restore brings them back', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea');
+      final lists = ShoppingLists(ann);
+      expect(lists.deletedLines(note), isEmpty);
+      final milk = idOf(ann, note, 'Milk');
+      final tea = idOf(ann, note, 'Tea');
+      lists.delete(milk);
+      lists.delete(tea);
+      expect(lists.deletedLines(note).map((l) => (l.id, l.text)), [
+        (tea, 'Tea'),
+        (milk, 'Milk'),
+      ]);
+      lists.restore(milk);
+      expect(lists.deletedLines(note).map((l) => l.text), ['Tea']);
+      expect(Checklists(ann).deletedLines(note), isEmpty);
+      lists.toPlain(note, _wall);
+      lists.make(note);
+      expect(lists.deletedLines(note), isEmpty);
+    });
+
     test('back to a plain Note, struck ones marked, and made again afresh', () {
       final note = shopping(ann, 'Shop\nMilk\nEggs\nTea');
       final lists = ShoppingLists(ann);
