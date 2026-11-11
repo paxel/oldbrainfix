@@ -152,8 +152,10 @@ fn the_edit_menu_finds_opens_the_settings_and_hands_the_clipboard_to_the_field()
     let (store, _, tap) = store()?;
     let mut harness = window(App::new(store, "en"));
     // Cut, Copy and Paste want a field the cursor was in: the Note
-    // dialog's, under the menu bar at hand (#146).
+    // dialog's, under the menu bar at hand (#146). Undo wants something
+    // to undo (#268).
     assert!(!enabled(&mut harness, "Edit", "Copy"));
+    assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
     harness.state_mut().select_note(&tap);
     harness.run();
     harness.get_by_label("Note text").click();
@@ -286,9 +288,20 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     harness.key_press(Key::Escape);
     harness.run();
 
+    // Delete asks nothing (#268); Edit ▸ Undo brings it back.
     pick(&mut harness, "Note", "Delete");
     harness.run();
-    assert!(shows(&harness, "Delete this Note?"));
+    assert!(!shows(&harness, "Delete this Note?"));
+    let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(Notes::new(h.state().store())
+            .by_id(&tap)?
+            .ok_or("the Note")?
+            .is_trashed())
+    };
+    assert!(trashed(&harness)?);
+    pick(&mut harness, "Edit", "Undo Ctrl+Z");
+    harness.run();
+    assert!(!trashed(&harness)?);
     Ok(())
 }
 
@@ -480,4 +493,108 @@ fn the_sidebar_marks_the_place_shown() -> TestResult {
     sorted.sort_by(f32::total_cmp);
     assert_eq!(order, sorted);
     Ok(())
+}
+
+#[test]
+fn ctrl_z_in_a_field_is_the_fields_and_outside_one_undoes_the_last_delete() -> TestResult {
+    let (store, _, tap) = store()?;
+    let bank = Notes::new(&store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Call the bank")
+        .ok_or("the bank")?
+        .id;
+    let mut harness = window(App::new(store, "en"));
+    let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(Notes::new(h.state().store())
+            .by_id(&tap)?
+            .ok_or("the Note")?
+            .is_trashed())
+    };
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    pick(&mut harness, "Note", "Delete");
+    harness.run();
+    assert!(trashed(&harness)?);
+    // Typing in another Note, Ctrl+Z takes back what was typed.
+    harness.state_mut().select_note(&bank);
+    harness.run();
+    harness.get_by_label("Note text").click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text(" now");
+    harness.run();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(trashed(&harness)?);
+    assert_eq!(focused(&harness).as_deref(), Some("Note text"));
+    // Over the list it brings the Note back; Ctrl+Shift+Z does not.
+    for _ in 0..2 {
+        harness.key_press(Key::Escape);
+        harness.run();
+    }
+    assert!(harness.state().selected_note().is_none());
+    harness.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z);
+    harness.run();
+    assert!(trashed(&harness)?);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(!trashed(&harness)?);
+    Ok(())
+}
+
+#[test]
+fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_leaves_none() -> TestResult {
+    let (store, _, tap) = store()?;
+    let bank = Notes::new(&store)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Call the bank")
+        .ok_or("the bank")?
+        .id;
+    let mut harness = window(App::new(store, "en"));
+    let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(Notes::new(h.state().store())
+            .by_id(&tap)?
+            .ok_or("the Note")?
+            .is_trashed())
+    };
+    // Restored from its dialog first, the undo finds nothing to bring back.
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    pick(&mut harness, "Note", "Delete");
+    harness.run();
+    harness.get_by_label("Restore").click();
+    harness.run();
+    assert!(!trashed(&harness)?);
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert_eq!(harness.state().error(), None);
+    assert!(!trashed(&harness)?);
+    assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
+
+    // A Note filed from Unsorted has no place to go back to: the delete
+    // before it is not undone by surprise.
+    pick(&mut harness, "Note", "Delete");
+    harness.run();
+    assert!(trashed(&harness)?);
+    harness.state_mut().select_note(&bank);
+    harness.run();
+    press_file_into(&mut harness);
+    last(&harness, "Household").click();
+    harness.run();
+    let filed = Notes::new(harness.state().store())
+        .by_id(&bank)?
+        .ok_or("the bank")?;
+    assert!(filed.place.is_some());
+    assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    harness.run();
+    assert!(trashed(&harness)?);
+    Ok(())
+}
+
+/// Ctrl+M: File into… for the Note in the Note dialog.
+fn press_file_into(harness: &mut Harness<'_, App>) {
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
+    harness.run();
 }

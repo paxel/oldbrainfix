@@ -13,7 +13,9 @@
 //! box's row with Move up, Move down, putting it under the Line above or
 //! back to the top level, and Delete; and "Uncheck all" while one is
 //! checked. "Show on the Agenda" and "Back to a plain Note" are badges of
-//! the Note dialog (#160).
+//! the Note dialog (#160). Delete asks nothing: the deleted Lines fold
+//! under "Removed Lines", each with Restore where this Device may change
+//! it, and Ctrl+Z brings the last one back (#268).
 //!
 //! A Checklist with a Routine or Reminder (#121) shows on its card and in
 //! its editor as checked for the Occurrence it is on now, and on the
@@ -29,8 +31,8 @@ use std::collections::{HashMap, HashSet};
 use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
-    Checklist, Checklists, Line, ListOnAgenda, Note, RoutineOccurrence, Sessions, ShoppingLists,
-    ShoppingOnAgenda, Store, WallClock,
+    Checklist, Checklists, DeletedLine, Line, ListOnAgenda, Note, RoutineOccurrence, Sessions,
+    ShoppingLists, ShoppingOnAgenda, Store, WallClock,
 };
 
 use crate::app::{check, embossed, icon_button};
@@ -123,6 +125,92 @@ pub enum ChecklistAction {
     /// Reads what the menu of the card of the Note with this id offers,
     /// as it opens.
     Menu(String),
+    /// Something asked of "Removed Lines" (#268).
+    Removed(RemovedAsk),
+}
+
+/// The local setting that keeps "Removed Lines" open, on this Device, as
+/// the phone's.
+pub const LINES_REMOVED_OPEN: &str = "linesRemovedOpen";
+
+/// What "Removed Lines" under a Checklist's or a Shopping List's Lines
+/// was asked (#268).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemovedAsk {
+    /// Brings the deleted Line with this id back, where it was.
+    Restore(String),
+    /// Keeps it open, or folded.
+    Open(bool),
+}
+
+/// The deleted Lines of a list as "Removed Lines" shows them (#268), the
+/// last deleted first.
+#[derive(Debug, Clone, Default)]
+pub struct RemovedLines {
+    pub lines: Vec<DeletedLine>,
+    /// The ones this Device may bring back, by id.
+    pub restorable: HashSet<String>,
+    /// Whether it is open, as last left on this Device.
+    pub open: bool,
+}
+
+impl RemovedLines {
+    /// Takes the deleted `lines`, with what `may_edit` allows.
+    pub fn read(
+        store: &Store,
+        lines: Vec<DeletedLine>,
+        may_edit: impl Fn(&str) -> oldbrainfix_core::Result<bool>,
+    ) -> oldbrainfix_core::Result<Self> {
+        let mut restorable = HashSet::new();
+        for line in &lines {
+            if may_edit(&line.id)? {
+                restorable.insert(line.id.clone());
+            }
+        }
+        Ok(Self {
+            lines,
+            restorable,
+            open: store.local_setting(LINES_REMOVED_OPEN)?.as_deref() == Some("true"),
+        })
+    }
+}
+
+/// "Removed Lines" folded under a list's Lines in the Note dialog while
+/// it has any (#268), as a Tally's "Removed entries": each deleted Line's
+/// text, with Restore below it where this Device may change it.
+pub fn removed_lines(
+    ui: &mut Ui,
+    t: &L10n,
+    note: &str,
+    removed: &RemovedLines,
+    asked: &mut Vec<RemovedAsk>,
+) {
+    if removed.lines.is_empty() {
+        return;
+    }
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let open = removed.open;
+    let fold = egui::CollapsingHeader::new(RichText::new(t.lines_removed()).color(text))
+        .id_salt(("lines removed", note))
+        .open(Some(open))
+        .show(ui, |ui| {
+            for line in &removed.lines {
+                ui.label(RichText::new(&line.text).color(weak));
+                // The control goes below its text.
+                if removed.restorable.contains(&line.id)
+                    && ui
+                        .button(RichText::new(t.restore()).color(text))
+                        .on_hover_text(&line.text)
+                        .clicked()
+                {
+                    asked.push(RemovedAsk::Restore(line.id.clone()));
+                }
+            }
+        });
+    if fold.header_response.clicked() {
+        asked.push(RemovedAsk::Open(!open));
+    }
 }
 
 /// The Checklist of the selected Note as its editor shows it.
@@ -140,6 +228,8 @@ pub struct ChecklistShown {
     /// How it shows on this person's Agenda, while "Show on the Agenda"
     /// applies to it: a Checklist without a Routine (#143, #219).
     pub on_agenda: Option<ListOnAgenda>,
+    /// Its deleted Lines (#268).
+    pub removed: RemovedLines,
 }
 
 /// Whether this Device may check the Lines of `list` as it shows: for
@@ -171,12 +261,14 @@ pub fn read(
             editable.insert(line.id.clone());
         }
     }
+    let deleted = lists.deleted_lines(&note.id)?;
     Ok(Some(ChecklistShown {
         checks: may_check_shown(store, &list)?,
         adds: lists.may_check(&note.id)?,
         editable,
         plain: changes && note.text_editable,
         on_agenda: on_agenda(&lists, &note.id)?,
+        removed: RemovedLines::read(store, deleted, |id| lists.may_edit(id))?,
         list,
     }))
 }
@@ -822,6 +914,9 @@ pub fn section(
         {
             actions.push(ChecklistAction::UncheckAll(note.clone()));
         }
+        let mut removed = Vec::new();
+        removed_lines(ui, t, note, &shown.removed, &mut removed);
+        actions.extend(removed.into_iter().map(ChecklistAction::Removed));
     });
 }
 

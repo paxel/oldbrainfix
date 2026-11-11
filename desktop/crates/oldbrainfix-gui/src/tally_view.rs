@@ -238,8 +238,9 @@ pub enum TallyAction {
     AddEntry,
     /// Opens the entry page of the entry with this id.
     EditEntry(String),
-    /// Asks whether the entry with this id goes.
-    AskDelete(String),
+    /// Removes the entry with this id, without asking; Ctrl+Z and
+    /// "Removed entries" bring it back (#268).
+    Delete(String),
     Restore(String),
     /// Opens the field page of the field with this id, or of a new one.
     OpenField(Option<String>),
@@ -659,7 +660,7 @@ fn entry_row(
             ui.close();
         }
         if ui.button(RichText::new(t.delete()).color(text)).clicked() {
-            actions.push(TallyAction::AskDelete(entry.id.clone()));
+            actions.push(TallyAction::Delete(entry.id.clone()));
             ui.close();
         }
     });
@@ -788,7 +789,7 @@ pub enum FormIntent {
     Close,
     /// Hides the field, or shows it again.
     Hide(bool),
-    /// Deletes the entry, after asking.
+    /// Deletes the entry, without asking (#268).
     Delete,
 }
 
@@ -1277,7 +1278,7 @@ impl FieldForm {
 /// values of the set before; a set after the first can be removed. Then
 /// the day it counts for, today for a new one, at the same time of day;
 /// and one line of text. A value left empty is none. An entry that exists
-/// has Delete, which asks once; it can be restored.
+/// has Delete, which asks nothing; Ctrl+Z restores it (#268).
 ///
 /// For a Session's pick (ADR 0029) a new entry is recorded for its
 /// Occurrence instead; it counts for now, so the day does not show.

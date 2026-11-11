@@ -7,8 +7,8 @@
 //! a Line where it was typed, a name already there bringing its Line
 //! back, Backspace at the start joins, the rows stay where they are while
 //! the editor is open, and the typed order is kept the next time; the
-//! Line menu sets the reappear time and deletes for good after asking
-//! once; full cards check, compact cards count the open Lines; a Member
+//! Line menu sets the reappear time and deletes without asking, "Removed
+//! Lines" and Ctrl+Z bringing it back (#268); full cards check, compact cards count the open Lines; a Member
 //! checks and adds but changes only their own Lines; and a Line Conflict
 //! is named as a Shopping List's. Today's
 //! Agenda shows each Shopping List with open Lines as chosen for it
@@ -588,16 +588,22 @@ fn the_line_badge_sets_the_reappear_time_and_the_menu_deletes_for_good() -> Test
     harness.key_press(egui::Key::Escape);
     harness.run();
 
-    // Deleting asks once, with the menu's words; Cancel keeps it.
+    // Deleting asks nothing (#268): the Line folds under "Removed
+    // Lines", whose Restore brings it back, and so does Ctrl+Z.
     click(&mut harness, "More: Bread")?;
     click(&mut harness, "Delete")?;
-    assert!(shows(&harness, "Delete this Line?"));
-    click(&mut harness, "Cancel")?;
-    assert_eq!(list(&harness, &note)?.count(), 2);
+    assert!(!shows(&harness, "Delete this Line?"));
+    assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
+    click(&mut harness, "Removed Lines")?;
+    assert!(shows(&harness, "Bread"));
+    click(&mut harness, "Restore")?;
+    assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
     click(&mut harness, "More: Bread")?;
-    click(&mut harness, "Delete")?;
     click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
     Ok(())
 }
 
@@ -627,7 +633,6 @@ fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_entry_stores_it_fi
     press(&mut harness, egui::Key::Enter);
     type_line(&mut harness, "Salt");
     click(&mut harness, "More: Salt")?;
-    click(&mut harness, "Delete")?;
     click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["Milk", "Bread", "Apples", "Tea"]);
     assert!(!shows(&harness, "More: Salt"));

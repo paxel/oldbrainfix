@@ -464,7 +464,7 @@ fn a_line_typed_in_is_stored_as_the_cursor_leaves_it_and_as_the_window_closes() 
 }
 
 #[test]
-fn the_line_menu_moves_indents_and_deletes_after_asking() -> TestResult {
+fn the_line_menu_moves_indents_and_deletes_without_asking() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
@@ -507,14 +507,24 @@ fn the_line_menu_moves_indents_and_deletes_after_asking() -> TestResult {
     harness.key_press(egui::Key::Escape);
     harness.run();
 
-    // Deleting asks once; Cancel keeps it.
+    // Deleting asks nothing (#268): the Line folds under "Removed
+    // Lines", whose Restore brings it back where it was.
+    assert!(!shows(&harness, "Removed Lines"));
     line_step(&mut harness, "Charger", "Delete")?;
-    assert!(shows(&harness, "Delete this Line?"));
-    click(&mut harness, "Cancel")?;
-    assert_eq!(list(&harness, &note)?.count(), 3);
-    line_step(&mut harness, "Charger", "Delete")?;
-    click(&mut harness, "Delete")?;
+    assert!(!shows(&harness, "Delete this Line?"));
     assert_eq!(texts(&harness, &note)?, ["Passport", "Ticket"]);
+    assert!(!shows(&harness, "Restore"));
+    click(&mut harness, "Removed Lines")?;
+    assert!(shows(&harness, "Charger"));
+    click(&mut harness, "Restore")?;
+    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
+    assert!(!shows(&harness, "Removed Lines"));
+    // Ctrl+Z brings back the one deleted last.
+    line_step(&mut harness, "Charger", "Delete")?;
+    assert_eq!(texts(&harness, &note)?, ["Passport", "Ticket"]);
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
     Ok(())
 }
 
@@ -549,7 +559,6 @@ fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_step_stores_it_fir
     press(&mut harness, egui::Key::Enter);
     type_in(&mut harness, "Bag");
     line_step(&mut harness, "Bag", "Delete")?;
-    click(&mut harness, "Delete")?;
     assert_eq!(
         texts(&harness, &note)?,
         ["Passport", "  Charger", "Seat", "Ticket", "  Window"]

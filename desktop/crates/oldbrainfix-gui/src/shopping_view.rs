@@ -14,7 +14,9 @@
 //! dialog where this Device may change the Line: None, Once or After,
 //! After with its number and Day, Week, Month or Year, each written at
 //! once. For such a Line, ⋮ and a right-click on its box's row hold
-//! "Delete for good". "Back to a plain Note" is a badge
+//! Delete, which asks nothing: the deleted Lines fold under "Removed
+//! Lines", each with Restore, and Ctrl+Z brings the last one back (#268).
+//! "Back to a plain Note" is a badge
 //! of the Note dialog (#160), as is "Show on the Agenda" (#186), whose
 //! three ways the card's ⋮ offers as radio buttons too.
 //! Nothing is written when a struck Line comes back: the window
@@ -29,7 +31,7 @@ use oldbrainfix_core::{
 };
 
 use crate::app::embossed;
-use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
+use crate::checklist_view::{self, CardMenu, LineAsk, RemovedAsk, RemovedLines, ShownLine};
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
@@ -63,6 +65,8 @@ pub enum ShoppingAction {
     /// Chooses how the Note's Shopping List shows on this person's
     /// Agenda (#186).
     OnAgenda(String, ShoppingOnAgenda),
+    /// Something asked of "Removed Lines" (#268).
+    Removed(RemovedAsk),
 }
 
 /// The Shopping List of the selected Note as its editor shows it.
@@ -78,6 +82,8 @@ pub struct ShoppingShown {
     /// How it shows on this person's Agenda, while "Show on the Agenda"
     /// applies to it (#186).
     pub on_agenda: Option<ShoppingOnAgenda>,
+    /// Its deleted Lines (#268).
+    pub removed: RemovedLines,
 }
 
 /// Reads the Shopping List of the Note `note` as it shows now, days as
@@ -99,11 +105,13 @@ pub fn read(
             editable.insert(line.id.clone());
         }
     }
+    let deleted = lists.deleted_lines(&note.id)?;
     Ok(Some(ShoppingShown {
         checks: lists.may_check(&note.id)?,
         editable,
         plain: changes && note.text_editable,
         on_agenda: on_agenda(&lists, &note.id)?,
+        removed: RemovedLines::read(store, deleted, |id| lists.may_edit(id))?,
         list,
     }))
 }
@@ -383,6 +391,9 @@ pub fn section(
         }
         // Back to a plain Note is the Note dialog's kind badge (#160).
         actions.extend(typing.into_iter().map(ShoppingAction::Typed));
+        let mut removed = Vec::new();
+        checklist_view::removed_lines(ui, t, &list.note_id, &shown.removed, &mut removed);
+        actions.extend(removed.into_iter().map(ShoppingAction::Removed));
     });
 }
 

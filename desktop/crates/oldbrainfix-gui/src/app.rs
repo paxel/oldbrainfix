@@ -118,7 +118,9 @@ use crate::capture_choices::{
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
-use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep, ShownLine};
+use crate::checklist_view::{
+    self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
+};
 use crate::enrich::Enricher;
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
@@ -175,6 +177,7 @@ use crate::tally_view::{
 use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
+use crate::undo::Undo;
 
 /// What the middle pane shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -734,30 +737,6 @@ enum Dialog {
         query: String,
         others: Vec<(String, String)>,
     },
-    /// Whether the selected Note goes to the trash with its Routines and
-    /// Reminders, as `question` names them; `linked` while it has any.
-    TrashNote {
-        question: String,
-        linked: bool,
-    },
-    /// Whether the edited Routine or Reminder goes to the trash.
-    DeleteRoutine {
-        question: String,
-    },
-    /// Whether the Frog `id` goes to the trash; its Note stays.
-    DeleteFrog {
-        id: String,
-    },
-    /// Whether the Tally's entry `id` goes; it can be restored.
-    DeleteEntry {
-        id: String,
-    },
-    /// Whether the Line `id` of a Checklist goes, or of a Shopping List
-    /// `for_good` (#122).
-    DeleteLine {
-        id: String,
-        for_good: bool,
-    },
     /// Sharing the Area `area`: the role the other person gets, and the
     /// People it can go to from afar (#108).
     Share {
@@ -828,11 +807,6 @@ enum Dialog {
         claim: bool,
         worked: pack_view::Worked,
     },
-    /// Whether the "From `name`" badge of the Note `note` goes (#165).
-    RemovePackFrom {
-        note: String,
-        name: String,
-    },
     /// A stranger's Sent Item held until "Show" (#91): only who it is
     /// from, and, while "Decline and block" asks, the Shared Areas
     /// blocking them leaves.
@@ -853,13 +827,6 @@ enum Dialog {
     /// Whether the photo (`photo`) or voice recording `hash` of the Note
     /// `note` goes while its text stays (ADR 0020).
     RemoveMedia {
-        note: String,
-        hash: String,
-        photo: bool,
-    },
-    /// Whether the Photo Text (`photo`) or Transcript of `hash` of the
-    /// Note `note` goes while its file stays (ADR 0025).
-    RemoveText {
         note: String,
         hash: String,
         photo: bool,
@@ -1124,6 +1091,9 @@ enum Action {
     Find,
     /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
     Clip(Clip),
+    /// Edit ▸ Undo, and Ctrl+Z outside a text field (#268): takes back
+    /// the last delete, check-off, filing or Merge.
+    Undo,
     /// Help ▸ User guide: the guide's desktop page in the browser.
     OpenGuide,
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
@@ -1239,6 +1209,8 @@ enum Action {
         notes: Vec<String>,
         place: String,
     },
+    /// Moves the selected Note to the trash with its Routines and
+    /// Reminders, without asking (#262, #268).
     Trash,
     Restore,
     /// Merges the selected Note into this one.
@@ -1303,17 +1275,11 @@ enum Action {
     /// ticked.
     SessionPoolTally,
     Editor(Intent),
-    /// Deletes the edited Routine, asked.
-    DeleteRoutine,
-    /// Deletes the selected Note with its Routines and Reminders, asked.
-    TrashNote,
     RestoreRoutine(String),
     /// Something asked of a Frog or the Frog view (#101).
     Frog(FrogAction),
     /// Spawns a Frog from the Note with this id.
     SpawnFrog(String),
-    /// Moves the Frog the dialog asks about to the trash.
-    DeleteFrog,
     RestoreFrog(String),
     /// Something asked of the Tally setup in the Note dialog (#103,
     /// #190).
@@ -1323,8 +1289,6 @@ enum Action {
     CardTally(String, TallyAction),
     /// Something asked of the field page or the entry page.
     TallyForm(FormIntent),
-    /// Removes the entry the dialog asks about.
-    DeleteEntry,
     /// Something asked of a Checklist, on a card or in the editor (#120).
     Checklist(ChecklistAction),
     /// Something asked of a Shopping List, on a card or in the editor
@@ -1356,8 +1320,6 @@ enum Action {
     /// Stores what was typed into the Lines of the Note shown and drops
     /// those left empty, as the editor is left (#141).
     LeaveLines,
-    /// Deletes the Line the dialog asks about.
-    DeleteLine,
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
@@ -1384,9 +1346,8 @@ enum Action {
     Feedback(FeedbackAsk),
     /// File ▸ Open Pack…: asks for the file and opens it (#165).
     OpenPack,
-    /// Asks whether the "From …" badge of the Note goes (#165).
-    AskRemovePackFrom(String),
-    /// Removes the "From …" badge of the Note (#165).
+    /// Removes the "From …" badge of the Note (#165), without asking
+    /// (#268).
     RemovePackFrom(String),
     /// Saves the Note of the send dialog as a Sent Item.
     SendNote,
@@ -1474,15 +1435,13 @@ enum Action {
         photo: bool,
         append: bool,
     },
-    /// Asks whether the Photo Text (`photo`) or Transcript of `hash` of
-    /// the Note `note` goes while its file stays.
-    AskRemoveText {
+    /// Removes the Photo Text (`photo`) or Transcript of `hash` of the
+    /// Note `note` while its file stays, without asking (#268).
+    RemoveText {
         note: String,
         hash: String,
         photo: bool,
     },
-    /// Removes the Photo Text or Transcript asked about.
-    RemoveText,
     /// Reads the photo (`photo`) or transcribes the recording `hash` of
     /// the Note `note` again.
     Again {
@@ -1669,6 +1628,9 @@ pub struct App {
     badge: Option<NoteBadge>,
     /// The Shopping List Line whose reappear time dialog is open (#195).
     reappear_line: Option<String>,
+    /// What Ctrl+Z and Edit ▸ Undo take back: the last delete, check-off,
+    /// filing or Merge (#268).
+    undo: Option<Undo>,
     /// The Note whose text took a paste that looks like code, while
     /// "Keep as code" waits under it (#213).
     code_offer: Option<String>,
@@ -2133,6 +2095,7 @@ impl App {
             quick_open: false,
             badge: None,
             reappear_line: None,
+            undo: None,
             code_offer: None,
             start_lines: false,
             tally_whose: HashMap::new(),
@@ -5470,6 +5433,12 @@ impl App {
                 self.search_focus = true;
             }
             Action::Clip(clip) => self.clip = Some(clip),
+            Action::Undo => {
+                if let Some(undo) = self.undo.take() {
+                    self.save_text()?;
+                    undo.apply(&self.store)?;
+                }
+            }
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
             Action::SyncNow => {
                 self.save_text()?;
@@ -5813,29 +5782,22 @@ impl App {
             Action::File { notes: ids, place } => self.file_notes(&ids, &place)?,
             Action::Trash => {
                 self.save_text()?;
-                let linked = Routines::new(&self.store).of_note(&selected)?;
-                let question = match linked.as_slice() {
-                    [] => self.t.delete_note_question().to_string(),
-                    [one] if one.is_reminder() => {
-                        self.t.delete_note_reminder_question().to_string()
-                    }
-                    _ => self.t.delete_note_linked_question(linked.len() as i64),
-                };
-                self.dialog = Some(Dialog::TrashNote {
-                    question,
-                    linked: !linked.is_empty(),
-                });
-            }
-            Action::TrashNote => {
-                // Its Routines and Reminders always go with it (#262).
-                Routines::new(&self.store).trash_note(&selected)?;
-                self.dialog = None;
+                // Its Routines and Reminders always go with it (#262) and
+                // come back with its undo (#268).
+                let listed = Notes::new(&self.store)
+                    .by_id(&selected)?
+                    .is_some_and(|n| !n.is_trashed());
+                if listed {
+                    Routines::new(&self.store).trash_note(&selected)?;
+                    self.undo = Some(Undo::Note(selected.clone()));
+                }
             }
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
             Action::Merge(into) => {
                 self.save_text()?;
                 Notes::new(&self.store).merge(&selected, &into)?;
                 self.dialog = None;
+                self.undo = Some(Undo::Merge(selected.clone()));
                 self.selected_note = Some(into);
             }
             Action::NewArea => {
@@ -5936,6 +5898,11 @@ impl App {
                 routines.mark_done(&routine, &occurrence, None)?;
                 // The Reminder goes with it, and comes back with it.
                 routines.trash_note(&selected)?;
+                self.undo = Some(Undo::Done {
+                    routine,
+                    occurrence,
+                    trashed: Some(selected.clone()),
+                });
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
             Action::ExportRoutines => {
@@ -6090,16 +6057,12 @@ impl App {
                         .unwrap_or_default();
                     self.tally_page = Some(TallyPage::new(place, true, system).with_name(text));
                 }
+                // Without asking; Ctrl+Z brings it back (#268).
                 Intent::Delete => {
-                    let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);
-                    let question = if reminder {
-                        self.t.delete_reminder_question()
-                    } else {
-                        self.t.delete_routine_question()
-                    };
-                    self.dialog = Some(Dialog::DeleteRoutine {
-                        question: question.to_string(),
-                    });
+                    if let Some(id) = self.editor.take().and_then(|e| e.routine) {
+                        Routines::new(&self.store).trash(&id)?;
+                        self.undo = Some(Undo::Routine(id));
+                    }
                 }
                 Intent::Close => self.editor = None,
                 Intent::OpenNote(id) => {
@@ -6112,41 +6075,16 @@ impl App {
                     return self.act(Action::Select(Selection::History(id)));
                 }
             },
-            Action::DeleteRoutine => {
-                self.dialog = None;
-                if let Some(id) = self.editor.take().and_then(|e| e.routine) {
-                    Routines::new(&self.store).trash(&id)?;
-                }
-            }
             Action::RestoreRoutine(id) => Routines::new(&self.store).restore(&id)?,
             Action::Frog(asked) => self.frog_action(asked)?,
             Action::SpawnFrog(note) => {
                 self.save_text()?;
                 Frogs::new(&self.store).spawn(&note)?;
             }
-            Action::DeleteFrog => {
-                if let Some(Dialog::DeleteFrog { id }) = self.dialog.take() {
-                    Frogs::new(&self.store).trash(&id)?;
-                }
-            }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
             Action::Tally(asked) => self.tally_action(None, asked)?,
             Action::CardTally(note, asked) => self.tally_action(Some(note), asked)?,
             Action::TallyForm(intent) => self.tally_form_action(intent)?,
-            Action::DeleteEntry => {
-                if let Some(Dialog::DeleteEntry { id }) = self.dialog.take() {
-                    let tallies = Tallies::new(&self.store);
-                    // A sync while the dialog was open may have taken it.
-                    if tallies.entry_by_id(&id)?.is_some_and(|e| !e.is_trashed()) {
-                        tallies.trash_entry(&id)?;
-                    }
-                    if let Some(TallyForm::Entry(form)) = &self.tally_form
-                        && form.entry.as_ref().is_some_and(|e| e.id == id)
-                    {
-                        self.tally_form = None;
-                    }
-                }
-            }
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
             Action::Tick { entity, id, to } => {
@@ -6207,15 +6145,6 @@ impl App {
                     .set_local_setting(&show_ticks_key(&note), if on { "true" } else { "false" })?;
             }
             Action::LeaveLines => self.lines.leave(&self.store, &*self.wall)?,
-            Action::DeleteLine => {
-                if let Some(Dialog::DeleteLine { id, .. }) = self.dialog.take() {
-                    if self.line_of(&id)?.is_some() {
-                        Checklists::new(&self.store).delete(&id)?;
-                    } else if self.shopping_line_of(&id)?.is_some() {
-                        ShoppingLists::new(&self.store).delete(&id)?;
-                    }
-                }
-            }
             Action::Setting(setting) => self.set(setting)?,
             Action::PickAlarmSound => {
                 if let Some(path) = (self.sound_picker)(self.t.alarm_sound_pick()) {
@@ -6323,17 +6252,11 @@ impl App {
                     self.open_file(&path);
                 }
             }
-            Action::AskRemovePackFrom(note) => {
-                if let Some(from) = self.store.pack_from(&note)? {
-                    let name = profile_view::display_name(&self.t, &from.name).to_string();
-                    self.dialog = Some(Dialog::RemovePackFrom { note, name });
-                }
-            }
             Action::RemovePackFrom(note) => {
-                if matches!(self.dialog, Some(Dialog::RemovePackFrom { .. })) {
-                    self.dialog = None;
+                if self.store.pack_from(&note)?.is_some() {
+                    self.store.remove_pack_from(&note)?;
+                    self.undo = Some(Undo::PackFrom(note));
                 }
-                self.store.remove_pack_from(&note)?;
             }
             Action::AcceptSent => match self.dialog.take() {
                 Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
@@ -6595,21 +6518,31 @@ impl App {
                     field.text = written;
                 }
             }
-            Action::AskRemoveText { note, hash, photo } => {
+            Action::RemoveText { note, hash, photo } => {
                 self.save_text()?;
-                self.dialog = Some(Dialog::RemoveText { note, hash, photo });
-            }
-            Action::RemoveText => {
-                if let Some(Dialog::RemoveText { note, hash, photo }) = self.dialog.take() {
-                    // A sync while the dialog was open may have taken it
-                    // already.
+                let notes = Notes::new(&self.store);
+                // The text is kept for the undo, which writes it back.
+                let held = notes.by_id(&note)?.and_then(|n| {
+                    let texts = if photo { n.photo_texts } else { n.transcripts };
+                    texts.get(&hash).cloned()
+                });
+                let may = if photo {
+                    notes.may_remove_photo_text(&note, &hash)?
+                } else {
+                    notes.may_remove_transcript(&note, &hash)?
+                };
+                if let Some(text) = held.filter(|_| may) {
                     if photo {
-                        if notes.may_remove_photo_text(&note, &hash)? {
-                            notes.remove_photo_text(&note, &hash)?;
-                        }
-                    } else if notes.may_remove_transcript(&note, &hash)? {
+                        notes.remove_photo_text(&note, &hash)?;
+                    } else {
                         notes.remove_transcript(&note, &hash)?;
                     }
+                    self.undo = Some(Undo::Text {
+                        note,
+                        hash,
+                        photo,
+                        text,
+                    });
                 }
             }
             Action::Again { note, hash, photo } => {
@@ -6705,7 +6638,7 @@ impl App {
     fn frog_action(&mut self, asked: FrogAction) -> oldbrainfix_core::Result<()> {
         // What was typed into the Note dialog first, as its Frog badge
         // eats or removes from there (#259).
-        if matches!(asked, FrogAction::Toggle(_) | FrogAction::AskDelete(_)) {
+        if matches!(asked, FrogAction::Toggle(_) | FrogAction::Delete(_)) {
             self.save_text()?;
         }
         let frogs = Frogs::new(&self.store);
@@ -6715,11 +6648,18 @@ impl App {
                     frogs.unmark_done(&id)?;
                 } else {
                     frogs.mark_done(&id, None)?;
+                    self.undo = Some(Undo::FrogEaten(id));
                 }
             }
             FrogAction::Another(id) => frogs.another(&*self.wall, &id)?,
             FrogAction::OpenNote(id) => return self.act(Action::SelectNote(id)),
-            FrogAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteFrog { id }),
+            // Without asking; Ctrl+Z brings it back (#268).
+            FrogAction::Delete(id) => {
+                if frogs.by_id(&id)?.is_some_and(|f| !f.is_trashed()) {
+                    frogs.trash(&id)?;
+                    self.undo = Some(Undo::Frog(id));
+                }
+            }
             FrogAction::OpenView => return self.act(Action::Select(Selection::Frogs)),
             FrogAction::DoneOpen(open) => {
                 let value = if open { "true" } else { "false" };
@@ -6832,10 +6772,14 @@ impl App {
                     LineStep::Down => checklist_view::move_down(&self.store, &list, &line)?,
                     LineStep::Indent => lists.indent(&id, true)?,
                     LineStep::Outdent => lists.indent(&id, false)?,
+                    // Without asking; Ctrl+Z and "Removed Lines" bring it
+                    // back (#268).
                     LineStep::Delete => {
-                        self.dialog = Some(Dialog::DeleteLine {
+                        lists.delete(&id)?;
+                        self.undo = Some(Undo::Line {
+                            note: list.note_id.clone(),
                             id,
-                            for_good: false,
+                            shopping: false,
                         });
                     }
                 }
@@ -6846,6 +6790,7 @@ impl App {
                     None => None,
                 };
             }
+            ChecklistAction::Removed(asked) => self.removed_lines(asked, false)?,
         }
         Ok(())
     }
@@ -6881,7 +6826,10 @@ impl App {
                     return Ok(());
                 };
                 self.lines.keep(&self.store, &*self.wall)?;
-                if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
+                let Some(shown) = self.shopping_line_of(&id)? else {
+                    return Ok(());
+                };
+                if !lists.may_edit(&id)? {
                     return Ok(());
                 }
                 match step {
@@ -6890,11 +6838,19 @@ impl App {
                         self.badge = Some(NoteBadge::Reappear);
                     }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
+                    // Without asking; Ctrl+Z and "Removed Lines" bring it
+                    // back (#268).
                     ShopStep::Delete => {
-                        self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
+                        lists.delete(&id)?;
+                        self.undo = Some(Undo::Line {
+                            note: shown.note_id.clone(),
+                            id,
+                            shopping: true,
+                        });
                     }
                 }
             }
+            ShoppingAction::Removed(asked) => self.removed_lines(asked, true)?,
             ShoppingAction::OnAgenda(note, shows) => {
                 // It may have gone to the trash or back to a plain Note
                 // meanwhile.
@@ -7241,7 +7197,7 @@ impl App {
                     &self.t,
                 )));
             }
-            TallyAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteEntry { id }),
+            TallyAction::Delete(id) => self.delete_entry(&id)?,
             TallyAction::Restore(id) => tallies.restore_entry(&id)?,
             TallyAction::Whose(whose) => {
                 self.tally_whose.insert(note, whose);
@@ -7307,9 +7263,8 @@ impl App {
                 if let TallyForm::Entry(form) = form
                     && let Some(entry) = &form.entry
                 {
-                    self.dialog = Some(Dialog::DeleteEntry {
-                        id: entry.id.clone(),
-                    });
+                    let id = entry.id.clone();
+                    self.delete_entry(&id)?;
                 }
             }
         }
@@ -7466,12 +7421,53 @@ impl App {
         occurrence: &Occurrence,
     ) -> oldbrainfix_core::Result<()> {
         let trashes = Routines::new(&self.store).trashes_when_done(routine)?;
-        if let Some(note) = trashes
+        if let Some(note) = &trashes
             && self.selected_note.as_deref() == Some(note.as_str())
         {
             self.leave_note()?;
         }
-        Routines::new(&self.store).check_off(routine, occurrence, None)?;
+        let trashed = Routines::new(&self.store).check_off(routine, occurrence, None)?;
+        // Ctrl+Z unchecks it, and brings back the Note it took to the
+        // trash (#268).
+        self.undo = Some(Undo::Done {
+            routine: routine.to_string(),
+            occurrence: *occurrence,
+            trashed: trashed.then_some(trashes).flatten(),
+        });
+        Ok(())
+    }
+
+    /// Does what "Removed Lines" of the open Checklist, or with
+    /// `shopping` Shopping List, was asked (#268): Restore brings the Line
+    /// back while it is still deleted and this Device may change it.
+    fn removed_lines(&mut self, asked: RemovedAsk, shopping: bool) -> oldbrainfix_core::Result<()> {
+        match asked {
+            RemovedAsk::Open(open) => {
+                let value = if open { "true" } else { "false" };
+                self.store
+                    .set_local_setting(checklist_view::LINES_REMOVED_OPEN, value)?;
+            }
+            RemovedAsk::Restore(id) => {
+                let note = self.selected_note.clone().unwrap_or_default();
+                Undo::Line { note, id, shopping }.apply(&self.store)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes the Tally's entry `id` without asking, and closes its page
+    /// if it shows; Ctrl+Z and "Removed entries" bring it back (#268).
+    fn delete_entry(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        let tallies = Tallies::new(&self.store);
+        if tallies.entry_by_id(id)?.is_some_and(|e| !e.is_trashed()) {
+            tallies.trash_entry(id)?;
+            self.undo = Some(Undo::Entry(id.to_string()));
+        }
+        if let Some(TallyForm::Entry(form)) = &self.tally_form
+            && form.entry.as_ref().is_some_and(|e| e.id == id)
+        {
+            self.tally_form = None;
+        }
         Ok(())
     }
 
@@ -8413,6 +8409,7 @@ impl App {
             || self.top_dialog().is_some_and(|top| top != TopDialog::Note);
         if self.welcome.is_none() && !over {
             let filing = self.file_into_notes();
+            let typing = ui.ctx().text_edit_focused();
             // Esc over the list drops the cards selected (#148); over a
             // dialog or menu it is theirs, in a field the field's.
             let clears = self.top_dialog().is_none()
@@ -8428,6 +8425,12 @@ impl App {
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::F) {
                     actions.push(Action::Find);
+                }
+                // In a text field Ctrl+Z is the field's, undoing what was
+                // typed (#268); Ctrl+Shift+Z, a redo elsewhere, undoes
+                // nothing.
+                if !typing && !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z) {
+                    actions.push(Action::Undo);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
@@ -8888,8 +8891,19 @@ impl App {
                 moving.push(id.as_str());
             }
         }
+        // Where each was, for Ctrl+Z (#268); one from Unsorted has no
+        // place to go back to.
+        let mut before = Vec::new();
+        for id in &moving {
+            if let Some(was) = notes.by_id(id)?.and_then(|n| n.place) {
+                before.push((id.to_string(), was));
+            }
+        }
         self.store
             .batch(|| moving.iter().try_for_each(|id| notes.file(id, place)))?;
+        if !moving.is_empty() {
+            self.undo = (!before.is_empty()).then_some(Undo::Filed(before));
+        }
         self.cards.clear();
         let stayed = ids.len() - moving.len();
         let t = self.t;
@@ -8952,6 +8966,14 @@ impl App {
                 menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
             });
             ui.menu_button(RichText::new(t.menu_edit()).color(text), |ui| {
+                // The last delete, check-off, filing or Merge (#268).
+                let undoes = self.undo.is_some();
+                menu_entries(
+                    ui,
+                    [(t.undo(), keys(Key::Z), undoes, Action::Undo)],
+                    actions,
+                );
+                ui.separator();
                 let items = [
                     (t.menu_cut(), None, field, Action::Clip(Clip::Cut)),
                     (t.menu_copy(), None, field, Action::Clip(Clip::Copy)),
@@ -11125,64 +11147,6 @@ impl App {
                     Dialog::Merge { query, others } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
-                    Dialog::TrashNote { question, linked } => {
-                        title(ui, question);
-                        let text = ui.visuals().text_color();
-                        let detail = if *linked {
-                            t.delete_note_linked_detail()
-                        } else {
-                            t.delete_note_detail()
-                        };
-                        ui.label(RichText::new(detail).color(text));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::TrashNote);
-                            }
-                        });
-                    }
-                    Dialog::DeleteRoutine { question } => {
-                        title(ui, question);
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteRoutine);
-                            }
-                        });
-                    }
-                    Dialog::DeleteFrog { .. } => {
-                        title(ui, t.delete_frog_question());
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteFrog);
-                            }
-                        });
-                    }
-                    Dialog::DeleteEntry { .. } => {
-                        title(ui, t.delete_entry_question());
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
-                                actions.push(Action::DeleteEntry);
-                            }
-                        });
-                    }
-                    Dialog::DeleteLine { for_good, .. } => {
-                        title(ui, t.checklist_delete_question());
-                        // The verb of the menu it came from.
-                        let verb = if *for_good {
-                            t.shopping_delete_for_good()
-                        } else {
-                            t.delete()
-                        };
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, verb) {
-                                actions.push(Action::DeleteLine);
-                            }
-                        });
-                    }
                     Dialog::Share { area, role, afar } => {
                         let shown = view
                             .area(area)
@@ -11283,15 +11247,6 @@ impl App {
                         pack_view::import_form(ui, &t, shown, form, &mut asked);
                         actions.extend(asked.map(Action::Pack));
                     }
-                    Dialog::RemovePackFrom { note, name } => {
-                        title(ui, &t.remove_pack_from(name));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.remove()) {
-                                actions.push(Action::RemovePackFrom(note.clone()));
-                            }
-                        });
-                    }
                     Dialog::SentItem {
                         opened,
                         blocking: Some(areas),
@@ -11382,24 +11337,6 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
                                 actions.push(Action::RemoveCaptured);
-                            }
-                        });
-                    }
-                    Dialog::RemoveText { photo, .. } => {
-                        title(
-                            ui,
-                            if *photo {
-                                t.remove_photo_text_question()
-                            } else {
-                                t.remove_transcript_question()
-                            },
-                        );
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.remove_generated_text_detail()).color(text));
-                        ui.horizontal(|ui| {
-                            cancel(ui, &t, actions);
-                            if destructive(ui, t.remove()) {
-                                actions.push(Action::RemoveText);
                             }
                         });
                     }
@@ -15829,13 +15766,22 @@ fn note_badges(
         if badge(ui, look, icon, t.captured_heading(), value, true).clicked() {
             actions.push(Action::Badge(Some(NoteBadge::Captured)));
         }
-        // Who the Pack it came from is from, until removed (#165).
+        // Who the Pack it came from is from, until removed (#165): its
+        // click offers to remove it, which asks nothing (#268).
         if let Some(from) = &placed.pack_from {
-            let said = t.pack_from(profile_view::display_name(t, &from.name));
+            let name = profile_view::display_name(t, &from.name);
+            let said = t.pack_from(name);
             let icon = (pack_view::PACK_ICON, None);
             let value = Some(BadgeValue::Text(&said));
-            if badge(ui, look, icon, t.pack_title(), value, changes).clicked() {
-                actions.push(Action::AskRemovePackFrom(note.id.clone()));
+            let from_badge = badge(ui, look, icon, t.pack_title(), value, changes);
+            if changes {
+                let text = ui.visuals().text_color();
+                egui::Popup::menu(&from_badge).show(|ui| {
+                    if menu_entry(ui, (icons::TRASH, text), &t.remove_pack_from(name)).clicked() {
+                        actions.push(Action::RemovePackFrom(note.id.clone()));
+                        ui.close();
+                    }
+                });
             }
         }
         for routine in shown.routines {
@@ -15992,7 +15938,7 @@ fn note_badges(
 /// The Frog's badge (#259): the frog, then Open, or Eaten today or
 /// yesterday; a click offers Eat now while it is open and this Device may
 /// check it off, and Remove the Frog for who may manage it (ADR 0013),
-/// which asks once, as the Frog view does. It only shows for others.
+/// which asks nothing, as in the Frog view (#268). It only shows for others.
 fn frog_badge(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -16022,7 +15968,7 @@ fn frog_badge(
             ui.close();
         }
         if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
-            actions.push(Action::Frog(FrogAction::AskDelete(frog.id.clone())));
+            actions.push(Action::Frog(FrogAction::Delete(frog.id.clone())));
             ui.close();
         }
     });
@@ -16092,7 +16038,7 @@ fn editor_media(
                 photo,
                 append,
             },
-            Generated::Remove(hash) => Action::AskRemoveText { note, hash, photo },
+            Generated::Remove(hash) => Action::RemoveText { note, hash, photo },
             Generated::Again(hash) => Action::Again { note, hash, photo },
         }
     };

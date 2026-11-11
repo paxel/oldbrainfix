@@ -1043,6 +1043,13 @@ replace a law of Both apps where they say so. A desktop law marked
   work while typing, over the Note dialog too, not while another dialog
   is open. On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
+- **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
+  filing or Merge** (#268), the desktop's offer to undo, with no
+  announcement: Edit ▸ Undo is first in its menu and greyed while
+  nothing waits; Ctrl+Z works over the list and the Note dialog but not
+  in a text field, where it undoes the typing. Only the last one waits.
+  A Note filed from Unsorted stays filed, as no restore takes a Note
+  back to Unsorted.
 - **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
   Note dialog, while Enter alone starts a new line; Enter in a one-line

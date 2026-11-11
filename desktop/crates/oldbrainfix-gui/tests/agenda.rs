@@ -219,6 +219,12 @@ fn the_agenda_shows_the_week_each_later_day_under_its_weekday_and_date() -> Test
     let routines = Routines::new(harness.state().store());
     let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
     assert!(reminder.done_at(&at(Day::new(2026, 11, 2), 9)).is_some());
+    // Ctrl+Z unchecks it again (#268).
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    let routines = Routines::new(harness.state().store());
+    let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
+    assert!(reminder.done_at(&at(Day::new(2026, 11, 2), 9)).is_none());
     Ok(())
 }
 
@@ -625,9 +631,6 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
     harness.run();
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(shows(&harness, "Delete this Note and its 1 Routine?"));
-    harness.get_by_label("Delete").click();
-    harness.run();
     let walk = find_note(harness.state(), "Walk the dog")?;
     assert!(
         Notes::new(harness.state().store())
@@ -650,8 +653,8 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
     harness.state_mut().close_note();
     harness.run();
 
-    // A Routine on its own: deleted from its editor, after asking, and
-    // restored from the trash.
+    // A Routine on its own: deleted from its editor without asking
+    // (#268), brought back by Ctrl+Z, and restored from the trash.
     harness.get_by_label("Agenda").click();
     harness.run();
     // Every other day of the week has its row; any opens the Routine.
@@ -664,15 +667,21 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
     assert!(shows(&harness, "Routine"));
     harness.get_by_label("Delete").click();
     harness.run();
-    assert!(shows(
+    assert!(!shows(
         &harness,
         "Delete this Routine? It stays in the trash for 30 days. Its Note stays."
     ));
+    assert!(routine_of(harness.state(), "Night meds").is_err());
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(routine_of(harness.state(), "Night meds").is_ok());
     harness
-        .query_all_by_label("Delete")
-        .last()
-        .ok_or("the dialog's Delete")?
+        .query_all_by_role_and_label(Role::Button, "Night meds")
+        .next()
+        .ok_or("a Night meds row")?
         .click();
+    harness.run();
+    harness.get_by_label("Delete").click();
     harness.run();
     assert!(routine_of(harness.state(), "Night meds").is_err());
     left(&harness, "Trash").click();
@@ -689,7 +698,7 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
 }
 
 #[test]
-fn deleting_a_note_with_routines_from_the_editor_asks_once_and_takes_them_along() -> TestResult {
+fn deleting_a_note_with_routines_asks_nothing_and_its_undo_brings_them_back() -> TestResult {
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
@@ -703,29 +712,26 @@ fn deleting_a_note_with_routines_from_the_editor_asks_once_and_takes_them_along(
             .is_trashed())
     };
 
-    // Cancel keeps the Note and its Routine.
+    // Delete takes its Routine along into the trash at once (#262,
+    // #268), with no way to delete the Note alone.
     harness.get_by_label("Move to trash").click();
-    harness.run();
-    assert!(shows(&harness, "Delete this Note and its 1 Routine?"));
-    assert!(shows(
-        &harness,
-        "They stay in the trash with it for 30 days and come back when you restore it."
-    ));
-    // No way to delete the Note alone (#262).
-    assert!(!shows(&harness, "Delete only the Note"));
-    harness.get_by_label("Cancel").click();
     harness.run();
     assert!(!shows(&harness, "Delete this Note and its 1 Routine?"));
-    assert!(!trashed(&harness)?);
-    assert!(routine_of(harness.state(), "Walk the dog").is_ok());
-
-    // Delete takes its Routine along into the trash.
-    harness.get_by_label("Move to trash").click();
-    harness.run();
-    harness.get_by_label("Delete").click();
-    harness.run();
+    assert!(!shows(&harness, "Delete only the Note"));
     assert!(trashed(&harness)?);
     assert!(routine_of(harness.state(), "Walk the dog").is_err());
+
+    // Edit ▸ Undo brings both back.
+    harness
+        .get_all_by_label("Edit")
+        .next()
+        .ok_or("Edit")?
+        .click();
+    harness.run();
+    harness.get_by_label("Undo Ctrl+Z").click();
+    harness.run();
+    assert!(!trashed(&harness)?);
+    assert!(routine_of(harness.state(), "Walk the dog").is_ok());
     Ok(())
 }
 

@@ -1085,6 +1085,36 @@ fn replace_and_append_take_a_photo_text_over_into_the_notes_text() -> TestResult
 }
 
 #[test]
+fn removing_a_transcript_asks_nothing_and_ctrl_z_writes_it_back() -> TestResult {
+    let store = empty_store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Bike", None, None)?;
+    let hash = notes.add_recording(&note.id, &heard())?;
+    notes.set_transcript(&note.id, &hash, "Lock code 1234")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness.get_by_label("Remove generated text").click();
+    harness.run();
+    assert!(!shows(&harness, "Remove this Transcript?"));
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert_eq!(bike.removed_transcripts, vec![hash.clone()]);
+    assert!(!shows(&harness, "Lock code 1234"));
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert!(bike.removed_transcripts.is_empty());
+    assert_eq!(
+        bike.transcripts.get(&hash).map(String::as_str),
+        Some("Lock code 1234")
+    );
+    assert_eq!(bike.recordings, vec![hash]);
+    assert!(shows(&harness, "Lock code 1234"));
+    Ok(())
+}
+
+#[test]
 fn replace_and_append_take_a_transcript_over_into_the_notes_text() -> TestResult {
     let store = empty_store()?;
     let notes = Notes::new(&store);
@@ -1132,7 +1162,7 @@ fn replace_and_append_take_a_transcript_over_into_the_notes_text() -> TestResult
 }
 
 #[test]
-fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
+fn removing_a_photo_text_asks_nothing_keeps_the_photo_and_ctrl_z_brings_it_back() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
@@ -1141,17 +1171,22 @@ fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
     let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
     harness.get_by_label("Remove generated text").click();
     harness.run();
-    assert!(shows(&harness, "Remove this Photo Text?"));
-    harness.get_by_label("Cancel").click();
-    harness.run();
     assert!(!shows(&harness, "Remove this Photo Text?"));
+    assert_eq!(harness.state().error(), None);
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.removed_photo_texts, vec![photo.to_string()]);
+    // Ctrl+Z writes the text back, and Remove takes it again.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert!(shed.removed_photo_texts.is_empty());
+    assert_eq!(
+        shed.photo_texts.get(photo).map(String::as_str),
+        Some("Spare key under the pot")
+    );
+    assert!(shows(&harness, "Spare key under the pot"));
     harness.get_by_label("Remove generated text").click();
     harness.run();
-    harness.get_by_label("Remove").click();
-    harness.run();
-    assert_eq!(harness.state().error(), None);
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.removed_photo_texts, vec![photo.to_string()]);
     assert_eq!(shed.photos.len(), 3);

@@ -55,7 +55,7 @@ const MAX_COUNT: i64 = 99_999;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Intent {
     Save,
-    /// Delete, after asking.
+    /// Delete, without asking; Ctrl+Z brings it back (#268).
     Delete,
     Close,
     /// Show the Note it comes from.

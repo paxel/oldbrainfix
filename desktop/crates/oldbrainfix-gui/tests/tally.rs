@@ -460,7 +460,7 @@ fn a_day_moved_across_a_change_of_the_clocks_keeps_its_time_of_day() -> TestResu
 }
 
 #[test]
-fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult {
+fn deleting_an_entry_asks_nothing_and_removed_entries_bring_it_back() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     let pages = tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -476,17 +476,7 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
     // Picked as a screen reader does, the menu closes all the same.
     click(&mut harness, "Delete")?;
     assert_eq!(edits(&harness), before);
-    assert!(shows(
-        &harness,
-        "Delete this entry? It can be restored under \"Removed entries\"."
-    ));
-    assert!(
-        !tallies
-            .entry_by_id(&entry.id)?
-            .ok_or("the entry")?
-            .is_trashed()
-    );
-    click(&mut harness, "Delete")?;
+    assert!(!shows_part(&harness, "Delete this entry?"));
     assert!(
         tallies
             .entry_by_id(&entry.id)?
@@ -514,7 +504,7 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
 }
 
 #[test]
-fn the_entry_page_deletes_after_asking_too() -> TestResult {
+fn the_entry_page_deletes_without_asking_and_ctrl_z_brings_it_back() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     tallies.add_field(&note, "Pages", "pages", None, None)?;
@@ -523,7 +513,6 @@ fn the_entry_page_deletes_after_asking_too() -> TestResult {
     entry_row(&harness, "Skimmed").click_accesskit();
     harness.run();
     click_button(&mut harness, "Delete");
-    click(&mut harness, "Delete")?;
     assert!(
         tallies
             .entry_by_id(&entry.id)?
@@ -531,6 +520,14 @@ fn the_entry_page_deletes_after_asking_too() -> TestResult {
             .is_trashed()
     );
     assert!(!shows(&harness, "Entry"), "the page closes");
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert!(
+        !tallies
+            .entry_by_id(&entry.id)?
+            .ok_or("the entry")?
+            .is_trashed()
+    );
     Ok(())
 }
 

@@ -84,6 +84,7 @@ pub mod text_marks_view;
 pub mod text_menu;
 pub mod theme;
 pub mod tray;
+pub mod undo;
 
 pub use app::{App, Page, Selection, Wall, local_wall};
 
