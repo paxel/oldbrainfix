@@ -125,7 +125,10 @@ impl eframe::App for Native {
         self.system_theme.hand_to(ctx);
         for command in waiting(&self.commands) {
             match command {
-                Command::Open => focus(ctx),
+                Command::Open => {
+                    focus(ctx);
+                    self.app.set_shown(true);
+                }
                 // The window stays where it is, so the keyboard goes back
                 // to whatever had it once the popup closes.
                 Command::Capture => match &mut self.popup {
@@ -143,6 +146,7 @@ impl eframe::App for Native {
         // Without a tray it stays, or nothing would bring it back.
         if std::mem::take(&mut self.start_hidden) && tray {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            self.app.set_shown(false);
         }
         if ctx.input(|i| i.viewport().close_requested()) {
             let quitting = self.quit.load(Ordering::SeqCst);
@@ -150,6 +154,7 @@ impl eframe::App for Native {
                 OnClose::Hide => {
                     ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                    self.app.set_shown(false);
                     // Kept as closing the window keeps it.
                     self.app.flush();
                 }
@@ -169,6 +174,7 @@ impl eframe::App for Native {
                     self.popup = None;
                     self.app.edit_note(&id);
                     focus(ctx);
+                    self.app.set_shown(true);
                 }
             }
         }

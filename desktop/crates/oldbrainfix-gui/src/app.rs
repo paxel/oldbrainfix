@@ -1838,6 +1838,9 @@ pub struct App {
     /// Wakes the window from another thread, so what arrives there is
     /// answered without the window polling for it (#292).
     redraw: Option<Wake>,
+    /// Whether the window is on screen: false while hidden into the tray,
+    /// when nothing it draws is seen and no animation needs frames (#292).
+    shown: bool,
     /// The client whose config was copied last while the port is open.
     ai_copied: Option<Client>,
     /// Asks the system's dialog for an alarm sound file, titled as given.
@@ -2212,6 +2215,7 @@ impl App {
             help_version: None,
             ai_port: None,
             redraw: None,
+            shown: true,
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
             sound_rung: None,
@@ -4295,6 +4299,17 @@ impl App {
     pub fn watch_changes(&mut self, changes: Arc<AtomicU64>) {
         self.seen_changes = changes.load(Ordering::SeqCst);
         self.changes = Some(changes);
+    }
+
+    /// Whether the window is on screen; the shell tells when it hides it
+    /// into the tray and brings it back.
+    pub fn set_shown(&mut self, shown: bool) {
+        self.shown = shown;
+    }
+
+    /// Whether what the window draws is seen: shown and not minimised.
+    fn drawn(&self, ctx: &egui::Context) -> bool {
+        self.shown && ctx.input(|i| i.viewport().minimized != Some(true))
     }
 
     /// How another thread wakes the window: the AI port's tool calls
@@ -8142,8 +8157,10 @@ impl App {
             if asked != self.sync.asking().is_some() {
                 ui.ctx().request_repaint();
             }
+            // Hidden, a phone pairing still gets its answer, only slower.
+            let pace = if self.drawn(ui.ctx()) { 100 } else { 1000 };
             ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(100));
+                .request_repaint_after(std::time::Duration::from_millis(pace));
         }
         // The AI port's tool calls are answered on this thread, while the
         // window idles too; what they drafted shows at once. The port wakes
@@ -8402,9 +8419,11 @@ impl App {
                 )
                 .show(ui, |ui| self.menu_bar(ui, &mut actions));
             // Under it, while a sync of this Device runs (#225).
-            if self.syncing.as_ref().is_some_and(Syncing::running) {
+            // Not while hidden: nobody sees it, and it would keep asking for frames.
+            let drawn = self.drawn(ui.ctx());
+            if drawn && self.syncing.as_ref().is_some_and(Syncing::running) {
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
-            } else if self.pack_opening() {
+            } else if drawn && self.pack_opening() {
                 // And while a Pack opens off the window's thread.
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
             }
