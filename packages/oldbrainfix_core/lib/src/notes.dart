@@ -34,7 +34,8 @@ abstract final class NoteKeys {
   /// When the Note was moved to the trash; absent while it is not there.
   static const trashed = 'trashed';
 
-  /// The Note this one was merged into; absent while it stands alone.
+  /// The Note this one was merged into; absent while it stands alone,
+  /// null once its Merge was undone.
   static const merged = 'merged';
 
   /// When the Note first spawned a Routine or Reminder; absent before.
@@ -945,6 +946,28 @@ class Notes {
       throw ArgumentError.value(intoId, 'intoId', 'the Note itself');
     }
     store.append(noteId, NoteKeys.merged, intoId);
+  }
+
+  /// Whether this Device may undo the Merge of the Note [noteId] (#268):
+  /// it shows merged into another, and it is this Device's to change
+  /// ([SharedAreas.mayChange]), in no Area or one it manages, or as a
+  /// Member when they made it.
+  bool mayUndoMerge(String noteId) =>
+      byId(noteId)?.isMerged == true && store.mayChange(noteId);
+
+  /// Undoes the Merge of the Note [noteId]: it stands alone again, in
+  /// the lists and where it was filed, with its Sections, Routines,
+  /// Reminders and Frogs, all of which never left it. One entry clears
+  /// the pointer [merge] wrote; latest wins, so the user's other Devices
+  /// follow. Refused unless [mayUndoMerge].
+  void undoMerge(String noteId) {
+    if (byId(noteId)?.isMerged != true) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a merged Note');
+    }
+    if (!store.mayChange(noteId)) {
+      throw StateError('the Merge of $noteId may not be undone here');
+    }
+    store.append(noteId, NoteKeys.merged, null);
   }
 
   /// The Sections of the Note [noteId], oldest first: its Amends, the

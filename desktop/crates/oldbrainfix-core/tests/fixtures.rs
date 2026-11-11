@@ -1746,6 +1746,11 @@ fn write_edits(store: &Store) -> Built {
     places.delete_topic(&empty.id, NotesGo::Unsorted)?;
     places.delete_area(&errands.id, NotesGo::Trash)?;
     places.delete_area(&garage.id, NotesGo::Unsorted)?;
+    let keys = notes.capture("Spare keys at the neighbours", Some(&home.id), None)?;
+    notes.amend(&keys.id, "Back by Friday")?;
+    let holiday = notes.capture("Neighbours on holiday", None, None)?;
+    notes.merge(&keys.id, &holiday.id)?;
+    notes.undo_merge(&keys.id)?;
     Ok(())
 }
 

@@ -32,7 +32,8 @@ pub mod keys {
     pub const IMPORTANCE: &str = "importance";
     /// When the Note was moved to the trash; absent while it is not there.
     pub const TRASHED: &str = "trashed";
-    /// The Note this one was merged into; absent while it stands alone.
+    /// The Note this one was merged into; absent while it stands alone,
+    /// null once its Merge was undone.
     pub const MERGED: &str = "merged";
     /// When the Note first spawned a Routine or Reminder.
     pub const SPAWNED: &str = "spawned";
@@ -1126,6 +1127,36 @@ impl<'a> Notes<'a> {
         }
         self.store
             .append(note_id, keys::MERGED, Some(into_id), None)
+            .map(drop)
+    }
+
+    /// Whether this Device may undo the Merge of the Note `note_id`
+    /// (#268): it shows merged into another, and it is this Device's to
+    /// change ([`Store::may_change`]), in no Area or one it manages, or as
+    /// a Member when they made it.
+    pub fn may_undo_merge(&self, note_id: &str) -> Result<bool> {
+        Ok(
+            self.by_id(note_id)?.is_some_and(|n| n.is_merged())
+                && self.store.may_change(note_id)?,
+        )
+    }
+
+    /// Undoes the Merge of the Note `note_id`: it stands alone again, in
+    /// the lists and where it was filed, with its Sections, Routines,
+    /// Reminders and Frogs, all of which never left it. One entry clears
+    /// the pointer [`Notes::merge`] wrote; latest wins, so the user's
+    /// other Devices follow. Refused unless [`Notes::may_undo_merge`].
+    pub fn undo_merge(&self, note_id: &str) -> Result<()> {
+        if !self.by_id(note_id)?.is_some_and(|n| n.is_merged()) {
+            return Err(Error::Invalid(format!("not a merged Note: {note_id}")));
+        }
+        if !self.store.may_change(note_id)? {
+            return Err(Error::Invalid(format!(
+                "the Merge of {note_id} may not be undone here"
+            )));
+        }
+        self.store
+            .append(note_id, keys::MERGED, None, None)
             .map(drop)
     }
 
@@ -3019,6 +3050,215 @@ mod tests {
             let section = section_of(store, &theirs.id)?;
             assert_eq!(section.text, "Two litres");
             assert!(section.modified.is_none() && section.edited_by.is_none());
+        }
+        Ok(())
+    }
+
+    fn ids(notes: Vec<Note>) -> Vec<String> {
+        notes.into_iter().map(|n| n.id).collect()
+    }
+
+    fn merged_into(store: &Store, id: &str) -> Result<Option<String>> {
+        Ok(Notes::new(store).by_id(id)?.and_then(|n| n.merged_into))
+    }
+
+    #[test]
+    fn an_undone_merge_brings_the_note_back_where_it_was_with_all_it_holds() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let home = Places::new(&ann).add_area("Home")?.id;
+        let keys = notes.capture("Spare keys at the neighbours", Some(&home), None)?;
+        let amend = notes.amend(&keys.id, "Back by Friday")?;
+        use crate::schedule::{ClockTime, Day, Frequency, Recurrence, Schedule};
+        let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
+        let rule = Recurrence::every(Frequency::Daily, 1);
+        let daily = Schedule::new(Day::new(2026, 3, 1), &eight, Some(rule)).ok_or("a Schedule")?;
+        let routine = crate::Routines::new(&ann).spawn(&keys.id, &daily)?;
+        let frog = crate::Frogs::new(&ann).spawn(&keys.id)?;
+        let loose = notes.capture("Ask about the plants", None, None)?;
+        let into = notes.capture("Neighbours on holiday", None, None)?;
+        notes.merge(&keys.id, &into.id)?;
+        notes.merge(&loose.id, &into.id)?;
+        assert_eq!(ids(notes.all()?), std::slice::from_ref(&into.id));
+        let routines_of = |id: &str| -> Result<Vec<String>> {
+            Ok(crate::Routines::new(&ann)
+                .of_note(id)?
+                .into_iter()
+                .map(|r| r.id)
+                .collect())
+        };
+        let frogs_of = |id: &str| -> Result<Vec<String>> {
+            Ok(crate::Frogs::new(&ann)
+                .of_note(id)?
+                .into_iter()
+                .map(|f| f.id)
+                .collect())
+        };
+        assert_eq!(routines_of(&into.id)?, std::slice::from_ref(&routine.id));
+        assert_eq!(frogs_of(&into.id)?, std::slice::from_ref(&frog.id));
+
+        let mark = ann.current_seq()?;
+        assert!(notes.may_undo_merge(&keys.id)?);
+        notes.undo_merge(&keys.id)?;
+        notes.undo_merge(&loose.id)?;
+        let written: Vec<_> = ann
+            .entries_after(mark)?
+            .into_iter()
+            .map(|e| (e.entity, e.field, e.value))
+            .collect();
+        assert_eq!(
+            written,
+            [
+                (keys.id.clone(), keys::MERGED.to_string(), None),
+                (loose.id.clone(), keys::MERGED.to_string(), None),
+            ]
+        );
+        assert_eq!(
+            ids(notes.all()?),
+            [into.id.clone(), loose.id.clone(), keys.id.clone()]
+        );
+        assert_eq!(ids(notes.inside(&home)?), std::slice::from_ref(&keys.id));
+        assert_eq!(ids(notes.unsorted()?), [loose.id.clone(), into.id.clone()]);
+        let back = note(&ann, &keys.id)?;
+        assert_eq!(back.merged_into, None);
+        assert_eq!(back.place.as_deref(), Some(home.as_str()));
+        assert!(notes.sections(&into.id)?.is_empty());
+        let sections: Vec<String> = notes
+            .sections(&keys.id)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(sections, [amend.id]);
+        assert_eq!(routines_of(&keys.id)?, [routine.id]);
+        assert!(routines_of(&into.id)?.is_empty());
+        assert_eq!(frogs_of(&keys.id)?, [frog.id]);
+        assert!(frogs_of(&into.id)?.is_empty());
+        // Nothing is left to undo.
+        assert!(!notes.may_undo_merge(&keys.id)?);
+        assert!(notes.undo_merge(&keys.id).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn undoing_a_merge_is_refused_where_nothing_shows_merged_and_writes_nothing() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let alone = notes.capture("alone", None, None)?;
+        let stranger = notes.capture("merged into a stranger", None, None)?;
+        ann.append(&stranger.id, keys::MERGED, Some("note:never-synced"), None)?;
+        let mark = ann.current_seq()?;
+        for id in [alone.id.as_str(), &stranger.id, "note:none", "section:x"] {
+            assert!(!notes.may_undo_merge(id)?, "{id}");
+            assert!(notes.undo_merge(id).is_err(), "{id}");
+        }
+        assert_eq!(ann.current_seq()?, mark);
+        Ok(())
+    }
+
+    #[test]
+    fn undoing_a_merge_of_a_chain_takes_out_only_the_one_note_and_what_is_in_it() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let a = notes.capture("a", None, None)?;
+        let b = notes.capture("b", None, None)?;
+        let c = notes.capture("c", None, None)?;
+        notes.merge(&a.id, &b.id)?;
+        notes.merge(&b.id, &c.id)?;
+        notes.undo_merge(&b.id)?;
+        assert_eq!(ids(notes.all()?), [c.id.clone(), b.id.clone()]);
+        assert_eq!(merged_into(&ann, &a.id)?, Some(b.id.clone()));
+        let sections: Vec<String> = notes.sections(&b.id)?.into_iter().map(|s| s.id).collect();
+        assert_eq!(sections, [a.id]);
+        assert!(notes.sections(&c.id)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn undoing_a_merge_of_two_notes_merged_into_each_other_leaves_the_other() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let x = notes.capture("x", None, None)?;
+        let y = notes.capture("y", None, None)?;
+        // Both merges arrive, as after a sync of two Devices.
+        ann.append(&x.id, keys::MERGED, Some(&y.id), None)?;
+        ann.append(&y.id, keys::MERGED, Some(&x.id), None)?;
+        let (low, high) = if x.id < y.id { (x, y) } else { (y, x) };
+        assert!(!notes.may_undo_merge(&low.id)?);
+        notes.undo_merge(&high.id)?;
+        assert_eq!(ids(notes.all()?), std::slice::from_ref(&high.id));
+        assert_eq!(merged_into(&ann, &low.id)?, Some(high.id));
+        Ok(())
+    }
+
+    #[test]
+    fn an_undone_merge_reaches_the_users_other_device_and_a_later_merge_wins() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        let notes = Notes::new(&ann);
+        let a = notes.capture("a", None, None)?;
+        let b = notes.capture("b", None, None)?;
+        notes.merge(&a.id, &b.id)?;
+        exchange(&desk, &ann, None)?;
+        Notes::new(&desk).undo_merge(&a.id)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            assert_eq!(merged_into(store, &a.id)?, None);
+        }
+        notes.merge(&a.id, &b.id)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            assert_eq!(merged_into(store, &a.id)?, Some(b.id.clone()));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_member_undoes_the_merge_of_their_own_note_a_manager_anyones() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let into = Notes::new(&ann).capture("Toner", Some(&area), None)?;
+        let own = Notes::new(&ben).capture("Ben's toner", Some(&area), None)?;
+        exchange(&ben, &ann, None)?;
+        Notes::new(&ben).merge(&own.id, &into.id)?;
+        assert!(Notes::new(&ben).may_undo_merge(&own.id)?);
+        Notes::new(&ben).undo_merge(&own.id)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(merged_into(store, &own.id)?, None);
+        }
+        Notes::new(&ben).merge(&own.id, &into.id)?;
+        exchange(&ben, &ann, None)?;
+        assert!(Notes::new(&ann).may_undo_merge(&own.id)?);
+        Notes::new(&ann).undo_merge(&own.id)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(merged_into(store, &own.id)?, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_undo_of_anothers_merge_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let into = Notes::new(&ann).capture("Toner", Some(&area), None)?;
+        let merged = Notes::new(&ann).capture("Order more", Some(&area), None)?;
+        Notes::new(&ann).merge(&merged.id, &into.id)?;
+        exchange(&ben, &ann, None)?;
+        let mark = ben.current_seq()?;
+        assert!(!Notes::new(&ben).may_undo_merge(&merged.id)?);
+        assert!(Notes::new(&ben).undo_merge(&merged.id).is_err());
+        assert_eq!(ben.current_seq()?, mark);
+        // As a modified app would write it.
+        ben.append(&merged.id, keys::MERGED, None, None)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(merged_into(store, &merged.id)?, Some(into.id.clone()));
         }
         Ok(())
     }
