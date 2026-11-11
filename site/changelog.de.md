@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.6.0]
 
+### Behoben
+
+- Auf dem Desktop hält die App keinen Prozessorkern mehr beschäftigt, während sie im Infobereich wartet oder nichts tut: Die Linie unter der Menüleiste bewegt sich in gleichmäßigem Takt und hört nach zwei Minuten auf, wenn ein Abgleich hängt, bei verstecktem Fenster wird nichts gezeichnet, und der KI-Port beantwortet einen Werkzeugaufruf, wenn er kommt, statt zehnmal in der Sekunde nachzusehen.
+
 ## [0.5.1] - 2026-11-08
 
 ### Behoben
