@@ -7,8 +7,8 @@
 //! PIN stays for the first Pairing in the Sync dialogs.
 
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use oldbrainfix_core::Store;
@@ -24,6 +24,8 @@ pub const CHECK_EVERY: Duration = Duration::from_secs(5);
 #[derive(Clone, Default)]
 pub struct Syncing {
     running: Arc<AtomicUsize>,
+    /// Since when syncs run without a pause, while any does.
+    since: Arc<Mutex<Option<Instant>>>,
     wake: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
@@ -32,6 +34,7 @@ impl Syncing {
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Syncing {
         Syncing {
             running: Arc::default(),
+            since: Arc::default(),
             wake: Some(Arc::new(wake)),
         }
     }
@@ -39,6 +42,20 @@ impl Syncing {
     /// Whether a sync runs now.
     pub fn running(&self) -> bool {
         self.running.load(Ordering::SeqCst) > 0
+    }
+
+    /// Whether the sync line shows: while a sync runs, but not past
+    /// `limit`. A sync that hangs, such as on a shared folder whose disk
+    /// stopped answering, cannot be stopped from here; the line goes so
+    /// that it does not move, and ask for frames, for good (#292).
+    pub fn shows_line(&self, limit: Duration) -> bool {
+        self.running()
+            && self
+                .since
+                .lock()
+                .ok()
+                .and_then(|since| *since)
+                .is_some_and(|since| since.elapsed() < limit)
     }
 
     /// Runs `work` as a sync: [`Syncing::running`] meanwhile.
@@ -59,7 +76,11 @@ struct Running<'a>(&'a Syncing);
 
 impl<'a> Running<'a> {
     fn start(syncing: &'a Syncing) -> Running<'a> {
-        syncing.running.fetch_add(1, Ordering::SeqCst);
+        if syncing.running.fetch_add(1, Ordering::SeqCst) == 0
+            && let Ok(mut since) = syncing.since.lock()
+        {
+            *since = Some(Instant::now());
+        }
         syncing.wake();
         Running(syncing)
     }
@@ -67,7 +88,11 @@ impl<'a> Running<'a> {
 
 impl Drop for Running<'_> {
     fn drop(&mut self) {
-        self.0.running.fetch_sub(1, Ordering::SeqCst);
+        if self.0.running.fetch_sub(1, Ordering::SeqCst) == 1
+            && let Ok(mut since) = self.0.since.lock()
+        {
+            *since = None;
+        }
         self.0.wake();
     }
 }
@@ -215,5 +240,37 @@ pub fn run(
             eprintln!("oldbrainfix: {e}");
             told = Some(e);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc::channel;
+
+    #[test]
+    fn the_line_shows_while_a_sync_runs_and_goes_past_its_limit() {
+        let syncing = Syncing::default();
+        assert!(!syncing.shows_line(Duration::from_secs(3600)));
+        let (started, start) = channel();
+        let (done, finish) = channel::<()>();
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                syncing.during(move || {
+                    started.send(()).ok();
+                    finish.recv().ok();
+                })
+            });
+            start.recv().ok();
+            assert!(syncing.running());
+            assert!(syncing.shows_line(Duration::from_secs(3600)));
+            // Past its limit the sync still runs, the line is gone.
+            std::thread::sleep(Duration::from_millis(5));
+            assert!(!syncing.shows_line(Duration::from_millis(1)));
+            assert!(syncing.running());
+            done.send(()).ok();
+        });
+        assert!(!syncing.running());
+        assert!(!syncing.shows_line(Duration::from_secs(3600)));
     }
 }

@@ -21,6 +21,10 @@ pub const SWEEP: f64 = 0.9;
 /// the window from drawing as fast as it can (#292).
 pub const FRAME: Duration = Duration::from_millis(33);
 
+/// How long the line shows for one sync at most: a sync that hangs past
+/// it keeps running, the line goes (#292).
+pub const LIMIT: Duration = Duration::from_secs(120);
+
 /// The stretch's share of the bar's width.
 const SHARE: f32 = 0.25;
 

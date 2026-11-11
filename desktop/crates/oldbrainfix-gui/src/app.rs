@@ -8421,7 +8421,12 @@ impl App {
             // Under it, while a sync of this Device runs (#225).
             // Not while hidden: nobody sees it, and it would keep asking for frames.
             let drawn = self.drawn(ui.ctx());
-            if drawn && self.syncing.as_ref().is_some_and(Syncing::running) {
+            if drawn
+                && self
+                    .syncing
+                    .as_ref()
+                    .is_some_and(|s| s.shows_line(sync_line::LIMIT))
+            {
                 sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
             } else if drawn && self.pack_opening() {
                 // And while a Pack opens off the window's thread.
