@@ -1834,9 +1834,10 @@ fn sharing_frames(
             harness.run();
             Ok(())
         }),
+        // The bundles' heading in the middle, the folder above it.
         ("shared-folder", synced, |harness, _, _| {
-            let stay = harness.state().t().sync_settings_stay().to_string();
-            sync_to(harness, &stay)
+            let bundles = harness.state().t().bundle_title().to_string();
+            sync_to(harness, &bundles)
         }),
         ("bundle", synced, |harness, _, _| {
             let stay = harness.state().t().sync_settings_stay().to_string();
@@ -1883,9 +1884,10 @@ fn family_frames(
         folder: true,
         ..PeopleSeed::default()
     };
+    // The bundles' heading in the middle, the folder above it.
     let shared_folder: PeopleScene = |harness, _, _| {
-        let stay = harness.state().t().sync_settings_stay().to_string();
-        sync_to(harness, &stay)
+        let bundles = harness.state().t().bundle_title().to_string();
+        sync_to(harness, &bundles)
     };
     let scenes: [(&str, PeopleSeed, PeopleScene); 4] = [
         ("syncthing-own", folder, shared_folder),

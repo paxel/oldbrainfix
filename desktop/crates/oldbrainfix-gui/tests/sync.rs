@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::join::{SyncFailure, lan_sync};
@@ -781,6 +782,71 @@ fn a_bundle_is_imported_and_one_saved_in_the_sync_dialog() -> TestResult {
     assert!(file.is_file(), "the extension is added");
     import_bundle(&phone, &file)?;
     assert_eq!(texts_of(&phone)?, texts_of(harness.state().store())?);
+    Ok(())
+}
+
+/// Whether the radio button `label` is the one picked.
+fn picked(harness: &Harness<'_, App>, label: &str) -> bool {
+    harness
+        .get_by_role_and_label(Role::RadioButton, label)
+        .accesskit_node()
+        .toggled()
+        == Some(Toggled::True)
+}
+
+#[test]
+fn a_bundle_is_for_the_device_picked_with_its_radio_button() -> TestResult {
+    let desk = store(1)?;
+    Notes::new(&desk).capture("From the desk", None, None)?;
+    // The phone holds all the desk has; a bundle for it has nothing new.
+    let phone = paired_phone(&desk)?;
+    pair(&desk, &phone.device_id()?)?;
+    let dir = tempfile::tempdir()?;
+    let mut harness = sync_view(desk, dir.path())?;
+    let saved = Arc::new(AtomicBool::new(false));
+    {
+        let saved = saved.clone();
+        let file = dir.path().join("bundle");
+        harness.state_mut().set_bundle_dialogs(
+            Box::new(move |_, _| {
+                saved.store(true, Ordering::SeqCst);
+                Some(file.clone())
+            }),
+            Box::new(|_| None),
+        );
+    }
+    assert!(picked(&harness, "Everything"));
+    assert!(!picked(&harness, "Pixel"));
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Pixel")
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(picked(&harness, "Pixel"));
+    assert!(!picked(&harness, "Everything"));
+    harness.get_by_label("Save bundle…").click_accesskit();
+    harness.step();
+    harness.step();
+    assert_eq!(
+        harness.state().notice(),
+        Some("There is nothing new to send.")
+    );
+    assert!(!saved.load(Ordering::SeqCst), "not even asked where to");
+
+    harness
+        .get_by_role_and_label(Role::RadioButton, "Everything")
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(picked(&harness, "Everything"));
+    harness.get_by_label("Save bundle…").click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(saved.load(Ordering::SeqCst));
+    assert_eq!(
+        harness.state().notice(),
+        Some("Bundle saved. Send it to the other Device and import it there.")
+    );
     Ok(())
 }
 
