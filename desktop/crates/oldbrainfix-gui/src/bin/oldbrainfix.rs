@@ -43,7 +43,7 @@ use oldbrainfix_core::{
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::app::BIGGER_ZOOM;
 use oldbrainfix_gui::auto_sync::{self, Syncing};
-use oldbrainfix_gui::autostart::Autostart;
+use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
 use oldbrainfix_gui::enrich::{
@@ -51,10 +51,12 @@ use oldbrainfix_gui::enrich::{
 };
 use oldbrainfix_gui::folder_sync;
 use oldbrainfix_gui::hotkey::{self, Hotkey};
+use oldbrainfix_gui::instance::Way;
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
 use oldbrainfix_gui::login;
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
+use oldbrainfix_gui::older_app::OlderAppView;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
@@ -438,6 +440,71 @@ impl eframe::App for Refusal {
     }
 }
 
+struct OlderApp(OlderAppView);
+
+impl eframe::App for OlderApp {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        App::install(ui.ctx());
+        self.0.show(ui);
+    }
+}
+
+/// An older app asked to make way for this start did not go: says so
+/// on the command line and, for a start that would show the window, the
+/// tray or the popup, in a window of its own, until it is closed; runs
+/// nothing else, so reminders never come twice. The exit code.
+fn older_stays(locale: &'static str, launch: &Launch) -> Result<i32, String> {
+    let view = OlderAppView::new(locale);
+    let t = view.t();
+    eprintln!(
+        "oldbrainfix: {} {}",
+        t.older_app_stays(),
+        t.older_app_stays_fix()
+    );
+    if !matches!(
+        launch,
+        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_)
+    ) {
+        return Ok(cli::FAILED);
+    }
+    let viewport = egui::ViewportBuilder::default()
+        .with_title(t.app_title())
+        .with_app_id(APP_ID)
+        .with_inner_size([640.0, 360.0]);
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+    eframe::run_native(
+        APP_NAME,
+        options,
+        Box::new(move |_| Ok(Box::new(OlderApp(view)))),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(cli::FAILED)
+}
+
+/// After an older app made way for a capture or an import, which end
+/// on their own: the app runs on in the tray, as the older one did, so
+/// reminders go on. `code` passes through.
+fn run_on(way: Way, code: i32) -> i32 {
+    if way != Way::Replaced {
+        return code;
+    }
+    let started = std::env::current_exe().and_then(|exe| {
+        std::process::Command::new(exe)
+            .arg(TRAY_ARG)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+    });
+    if let Err(e) = started {
+        eprintln!("oldbrainfix: {e}");
+    }
+    code
+}
+
 /// Opens the store in `dir`.
 fn open_store(dir: &Path) -> Result<Store, Error> {
     Store::open(
@@ -547,22 +614,33 @@ fn run() -> Result<i32, String> {
         println!("{}", t.cli_usage());
         return Ok(cli::OK);
     }
+    // Neither the running app nor the database is asked.
+    if launch == Launch::Version {
+        println!("{}", cli::version_line());
+        return Ok(cli::OK);
+    }
     let dir = oldbrainfix_gui::data_dir().ok_or("no data directory for this user")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let socket = dir.join("instance.sock");
     // Files for the window to open: from `open`, and later starts.
     let handed: Arc<Mutex<Vec<std::path::PathBuf>>> = Arc::default();
+    // An older app running goes first (#290), before this start opens
+    // the database; one of this version or newer takes the wish below.
+    let way = instance::make_way(&socket, env!("CARGO_PKG_VERSION"), instance::QUIT_WAIT);
+    if way == Way::Stays {
+        return older_stays(locale, &launch);
+    }
     let first = match launch {
-        Launch::Text(text) => return Ok(capture_text(&dir, &socket, &t, &text)),
+        Launch::Text(text) => return Ok(run_on(way, capture_text(&dir, &socket, &t, &text))),
         Launch::Stdin => {
             let mut text = String::new();
             if let Err(e) = std::io::stdin().read_to_string(&mut text) {
                 eprintln!("oldbrainfix: {}", t.cli_failed(&e.to_string()));
-                return Ok(cli::FAILED);
+                return Ok(run_on(way, cli::FAILED));
             }
-            return Ok(capture_text(&dir, &socket, &t, &text));
+            return Ok(run_on(way, capture_text(&dir, &socket, &t, &text)));
         }
-        Launch::Import(file) => return Ok(import_file(&dir, &socket, &t, &file)),
+        Launch::Import(file) => return Ok(run_on(way, import_file(&dir, &socket, &t, &file))),
         Launch::Open(file) => {
             // The running app has a working directory of its own.
             let path = std::path::absolute(&file).unwrap_or_else(|_| file.into());
@@ -574,7 +652,7 @@ fn run() -> Result<i32, String> {
             }
             Some(Command::Open)
         }
-        Launch::Window | Launch::Help => Some(Command::Open),
+        Launch::Window | Launch::Help | Launch::Version => Some(Command::Open),
         Launch::Popup => Some(Command::Capture),
         // A login start adds nothing to a running app.
         Launch::Tray => None,

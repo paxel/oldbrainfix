@@ -7,8 +7,15 @@
 //! Sent Item for the window to show. On systems without Unix sockets
 //! every start runs on its own.
 //!
+//! Before it hands anything over, a start asks the running app for its
+//! version (#290): one older than this start, or one that does not
+//! answer, as 0.5 and before, is asked to quit, and this start runs in
+//! its place once it has gone, so an update takes effect on the next
+//! start.
+//!
 //! The protocol: one line with a word (`open`, `capture`, `quit`,
-//! `none`), and nothing back; or the line `text`, then the text to the
+//! `none`), and nothing back; or the line `version`, answered by one
+//! line with the running app's version; or the line `text`, then the text to the
 //! end of the stream, answered by `ok` or by `error` and what went wrong;
 //! or the line `import`, then the path to the end of the stream,
 //! answered by `ok` and what came in, or by `error` and what went wrong;
@@ -17,6 +24,7 @@
 
 use std::path::Path;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use crate::tray::Command;
 
@@ -26,6 +34,9 @@ const TEXT: &str = "text";
 const IMPORT: &str = "import";
 /// The word before the path of a file for the window to open.
 const FILE: &str = "file";
+/// The word that asks the running app for its version.
+#[cfg(unix)]
+const VERSION: &str = "version";
 const OK: &str = "ok";
 const ERROR: &str = "error";
 
@@ -38,6 +49,87 @@ pub type Import = Box<dyn Fn(&Path) -> Result<String, String> + Send>;
 
 /// Takes the path of a file for the window to open.
 pub type OpenFile = Box<dyn Fn(&Path) + Send>;
+
+/// How long a start waits for an older app it asked to quit to go: it
+/// ends its syncs and its Backup first.
+pub const QUIT_WAIT: Duration = Duration::from_secs(5);
+
+/// How long a start waits for the running app to say its version; one
+/// of 0.5 or before answers at once, by closing the connection.
+#[cfg(unix)]
+const VERSION_WAIT: Duration = Duration::from_secs(5);
+
+/// What a start found at the socket, and did about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Way {
+    /// No app runs: this start runs, or does its wish on its own.
+    Alone,
+    /// An older app ran and has gone: this start runs in its place.
+    Replaced,
+    /// An app of this version or newer runs: the wish goes to it.
+    HandOver,
+    /// An older app was asked to quit and is still there: this start
+    /// says so and ends, so reminders never come twice.
+    Stays,
+}
+
+/// Whether the running app's `theirs` is older than `own`: an answer
+/// that is no version, or none at all, counts as older.
+pub fn older(theirs: Option<&str>, own: &str) -> bool {
+    let Ok(own) = semver::Version::parse(own) else {
+        return false;
+    };
+    match theirs.map(semver::Version::parse) {
+        Some(Ok(theirs)) => theirs < own,
+        _ => true,
+    }
+}
+
+/// Makes way for this start, of version `own`: asks the app running at
+/// `socket` for its version and, when it is older, asks it to quit and
+/// waits up to `wait` for its socket to be free.
+#[cfg(unix)]
+pub fn make_way(socket: &Path, own: &str, wait: Duration) -> Way {
+    let Some(theirs) = running_version(socket) else {
+        return Way::Alone;
+    };
+    if !older(theirs.as_deref(), own) {
+        return Way::HandOver;
+    }
+    hand_over(socket, Some(Command::Quit));
+    let until = std::time::Instant::now() + wait;
+    loop {
+        if std::os::unix::net::UnixStream::connect(socket).is_err() {
+            return Way::Replaced;
+        }
+        if std::time::Instant::now() >= until {
+            return Way::Stays;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(not(unix))]
+pub fn make_way(_socket: &Path, _own: &str, _wait: Duration) -> Way {
+    Way::Alone
+}
+
+/// The version the app running at `socket` says: `None` when none runs,
+/// `Some(None)` when it says nothing.
+#[cfg(unix)]
+fn running_version(socket: &Path) -> Option<Option<String>> {
+    use std::io::{Read, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).ok()?;
+    let answer = (|| -> std::io::Result<String> {
+        stream.set_read_timeout(Some(VERSION_WAIT))?;
+        writeln!(stream, "{VERSION}")?;
+        stream.shutdown(std::net::Shutdown::Write)?;
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer)?;
+        Ok(answer.trim().to_string())
+    })();
+    Some(answer.ok().filter(|a| !a.is_empty()))
+}
 
 /// What a second start says.
 fn word(command: Option<Command>) -> &'static str {
@@ -159,6 +251,18 @@ pub fn listen(
     socket: &Path,
     commands: Sender<Command>,
     wake: Box<dyn Fn() + Send>,
+    handlers: (Capture, Import, OpenFile),
+) -> std::io::Result<()> {
+    listen_as(socket, env!("CARGO_PKG_VERSION"), commands, wake, handlers)
+}
+
+/// [`listen`], answering `version` with `version`.
+#[cfg(unix)]
+fn listen_as(
+    socket: &Path,
+    version: &'static str,
+    commands: Sender<Command>,
+    wake: Box<dyn Fn() + Send>,
     (capture, import, open): (Capture, Import, OpenFile),
 ) -> std::io::Result<()> {
     use std::io::{BufRead, Read, Write};
@@ -188,6 +292,8 @@ pub fn listen(
                     Err(e) => format!("{ERROR} {e}"),
                 };
                 drop(writeln!(reader.get_mut(), "{answer}"));
+            } else if word == VERSION {
+                drop(writeln!(reader.get_mut(), "{version}"));
             } else if word == FILE {
                 let mut path = String::new();
                 if reader.read_to_string(&mut path).is_ok() && !path.is_empty() {
@@ -242,6 +348,148 @@ mod tests {
         let wait = std::time::Duration::from_secs(5);
         assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
         assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Capture));
+        Ok(())
+    }
+
+    /// The handlers of a running app that takes nothing in.
+    fn idle() -> (Capture, Import, OpenFile) {
+        (
+            Box::new(|_| Ok(())),
+            Box::new(|_| Ok(String::new())),
+            Box::new(|_| {}),
+        )
+    }
+
+    /// A running app of `version` at `socket` that, asked to quit,
+    /// goes, its socket removed as the app removes it at its end; the
+    /// commands it got.
+    fn running_app(
+        socket: &Path,
+        version: &'static str,
+    ) -> std::io::Result<std::sync::mpsc::Receiver<Command>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        listen_as(socket, version, tx, Box::new(|| {}), idle())?;
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let path = socket.to_path_buf();
+        std::thread::spawn(move || {
+            for command in rx {
+                if command == Command::Quit {
+                    let _ = std::fs::remove_file(&path);
+                }
+                let _ = seen_tx.send(command);
+            }
+        });
+        Ok(seen_rx)
+    }
+
+    /// A running app of 0.5 or before at `socket`: it reads every word
+    /// and answers none; asked to quit it goes when `quits`.
+    fn app_of_0_5(socket: &Path, quits: bool) -> std::io::Result<()> {
+        use std::io::BufRead;
+        let listener = std::os::unix::net::UnixListener::bind(socket)?;
+        let path = socket.to_path_buf();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                let _ = std::io::BufReader::new(stream).read_line(&mut line);
+                if line.trim() == "quit" && quits {
+                    let _ = std::fs::remove_file(&path);
+                    return;
+                }
+            }
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn versions_are_compared_as_semantic_versions() {
+        assert!(older(Some("0.5.1"), "0.6.0"));
+        assert!(older(Some("0.9.3"), "0.10.0"));
+        assert!(older(Some("0.6.0-rc.1"), "0.6.0"));
+        assert!(!older(Some("0.6.0"), "0.6.0"));
+        assert!(!older(Some("0.10.0"), "0.9.3"));
+        assert!(!older(Some("1.0.0"), "0.6.0"));
+        // No answer, or none that is a version, counts as older.
+        assert!(older(None, "0.6.0"));
+        assert!(older(Some("ok"), "0.6.0"));
+    }
+
+    #[test]
+    fn the_running_app_says_its_version() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        assert_eq!(running_version(&socket), None);
+        let (tx, rx) = std::sync::mpsc::channel();
+        listen(&socket, tx, Box::new(|| {}), idle())?;
+        assert_eq!(
+            running_version(&socket),
+            Some(Some(env!("CARGO_PKG_VERSION").to_string()))
+        );
+        // Asking is no wish.
+        assert!(rx.try_recv().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn no_app_running_lets_this_start_run_alone() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        assert_eq!(make_way(&socket, "0.6.0", QUIT_WAIT), Way::Alone);
+        // One left behind by a crash answers nobody.
+        drop(std::os::unix::net::UnixListener::bind(&socket)?);
+        assert!(socket.exists());
+        assert_eq!(make_way(&socket, "0.6.0", QUIT_WAIT), Way::Alone);
+        Ok(())
+    }
+
+    #[test]
+    fn an_older_app_answering_its_version_is_asked_to_quit_and_replaced() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        let seen = running_app(&socket, "0.5.9")?;
+        assert_eq!(make_way(&socket, "0.6.0", QUIT_WAIT), Way::Replaced);
+        let wait = std::time::Duration::from_secs(5);
+        assert_eq!(seen.recv_timeout(wait).ok(), Some(Command::Quit));
+        assert!(!hand_over(&socket, Some(Command::Open)), "it has gone");
+        Ok(())
+    }
+
+    #[test]
+    fn an_app_answering_nothing_counts_as_older_and_is_replaced() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        app_of_0_5(&socket, true)?;
+        assert_eq!(make_way(&socket, "0.6.0", QUIT_WAIT), Way::Replaced);
+        assert!(!socket.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn an_app_of_the_same_version_or_newer_takes_the_wish() -> std::io::Result<()> {
+        for theirs in ["0.6.0", "0.7.0"] {
+            let dir = tempfile::tempdir()?;
+            let socket = dir.path().join("instance.sock");
+            let seen = running_app(&socket, theirs)?;
+            assert_eq!(make_way(&socket, "0.6.0", QUIT_WAIT), Way::HandOver);
+            assert!(hand_over(&socket, Some(Command::Open)));
+            // The first command it got is the wish: it was not asked to quit.
+            let wait = std::time::Duration::from_secs(5);
+            assert_eq!(seen.recv_timeout(wait).ok(), Some(Command::Open));
+            assert!(socket.exists());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn an_older_app_that_does_not_quit_in_time_stays_and_this_start_ends() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        app_of_0_5(&socket, false)?;
+        let wait = std::time::Duration::from_millis(300);
+        let asked = std::time::Instant::now();
+        assert_eq!(make_way(&socket, "0.6.0", wait), Way::Stays);
+        assert!(asked.elapsed() < std::time::Duration::from_secs(3));
+        assert!(socket.exists());
         Ok(())
     }
 

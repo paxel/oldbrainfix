@@ -32,6 +32,12 @@
   every start writes or refreshes the app's entry in the application menu and its icon.
 </p>
 <p>
+  An update replaces the running app on the next start: when an older version still runs in the
+  tray, the new one ends it and runs in its place, with the window, the popup, the capture or the
+  import it was started for. If the older one does not end within a few seconds, the new one says so
+  and starts nothing; choose <strong>Quit</strong> in the tray's menu and start the app again.
+</p>
+<p>
   The first start offers the same three choices as the phone: <strong>New to Old Brain
   Fix</strong> with the Starter Set, where Simple or Advanced is picked, <strong>Add a Device of
   mine</strong> and <strong>Restore from a Backup</strong> (see
@@ -404,6 +410,7 @@
   <li><code>oldbrainfix capture -</code> keeps what comes in on standard input.</li>
   <li><code>oldbrainfix import FILE</code> imports a sync bundle and prints what came in.</li>
   <li><code>oldbrainfix open FILE</code> shows a Sent Item in the window, to accept or decline; a Profile card file adds the person and opens their Profile.</li>
+  <li><code>oldbrainfix --version</code> or <code>-V</code> prints the version, such as "Old Brain Fix 0.6.0", without starting the app.</li>
   <li><code>oldbrainfix --help</code> prints the usage.</li>
 </ul>
 <p>

@@ -59,6 +59,8 @@ rfd = "0.17"
 # the core's zip, which also reads Deflate here, through the flate2 the
 # PNG decoder brings already.
 zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+# Whether the app running already is older than this start (#290).
+semver = "1"
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]

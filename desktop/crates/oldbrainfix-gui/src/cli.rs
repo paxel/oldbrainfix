@@ -7,7 +7,8 @@
 //! - `oldbrainfix capture -` captures what comes in on stdin,
 //! - `oldbrainfix import FILE` imports the sync bundle FILE,
 //! - `oldbrainfix open FILE` shows the Sent Item FILE in the window, to
-//!   accept or decline.
+//!   accept or decline,
+//! - `oldbrainfix --version` prints the version.
 //!
 //! A capture without a window prints nothing when it worked; an import
 //! prints what came in. The exit codes are [`OK`], [`FAILED`] and
@@ -52,6 +53,8 @@ pub enum Launch {
     Open(String),
     /// Prints the usage.
     Help,
+    /// Prints the version.
+    Version,
 }
 
 /// Arguments that make no sense.
@@ -66,6 +69,7 @@ pub fn parse(args: &[String]) -> Result<Launch, Usage> {
     match first.as_str() {
         TRAY_ARG if rest.is_empty() => Ok(Launch::Tray),
         "-h" | "--help" | "help" if rest.is_empty() => Ok(Launch::Help),
+        "-V" | "--version" if rest.is_empty() => Ok(Launch::Version),
         CAPTURE => match rest {
             [] => Ok(Launch::Popup),
             [one] if one == "-" => Ok(Launch::Stdin),
@@ -92,6 +96,12 @@ fn words(text: &[String]) -> Result<Launch, Usage> {
     Ok(Launch::Text(text.join(" ")))
 }
 
+/// What `--version` prints: the name and the version this program was
+/// built as.
+pub fn version_line() -> String {
+    format!("Old Brain Fix {}", env!("CARGO_PKG_VERSION"))
+}
+
 /// The text to capture as it is kept: without the blanks around it;
 /// `None` when nothing is left.
 pub fn note_text(text: &str) -> Option<&str> {
@@ -114,6 +124,22 @@ mod tests {
         assert_eq!(parse_of(&["--help"]), Ok(Launch::Help));
         assert_eq!(parse_of(&["--tray", "x"]), Err(Usage));
         assert_eq!(parse_of(&["captur"]), Err(Usage));
+    }
+
+    #[test]
+    fn version_is_asked_by_either_spelling_and_alone() {
+        assert_eq!(parse_of(&["--version"]), Ok(Launch::Version));
+        assert_eq!(parse_of(&["-V"]), Ok(Launch::Version));
+        assert_eq!(parse_of(&["--version", "x"]), Err(Usage));
+        assert_eq!(parse_of(&["-V", "--help"]), Err(Usage));
+        assert_eq!(parse_of(&["--tray", "--version"]), Err(Usage));
+        assert_eq!(parse_of(&["-v"]), Err(Usage));
+        assert_eq!(parse_of(&["version"]), Err(Usage));
+        assert_eq!(parse_of(&["capture", "--version"]), Err(Usage));
+        assert_eq!(
+            version_line(),
+            format!("Old Brain Fix {}", env!("CARGO_PKG_VERSION"))
+        );
     }
 
     #[test]

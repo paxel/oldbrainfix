@@ -3367,6 +3367,7 @@ dependencies = [
  "rten",
  "rten-tensor",
  "rusto-rs",
+ "semver",
  "serde_json",
  "sys-locale",
  "tempfile",

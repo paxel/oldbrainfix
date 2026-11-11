@@ -92,6 +92,8 @@ mod tests {
             (en.popup_keys_hint(), de.popup_keys_hint()),
             (en.hotkey_unavailable(), de.hotkey_unavailable()),
             (en.cli_usage(), de.cli_usage()),
+            (en.older_app_stays(), de.older_app_stays()),
+            (en.older_app_stays_fix(), de.older_app_stays_fix()),
             (en.bundle_save(), de.bundle_save()),
             (en.bundle_open(), de.bundle_open()),
             (en.bundle_drop(), de.bundle_drop()),
@@ -162,6 +164,7 @@ mod tests {
             de.person_filter_remove("Ben")
         );
         assert!(en.cli_usage().contains("oldbrainfix import FILE"));
+        assert!(de.cli_usage().contains("oldbrainfix --version"));
         assert_eq!(de.close(), "Schließen");
     }
 }
