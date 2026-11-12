@@ -39,6 +39,7 @@ import 'lock_platform.dart';
 import 'lock_screen.dart';
 import 'look.dart';
 import 'nudge_screen.dart';
+import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
@@ -400,9 +401,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                   child: AppLinkScope(
                                                     onOpen: _links.open,
                                                     onPick: _pickLink,
-                                                    child:
-                                                        child ??
-                                                        const SizedBox.shrink(),
+                                                    child: AlarmSyncScope(
+                                                      alarms: _alarms,
+                                                      child:
+                                                          child ??
+                                                          const SizedBox.shrink(),
+                                                    ),
                                                   ),
                                                 ),
                                               ),

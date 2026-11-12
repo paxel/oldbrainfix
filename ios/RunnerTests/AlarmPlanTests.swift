@@ -186,6 +186,52 @@ class AlarmPlanTests: XCTestCase {
       .openChanges)
   }
 
+  func testNotTodaysActionsMapToTheirAnswers() {
+    XCTAssertEqual(
+      NotificationAnswer.of(category: NotificationAnswer.alarmCategory, action: "obf.skip"), .skip)
+    XCTAssertEqual(
+      NotificationAnswer.of(category: NotificationAnswer.alarmCategory, action: "obf.tomorrow"),
+      .tomorrow)
+    XCTAssertEqual(
+      NotificationAnswer.of(category: NotificationAnswer.pastAlarmCategory, action: "obf.skip"),
+      .skip)
+    XCTAssertEqual(
+      NotificationAnswer.of(
+        category: NotificationAnswer.pastAlarmCategory, action: "obf.snooze.10"),
+      .snooze(minutes: 10))
+    // An earlier day's Occurrence has no Tomorrow.
+    XCTAssertEqual(
+      NotificationAnswer.of(
+        category: NotificationAnswer.pastAlarmCategory, action: "obf.tomorrow"),
+      .open)
+    XCTAssertTrue(AlarmPlan.offersTomorrow("2026-10-24T08:00", today: "2026-10-24"))
+    XCTAssertFalse(AlarmPlan.offersTomorrow("2026-10-23T22:00", today: "2026-10-24"))
+  }
+
+  func testSkipSilencesAnOccurrenceAndTomorrowRingsItTheDayAfter() {
+    let pills = alarm("pills", renag: 10, end: [2026, 10, 24, 14, 0])
+    let water = alarm("water")
+    var queue = ActionQueue()
+    queue.add(
+      kind: QueuedAction.skip, routine: "water", occurrence: "2026-10-24T08:00", title: "water",
+      body: "", now: eight)
+    queue.add(
+      kind: QueuedAction.tomorrow, routine: "pills", occurrence: "2026-10-24T08:00",
+      title: "pills", body: "08:00", now: eight)
+
+    let plan = AlarmPlan.effective([pills, water], queued: queue.pending)
+    XCTAssertEqual(plan.map { $0.id }, ["occurrence:pills@2026-10-25T08:00"])
+    XCTAssertEqual(plan.first?.local, [2026, 10, 25, 8, 0])
+    XCTAssertEqual(plan.first?.end, [2026, 10, 25, 14, 0])
+    XCTAssertEqual(plan.first?.renagMs, 10 * minute)
+    // Missed when the next one starts, as before, where that comes later.
+    let weekly = alarm("pills", renag: 10, end: [2026, 10, 31, 8, 0])
+    XCTAssertEqual(AlarmPlan.moved(weekly)?.end, [2026, 10, 31, 8, 0])
+    XCTAssertEqual(AlarmPlan.movedKey("2026-12-31"), "2027-01-01")
+    XCTAssertEqual(AlarmPlan.movedKey("2028-02-28T07:00"), "2028-02-29T07:00")
+    XCTAssertNil(AlarmPlan.movedKey("someday"))
+  }
+
   func testTheArmedPlanReadsAsTheChannelSendsIt() {
     let alarms = PlanCodec.alarms([
       [

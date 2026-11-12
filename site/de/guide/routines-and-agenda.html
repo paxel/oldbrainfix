@@ -186,7 +186,7 @@
 <guide-box name="check-off">
 <h2>Abhaken, wenn es klingelt</h2>
 <p>Markiere eine Routine oder Erinnerung als erledigt.</p>
-<box-tab device="phone" alt="Der Notiz-Editor der Therme mit Fällig 09:30, Erledigt und Erledigt und in den Papierkorb oben">
+<box-tab device="phone" alt="Der Notiz-Editor der Therme mit Fällig 09:30, Erledigt, Später, Nicht heute und Erledigt und in den Papierkorb oben">
 <li>Tippe die Benachrichtigung.</li>
 <li>Tippe oben <strong>Erledigt</strong>.</li>
 </box-tab>
@@ -196,18 +196,30 @@
 </box-tab>
 <box-more>
 <p>
-  Eine Fälligkeit erscheint als Benachrichtigung mit <strong>Erledigt</strong> und
-  <strong>Später</strong>; Später macht aus derselben Benachrichtigung 10 Min., 30 Min. und 1 Std.
-  Beides geht, ohne die App zu öffnen, auch auf dem Sperrbildschirm.
+  Eine Fälligkeit erscheint als Benachrichtigung mit <strong>Erledigt</strong>,
+  <strong>Später</strong> und <strong>Nicht heute</strong>; Später macht aus derselben
+  Benachrichtigung 10 Min., 30 Min. und 1 Std., Nicht heute <strong>Auslassen</strong> und
+  <strong>Morgen</strong>. Alles geht, ohne die App zu öffnen, auch auf dem Sperrbildschirm.
+</p>
+<p>
+  <strong>Auslassen</strong> ist für eine Fälligkeit, die du heute nicht erledigen wirst: Sie ist
+  weder erledigt noch verpasst, klingelt nicht mehr, steht für den Tag durchgestrichen als
+  „Ausgelassen“ in der Agenda und erscheint nie in der Verpasst-Übersicht. <strong>Morgen</strong>
+  lässt sie aus und fügt eine einmalige Fälligkeit derselben Routine am Tag danach zur selben Zeit
+  hinzu, „Vom Vortag“; die Agenda zeigt unter der heutigen „Stattdessen am Tag danach“. Morgen gibt es nur
+  für eine Fälligkeit von heute oder später. Keins von beiden ändert den Plan. In der App
+  ausgelassen, steht „Ausgelassen“ oder „Stattdessen am Tag danach“ 10 Sekunden lang oben, und ein Tippen
+  darauf nimmt es zurück; das Kästchen hakt eine ausgelassene Fälligkeit weiter ab.
 </p>
 <p>
   Ein Tippen auf die Benachrichtigung öffnet ihre Notiz. Oben im Notiz-Editor, über dem Namen, steht
   die Fälligkeit, die gerade fällig ist, als „Fällig 15:00“, sobald ihre Zeit gekommen ist, sonst die
-  zuletzt verpasste mit ihrem Tag, mit <strong>Erledigt</strong>. Eine einmalige Erinnerung, die die
+  zuletzt verpasste mit ihrem Tag, mit <strong>Erledigt</strong>, <strong>Später</strong>, solange
+  sie nicht verpasst ist, und <strong>Nicht heute</strong>; jedes öffnet seine Auswahl dort, wo du
+  tippst. Eine einmalige Erinnerung, die die
   einzige Routine oder Erinnerung der Notiz ist, hat auch <strong>Erledigt und in den
   Papierkorb</strong>, wo dieses Gerät die Notiz ändern darf: Es hakt die Erinnerung ab, legt die
-  Notiz mit ihr in den Papierkorb und schließt den Editor. Später bleibt in der Benachrichtigung. Die
-  Karte einer Notiz, kompakt wie ausführlich, hat ein Kästchen mit der Uhrzeit für die heutige
+  Notiz mit ihr in den Papierkorb und schließt den Editor. Die Karte einer Notiz, kompakt wie ausführlich, hat ein Kästchen mit der Uhrzeit für die heutige
   Fälligkeit jeder ihrer Routinen und Erinnerungen; es hakt sie ab und wieder auf wie das Kästchen
   der Agenda, und langes Drücken auf die Karte öffnet weiter den Editor.
 </p>
@@ -248,8 +260,9 @@
   Benachrichtigung, „Verpasst, während Old Brain Fix nicht lief“.
 </p>
 <p>
-  Auf dem iPhone ist die Benachrichtigung zeitkritisch und bietet Erledigt und die drei Später,
-  10 Min., 30 Min. und 1 Std., auf einmal an; jedes erneute Erinnern ist eine eigene Benachrichtigung.
+  Auf dem iPhone ist die Benachrichtigung zeitkritisch und bietet Erledigt, die drei Später,
+  10 Min., 30 Min. und 1 Std., Auslassen und Morgen auf einmal an; jedes erneute Erinnern ist eine
+  eigene Benachrichtigung, und eines nach Mitternacht für einen früheren Tag bietet kein Morgen.
   Einen Ton wählt man dort nicht: Benachrichtigungen klingen mit dem Benachrichtigungston des iPhones,
   Alarme mit seinem Alarmton, und die Einstellungen haben dort keinen <strong>Alarmton</strong>. Nachdem das iPhone aus
   war, kommt keine Nachhol-Benachrichtigung; die Verpasst-Übersicht zeigt beim Öffnen der App, was
@@ -304,9 +317,11 @@
   Der <strong>Verlauf</strong> einer Routine öffnet aus der Leiste ihres Editors oder aus dem Menü
   ihrer Zeile in der Agenda. Er zeigt die <strong>Serie</strong>, aktuell und längste, mit den
   letzten 7 Tagen als Punkte; die <strong>Einhaltung</strong> diese Woche, diesen Monat und in den
-  letzten 30 Tagen, etwa „18 von 20 erledigt“; und das Protokoll jeder Fälligkeit, die neueste
-  zuerst: erledigt mit Uhrzeit, früh oder spät, verpasst, fällig und noch nicht erledigt oder noch
-  kommend, mit dem Verschobenen, das dieses Telefon für etwa den letzten Monat festgehalten hat. Die
+  letzten 30 Tagen, etwa „18 von 20 erledigt“, mit dem Ausgelassenen daneben, „· 3 ausgelassen“, nie
+  Teil des Anteils; und das Protokoll jeder Fälligkeit, die neueste zuerst: erledigt mit Uhrzeit,
+  früh oder spät, verpasst, ausgelassen, fällig und noch nicht erledigt oder noch kommend, mit dem
+  Verschobenen, das dieses Telefon für etwa den letzten Monat festgehalten hat. Eine ausgelassene
+  Fälligkeit unterbricht die Serie nicht und zählt nicht mit. Die
   Einstellungen schalten unter „Verlauf“ die Serien mit „Serien auf diesem Telefon zeigen“ ab; die
   Einhaltung steht immer da. Eine Erinnerung hat keinen Verlauf.
 </p>
@@ -388,7 +403,9 @@
   stelle sie innerhalb von 30 Tagen aus dem Papierkorb wieder her, weiter erledigt.
 </p>
 <p>
-  ⋮ an einer Zeile oder langes Drücken öffnet ein Menü mit <strong>Verlauf</strong> bei einer
+  ⋮ an einer Zeile oder langes Drücken öffnet ein Menü mit <strong>Später</strong> (10 Min.,
+  30 Min., 1 Std.), solange die Fälligkeit fällig ist, <strong>Nicht heute</strong> (Auslassen,
+  Morgen), solange sie weder erledigt noch ausgelassen ist, <strong>Verlauf</strong> bei einer
   Routine und, wo das Handy eine Kalender-App hat, <strong>Teilen</strong>. Eine Fälligkeit aus einem
   gesperrten Bereich, der auf maskiert steht, erscheint als „Private Routine“ mit ihrer Uhrzeit und
   lässt sich trotzdem abhaken; sie zu öffnen fragt zuerst nach dem Öffnen ihres Bereichs.

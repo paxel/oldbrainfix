@@ -176,8 +176,12 @@ void main() {
         Schedule(start: Day(2026, 10, 24), times: [at(14, 30)]),
       );
       await start(tester, platform: const NoCalendar());
-      // A Reminder has nothing else in its menu, so no ⋮ either.
-      expect(rowMenu(dentist), findsNothing);
+      // A Reminder's ⋮ only answers it (#269): no Share.
+      await tap(tester, rowMenu(dentist));
+      expect(find.byKey(const ValueKey('answer-skip')), findsOneWidget);
+      expect(find.text(share), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
       await tap(tester, allButton);
       expect(find.text('dentist'), findsOneWidget);
       expect(exportButton, findsNothing);

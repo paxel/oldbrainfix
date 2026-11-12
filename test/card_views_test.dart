@@ -186,6 +186,71 @@ void main() {
       expect(find.text('done 0 / skipped 0 this week'), findsOneWidget);
       expect(find.textContaining('morning moves'), findsNothing);
     });
+    testWidgets('of a Session Note counts the runs skipped, not those '
+        'Missed, and its next run is one Tomorrow added (#269)', (
+      tester,
+    ) async {
+      final pool = notes.capture('Push-ups').id;
+      Tallies(store).addField(pool, name: 'Done', unit: 'times', target: 20);
+      now = DateTime.utc(2026, 10, 19, 6);
+      final daily = Sessions(store).spawn(
+        notes.capture('Sport').id,
+        Schedule(
+          start: Day(2026, 10, 19),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      final weekly = Sessions(store).spawn(
+        notes.capture('Swim').id,
+        Schedule(
+          start: Day(2026, 10, 3),
+          times: [ClockTime(7, 0)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=SA'),
+        ),
+        pool: [pool],
+        count: 1,
+        rule: SessionRule.rolling,
+      );
+      now = DateTime.utc(2026, 10, 24, 8);
+      final routines = Routines(store);
+      // Sunday the 18th starts the week: the 19th to the 21st and the
+      // 23rd Missed, the 22nd skipped, today's still due.
+      routines.skip(daily.id, Occurrence(Day(2026, 10, 22), ClockTime(7, 0)));
+      routines.tomorrow(
+        weekly.id,
+        Occurrence(Day(2026, 10, 24), ClockTime(7, 0)),
+      );
+      await openCompact(tester);
+
+      final sport = cardOf('Sport').first;
+      expect(
+        find.descendant(
+          of: sport,
+          matching: find.text('done 0 / skipped 1 this week'),
+        ),
+        findsOneWidget,
+      );
+      final swim = cardOf('Swim').first;
+      expect(
+        find.descendant(
+          of: swim,
+          matching: find.text('Next: Sun, 10/25/2026 07:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: swim,
+          matching: find.text('done 0 / skipped 1 this week'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('of a Session Note shows the next run of any of its Routines '
         'and this week\'s done and skipped over all of them', (tester) async {
       final pool = notes.capture('Push-ups').id;

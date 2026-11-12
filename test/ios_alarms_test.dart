@@ -210,6 +210,34 @@ void main() {
     expect(ids, contains('snooze:${dentist.id}@2026-10-24T15:00'));
   });
 
+  testWidgets('Skip and Tomorrow tapped on the lock screen reach the log '
+      '(#269)', (tester) async {
+    final pills = routines.create('pills', daily([at(8), at(20)]));
+    final tapped = DateTime.utc(2026, 10, 24, 6, 5);
+    pending.addAll([
+      for (final (seq, kind, occurrence) in [
+        (1, 'skip', '2026-10-24T08:00'),
+        (2, 'tomorrow', '2026-10-24T20:00'),
+      ])
+        {
+          'seq': seq,
+          'kind': kind,
+          'routine': pills.id,
+          'occurrence': occurrence,
+          'at': tapped.millisecondsSinceEpoch,
+          'until': 0,
+          'line': '',
+        },
+    ]);
+    await start(tester);
+
+    final routine = routines.byId(pills.id)!;
+    expect(routine.skippedAt(Occurrence(today, at(8))), tapped);
+    expect(routine.skippedAt(Occurrence(today, at(20))), tapped);
+    expect(routine.tomorrow, contains('2026-10-24T20:00'));
+    expect(named('ack').last.arguments, 2);
+  });
+
   testWidgets('a tap while the app runs arrives through "actions"', (
     tester,
   ) async {

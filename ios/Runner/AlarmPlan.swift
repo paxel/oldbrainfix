@@ -135,10 +135,12 @@ enum AlarmPlan {
   }
 
   /// The plan with the taps the app has not applied yet: what was tapped
-  /// Done is gone, snoozed Occurrences ring again at their snooze and
-  /// Re-nag from there, as they did.
+  /// Done, Skip or Tomorrow is gone, snoozed Occurrences ring again at
+  /// their snooze and Re-nag from there, as they did, and an Occurrence
+  /// Tomorrow moved rings the day after at the same time (`moved`).
   static func effective(_ plan: [PlannedAlarm], queued: [QueuedAction]) -> [PlannedAlarm] {
-    let done = Set(queued.filter { $0.kind == QueuedAction.done }.map { $0.key })
+    let answered: Set<String> = [QueuedAction.done, QueuedAction.skip, QueuedAction.tomorrow]
+    let done = Set(queued.filter { answered.contains($0.kind) }.map { $0.key })
     var snoozes: [String: QueuedAction] = [:]
     var order: [String] = []
     for tap in queued where tap.kind == QueuedAction.snooze {
@@ -162,8 +164,84 @@ enum AlarmPlan {
         escalate: was?.escalate ?? 0
       )
     }
-    return kept + added
+    var planned = Set((kept + added).map { $0.key })
+    var tomorrow: [PlannedAlarm] = []
+    for tap in queued where tap.kind == QueuedAction.tomorrow {
+      guard let was = plan.first(where: { $0.key == tap.key }),
+        let alarm = moved(was), !planned.contains(alarm.key)
+      else { continue }
+      planned.insert(alarm.key)
+      tomorrow.append(alarm)
+    }
+    return kept + added + tomorrow
   }
+
+  /// The alarm of the one-time Occurrence Tomorrow adds for `alarm`'s
+  /// (#269): the day after at the same time, Re-nagging and escalating
+  /// as it did, and Missed when it was, or a day later where that came
+  /// before the moved one; nil when its Occurrence
+  /// or wall-clock moment does not read. A snooze's moment is the
+  /// Occurrence's own time, an all-day one's the time it rang at.
+  static func moved(_ alarm: PlannedAlarm) -> PlannedAlarm? {
+    guard let occurrence = movedKey(alarm.occurrence) else { return nil }
+    let parts = alarm.occurrence.split(separator: "T", omittingEmptySubsequences: false)
+    let local: [Int]
+    if parts.count == 2 {
+      let time = parts[1].split(separator: ":").compactMap { Int($0) }
+      guard time.count == 2, let day = dayOf(occurrence) else { return nil }
+      local = day + time
+    } else {
+      guard let rang = alarm.local, rang.count == 5 else { return nil }
+      local = nextDay(rang)
+    }
+    var moved = alarm
+    moved.id = "occurrence:\(alarm.routine)@\(occurrence)"
+    moved.occurrence = occurrence
+    moved.local = local
+    moved.at = nil
+    // Missed when the Occurrence after it starts, as before; a day later
+    // only where that came before it, as a Reminder's midnight.
+    moved.end = alarm.end.flatMap { end in
+      end.count == 5 ? (end.lexicographicallyPrecedes(local) || end == local ? nextDay(end) : end) : nil
+    }
+    return moved
+  }
+
+  /// The key of the Occurrence a day after `occurrence`, at the same
+  /// time; nil when it does not read.
+  static func movedKey(_ occurrence: String) -> String? {
+    let parts = occurrence.split(separator: "T", omittingEmptySubsequences: false)
+    guard parts.count <= 2, let day = dayOf(String(parts[0])) else { return nil }
+    let next = nextDay(day + [0, 0])
+    let text = String(format: "%04d-%02d-%02d", next[0], next[1], next[2])
+    return parts.count == 2 ? "\(text)T\(parts[1])" : text
+  }
+
+  /// Whether Not today offers Tomorrow for `occurrence` on `today`
+  /// ("2026-10-24"): only for an Occurrence of today or later.
+  static func offersTomorrow(_ occurrence: String, today: String) -> Bool {
+    String(occurrence.prefix(10)) >= today
+  }
+
+  /// [year, month, day] of `key`'s day, or nil.
+  private static func dayOf(_ key: String) -> [Int]? {
+    let parts = key.prefix(while: { $0 != "T" }).split(separator: "-")
+    guard parts.count == 3, parts[0].count == 4 else { return nil }
+    let numbers = parts.compactMap { Int($0) }
+    return numbers.count == 3 ? numbers : nil
+  }
+
+  /// `local` a calendar day later, at the same wall-clock time.
+  private static func nextDay(_ local: [Int]) -> [Int] {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    let date = calendar.date(
+      from: DateComponents(year: local[0], month: local[1], day: local[2], hour: 12))!
+    let next = calendar.date(byAdding: .day, value: 1, to: date)!
+    let parts = calendar.dateComponents([.year, .month, .day], from: next)
+    return [parts.year!, parts.month!, parts.day!, local[3], local[4]]
+  }
+
 
   /// The Nudge with the latest snooze tapped on its notification and not
   /// applied by the app yet.

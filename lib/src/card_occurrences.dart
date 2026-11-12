@@ -15,8 +15,9 @@ typedef NoteOccurrences = ({
 });
 
 /// The boxes of a Note's card, in either view, for today's Occurrences of
-/// its Routines and Reminders (#215): of each its first one today not
-/// Done, else its last one, Done and struck through. A box ticks it as
+/// its Routines and Reminders (#215): of each its first one today
+/// neither Done nor skipped, else its last one, Done or skipped (#269)
+/// and struck through. A box ticks it as
 /// the Agenda row's does and opens nothing: it checks off and unchecks
 /// again, a Session's only shows Done, and one Done from every Line
 /// checked stays checked. Where this Device may not check it off, the box
@@ -112,8 +113,12 @@ class _CardOccurrencesState extends State<CardOccurrences> {
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
-                    occurrenceTime(t, locale, row.occurrence),
-                    style: row.done == null
+                    // A skipped one says so, struck as a Done one (#269).
+                    row.done == null && row.skipped != null
+                        ? '${occurrenceTime(t, locale, row.occurrence)} · '
+                              '${t.occurrenceSkipped}'
+                        : occurrenceTime(t, locale, row.occurrence),
+                    style: row.done == null && row.skipped == null
                         ? text
                         : text?.copyWith(
                             decoration: TextDecoration.lineThrough,

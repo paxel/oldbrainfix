@@ -69,7 +69,8 @@ replace a law of Both apps where they say so. A desktop law marked
   go into an announcement.
 - A quick local success the screen already shows (copied, saved) gets
   no announcement. The one exception is the phone's offer to undo what
-  was just deleted (#268; see Phone, "Announcements").
+  was just deleted, skipped or moved to tomorrow (#268, #269; see Phone,
+  "Announcements").
 - A failure's tap opens a dialog with cause, fix and the full text,
   Close and Report; the page it belongs to is a line inside, not a
   third button.
@@ -139,9 +140,13 @@ replace a law of Both apps where they say so. A desktop law marked
   Checklist's group shows is decided in one place (`agendaLines`, on the
   desktop `agenda_lines`).
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
-  press: History for a Routine, and Share, which hands the Routine as
-  its whole series with its end, or the Reminder, to another app as a
-  calendar file. A Masked row asks for its Area to open first.
+  press: **Snooze** (10 min, 30 min, 1 h) while it is due, started and
+  not yet Missed, and **Not today** (Skip, and Tomorrow) while it is
+  neither Done nor skipped and this Device may check it off (#269), each
+  under its heading; then History for a Routine, and Share, which hands
+  the Routine as its whole series with its end, or the Reminder, to
+  another app as a calendar file. History and Share ask a Masked row's
+  Area to open first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines (#143, #208): its name as the heading, without a
   box, and its open Lines under it, each with its box, which checks it;
@@ -161,11 +166,17 @@ replace a law of Both apps where they say so. A desktop law marked
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
-  through; the box unchecks it. Checking off opens nothing. **Unless the
+  through; the box unchecks it. Checking off opens nothing. **A skipped
+  Occurrence stays for the day struck as skipped** (#269), "Skipped"
+  under its title, or "The day after instead" when Not today ▸ Tomorrow
+  skipped it; its box still checks it off. The one-time Occurrence
+  Tomorrow added shows the day after, at the same time, with "From the
+  day before" under its title. **Unless the
   Device hides what is checked** (#217): with "Hide what's checked on
   the Agenda" in Settings ▸ Agenda, off by default, a Done Occurrence, a
   checked Line and a pick with its entry leave the Agenda and the widget
-  at once instead of striking through, and a group with nothing left
+  at once instead of striking through, a skipped Occurrence with them,
+  and a group with nothing left
   goes with them, a Session's heading once it is Done and "Eat a frog"
   once today's Frog is eaten.
 - **Done can move its Note to the trash** (#211): with "Move a Note to
@@ -265,7 +276,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A card ticks today's Occurrences of its Note** (#215): in either
   view, under where it is filed and over its text, a box with the time
   for each of its Routines and Reminders with an Occurrence today, its
-  first one not Done, else its last one, Done and struck through. The box
+  first one neither Done nor skipped, else its last one, Done or
+  skipped ("08:00 · Skipped") and struck through. The box
   checks off and unchecks as the Agenda row's does and opens nothing; a
   Session's only shows Done, one Done from every Line checked stays
   checked, and where this Device may not check it off it only shows. A
@@ -274,7 +286,10 @@ replace a law of Both apps where they say so. A desktop law marked
   the name, for each Routine and Reminder of the Note an Occurrence due
   now, "Due 15:00" (with its day when it began on an earlier one), else
   its latest Missed one, "Missed" with its day and time, whether the
-  Missed Summary was seen or not, each with **Done**, and for a one-time
+  Missed Summary was seen or not, each with **Done**, beside it
+  **Snooze** while it is not Missed and **Not today** (#269), each
+  opening its choices where the finger is, Tomorrow only for an
+  Occurrence of today or later, and for a one-time
   Reminder that is the Note's only Routine or Reminder also **"Done and
   move to trash"**, where this Device may move the Note: it checks it
   off, moves the Note with the Reminder to the trash and closes the
@@ -644,11 +659,19 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Alarms and notifications
 
-- An Occurrence's notification offers **Done** and **Snooze** (10 min,
-  30 min, 1 h) without opening the app. Done is also at the top of its
-  Note's editor and on its card (#215); Snooze stays in the
-  notification. Done moves a Plain Note with its only Reminder to the
-  trash where the person chose so (#211, "Agenda").
+- An Occurrence's notification offers **Done**, **Snooze** (10 min,
+  30 min, 1 h) and **Not today** (Skip, and Tomorrow) without opening
+  the app (#269). Done is also at the top of its Note's editor and on
+  its card (#215); Snooze and Not today sit in the notification, the
+  Agenda row's ⋮ and the Note editor's Due line. **Skip** marks the
+  Occurrence neither Done nor Missed: its alarm and Re-nag stop, it
+  never shows in the Missed Summary, and it leaves the Adherence, which
+  counts it beside it ("92 % this month · 3 skipped"). **Tomorrow**
+  skips it and adds a one-time Occurrence of the same Routine the day
+  after at the same time; it is offered only for an Occurrence of today
+  or later. Neither changes the schedule. Done moves a Plain Note with
+  its only Reminder to the trash where the person chose so (#211,
+  "Agenda").
 
 ## Phone
 
@@ -731,7 +754,10 @@ replace a law of Both apps where they say so. A desktop law marked
 - **An offer to undo** (#268): what was just deleted on the phone and
   can be restored says so at the top at once ("Moved to the Trash",
   "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
-  label removed", "Transcript removed"), with "Undo" at its end; its
+  label removed", "Transcript removed"), and so does a Skip or Tomorrow
+  made in the app ("Skipped", "The day after instead", #269), whose undo
+  takes the skip back; one made on a notification offers none. It ends
+  with "Undo"; its
   tap undoes it, and a screen reader hears "Undo" as the tap's hint. It
   shows before what waits, a newer one takes the place of the one
   before, and left alone it goes by itself after 10 seconds, undoing
@@ -975,6 +1001,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
+- **On Android an Occurrence's notification has three buttons** (#269,
+  Q650): Done · Snooze · Not today, as Android shows no more. Snooze
+  replaces them in place with 10 min, 30 min and 1 h, and Not today with
+  Skip and Tomorrow, under "Skip it, or tomorrow at the same time?";
+  Tomorrow only for an Occurrence of today or later.
 - An Occurrence from a locked Area whose Area is set to Masked never
   shows its title in a notification or on the Agenda, and stays
   checkable.
@@ -984,10 +1015,12 @@ replace a law of Both apps where they say so. A desktop law marked
     own alarm screen replaces the page: its Stop answers Done, and its
     one Snooze waits 10 min, as there is room for one only. Without the
     Alarms permission it comes as a time-sensitive notification.
-  - An Occurrence's notification is time-sensitive and offers Done and
-    the three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h")
-    at once, not Snooze and then its choices; each Re-nag is a
-    notification of its own in the Occurrence's group.
+  - An Occurrence's notification is time-sensitive and offers Done, the
+    three snoozes ("Snooze 10 min", "Snooze 30 min", "Snooze 1 h"),
+    Skip and Tomorrow at once, not Snooze and Not today and then their
+    choices (#269); a Re-nag after midnight of an earlier day's
+    Occurrence offers no Tomorrow. Each Re-nag is a notification of its
+    own in the Occurrence's group.
   - The setup asks for Notifications and Alarms only; exact and
     full-screen alarms do not exist there.
   - iOS rings only what was handed to it beforehand, at most 64 rings

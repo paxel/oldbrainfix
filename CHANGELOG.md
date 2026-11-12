@@ -8,6 +8,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Added
 
 - On the desktop, `oldbrainfix --version` and `oldbrainfix -V` print the installed version, such as "Old Brain Fix 0.6.0", without starting the app.
+- On the phone, Snooze (10 min, 30 min, 1 h) is also in the Agenda row's ⋮ and beside Done at the top of the Note editor, so an Occurrence can still be snoozed once its notification is gone.
+- On the phone, Not today in the notification, the Agenda row's ⋮ and the Note editor offers Skip, which leaves an Occurrence neither Done nor Missed and stops its alarm, and Tomorrow, which skips it and adds a one-time Occurrence the day after at the same time, without changing the schedule.
+- A skipped Occurrence shows struck through as skipped on the Agenda for the day, never shows in the Missed Summary, and leaves the Adherence, which counts it beside the share, such as "92 % this month · 3 skipped"; a Session's "skipped" now counts these skips instead of its Missed runs.
 
 ### Changed
 

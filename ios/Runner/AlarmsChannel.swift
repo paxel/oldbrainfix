@@ -262,6 +262,12 @@ final class AlarmScheduler {
           kind: QueuedAction.snooze, routine: routine, occurrence: occurrence, title: title,
           body: body, until: now + Int64(minutes) * 60_000, now: now)
       }
+    case .skip, .tomorrow:
+      WidgetFiles.updateQueue {
+        $0.add(
+          kind: answer == .skip ? QueuedAction.skip : QueuedAction.tomorrow, routine: routine,
+          occurrence: occurrence, title: title, body: body, now: now)
+      }
     case .nudgeSnooze(let minutes):
       WidgetFiles.updateQueue {
         $0.add(
@@ -278,7 +284,7 @@ final class AlarmScheduler {
     // A Done shows checked on the Agenda widget at once, as on Android.
     WidgetCenter.shared.reloadTimelines(ofKind: WidgetFiles.agendaKind)
     switch answer {
-    case .done, .snooze:
+    case .done, .snooze, .skip, .tomorrow:
       removeDelivered(keys: [key])
       stopAlarms(of: key)
     case .nudgeSnooze:
@@ -422,9 +428,10 @@ final class AlarmScheduler {
     -> Set<UNNotificationCategory>
   {
     let snoozes = AlarmPlan.snoozeMinutes
-    let alarm = UNNotificationCategory(
-      identifier: NotificationAnswer.alarmCategory,
-      actions: [
+    // All at once, not Snooze and Not today and then their choices
+    // (#269): Done, the three snoozes, Skip and Tomorrow.
+    func alarmActions(tomorrow: Bool) -> [UNNotificationAction] {
+      [
         UNNotificationAction(
           identifier: NotificationAnswer.doneAction, title: Self.label(labels, "done"),
           options: [])
@@ -433,7 +440,28 @@ final class AlarmScheduler {
           UNNotificationAction(
             identifier: NotificationAnswer.snoozePrefix + String($0),
             title: Self.snoozeTitle(labels, minutes: $0), options: [])
-        },
+        }
+        + [
+          UNNotificationAction(
+            identifier: NotificationAnswer.skipAction, title: Self.label(labels, "skip"),
+            options: [])
+        ]
+        + (tomorrow
+          ? [
+            UNNotificationAction(
+              identifier: NotificationAnswer.tomorrowAction,
+              title: Self.label(labels, "tomorrow"), options: [])
+          ] : [])
+    }
+    let alarm = UNNotificationCategory(
+      identifier: NotificationAnswer.alarmCategory,
+      actions: alarmActions(tomorrow: true),
+      intentIdentifiers: [],
+      options: [])
+    // A Re-nag after midnight of an earlier day's Occurrence: no Tomorrow.
+    let pastAlarm = UNNotificationCategory(
+      identifier: NotificationAnswer.pastAlarmCategory,
+      actions: alarmActions(tomorrow: false),
       intentIdentifiers: [],
       options: [])
     let nudge = UNNotificationCategory(
@@ -452,7 +480,7 @@ final class AlarmScheduler {
       intentIdentifiers: [],
       hiddenPreviewsBodyPlaceholder: changes?.publicText ?? "",
       options: [])
-    return [alarm, nudge, changesCategory]
+    return [alarm, pastAlarm, nudge, changesCategory]
   }
 
   private func request(_ ring: Ring, nudge: PlannedNudge?, changes: PlannedNudge?)
@@ -465,7 +493,9 @@ final class AlarmScheduler {
       guard let alarm = ring.alarm else { return nil }
       content.title = alarm.title
       content.body = alarm.body
-      content.categoryIdentifier = NotificationAnswer.alarmCategory
+      content.categoryIdentifier =
+        AlarmPlan.offersTomorrow(alarm.occurrence, today: Self.dayText(ring.at))
+        ? NotificationAnswer.alarmCategory : NotificationAnswer.pastAlarmCategory
       content.threadIdentifier = alarm.key
       content.interruptionLevel = .timeSensitive
       content.userInfo = [
@@ -493,6 +523,14 @@ final class AlarmScheduler {
       identifier: AlarmPlan.requestId(ring),
       content: content,
       trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
+  }
+
+  /// The day `at` (epoch millis) falls on, on this phone's clock, as an
+  /// Occurrence's key names it ("2026-10-24").
+  private static func dayText(_ at: Int64) -> String {
+    let parts = Calendar.current.dateComponents(
+      [.year, .month, .day], from: Date(timeIntervalSince1970: Double(at) / 1000))
+    return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
   }
 
   /// Takes away the delivered notifications of the Occurrences `keys`.

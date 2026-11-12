@@ -179,7 +179,7 @@
 <guide-box name="check-off">
 <h2>Check it off when it rings</h2>
 <p>Mark a Routine or Reminder as Done.</p>
-<box-tab device="phone" alt="The Note editor of the boiler's Note with Due 09:30, Done and Done and move to trash at the top">
+<box-tab device="phone" alt="The Note editor of the boiler's Note with Due 09:30, Done, Snooze, Not today and Done and move to trash at the top">
 <li>Tap the notification.</li>
 <li>Tap <strong>Done</strong> at the top.</li>
 </box-tab>
@@ -189,17 +189,29 @@
 </box-tab>
 <box-more>
 <p>
-  An Occurrence shows as a notification with <strong>Done</strong> and <strong>Snooze</strong>; Snooze
-  turns the same notification into 10 min, 30 min and 1 h. Both work without opening the app, also
-  on the lock screen.
+  An Occurrence shows as a notification with <strong>Done</strong>, <strong>Snooze</strong> and
+  <strong>Not today</strong>; Snooze turns the same notification into 10 min, 30 min and 1 h, and
+  Not today into <strong>Skip</strong> and <strong>Tomorrow</strong>. All of them work without
+  opening the app, also on the lock screen.
+</p>
+<p>
+  <strong>Skip</strong> is for an Occurrence you won't do today: it is neither Done nor Missed, it
+  rings no more, it shows struck through as "Skipped" on the Agenda for the day, and it never shows
+  in the Missed Summary. <strong>Tomorrow</strong> skips it and adds a one-time Occurrence of the
+  same Routine the day after at the same time, "From the day before"; the Agenda shows "The day
+  after instead" under today's. Tomorrow is offered only for an Occurrence of today or later. Neither
+  changes the schedule. Skipped in the app, "Skipped" or "The day after instead" shows at the top for 10
+  seconds, and a tap on it takes it back; the box still checks a skipped Occurrence off.
 </p>
 <p>
   Tapping the notification opens its Note. At the top of the Note editor, above the name, the
   Occurrence that is due shows as "Due 15:00", once its time has come, or else the latest Missed one
-  with its day, with <strong>Done</strong>. A one-time Reminder that is the Note's only Routine or
+  with its day, with <strong>Done</strong>, <strong>Snooze</strong> while it is not Missed, and
+  <strong>Not today</strong>; each opens its choices where you tap. A one-time Reminder that is the
+  Note's only Routine or
   Reminder also has <strong>Done and move to trash</strong>, where this Device may change the Note:
-  it checks the Reminder off, moves the Note with it to the trash and closes the editor. Snooze stays
-  in the notification. A Note's card, compact or detailed, has a box with the time for today's
+  it checks the Reminder off, moves the Note with it to the trash and closes the editor. A Note's
+  card, compact or detailed, has a box with the time for today's
   Occurrence of each of its Routines and Reminders; it checks it off and unchecks it as the box on
   the Agenda does, and a long press on the card still opens the editor.
 </p>
@@ -236,8 +248,9 @@
   is told in one notification, "Missed while Old Brain Fix was not running".
 </p>
 <p>
-  On the iPhone the notification is time-sensitive and offers Done and the three snoozes, 10 min,
-  30 min and 1 h, at once; each Re-nag is a notification of its own. There is no choice of sound:
+  On the iPhone the notification is time-sensitive and offers Done, the three snoozes, 10 min,
+  30 min and 1 h, Skip and Tomorrow at once; each Re-nag is a notification of its own, and one after
+  midnight for an earlier day offers no Tomorrow. There is no choice of sound:
   notifications ring with the iPhone's notification sound and alarms with its alarm sound, and
   Settings have no <strong>Alarm sound</strong> there. After the iPhone was off there is no Catch-up
   Notification; the Missed Summary shows what was Missed when the app opens.
@@ -290,9 +303,10 @@
   A Routine's <strong>History</strong> opens from its editor's bar or from the menu of its row on the
   Agenda. It shows the <strong>Streak</strong>, now and longest, with the last 7 days as dots; the
   <strong>Adherence</strong> this week, this month and over the last 30 days, such as "18 of 20
-  Done"; and the log of every Occurrence, the latest first: Done with its time, early or late,
-  Missed, due and not Done yet, or still to come, with the snoozes this phone recorded over about
-  the last month. Settings, under "History", can turn the Streaks off with "Show Streaks on this
+  Done", with what was skipped beside it, "· 3 skipped", never part of the share; and the log of
+  every Occurrence, the latest first: Done with its time, early or late, Missed, skipped, due and
+  not Done yet, or still to come, with the snoozes this phone recorded over about the last month. A
+  skipped Occurrence neither breaks the Streak nor counts in it. Settings, under "History", can turn the Streaks off with "Show Streaks on this
   phone"; the Adherence shows either way. A Reminder has no History.
 </p>
 <p>
@@ -367,8 +381,10 @@
   within 30 days, still Done.
 </p>
 <p>
-  ⋮ on a row, or a long press, opens a menu with <strong>History</strong> for a Routine and, where
-  the phone has a calendar app, <strong>Share</strong>. An Occurrence from a locked Area set to
+  ⋮ on a row, or a long press, opens a menu with <strong>Snooze</strong> (10 min, 30 min, 1 h)
+  while the Occurrence is due, <strong>Not today</strong> (Skip, Tomorrow) while it is neither Done
+  nor skipped, <strong>History</strong> for a Routine and, where the phone has a calendar app,
+  <strong>Share</strong>. An Occurrence from a locked Area set to
   Masked shows as "Private Routine" with its time and can still be checked off; opening it asks for
   its Area to be opened first.
 </p>

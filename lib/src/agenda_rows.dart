@@ -185,11 +185,13 @@ class AgendaDays {
   }) {
     final hidesChecked = store.agendaHidesChecked;
     final reader = _Reader(store, places, wallClock, sessions);
-    // What shows as Done leaves where this Device hides it (#217).
+    // What shows as Done leaves where this Device hides it (#217), and
+    // so does what is struck as skipped (#269).
     List<PlacedRow> placed(List<AgendaRow> rows) => [
       for (final row in rows)
         if (reader.place(row) case final placed
-            when !hidesChecked || !shownDone(placed))
+            when !hidesChecked ||
+                !(shownDone(placed) || placed.row.skipped != null))
           placed,
     ];
     final agenda = Routines(store).agenda(wallClock, days: days);

@@ -1274,6 +1274,48 @@ abstract class AppLocalizations {
   /// **'1 h'**
   String get snooze60;
 
+  /// Beside Snooze on an Occurrence's notification, in the Agenda row's menu and in the Note editor's Due line (#269): opens Skip and Tomorrow. CONTEXT.md, Not today.
+  ///
+  /// In en, this message translates to:
+  /// **'Not today'**
+  String get notToday;
+
+  /// The text of an Occurrence's notification once Not today was tapped, above Skip and Tomorrow (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skip it, or tomorrow at the same time?'**
+  String get notTodayQuestion;
+
+  /// A Not today choice (#269): the Occurrence is neither Done nor Missed, and rings no more. CONTEXT.md, Skip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skip;
+
+  /// A Not today choice (#269): skips the Occurrence and adds a one-time one of the same Routine the day after, at the same time.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get notTodayTomorrow;
+
+  /// Under a skipped Occurrence on the Agenda, struck through for the day (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get occurrenceSkipped;
+
+  /// Under an Occurrence on the Agenda that Not today ▸ Tomorrow skipped (#269); its one-time Occurrence shows the day after.
+  ///
+  /// In en, this message translates to:
+  /// **'The day after instead'**
+  String get occurrenceTomorrowInstead;
+
+  /// Under the one-time Occurrence that Not today ▸ Tomorrow added, on the Agenda and in the Routine's history log (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'From the day before'**
+  String get occurrenceFromDayBefore;
+
   /// No description provided for @alarmsBanner.
   ///
   /// In en, this message translates to:
@@ -2143,6 +2185,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Due, not Done yet'**
   String get logOpen;
+
+  /// A day of the last seven days in a Routine's history whose Occurrences were all skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: skipped'**
+  String daySkipped(String day);
+
+  /// Beside a period's Adherence in a Routine's history, when Occurrences were skipped in it (#269): "92 % · 3 skipped". Skipped ones are not part of the share.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} skipped'**
+  String adherenceSkipped(int count);
+
+  /// An Occurrence in a Routine's history log that was skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get logSkipped;
+
+  /// An Occurrence in a Routine's history log that Not today ▸ Tomorrow skipped (#269).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped, the day after instead'**
+  String get logSkippedTomorrow;
 
   /// No description provided for @logComing.
   ///
@@ -5480,7 +5546,7 @@ abstract class AppLocalizations {
   /// **'Next: {when}'**
   String sessionCardNext(String when);
 
-  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many Missed since the week began.
+  /// The compact view of the card of a Note that runs a Session (#189): how many of its runs were Done and how many skipped (#269) since the week began.
   ///
   /// In en, this message translates to:
   /// **'done {done} / skipped {skipped} this week'**
@@ -5492,7 +5558,7 @@ abstract class AppLocalizations {
   /// **'Last 4 weeks'**
   String get sessionHistory;
 
-  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many Missed in it.
+  /// One week of a Session Note's history on its detailed card (#191): the day the week starts, and how many runs of all its Routines were Done and how many skipped (#269) in it.
   ///
   /// In en, this message translates to:
   /// **'Week of {day}: done {done} / skipped {skipped}'**
@@ -9331,6 +9397,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Photo Text removed'**
   String get undoPhotoTextRemoved;
+
+  /// Announced after Not today ▸ Skip in the app (#269); its tap takes the skip back.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get undoSkipped;
+
+  /// Announced after Not today ▸ Tomorrow in the app (#269); its tap takes it back, and the Occurrence added tomorrow goes.
+  ///
+  /// In en, this message translates to:
+  /// **'The day after instead'**
+  String get undoTomorrow;
 
   /// Folded heading under a Checklist's or Shopping List's Lines in the Note editor: the deleted Lines, each with Restore.
   ///

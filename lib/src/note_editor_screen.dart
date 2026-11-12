@@ -23,6 +23,7 @@ import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_history_screen.dart';
+import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
@@ -2275,9 +2276,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     Navigator.of(context).pop();
   }
 
+  /// Answers [open] from the line at the top with a snooze, Skip or
+  /// Tomorrow (#269); the latter two take it off the line.
+  void _answer(OpenOccurrence open, OccurrenceAnswer answer) {
+    answerOccurrence(
+      context,
+      _routineBook,
+      AlarmSyncScope.of(context),
+      open.routine.id,
+      open.occurrence,
+      answer,
+    );
+    _reload();
+  }
+
   /// The lines at the top of the editor, above the name (#215): of each
   /// Occurrence the Note asks to check off "Due 15:00" or "Missed" with
-  /// its day, and Done; for a one-time Reminder, the Note's only one, also
+  /// its day, and Done, Snooze while it is not Missed and Not today
+  /// (#269); for a one-time Reminder, the Note's only one, also
   /// "Done and move to trash" where this Device may move the Note.
   List<Widget> _openLines(AppLocalizations t, bool changes) {
     final locale = Localizations.localeOf(context).toString();
@@ -2309,6 +2325,33 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 key: const ValueKey('open-done'),
                 onPressed: () => _checkOff(open),
                 child: Text(t.markDone),
+              ),
+              // Snooze rings from now on: not for one Missed (#269).
+              if (!open.missed)
+                AnswerButton(
+                  key: const ValueKey('open-snooze'),
+                  label: t.snooze,
+                  items: () => occurrenceAnswerItems(
+                    t,
+                    (answer) => answer,
+                    snooze: true,
+                    notToday: false,
+                    tomorrow: false,
+                  ),
+                  onAnswer: (answer) => _answer(open, answer),
+                ),
+              AnswerButton(
+                key: const ValueKey('open-not-today'),
+                label: t.notToday,
+                items: () => occurrenceAnswerItems(
+                  t,
+                  (answer) => answer,
+                  snooze: false,
+                  notToday: true,
+                  // Tomorrow only for one of today or later.
+                  tomorrow: !(open.occurrence.day < today),
+                ),
+                onAnswer: (answer) => _answer(open, answer),
               ),
               if (changes && open.routine.isReminder && _routines.length == 1)
                 OutlinedButton(

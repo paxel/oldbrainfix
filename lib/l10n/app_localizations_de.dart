@@ -777,6 +777,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get snooze60 => '1 Std.';
 
   @override
+  String get notToday => 'Nicht heute';
+
+  @override
+  String get notTodayQuestion => 'Auslassen oder morgen zur selben Zeit?';
+
+  @override
+  String get skip => 'Auslassen';
+
+  @override
+  String get notTodayTomorrow => 'Morgen';
+
+  @override
+  String get occurrenceSkipped => 'Ausgelassen';
+
+  @override
+  String get occurrenceTomorrowInstead => 'Stattdessen am Tag danach';
+
+  @override
+  String get occurrenceFromDayBefore => 'Vom Vortag';
+
+  @override
   String get alarmsBanner =>
       'Alarme kommen vielleicht zu spät oder gar nicht: Eine Erlaubnis fehlt. Tippe hier, um das zu beheben.';
 
@@ -1336,6 +1357,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get logOpen => 'Fällig, noch nicht erledigt';
+
+  @override
+  String daySkipped(String day) {
+    return '$day: ausgelassen';
+  }
+
+  @override
+  String adherenceSkipped(int count) {
+    return '$count ausgelassen';
+  }
+
+  @override
+  String get logSkipped => 'Ausgelassen';
+
+  @override
+  String get logSkippedTomorrow => 'Ausgelassen, stattdessen am Tag danach';
 
   @override
   String get logComing => 'Kommt noch';
@@ -5799,6 +5836,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get undoPhotoTextRemoved => 'Fototext entfernt';
+
+  @override
+  String get undoSkipped => 'Ausgelassen';
+
+  @override
+  String get undoTomorrow => 'Stattdessen am Tag danach';
 
   @override
   String get linesRemoved => 'Entfernte Zeilen';

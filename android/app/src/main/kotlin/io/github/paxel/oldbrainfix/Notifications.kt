@@ -13,11 +13,12 @@ import android.net.Uri
 import android.os.Build
 
 /**
- * The notification of a due Occurrence with Done and Snooze, and the one
- * a full-screen alarm rings under. Android
- * shows at most three actions, so Snooze turns the same notification
- * into the three snooze choices (10 min, 30 min, 1 h). Every action is a
- * broadcast, so it works from the lock screen without opening the app.
+ * The notification of a due Occurrence with Done, Snooze and Not today,
+ * and the one a full-screen alarm rings under. Android shows at most
+ * three actions, so Snooze turns the same notification into the three
+ * snooze choices (10 min, 30 min, 1 h), and Not today into Skip and
+ * Tomorrow (#269). Every action is a broadcast, so it works from the
+ * lock screen without opening the app.
  */
 object Notifications {
     private const val ESCALATED_CHANNEL = "escalated"
@@ -48,8 +49,9 @@ object Notifications {
 
     /**
      * The notification the full-screen alarm rings under. It opens the
-     * full-screen alarm over the lock screen, and offers Done and Snooze
-     * where Android shows it only on top of the screen (the phone in use).
+     * full-screen alarm over the lock screen, and offers Done, Snooze and
+     * Not today where Android shows it only on top of the screen (the
+     * phone in use).
      */
     fun ringing(context: Context, alarm: Alarm): Notification {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -86,9 +88,25 @@ object Notifications {
             .build()
     }
 
-    private fun doneAndSnooze(context: Context, alarm: Alarm) = listOf(
-        action(context, alarm, AlarmReceiver.ACTION_DONE, Scheduler.label(context, "done")),
-        action(context, alarm, AlarmReceiver.ACTION_SNOOZE, Scheduler.label(context, "snooze")),
+    private fun doneAndSnooze(context: Context, alarm: Alarm) = buttons().map { (kind, label) ->
+        action(context, alarm, kind, Scheduler.label(context, label))
+    }
+
+    /** The first buttons of an Occurrence's notification, with the label naming each. */
+    internal fun buttons() = listOf(
+        AlarmReceiver.ACTION_DONE to "done",
+        AlarmReceiver.ACTION_SNOOZE to "snooze",
+        AlarmReceiver.ACTION_NOT_TODAY to "notToday",
+    )
+
+    /**
+     * Not today's choices for [occurrence] on [today] ("2026-10-24"),
+     * with the label naming each: Skip, and Tomorrow only for an
+     * Occurrence of today or later.
+     */
+    internal fun notTodayChoices(occurrence: String, today: String) = listOfNotNull(
+        AlarmReceiver.ACTION_SKIP to "skip",
+        (AlarmReceiver.ACTION_TOMORROW to "tomorrow").takeIf { AlarmPlan.offersTomorrow(occurrence, today) },
     )
 
     /** The same notification, now offering how long to snooze, quietly. */
@@ -97,6 +115,15 @@ object Notifications {
             action(context, alarm, AlarmReceiver.ACTION_SNOOZE_FOR, Scheduler.label(context, label), minutes)
         }
         post(context, alarm, Scheduler.label(context, "snoozeQuestion"), actions, alertOnce = true)
+    }
+
+    /** The same notification, now offering Skip and Tomorrow, quietly (#269). */
+    fun showNotTodayChoices(context: Context, alarm: Alarm) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
+        val actions = notTodayChoices(alarm.occurrence, today).map { (kind, label) ->
+            action(context, alarm, kind, Scheduler.label(context, label))
+        }
+        post(context, alarm, Scheduler.label(context, "notTodayQuestion"), actions, alertOnce = true)
     }
 
     /**

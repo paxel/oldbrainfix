@@ -222,10 +222,14 @@ void main() {
         Schedule(start: Day(2026, 10, 24), times: [at(10)]),
       );
       await start(tester);
-      // No menu: the press opens the Reminder as a tap does.
+      // Its menu answers it (#269), and has no History.
       await tester.longPress(find.text('call mum'));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('answer-skip')), findsOneWidget);
       expect(find.text('History'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('call mum'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(historyButton, findsNothing);
     });

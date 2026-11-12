@@ -7,6 +7,9 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Neu
 
 - Auf dem Desktop geben `oldbrainfix --version` und `oldbrainfix -V` die installierte Version aus, etwa „Old Brain Fix 0.6.0“, ohne die App zu starten.
+- Auf dem Handy steht Später (10 Min., 30 Min., 1 Std.) auch im ⋮ einer Zeile der Agenda und neben Erledigt oben im Notiz-Editor, damit sich eine Fälligkeit auch dann verschieben lässt, wenn ihre Benachrichtigung weg ist.
+- Auf dem Handy bietet Nicht heute in der Benachrichtigung, im ⋮ einer Zeile der Agenda und im Notiz-Editor Auslassen, das eine Fälligkeit weder erledigt noch verpasst sein lässt und ihren Alarm beendet, und Morgen, das sie auslässt und am Tag danach zur selben Zeit eine einmalige Fälligkeit hinzufügt, ohne den Plan zu ändern.
+- Eine ausgelassene Fälligkeit steht für den Tag durchgestrichen als ausgelassen in der Agenda, erscheint nie in der Verpasst-Übersicht und fällt aus der Einhaltung heraus, die sie neben dem Anteil zählt, etwa „92 % diesen Monat · 3 ausgelassen“; das „ausgelassen“ einer Einheit zählt nun diese statt ihrer verpassten Läufe.
 
 ### Geändert
 

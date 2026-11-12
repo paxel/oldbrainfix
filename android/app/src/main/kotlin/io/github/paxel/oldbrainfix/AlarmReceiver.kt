@@ -5,13 +5,15 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * The armed alarm firing, and Done and Snooze tapped on a notification
- * (Done also from the Agenda widget).
+ * The armed alarm firing, and Done, Snooze and Not today tapped on a
+ * notification (Done also from the Agenda widget).
  * A tap is queued for the app (it applies it to the log on its next
  * start or at once while it runs) and takes effect on the alarms right
- * away: what is Done no longer rings, a snooze rings again. Either stops
- * the Occurrence's full-screen alarm, and so does the first Snooze tap,
- * before its length is picked. The Nudge's snoozes are taken at once.
+ * away: what is Done or skipped no longer rings, a snooze rings again,
+ * and what Tomorrow moved rings the day after. Each stops the
+ * Occurrence's full-screen alarm, and so do the first Snooze and Not
+ * today taps, before their choice is picked. The Nudge's snoozes are
+ * taken at once.
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -24,6 +26,13 @@ class AlarmReceiver : BroadcastReceiver() {
                 Notifications.showSnoozeChoices(context, alarm)
             }
             ACTION_SNOOZE_FOR -> snooze(context, alarmOf(intent), intent.getIntExtra(EXTRA_MINUTES, 60))
+            ACTION_NOT_TODAY -> {
+                val alarm = alarmOf(intent)
+                RingService.stop(alarm.routine, alarm.occurrence)
+                Notifications.showNotTodayChoices(context, alarm)
+            }
+            ACTION_SKIP -> notToday(context, alarmOf(intent), EventQueue.KIND_SKIP)
+            ACTION_TOMORROW -> notToday(context, alarmOf(intent), EventQueue.KIND_TOMORROW)
             ACTION_NUDGE_SNOOZE -> snoozeNudge(context, intent.getIntExtra(EXTRA_MINUTES, 60))
         }
     }
@@ -34,6 +43,9 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_SNOOZE = "io.github.paxel.oldbrainfix.SNOOZE"
         const val ACTION_SNOOZE_FOR = "io.github.paxel.oldbrainfix.SNOOZE_FOR"
         const val ACTION_NUDGE_SNOOZE = "io.github.paxel.oldbrainfix.NUDGE_SNOOZE"
+        const val ACTION_NOT_TODAY = "io.github.paxel.oldbrainfix.NOT_TODAY"
+        const val ACTION_SKIP = "io.github.paxel.oldbrainfix.SKIP"
+        const val ACTION_TOMORROW = "io.github.paxel.oldbrainfix.TOMORROW"
         const val EXTRA_ID = "oldbrainfix.id"
         const val EXTRA_ROUTINE = "oldbrainfix.routine"
         const val EXTRA_OCCURRENCE = "oldbrainfix.occurrence"
@@ -50,6 +62,12 @@ class AlarmReceiver : BroadcastReceiver() {
         /** A snooze of [minutes], from a notification or the full-screen alarm. */
         fun snooze(context: Context, alarm: Alarm, minutes: Int) {
             EventQueue.add(context, "snooze", alarm, System.currentTimeMillis() + minutes * 60_000L)
+            answered(context, alarm)
+        }
+
+        /** Not today ▸ Skip or Tomorrow ([kind]), from a notification (#269). */
+        fun notToday(context: Context, alarm: Alarm, kind: String) {
+            EventQueue.add(context, kind, alarm)
             answered(context, alarm)
         }
 

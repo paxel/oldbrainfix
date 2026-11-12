@@ -32,6 +32,7 @@ import 'merge_into_screen.dart';
 import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'occurrence_answers.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
 import 'nudge_screen.dart';
@@ -808,14 +809,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   /// The ⋮ of an Occurrence's row, or a long press on it, opens a menu
-  /// where the finger is: a Routine's history, and Share, which hands the
-  /// Routine as its whole series, or the Reminder, to another app as a
-  /// calendar file. Both open a locked Area first, as a Masked row tells
-  /// nothing until then. Null when there is nothing to offer.
+  /// where the finger is: Snooze and Not today while it can be answered
+  /// (#269), a Routine's history, and Share, which hands the Routine as
+  /// its whole series, or the Reminder, to another app as a calendar
+  /// file. History and Share open a locked Area first, as a Masked row
+  /// tells nothing until then; Snooze and Not today answer it as its box
+  /// does. Null when there is nothing to offer.
   void Function(Offset at)? _rowMenu(AgendaRow row) {
     final history = !row.routine.isReminder;
     final share = CalendarScope.of(context).available;
-    if (!history && !share) return null;
+    final answers = row.done == null && row.skipped == null;
+    if (!history && !share && !answers) return null;
     return (at) => _showRowMenu(row, at, history: history, share: share);
   }
 
@@ -829,33 +833,60 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
-    PopupMenuItem<_RowChoice> item(
-      _RowChoice value,
-      IconData icon,
-      String label,
-    ) => PopupMenuItem(
-      key: ValueKey('row-${value.name}'),
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon),
-          const SizedBox(width: 12),
-          Flexible(child: Text(label)),
-        ],
-      ),
+    // As the log has it now, not as the Agenda read it.
+    final routine = _routines.byId(row.routine.id) ?? row.routine;
+    final checked =
+        _tapped[_boxKey(routine: row.routine.id, occurrence: row.occurrence)];
+    final (:snooze, :notToday, :tomorrow) = checked == true
+        ? (snooze: false, notToday: false, tomorrow: false)
+        : occurrenceAnswers(_routines.store, routine, row.occurrence);
+    PopupMenuItem<Object> item(_RowChoice value, IconData icon, String label) =>
+        PopupMenuItem(
+          key: ValueKey('row-${value.name}'),
+          value: value,
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        );
+    final answers = occurrenceAnswerItems<Object>(
+      t,
+      (answer) => answer,
+      snooze: snooze,
+      notToday: notToday,
+      tomorrow: tomorrow,
     );
-    final choice = await showMenu<_RowChoice>(
+    final items = [
+      ...answers,
+      if (answers.isNotEmpty && (history || share)) const PopupMenuDivider(),
+      if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
+      if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
+    ];
+    if (items.isEmpty) return;
+    final choice = await showMenu<Object>(
       context: context,
       position: RelativeRect.fromRect(
         overlay.globalToLocal(at) & Size.zero,
         Offset.zero & overlay.size,
       ),
-      items: [
-        if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
-        if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
-      ],
+      items: items,
     );
     if (!mounted || choice == null) return;
+    if (choice is OccurrenceAnswer) {
+      answerOccurrence(
+        context,
+        _routines,
+        widget.alarms,
+        row.routine.id,
+        row.occurrence,
+        choice,
+      );
+      _reload();
+      return;
+    }
     if (!await _openAreaOf(row) || !mounted) return;
     switch (choice) {
       case _RowChoice.history:
@@ -912,8 +943,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
           : note == null
           ? t.noteGone
           : noteText(t, note),
-      struck: tapped ?? row.done != null,
-      under: _sessionUnder(t, placed),
+      // A skipped one stays struck for the day, as a Done one (#269).
+      struck: tapped ?? (row.done != null || row.skipped != null),
+      under: _answeredUnder(t, row, tapped) ?? _sessionUnder(t, placed),
       marks: [
         if (row.routine.isReminder)
           Icon(
@@ -928,6 +960,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
       menuKey: ValueKey('row-menu-${row.routine.id}'),
       entries: [..._sessionPicks(t, placed), ..._routineLines(placed)],
     );
+  }
+
+  /// What shows under the title of an Occurrence Not today answered
+  /// (#269): that it was skipped, or that it comes tomorrow instead, as
+  /// long as it is not Done; that it came from the day before on the one
+  /// Tomorrow added.
+  Widget? _answeredUnder(AppLocalizations t, AgendaRow row, bool? tapped) {
+    final done = tapped ?? row.done != null;
+    if (row.skipped != null && !done) {
+      return Text(
+        row.routine.tomorrow.contains(row.occurrence.key)
+            ? t.occurrenceTomorrowInstead
+            : t.occurrenceSkipped,
+        key: ValueKey('row-skipped-${row.routine.id}@${row.occurrence.key}'),
+      );
+    }
+    if (row.moved) {
+      return Text(
+        t.occurrenceFromDayBefore,
+        key: ValueKey('row-moved-${row.routine.id}@${row.occurrence.key}'),
+      );
+    }
+    return null;
   }
 
   /// What shows under a Session's title: on later days how many it

@@ -167,16 +167,24 @@ _Avoid_: Instanz, Slot
 Eine Fälligkeit, die du abgehakt hast. Früh oder spät abhaken verschiebt nie den Plan.
 _Avoid_: Abgeschlossen, Abgehakt (in der App)
 
+**Nicht heute** [Not today]:
+Die Wahl für eine Fälligkeit, die du heute nicht erledigen wirst, neben „Später“: Auslassen, oder Morgen, das sie auslässt und eine einmalige Fälligkeit derselben Routine am Tag danach zur selben Zeit hinzufügt. Keins von beiden ändert den Plan.
+_Avoid_: Aufschieben, Umplanen (das ändert den Plan), Vertagen
+
+**Auslassen** [Skip]:
+Eine Fälligkeit als nicht zu erledigen markieren, eine Entscheidung und kein Versäumnis: Sie ist weder erledigt noch verpasst, ihr Alarm und das erneute Erinnern hören auf, sie erscheint nie in der Verpasst-Übersicht, und sie fällt aus der Einhaltung heraus, die die ausgelassenen daneben zählt. Es lässt sich zurücknehmen.
+_Avoid_: Verwerfen, Abbrechen, Verpasst
+
 **Erneut erinnern** [Re-nag]:
-Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben wird oder die nächste Fälligkeit beginnt.
+Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben oder ausgelassen wird oder die nächste Fälligkeit beginnt.
 _Avoid_: Wiederholen, Erinnerung
 
 **Eskalation** [Escalation]:
 Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton. Den Vollbild-Alarm gibt es nur auf dem Telefon; auf dem Desktop wird die Benachrichtigung dringend, mit dem Alarmton des Systems.
 
 **Verpasst** [Missed]:
-Eine Fälligkeit, die nie erledigt wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
-_Avoid_: Überfällig, Übersprungen
+Eine Fälligkeit, die weder erledigt noch ausgelassen wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
+_Avoid_: Überfällig, Übersprungen, Ausgelassen (das ist ein Auslassen, deine Entscheidung)
 
 **Verpasst-Übersicht** [Missed Summary]:
 Die Karte in der Agenda, die auflistet, was verpasst wurde und wie oft, seit du es zuletzt bestätigt hast.
@@ -185,10 +193,10 @@ Die Karte in der Agenda, die auflistet, was verpasst wurde und wie oft, seit du 
 Die eine Benachrichtigung, nachdem das Gerät aus oder leer war, die sagt, wie viel in der Zeit verpasst wurde.
 
 **Serie** [Streak]:
-Die Folge aufeinanderfolgender Fälligkeiten einer Routine, die erledigt wurden.
+Die Folge aufeinanderfolgender Fälligkeiten einer Routine, die erledigt wurden; eine ausgelassene unterbricht sie nicht und zählt nicht mit.
 
 **Einhaltung** [Adherence]:
-Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurden, etwa "92 % in diesem Monat".
+Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurden, ohne die ausgelassenen, die daneben gezählt werden, etwa "92 % in diesem Monat · 3 ausgelassen".
 
 **Agenda** [Agenda]:
 Der Startbildschirm: die Fälligkeiten von heute, dann gedimmt morgen, mit der Verpasst-Übersicht und der Zahl der unsortierten Notizen obenauf.

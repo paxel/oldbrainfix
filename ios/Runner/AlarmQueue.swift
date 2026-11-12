@@ -1,10 +1,14 @@
 import Foundation
 
-/// Done or a snooze tapped on a notification or an AlarmKit alarm, kept
-/// until the app applied it to the log (android/…/EventQueue.kt).
+/// Done, a snooze or Not today tapped on a notification or an AlarmKit
+/// alarm, kept until the app applied it to the log
+/// (android/…/EventQueue.kt).
 struct QueuedAction: Equatable {
   static let done = "done"
   static let snooze = "snooze"
+  /// Not today ▸ Skip and Tomorrow (#269).
+  static let skip = "skip"
+  static let tomorrow = "tomorrow"
   static let nudgeSnooze = "nudgeSnooze"
   /// A Line of a Checklist Routine's Occurrence checked in the Agenda
   /// widget (#242).
@@ -19,7 +23,9 @@ struct QueuedAction: Equatable {
 
   /// The kinds the iPhone queues: a notification's or an alarm's, and
   /// the Agenda widget's boxes (#242), as android/…/EventQueue.kt.
-  static let kinds: Set<String> = [done, snooze, nudgeSnooze, line, frog, shopping, checklist]
+  static let kinds: Set<String> = [
+    done, snooze, skip, tomorrow, nudgeSnooze, line, frog, shopping, checklist,
+  ]
 
   /// Counts up; the app acknowledges everything up to one it applied.
   var seq: Int64
@@ -136,6 +142,9 @@ struct ActionQueue {
 enum NotificationAnswer: Equatable {
   case done
   case snooze(minutes: Int)
+  /// Not today ▸ Skip and Tomorrow (#269).
+  case skip
+  case tomorrow
   case nudgeSnooze(minutes: Int)
   case openNudge
   case openChanges
@@ -143,9 +152,14 @@ enum NotificationAnswer: Equatable {
   case open
 
   static let alarmCategory = "obf.alarm"
+  /// An Occurrence of an earlier day, a Re-nag after midnight: Not today
+  /// offers Skip alone there (#269).
+  static let pastAlarmCategory = "obf.alarm.past"
   static let nudgeCategory = "obf.nudge"
   static let changesCategory = "obf.changes"
   static let doneAction = "obf.done"
+  static let skipAction = "obf.skip"
+  static let tomorrowAction = "obf.tomorrow"
   static let snoozePrefix = "obf.snooze."
   static let nudgeSnoozePrefix = "obf.nudgeSnooze."
   /// UNNotificationDefaultActionIdentifier's value: the notification
@@ -155,8 +169,10 @@ enum NotificationAnswer: Equatable {
   /// What the action `action` on a notification of `category` means.
   static func of(category: String, action: String) -> NotificationAnswer {
     switch category {
-    case alarmCategory:
+    case alarmCategory, pastAlarmCategory:
       if action == doneAction { return .done }
+      if action == skipAction { return .skip }
+      if action == tomorrowAction && category == alarmCategory { return .tomorrow }
       if let minutes = snoozeMinutes(in: action, after: snoozePrefix) { return .snooze(minutes: minutes) }
     case nudgeCategory:
       if action == defaultAction { return .openNudge }
