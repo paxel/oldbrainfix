@@ -818,7 +818,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Long-press is the secondary action**: a menu, or the editor when
   there is only one thing to do. A long-press on a Note card opens its
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
-  long-press never changes data by itself.
+  long-press on "+" of the Agenda or the lock screen opens text capture
+  (#282; see Capture). A long-press never changes data by itself.
 - **An Area moves by its handle** (#280): each row of the phone's Areas
   list carries a drag handle before ⋮, and a drag up or down on it,
   taken at once, moves the Area in the list; a swipe sideways that
@@ -869,7 +870,12 @@ replace a law of Both apps where they say so. A desktop law marked
   filled from the clipboard: its text in the field, its picture as the
   Note's photo, both when it holds both, and a line on the screen, no
   announcement, when it holds neither. The clipboard is read only on
-  that tap, never on opening or in the background. The text capture
+  that tap, never on opening or in the background. **A long press on
+  "+" opens text capture at once** (#282), the Agenda's and the lock
+  screen's alike, as Text in the fan does, with no fan; a tap still fans
+  out. A screen reader announces the long press with the button ("write
+  a Note at once"), and on the iPhone, whose VoiceOver has no long press,
+  it is among the button's actions. The text capture
   screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
@@ -1111,6 +1117,18 @@ replace a law of Both apps where they say so. A desktop law marked
 - An action in ⋮ shows its icon and its words, as it does on the bar.
 - Labelled buttons (Save) and buttons that open a menu of their own
   never overflow.
+
+### Settings
+
+- **A search field sits at the top of Settings** (#282), under the bar,
+  staying there while the page scrolls; nothing focuses it on opening.
+  It filters to the settings whose label or detail line holds every
+  word typed, in any case, in the app's language, a setting without a
+  label of its own by the names of its options, each under its
+  section's heading; a heading that matches shows its section whole.
+  The intro line goes while a search runs, and a search that finds
+  nothing says so in the page ("No setting matches “…”."), not at the
+  top. ✕ in the field, or emptying it, shows everything again.
 
 ### Alarms and notifications
 

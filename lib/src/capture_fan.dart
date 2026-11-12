@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import 'l10n.dart';
 import 'photo_platform.dart';
@@ -119,6 +123,62 @@ Rect? fanAnchor(BuildContext context, BuildContext? button) {
   final over = Navigator.of(context).context.findRenderObject();
   if (box is! RenderBox || over is! RenderBox || !box.hasSize) return null;
   return box.localToGlobal(Offset.zero, ancestor: over) & box.size;
+}
+
+/// The "+" of the Agenda and the lock screen (UI laws, "Capture"): a
+/// tap runs [onPressed], which fans out the ways to capture; a long press
+/// runs [onLongPress], which opens text Capture at once (#282), with the
+/// platform's touch as a card's long press gives it. A screen reader
+/// hears the long press with the button, and on the iPhone, whose
+/// VoiceOver has no long press, finds it among the button's actions.
+/// [plusKey] and [heroTag] are the button's, where the fan opens from.
+class CapturePlus extends StatelessWidget {
+  final Key plusKey;
+  final Object heroTag;
+  final VoidCallback onPressed;
+  final VoidCallback onLongPress;
+
+  const CapturePlus({
+    super.key,
+    required this.plusKey,
+    required this.heroTag,
+    required this.onPressed,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return MergeSemantics(
+      child: Semantics(
+        onLongPressHint: t.captureLongPressHint,
+        customSemanticsActions: defaultTargetPlatform == TargetPlatform.iOS
+            ? {
+                CustomSemanticsAction(label: t.captureLongPressAction):
+                    onLongPress,
+              }
+            : null,
+        // Its own label and hover, without the tooltip's long press,
+        // which is the capture's.
+        child: Tooltip(
+          message: t.captureTooltip,
+          triggerMode: TooltipTriggerMode.manual,
+          child: GestureDetector(
+            onLongPress: () {
+              unawaited(Feedback.forLongPress(context));
+              onLongPress();
+            },
+            child: FloatingActionButton(
+              key: plusKey,
+              heroTag: heroTag,
+              onPressed: onPressed,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The Agenda's "+" opened: the capture [ways] fanned out, Text nearest

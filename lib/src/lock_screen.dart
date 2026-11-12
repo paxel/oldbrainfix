@@ -119,12 +119,12 @@ class _LockScreenState extends State<LockScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        key: _plus,
+      floatingActionButton: CapturePlus(
+        plusKey: _plus,
         heroTag: 'lockedCapture',
-        tooltip: t.captureTooltip,
         onPressed: _capture,
-        child: const Icon(Icons.add),
+        // Text Capture at once, as on the Agenda (#282).
+        onLongPress: () => widget.onCapture(CaptureWay.text),
       ),
     );
   }

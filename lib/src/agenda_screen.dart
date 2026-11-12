@@ -575,6 +575,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
+  /// Opens text Capture at once, as a long press on "+" asks (#282).
+  Future<void> _captureText() => captureNote(
+    context,
+    widget.notes,
+    onCaptured: (id) => _capturedId = id,
+    onChanged: _reloadIfMounted,
+  );
+
   /// Closes the fan of "+", here or on the lock screen, when it is open,
   /// before a share or a quick entry point opens Capture over it.
   void _closeFan() =>
@@ -1554,12 +1562,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ],
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          key: _plus,
+        floatingActionButton: CapturePlus(
+          plusKey: _plus,
           heroTag: 'capture',
-          tooltip: t.captureTooltip,
           onPressed: _capture,
-          child: const Icon(Icons.add),
+          onLongPress: _captureText,
         ),
       ),
     );

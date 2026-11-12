@@ -18,6 +18,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, the window opens as large and where it was closed, maximized if it was, with the sidebar as wide and the Note dialog as large as they were left, each kept on this computer only; a window whose monitor is gone opens centred, and the Note dialog is resized by dragging its edges and corners.
 - On the desktop, the menu bar has an Area menu with Rename (F2), Colour and icon, Share…, People, Export as Pack… and Delete for the Area or Topic shown, and an AI menu that opens the AI port's card in the Settings and the review of an AI Task that waits, and the sidebar shows how many Notes Unsorted holds, such as "Unsorted 7", and folds an Area's Topics with the chevron at the end of its row, kept on this computer.
 - On the phone and the desktop, the Areas list and the sidebar keep your own order of the Areas, which a drag on the handle of an Area's row on the phone, a drag of the Area's row in the sidebar, Move up and Move down in the desktop's Area menu and right-click, and Alt+Up and Alt+Down change, the same on all of your Devices and in File into…, Area Locks, Link to… and Notes for the feedback; the others in a Shared Area keep their own order, and once an Area has been moved, a new Area goes to the end.
+- On the phone, a long press on the "+" of the Agenda or the lock screen opens the capture screen for text at once, without the fan, and a screen reader announces it with the button.
+- On the phone, Settings has a search field at the top that shows only the settings whose name or detail line holds the words typed, under their section's heading, and says so when none does.
 
 ### Changed
 

@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get captureFanClose;
 
+  /// Screen reader hint of the long press on the Agenda's and the lock screen's + (#282): it opens text capture at once, without the fan. Lowercase, as Android reads it after "Double-tap and hold to".
+  ///
+  /// In en, this message translates to:
+  /// **'write a Note at once'**
+  String get captureLongPressHint;
+
+  /// Screen reader action of the Agenda's and the lock screen's + on the iPhone (#282), the long press's: opens text capture at once, without the fan.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a Note at once'**
+  String get captureLongPressAction;
+
   /// No description provided for @photoMissing.
   ///
   /// In en, this message translates to:
@@ -2533,6 +2545,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.'**
   String get settingsIntro;
+
+  /// Hint of the search field at the top of Settings (#282), which filters to the matching settings with their headings.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Settings'**
+  String get settingsSearchHint;
+
+  /// Shown in Settings when its search finds no setting (#282).
+  ///
+  /// In en, this message translates to:
+  /// **'No setting matches “{query}”.'**
+  String settingsSearchNothing(String query);
 
   /// No description provided for @settingsLook.
   ///

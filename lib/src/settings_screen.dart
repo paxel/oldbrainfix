@@ -27,10 +27,13 @@ import 'page_bar.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'settings_search.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
+
+export 'settings_search.dart' show SettingsHeading, SettingsSection;
 
 /// How this Device shows the known units of Tallies: as its region
 /// does, or a system chosen.
@@ -83,6 +86,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   GlobalKey _heading(String section) =>
       _headings.putIfAbsent(section, () => GlobalKey(debugLabel: section));
+
+  /// The search on top (#282), its query as [SettingsSearch] takes it,
+  /// and the query that showed no row, which the page then says.
+  final _search = TextEditingController();
+  var _query = '';
+  String? _nothingFor;
+
+  void _searched(String typed) {
+    setState(() => _query = SettingsSearch.queryOf(typed));
+    // The sections decide which of their rows show while they build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final nothing = _query.isNotEmpty && !SettingsSearch.showsAnyRow(context)
+          ? _query
+          : null;
+      if (nothing != _nothingFor) setState(() => _nothingFor = nothing);
+    });
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -515,337 +542,527 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // A value set elsewhere stays pickable.
     final renagChoices = {...RoutineEditorScreen.renagChoices, renag}.toList()
       ..sort();
+    final regionUnits = t.unitSystemRegion(switch (_regionUnits) {
+      UnitSystem.metric => t.unitSystemMetricName,
+      UnitSystem.imperial => t.unitSystemImperialName,
+    });
+    final soundDetail = _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen;
+    final typed = _search.text.trim();
     return Scaffold(
       appBar: pageBar(context, title: t.settingsTitle),
-      // A short page, built whole.
-      body: SingleChildScrollView(
-        padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 24)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-              child: Text(t.settingsIntro),
-            ),
-            SettingsHeading(t.settingsLook, key: _heading('look')),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ChoiceChips<ThemeChoice>(
-                key: const ValueKey('theme'),
-                value: _theme,
-                options: [
-                  RadioOption(
-                    value: ThemeChoice.system,
-                    title: Text(t.themeSystem),
-                    secondary: const Icon(Icons.brightness_auto_outlined),
-                  ),
-                  RadioOption(
-                    value: ThemeChoice.light,
-                    title: Text(t.themeLight),
-                    secondary: const Icon(Icons.light_mode_outlined),
-                  ),
-                  RadioOption(
-                    value: ThemeChoice.dark,
-                    title: Text(t.themeDark),
-                    secondary: const Icon(Icons.dark_mode_outlined),
-                  ),
-                ],
-                onChanged: _setTheme,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // At the top, above the page it filters (#282).
+          BrowserSearchField(
+            key: const ValueKey('settingsSearch'),
+            controller: _search,
+            hint: t.settingsSearchHint,
+            onChanged: _searched,
+          ),
+          Expanded(
+            // A short page, built whole.
+            child: SingleChildScrollView(
+              padding: clearOfSystemBars(
+                context,
+                const EdgeInsets.only(bottom: 24),
               ),
-            ),
-            SettingsSection(
-              children: [
-                SwitchBelow(
-                  switchKey: const ValueKey('fatFingers'),
-                  leading: const Icon(Icons.touch_app_outlined),
-                  value: _fatFingers,
-                  onChanged: _setFatFingers,
-                  title: Text(t.fatFingers),
-                  subtitle: Text(t.fatFingersDetail),
-                ),
-              ],
-            ),
-            SettingsHeading(t.settingsUnits, key: _heading('units')),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-              child: Text(t.settingsUnitsDetail),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: RadioColumn<_UnitChoice>(
-                key: const ValueKey('unitSystem'),
-                value: _units,
-                options: [
-                  RadioOption(
-                    key: const ValueKey('unitSystem-region'),
-                    value: _UnitChoice.region,
-                    title: Text(
-                      t.unitSystemRegion(switch (_regionUnits) {
-                        UnitSystem.metric => t.unitSystemMetricName,
-                        UnitSystem.imperial => t.unitSystemImperialName,
-                      }),
-                    ),
-                  ),
-                  RadioOption(
-                    key: const ValueKey('unitSystem-metric'),
-                    value: _UnitChoice.metric,
-                    title: Text(t.unitSystemMetric),
-                  ),
-                  RadioOption(
-                    key: const ValueKey('unitSystem-imperial'),
-                    value: _UnitChoice.imperial,
-                    title: Text(t.unitSystemImperial),
-                  ),
-                ],
-                onChanged: _setUnits,
-              ),
-            ),
-            SettingsHeading(t.settingsAgenda, key: _heading('agenda')),
-            SettingsSection(
-              children: [
-                SwitchBelow(
-                  switchKey: const ValueKey('agendaHideChecked'),
-                  leading: const Icon(Icons.playlist_remove),
-                  value: _hidesChecked,
-                  onChanged: _setHidesChecked,
-                  title: Text(t.hideCheckedOnAgenda),
-                  subtitle: Text(t.hideCheckedOnAgendaDetail),
-                ),
-                SwitchBelow(
-                  switchKey: const ValueKey('trashDoneReminder'),
-                  leading: const Icon(Icons.auto_delete_outlined),
-                  value: _trashesDone,
-                  onChanged: _setTrashesDone,
-                  title: Text(t.trashDoneReminder),
-                  subtitle: Text(t.trashDoneReminderDetail),
-                ),
-              ],
-            ),
-            SettingsHeading(t.settingsAlarms, key: _heading('alarms')),
-            SettingsSection(
-              children: [
-                if (widget.alarms.platform.available)
-                  ListTile(
-                    key: const ValueKey('alarmSetup'),
-                    leading: const Icon(Icons.alarm_on),
-                    title: Text(t.setupTitle),
-                    subtitle: Text(t.settingsAlarmSetupDetail),
-                    onTap: () => _push(
-                      Builder(
-                        builder: (context) => SetupScreen(
-                          alarms: widget.alarms,
-                          onDone: () => Navigator.of(context).pop(),
+              child: SettingsSearch(
+                query: _query,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_query.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                        child: Text(t.settingsIntro),
+                      ),
+                    if (_query.isNotEmpty && _nothingFor == _query)
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          t.settingsSearchNothing(typed),
+                          key: const ValueKey('settingsSearchNothing'),
                         ),
                       ),
+                    SettingsGroup(
+                      heading: t.settingsLook,
+                      headingKey: _heading('look'),
+                      children: [
+                        SettingsRow(
+                          words: [t.themeSystem, t.themeLight, t.themeDark],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: ChoiceChips<ThemeChoice>(
+                              key: const ValueKey('theme'),
+                              value: _theme,
+                              options: [
+                                RadioOption(
+                                  value: ThemeChoice.system,
+                                  title: Text(t.themeSystem),
+                                  secondary: const Icon(
+                                    Icons.brightness_auto_outlined,
+                                  ),
+                                ),
+                                RadioOption(
+                                  value: ThemeChoice.light,
+                                  title: Text(t.themeLight),
+                                  secondary: const Icon(
+                                    Icons.light_mode_outlined,
+                                  ),
+                                ),
+                                RadioOption(
+                                  value: ThemeChoice.dark,
+                                  title: Text(t.themeDark),
+                                  secondary: const Icon(
+                                    Icons.dark_mode_outlined,
+                                  ),
+                                ),
+                              ],
+                              onChanged: _setTheme,
+                            ),
+                          ),
+                        ),
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [t.fatFingers, t.fatFingersDetail],
+                              child: SwitchBelow(
+                                switchKey: const ValueKey('fatFingers'),
+                                leading: const Icon(Icons.touch_app_outlined),
+                                value: _fatFingers,
+                                onChanged: _setFatFingers,
+                                title: Text(t.fatFingers),
+                                subtitle: Text(t.fatFingersDetail),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                ControlBelow(
-                  leading: const Icon(Icons.repeat),
-                  title: Text(t.renagDevice),
-                  subtitle: Text(t.settingsRenagDetail),
-                  control: ChoiceChips<int>(
-                    key: const ValueKey('renagDevice'),
-                    value: renag,
-                    onChanged: (minutes) =>
-                        _setRenag(Duration(minutes: minutes)),
-                    options: [
-                      for (final m in renagChoices)
-                        RadioOption(value: m, title: Text(t.renagMinutes(m))),
-                    ],
-                  ),
-                ),
-                ListTile(
-                  key: const ValueKey('allDayFrom'),
-                  leading: const Icon(Icons.wb_sunny_outlined),
-                  title: Text(t.allDayFrom),
-                  subtitle: Text(t.allDayFromDetail),
-                  trailing: Text(
-                    clockText(
-                      Localizations.localeOf(context).toString(),
-                      _allDayFrom,
+                    SettingsGroup(
+                      heading: t.settingsUnits,
+                      headingKey: _heading('units'),
+                      children: [
+                        SettingsRow(
+                          words: [
+                            t.settingsUnitsDetail,
+                            regionUnits,
+                            t.unitSystemMetric,
+                            t.unitSystemImperial,
+                          ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  0,
+                                  24,
+                                  0,
+                                ),
+                                child: Text(t.settingsUnitsDetail),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: RadioColumn<_UnitChoice>(
+                                  key: const ValueKey('unitSystem'),
+                                  value: _units,
+                                  options: [
+                                    RadioOption(
+                                      key: const ValueKey('unitSystem-region'),
+                                      value: _UnitChoice.region,
+                                      title: Text(regionUnits),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey('unitSystem-metric'),
+                                      value: _UnitChoice.metric,
+                                      title: Text(t.unitSystemMetric),
+                                    ),
+                                    RadioOption(
+                                      key: const ValueKey(
+                                        'unitSystem-imperial',
+                                      ),
+                                      value: _UnitChoice.imperial,
+                                      title: Text(t.unitSystemImperial),
+                                    ),
+                                  ],
+                                  onChanged: _setUnits,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  onTap: _pickAllDayFrom,
-                ),
-                if (widget.alarms.platform.available &&
-                    widget.alarms.platform.choosesSound)
-                  ListTile(
-                    key: const ValueKey('alarmSound'),
-                    leading: const Icon(Icons.music_note_outlined),
-                    title: Text(t.alarmSound),
-                    subtitle: Text(
-                      _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen,
+                    SettingsGroup(
+                      heading: t.settingsAgenda,
+                      headingKey: _heading('agenda'),
+                      children: [
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.hideCheckedOnAgenda,
+                                t.hideCheckedOnAgendaDetail,
+                              ],
+                              child: SwitchBelow(
+                                switchKey: const ValueKey('agendaHideChecked'),
+                                leading: const Icon(Icons.playlist_remove),
+                                value: _hidesChecked,
+                                onChanged: _setHidesChecked,
+                                title: Text(t.hideCheckedOnAgenda),
+                                subtitle: Text(t.hideCheckedOnAgendaDetail),
+                              ),
+                            ),
+                            SettingsRow(
+                              words: [
+                                t.trashDoneReminder,
+                                t.trashDoneReminderDetail,
+                              ],
+                              child: SwitchBelow(
+                                switchKey: const ValueKey('trashDoneReminder'),
+                                leading: const Icon(Icons.auto_delete_outlined),
+                                value: _trashesDone,
+                                onChanged: _setTrashesDone,
+                                title: Text(t.trashDoneReminder),
+                                subtitle: Text(t.trashDoneReminderDetail),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    onTap: _pickSound,
-                  ),
-              ],
-            ),
-            SettingsHeading(t.settingsNudges, key: _heading('nudges')),
-            _NudgeSettings(store: widget.store, alarms: widget.alarms),
-            SettingsHeading(t.settingsCapture, key: _heading('capture')),
-            SettingsSection(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.place_outlined),
-                  title: Text(t.namedPlacesTitle),
-                  subtitle: Text(t.settingsNamedPlacesDetail),
-                  onTap: () => _push(
-                    NamedPlacesScreen(namedPlaces: NamedPlaces(widget.store)),
-                  ),
+                    SettingsGroup(
+                      heading: t.settingsAlarms,
+                      headingKey: _heading('alarms'),
+                      children: [
+                        SettingsSection(
+                          children: [
+                            if (widget.alarms.platform.available)
+                              SettingsRow(
+                                words: [
+                                  t.setupTitle,
+                                  t.settingsAlarmSetupDetail,
+                                ],
+                                child: ListTile(
+                                  key: const ValueKey('alarmSetup'),
+                                  leading: const Icon(Icons.alarm_on),
+                                  title: Text(t.setupTitle),
+                                  subtitle: Text(t.settingsAlarmSetupDetail),
+                                  onTap: () => _push(
+                                    Builder(
+                                      builder: (context) => SetupScreen(
+                                        alarms: widget.alarms,
+                                        onDone: () =>
+                                            Navigator.of(context).pop(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            SettingsRow(
+                              words: [t.renagDevice, t.settingsRenagDetail],
+                              child: ControlBelow(
+                                leading: const Icon(Icons.repeat),
+                                title: Text(t.renagDevice),
+                                subtitle: Text(t.settingsRenagDetail),
+                                control: ChoiceChips<int>(
+                                  key: const ValueKey('renagDevice'),
+                                  value: renag,
+                                  onChanged: (minutes) =>
+                                      _setRenag(Duration(minutes: minutes)),
+                                  options: [
+                                    for (final m in renagChoices)
+                                      RadioOption(
+                                        value: m,
+                                        title: Text(t.renagMinutes(m)),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SettingsRow(
+                              words: [t.allDayFrom, t.allDayFromDetail],
+                              child: ListTile(
+                                key: const ValueKey('allDayFrom'),
+                                leading: const Icon(Icons.wb_sunny_outlined),
+                                title: Text(t.allDayFrom),
+                                subtitle: Text(t.allDayFromDetail),
+                                trailing: Text(
+                                  clockText(
+                                    Localizations.localeOf(context).toString(),
+                                    _allDayFrom,
+                                  ),
+                                ),
+                                onTap: _pickAllDayFrom,
+                              ),
+                            ),
+                            if (widget.alarms.platform.available &&
+                                widget.alarms.platform.choosesSound)
+                              SettingsRow(
+                                words: [t.alarmSound, soundDetail],
+                                child: ListTile(
+                                  key: const ValueKey('alarmSound'),
+                                  leading: const Icon(
+                                    Icons.music_note_outlined,
+                                  ),
+                                  title: Text(t.alarmSound),
+                                  subtitle: Text(soundDetail),
+                                  onTap: _pickSound,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    _NudgeSettings(
+                      store: widget.store,
+                      alarms: widget.alarms,
+                      headingKey: _heading('nudges'),
+                    ),
+                    SettingsGroup(
+                      heading: t.settingsCapture,
+                      headingKey: _heading('capture'),
+                      children: [
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.namedPlacesTitle,
+                                t.settingsNamedPlacesDetail,
+                              ],
+                              child: ListTile(
+                                leading: const Icon(Icons.place_outlined),
+                                title: Text(t.namedPlacesTitle),
+                                subtitle: Text(t.settingsNamedPlacesDetail),
+                                onTap: () => _push(
+                                  NamedPlacesScreen(
+                                    namedPlaces: NamedPlaces(widget.store),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (ContextScope.of(context).available)
+                              SettingsRow(
+                                words: [
+                                  t.captureContextTitle,
+                                  t.settingsCaptureContextDetail,
+                                ],
+                                child: ListTile(
+                                  leading: const Icon(Icons.manage_history),
+                                  title: Text(t.captureContextTitle),
+                                  subtitle: Text(
+                                    t.settingsCaptureContextDetail,
+                                  ),
+                                  onTap: () => _push(
+                                    CaptureContextScreen(store: widget.store),
+                                  ),
+                                ),
+                              ),
+                            if (speech != null &&
+                                speech.model.platform.available)
+                              SettingsRow(
+                                words: [
+                                  t.speechModelTitle,
+                                  t.settingsSpeechModelDetail,
+                                ],
+                                child: ListTile(
+                                  leading: const Icon(
+                                    Icons.record_voice_over_outlined,
+                                  ),
+                                  title: Text(t.speechModelTitle),
+                                  subtitle: Text(t.settingsSpeechModelDetail),
+                                  onTap: () => _push(
+                                    SpeechModelScreen(model: speech.model),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    _QuickNoteSettings(
+                      store: widget.store,
+                      advanced: _advanced,
+                      headingKey: _heading('quick-note'),
+                    ),
+                    if (hasCalendarPage(context))
+                      SettingsGroup(
+                        heading: t.settingsCalendar,
+                        headingKey: _heading('calendar'),
+                        children: [
+                          SettingsSection(
+                            children: [
+                              SettingsRow(
+                                words: [
+                                  t.calendarPageTitle,
+                                  t.settingsCalendarDetail,
+                                ],
+                                child: ListTile(
+                                  key: const ValueKey('calendarPage'),
+                                  leading: const Icon(Icons.event_outlined),
+                                  title: Text(t.calendarPageTitle),
+                                  subtitle: Text(t.settingsCalendarDetail),
+                                  onTap: () => _push(
+                                    CalendarScreen(store: widget.store),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    if (LockScope.of(context) case final lock?)
+                      LockSettingsSection(
+                        lock: lock,
+                        alarms: widget.alarms,
+                        places: Places(widget.store),
+                        headingKey: _heading('privacy'),
+                      ),
+                    SettingsGroup(
+                      heading: t.settingsTyping,
+                      headingKey: _heading('typing'),
+                      children: [
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [t.twoRowEditor, t.twoRowEditorDetail],
+                              child: SwitchBelow(
+                                switchKey: const ValueKey('twoRowEditor'),
+                                leading: const Icon(Icons.keyboard_outlined),
+                                value: _twoRows,
+                                onChanged: _setTwoRows,
+                                title: Text(t.twoRowEditor),
+                                subtitle: Text(t.twoRowEditorDetail),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SettingsGroup(
+                      heading: t.settingsHistory,
+                      headingKey: _heading('history'),
+                      children: [
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [t.showStreaks, t.showStreaksDetail],
+                              child: SwitchBelow(
+                                switchKey: const ValueKey('streaks'),
+                                leading: const Icon(
+                                  Icons.local_fire_department_outlined,
+                                ),
+                                value: _streaksOn,
+                                onChanged: _setStreaks,
+                                title: Text(t.showStreaks),
+                                subtitle: Text(t.showStreaksDetail),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (FolderScope.of(context).available)
+                      SettingsGroup(
+                        heading: t.settingsImport,
+                        headingKey: _heading('import'),
+                        children: [
+                          SettingsSection(
+                            children: [
+                              SettingsRow(
+                                words: [t.importFolder, t.importFolderDetail],
+                                child: _importRow(
+                                  _Importing.folder,
+                                  key: const ValueKey('importFolder'),
+                                  icon: Icons.drive_folder_upload_outlined,
+                                  title: t.importFolder,
+                                  detail: t.importFolderDetail,
+                                  reading: t.importReading,
+                                  onTap: _import,
+                                ),
+                              ),
+                              SettingsRow(
+                                words: [t.importKeep, t.importKeepDetail],
+                                child: _importRow(
+                                  _Importing.keep,
+                                  key: const ValueKey('importKeep'),
+                                  icon: Icons.sticky_note_2_outlined,
+                                  title: t.importKeep,
+                                  detail: t.importKeepDetail,
+                                  reading: t.importKeepReading,
+                                  onTap: _importKeep,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    // The person's own, on all of their own Devices
+                    // (#197): after the settings of this phone, before
+                    // About.
+                    SettingsGroup(
+                      heading: t.features,
+                      headingKey: _heading('features'),
+                      children: [
+                        SettingsRow(
+                          words: [
+                            t.featuresDetail,
+                            t.featuresSimple,
+                            t.featuresSimpleDetail,
+                            t.featuresAdvanced,
+                            t.featuresAdvancedDetail,
+                          ],
+                          child: FeaturesChoice(
+                            advanced: _advanced,
+                            onChanged: _setAdvanced,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SettingsGroup(
+                      children: [
+                        const SizedBox(height: 16),
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.feedbackTitle,
+                                t.feedbackSettingsDetail,
+                              ],
+                              child: ListTile(
+                                key: const ValueKey('sendFeedback'),
+                                leading: const Icon(Icons.feedback_outlined),
+                                title: Text(t.feedbackTitle),
+                                subtitle: Text(t.feedbackSettingsDetail),
+                                onTap: () =>
+                                    _push(FeedbackScreen(store: widget.store)),
+                              ),
+                            ),
+                            SettingsRow(
+                              words: [t.aboutTitle],
+                              child: ListTile(
+                                leading: const Icon(Icons.info_outline),
+                                title: Text(t.aboutTitle),
+                                onTap: () => _push(const AboutScreen()),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                if (ContextScope.of(context).available)
-                  ListTile(
-                    leading: const Icon(Icons.manage_history),
-                    title: Text(t.captureContextTitle),
-                    subtitle: Text(t.settingsCaptureContextDetail),
-                    onTap: () =>
-                        _push(CaptureContextScreen(store: widget.store)),
-                  ),
-                if (speech != null && speech.model.platform.available)
-                  ListTile(
-                    leading: const Icon(Icons.record_voice_over_outlined),
-                    title: Text(t.speechModelTitle),
-                    subtitle: Text(t.settingsSpeechModelDetail),
-                    onTap: () => _push(SpeechModelScreen(model: speech.model)),
-                  ),
-              ],
-            ),
-            SettingsHeading(t.settingsQuickNote, key: _heading('quick-note')),
-            _QuickNoteSettings(store: widget.store, advanced: _advanced),
-            if (hasCalendarPage(context)) ...[
-              SettingsHeading(t.settingsCalendar, key: _heading('calendar')),
-              SettingsSection(
-                children: [
-                  ListTile(
-                    key: const ValueKey('calendarPage'),
-                    leading: const Icon(Icons.event_outlined),
-                    title: Text(t.calendarPageTitle),
-                    subtitle: Text(t.settingsCalendarDetail),
-                    onTap: () => _push(CalendarScreen(store: widget.store)),
-                  ),
-                ],
               ),
-            ],
-            if (LockScope.of(context) case final lock?) ...[
-              SettingsHeading(t.settingsPrivacy, key: _heading('privacy')),
-              LockSettingsSection(
-                lock: lock,
-                alarms: widget.alarms,
-                places: Places(widget.store),
-              ),
-            ],
-            SettingsHeading(t.settingsTyping, key: _heading('typing')),
-            SettingsSection(
-              children: [
-                SwitchBelow(
-                  switchKey: const ValueKey('twoRowEditor'),
-                  leading: const Icon(Icons.keyboard_outlined),
-                  value: _twoRows,
-                  onChanged: _setTwoRows,
-                  title: Text(t.twoRowEditor),
-                  subtitle: Text(t.twoRowEditorDetail),
-                ),
-              ],
             ),
-            SettingsHeading(t.settingsHistory, key: _heading('history')),
-            SettingsSection(
-              children: [
-                SwitchBelow(
-                  switchKey: const ValueKey('streaks'),
-                  leading: const Icon(Icons.local_fire_department_outlined),
-                  value: _streaksOn,
-                  onChanged: _setStreaks,
-                  title: Text(t.showStreaks),
-                  subtitle: Text(t.showStreaksDetail),
-                ),
-              ],
-            ),
-            if (FolderScope.of(context).available) ...[
-              SettingsHeading(t.settingsImport, key: _heading('import')),
-              SettingsSection(
-                children: [
-                  _importRow(
-                    _Importing.folder,
-                    key: const ValueKey('importFolder'),
-                    icon: Icons.drive_folder_upload_outlined,
-                    title: t.importFolder,
-                    detail: t.importFolderDetail,
-                    reading: t.importReading,
-                    onTap: _import,
-                  ),
-                  _importRow(
-                    _Importing.keep,
-                    key: const ValueKey('importKeep'),
-                    icon: Icons.sticky_note_2_outlined,
-                    title: t.importKeep,
-                    detail: t.importKeepDetail,
-                    reading: t.importKeepReading,
-                    onTap: _importKeep,
-                  ),
-                ],
-              ),
-            ],
-            // The person's own, on all of their own Devices (#197): after
-            // the settings of this phone, before About.
-            SettingsHeading(t.features, key: _heading('features')),
-            FeaturesChoice(advanced: _advanced, onChanged: _setAdvanced),
-            const SizedBox(height: 16),
-            SettingsSection(
-              children: [
-                ListTile(
-                  key: const ValueKey('sendFeedback'),
-                  leading: const Icon(Icons.feedback_outlined),
-                  title: Text(t.feedbackTitle),
-                  subtitle: Text(t.feedbackSettingsDetail),
-                  onTap: () => _push(FeedbackScreen(store: widget.store)),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: Text(t.aboutTitle),
-                  onTap: () => _push(const AboutScreen()),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
-
-/// A section title of Settings and the Profile page.
-class SettingsHeading extends StatelessWidget {
-  final String text;
-
-  const SettingsHeading(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
-  );
-}
-
-/// The tiles of one section on an embossed card.
-class SettingsSection extends StatelessWidget {
-  final List<Widget> children;
-
-  const SettingsSection({super.key, required this.children});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-    child: Embossed(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        // The tiles' ink shows on the card, not under it.
-        child: Material(
-          type: MaterialType.transparency,
-          child: Column(children: children),
-        ),
-      ),
-    ),
-  );
 }
 
 /// This Device's Nudge settings: how long an ignored Nudge waits before
@@ -857,7 +1074,14 @@ class _NudgeSettings extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
 
-  const _NudgeSettings({required this.store, required this.alarms});
+  /// The heading's key, for an app link (#261).
+  final Key? headingKey;
+
+  const _NudgeSettings({
+    required this.store,
+    required this.alarms,
+    this.headingKey,
+  });
 
   @override
   State<_NudgeSettings> createState() => _NudgeSettingsState();
@@ -898,54 +1122,76 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
     String time(ClockTime c) => clockText(locale, c);
     final repeat = _repeat.inMinutes;
     final choices = {..._NudgeSettings.repeatChoices, repeat}.toList()..sort();
-    return SettingsSection(
+    return SettingsGroup(
+      heading: t.settingsNudges,
+      headingKey: widget.headingKey,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Text(t.nudgeSettingsExplain),
-        ),
-        ControlBelow(
-          leading: const Icon(Icons.notifications_paused_outlined),
-          title: Text(t.nudgeRepeat),
-          control: ChoiceChips<int>(
-            key: const ValueKey('nudgeRepeat'),
-            value: repeat,
-            onChanged: (minutes) {
-              widget.store.nudgeRepeat = Duration(minutes: minutes);
-              _changed();
-            },
-            options: [
-              for (final m in choices)
-                RadioOption(value: m, title: Text(t.renagMinutes(m))),
+        SettingsSection(
+          children: [
+            SettingsRow(
+              words: [t.nudgeSettingsExplain],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(t.nudgeSettingsExplain),
+              ),
+            ),
+            SettingsRow(
+              words: [t.nudgeRepeat],
+              child: ControlBelow(
+                leading: const Icon(Icons.notifications_paused_outlined),
+                title: Text(t.nudgeRepeat),
+                control: ChoiceChips<int>(
+                  key: const ValueKey('nudgeRepeat'),
+                  value: repeat,
+                  onChanged: (minutes) {
+                    widget.store.nudgeRepeat = Duration(minutes: minutes);
+                    _changed();
+                  },
+                  options: [
+                    for (final m in choices)
+                      RadioOption(value: m, title: Text(t.renagMinutes(m))),
+                  ],
+                ),
+              ),
+            ),
+            SettingsRow(
+              words: [t.quietHours],
+              child: SwitchBelow(
+                switchKey: const ValueKey('quietHours'),
+                leading: const Icon(Icons.bedtime_outlined),
+                title: Text(t.quietHours),
+                value: _quietOn,
+                onChanged: (on) {
+                  widget.store.quietHoursOn = on;
+                  _changed();
+                },
+              ),
+            ),
+            // Found with the Quiet Hours they belong to.
+            if (_quietOn) ...[
+              SettingsRow(
+                words: [t.quietHours, t.quietFrom],
+                child: ListTile(
+                  key: const ValueKey('quietFrom'),
+                  leading: const SizedBox.shrink(),
+                  title: Text(t.quietFrom),
+                  trailing: Text(time(_quiet.start)),
+                  onTap: () => _pick(start: true),
+                ),
+              ),
+              SettingsRow(
+                words: [t.quietHours, t.quietUntil],
+                child: ListTile(
+                  key: const ValueKey('quietUntil'),
+                  leading: const SizedBox.shrink(),
+                  title: Text(t.quietUntil),
+                  trailing: Text(time(_quiet.end)),
+                  onTap: () => _pick(start: false),
+                ),
+              ),
             ],
-          ),
+          ],
         ),
-        SwitchBelow(
-          switchKey: const ValueKey('quietHours'),
-          leading: const Icon(Icons.bedtime_outlined),
-          title: Text(t.quietHours),
-          value: _quietOn,
-          onChanged: (on) {
-            widget.store.quietHoursOn = on;
-            _changed();
-          },
-        ),
-        if (_quietOn) ...[
-          ListTile(
-            key: const ValueKey('quietFrom'),
-            leading: const SizedBox.shrink(),
-            title: Text(t.quietFrom),
-            trailing: Text(time(_quiet.start)),
-            onTap: () => _pick(start: true),
-          ),
-          ListTile(
-            key: const ValueKey('quietUntil'),
-            leading: const SizedBox.shrink(),
-            title: Text(t.quietUntil),
-            trailing: Text(time(_quiet.end)),
-            onTap: () => _pick(start: false),
-          ),
-        ],
       ],
     );
   }
@@ -961,7 +1207,14 @@ class _QuickNoteSettings extends StatefulWidget {
   /// Whether the format bar's switch shows: only in Advanced (#197).
   final bool advanced;
 
-  const _QuickNoteSettings({required this.store, required this.advanced});
+  /// The heading's key, for an app link (#261).
+  final Key? headingKey;
+
+  const _QuickNoteSettings({
+    required this.store,
+    required this.advanced,
+    this.headingKey,
+  });
 
   @override
   State<_QuickNoteSettings> createState() => _QuickNoteSettingsState();
@@ -988,51 +1241,70 @@ class _QuickNoteSettingsState extends State<_QuickNoteSettings> {
   Widget build(BuildContext context) {
     final t = context.t;
     Widget shows(QuickNoteControl control, IconData icon, String title) =>
-        SwitchBelow(
-          switchKey: ValueKey('quickNote-${control.name}'),
-          leading: Icon(icon),
-          title: Text(title),
-          value: _shows[control] ?? false,
-          onChanged: (on) => _set(control, on),
+        SettingsRow(
+          words: [title],
+          child: SwitchBelow(
+            switchKey: ValueKey('quickNote-${control.name}'),
+            leading: Icon(icon),
+            title: Text(title),
+            value: _shows[control] ?? false,
+            onChanged: (on) => _set(control, on),
+          ),
         );
-    return SettingsSection(
+    return SettingsGroup(
+      heading: t.settingsQuickNote,
+      headingKey: widget.headingKey,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Text(t.settingsQuickNoteDetail),
-        ),
-        shows(
-          QuickNoteControl.fileInto,
-          Icons.drive_file_move_outline,
-          t.fileInto,
-        ),
-        // The alarm clock offers a Routine or Reminder without it (#223);
-        // Frogs, Sessions and Tallies are made only in Advanced (#197).
-        if (widget.advanced)
-          shows(
-            QuickNoteControl.schedule,
-            Icons.alarm_add_outlined,
-            t.quickNoteSchedule,
-          ),
-        shows(
-          QuickNoteControl.shopping,
-          Icons.add_shopping_cart,
-          t.addToShoppingList,
-        ),
-        shows(QuickNoteControl.importance, Icons.priority_high, t.importance),
-        if (widget.advanced)
-          shows(
-            QuickNoteControl.formatBar,
-            Icons.format_bold,
-            t.quickNoteFormatBar,
-          ),
-        SwitchBelow(
-          switchKey: const ValueKey('quickNote-nudgeButtons'),
-          leading: const Icon(Icons.snooze),
-          title: Text(t.quickNoteNudgeButtons),
-          subtitle: Text(t.quickNoteNudgeButtonsDetail),
-          value: _nudgeButtons,
-          onChanged: _setNudgeButtons,
+        SettingsSection(
+          children: [
+            SettingsRow(
+              words: [t.settingsQuickNoteDetail],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(t.settingsQuickNoteDetail),
+              ),
+            ),
+            shows(
+              QuickNoteControl.fileInto,
+              Icons.drive_file_move_outline,
+              t.fileInto,
+            ),
+            // The alarm clock offers a Routine or Reminder without it (#223);
+            // Frogs, Sessions and Tallies are made only in Advanced (#197).
+            if (widget.advanced)
+              shows(
+                QuickNoteControl.schedule,
+                Icons.alarm_add_outlined,
+                t.quickNoteSchedule,
+              ),
+            shows(
+              QuickNoteControl.shopping,
+              Icons.add_shopping_cart,
+              t.addToShoppingList,
+            ),
+            shows(
+              QuickNoteControl.importance,
+              Icons.priority_high,
+              t.importance,
+            ),
+            if (widget.advanced)
+              shows(
+                QuickNoteControl.formatBar,
+                Icons.format_bold,
+                t.quickNoteFormatBar,
+              ),
+            SettingsRow(
+              words: [t.quickNoteNudgeButtons, t.quickNoteNudgeButtonsDetail],
+              child: SwitchBelow(
+                switchKey: const ValueKey('quickNote-nudgeButtons'),
+                leading: const Icon(Icons.snooze),
+                title: Text(t.quickNoteNudgeButtons),
+                subtitle: Text(t.quickNoteNudgeButtonsDetail),
+                value: _nudgeButtons,
+                onChanged: _setNudgeButtons,
+              ),
+            ),
+          ],
         ),
       ],
     );

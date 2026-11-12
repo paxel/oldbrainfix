@@ -47,6 +47,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get captureFanClose => 'Schließen';
 
   @override
+  String get captureLongPressHint => 'sofort eine Notiz schreiben';
+
+  @override
+  String get captureLongPressAction => 'Sofort eine Notiz schreiben';
+
+  @override
   String get photoMissing => 'Foto nicht auf diesem Gerät';
 
   @override
@@ -1575,6 +1581,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsIntro =>
       'Einfach oder Erweitert und die Papierkorb-Einstellung werden mit deinen eigenen Geräten synchronisiert; die anderen Einstellungen gelten nur für dieses Handy.';
+
+  @override
+  String get settingsSearchHint => 'Einstellungen durchsuchen';
+
+  @override
+  String settingsSearchNothing(String query) {
+    return 'Keine Einstellung passt zu „$query“.';
+  }
 
   @override
   String get settingsLook => 'Aussehen';

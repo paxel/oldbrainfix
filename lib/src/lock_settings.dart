@@ -11,6 +11,7 @@ import 'l10n.dart';
 import 'look.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
+import 'settings_search.dart';
 import 'system_bars.dart';
 
 /// Makes sure a PIN is set, asking for a new one when none is; whether
@@ -23,7 +24,7 @@ Future<bool> _ensurePin(BuildContext context, Store store) async {
   return true;
 }
 
-/// The App Lock's part of Settings: the lock itself, biometrics or the
+/// The App Lock's part of Settings, under its heading: the lock itself, biometrics or the
 /// screen lock where the Device has them, the PIN, how soon the app
 /// locks again, and the way to the Area Locks. Turning a lock off,
 /// changing the PIN and showing a locked Area's alarms in full ask for
@@ -37,11 +38,15 @@ class LockSettingsSection extends StatefulWidget {
   final AlarmSync alarms;
   final Places places;
 
+  /// The heading's key, for an app link (#261).
+  final Key? headingKey;
+
   const LockSettingsSection({
     super.key,
     required this.lock,
     required this.alarms,
     required this.places,
+    this.headingKey,
   });
 
   @override
@@ -140,83 +145,92 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
       ...LockSettingsSection.relockChoices,
       relock,
     }.toList()..sort();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The tiles' ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              children: [
-                SwitchBelow(
-                  switchKey: const ValueKey('appLock'),
-                  leading: const Icon(Icons.lock_outline),
-                  value: _appLock,
-                  onChanged: _setAppLock,
-                  title: Text(t.appLock),
-                  subtitle: Text(t.appLockDetail),
+    return SettingsGroup(
+      heading: t.settingsPrivacy,
+      headingKey: widget.headingKey,
+      children: [
+        SettingsSection(
+          children: [
+            SettingsRow(
+              words: [t.appLock, t.appLockDetail],
+              child: SwitchBelow(
+                switchKey: const ValueKey('appLock'),
+                leading: const Icon(Icons.lock_outline),
+                value: _appLock,
+                onChanged: _setAppLock,
+                title: Text(t.appLock),
+                subtitle: Text(t.appLockDetail),
+              ),
+            ),
+            if (_hasPin && _canBiometrics == true)
+              SettingsRow(
+                words: [t.unlockBiometricsHere, t.biometricsDetail],
+                child: SwitchBelow(
+                  switchKey: const ValueKey('biometrics'),
+                  leading: const Icon(Icons.fingerprint),
+                  value: _biometrics,
+                  onChanged: _setBiometrics,
+                  title: Text(t.unlockBiometricsHere),
+                  subtitle: Text(t.biometricsDetail),
                 ),
-                if (_hasPin && _canBiometrics == true)
-                  SwitchBelow(
-                    switchKey: const ValueKey('biometrics'),
-                    leading: const Icon(Icons.fingerprint),
-                    value: _biometrics,
-                    onChanged: _setBiometrics,
-                    title: Text(t.unlockBiometricsHere),
-                    subtitle: Text(t.biometricsDetail),
-                  ),
-                if (_hasPin)
-                  ListTile(
-                    key: const ValueKey('changePin'),
-                    leading: const Icon(Icons.pin_outlined),
-                    title: Text(t.pinChange),
-                    onTap: _changePin,
-                  ),
-                ControlBelow(
-                  leading: const Icon(Icons.timer_outlined),
-                  title: Text(t.relockAfter),
-                  subtitle: Text(t.relockDetail),
-                  control: ChoiceChips<int>(
-                    key: const ValueKey('relock'),
-                    value: relock,
-                    onChanged: _setRelock,
-                    options: [
-                      for (final m in relockChoices)
-                        RadioOption(
-                          value: m,
-                          title: Text(
-                            m == 0 ? t.relockAtOnce : t.renagMinutes(m),
-                          ),
-                        ),
-                    ],
-                  ),
+              ),
+            if (_hasPin)
+              SettingsRow(
+                words: [t.pinChange],
+                child: ListTile(
+                  key: const ValueKey('changePin'),
+                  leading: const Icon(Icons.pin_outlined),
+                  title: Text(t.pinChange),
+                  onTap: _changePin,
                 ),
-                ListTile(
-                  key: const ValueKey('areaLocks'),
-                  leading: const Icon(Icons.folder_off_outlined),
-                  title: Text(t.areaLocksTitle),
-                  subtitle: Text(t.areaLocksDetail),
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AreaLocksScreen(
-                          lock: widget.lock,
-                          alarms: widget.alarms,
-                          places: widget.places,
+              ),
+            SettingsRow(
+              words: [t.relockAfter, t.relockDetail],
+              child: ControlBelow(
+                leading: const Icon(Icons.timer_outlined),
+                title: Text(t.relockAfter),
+                subtitle: Text(t.relockDetail),
+                control: ChoiceChips<int>(
+                  key: const ValueKey('relock'),
+                  value: relock,
+                  onChanged: _setRelock,
+                  options: [
+                    for (final m in relockChoices)
+                      RadioOption(
+                        value: m,
+                        title: Text(
+                          m == 0 ? t.relockAtOnce : t.renagMinutes(m),
                         ),
                       ),
-                    );
-                    // A PIN may have been set there.
-                    _reread();
-                  },
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            SettingsRow(
+              words: [t.areaLocksTitle, t.areaLocksDetail],
+              child: ListTile(
+                key: const ValueKey('areaLocks'),
+                leading: const Icon(Icons.folder_off_outlined),
+                title: Text(t.areaLocksTitle),
+                subtitle: Text(t.areaLocksDetail),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AreaLocksScreen(
+                        lock: widget.lock,
+                        alarms: widget.alarms,
+                        places: widget.places,
+                      ),
+                    ),
+                  );
+                  // A PIN may have been set there.
+                  _reread();
+                },
+              ),
+            ),
+          ],
         ),
-      ),
+      ],
     );
   }
 }

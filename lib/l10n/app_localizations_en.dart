@@ -47,6 +47,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureFanClose => 'Close';
 
   @override
+  String get captureLongPressHint => 'write a Note at once';
+
+  @override
+  String get captureLongPressAction => 'Write a Note at once';
+
+  @override
   String get photoMissing => 'Photo not on this device';
 
   @override
@@ -1565,6 +1571,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsIntro =>
       'Simple or Advanced and the Trash setting sync to your own Devices; the other settings belong to this phone.';
+
+  @override
+  String get settingsSearchHint => 'Search Settings';
+
+  @override
+  String settingsSearchNothing(String query) {
+    return 'No setting matches “$query”.';
+  }
 
   @override
   String get settingsLook => 'Look';
