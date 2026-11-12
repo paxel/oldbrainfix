@@ -374,6 +374,41 @@
           "mayUse": false
         }
       ]
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "history": [
+        {
+          "at": "2026-01-01T10:02:11.000Z",
+          "entity": "note:00000000000000000000000000000016",
+          "kind": "filed",
+          "before": "area:00000000000000000000000000000001",
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:10.000Z",
+          "entity": "note:00000000000000000000000000000016",
+          "kind": "filed",
+          "before": null,
+          "after": "area:00000000000000000000000000000001",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:02:06.000Z",
+          "entity": "note:00000000000000000000000000000016",
+          "kind": "captured",
+          "before": null,
+          "after": "Reading glasses at the office",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
     }
   ]
 }

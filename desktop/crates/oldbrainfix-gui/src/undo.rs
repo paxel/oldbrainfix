@@ -50,8 +50,9 @@ pub enum Undo {
     },
     /// The Frog checked off.
     FrogEaten(String),
-    /// Notes filed, each with the Area or Topic it was in before.
-    Filed(Vec<(String, String)>),
+    /// Notes filed, each with the Area or Topic it was in before, or
+    /// none when it was filed nowhere.
+    Filed(Vec<(String, Option<String>)>),
 }
 
 impl Undo {
@@ -156,12 +157,24 @@ impl Undo {
                 store.batch(|| {
                     for (note, place) in &moves {
                         let listed = notes.by_id(note)?.is_some_and(|n| !n.is_trashed());
-                        if listed
-                            && store.may_change(note)?
-                            && places.is_place(place)?
-                            && store.may_write_in(place)?
-                        {
-                            notes.file(note, place)?;
+                        if !listed {
+                            continue;
+                        }
+                        match place {
+                            Some(place) => {
+                                if store.may_change(note)?
+                                    && places.is_place(place)?
+                                    && store.may_write_in(place)?
+                                {
+                                    notes.file(note, place)?;
+                                }
+                            }
+                            // Back to Unsorted, where it came from.
+                            None => {
+                                if notes.may_unfile(note)? {
+                                    notes.unfile(note)?;
+                                }
+                            }
                         }
                     }
                     Ok(())

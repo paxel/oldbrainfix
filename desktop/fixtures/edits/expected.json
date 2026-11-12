@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:02:05.000Z",
+  "now": "2026-01-02T10:02:11.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [
     {
@@ -341,9 +341,40 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "text": "Reading glasses at the office",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:02:06.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000016",
     "note:00000000000000000000000000000015",
     "note:00000000000000000000000000000013",
     "note:00000000000000000000000000000012",
@@ -358,7 +389,8 @@
     "note:0000000000000000000000000000000c",
     "note:00000000000000000000000000000011",
     "note:00000000000000000000000000000012",
-    "note:00000000000000000000000000000015"
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000016"
   ],
   "trashed": [
     "note:0000000000000000000000000000000f",
@@ -373,6 +405,7 @@
     ]
   },
   "sections": {
+    "note:00000000000000000000000000000016": [],
     "note:00000000000000000000000000000015": [],
     "note:00000000000000000000000000000013": [
       {
@@ -417,6 +450,12 @@
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Reading glasses at the office"
+    },
     "note:00000000000000000000000000000015": {
       "html": null,
       "photos": [],
@@ -486,6 +525,7 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000016",
       "note:00000000000000000000000000000015",
       "note:00000000000000000000000000000013",
       "note:00000000000000000000000000000012",
@@ -504,6 +544,7 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000016",
       "note:00000000000000000000000000000015",
       "note:00000000000000000000000000000013",
       "note:00000000000000000000000000000012",

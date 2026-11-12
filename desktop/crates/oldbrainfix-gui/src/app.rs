@@ -8891,18 +8891,17 @@ impl App {
                 moving.push(id.as_str());
             }
         }
-        // Where each was, for Ctrl+Z (#268); one from Unsorted has no
-        // place to go back to.
+        // Where each was, for Ctrl+Z (#268); one from Unsorted goes back
+        // there.
         let mut before = Vec::new();
         for id in &moving {
-            if let Some(was) = notes.by_id(id)?.and_then(|n| n.place) {
-                before.push((id.to_string(), was));
-            }
+            let was = notes.by_id(id)?.and_then(|n| n.place);
+            before.push((id.to_string(), was));
         }
         self.store
             .batch(|| moving.iter().try_for_each(|id| notes.file(id, place)))?;
         if !moving.is_empty() {
-            self.undo = (!before.is_empty()).then_some(Undo::Filed(before));
+            self.undo = Some(Undo::Filed(before));
         }
         self.cards.clear();
         let stayed = ids.len() - moving.len();

@@ -919,6 +919,33 @@ impl<'a> Notes<'a> {
             .map(drop)
     }
 
+    /// Whether this Device may take the Note `note_id` out of its Area
+    /// or Topic (#268): it shows filed in one that exists, and it is this
+    /// Device's to change ([`Store::may_change`]), as filing it was.
+    pub fn may_unfile(&self, note_id: &str) -> Result<bool> {
+        Ok(self.by_id(note_id)?.is_some_and(|n| n.place.is_some())
+            && self.store.may_change(note_id)?)
+    }
+
+    /// Takes the Note `note_id` out of its Area or Topic, filed nowhere
+    /// again: back in Unsorted unless something else keeps it out, such
+    /// as a Routine it spawned. One entry clears the place
+    /// [`Notes::file`] wrote; latest wins, so the user's other Devices
+    /// follow. Refused unless [`Notes::may_unfile`].
+    pub fn unfile(&self, note_id: &str) -> Result<()> {
+        if !self.by_id(note_id)?.is_some_and(|n| n.place.is_some()) {
+            return Err(Error::Invalid(format!("not a filed Note: {note_id}")));
+        }
+        if !self.store.may_change(note_id)? {
+            return Err(Error::Invalid(format!(
+                "{note_id} may not be taken out of its place here"
+            )));
+        }
+        self.store
+            .append(note_id, keys::PLACE, None, None)
+            .map(drop)
+    }
+
     /// Fixes the text of the Note `note_id` in place. The old text stays
     /// in the log only. A text in a format this version does not know is
     /// never overwritten (ADR 0018). The text keeps the Note's format.
@@ -3259,6 +3286,160 @@ mod tests {
         exchange(&ben, &ann, None)?;
         for store in [&ann, &ben] {
             assert_eq!(merged_into(store, &merged.id)?, Some(into.id.clone()));
+        }
+        Ok(())
+    }
+
+    fn place_of(store: &Store, id: &str) -> Result<Option<String>> {
+        Ok(Notes::new(store).by_id(id)?.and_then(|n| n.place))
+    }
+
+    #[test]
+    fn taking_a_note_out_of_its_place_sends_it_back_to_unsorted_with_one_entry() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let home = Places::new(&ann).add_area("Home")?.id;
+        let keys = notes.capture("Spare keys at the neighbours", None, None)?;
+        notes.file(&keys.id, &home)?;
+        assert!(notes.unsorted()?.is_empty());
+
+        let mark = ann.current_seq()?;
+        assert!(notes.may_unfile(&keys.id)?);
+        notes.unfile(&keys.id)?;
+        let written: Vec<_> = ann
+            .entries_after(mark)?
+            .into_iter()
+            .map(|e| (e.entity, e.field, e.value))
+            .collect();
+        assert_eq!(written, [(keys.id.clone(), keys::PLACE.to_string(), None)]);
+        assert_eq!(place_of(&ann, &keys.id)?, None);
+        assert_eq!(ids(notes.unsorted()?), std::slice::from_ref(&keys.id));
+        assert!(notes.inside(&home)?.is_empty());
+        // Nothing is left to take out.
+        assert!(!notes.may_unfile(&keys.id)?);
+        assert!(notes.unfile(&keys.id).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn taking_a_note_out_of_its_place_leaves_one_that_spawned_a_routine_out_of_unsorted()
+    -> TestResult {
+        use crate::schedule::{ClockTime, Day, Frequency, Recurrence, Schedule};
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let home = Places::new(&ann).add_area("Home")?.id;
+        let bins = notes.capture("Bins out", Some(&home), None)?;
+        let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
+        let rule = Recurrence::every(Frequency::Daily, 1);
+        let daily = Schedule::new(Day::new(2026, 3, 1), &eight, Some(rule)).ok_or("a Schedule")?;
+        crate::Routines::new(&ann).spawn(&bins.id, &daily)?;
+        let mark = ann.current_seq()?;
+        notes.unfile(&bins.id)?;
+        let fields: Vec<_> = ann
+            .entries_after(mark)?
+            .into_iter()
+            .map(|e| e.field)
+            .collect();
+        assert_eq!(fields, [keys::PLACE]);
+        let back = note(&ann, &bins.id)?;
+        assert_eq!(back.place, None);
+        assert!(back.spawned);
+        assert!(notes.unsorted()?.is_empty());
+        assert_eq!(ids(notes.all()?), std::slice::from_ref(&bins.id));
+        Ok(())
+    }
+
+    #[test]
+    fn taking_a_note_out_is_refused_where_nothing_shows_filed_and_writes_nothing() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let places = Places::new(&ann);
+        let loose = notes.capture("never filed", None, None)?;
+        let gone = places.add_area("Gone")?.id;
+        let stranded = notes.capture("filed where nothing is", Some(&gone), None)?;
+        // The place deleted elsewhere, its Notes not moved here yet.
+        ann.append(&gone, crate::places::keys::TYPE, None, None)?;
+        let mark = ann.current_seq()?;
+        for id in [loose.id.as_str(), &stranded.id, "note:none", &gone] {
+            assert!(!notes.may_unfile(id)?, "{id}");
+            assert!(notes.unfile(id).is_err(), "{id}");
+        }
+        assert_eq!(ann.current_seq()?, mark);
+        Ok(())
+    }
+
+    #[test]
+    fn taking_a_note_out_reaches_the_users_other_device_and_a_later_filing_wins() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        let notes = Notes::new(&ann);
+        let home = Places::new(&ann).add_area("Home")?.id;
+        let keys = notes.capture("Spare keys", Some(&home), None)?;
+        exchange(&desk, &ann, None)?;
+        Notes::new(&desk).unfile(&keys.id)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            assert_eq!(
+                ids(Notes::new(store).unsorted()?),
+                std::slice::from_ref(&keys.id)
+            );
+        }
+        notes.file(&keys.id, &home)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            assert_eq!(place_of(store, &keys.id)?, Some(home.clone()));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_member_takes_out_their_own_note_a_manager_anyones() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let own = Notes::new(&ben).capture("Ben's toner", Some(&area), None)?;
+        let more = Notes::new(&ben).capture("Ben's stapler", Some(&area), None)?;
+        exchange(&ben, &ann, None)?;
+        assert!(Notes::new(&ben).may_unfile(&own.id)?);
+        Notes::new(&ben).unfile(&own.id)?;
+        assert_eq!(
+            ids(Notes::new(&ben).unsorted()?),
+            std::slice::from_ref(&own.id)
+        );
+        assert!(Notes::new(&ann).may_unfile(&more.id)?);
+        Notes::new(&ann).unfile(&more.id)?;
+        assert_eq!(
+            ids(Notes::new(&ann).unsorted()?),
+            std::slice::from_ref(&more.id)
+        );
+        // Out of the Area, neither leaves for the other person: each
+        // stays filed there for them (ADR 0013).
+        exchange(&ben, &ann, None)?;
+        assert_eq!(place_of(&ann, &own.id)?, Some(area.clone()));
+        assert_eq!(place_of(&ben, &more.id)?, Some(area));
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_try_on_anothers_note_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let theirs = Notes::new(&ann).capture("Order paper", Some(&area), None)?;
+        exchange(&ben, &ann, None)?;
+        let mark = ben.current_seq()?;
+        assert!(!Notes::new(&ben).may_unfile(&theirs.id)?);
+        assert!(Notes::new(&ben).unfile(&theirs.id).is_err());
+        assert_eq!(ben.current_seq()?, mark);
+        // As a modified app would write it.
+        ben.append(&theirs.id, keys::PLACE, None, None)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(place_of(store, &theirs.id)?, Some(area.clone()));
+            assert!(Notes::new(store).unsorted()?.is_empty());
         }
         Ok(())
     }

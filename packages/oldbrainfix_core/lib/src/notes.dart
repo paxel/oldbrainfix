@@ -769,6 +769,27 @@ class Notes {
     store.append(noteId, NoteKeys.place, placeId);
   }
 
+  /// Whether this Device may take the Note [noteId] out of its Area or
+  /// Topic (#268): it shows filed in one that exists, and it is this
+  /// Device's to change ([SharedAreas.mayChange]), as filing it was.
+  bool mayUnfile(String noteId) =>
+      byId(noteId)?.place != null && store.mayChange(noteId);
+
+  /// Takes the Note [noteId] out of its Area or Topic, filed nowhere
+  /// again: back in Unsorted unless something else keeps it out, such as
+  /// a Routine it spawned. One entry clears the place [file] wrote;
+  /// latest wins, so the user's other Devices follow. Refused unless
+  /// [mayUnfile].
+  void unfile(String noteId) {
+    if (byId(noteId)?.place == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a filed Note');
+    }
+    if (!store.mayChange(noteId)) {
+      throw StateError('$noteId may not be taken out of its place here');
+    }
+    store.append(noteId, NoteKeys.place, null);
+  }
+
   /// Nudges the Note [noteId] [nudgeIn] from now instead of when it was
   /// set to before.
   void setNudge(String noteId, Duration nudgeIn) {

@@ -521,7 +521,8 @@ final _scenarios = <Scenario>[
         'Routine included), into the Area and into the trash, and an empty '
         'one; Areas deleted with their Topics, their Notes sent into the '
         'trash and back to Unsorted; a Note with an Amend merged into '
-        'another and its Merge undone (#268).',
+        'another and its Merge undone; a Note filed from Unsorted and sent '
+        'back to Unsorted (#268).',
     build: (store) {
       final notes = Notes(store);
       final places = Places(store);
@@ -585,6 +586,9 @@ final _scenarios = <Scenario>[
       final holiday = notes.capture('Neighbours on holiday');
       notes.merge(keys.id, holiday.id);
       notes.undoMerge(keys.id);
+      final glasses = notes.capture('Reading glasses at the office');
+      notes.file(glasses.id, home.id);
+      notes.unfile(glasses.id);
     },
   ),
   (

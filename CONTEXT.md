@@ -126,7 +126,7 @@ Where the user finds and opens filed Notes. On the phone the page that "Search a
 _Avoid_: search screen, library
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted, or when the filing that took it out of Unsorted is undone. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:

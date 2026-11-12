@@ -1751,6 +1751,9 @@ fn write_edits(store: &Store) -> Built {
     let holiday = notes.capture("Neighbours on holiday", None, None)?;
     notes.merge(&keys.id, &holiday.id)?;
     notes.undo_merge(&keys.id)?;
+    let glasses = notes.capture("Reading glasses at the office", None, None)?;
+    notes.file(&glasses.id, &home.id)?;
+    notes.unfile(&glasses.id)?;
     Ok(())
 }
 

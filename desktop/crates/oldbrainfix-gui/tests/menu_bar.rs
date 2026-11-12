@@ -543,7 +543,7 @@ fn ctrl_z_in_a_field_is_the_fields_and_outside_one_undoes_the_last_delete() -> T
 }
 
 #[test]
-fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_leaves_none() -> TestResult {
+fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_goes_back() -> TestResult {
     let (store, _, tap) = store()?;
     let bank = Notes::new(&store)
         .all()?
@@ -572,8 +572,8 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_leaves_none()
     assert!(!trashed(&harness)?);
     assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
 
-    // A Note filed from Unsorted has no place to go back to: the delete
-    // before it is not undone by surprise.
+    // A Note filed from Unsorted goes back to Unsorted; the delete before
+    // it is not undone with it.
     pick(&mut harness, "Note", "Delete");
     harness.run();
     assert!(trashed(&harness)?);
@@ -582,14 +582,26 @@ fn an_undo_with_nothing_left_does_nothing_and_filing_from_unsorted_leaves_none()
     press_file_into(&mut harness);
     last(&harness, "Household").click();
     harness.run();
-    let filed = Notes::new(harness.state().store())
-        .by_id(&bank)?
-        .ok_or("the bank")?;
-    assert!(filed.place.is_some());
-    assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
+    let place = |h: &Harness<'_, App>| -> Result<Option<String>, Box<dyn std::error::Error>> {
+        Ok(Notes::new(h.state().store())
+            .by_id(&bank)?
+            .ok_or("the bank")?
+            .place)
+    };
+    assert!(place(&harness)?.is_some());
+    assert!(enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
     harness.run();
+    assert_eq!(harness.state().error(), None);
+    assert_eq!(place(&harness)?, None);
+    let unsorted: Vec<String> = Notes::new(harness.state().store())
+        .unsorted()?
+        .into_iter()
+        .map(|n| n.id)
+        .collect();
+    assert_eq!(unsorted, [bank]);
     assert!(trashed(&harness)?);
+    assert!(!enabled(&mut harness, "Edit", "Undo Ctrl+Z"));
     Ok(())
 }
 

@@ -1048,8 +1048,6 @@ replace a law of Both apps where they say so. A desktop law marked
   announcement: Edit ▸ Undo is first in its menu and greyed while
   nothing waits; Ctrl+Z works over the list and the Note dialog but not
   in a text field, where it undoes the typing. Only the last one waits.
-  A Note filed from Unsorted stays filed, as no restore takes a Note
-  back to Unsorted.
 - **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
   Note dialog, while Enter alone starts a new line; Enter in a one-line
