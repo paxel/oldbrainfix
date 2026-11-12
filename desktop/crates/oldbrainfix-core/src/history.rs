@@ -1,17 +1,20 @@
 //! A Routine's history (CONTEXT.md) as the Dart core's `history.dart`
-//! has it: each Occurrence Done, Missed or still open, its Streak and its
-//! Adherence, as a pure function of the schedules it had, what was Done,
-//! this Device's snoozes, now and the wall clock. Missed follows the same
+//! has it: each Occurrence Done, Missed, skipped or still open, its
+//! Streak and its Adherence, as a pure function of the schedules it had,
+//! what was Done and skipped, this Device's snoozes, now and the wall
+//! clock. Missed follows the same
 //! rules as the Missed Summary.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Duration, Utc};
 
 use crate::Result;
 use crate::alarms::{Alarms, instant_of, missed_from, start_of};
 use crate::entry::Entry;
-use crate::routines::{Routine, Routines, keys};
+use crate::routines::{
+    Routine, Routines, first_occurrence_from, keys, moved_occurrences, occurrences_between,
+};
 use crate::schedule::{ClockTime, Day, Occurrence, Schedule, WallClock};
 use crate::settings::DeviceSettings;
 use crate::store::{Fields, Store};
@@ -87,6 +90,8 @@ pub enum OccurrenceStatus {
     Done,
     /// Never Done, and its time is over (CONTEXT.md).
     Missed,
+    /// Skipped, by Skip or Tomorrow, and not Done (CONTEXT.md, Skip).
+    Skipped,
     /// Due, not Done, not Missed yet.
     Open,
     /// Not due yet.
@@ -99,6 +104,7 @@ impl OccurrenceStatus {
         match self {
             OccurrenceStatus::Done => "done",
             OccurrenceStatus::Missed => "missed",
+            OccurrenceStatus::Skipped => "skipped",
             OccurrenceStatus::Open => "open",
             OccurrenceStatus::Coming => "coming",
         }
@@ -141,6 +147,10 @@ pub struct HistoryEntry {
     /// Until when it was last snoozed on this Device, if this Device still
     /// knows; snoozes are never synced (ADR 0008).
     pub snoozed_until: Option<DateTime<Utc>>,
+    /// When it was skipped; `None` unless it was.
+    pub skipped_at: Option<DateTime<Utc>>,
+    /// Whether Tomorrow added it, a day after the one it skipped.
+    pub moved: bool,
 }
 
 impl HistoryEntry {
@@ -160,11 +170,14 @@ impl HistoryEntry {
 }
 
 /// The Done and Missed Occurrences over a period; those still open do
-/// not count.
+/// not count, nor do those skipped, which are counted beside them
+/// ("92 % this month · 3 skipped").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Adherence {
     pub done: usize,
     pub missed: usize,
+    /// The Occurrences skipped and not Done: never part of the share.
+    pub skipped: usize,
 }
 
 impl Adherence {
@@ -183,12 +196,14 @@ pub struct DayTally {
     pub missed: usize,
     /// Not Done and not Missed yet.
     pub open: usize,
+    /// Skipped and not Done.
+    pub skipped: usize,
 }
 
 impl DayTally {
     /// Whether nothing was due that day.
     pub fn is_empty(&self) -> bool {
-        self.done + self.missed + self.open == 0
+        self.done + self.missed + self.open + self.skipped == 0
     }
 }
 
@@ -204,7 +219,8 @@ pub struct RoutineHistory {
     /// The day weeks start on, 1 for Monday to 7 for Sunday.
     pub week_start: u32,
     /// The run of Done Occurrences up to the latest that is no longer
-    /// open (CONTEXT.md, Streak): one still due does not break it.
+    /// open (CONTEXT.md, Streak): one still due does not break it, nor
+    /// does one skipped, which does not count in it either.
     pub current_streak: usize,
     /// The longest run of Done Occurrences ever.
     pub longest_streak: usize,
@@ -261,7 +277,7 @@ impl RoutineHistory {
             match entry.status {
                 OccurrenceStatus::Done => run += 1,
                 OccurrenceStatus::Missed => return run,
-                OccurrenceStatus::Open | OccurrenceStatus::Coming => {}
+                OccurrenceStatus::Skipped | OccurrenceStatus::Open | OccurrenceStatus::Coming => {}
             }
         }
         run
@@ -277,7 +293,7 @@ impl RoutineHistory {
                     longest = longest.max(run);
                 }
                 OccurrenceStatus::Missed => run = 0,
-                OccurrenceStatus::Open | OccurrenceStatus::Coming => {}
+                OccurrenceStatus::Skipped | OccurrenceStatus::Open | OccurrenceStatus::Coming => {}
             }
         }
         longest
@@ -289,11 +305,13 @@ impl RoutineHistory {
             done: 0,
             missed: 0,
             open: 0,
+            skipped: 0,
         };
         for entry in self.between(day, day) {
             match entry.status {
                 OccurrenceStatus::Done => tally.done += 1,
                 OccurrenceStatus::Missed => tally.missed += 1,
+                OccurrenceStatus::Skipped => tally.skipped += 1,
                 OccurrenceStatus::Open | OccurrenceStatus::Coming => tally.open += 1,
             }
         }
@@ -307,6 +325,7 @@ impl RoutineHistory {
             match entry.status {
                 OccurrenceStatus::Done => adherence.done += 1,
                 OccurrenceStatus::Missed => adherence.missed += 1,
+                OccurrenceStatus::Skipped => adherence.skipped += 1,
                 OccurrenceStatus::Open | OccurrenceStatus::Coming => {}
             }
         }
@@ -314,22 +333,50 @@ impl RoutineHistory {
     }
 }
 
+/// What the Occurrences of a Routine were answered with, by
+/// [`Occurrence::key`]: when each was Done, when each was skipped, and
+/// which of those Tomorrow skipped.
+#[derive(Debug, Clone, Copy)]
+pub struct Answers<'a> {
+    pub done: &'a BTreeMap<String, DateTime<Utc>>,
+    pub skipped: &'a BTreeMap<String, DateTime<Utc>>,
+    pub tomorrow: &'a BTreeSet<String>,
+}
+
+impl<'a> Answers<'a> {
+    /// What `routine` holds.
+    pub fn of(routine: &'a Routine) -> Answers<'a> {
+        Answers {
+            done: &routine.done,
+            skipped: &routine.skipped,
+            tomorrow: &routine.tomorrow,
+        }
+    }
+}
+
 /// The history at `now` of a Routine that had the `spans` (see
-/// [`schedule_spans`]), was Done at `done` and was snoozed on this Device
-/// until `snoozes`, both by [`Occurrence::key`], with days as `wall`
-/// shows them. An Occurrence is Missed as the Missed Summary says: when
-/// the next one starts, unless the schedule changed or the Routine went
-/// to the trash before. Whatever was Done counts, asked for or not. An
-/// all-day Occurrence starts at `all_day_from`, as the alarm plan has it.
+/// [`schedule_spans`]), with the `answers` it was given and snoozed on
+/// this Device until `snoozes`, all by [`Occurrence::key`], with days as
+/// `wall` shows them. An Occurrence is Missed as the Missed Summary says:
+/// when the next one starts, unless the schedule changed or the Routine
+/// went to the trash before, or it was skipped. Whatever was Done counts,
+/// asked for or not. Each span holds the Occurrences Tomorrow added to
+/// its schedule ([`moved_occurrences`]). An all-day Occurrence starts at
+/// `all_day_from`, as the alarm plan has it.
 pub fn routine_history(
     spans: &[ScheduleSpan],
-    done: &BTreeMap<String, DateTime<Utc>>,
+    answers: Answers<'_>,
     snoozes: &BTreeMap<String, DateTime<Utc>>,
     now: DateTime<Utc>,
     wall: &WallClock,
     week_start: u32,
     all_day_from: ClockTime,
 ) -> RoutineHistory {
+    let Answers {
+        done,
+        skipped,
+        tomorrow,
+    } = answers;
     let today = Day::today(now, wall);
     let mut asked: BTreeMap<String, HistoryEntry> = BTreeMap::new();
     // Done, but outside every span: kept unless asked for elsewhere.
@@ -337,7 +384,8 @@ pub fn routine_history(
     let entry = |occurrence: Occurrence,
                  status: OccurrenceStatus,
                  start: DateTime<Utc>,
-                 missed_at: DateTime<Utc>| {
+                 missed_at: DateTime<Utc>,
+                 moved: bool| {
         let key = occurrence.key();
         HistoryEntry {
             occurrence,
@@ -346,6 +394,8 @@ pub fn routine_history(
             missed_at,
             done_at: done.get(&key).copied(),
             snoozed_until: snoozes.get(&key).copied(),
+            skipped_at: skipped.get(&key).copied(),
+            moved,
         }
     };
     for span in spans {
@@ -355,17 +405,15 @@ pub fn routine_history(
         if to < from {
             continue;
         }
-        let occurrences = schedule.between(from, to);
-        let after = if schedule.once() {
-            None
-        } else {
-            schedule.next(to.add_days(1), 1).into_iter().next()
-        };
+        let moved = moved_occurrences(schedule, tomorrow);
+        let occurrences = occurrences_between(schedule, &moved, from, to);
+        let after = first_occurrence_from(schedule, &moved, to.add_days(1));
         for (i, occurrence) in occurrences.iter().enumerate() {
             if occurrence.day > today {
                 break;
             }
             let next = occurrences.get(i + 1).or(after.as_ref());
+            let is_moved = moved.contains(occurrence);
             let wall_start = start_of(occurrence, all_day_from);
             let wall_ends = missed_from(occurrence, next);
             let start = instant_of(wall_start.day, wall_start.time, wall);
@@ -373,7 +421,13 @@ pub fn routine_history(
             let in_span = start >= span.from && span.until.is_none_or(|until| start < until);
             let key = occurrence.key();
             if done.contains_key(&key) {
-                let e = entry(*occurrence, OccurrenceStatus::Done, start, missed_at);
+                let e = entry(
+                    *occurrence,
+                    OccurrenceStatus::Done,
+                    start,
+                    missed_at,
+                    is_moved,
+                );
                 if in_span {
                     asked.insert(key, e);
                 } else {
@@ -384,8 +438,23 @@ pub fn routine_history(
             if !in_span {
                 continue;
             }
-            if missed_at <= now && span.until.is_none_or(|until| missed_at <= until) {
-                let e = entry(*occurrence, OccurrenceStatus::Missed, start, missed_at);
+            if skipped.contains_key(&key) {
+                let e = entry(
+                    *occurrence,
+                    OccurrenceStatus::Skipped,
+                    start,
+                    missed_at,
+                    is_moved,
+                );
+                asked.insert(key, e);
+            } else if missed_at <= now && span.until.is_none_or(|until| missed_at <= until) {
+                let e = entry(
+                    *occurrence,
+                    OccurrenceStatus::Missed,
+                    start,
+                    missed_at,
+                    is_moved,
+                );
                 asked.insert(key, e);
             } else if span.until.is_none() {
                 let status = if start > now {
@@ -393,7 +462,7 @@ pub fn routine_history(
                 } else {
                     OccurrenceStatus::Open
                 };
-                asked.insert(key, entry(*occurrence, status, start, missed_at));
+                asked.insert(key, entry(*occurrence, status, start, missed_at, is_moved));
             }
         }
     }
@@ -418,6 +487,7 @@ pub fn routine_history(
             OccurrenceStatus::Done,
             instant_of(wall_start.day, wall_start.time, wall),
             instant_of(wall_ends.day, wall_ends.time, wall),
+            false,
         );
         asked.insert(key.clone(), e);
     }
@@ -446,7 +516,7 @@ impl Routines<'_> {
         let spans = schedule_spans(&self.store.history(&routine.id)?);
         Ok(routine_history(
             &spans,
-            &routine.done,
+            Answers::of(routine),
             &snoozes,
             self.store.now(),
             wall,
@@ -713,6 +783,8 @@ mod tests {
             missed_at: wall(10, 25, 0, 0),
             done_at: Some(done_at),
             snoozed_until: None,
+            skipped_at: None,
+            moved: false,
         };
         assert_eq!(
             all_day(wall(10, 24, 9, 0)).timing(),

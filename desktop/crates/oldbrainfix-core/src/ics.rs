@@ -293,6 +293,9 @@ mod tests {
             scheduled_at: None,
             trashed: None,
             trashed_with: None,
+            skipped: BTreeMap::new(),
+            tomorrow: Default::default(),
+            moved: Vec::new(),
         }
     }
 

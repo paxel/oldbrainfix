@@ -46,7 +46,7 @@ fn is_id(text: &str) -> bool {
 
 /// An instant as both cores write it: `2026-03-01T08:00:00.000Z`, the
 /// fraction of a second from one to six digits or none.
-fn is_instant(text: &str) -> bool {
+pub(crate) fn is_instant(text: &str) -> bool {
     let b = text.as_bytes();
     let digits = |range: std::ops::Range<usize>| {
         b.get(range)
@@ -78,7 +78,8 @@ fn is_instant(text: &str) -> bool {
 /// Whether `e`, written by a blocked person's Device, is kept (ADR 0021),
 /// as the Dart core's `keptFromBlocked`: only what carries no text,
 /// picture or sound and keeps the Shared Areas whole. That is a
-/// check-off or its undoing (`done@…` on a Routine, `done` on a Frog,
+/// check-off or its undoing (`done@…` on a Routine, a skip `skip@…` on
+/// it, `done` on a Frog,
 /// `checked` on a Checklist's Line, `check@…` on a Routine for one of its
 /// Lines, a tick `box@…` of a box in the text of a Note or a Section), a
 /// grant (`role:…` on an Area), and a Note's `$type` and filing, which
@@ -125,6 +126,16 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
     {
         return Occurrence::parse(key).is_some_and(|o| o.key() == key)
             && value.is_none_or(is_instant);
+    }
+    if kind == "routine"
+        && let Some(key) = field.strip_prefix(routine_keys::SKIP_PREFIX)
+    {
+        let at = value.map(|v| {
+            v.strip_suffix(routine_keys::TOMORROW_MARK)
+                .and_then(|v| v.strip_suffix(' '))
+                .unwrap_or(v)
+        });
+        return Occurrence::parse(key).is_some_and(|o| o.key() == key) && at.is_none_or(is_instant);
     }
     if kind == "routine"
         && let Some(rest) = field.strip_prefix(checklist_keys::CHECK_PREFIX)
@@ -1200,6 +1211,17 @@ mod tests {
                 Some("2026-03-01T08:00:00.000Z"),
             ),
             entry("routine:ab12", "done@2026-03-01", None),
+            entry(
+                "routine:ab12",
+                "skip@2026-03-01T08:00",
+                Some("2026-03-01T07:00:00.000Z"),
+            ),
+            entry(
+                "routine:ab12",
+                "skip@2026-03-01",
+                Some("2026-03-01T07:00:00.000Z tomorrow"),
+            ),
+            entry("routine:ab12", "skip@2026-03-01", None),
             entry("frog:ab12", "done", Some("2026-03-01T08:00:00.000Z")),
             entry("frog:ab12", "done", None),
             entry("line:ab12", "checked", Some("2026-03-01T08:00:00.000Z")),
@@ -1243,6 +1265,15 @@ mod tests {
             entry("routine:ab12", "done@2026-03-01T08:00", Some("Rude words")),
             entry("routine:ab12", "done@Rude", None),
             entry("routine:ab12", "done@2026-3-1", None),
+            entry("routine:ab12", "skip@2026-03-01", Some("Rude words")),
+            entry(
+                "routine:ab12",
+                "skip@2026-03-01",
+                Some("2026-03-01T07:00:00.000Z x"),
+            ),
+            entry("routine:ab12", "skip@2026-03-01", Some(" tomorrow")),
+            entry("routine:ab12", "skip@Rude", None),
+            entry("routine:ab12", "skip@2026-3-1", None),
             entry("routine:Rude words", "done@2026-03-01", None),
             entry(&big, "done@2026-03-01", None),
             entry("frog:ab12", "done", Some("Rude words")),

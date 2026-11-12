@@ -995,7 +995,7 @@ impl<'a> Sessions<'a> {
         let routines: Vec<Routine> = sessions.iter().map(|s| s.routine.clone()).collect();
         let mut due: Vec<(Session, Occurrence)> = Vec::new();
         for session in sessions {
-            for occurrence in session.routine.schedule.on(day) {
+            for occurrence in session.routine.on(day) {
                 due.push((session.clone(), occurrence));
             }
         }
@@ -1378,7 +1378,7 @@ impl<'a> Sessions<'a> {
     /// The Session `id`, due at `occurrence`.
     fn require_due(&self, id: &str, occurrence: &Occurrence) -> Result<Session> {
         let session = self.require(id)?;
-        if !session.routine.schedule.has(occurrence) {
+        if !session.routine.has(occurrence) {
             return Err(Error::Invalid(format!("not due then: {occurrence}")));
         }
         Ok(session)

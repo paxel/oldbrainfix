@@ -404,17 +404,20 @@ class Checklists {
   static RoutineOccurrence? _now(List<Routine> routines, Day today) {
     Day? latest;
     for (final routine in routines) {
-      final day = _lastDay(routine.schedule, today);
+      var day = _lastDay(routine.schedule, today);
+      // A one-time Occurrence Tomorrow added counts as any other.
+      for (final moved in routine.moved) {
+        if (moved.day > today) break;
+        if (day == null || moved.day > day) day = moved.day;
+      }
       if (day != null && (latest == null || day > latest)) latest = day;
     }
     final found = <(Routine, Occurrence)>[
       for (final routine in routines)
         if (latest != null)
-          for (final occurrence in routine.schedule.on(latest))
-            (routine, occurrence)
-        else
-          for (final occurrence in routine.schedule.next(today, 1))
-            (routine, occurrence),
+          for (final occurrence in routine.on(latest)) (routine, occurrence)
+        else if (routine.firstFrom(today) case final occurrence?)
+          (routine, occurrence),
     ];
     if (found.isEmpty) return null;
     found.sort((a, b) {
@@ -424,7 +427,7 @@ class Checklists {
     var (routine, occurrence) = found.first;
     if (latest != null) {
       (routine, occurrence) = found.firstWhere(
-        (f) => f.$1.doneAt(f.$2) == null,
+        (f) => f.$1.doneAt(f.$2) == null && f.$1.skippedAt(f.$2) == null,
         orElse: () => found.last,
       );
     }
@@ -848,7 +851,7 @@ class Checklists {
         (routine.noteId != noteId && routines.note(routine)?.id != noteId)) {
       throw ArgumentError.value(on.routineId, 'on', 'no Routine of $noteId');
     }
-    if (!routine.schedule.has(on.occurrence)) {
+    if (!routine.has(on.occurrence)) {
       throw ArgumentError.value(on.occurrence, 'on', 'not due then');
     }
     if (!store.mayCheckOff(on.routineId)) {

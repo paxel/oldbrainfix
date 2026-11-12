@@ -196,6 +196,7 @@ fn log_row(ui: &mut Ui, t: &L10n, tones: Tones, entry: &HistoryEntry, wall: &Wal
     let (icon, colour) = match entry.status {
         OccurrenceStatus::Done => (icons::STATUS_DONE, tones.accent),
         OccurrenceStatus::Missed => (icons::STATUS_MISSED, ui.visuals().error_fg_color),
+        OccurrenceStatus::Skipped => (icons::PICK_OPEN, weak),
         OccurrenceStatus::Open => (icons::PICK_OPEN, tones.accent),
         OccurrenceStatus::Coming => (icons::CONTEXT_WHEN, weak),
     };

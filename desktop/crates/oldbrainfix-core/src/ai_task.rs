@@ -901,6 +901,18 @@ mod tests {
                 raw(session.id(), &crate::routines::keys::done(&first), at),
             ),
             (
+                "a skip",
+                raw(session.id(), &crate::routines::keys::skip(&first), at),
+            ),
+            (
+                "a move to tomorrow",
+                raw(
+                    session.id(),
+                    &crate::routines::keys::skip(&first),
+                    &format!("{at} tomorrow"),
+                ),
+            ),
+            (
                 "a pick",
                 raw(session.id(), &crate::sessions::keys::pick(&first), &run),
             ),

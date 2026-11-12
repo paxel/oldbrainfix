@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 27] = [
+const SCENARIOS: [&str; 28] = [
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -68,6 +68,7 @@ const SCENARIOS: [&str; 27] = [
     "markdown",
     "markers",
     "media",
+    "not-today",
     "notes",
     "places",
     "routines",
@@ -2077,7 +2078,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 27] = [
+    let writers: [(&str, Writer); 28] = [
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),
@@ -2095,6 +2096,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),
+        ("not-today", write_not_today),
         ("notes", write_notes),
         ("places", write_places),
         ("routines", write_routines),
@@ -3106,6 +3108,219 @@ fn routine_histories_come_to_what_the_dart_core_says() -> TestResult {
         }
         let held = check["histories"].as_object().ok_or("histories")?;
         assert_eq!(shown, held.len(), "{now}");
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ Not today
+
+/// The generator's `not-today` scenario.
+fn write_not_today(store: &Store) -> Built {
+    use oldbrainfix_core::routines::keys;
+    let routines = Routines::new(store);
+    let on = |day: i64, time: Option<ClockTime>| Occurrence::new(Day::new(2026, 1, day), time);
+    let daily = |times: &[ClockTime]| schedule(Day::new(2026, 1, 1), times, Some("FREQ=DAILY"));
+    let (seven, eight, ten) = (Some(at(7, 0)?), Some(at(8, 0)?), Some(at(10, 0)?));
+    let stretch = routines.create("Stretch", &daily(&[at(7, 0)?])?)?.id;
+    let bins = routines
+        .create(
+            "Take out the bins",
+            &schedule(
+                Day::new(2026, 1, 2),
+                &[at(8, 0)?],
+                Some("FREQ=WEEKLY;BYDAY=FR"),
+            )?,
+        )?
+        .id;
+    let call = routines
+        .create(
+            "Call the bank",
+            &schedule(Day::new(2026, 1, 3), &[at(10, 0)?], None)?,
+        )?
+        .id;
+    let walk = routines.create("Walk", &daily(&[])?)?.id;
+    let every_other =
+        |time: ClockTime| schedule(Day::new(2026, 1, 1), &[time], Some("FREQ=DAILY;INTERVAL=2"));
+    let plants = routines
+        .create("Water the plants", &every_other(at(18, 0)?)?)?
+        .id;
+    routines.mark_done(&stretch, &on(2, seven), None)?;
+    routines.skip(&stretch, &on(3, seven), None)?;
+    routines.tomorrow(&walk, &on(2, None), None)?;
+    routines.skip(&walk, &on(5, None), None)?;
+    routines.unskip(&walk, &on(5, None))?;
+    // 09:00 on the 2nd: the bins wait a day, and then another.
+    jump(Duration::hours(22));
+    routines.tomorrow(&bins, &on(2, eight), None)?;
+    routines.skip(&call, &on(3, ten), None)?;
+    jump(Duration::days(1));
+    routines.tomorrow(&bins, &on(3, eight), None)?;
+    routines.tomorrow(&call, &on(3, ten), None)?;
+    Alarms::new(store).apply_skip(&stretch, &on(6, seven).key(), utc_at(2026, 1, 3, 9, 30)?)?;
+    let six_pm = Some(at(18, 0)?);
+    routines.skip(&plants, &on(1, six_pm), None)?;
+    routines.tomorrow(&plants, &on(3, six_pm), None)?;
+    routines.mark_done(&plants, &on(3, six_pm), None)?;
+    routines.reschedule(&plants, &every_other(at(19, 0)?)?)?;
+    // As no app writes them.
+    let raw = |id: &str, field: &str, value: &str| store.append(id, field, Some(value), None);
+    raw(
+        &stretch,
+        &format!("{}Rude", keys::SKIP_PREFIX),
+        "2026-01-03T09:00:00.000Z tomorrow",
+    )?;
+    raw(&stretch, &keys::skip(&on(7, seven)), "Rude")?;
+    raw(
+        &stretch,
+        &keys::skip(&on(8, seven)),
+        "2026-02-30T09:00:00.000Z tomorrow",
+    )?;
+    raw(
+        &stretch,
+        &keys::skip(&on(9, seven)),
+        "2026-01-03T09:00:00.000123Z later",
+    )?;
+    raw(
+        &bins,
+        &format!("{}2026-01-06T03:00", keys::SKIP_PREFIX),
+        "2026-01-03T09:00:00.000Z tomorrow",
+    )?;
+    Ok(())
+}
+
+fn not_today_rows(rows: &[AgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!([
+                r.routine.id,
+                r.occurrence.key(),
+                iso(r.done()),
+                iso(r.skipped()),
+                r.moved(),
+            ]))
+            .collect::<Vec<_>>()
+    )
+}
+
+fn not_today_adherence(a: &Adherence) -> Value {
+    json!({"done": a.done, "missed": a.missed, "skipped": a.skipped, "share": a.share()})
+}
+
+/// What this core makes of the `not-today` log at one held moment, in
+/// the shape of a check in the generator's `not_today.json`.
+fn not_today_check(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let now = store.now();
+    let routines = Routines::new(store);
+    let alarms = Alarms::new(store);
+    let agenda = routines.agenda(&berlin)?;
+    let missed = alarms.missed(&berlin)?;
+    let mut open_of = serde_json::Map::new();
+    for note in Notes::new(store).all()? {
+        let open: Vec<Value> = alarms
+            .open_of(&note.id, &berlin)?
+            .iter()
+            .map(|o| json!([o.routine.id, o.occurrence.key(), o.missed]))
+            .collect();
+        open_of.insert(note.id, json!(open));
+    }
+    let mut today_by_note = serde_json::Map::new();
+    for (id, rows) in routines.today_by_note(&berlin)? {
+        today_by_note.insert(id, not_today_rows(&rows));
+    }
+    let mut histories = Vec::new();
+    for r in routines.all()? {
+        let h = routines.history(&r, &berlin, oldbrainfix_core::history::MONDAY)?;
+        histories.push(json!({
+            "routine": r.id,
+            "currentStreak": h.current_streak,
+            "longestStreak": h.longest_streak,
+            "lastSevenDays": h.last_seven_days.iter().map(|d| json!([
+                d.day.to_string(), d.done, d.missed, d.open, d.skipped, d.is_empty(),
+            ])).collect::<Vec<_>>(),
+            "thisWeek": not_today_adherence(&h.this_week),
+            "thisMonth": not_today_adherence(&h.this_month),
+            "entries": h.entries.iter().map(|e| json!([
+                e.occurrence.key(),
+                e.status.name(),
+                dart_iso(e.missed_at),
+                iso(e.done_at),
+                iso(e.skipped_at),
+                e.moved,
+            ])).collect::<Vec<_>>(),
+        }));
+    }
+    Ok(json!({
+        "now": dart_iso(now),
+        "agenda": {
+            "today": not_today_rows(&agenda.today_rows),
+            "tomorrow": not_today_rows(&agenda.tomorrow_rows),
+        },
+        "alarms": alarms.plan(&berlin)?.iter().map(|a| json!([
+            a.id(), dart_iso(a.at), dart_iso(a.ends_at), a.fires_after(now).is_some(),
+        ])).collect::<Vec<_>>(),
+        "missed": {
+            "count": missed.count(),
+            "nextChange": iso(missed.next_change),
+            "routines": missed.routines.iter().map(|m| {
+                let mut row = vec![json!(m.routine.id)];
+                row.extend(m.missed.iter().map(|o| json!([o.occurrence.key(), dart_iso(o.missed_at)])));
+                Value::Array(row)
+            }).collect::<Vec<_>>(),
+        },
+        "openOf": open_of,
+        "recentlyDone": alarms.recently_done(&berlin)?.iter()
+            .map(|(id, o)| json!([id, o.key()]))
+            .collect::<Vec<_>>(),
+        "todayByNote": today_by_note,
+        "histories": histories,
+    }))
+}
+
+#[test]
+fn skips_and_moved_occurrences_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("not-today").join("not_today.json"))?;
+    let read_at = read_json(&fixtures().join("not-today").join("expected.json"))?;
+    let store = load("not-today", read_at["now"].as_str().ok_or("now")?)?;
+    let routines = Routines::new(&store);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut every = Vec::new();
+    for id in &ids {
+        let Some(r) = routines.by_id(id)? else {
+            continue;
+        };
+        let skipped: serde_json::Map<String, Value> = r
+            .skipped
+            .iter()
+            .map(|(k, v)| (k.clone(), json!(dart_iso(*v))))
+            .collect();
+        every.push(json!({
+            "id": r.id,
+            "skipped": skipped,
+            "tomorrow": r.tomorrow,
+            "moved": r.moved.iter().map(Occurrence::key).collect::<Vec<_>>(),
+            "between": r.between(Day::new(2026, 1, 1), Day::new(2026, 1, 10))
+                .iter().map(Occurrence::key).collect::<Vec<_>>(),
+            "firstFrom": r.first_from(Day::new(2026, 1, 4)).map(|o| o.key()),
+        }));
+    }
+    assert_eq!(json!(every), expected["routines"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 3);
+    for check in checks {
+        let now = check["now"].as_str().ok_or("now")?;
+        let ours = not_today_check(&load("not-today", now)?)?;
+        for key in [
+            "agenda",
+            "alarms",
+            "missed",
+            "openOf",
+            "recentlyDone",
+            "todayByNote",
+            "histories",
+        ] {
+            assert_eq!(ours[key], check[key], "{now} {key}");
+        }
     }
     Ok(())
 }
@@ -4561,6 +4776,9 @@ fn bare_routine(id: &str, schedule: Schedule) -> Routine {
         scheduled_at: None,
         trashed: None,
         trashed_with: None,
+        skipped: BTreeMap::new(),
+        tomorrow: Default::default(),
+        moved: Vec::new(),
     }
 }
 

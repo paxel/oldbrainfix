@@ -139,7 +139,9 @@ struct Timed {
 }
 
 /// The Occurrences of `routine` from `from` to `to` that were asked for
-/// (due at or after when it was scheduled), placed on `wall`.
+/// (due at or after when it was scheduled), placed on `wall`; those
+/// Tomorrow added among them, each counting as the next one of the one
+/// before it.
 fn timed(
     routine: &Routine,
     from: Day,
@@ -147,13 +149,8 @@ fn timed(
     wall: &WallClock,
     all_day_from: ClockTime,
 ) -> Vec<Timed> {
-    let schedule = &routine.schedule;
-    let occurrences = schedule.between(from, to);
-    let after = if schedule.once() {
-        None
-    } else {
-        schedule.next(to.add_days(1), 1).into_iter().next()
-    };
+    let occurrences = routine.between(from, to);
+    let after = routine.first_from(to.add_days(1));
     let mut out = Vec::new();
     for (i, occurrence) in occurrences.iter().enumerate() {
         let next = occurrences.get(i + 1).or(after.as_ref());
@@ -255,7 +252,7 @@ pub fn snooze_key(routine_id: &str, occurrence: &Occurrence) -> String {
 }
 
 /// The alarms that should exist at `now`: for each Routine its
-/// Occurrences that are not Done and not yet Missed, from
+/// Occurrences that are not Done, not skipped and not yet Missed, from
 /// [`ALARM_HORIZON_DAYS`] back to as far ahead, at most
 /// [`ALARMS_PER_ROUTINE`], the soonest first and at most [`ALARM_LIMIT`].
 /// A snoozed one rings at its snooze instead; a snooze reaching past when
@@ -288,7 +285,10 @@ pub fn alarm_plan(
                 break;
             }
             let occurrence = t.occurrence;
-            if routine.done_at(&occurrence).is_some() || t.ends_at <= now {
+            if routine.done_at(&occurrence).is_some()
+                || routine.skipped_at(&occurrence).is_some()
+                || t.ends_at <= now
+            {
                 continue;
             }
             let snoozed = snoozes.get(&snooze_key(&routine.id, &occurrence)).copied();
@@ -377,8 +377,8 @@ impl MissedSummary {
     }
 }
 
-/// The Missed Summary at `now`: every Occurrence not Done that became
-/// Missed after `seen` (or within [`ALARM_HORIZON_DAYS`] when never seen,
+/// The Missed Summary at `now`: every Occurrence neither Done nor
+/// skipped that became Missed after `seen` (or within [`ALARM_HORIZON_DAYS`] when never seen,
 /// and never further back than that), by Routine.
 pub fn missed_summary(
     routines: &[(Routine, Option<Note>)],
@@ -394,7 +394,10 @@ pub fn missed_summary(
     for (routine, note) in routines {
         let mut missed = Vec::new();
         for t in timed(routine, from, today, wall, all_day_from) {
-            if routine.done_at(&t.occurrence).is_some() {
+            // A skip is a decision, not a lapse (CONTEXT.md, Skip).
+            if routine.done_at(&t.occurrence).is_some()
+                || routine.skipped_at(&t.occurrence).is_some()
+            {
                 continue;
             }
             if t.ends_at > now {
@@ -446,7 +449,7 @@ pub struct OpenOccurrence {
 /// Missed, else the latest Missed one, whether the Missed Summary was
 /// "seen" or not, within [`ALARM_HORIZON_DAYS`]; none when neither is
 /// open. What is Done, from its check-off, its entries or its Lines, asks
-/// for nothing.
+/// for nothing, nor does what is skipped.
 pub fn open_occurrences(
     routines: &[Routine],
     now: DateTime<Utc>,
@@ -460,7 +463,10 @@ pub fn open_occurrences(
         let mut due = None;
         let mut missed = None;
         for t in timed(routine, from, today, wall, all_day_from) {
-            if routine.done_at(&t.occurrence).is_some() || t.start > now {
+            if routine.done_at(&t.occurrence).is_some()
+                || routine.skipped_at(&t.occurrence).is_some()
+                || t.start > now
+            {
                 continue;
             }
             if t.ends_at > now {
@@ -631,17 +637,17 @@ impl<'a> Alarms<'a> {
         DeviceSettings::new(self.store).set_missed_seen(Some(self.store.now()))
     }
 
-    /// The Occurrences Done from yesterday to tomorrow on `wall`, by
-    /// Routine id: their notifications, if still showing, can go.
+    /// The Occurrences Done or skipped from yesterday to tomorrow on
+    /// `wall`, by Routine id: their notifications, if still showing, can
+    /// go.
     pub fn recently_done(&self, wall: &WallClock) -> Result<Vec<(String, Occurrence)>> {
         let today = Day::today(self.store.now(), wall);
         let mut out = Vec::new();
         for routine in Routines::new(self.store).all()? {
-            for occurrence in routine
-                .schedule
-                .between(today.add_days(-1), today.add_days(1))
-            {
-                if routine.done_at(&occurrence).is_some() {
+            for occurrence in routine.between(today.add_days(-1), today.add_days(1)) {
+                if routine.done_at(&occurrence).is_some()
+                    || routine.skipped_at(&occurrence).is_some()
+                {
                     out.push((routine.id.clone(), occurrence));
                 }
             }
@@ -673,6 +679,60 @@ impl<'a> Alarms<'a> {
             Err(Error::Invalid(_)) => Ok(false),
             Err(e) => Err(e),
         }
+    }
+
+    /// Applies a Skip tapped on a notification at `at`
+    /// ([`Routines::skip`]). Returns whether it changed anything; a
+    /// Routine trashed or rescheduled meanwhile, or an Occurrence already
+    /// Done or skipped, is left as it is.
+    pub fn apply_skip(
+        &self,
+        routine_id: &str,
+        occurrence_key: &str,
+        at: DateTime<Utc>,
+    ) -> Result<bool> {
+        self.apply_not_today(routine_id, occurrence_key, at, false)
+    }
+
+    /// Applies a Tomorrow tapped on a notification at `at`
+    /// ([`Routines::tomorrow`]), as [`Alarms::apply_skip`] does.
+    pub fn apply_tomorrow(
+        &self,
+        routine_id: &str,
+        occurrence_key: &str,
+        at: DateTime<Utc>,
+    ) -> Result<bool> {
+        self.apply_not_today(routine_id, occurrence_key, at, true)
+    }
+
+    fn apply_not_today(
+        &self,
+        routine_id: &str,
+        occurrence_key: &str,
+        at: DateTime<Utc>,
+        tomorrow: bool,
+    ) -> Result<bool> {
+        let routines = Routines::new(self.store);
+        let (Some(occurrence), Some(routine)) = (
+            Occurrence::parse(occurrence_key),
+            routines.by_id(routine_id)?,
+        ) else {
+            return Ok(false);
+        };
+        if routine.is_trashed()
+            || routine.done_at(&occurrence).is_some()
+            || routine.skipped_at(&occurrence).is_some()
+            || !routine.has(&occurrence)
+            || !self.store.may_check_off(routine_id)?
+        {
+            return Ok(false);
+        }
+        if tomorrow {
+            routines.tomorrow(routine_id, &occurrence, Some(at))?;
+        } else {
+            routines.skip(routine_id, &occurrence, Some(at))?;
+        }
+        Ok(true)
     }
 
     /// Applies a Snooze tapped on a notification: the Occurrence fires

@@ -266,6 +266,7 @@ class _LogRow extends StatelessWidget {
     final (icon, colour) = switch (entry.status) {
       OccurrenceStatus.done => (Icons.check_circle, scheme.primary),
       OccurrenceStatus.missed => (Icons.cancel, scheme.error),
+      OccurrenceStatus.skipped => (Icons.remove_circle_outline, scheme.outline),
       OccurrenceStatus.open => (Icons.radio_button_unchecked, scheme.primary),
       OccurrenceStatus.coming => (Icons.schedule, scheme.outline),
     };

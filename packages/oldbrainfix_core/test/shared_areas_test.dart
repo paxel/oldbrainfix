@@ -416,6 +416,25 @@ void main() {
       expect(ann.mayManage(h.area), isTrue);
     });
 
+    test('a Member skips an Occurrence and moves one to tomorrow, and it '
+        'counts on every Device (#269)', () {
+      final h = household(AreaRole.member);
+      final skipped = Occurrence(Day(2026, 3, 2), ClockTime(8, 0));
+      final moved = Occurrence(Day(2026, 3, 3), ClockTime(8, 0));
+      Routines(ben).skip(h.routine, skipped);
+      Routines(ben).tomorrow(h.routine, moved);
+      exchange(ben, ann);
+      for (final store in [ann, ben]) {
+        final routine = Routines(store).byId(h.routine)!;
+        expect(routine.skippedAt(skipped), isNotNull);
+        expect(routine.skippedAt(moved), isNotNull);
+        expect(routine.tomorrow, {moved.key});
+      }
+      Routines(ben).unskip(h.routine, skipped);
+      exchange(ben, ann);
+      expect(Routines(ann).byId(h.routine)!.skippedAt(skipped), isNull);
+    });
+
     test('a tick another person\'s Device wrote on a Note in no Shared '
         'Area counts for nothing (ADR 0035)', () {
       final h = household(AreaRole.member);

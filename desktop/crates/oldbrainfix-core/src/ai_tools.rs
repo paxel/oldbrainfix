@@ -660,6 +660,15 @@ fn data_tools() -> Vec<Value> {
             &[],
         ),
         tool(
+            "read_skips",
+            "Reads the skipped Occurrences of Routines and Reminders, of one, of those of a Note, or all: each Occurrence the user skipped (Not today), with its day, when it was skipped and, when they chose Tomorrow, the one-time Occurrence added the day after. Skipping is the user's own; it is read only. The range goes by the Occurrence's day.",
+            true,
+            range_properties(
+                json!({"note": string("Only those spawned from this Note"), "routine": string("Only this Routine")}),
+            ),
+            &[],
+        ),
+        tool(
             "read_eaten_frogs",
             "Reads the Frogs eaten (checked off), most recently first, with when each was eaten and its Note.",
             true,
@@ -1530,6 +1539,35 @@ impl Store {
                             "note": routine.note_id,
                             "occurrence": key,
                             "routine": routine.id,
+                        });
+                        found.push((*at, value));
+                    }
+                }
+            }
+            "read_skips" => {
+                let routines = Routines::new(self);
+                let all = match (optional_text(args, "routine"), optional_text(args, "note")) {
+                    (Some(id), _) => routines.by_id(id)?.into_iter().collect(),
+                    (None, Some(note)) => routines.of_note(note)?,
+                    (None, None) => routines.all()?,
+                };
+                for routine in all {
+                    for (key, at) in &routine.skipped {
+                        let Some(occurrence) = Occurrence::parse(key) else {
+                            continue;
+                        };
+                        // Done wins over a skip (ADR 0006).
+                        if !range.holds(occurrence.day) || routine.done_at(&occurrence).is_some() {
+                            continue;
+                        }
+                        let tomorrow = Occurrence::new(occurrence.day.add_days(1), occurrence.time);
+                        let value = json!({
+                            "at": dart_iso(*at),
+                            "day": occurrence.day.to_string(),
+                            "note": routine.note_id,
+                            "occurrence": key,
+                            "routine": routine.id,
+                            "tomorrow": routine.is_moved(&tomorrow).then(|| tomorrow.key()),
                         });
                         found.push((*at, value));
                     }
@@ -2993,6 +3031,7 @@ mod tests {
             "read_tally_entries",
             "read_ticks",
             "read_check_offs",
+            "read_skips",
             "read_eaten_frogs",
             "read_note_history",
             "read_session_picks",
@@ -3316,6 +3355,22 @@ mod tests {
         let offs = read("read_check_offs", json!({"note": pills}))?;
         assert_eq!(offs.pointer("/0/occurrence"), Some(&json!(first.key())));
         assert!(offs.pointer("/0/at").is_some_and(Value::is_string));
+        let second = Occurrence::new(Day::new(2026, 1, 2), ClockTime::new(8, 0));
+        let third = Occurrence::new(Day::new(2026, 1, 3), ClockTime::new(8, 0));
+        Routines::new(&store).skip(&routine.id, &second, Some(at(21)?))?;
+        Routines::new(&store).tomorrow(&routine.id, &third, Some(at(22)?))?;
+        let skips = read("read_skips", json!({"routine": routine.id}))?;
+        assert_eq!(skips.pointer("/0/occurrence"), Some(&json!(third.key())));
+        assert_eq!(skips.pointer("/0/at"), Some(&json!(dart_iso(at(22)?))));
+        // A daily Routine has tomorrow's own: none added.
+        assert_eq!(skips.pointer("/0/tomorrow"), Some(&Value::Null));
+        assert_eq!(skips.pointer("/1/occurrence"), Some(&json!(second.key())));
+        assert_eq!(skips.as_array().map(Vec::len), Some(2));
+        let none = read(
+            "read_skips",
+            json!({"routine": routine.id, "from": "2026-01-04"}),
+        )?;
+        assert_eq!(none, json!([]));
         let eaten = read("read_eaten_frogs", json!({"from": "2025-10-20"}))?;
         assert_eq!(eaten.pointer("/0/at"), Some(&json!(dart_iso(at(20)?))));
         assert_eq!(

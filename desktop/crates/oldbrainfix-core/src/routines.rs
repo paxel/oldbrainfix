@@ -6,7 +6,7 @@
 //! Dart core's.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -40,6 +40,15 @@ pub mod keys {
     /// Prefix of the field marking an Occurrence Done, keyed by its
     /// wall-clock key; the value is when it was checked off.
     pub const DONE_PREFIX: &str = "done@";
+    /// Prefix of the field marking an Occurrence skipped (CONTEXT.md,
+    /// Skip), keyed as [`DONE_PREFIX`]: the value is when it was skipped,
+    /// followed by a space and [`TOMORROW_MARK`] when Not today ▸
+    /// Tomorrow added a one-time Occurrence the day after at the same
+    /// time; null when it was unskipped again. The moved Occurrence is
+    /// never written: it follows from the key (ADR 0006).
+    pub const SKIP_PREFIX: &str = "skip@";
+    /// The word after the moment in a skip value written by Tomorrow.
+    pub const TOMORROW_MARK: &str = "tomorrow";
     /// The Routine's own Re-nag interval in minutes.
     pub const RENAG: &str = "renag";
     /// After how many ignored Re-nags the Routine escalates.
@@ -54,6 +63,11 @@ pub mod keys {
     /// The field marking `occurrence` Done.
     pub fn done(occurrence: &crate::schedule::Occurrence) -> String {
         format!("{DONE_PREFIX}{}", occurrence.key())
+    }
+
+    /// The field marking `occurrence` skipped.
+    pub fn skip(occurrence: &crate::schedule::Occurrence) -> String {
+        format!("{SKIP_PREFIX}{}", occurrence.key())
     }
 }
 
@@ -78,6 +92,14 @@ pub struct Routine {
     pub trashed: Option<DateTime<Utc>>,
     /// The Note it went to the trash with.
     pub trashed_with: Option<String>,
+    /// When each skipped Occurrence was skipped, by its key: by Skip or
+    /// by Tomorrow (CONTEXT.md, Not today).
+    pub skipped: BTreeMap<String, DateTime<Utc>>,
+    /// The keys of the Occurrences of `skipped` that Tomorrow skipped.
+    pub tomorrow: BTreeSet<String>,
+    /// The one-time Occurrences Tomorrow added that the schedule does not
+    /// have, in order ([`moved_occurrences`]).
+    pub moved: Vec<Occurrence>,
 }
 
 impl Routine {
@@ -93,6 +115,120 @@ impl Routine {
     pub fn done_at(&self, occurrence: &Occurrence) -> Option<DateTime<Utc>> {
         self.done.get(&occurrence.key()).copied()
     }
+
+    /// When `occurrence` was skipped; `None` while it is not. One that is
+    /// Done as well counts as Done.
+    pub fn skipped_at(&self, occurrence: &Occurrence) -> Option<DateTime<Utc>> {
+        self.skipped.get(&occurrence.key()).copied()
+    }
+
+    /// Whether `occurrence` is one Tomorrow added, a day after the one it
+    /// skipped.
+    pub fn is_moved(&self, occurrence: &Occurrence) -> bool {
+        self.moved.contains(occurrence)
+    }
+
+    /// Whether `occurrence` is one of the Routine's: of its schedule, or
+    /// added by Tomorrow.
+    pub fn has(&self, occurrence: &Occurrence) -> bool {
+        self.schedule.has(occurrence) || self.moved.contains(occurrence)
+    }
+
+    /// The Routine's Occurrences from `from` to `to`, both days included,
+    /// those Tomorrow added among them, in order.
+    pub fn between(&self, from: Day, to: Day) -> Vec<Occurrence> {
+        occurrences_between(&self.schedule, &self.moved, from, to)
+    }
+
+    /// The Routine's Occurrences on `day`, all-day first, then by time.
+    pub fn on(&self, day: Day) -> Vec<Occurrence> {
+        self.between(day, day)
+    }
+
+    /// The Routine's first Occurrence on `from` or after it, within the
+    /// schedule's look-ahead.
+    pub fn first_from(&self, from: Day) -> Option<Occurrence> {
+        first_occurrence_from(&self.schedule, &self.moved, from)
+    }
+}
+
+/// The one-time Occurrences that Tomorrow on the Occurrences `tomorrow`
+/// names added to `schedule`, in order, as the Dart core's
+/// `movedOccurrences`: each the day after the one it skipped, at the same
+/// time, as long as that one is an Occurrence of `schedule` or one added
+/// before it, and not one `schedule` has itself. Keys that name no
+/// Occurrence are left out.
+pub fn moved_occurrences<'k>(
+    schedule: &Schedule,
+    tomorrow: impl IntoIterator<Item = &'k String>,
+) -> Vec<Occurrence> {
+    let mut origins: Vec<Occurrence> = tomorrow
+        .into_iter()
+        .filter_map(|key| Occurrence::parse(key).filter(|o| o.key() == *key))
+        .collect();
+    origins.sort();
+    let mut moved: Vec<Occurrence> = Vec::new();
+    for origin in origins {
+        if !schedule.has(&origin) && !moved.contains(&origin) {
+            continue;
+        }
+        let target = Occurrence::new(origin.day.add_days(1), origin.time);
+        if !schedule.has(&target) && !moved.contains(&target) {
+            moved.push(target);
+        }
+    }
+    moved
+}
+
+/// The Occurrences of `schedule` from `from` to `to` with those of
+/// `moved` in that span, in order.
+pub fn occurrences_between(
+    schedule: &Schedule,
+    moved: &[Occurrence],
+    from: Day,
+    to: Day,
+) -> Vec<Occurrence> {
+    let mut occurrences = schedule.between(from, to);
+    let before = occurrences.len();
+    occurrences.extend(moved.iter().filter(|o| o.day >= from && o.day <= to));
+    if occurrences.len() > before {
+        occurrences.sort();
+    }
+    occurrences
+}
+
+/// The first Occurrence of `schedule` or of `moved` on `from` or after
+/// it.
+pub fn first_occurrence_from(
+    schedule: &Schedule,
+    moved: &[Occurrence],
+    from: Day,
+) -> Option<Occurrence> {
+    let first = schedule.next(from, 1).into_iter().next();
+    match moved.iter().find(|o| o.day >= from) {
+        Some(o) if first.is_none_or(|f| *o < f) => Some(*o),
+        _ => first,
+    }
+}
+
+/// What a skip value says, as the Dart core's `Routines.skipOf`: when
+/// the Occurrence was skipped and whether by Tomorrow; `None` when it
+/// says nothing this version reads. A word after the moment other than
+/// [`keys::TOMORROW_MARK`] is a later version's: a skip, moving nothing.
+pub fn skip_of(value: &str) -> Option<(DateTime<Utc>, bool)> {
+    let (text, word) = match value.split_once(' ') {
+        Some((text, word)) => (text, Some(word)),
+        None => (value, None),
+    };
+    if !crate::blocks::is_instant(text) {
+        return None;
+    }
+    // A moment the calendar has, as Dart's `DateTime.parse` keeps it.
+    let at = parse_time(text)
+        .ok()
+        .filter(|at| at.timestamp_subsec_nanos() < 1_000_000_000)
+        .filter(|at| dart_iso(*at).get(..19) == text.get(..19))?;
+    Some((at, word == Some(keys::TOMORROW_MARK)))
 }
 
 /// A Routine or Reminder whose schedule this version cannot read, as the
@@ -149,6 +285,16 @@ pub struct AgendaRow {
 impl AgendaRow {
     pub fn done(&self) -> Option<DateTime<Utc>> {
         self.routine.done_at(&self.occurrence)
+    }
+
+    /// When it was skipped; `None` while it is not (CONTEXT.md, Skip).
+    pub fn skipped(&self) -> Option<DateTime<Utc>> {
+        self.routine.skipped_at(&self.occurrence)
+    }
+
+    /// Whether Tomorrow added it, a day after the one it skipped.
+    pub fn moved(&self) -> bool {
+        self.routine.is_moved(&self.occurrence)
     }
 }
 
@@ -369,13 +515,85 @@ impl<'a> Routines<'a> {
         at: Option<DateTime<Utc>>,
     ) -> Result<()> {
         let routine = self.require(id)?;
-        if !routine.schedule.has(occurrence) {
+        if !routine.has(occurrence) {
             return Err(Error::Invalid(format!("not due then: {occurrence}")));
         }
         let value = dart_iso(at.unwrap_or_else(|| self.store.now()));
         self.store
             .append(id, &keys::done(occurrence), Some(&value), None)
             .map(drop)
+    }
+
+    /// Skips `occurrence` of the Routine `id` (CONTEXT.md, Skip), at `at`
+    /// or the store's now: it is neither Done nor Missed, rings no more
+    /// and leaves the Adherence. The schedule stays as it is (ADR 0006).
+    /// Refused for an Occurrence already Done, and where this Device may
+    /// not check off.
+    pub fn skip(&self, id: &str, occurrence: &Occurrence, at: Option<DateTime<Utc>>) -> Result<()> {
+        self.write_skip(id, occurrence, at, false)
+    }
+
+    /// Not today ▸ Tomorrow: skips `occurrence` of the Routine `id` as
+    /// [`Routines::skip`] does, and adds a one-time Occurrence of the
+    /// Routine the day after it at the same time. The schedule stays as
+    /// it is (ADR 0006); when it has that Occurrence already, nothing is
+    /// added.
+    pub fn tomorrow(
+        &self,
+        id: &str,
+        occurrence: &Occurrence,
+        at: Option<DateTime<Utc>>,
+    ) -> Result<()> {
+        self.write_skip(id, occurrence, at, true)
+    }
+
+    /// Takes back the Skip or Tomorrow of `occurrence` of the Routine
+    /// `id`: it is due again as before, and an Occurrence Tomorrow added
+    /// for it is gone; what was Done on that one stays Done.
+    pub fn unskip(&self, id: &str, occurrence: &Occurrence) -> Result<()> {
+        let routine = self.require(id)?;
+        self.require_check_off(id)?;
+        if routine.skipped_at(occurrence).is_none() {
+            return Ok(());
+        }
+        self.store
+            .append(id, &keys::skip(occurrence), None, None)
+            .map(drop)
+    }
+
+    fn write_skip(
+        &self,
+        id: &str,
+        occurrence: &Occurrence,
+        at: Option<DateTime<Utc>>,
+        tomorrow: bool,
+    ) -> Result<()> {
+        let routine = self.require(id)?;
+        if !routine.has(occurrence) {
+            return Err(Error::Invalid(format!("not due then: {occurrence}")));
+        }
+        self.require_check_off(id)?;
+        if routine.done_at(occurrence).is_some() {
+            return Err(Error::Invalid(format!("{occurrence} of {id} is Done")));
+        }
+        let when = dart_iso(at.unwrap_or_else(|| self.store.now()));
+        let value = if tomorrow {
+            format!("{when} {}", keys::TOMORROW_MARK)
+        } else {
+            when
+        };
+        self.store
+            .append(id, &keys::skip(occurrence), Some(&value), None)
+            .map(drop)
+    }
+
+    fn require_check_off(&self, id: &str) -> Result<()> {
+        if !self.store.may_check_off(id)? {
+            return Err(Error::Invalid(format!(
+                "no role in the Shared Area of {id}"
+            )));
+        }
+        Ok(())
     }
 
     /// Checks off `occurrence` of the Routine `id` as [`Routines::mark_done`]
@@ -465,6 +683,24 @@ impl<'a> Routines<'a> {
             .and_then(|e| e.parse::<i64>().ok())
             .filter(|e| *e >= 1);
         let trashed = fields.get(keys::TRASHED).map(parse_time).transpose()?;
+        let mut skipped = BTreeMap::new();
+        let mut tomorrow = BTreeSet::new();
+        for (key, value) in fields.iter() {
+            let (Some(occurrence), Some(value)) = (key.strip_prefix(keys::SKIP_PREFIX), value)
+            else {
+                continue;
+            };
+            let Some((at, by_tomorrow)) = skip_of(value) else {
+                continue;
+            };
+            if Occurrence::parse(occurrence).is_none_or(|o| o.key() != occurrence) {
+                continue;
+            }
+            skipped.insert(occurrence.to_string(), at);
+            if by_tomorrow {
+                tomorrow.insert(occurrence.to_string());
+            }
+        }
         let mut scheduled_at: Option<DateTime<Utc>> = None;
         let history = self.store.history(id)?;
         for entry in &history {
@@ -511,11 +747,15 @@ impl<'a> Routines<'a> {
                 done.insert(occurrence.to_string(), parse_time(value)?);
             }
         }
+        let moved = moved_occurrences(&schedule, &tomorrow);
         Ok(Some(Routine {
             id: id.to_string(),
             note_id: note_id.to_string(),
             schedule,
             done,
+            skipped,
+            tomorrow,
+            moved,
             renag,
             escalation,
             scheduled_at,
@@ -683,15 +923,11 @@ impl<'a> Routines<'a> {
             let mut rows: Vec<AgendaRow> = routines
                 .iter()
                 .flat_map(|(routine, note)| {
-                    routine
-                        .schedule
-                        .on(day)
-                        .into_iter()
-                        .map(|occurrence| AgendaRow {
-                            routine: routine.clone(),
-                            occurrence,
-                            note: note.clone(),
-                        })
+                    routine.on(day).into_iter().map(|occurrence| AgendaRow {
+                        routine: routine.clone(),
+                        occurrence,
+                        note: note.clone(),
+                    })
                 })
                 .collect();
             rows.sort_by(agenda_order);
@@ -710,9 +946,9 @@ impl<'a> Routines<'a> {
     /// What the cards tick today (#215), by the id of the Note each
     /// Routine and Reminder shows under, with days as `wall` shows them:
     /// of each with an Occurrence today, in the order of today's Agenda,
-    /// its first one today not Done, else its last one today, Done. Read
-    /// once for all the cards of a list; the Notes in the order their
-    /// first Routine comes.
+    /// its first one today neither Done nor skipped, else its last one
+    /// today. Read once for all the cards of a list; the Notes in the
+    /// order their first Routine comes.
     pub fn today_by_note(&self, wall: &WallClock) -> Result<Vec<(String, Vec<AgendaRow>)>> {
         let mut by_routine: Vec<AgendaRow> = Vec::new();
         for row in self.agenda(wall)?.today_rows {
@@ -721,7 +957,7 @@ impl<'a> Routines<'a> {
                 .find(|held| held.routine.id == row.routine.id)
             {
                 None => by_routine.push(row),
-                Some(held) if held.done().is_some() => *held = row,
+                Some(held) if held.done().is_some() || held.skipped().is_some() => *held = row,
                 Some(_) => {}
             }
         }
@@ -1134,6 +1370,142 @@ mod tests {
         Ok(())
     }
 
+    /// Fridays at 08:00 from 2 January 2026.
+    fn fridays() -> Result<Schedule> {
+        let rule =
+            Recurrence::parse("FREQ=WEEKLY;BYDAY=FR").map_err(|e| Error::Invalid(e.to_string()))?;
+        let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
+        Schedule::new(Day::new(2026, 1, 2), &eight, Some(rule))
+            .ok_or_else(|| Error::Invalid("a schedule".into()))
+    }
+
+    fn store_at(now: &str) -> Result<Store> {
+        let now = parse_time(now)?;
+        Store::in_memory(Box::new(move || now), || {
+            Ok(crate::signing::SigningKey::from_seed([1; 32]))
+        })
+    }
+
+    fn weekly_store() -> Result<(Store, String)> {
+        let store = store_at("2026-01-02T06:00:00.000Z")?;
+        let id = Routines::new(&store).create("bins", &fridays()?)?.id;
+        Ok((store, id))
+    }
+
+    #[test]
+    fn a_checklists_and_a_sessions_moved_occurrence_is_theirs_to_check() -> Result<()> {
+        // Saturday, the day after the one moved.
+        let store = store_at("2026-01-03T09:00:00.000Z")?;
+        let wall = |at: DateTime<Utc>| at.naive_utc();
+        let note = Notes::new(&store)
+            .capture("Before the bins\nRinse\nSort", None, None)?
+            .id;
+        let lists = crate::Checklists::new(&store);
+        lists.make(&note)?;
+        let bins = Routines::new(&store).spawn(&note, &fridays()?)?.id;
+        Routines::new(&store).tomorrow(&bins, &friday(0), None)?;
+        let on = lists
+            .occurrence_now(&note, &wall)?
+            .ok_or_else(|| Error::Invalid("an Occurrence now".into()))?;
+        assert_eq!(on.occurrence, friday(1));
+        let list = lists
+            .by_note(&note)?
+            .ok_or_else(|| Error::Invalid("a Checklist".into()))?;
+        for line in &list.lines {
+            lists.check_for(&line.id, &on)?;
+        }
+        let read = Routines::new(&store).by_id(&bins)?;
+        assert!(read.is_some_and(|r| r.done_at(&friday(1)).is_some()));
+
+        let push_ups = Notes::new(&store).capture("Push-ups", None, None)?.id;
+        crate::Tallies::new(&store).add_field(&push_ups, "Push-ups", "times", Some(20.0), None)?;
+        let sessions = crate::Sessions::new(&store);
+        let session = sessions.create(
+            "Sport",
+            &fridays()?,
+            std::slice::from_ref(&push_ups),
+            1,
+            crate::SessionRule::Rolling,
+        )?;
+        assert!(sessions.on(session.id(), &friday(1)).is_err());
+        Routines::new(&store).tomorrow(session.id(), &friday(0), None)?;
+        assert!(sessions.on(session.id(), &friday(1)).is_ok());
+        Ok(())
+    }
+
+    fn friday(days: i64) -> Occurrence {
+        Occurrence::new(Day::new(2026, 1, 2).add_days(days), ClockTime::new(8, 0))
+    }
+
+    #[test]
+    fn tomorrow_adds_the_next_day_and_moves_on_and_nothing_else_is_planted() -> Result<()> {
+        let (store, id) = weekly_store()?;
+        let routines = Routines::new(&store);
+        routines.tomorrow(&id, &friday(0), None)?;
+        routines.tomorrow(&id, &friday(1), None)?;
+        // As no app writes it: Tomorrow on what is no Occurrence.
+        store.append(
+            &id,
+            &format!("{}2026-01-05T03:00", keys::SKIP_PREFIX),
+            Some("2026-01-02T06:00:00.000Z tomorrow"),
+            None,
+        )?;
+        let routine = routines.by_id(&id)?.ok_or(Error::Invalid("gone".into()))?;
+        assert_eq!(routine.moved, [friday(1), friday(2)]);
+        assert!(routine.skipped_at(&friday(1)).is_some());
+        assert_eq!(routine.first_from(Day::new(2026, 1, 5)), Some(friday(7)));
+        assert!(
+            routine
+                .schedule
+                .rule
+                .as_ref()
+                .is_some_and(|r| r.format() == "FREQ=WEEKLY;BYDAY=FR")
+        );
+        routines.unskip(&id, &friday(0))?;
+        let back = routines.by_id(&id)?.ok_or(Error::Invalid("gone".into()))?;
+        assert!(back.moved.is_empty(), "the chain goes with its start");
+        Ok(())
+    }
+
+    #[test]
+    fn only_an_occurrence_due_and_not_done_is_skipped() -> Result<()> {
+        let (store, id) = weekly_store()?;
+        let routines = Routines::new(&store);
+        assert!(routines.skip(&id, &friday(1), None).is_err());
+        routines.mark_done(&id, &friday(0), None)?;
+        assert!(routines.skip(&id, &friday(0), None).is_err());
+        assert!(routines.tomorrow(&id, &friday(0), None).is_err());
+        let written = store.all_entries()?.len();
+        routines.unskip(&id, &friday(7))?;
+        assert_eq!(store.all_entries()?.len(), written, "nothing held");
+        Ok(())
+    }
+
+    #[test]
+    fn a_skip_value_reads_as_the_dart_core_reads_it() -> Result<()> {
+        let at = parse_time("2026-03-02T06:00:00.000123Z")?;
+        assert_eq!(
+            skip_of("2026-03-02T06:00:00.000123Z later"),
+            Some((at, false))
+        );
+        assert_eq!(
+            skip_of("2026-03-02T06:00:00.000123Z tomorrow"),
+            Some((at, true))
+        );
+        for value in [
+            "Rude",
+            "2026-02-30T06:00:00.000Z tomorrow",
+            "2026-03-02T24:00:00Z",
+            "2026-03-02T06:00:60Z",
+            "2026-03-02T06:00:00+01:00",
+            "2026-03-02 06:00:00Z",
+            " tomorrow",
+        ] {
+            assert_eq!(skip_of(value), None, "{value}");
+        }
+        Ok(())
+    }
+
     #[test]
     fn over_a_week_the_days_after_tomorrow_cross_a_month_end() -> Result<()> {
         let now = parse_time("2026-10-28T11:00:00.000Z")?;
@@ -1185,6 +1557,9 @@ mod tests {
             scheduled_at: None,
             trashed: None,
             trashed_with: None,
+            skipped: BTreeMap::new(),
+            tomorrow: Default::default(),
+            moved: Vec::new(),
         });
         let name_of = |r: &Routine| {
             names

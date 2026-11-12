@@ -323,6 +323,36 @@ mod tests {
     }
 
     #[test]
+    fn a_members_skip_and_tomorrow_count_on_every_device() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let bins = Notes::new(&ann).capture("Bins", Some(&area), None)?;
+        let eight = crate::schedule::ClockTime::new(8, 0);
+        let daily = crate::schedule::Recurrence::parse("FREQ=DAILY")?;
+        let schedule = Schedule::new(
+            Day::new(2026, 3, 1),
+            &eight.into_iter().collect::<Vec<_>>(),
+            Some(daily),
+        )
+        .ok_or("a schedule")?;
+        let routine = Routines::new(&ann).spawn(&bins.id, &schedule)?;
+        exchange(&ben, &ann, true)?;
+        let skipped = crate::schedule::Occurrence::new(Day::new(2026, 3, 2), eight);
+        let moved = crate::schedule::Occurrence::new(Day::new(2026, 3, 3), eight);
+        Routines::new(&ben).skip(&routine.id, &skipped, None)?;
+        Routines::new(&ben).tomorrow(&routine.id, &moved, None)?;
+        exchange(&ben, &ann, true)?;
+        for store in [&ann, &ben] {
+            let read = Routines::new(store)
+                .by_id(&routine.id)?
+                .ok_or("the Routine")?;
+            assert!(read.skipped_at(&skipped).is_some());
+            assert!(read.skipped_at(&moved).is_some());
+            assert_eq!(Vec::from_iter(&read.tomorrow), [&moved.key()]);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn a_members_done_moves_nothing_of_another_persons_note() -> TestResult {
         let (ann, ben, area) = household()?;
         let dentist = Notes::new(&ann).capture("Dentist", Some(&area), None)?;

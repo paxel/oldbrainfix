@@ -1,7 +1,7 @@
-/// A Routine's history (CONTEXT.md): each Occurrence Done, Missed or
-/// still open, its Streak and its Adherence, as a pure function of the
-/// schedules it had, what was Done, this Device's snoozes, now and the
-/// wall clock. Missed follows the same rules as the Missed Summary.
+/// A Routine's history (CONTEXT.md): each Occurrence Done, Missed,
+/// skipped or still open, its Streak and its Adherence, as a pure
+/// function of the schedules it had, what was Done and skipped, this
+/// Device's snoozes, now and the wall clock. Missed follows the same rules as the Missed Summary.
 library;
 
 import 'alarms.dart';
@@ -63,6 +63,9 @@ enum OccurrenceStatus {
   /// Never Done, and its time is over (CONTEXT.md).
   missed,
 
+  /// Skipped, by Skip or Tomorrow, and not Done (CONTEXT.md, Skip).
+  skipped,
+
   /// Due, not Done, not Missed yet.
   open,
 
@@ -100,6 +103,12 @@ class HistoryEntry {
   /// knows; snoozes are never synced (ADR 0008).
   final DateTime? snoozedUntil;
 
+  /// When it was skipped; null unless it was.
+  final DateTime? skippedAt;
+
+  /// Whether Tomorrow added it, a day after the one it skipped.
+  final bool moved;
+
   const HistoryEntry({
     required this.occurrence,
     required this.status,
@@ -107,6 +116,8 @@ class HistoryEntry {
     required this.missedAt,
     this.doneAt,
     this.snoozedUntil,
+    this.skippedAt,
+    this.moved = false,
   });
 
   /// Whether it was Done early, on time or late; null unless Done. An
@@ -123,12 +134,16 @@ class HistoryEntry {
 }
 
 /// The Done and Missed Occurrences over a period; those still open do
-/// not count.
+/// not count, nor do those skipped, which are counted beside them
+/// ("92 % this month · 3 skipped").
 class Adherence {
   final int done;
   final int missed;
 
-  const Adherence({required this.done, required this.missed});
+  /// The Occurrences skipped and not Done: never part of [share].
+  final int skipped;
+
+  const Adherence({required this.done, required this.missed, this.skipped = 0});
 
   /// The share Done, from 0 to 1; null when nothing counts yet.
   double? get share => done + missed == 0 ? null : done / (done + missed);
@@ -143,15 +158,19 @@ class DayTally {
   /// Not Done and not Missed yet.
   final int open;
 
+  /// Skipped and not Done.
+  final int skipped;
+
   const DayTally({
     required this.day,
     required this.done,
     required this.missed,
     required this.open,
+    this.skipped = 0,
   });
 
   /// Whether nothing was due that day.
-  bool get empty => done + missed + open == 0;
+  bool get empty => done + missed + open + skipped == 0;
 }
 
 /// A Routine's history up to the end of today.
@@ -191,7 +210,8 @@ class RoutineHistory {
   ];
 
   /// The run of Done Occurrences up to the latest that is no longer
-  /// open (CONTEXT.md, Streak): one still due does not break it.
+  /// open (CONTEXT.md, Streak): one still due does not break it, nor
+  /// does one skipped, which does not count in it either.
   late final int currentStreak;
 
   int _currentStreak() {
@@ -202,7 +222,9 @@ class RoutineHistory {
           run++;
         case OccurrenceStatus.missed:
           return run;
-        case OccurrenceStatus.open || OccurrenceStatus.coming:
+        case OccurrenceStatus.skipped ||
+            OccurrenceStatus.open ||
+            OccurrenceStatus.coming:
           continue;
       }
     }
@@ -222,7 +244,9 @@ class RoutineHistory {
           if (run > longest) longest = run;
         case OccurrenceStatus.missed:
           run = 0;
-        case OccurrenceStatus.open || OccurrenceStatus.coming:
+        case OccurrenceStatus.skipped ||
+            OccurrenceStatus.open ||
+            OccurrenceStatus.coming:
           continue;
       }
     }
@@ -236,28 +260,39 @@ class RoutineHistory {
     var done = 0;
     var missed = 0;
     var open = 0;
+    var skipped = 0;
     for (final entry in between(day, day)) {
       switch (entry.status) {
         case OccurrenceStatus.done:
           done++;
         case OccurrenceStatus.missed:
           missed++;
+        case OccurrenceStatus.skipped:
+          skipped++;
         case OccurrenceStatus.open || OccurrenceStatus.coming:
           open++;
       }
     }
-    return DayTally(day: day, done: done, missed: missed, open: open);
+    return DayTally(
+      day: day,
+      done: done,
+      missed: missed,
+      open: open,
+      skipped: skipped,
+    );
   }
 
   /// The Adherence from [from] to [to], both days included.
   Adherence adherence(Day from, Day to) {
     var done = 0;
     var missed = 0;
+    var skipped = 0;
     for (final entry in between(from, to)) {
       if (entry.status == OccurrenceStatus.done) done++;
       if (entry.status == OccurrenceStatus.missed) missed++;
+      if (entry.status == OccurrenceStatus.skipped) skipped++;
     }
-    return Adherence(done: done, missed: missed);
+    return Adherence(done: done, missed: missed, skipped: skipped);
   }
 
   /// Since the week began, on [weekStart].
@@ -271,15 +306,20 @@ class RoutineHistory {
 }
 
 /// The history at [now] of a Routine that had the [spans] (see
-/// [scheduleSpans]), was Done at [done] and was snoozed on this Device
-/// until [snoozes], both by [Occurrence.key], with days as [wallClock]
-/// shows them. An Occurrence is Missed as the Missed Summary says: when
-/// the next one starts, unless the schedule changed or the Routine went
-/// to the trash before. Whatever was Done counts, asked for or not. An
-/// all-day Occurrence starts at [allDayFrom], as the alarm plan has it.
+/// [scheduleSpans]), was Done at [done], skipped at [skipped], [tomorrow]
+/// of them by Tomorrow, and was snoozed on this Device until [snoozes],
+/// all by [Occurrence.key], with days as [wallClock] shows them. An
+/// Occurrence is Missed as the Missed Summary says: when the next one
+/// starts, unless the schedule changed or the Routine went to the trash
+/// before, or it was skipped. Whatever was Done counts, asked for or not.
+/// Each span holds the Occurrences Tomorrow added to its schedule
+/// ([movedOccurrences]). An all-day Occurrence starts at [allDayFrom], as
+/// the alarm plan has it.
 RoutineHistory routineHistory({
   required List<ScheduleSpan> spans,
   required Map<String, DateTime> done,
+  Map<String, DateTime> skipped = const {},
+  Set<String> tomorrow = const {},
   Map<String, DateTime> snoozes = const {},
   required DateTime now,
   required WallClock wallClock,
@@ -295,14 +335,17 @@ RoutineHistory routineHistory({
     Occurrence occurrence,
     OccurrenceStatus status,
     DateTime start,
-    DateTime missedAt,
-  ) => HistoryEntry(
+    DateTime missedAt, {
+    bool moved = false,
+  }) => HistoryEntry(
     occurrence: occurrence,
     status: status,
     start: start,
     missedAt: missedAt,
     doneAt: done[occurrence.key],
     snoozedUntil: snoozes[occurrence.key],
+    skippedAt: skipped[occurrence.key],
+    moved: moved,
   );
 
   for (final span in spans) {
@@ -311,14 +354,14 @@ RoutineHistory routineHistory({
     final from = Day.today(span.from, wallClock);
     final to = until == null ? today : Day.today(until, wallClock);
     if (to < from) continue;
-    final occurrences = schedule.between(from, to);
-    final after = schedule.once ? null : schedule.next(to.addDays(1), 1);
+    final moved = movedOccurrences(schedule, tomorrow);
+    final occurrences = occurrencesBetween(schedule, moved, from, to);
+    final after = firstOccurrenceFrom(schedule, moved, to.addDays(1));
     for (var i = 0; i < occurrences.length; i++) {
       final occurrence = occurrences[i];
       if (occurrence.day > today) break;
-      final next = i + 1 < occurrences.length
-          ? occurrences[i + 1]
-          : after?.firstOrNull;
+      final next = i + 1 < occurrences.length ? occurrences[i + 1] : after;
+      final isMoved = moved.contains(occurrence);
       final wallStart = startOf(occurrence, allDay);
       final wallEnds = missedFrom(occurrence, next);
       final start = instantOf(wallStart.day, wallStart.time, wallClock);
@@ -328,7 +371,13 @@ RoutineHistory routineHistory({
           (until == null || start.isBefore(until));
       final key = occurrence.key;
       if (done[key] != null) {
-        final e = entry(occurrence, OccurrenceStatus.done, start, missedAt);
+        final e = entry(
+          occurrence,
+          OccurrenceStatus.done,
+          start,
+          missedAt,
+          moved: isMoved,
+        );
         if (inSpan) {
           asked[key] = e;
         } else {
@@ -337,13 +386,22 @@ RoutineHistory routineHistory({
         continue;
       }
       if (!inSpan) continue;
-      if (!missedAt.isAfter(now) &&
+      if (skipped[key] != null) {
+        asked[key] = entry(
+          occurrence,
+          OccurrenceStatus.skipped,
+          start,
+          missedAt,
+          moved: isMoved,
+        );
+      } else if (!missedAt.isAfter(now) &&
           (until == null || !missedAt.isAfter(until))) {
         asked[key] = entry(
           occurrence,
           OccurrenceStatus.missed,
           start,
           missedAt,
+          moved: isMoved,
         );
       } else if (until == null) {
         asked[key] = entry(
@@ -351,6 +409,7 @@ RoutineHistory routineHistory({
           start.isAfter(now) ? OccurrenceStatus.coming : OccurrenceStatus.open,
           start,
           missedAt,
+          moved: isMoved,
         );
       }
     }
@@ -390,6 +449,8 @@ extension RoutineHistories on Routines {
     return routineHistory(
       spans: scheduleSpans(store.history(routine.id)),
       done: routine.done,
+      skipped: routine.skipped,
+      tomorrow: routine.tomorrow,
       snoozes: {
         // Keyed by snoozeKey: the Routine's id, then the Occurrence's.
         for (final MapEntry(:key, :value) in Alarms(store).snoozes.entries)

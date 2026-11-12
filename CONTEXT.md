@@ -169,16 +169,24 @@ _Avoid_: instance, slot
 An Occurrence or Frog the user checked off. Checking off early or late never moves the schedule.
 _Avoid_: completed, ticked (in the UI)
 
+**Not today**:
+The choice for an Occurrence the user won't do today, beside Snooze: Skip, or Tomorrow, which skips it and adds a one-time Occurrence of the same Routine the day after at the same time. Neither changes the schedule. German: Nicht heute.
+_Avoid_: postpone, reschedule (that changes the schedule), defer
+
+**Skip**:
+Marking an Occurrence as not to be done, a decision rather than a lapse: it is neither Done nor Missed, its alarm and Re-nag stop, it never shows in the Missed Summary, and it leaves the Adherence, which counts the skips beside it. It can be taken back. German: Auslassen.
+_Avoid_: dismiss, cancel, Missed
+
 **Re-nag**:
-Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, or the next Occurrence starts.
+Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed, skipped, or the next Occurrence starts.
 _Avoid_: repeat, reminder
 
 **Escalation**:
 An opt-in step where an Occurrence ignored for several Re-nags turns into a full-screen alarm with sound. The full-screen alarm is phone-only; on the desktop Escalation makes the notification urgent, with the system's alarm sound.
 
 **Missed**:
-An Occurrence that was never Done: a Routine's when its next Occurrence starts, a Reminder's at midnight.
-_Avoid_: overdue, skipped
+An Occurrence that was never Done nor skipped: a Routine's when its next Occurrence starts, a Reminder's at midnight.
+_Avoid_: overdue, skipped (that is a Skip, the user's decision)
 
 **Missed Summary**:
 The card on the Agenda listing what was Missed and how often since the user last confirmed it.
@@ -187,10 +195,10 @@ The card on the Agenda listing what was Missed and how often since the user last
 The single notification after the device was off or dead, saying how much was Missed while it was down.
 
 **Streak**:
-The run of consecutive Occurrences of a Routine that were Done.
+The run of consecutive Occurrences of a Routine that were Done; a skipped one neither breaks it nor counts in it.
 
 **Adherence**:
-The share of a Routine's Occurrences that were Done over a period, e.g. "92 % this month".
+The share of a Routine's Occurrences that were Done over a period, those skipped left out and counted beside it, e.g. "92 % this month · 3 skipped".
 
 **Agenda**:
 The home screen: today's Occurrences, then two Frogs to eat one of, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.

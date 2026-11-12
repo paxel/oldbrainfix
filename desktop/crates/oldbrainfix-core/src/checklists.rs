@@ -1372,7 +1372,7 @@ impl<'a> Checklists<'a> {
                 on.routine_id
             )));
         };
-        if !routine.schedule.has(&on.occurrence) {
+        if !routine.has(&on.occurrence) {
             return Err(Error::Invalid(format!(
                 "{} is not due then",
                 on.occurrence.key()
@@ -1530,15 +1530,19 @@ fn checked_for(list: Checklist, on: &RoutineOccurrence, checks: &LineChecks) -> 
 /// The Occurrence of `routines` a Checklist is on `today`
 /// ([`Checklists::occurrence_now`]).
 fn now_of(routines: &[Routine], today: Day) -> Option<RoutineOccurrence> {
+    // A one-time Occurrence Tomorrow added counts as any other.
     let latest = routines
         .iter()
-        .filter_map(|r| last_day(&r.schedule, today))
+        .filter_map(|r| {
+            let moved = r.moved.iter().map(|o| o.day).filter(|d| *d <= today).max();
+            last_day(&r.schedule, today).max(moved)
+        })
         .max();
     let mut found: Vec<(&Routine, Occurrence)> = Vec::new();
     for routine in routines {
         let occurrences = match latest {
-            Some(day) => routine.schedule.on(day),
-            None => routine.schedule.next(today, 1),
+            Some(day) => routine.on(day),
+            None => routine.first_from(today).into_iter().collect(),
         };
         found.extend(occurrences.into_iter().map(|o| (routine, o)));
     }
@@ -1547,7 +1551,7 @@ fn now_of(routines: &[Routine], today: Day) -> Option<RoutineOccurrence> {
         None => found.first(),
         Some(_) => found
             .iter()
-            .find(|(r, o)| r.done_at(o).is_none())
+            .find(|(r, o)| r.done_at(o).is_none() && r.skipped_at(o).is_none())
             .or(found.last()),
     }?;
     Some(RoutineOccurrence {

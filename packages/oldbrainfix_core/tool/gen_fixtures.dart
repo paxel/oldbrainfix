@@ -19,7 +19,9 @@
 /// Agenda (`checklists.json`); the
 /// Shopping List scenario its Lines at moments around the days they come
 /// back (`shopping.json`); the History scenario each Routine's history at
-/// held moments with this Device's settings (`history.json`).
+/// held moments with this Device's settings (`history.json`); the Not
+/// today scenario what is skipped and moved, the Agenda, the alarms, the
+/// Missed Summary and the histories at held moments (`not_today.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -589,6 +591,94 @@ final _scenarios = <Scenario>[
       final glasses = notes.capture('Reading glasses at the office');
       notes.file(glasses.id, home.id);
       notes.unfile(glasses.id);
+    },
+  ),
+  (
+    name: 'not-today',
+    about:
+        'Occurrences answered without being Done (#269): a daily Routine '
+        'Done, skipped ahead, skipped as tapped on a notification and '
+        'Missed; a weekly one moved to tomorrow and on again; a Reminder '
+        'moved to tomorrow; an all-day Routine moved onto a day that has '
+        'its own, and one skipped and unskipped; a Skip on one Occurrence '
+        'turned into a Tomorrow; a Routine every other day skipped, moved to '
+        'tomorrow and Done after all, then rescheduled to another time, '
+        'which drops what Tomorrow added; and skips under keys and with '
+        'values no '
+        'app writes, a later word after the moment, and a Tomorrow on what '
+        'is no Occurrence.',
+    build: (store) {
+      final routines = Routines(store);
+      void jump(Duration by) => _tick = _tick.add(by);
+      Occurrence on(int day, [ClockTime? time]) =>
+          Occurrence(Day(2026, 1, day), time);
+      Schedule daily(List<ClockTime> times, [String rule = 'FREQ=DAILY']) =>
+          Schedule(
+            start: Day(2026, 1, 1),
+            times: times,
+            rule: Recurrence.parse(rule),
+          );
+      final stretch = routines.create('Stretch', daily([_at(7)]));
+      final bins = routines.create(
+        'Take out the bins',
+        Schedule(
+          start: Day(2026, 1, 2),
+          times: [_at(8)],
+          rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=FR'),
+        ),
+      );
+      final call = routines.create(
+        'Call the bank',
+        Schedule(start: Day(2026, 1, 3), times: [_at(10)]),
+      );
+      final walk = routines.create('Walk', daily([]));
+      final plants = routines.create(
+        'Water the plants',
+        daily([_at(18)], 'FREQ=DAILY;INTERVAL=2'),
+      );
+      routines.markDone(stretch.id, on(2, _at(7)));
+      routines.skip(stretch.id, on(3, _at(7)));
+      routines.tomorrow(walk.id, on(2));
+      routines.skip(walk.id, on(5));
+      routines.unskip(walk.id, on(5));
+      // 09:00 on the 2nd: the bins wait a day, and then another.
+      jump(const Duration(hours: 22));
+      routines.tomorrow(bins.id, on(2, _at(8)));
+      routines.skip(call.id, on(3, _at(10)));
+      jump(const Duration(days: 1));
+      routines.tomorrow(bins.id, on(3, _at(8)));
+      routines.tomorrow(call.id, on(3, _at(10)));
+      Alarms(store).applySkip(
+        stretch.id,
+        on(6, _at(7)).key,
+        DateTime.utc(2026, 1, 3, 9, 30),
+      );
+      routines.skip(plants.id, on(1, _at(18)));
+      routines.tomorrow(plants.id, on(3, _at(18)));
+      routines.markDone(plants.id, on(3, _at(18)));
+      routines.reschedule(plants.id, daily([_at(19)], 'FREQ=DAILY;INTERVAL=2'));
+      // As no app writes them.
+      store.append(
+        stretch.id,
+        '${RoutineKeys.skipPrefix}Rude',
+        '2026-01-03T09:00:00.000Z tomorrow',
+      );
+      store.append(stretch.id, RoutineKeys.skip(on(7, _at(7))), 'Rude');
+      store.append(
+        stretch.id,
+        RoutineKeys.skip(on(8, _at(7))),
+        '2026-02-30T09:00:00.000Z tomorrow',
+      );
+      store.append(
+        stretch.id,
+        RoutineKeys.skip(on(9, _at(7))),
+        '2026-01-03T09:00:00.000123Z later',
+      );
+      store.append(
+        bins.id,
+        '${RoutineKeys.skipPrefix}2026-01-06T03:00',
+        '2026-01-03T09:00:00.000Z tomorrow',
+      );
     },
   ),
   (
@@ -3248,6 +3338,147 @@ Map<String, Object?> _routine(Routine routine) => {
   'trashedWith': routine.trashedWith,
   'reminder': routine.isReminder,
 };
+
+/// What the Routines of the `not-today` scenario come to: each with what
+/// is skipped and moved, and at held moments the Agenda, the alarm plan,
+/// the Missed Summary, what each Note asks to check off, what the
+/// notifications may close and each Routine's history, on [_europe].
+/// Leaves the clock held as it was.
+Map<String, Object?> _notToday(Store store) {
+  final routines = Routines(store);
+  final ids = store.entitiesOfType(RoutineKeys.typeRoutine)..sort();
+  String? iso(DateTime? at) => at?.toUtc().toIso8601String();
+  Map<String, Object?> adherence(Adherence a) => {
+    'done': a.done,
+    'missed': a.missed,
+    'skipped': a.skipped,
+    'share': a.share,
+  };
+  List<Object?> rows(List<AgendaRow> rows) => [
+    for (final row in rows)
+      [
+        row.routine.id,
+        row.occurrence.key,
+        iso(row.done),
+        iso(row.skipped),
+        row.moved,
+      ],
+  ];
+  final held = _held;
+  final checks = [
+    // Saturday 08:30: the bins moved twice ring, Stretch is skipped.
+    DateTime.utc(2026, 1, 3, 7, 30),
+    // Monday noon: what Sunday Missed, never a skip.
+    DateTime.utc(2026, 1, 5, 11),
+    // A week on, the bins moved to Sunday Missed at last.
+    DateTime.utc(2026, 1, 10, 11),
+  ];
+  final result = {
+    'routines': [
+      for (final id in ids)
+        if (routines.byId(id) case final r?)
+          {
+            'id': r.id,
+            'skipped': {
+              for (final key in r.skipped.keys.toList()..sort())
+                key: iso(r.skipped[key]),
+            },
+            'tomorrow': r.tomorrow.toList()..sort(),
+            'moved': [for (final o in r.moved) o.key],
+            'between': [
+              for (final o in r.between(Day(2026, 1, 1), Day(2026, 1, 10)))
+                o.key,
+            ],
+            'firstFrom': r.firstFrom(Day(2026, 1, 4))?.key,
+          },
+    ],
+    'checks': [
+      for (final now in checks)
+        () {
+          _held = now;
+          final alarms = Alarms(store);
+          final agenda = routines.agenda(_europe);
+          final plan = alarms.plan(_europe);
+          final missed = alarms.missed(_europe);
+          return {
+            'now': now.toIso8601String(),
+            'agenda': {
+              'today': rows(agenda.todayRows),
+              'tomorrow': rows(agenda.tomorrowRows),
+            },
+            'alarms': [
+              for (final a in plan)
+                [a.id, iso(a.at), iso(a.endsAt), a.firesAfter(now) != null],
+            ],
+            'missed': {
+              'count': missed.count,
+              'nextChange': iso(missed.nextChange),
+              'routines': [
+                for (final m in missed.routines)
+                  [
+                    m.routine.id,
+                    for (final o in m.missed)
+                      [o.occurrence.key, iso(o.missedAt)],
+                  ],
+              ],
+            },
+            'openOf': {
+              for (final note in Notes(store).all())
+                note.id: [
+                  for (final o in alarms.openOf(note.id, _europe))
+                    [o.routine.id, o.occurrence.key, o.missed],
+                ],
+            },
+            'recentlyDone': [
+              for (final (id, o) in alarms.recentlyDone(_europe)) [id, o.key],
+            ],
+            'todayByNote': {
+              for (final MapEntry(:key, :value)
+                  in routines.todayByNote(_europe).entries)
+                key: rows(value),
+            },
+            'histories': [
+              for (final r in routines.all())
+                () {
+                  final h = routines.history(r, _europe);
+                  return {
+                    'routine': r.id,
+                    'currentStreak': h.currentStreak,
+                    'longestStreak': h.longestStreak,
+                    'lastSevenDays': [
+                      for (final d in h.lastSevenDays)
+                        [
+                          '${d.day}',
+                          d.done,
+                          d.missed,
+                          d.open,
+                          d.skipped,
+                          d.empty,
+                        ],
+                    ],
+                    'thisWeek': adherence(h.thisWeek),
+                    'thisMonth': adherence(h.thisMonth),
+                    'entries': [
+                      for (final e in h.entries)
+                        [
+                          e.occurrence.key,
+                          e.status.name,
+                          iso(e.missedAt),
+                          iso(e.doneAt),
+                          iso(e.skippedAt),
+                          e.moved,
+                        ],
+                    ],
+                  };
+                }(),
+            ],
+          };
+        }(),
+    ],
+  };
+  _held = held;
+  return result;
+}
 
 /// How many alarms of each plan the fixture spells out, the soonest
 /// first; the count covers them all.
@@ -9097,6 +9328,12 @@ Future<void> main(List<String> args) async {
     'Nudge of the `routines` log at held moments with this Device\'s '
     'settings, and of each Note the Occurrence due or Missed of each of '
     'its Routines and what its card ticks today, on the same clock.\n'
+    '- `not-today/not_today.json`: what the Routines of the `not-today` '
+    'log come to (#269): each with what is skipped, by Tomorrow too, and '
+    'the Occurrences Tomorrow added, and at held moments the Agenda, the '
+    'alarm plan, the Missed Summary, what each Note asks to check off, '
+    'what the notifications may close and each Routine\'s history, its '
+    'Streaks and its Adherence with the skips beside it.\n'
     '- `markers/markers.json`: what the values of a later version in the '
     '`markers` log come to (ADR 0034): the Routines read and those whose '
     'schedule needs a newer version, by Note too, the people of the '
@@ -9550,6 +9787,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/alarms.json'),
           '${_json.convert(_alarms(store))}\n',
+        );
+      }
+      if (scenario.name == 'not-today') {
+        _write(
+          File('${out.path}/not_today.json'),
+          '${_json.convert(_notToday(store))}\n',
         );
       }
       if (store.entitiesOfType(FrogKeys.typeFrog).isNotEmpty) {

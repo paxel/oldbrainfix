@@ -12,6 +12,7 @@ import 'notes.dart';
 import 'nudges.dart';
 import 'routines.dart';
 import 'schedule.dart';
+import 'shared_areas.dart';
 import 'store.dart';
 
 /// How many days ahead the plan looks. The platform keeps the whole
@@ -110,7 +111,9 @@ class _Timed {
 }
 
 /// The Occurrences of [routine] from [from] to [to] that were asked for
-/// (due at or after [Routine.scheduledAt]), placed on [wallClock].
+/// (due at or after [Routine.scheduledAt]), placed on [wallClock]; those
+/// Tomorrow added among them, each counting as the next one of the one
+/// before it.
 List<_Timed> _timed(
   Routine routine,
   Day from,
@@ -118,15 +121,12 @@ List<_Timed> _timed(
   WallClock wallClock,
   ClockTime allDayFrom,
 ) {
-  final schedule = routine.schedule;
-  final occurrences = schedule.between(from, to);
-  final after = schedule.once ? null : schedule.next(to.addDays(1), 1);
+  final occurrences = routine.between(from, to);
+  final after = routine.firstFrom(to.addDays(1));
   final since = routine.scheduledAt;
   final timed = <_Timed>[];
   for (var i = 0; i < occurrences.length; i++) {
-    final next = i + 1 < occurrences.length
-        ? occurrences[i + 1]
-        : after?.firstOrNull;
+    final next = i + 1 < occurrences.length ? occurrences[i + 1] : after;
     final t = _place(occurrences[i], next, wallClock, allDayFrom);
     if (since == null || !t.start.isBefore(since)) timed.add(t);
   }
@@ -246,7 +246,7 @@ String snoozeKey(String routineId, Occurrence occurrence) =>
     '$routineId@${occurrence.key}';
 
 /// The alarms that should exist at [now]: for each Routine its
-/// Occurrences that are not Done and not yet Missed, from
+/// Occurrences that are not Done, not skipped and not yet Missed, from
 /// [alarmHorizonDays] back to as far ahead, at most [alarmsPerRoutine],
 /// the soonest first and at most [alarmLimit]. An Occurrence already
 /// rung stays while it Re-nags. A snoozed one rings at its snooze
@@ -282,6 +282,7 @@ List<PlannedAlarm> alarmPlan({
       if (planned >= alarmsPerRoutine) break;
       final occurrence = t.occurrence;
       if (routine.doneAt(occurrence) != null) continue;
+      if (routine.skippedAt(occurrence) != null) continue;
       if (!t.endsAt.isAfter(now)) continue;
       final snoozed = snoozes[snoozeKey(routine.id, occurrence)]?.toUtc();
       if (snoozed != null && !snoozed.isBefore(t.endsAt)) continue;
@@ -346,7 +347,8 @@ class MissedRoutine {
 class MissedSummary {
   final List<MissedRoutine> routines;
 
-  /// When the next Occurrence not Done becomes Missed, so a screen
+  /// When the next Occurrence neither Done nor skipped becomes Missed, so
+  /// a screen
   /// showing the summary knows when to look again; null when none will.
   final DateTime? nextChange;
 
@@ -358,8 +360,8 @@ class MissedSummary {
   int get count => routines.fold(0, (sum, r) => sum + r.count);
 }
 
-/// The Missed Summary at [now]: every Occurrence not Done that became
-/// Missed after [seen] (or within [alarmHorizonDays] when never seen, and
+/// The Missed Summary at [now]: every Occurrence neither Done nor skipped
+/// that became Missed after [seen] (or within [alarmHorizonDays] when never seen, and
 /// never further back than that), by Routine.
 MissedSummary missedSummary({
   required List<(Routine, Note?)> routines,
@@ -377,6 +379,8 @@ MissedSummary missedSummary({
     final missed = <MissedOccurrence>[];
     for (final t in _timed(routine, from, today, wallClock, allDay)) {
       if (routine.doneAt(t.occurrence) != null) continue;
+      // A skip is a decision, not a lapse (CONTEXT.md, Skip).
+      if (routine.skippedAt(t.occurrence) != null) continue;
       if (t.endsAt.isAfter(now)) {
         if (nextChange == null || t.endsAt.isBefore(nextChange)) {
           nextChange = t.endsAt;
@@ -414,7 +418,7 @@ typedef OpenOccurrence = ({
 /// Missed, else the latest Missed one, whether the Missed Summary was
 /// "seen" or not, within [alarmHorizonDays]; none when neither is open.
 /// What is Done, from its check-off, its entries or its Lines, asks for
-/// nothing.
+/// nothing, nor does what is skipped.
 List<OpenOccurrence> openOccurrences({
   required List<Routine> routines,
   required DateTime now,
@@ -430,6 +434,7 @@ List<OpenOccurrence> openOccurrences({
     _Timed? missed;
     for (final t in _timed(routine, from, today, wallClock, allDay)) {
       if (routine.doneAt(t.occurrence) != null) continue;
+      if (routine.skippedAt(t.occurrence) != null) continue;
       if (t.start.isAfter(now)) continue;
       if (t.endsAt.isAfter(now)) {
         due = t;
@@ -558,9 +563,10 @@ class Alarms {
   /// The user tapped "seen": the Missed Summary starts over from now.
   void markSeen() => store.missedSeen = store.clock();
 
-  /// The Occurrences Done from yesterday to tomorrow on [wallClock], by
-  /// Routine id: their notifications, if still showing, can go. Over
-  /// [routines] when the caller has read [Routines.all] already (#228).
+  /// The Occurrences Done or skipped from yesterday to tomorrow on
+  /// [wallClock], by Routine id: their notifications, if still showing,
+  /// can go. Over [routines] when the caller has read [Routines.all]
+  /// already (#228).
   List<(String, Occurrence)> recentlyDone(
     WallClock wallClock, {
     List<Routine>? routines,
@@ -568,11 +574,13 @@ class Alarms {
     final today = Day.today(store.clock(), wallClock);
     return [
       for (final routine in routines ?? Routines(store).all())
-        for (final occurrence in routine.schedule.between(
+        for (final occurrence in routine.between(
           today.addDays(-1),
           today.addDays(1),
         ))
-          if (routine.doneAt(occurrence) != null) (routine.id, occurrence),
+          if (routine.doneAt(occurrence) != null ||
+              routine.skippedAt(occurrence) != null)
+            (routine.id, occurrence),
     ];
   }
 
@@ -593,6 +601,45 @@ class Alarms {
     } on ArgumentError {
       return false;
     }
+  }
+
+  /// Applies a Skip tapped on a notification at [at] ([Routines.skip]):
+  /// [occurrenceKey] of the Routine [routineId] is skipped as of then.
+  /// Returns whether it changed anything; a Routine trashed or
+  /// rescheduled meanwhile, or an Occurrence already Done or skipped, is
+  /// left as it is.
+  bool applySkip(String routineId, String occurrenceKey, DateTime at) =>
+      _applyNotToday(routineId, occurrenceKey, at, tomorrow: false);
+
+  /// Applies a Tomorrow tapped on a notification at [at]
+  /// ([Routines.tomorrow]), as [applySkip] does.
+  bool applyTomorrow(String routineId, String occurrenceKey, DateTime at) =>
+      _applyNotToday(routineId, occurrenceKey, at, tomorrow: true);
+
+  bool _applyNotToday(
+    String routineId,
+    String occurrenceKey,
+    DateTime at, {
+    required bool tomorrow,
+  }) {
+    final occurrence = Occurrence.tryParse(occurrenceKey);
+    final routines = Routines(store);
+    final routine = routines.byId(routineId);
+    if (occurrence == null || routine == null || routine.isTrashed) {
+      return false;
+    }
+    if (routine.doneAt(occurrence) != null ||
+        routine.skippedAt(occurrence) != null ||
+        !routine.has(occurrence) ||
+        !store.mayCheckOff(routineId)) {
+      return false;
+    }
+    if (tomorrow) {
+      routines.tomorrow(routineId, occurrence, at: at);
+    } else {
+      routines.skip(routineId, occurrence, at: at);
+    }
+    return true;
   }
 
   /// Applies a Snooze tapped on a notification: [occurrenceKey] of the
