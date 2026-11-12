@@ -225,40 +225,54 @@ class _AdherencePanel extends StatelessWidget {
       final share = adherence.share;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label),
-                  // Beside the share, never in it (#269); a line of its
-                  // own, so a narrow phone has room.
-                  if (adherence.skipped > 0)
-                    Text(
-                      t.adherenceSkipped(adherence.skipped),
-                      key: const ValueKey('adherence-skipped'),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // On a narrow phone the share wraps rather than running off;
+            // it takes at most this much of the row, the percent stays
+            // whole.
+            final most = BoxConstraints(maxWidth: constraints.maxWidth * 0.45);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label),
+                      // Beside the share, never in it (#269); a line of
+                      // its own, so a narrow phone has room.
+                      if (adherence.skipped > 0)
+                        Text(
+                          t.adherenceSkipped(adherence.skipped),
+                          key: const ValueKey('adherence-skipped'),
+                          style: text.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+                if (share == null)
+                  ConstrainedBox(
+                    constraints: most,
+                    child: Text(t.adherenceNone),
+                  )
+                else ...[
+                  ConstrainedBox(
+                    constraints: most,
+                    child: Text(
+                      t.adherenceOf(
+                        adherence.done,
+                        adherence.done + adherence.missed,
+                      ),
                       style: text.bodySmall,
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(percent.format(share), style: text.titleMedium),
                 ],
-              ),
-            ),
-            if (share == null)
-              Text(t.adherenceNone)
-            else ...[
-              Text(
-                t.adherenceOf(
-                  adherence.done,
-                  adherence.done + adherence.missed,
-                ),
-                style: text.bodySmall,
-              ),
-              const SizedBox(width: 12),
-              Text(percent.format(share), style: text.titleMedium),
-            ],
-          ],
+              ],
+            );
+          },
         ),
       );
     }

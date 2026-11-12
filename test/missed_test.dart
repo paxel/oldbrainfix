@@ -148,6 +148,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(inCard(find.text('pills · once')), findsOneWidget);
     });
+
+    testWidgets('fits a 320 dp phone in German; the day and time wrap '
+        'instead of running off', (tester) async {
+      tester.view.physicalSize = const Size(960, 1920);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      madeAt(DateTime(2026, 10, 21, 6), 'pills', daily([at(8)]));
+      madeAt(
+        DateTime(2026, 10, 21, 6),
+        'dentist',
+        Schedule(start: Day(2026, 10, 22)),
+      );
+      await start(tester);
+
+      expect(inCard(find.text('Verpasst')), findsOneWidget);
+      expect(inCard(find.text('Do., 22.10.2026  Ganztägig')), findsOneWidget);
+      expect(inCard(find.text('Fr., 23.10.2026  08:00')), findsOneWidget);
+      final right = tester.getTopRight(card).dx;
+      for (final row in inCard(find.textContaining('.2026')).evaluate()) {
+        expect(
+          tester.getTopRight(find.byWidget(row.widget)).dx,
+          lessThanOrEqualTo(right),
+        );
+      }
+    });
   });
 
   group('Re-nag', () {

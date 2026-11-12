@@ -21,6 +21,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Das Senden einer Notiz an eine Person wählt auf dem Handy und auf dem Desktop nicht mehr die erste Person der Liste: Niemand ist gewählt, bis du wählst, und eine Aktualisierung beginnt bei der Person, an die dieses Gerät die Notiz zuletzt gesendet hat, damit eine private Notiz nicht an die falsche Person geht.
 - Auf dem Desktop hält die App keinen Prozessorkern mehr beschäftigt, während sie im Infobereich wartet oder nichts tut: Die Linie unter der Menüleiste bewegt sich in gleichmäßigem Takt und hört nach zwei Minuten auf, wenn ein Abgleich hängt, bei verstecktem Fenster wird nichts gezeichnet, und der KI-Port beantwortet einen Werkzeugaufruf, wenn er kommt, statt zehnmal in der Sekunde nachzusehen.
 - Auf dem Desktop beendet ein Start der aktualisierten App eine ältere Version, die noch im Infobereich läuft, und läuft an ihrer Stelle, statt das Fenster der älteren Version zu öffnen, bis sie beendet wurde.
+- Auf einem schmalen Handy brechen die Tage und Uhrzeiten in der Verpasst-Übersicht und der Anteil neben jeder Einhaltung im Verlauf einer Routine in eine zweite Zeile um, statt über den Bildschirmrand hinauszulaufen.
 
 ## [0.5.1] - 2026-11-08
 

@@ -748,12 +748,18 @@ void main() {
       await tap(tester, key('session-pick-$pushUps'));
       expect(find.text('Entry'), findsOneWidget);
       await tap(tester, key('tally-entry-trash'));
-      await tap(tester, find.text('Delete').last);
+      // Deleted without asking; the announcement at the top undoes it
+      // (#268).
+      expect(find.byType(AlertDialog), findsNothing);
 
       expect(tallies.entryById(entry.id)?.isTrashed, isTrue);
       final box = tester.widget<Checkbox>(find.byType(Checkbox).first);
       expect(box.value, isFalse);
       expect(box.onChanged, isNull, reason: 'it only shows Done (#208)');
+
+      await tap(tester, find.text('Entry deleted'));
+      expect(tallies.entryById(entry.id)?.isTrashed, isFalse);
+      expect(tester.widget<Checkbox>(find.byType(Checkbox).first).value, true);
     });
 
     testWidgets('the heading\'s box only shows Done and a tap on it does '

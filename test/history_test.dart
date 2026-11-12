@@ -233,5 +233,30 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(historyButton, findsNothing);
     });
+
+    testWidgets('the Adherence fits a 320 dp phone in German; the share '
+        'wraps instead of running off', (tester) async {
+      tester.view.physicalSize = const Size(960, 1920);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      pills();
+      await start(tester);
+      await tap(tester, find.text('pills').first);
+      await tap(tester, find.byTooltip('Verlauf'));
+      expect(page, findsOneWidget);
+
+      expect(find.text('Einhaltung'), findsOneWidget);
+      expect(find.text('3 von 4 erledigt'), findsNWidgets(3));
+      expect(find.text('75\u00a0%'), findsNWidgets(3));
+      final right = tester.getTopRight(page).dx;
+      for (final percent in find.text('75\u00a0%').evaluate()) {
+        expect(
+          tester.getTopRight(find.byWidget(percent.widget)).dx,
+          lessThanOrEqualTo(right),
+        );
+      }
+    });
   });
 }
