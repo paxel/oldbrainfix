@@ -218,7 +218,7 @@ fn note_delete_with_no_note_open_trashes_the_cards_selected() -> TestResult {
         .click();
     harness.run();
     harness
-        .query_all_by_label("Delete")
+        .query_all_by_label("Delete Delete")
         .next_back()
         .ok_or("Delete in the Note menu")?
         .click();
@@ -463,7 +463,7 @@ fn the_note_menu_merges_and_weighs_the_cards_selected() -> TestResult {
     note_menu(&mut harness)?;
     harness.get_by_label("Importance ⏵").click();
     harness.run();
-    harness.get_by_label("Unimportant").click_accesskit();
+    harness.get_by_label("Unimportant 3").click_accesskit();
     harness.run();
     assert_eq!(
         note(&harness, &ids, MILK)?.importance,
@@ -483,7 +483,7 @@ fn the_note_menu_merges_and_weighs_the_cards_selected() -> TestResult {
     select(&mut harness, &[MILK, ROSES]);
     note_menu(&mut harness)?;
     harness
-        .query_all_by_label("Merge into…")
+        .query_all_by_label("Merge into… Ctrl+Shift+M")
         .next_back()
         .ok_or("Merge into… in the Note menu")?
         .click();
@@ -527,9 +527,11 @@ fn the_note_menu_weighs_and_restores_the_note_open() -> TestResult {
     harness.state_mut().select_note(&milk);
     harness.run();
     note_menu(&mut harness)?;
+    // The menu's entry, ahead of the dialog's button it lies over since
+    // its keys widened it (#274).
     harness
         .query_all_by_label("Restore")
-        .next_back()
+        .next()
         .ok_or("Restore in the Note menu")?
         .click();
     harness.run();

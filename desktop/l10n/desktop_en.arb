@@ -604,5 +604,7 @@
   "olderAppStays": "An older Old Brain Fix is still running and did not end for this update.",
   "@olderAppStays": {"description": "Said, on the command line and in a window, when a start asked an older running desktop app to quit and it did not go within a few seconds."},
   "olderAppStaysFix": "Choose Quit in its tray menu, then start Old Brain Fix again.",
-  "@olderAppStaysFix": {"description": "Under 'olderAppStays': what to do."}
+  "@olderAppStaysFix": {"description": "Under 'olderAppStays': what to do."},
+  "searchUnsortedHint": "Search Unsorted",
+  "@searchUnsortedHint": {"description": "Hint in the search field of Unsorted on the desktop (#274); Unsorted is the list of Notes not yet filed."}
 }

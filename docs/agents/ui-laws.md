@@ -1135,9 +1135,12 @@ replace a law of Both apps where they say so. A desktop law marked
   as far as the dialog offers it, but File into…, Merge into…,
   Importance and Delete, in the Trash Restore in Delete's place, act on
   the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
-  Ctrl+F, Ctrl+M, Ctrl+,; Cmd on macOS) stand beside the entries and
-  work while typing, over the Note dialog too, not while another dialog
-  is open. On the desktop the menu bar leads to Settings, Backups and
+  Ctrl+F, Ctrl+M, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on macOS)
+  stand beside the entries and work while typing, over the Note dialog
+  too, not while another dialog is open; Delete and 1 to 3 stand beside
+  Delete and Importance's entries while those act on the cards selected
+  (#274). Ctrl+F searches the list shown where it has a search field
+  (All Notes, Unsorted, an Area, a Topic), else All Notes'. On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
@@ -1146,6 +1149,19 @@ replace a law of Both apps where they say so. A desktop law marked
   in a text field, where it undoes the typing. Only the last one waits;
   cards selected and moved to the trash or merged together come back
   with one (#273).
+- **The keys work the card lists** (#274, Q657): over a Note list's
+  cards, with no dialog, menu or Note dialog on top and no field or
+  other widget holding the keyboard, Up and Down select the next card
+  alone (with nothing selected Down the first, Up the last), Shift+Up
+  and Shift+Down run the selection on from where it started, Ctrl+A
+  selects every card, Enter opens the Note of the card reached last,
+  Delete moves the cards selected to the Trash asking nothing (Ctrl+Z
+  undoes it), and 1, 2 and 3 make them Important, Normal or
+  Unimportant; in the Trash Delete and the digits do nothing. Down in
+  the search field goes to the first card found. The card reached
+  scrolls into view; after an action, which ends the selection, Up and
+  Down go on from it while it still shows, else from the top. Sorting Unsorted is Down, Ctrl+M, type, Enter for
+  each Note.
 - **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
   Note dialog, while Enter alone starts a new line; Enter in a one-line
@@ -1216,8 +1232,9 @@ replace a law of Both apps where they say so. A desktop law marked
   it away, Shift-click selects the run from the card clicked last in the
   list's order (#148). The selected cards carry a check mark and a
   thicker outline, and say so to a screen reader; Esc and showing
-  another place drop the selection. A double-click or Edit opens the
-  Note dialog.
+  another place drop the selection. Up, Down, Shift and Ctrl+A select
+  from the keyboard (#274, see Menu bar and keys). A double-click, Edit
+  or Enter opens the Note dialog.
 - **A selection is acted on from a card's right-click** (#273, Q656):
   its menu offers, after File into…, Merge into… and Importance ▸
   Important, Normal or Unimportant, and Move to trash last, each only on

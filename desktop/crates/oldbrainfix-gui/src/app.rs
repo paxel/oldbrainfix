@@ -1132,6 +1132,15 @@ enum Action {
     PickCard(String, Pick),
     /// Esc over the list: no card selected.
     ClearCards,
+    /// Down (`down`) or Up over the list (#274): the next card selected
+    /// alone, or with Shift (`on`) the selection run on to it; it scrolls
+    /// into view.
+    StepCards {
+        down: bool,
+        on: bool,
+    },
+    /// Ctrl+A over the list (#274): every card shown selected.
+    SelectAllCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
     /// Opens the Note in the Note dialog (#146): a double-click on its
@@ -1602,6 +1611,9 @@ pub struct App {
     /// quick note's field or the search, until it has it.
     capture_focus: bool,
     search_focus: bool,
+    /// The card Up or Down selected (#274), until the list scrolled it
+    /// into view.
+    scroll_card: Option<String>,
     /// File ▸ Quit and File ▸ Quick note, for the native window to do.
     quit_wanted: bool,
     quick_note_wanted: bool,
@@ -2107,6 +2119,7 @@ impl App {
             clip: None,
             capture_focus: false,
             search_focus: false,
+            scroll_card: None,
             quit_wanted: false,
             quick_note_wanted: false,
             theme,
@@ -4906,7 +4919,19 @@ impl App {
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
-            Selection::Unsorted => self.store.notes_by(notes.unsorted()?, &self.people)?,
+            Selection::Unsorted => {
+                // Its search (#274) keeps the list's order, oldest first.
+                let mut unsorted = notes.unsorted()?;
+                if !self.query.trim().is_empty() {
+                    let found: HashSet<String> = search
+                        .notes(&self.query, None)?
+                        .into_iter()
+                        .map(|n| n.id)
+                        .collect();
+                    unsorted.retain(|n| found.contains(&n.id));
+                }
+                self.store.notes_by(unsorted, &self.people)?
+            }
             Selection::Place(id) => {
                 let found = search.notes(&self.query, Some(id))?;
                 // A Topic's Notes show inside the Topic; a search in its
@@ -5484,8 +5509,9 @@ impl App {
             Action::Quit => self.quit_wanted = true,
             Action::Find => {
                 self.leave_note()?;
-                // All Notes, an Area and a Topic have the search.
-                if !matches!(self.selection, Selection::All | Selection::Place(_)) {
+                // All Notes, Unsorted, an Area and a Topic have the search
+                // (#274), the list shown searched.
+                if !self.searches() {
                     self.go(Selection::All);
                 }
                 self.search_focus = true;
@@ -5521,6 +5547,15 @@ impl App {
                 }
             }
             Action::ClearCards => self.cards.clear(),
+            Action::StepCards { down, on } => {
+                let order = self.shown_cards();
+                self.scroll_card = if on {
+                    self.cards.step_on(&order, down)
+                } else {
+                    self.cards.step(&order, down)
+                };
+            }
+            Action::SelectAllCards => self.cards.select_all(&self.shown_cards()),
             Action::AskImport => self.dialog = Some(Dialog::Import),
             Action::SelectNote(id) => {
                 // One dialog at a time: the quick note is kept and closed.
@@ -8538,6 +8573,7 @@ impl App {
             || self.top_dialog().is_some_and(|top| top != TopDialog::Note);
         if self.welcome.is_none() && !over {
             let filing = self.file_into_notes();
+            let merging = self.merge_action();
             let typing = ui.ctx().text_edit_focused();
             // Esc over the list drops the cards selected (#148); over a
             // dialog or menu it is theirs, in a field the field's.
@@ -8564,10 +8600,19 @@ impl App {
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
                 }
-                if let Some(notes) = filing.filter(|_| i.consume_key(Modifiers::COMMAND, Key::M)) {
+                // Ctrl+Shift+M before Ctrl+M, which takes it with Shift too
+                // (#274).
+                let shift = i.modifiers.shift;
+                let shift_m = Modifiers::COMMAND | Modifiers::SHIFT;
+                if let Some(merge) = merging.filter(|_| shift && i.consume_key(shift_m, Key::M)) {
+                    actions.push(merge);
+                } else if let Some(notes) =
+                    filing.filter(|_| !shift && i.consume_key(Modifiers::COMMAND, Key::M))
+                {
                     actions.push(Action::AskFileInto(notes));
                 }
             });
+            self.list_keys(ui.ctx(), &mut actions);
         }
         // The field the cursor is in, for Edit's Cut, Copy and Paste,
         // which take the cursor out of it.
@@ -9016,6 +9061,97 @@ impl App {
         self.view.notes.iter().map(|p| p.note.id.clone()).collect()
     }
 
+    /// Whether the list shown has a search field: All Notes, Unsorted
+    /// (#274), an Area and a Topic.
+    fn searches(&self) -> bool {
+        matches!(
+            self.selection,
+            Selection::All | Selection::Unsorted | Selection::Place(_)
+        )
+    }
+
+    /// What Merge into… and Ctrl+Shift+M merge (#274): the Note in the
+    /// Note dialog where it may be changed, else the cards selected
+    /// outside the trash; none where nothing is.
+    fn merge_action(&self) -> Option<Action> {
+        if self.note_menu().is_some_and(|n| n.changes) {
+            return Some(Action::StartMerge);
+        }
+        let chosen = self.menu_cards();
+        (!chosen.is_empty() && self.selection != Selection::Trash)
+            .then_some(Action::AskMergeNotes(chosen))
+    }
+
+    /// The keys over the cards of a Note list (#274), as the pointer
+    /// acts on them: Up and Down select the next card, with Shift they run
+    /// the selection on, Ctrl+A selects all, Enter opens the card reached
+    /// last, Delete moves the selection to the trash, 1, 2 and 3 make it
+    /// Important, Normal or Unimportant; Down in the search goes into the
+    /// cards found. Only with no dialog, menu or Note on top and no field
+    /// or other widget holding the keyboard, which then has the keys; in
+    /// the trash Delete and the digits do nothing.
+    fn list_keys(&self, ctx: &egui::Context, actions: &mut Vec<Action>) {
+        let list = matches!(
+            self.selection,
+            Selection::All | Selection::Unsorted | Selection::Place(_) | Selection::Trash
+        );
+        if !list
+            || self.view.notes.is_empty()
+            || self.top_dialog().is_some()
+            || egui::Popup::is_any_open(ctx)
+        {
+            return;
+        }
+        let search = Id::new("search");
+        if ctx.memory(|m| m.has_focus(search)) {
+            if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::ArrowDown)) {
+                ctx.memory_mut(|m| m.surrender_focus(search));
+                actions.push(Action::ClearCards);
+                actions.push(Action::StepCards {
+                    down: true,
+                    on: false,
+                });
+            }
+            return;
+        }
+        if ctx.memory(|m| m.focused().is_some()) {
+            return;
+        }
+        let chosen = self.menu_cards();
+        let weighs = !chosen.is_empty() && self.selection != Selection::Trash;
+        let opens = self.cards.cursor().map(str::to_string);
+        ctx.input_mut(|i| {
+            for (key, down) in [(Key::ArrowDown, true), (Key::ArrowUp, false)] {
+                if i.consume_key(Modifiers::SHIFT, key) {
+                    actions.push(Action::StepCards { down, on: true });
+                } else if i.consume_key(Modifiers::NONE, key) {
+                    actions.push(Action::StepCards { down, on: false });
+                }
+            }
+            if i.consume_key(Modifiers::COMMAND, Key::A) {
+                actions.push(Action::SelectAllCards);
+            }
+            if let Some(id) = opens.filter(|_| i.consume_key(Modifiers::NONE, Key::Enter)) {
+                actions.push(Action::SelectNote(id));
+            }
+            // On a Mac keyboard the key named delete is Backspace.
+            let deletes = i.consume_key(Modifiers::NONE, Key::Delete)
+                || (cfg!(target_os = "macos") && i.consume_key(Modifiers::NONE, Key::Backspace));
+            if weighs && deletes {
+                actions.push(Action::TrashNotes(chosen.clone()));
+            }
+            for (key, importance) in [
+                (Key::Num1, Importance::Important),
+                (Key::Num2, Importance::Normal),
+                (Key::Num3, Importance::Unimportant),
+            ] {
+                if weighs && i.consume_key(Modifiers::NONE, key) {
+                    actions.push(Action::ImportanceOf(chosen.clone(), importance));
+                }
+            }
+        });
+    }
+
     /// Files the Notes `ids` into the Area or Topic `place` in one go
     /// (#148), as File into… and a drop on the sidebar ask, Unsorted ones
     /// leaving Unsorted. One this Device may not move stays: another
@@ -9085,7 +9221,7 @@ impl App {
             // (#272).
             DeviceSettings::new(&self.store).filed_into(place)?;
         }
-        self.cards.clear();
+        self.cards.end();
         let stayed = ids.len() - moving.len();
         let t = self.t;
         if stayed == 0 {
@@ -9118,7 +9254,7 @@ impl App {
                 going.push(id.clone());
             }
         }
-        self.cards.clear();
+        self.cards.end();
         if going.is_empty() {
             return Ok(());
         }
@@ -9140,7 +9276,7 @@ impl App {
                 back.push(id.as_str());
             }
         }
-        self.cards.clear();
+        self.cards.end();
         let routines = Routines::new(&self.store);
         self.store
             .batch(|| back.iter().try_for_each(|id| routines.restore_note(id)))
@@ -9163,7 +9299,7 @@ impl App {
                 setting.push(id.as_str());
             }
         }
-        self.cards.clear();
+        self.cards.end();
         self.store.batch(|| {
             setting
                 .iter()
@@ -9188,7 +9324,7 @@ impl App {
                 going.push(id.as_str());
             }
         }
-        self.cards.clear();
+        self.cards.end();
         if going.is_empty() || !listed(into)? {
             return Ok(());
         }
@@ -9208,10 +9344,11 @@ impl App {
         let ctx = ui.ctx().clone();
         // As the system writes them: Ctrl+N, or ⌘N on macOS; the comma as
         // a comma.
-        let keys = |key: Key| {
-            let shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, key);
+        let keys_with = |modifiers: Modifiers, key: Key| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, key);
             Some(ctx.format_shortcut(&shortcut).replace("Comma", ","))
         };
+        let keys = |key: Key| keys_with(Modifiers::COMMAND, key);
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
         // File into… also files the cards selected in the list (#148),
@@ -9233,6 +9370,9 @@ impl App {
         } else {
             Action::AskMergeNotes(chosen.clone())
         };
+        // Delete and 1 to 3 stand beside the entries where they act on the
+        // cards selected (#274), as over the list; not on the Note open.
+        let list_keys = listed && !open;
         let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
@@ -9333,14 +9473,19 @@ impl App {
                         filing.is_some(),
                         Action::AskFileInto(filing.clone().unwrap_or_default()),
                     ),
-                    (t.merge_into(), None, open || listed, merge),
+                    (
+                        t.merge_into(),
+                        keys_with(Modifiers::COMMAND | Modifiers::SHIFT, Key::M),
+                        open || listed,
+                        merge,
+                    ),
                 ];
                 menu_entries(ui, items, actions);
                 let weighs = open || listed;
                 ui.add_enabled_ui(weighs, |ui| {
                     ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
                         // One that has it already writes nothing.
-                        if let Some(importance) = importance_entries(ui, &t) {
+                        if let Some(importance) = importance_entries(ui, &t, list_keys) {
                             let weighed = if open {
                                 vec![id.clone()]
                             } else {
@@ -9465,7 +9610,13 @@ impl App {
                 } else if open {
                     (t.delete(), None, true, Action::Trash)
                 } else {
-                    (t.delete(), None, listed, Action::TrashNotes(chosen.clone()))
+                    let delete = keys_with(Modifiers::NONE, Key::Delete);
+                    (
+                        t.delete(),
+                        delete,
+                        listed,
+                        Action::TrashNotes(chosen.clone()),
+                    )
                 };
                 menu_entries(ui, [last], actions);
             });
@@ -10423,6 +10574,7 @@ impl App {
         ui.add_space(8.0);
         let hint = match &self.selection {
             Selection::All => Some(self.t.search_all_hint()),
+            Selection::Unsorted => Some(self.t.search_unsorted_hint()),
             Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
             Selection::Place(_) => Some(self.t.search_topic_hint()),
             _ => None,
@@ -10468,6 +10620,9 @@ impl App {
         if self.view.notes.is_empty() {
             let empty = if trash {
                 self.t.trash_empty()
+            } else if !self.query.trim().is_empty() {
+                // A search that finds nothing, not an empty list.
+                self.t.nothing_found()
             } else {
                 self.t.no_notes_yet()
             };
@@ -10489,6 +10644,8 @@ impl App {
             // A list with its switch has the view button on its cards
             // (#189).
             let switches = self.cards_key().is_some();
+            // The card Up or Down selected comes into view (#274), once.
+            let scroll_to = self.scroll_card.take();
             for placed in &self.view.notes {
                 let id = &placed.note.id;
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
@@ -10535,6 +10692,9 @@ impl App {
                     look,
                     media,
                 );
+                if scroll_to.as_deref() == Some(id.as_str()) {
+                    clicks.card.scroll_to_me(None);
+                }
                 // Dragged, the card takes the cards selected with it when
                 // it is one of them (#148).
                 if draggable && clicks.card.drag_started() {
@@ -13051,17 +13211,24 @@ struct NoteMenu {
     tally: bool,
 }
 
-/// Important, Normal and Unimportant, as a menu's entries (#273): the
-/// one picked, which closes the menu.
-fn importance_entries(ui: &mut Ui, t: &L10n) -> Option<Importance> {
+/// Important, Normal and Unimportant, as a menu's entries (#273), with
+/// `keys` each with the digit that sets it over the list (#274): the one
+/// picked, which closes the menu.
+fn importance_entries(ui: &mut Ui, t: &L10n, keys: bool) -> Option<Importance> {
     let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
     let mut picked = None;
-    for (importance, label) in [
-        (Importance::Important, t.importance_important()),
-        (Importance::Normal, t.importance_normal()),
-        (Importance::Unimportant, t.importance_unimportant()),
+    for (importance, label, key) in [
+        (Importance::Important, t.importance_important(), "1"),
+        (Importance::Normal, t.importance_normal(), "2"),
+        (Importance::Unimportant, t.importance_unimportant(), "3"),
     ] {
-        if ui.button(RichText::new(label).color(text)).clicked() {
+        let mut button = egui::Button::new(RichText::new(label).color(text));
+        // The digit that sets it over the list (#274).
+        if keys {
+            button = button.shortcut_text(RichText::new(key).color(weak));
+        }
+        if ui.add(button).clicked() {
             picked = Some(importance);
             ui.close();
         }
@@ -17962,7 +18129,7 @@ fn note_card(
                 picked = Some(Action::AskMergeNotes(one()));
             }
             ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
-                if let Some(importance) = importance_entries(ui, t) {
+                if let Some(importance) = importance_entries(ui, t, false) {
                     picked = Some(Action::ImportanceOf(one(), importance));
                 }
             });
