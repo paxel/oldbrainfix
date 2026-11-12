@@ -11,6 +11,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.view.WindowManager
 import androidx.core.content.FileProvider
@@ -390,7 +391,7 @@ class MainActivity : FlutterActivity() {
                             args["subject"] as? String,
                         ),
                     )
-                    "pick" -> pickBundle(result)
+                    "pick" -> pickBundle(result, Bundles.startOf(args["from"] as? String))
                     "take" -> result.success(Bundles.take())
                     "print" -> result.success(
                         Printing.print(
@@ -752,11 +753,18 @@ class MainActivity : FlutterActivity() {
         soundAnswer = result
     }
 
-    /** Opens the system's file picker for a bundle to import; the answer comes in [onActivityResult]. */
-    private fun pickBundle(result: MethodChannel.Result) {
+    /**
+     * Opens the system's file picker for a bundle to import, at the document
+     * [start] where there is one (Android 8 and later); the answer comes in
+     * [onActivityResult].
+     */
+    private fun pickBundle(result: MethodChannel.Result, start: String?) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType("*/*")
+        if (start != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(start))
+        }
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_BUNDLE)

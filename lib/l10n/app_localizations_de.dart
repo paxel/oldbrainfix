@@ -5959,4 +5959,64 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get leaveKeepEditing => 'Weiter bearbeiten';
+
+  @override
+  String get backupOpenTitle => 'Notizen zurückholen';
+
+  @override
+  String get backupOpenIntro =>
+      'Öffne eine Sicherung, um Notizen aus ihr zurückzuholen, etwa eine endgültig gelöschte Notiz oder eine frühere Fassung einer Liste. Sie kommen als Kopien in neue Bereiche; sonst ändert sich nichts.';
+
+  @override
+  String get backupOpen => 'Sicherung öffnen …';
+
+  @override
+  String get backupOpenPageTitle => 'Sicherung öffnen';
+
+  @override
+  String get backupOpenUnlockIntro =>
+      'Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt. Nichts wird wiederhergestellt: Du wählst die Notizen aus, die zurückkommen.';
+
+  @override
+  String get backupOpenStart => 'Öffnen';
+
+  @override
+  String get backupOpenWorking => 'Wird geöffnet … das dauert einen Moment.';
+
+  @override
+  String get backupNotOpened => 'Die Sicherung wurde nicht geöffnet.';
+
+  @override
+  String get backupNotOpenedTitle => 'Sicherung nicht geöffnet';
+
+  @override
+  String get backupOpenDamagedFix =>
+      'Nichts wurde geändert; versuch eine ältere Sicherung.';
+
+  @override
+  String get backupNotesHint =>
+      'Wähl die Notizen aus, die zurückkommen. Jede kommt als Kopie in einen neuen Bereich, mit ihren Dateien; die Notizen auf diesem Gerät bleiben, wie sie sind.';
+
+  @override
+  String get backupNoteTrashed => 'Im Papierkorb';
+
+  @override
+  String get backupSuffix => 'Sicherung';
+
+  @override
+  String get backupNoArea => 'Aus einer Sicherung';
+
+  @override
+  String get backupNotesNotAdded => 'Die Notizen wurden nicht hinzugefügt.';
+
+  @override
+  String get backupNotesNotAddedTitle => 'Notizen nicht hinzugefügt';
+
+  @override
+  String get backupAddDamagedCause =>
+      'Die Sicherungsdatei hat sich geändert oder ließ sich seit dem Öffnen nicht mehr lesen.';
+
+  @override
+  String get backupAddDamagedFix =>
+      'Nichts wurde hinzugefügt; öffne die Sicherung noch einmal.';
 }

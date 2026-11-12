@@ -2392,7 +2392,14 @@ void main() {
           }
 
           boxFrame(privacy177, 'set-up', (tester) async {
-            final t = await start(tester, seed());
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
             await openBackups(tester, t);
             expect(find.byKey(const ValueKey('set-up')), findsOneWidget);
           });
@@ -2415,6 +2422,7 @@ void main() {
               seeded.store,
               _guideDpr,
               folders: DirFolders(dir.path),
+              bundles: FakeBundles(Directory('build')),
             );
             await openBackups(tester, t);
             expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
@@ -2549,7 +2557,14 @@ void main() {
           });
 
           boxFrame(desktop178, 'dialogs', (tester) async {
-            final t = await start(tester, seed());
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seed().store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
             await openBackups(tester, t);
           });
 

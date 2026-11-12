@@ -448,6 +448,16 @@ replace a law of Both apps where they say so. A desktop law marked
   sit on the bar, the size over the tree. A Pack opened shows the same
   tree, all ticked, under who it is from; its ticks ("Add my Profile",
   "Claim as mine") go below their text.
+- **"Open a Backup…"** (#285) is on the Backups page, in a card of its
+  own ("Take Notes back"), set up or not. It picks the file (on
+  Android the file picker starts in the Backups folder), asks for the
+  passphrase or the recovery key as restoring does and refuses what
+  restoring refuses, announced at the top. Then the same page shows the
+  Pack's tree under the Backup's date: no Note ticked, everything under
+  each; a Note from the Backup's Trash says "In the Trash" under its
+  name, not by colour alone. "Untick all" goes back to that start, "Add"
+  is announced as a Pack's and closes the page; a failed Add leaves the
+  page open and the log as it was.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.

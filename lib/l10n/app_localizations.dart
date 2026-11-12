@@ -9607,6 +9607,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep editing'**
   String get leaveKeepEditing;
+
+  /// Title of the card on the Backups page that opens a Backup to take Notes back from it (#285).
+  ///
+  /// In en, this message translates to:
+  /// **'Take Notes back'**
+  String get backupOpenTitle;
+
+  /// Text of the card 'backupOpenTitle' on the Backups page.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup to bring Notes back from it, such as a Note deleted for good or an earlier version of a list. They come back as copies in new Areas; nothing else changes.'**
+  String get backupOpenIntro;
+
+  /// Button on the Backups page that picks a Backup file to take Notes back from it.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup…'**
+  String get backupOpen;
+
+  /// Title of the page that asks for the passphrase or recovery key of a Backup opened to take Notes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a Backup'**
+  String get backupOpenPageTitle;
+
+  /// Text over the passphrase and recovery key fields when a Backup is opened to take Notes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Open it with your passphrase or with the recovery key from the Recovery Sheet. Nothing is restored: you pick the Notes to take back.'**
+  String get backupOpenUnlockIntro;
+
+  /// Button that opens the Backup with the passphrase or recovery key typed.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get backupOpenStart;
+
+  /// Shown beside a spinner while a Backup is opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening… this takes a moment.'**
+  String get backupOpenWorking;
+
+  /// Announced when a Backup could not be opened to take Notes back; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup was not opened.'**
+  String get backupNotOpened;
+
+  /// Title of the dialog behind 'backupNotOpened'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup not opened'**
+  String get backupNotOpenedTitle;
+
+  /// The fix when a Backup opened to take Notes back is damaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was changed; try an older Backup.'**
+  String get backupOpenDamagedFix;
+
+  /// Text over the tree of a Backup's Notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.'**
+  String get backupNotesHint;
+
+  /// Under a Note of a Backup's tree that lay in the Trash when the Backup was made.
+  ///
+  /// In en, this message translates to:
+  /// **'In the Trash'**
+  String get backupNoteTrashed;
+
+  /// Put after the name of a new Area from a Backup when an Area has that name: 'Health (Backup)'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupSuffix;
+
+  /// The name of the new Area for the Notes of a Backup that were in no Area.
+  ///
+  /// In en, this message translates to:
+  /// **'From a Backup'**
+  String get backupNoArea;
+
+  /// Announced when Add on a Backup's Notes failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes were not added.'**
+  String get backupNotesNotAdded;
+
+  /// Title of the dialog behind 'backupNotesNotAdded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes not added'**
+  String get backupNotesNotAddedTitle;
+
+  /// Why the Notes of a Backup were not added.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup file changed or could not be read again since it was opened.'**
+  String get backupAddDamagedCause;
+
+  /// The fix when the Notes of a Backup were not added.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was added; open the Backup again.'**
+  String get backupAddDamagedFix;
 }
 
 class _AppLocalizationsDelegate

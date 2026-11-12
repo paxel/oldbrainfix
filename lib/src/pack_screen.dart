@@ -504,17 +504,22 @@ class _PackImportScreenState extends State<PackImportScreen> {
 /// Area and a Topic as headings, a Note by its kind's icon and its name,
 /// under it its files with their sizes, their texts, its Routines,
 /// Reminders and Frog, and under a Session the Tallies it brought from
-/// outside. An item under a Note that is not ticked cannot be ticked.
+/// outside. An item under a Note that is not ticked cannot be ticked;
+/// a Note in [trashed] says so under its name.
 class PackTreeView extends StatelessWidget {
   final Pack pack;
   final Set<String> ticks;
   final void Function(String key, bool on) onTick;
+
+  /// The Notes said to lie in the Trash: of a Backup opened (#285).
+  final Set<int> trashed;
 
   const PackTreeView({
     super.key,
     required this.pack,
     required this.ticks,
     required this.onTick,
+    this.trashed = const {},
   });
 
   @override
@@ -564,6 +569,11 @@ class PackTreeView extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                subtitle:
+                    item.kind == PackItemKind.note &&
+                        trashed.contains(item.note)
+                    ? Text(t.backupNoteTrashed)
+                    : null,
               ),
             ),
           );

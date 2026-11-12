@@ -75,8 +75,14 @@ class FakeBundles implements BundlePlatform {
     return dismisses ? ShareOutcome.dismissed : ShareOutcome.taken;
   }
 
+  /// The folder each pick was asked to start in.
+  final pickedFrom = <String?>[];
+
   @override
-  Future<String?> pick() async => picks;
+  Future<String?> pick({String? from}) async {
+    pickedFrom.add(from);
+    return picks;
+  }
 
   /// What was handed to the print dialog.
   final printed = <String>[];

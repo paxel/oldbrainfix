@@ -5888,4 +5888,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveKeepEditing => 'Keep editing';
+
+  @override
+  String get backupOpenTitle => 'Take Notes back';
+
+  @override
+  String get backupOpenIntro =>
+      'Open a Backup to bring Notes back from it, such as a Note deleted for good or an earlier version of a list. They come back as copies in new Areas; nothing else changes.';
+
+  @override
+  String get backupOpen => 'Open a Backup…';
+
+  @override
+  String get backupOpenPageTitle => 'Open a Backup';
+
+  @override
+  String get backupOpenUnlockIntro =>
+      'Open it with your passphrase or with the recovery key from the Recovery Sheet. Nothing is restored: you pick the Notes to take back.';
+
+  @override
+  String get backupOpenStart => 'Open';
+
+  @override
+  String get backupOpenWorking => 'Opening… this takes a moment.';
+
+  @override
+  String get backupNotOpened => 'The Backup was not opened.';
+
+  @override
+  String get backupNotOpenedTitle => 'Backup not opened';
+
+  @override
+  String get backupOpenDamagedFix =>
+      'Nothing was changed; try an older Backup.';
+
+  @override
+  String get backupNotesHint =>
+      'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.';
+
+  @override
+  String get backupNoteTrashed => 'In the Trash';
+
+  @override
+  String get backupSuffix => 'Backup';
+
+  @override
+  String get backupNoArea => 'From a Backup';
+
+  @override
+  String get backupNotesNotAdded => 'The Notes were not added.';
+
+  @override
+  String get backupNotesNotAddedTitle => 'Notes not added';
+
+  @override
+  String get backupAddDamagedCause =>
+      'The Backup file changed or could not be read again since it was opened.';
+
+  @override
+  String get backupAddDamagedFix => 'Nothing was added; open the Backup again.';
 }

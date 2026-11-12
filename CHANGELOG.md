@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, Alt+Up and Alt+Down move the Checklist or Shopping List Line the cursor is in one place within its group or the top level, as Move up and Move down in its ⋮ do, and a Line is dragged up or down by the handle beside its ⋮, a line showing where it goes; a Shopping List's open Lines move among the open ones, on the phone too by Move up and Move down in their ⋮, and the struck ones stay where they are.
 - On the desktop, Record keys beside the Settings' hotkey field takes the next keys pressed together as the hotkey, none of the app's own keys working meanwhile and Esc stopping it, while the field still takes the keys typed out.
 - On the phone, Add to home screen in a Tally card's ⋮ puts a shortcut on the home screen that opens the Tally's entry page directly, after the unlock behind the App Lock, and goes back to the home screen once the entry is saved; on the iPhone, Add to the app icon puts the Tally among the actions of the app icon's long press instead.
+- On the phone, Open a Backup… on the Backups page opens a Backup file with the passphrase or the recovery key and shows its Notes as a Pack's tree under its date, those from its Trash marked, and Add brings the ticked ones back as copies in new Areas without restoring the Backup or changing anything else.
 
 ### Changed
 
