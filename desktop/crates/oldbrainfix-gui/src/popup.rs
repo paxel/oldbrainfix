@@ -59,7 +59,8 @@ use egui::{
     RichText, ScrollArea, TextEdit, Ui, ViewportCommand,
 };
 use oldbrainfix_core::{
-    APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic, markdown, text_format,
+    APP_ID, Area, DeviceSettings, Note, Notes, PersonSettings, Places, Store, Topic, markdown,
+    text_format,
 };
 
 use crate::app::{Wall, done_form, failure_form, local_wall, name_field, region_of};
@@ -75,6 +76,7 @@ use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
 use crate::media::{Clipboard, Recorder};
 use crate::media_view::{self, Voice};
+use crate::names::area_name;
 use crate::paste;
 use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
@@ -378,15 +380,19 @@ impl CapturePopup {
             Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
         let places = Places::new(&self.store);
-        let read = places.areas().and_then(|areas| {
-            areas
-                .into_iter()
-                .map(|area| {
-                    let topics = places.topics(&area.id)?;
-                    Ok((area, topics))
-                })
-                .collect::<oldbrainfix_core::Result<Vec<_>>>()
-        });
+        // In the person's own order, as the sidebar has them (#280).
+        let t = self.t;
+        let read = PersonSettings::new(&self.store)
+            .areas_in_order_by(|a| area_name(&t, a))
+            .and_then(|areas| {
+                areas
+                    .into_iter()
+                    .map(|area| {
+                        let topics = places.topics(&area.id)?;
+                        Ok((area, topics))
+                    })
+                    .collect::<oldbrainfix_core::Result<Vec<_>>>()
+            });
         match read {
             Ok(areas) => self.areas = areas,
             Err(e) => self.error = Some(Failure::of(&self.t, &e)),

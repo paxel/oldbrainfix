@@ -2,9 +2,10 @@
 //! dialog, over the quick note and as a page of the capture popup: a
 //! filter field that takes the keyboard, then "Filed into recently" with
 //! the last places this Device filed into while nothing is typed, then
-//! the Areas by name, each with its Topics and, in Advanced for who may
-//! set up a Topic there, "New Topic…", and "New Area…" at the end. A
-//! new place is named here and made, and the Note goes into it.
+//! the Areas in the person's own order (#280), each with its Topics by
+//! name and, in Advanced for who may set up a Topic there, "New
+//! Topic…", and "New Area…" at the end. A new place is named here and
+//! made, and the Note goes into it.
 //!
 //! Enter in the filter takes the first row shown: the latest place filed
 //! into, else the first match, else New Area… with what is typed.
@@ -77,7 +78,8 @@ pub struct FileIntoPicker {
 
 impl FileIntoPicker {
     /// File into… over `areas` with their Topics: only the Areas this
-    /// Device may write in (ADR 0013), by name as `t` shows them, and
+    /// Device may write in (ADR 0013), in the order of `areas`, the
+    /// person's own (#280), their Topics by name as `t` shows them, and
     /// the places it filed into last among them.
     pub fn read(
         store: &Store,
@@ -99,7 +101,6 @@ impl FileIntoPicker {
                 adds_topic: advanced && store.may_manage(Some(&area.id))?,
             });
         }
-        tree.sort_by(|a, b| by_name(&area_name(t, &a.area), &area_name(t, &b.area)));
         let recent = DeviceSettings::new(store)
             .recently_filed_into()?
             .iter()

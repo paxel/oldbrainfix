@@ -282,6 +282,12 @@ enum Clip {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DraggedNotes(pub Vec<String>);
 
+/// What an Area's row in the sidebar carries while it is dragged: the
+/// Area's id, for its new place in the person's own order (#280). A
+/// card's drop files, this one's moves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DraggedArea(String);
+
 /// A Note with the Area and Topic it is filed in, and the Profile of the
 /// other person who wrote it; none for the user's own.
 #[derive(Debug, Clone)]
@@ -719,6 +725,32 @@ impl View {
             .iter()
             .flat_map(|(_, topics)| topics)
             .find(|t| t.id == id)
+    }
+
+    /// Where Move up, or else Move down, puts the Area `id` in the order
+    /// the sidebar shows (#280), counted after it was taken out: none for
+    /// the Area at that end, which stays, and for no Area.
+    fn area_step(&self, id: &str, up: bool) -> Option<usize> {
+        let at = self.areas.iter().position(|(a, _)| a.id == id)?;
+        if up {
+            at.checked_sub(1)
+        } else {
+            (at + 1 < self.areas.len()).then_some(at + 1)
+        }
+    }
+}
+
+/// Where an Area dragged from `from` in the sidebar goes when let go
+/// over the gap `slot` between its rows, 0 above the first and the
+/// number of Areas below the last (#280): its index once taken out,
+/// none in the gaps beside it, where it stays and nothing is written.
+fn area_dropped_at(from: usize, slot: usize) -> Option<usize> {
+    if slot == from || slot == from + 1 {
+        None
+    } else if slot > from {
+        Some(slot - 1)
+    } else {
+        Some(slot)
     }
 }
 
@@ -1249,6 +1281,10 @@ enum Action {
     /// Folds the Topics of this Area in the sidebar, or unfolds them, and
     /// keeps that on this Device (#279).
     FoldArea(String, bool),
+    /// Puts this Area at that index of the person's own order of the
+    /// Areas, counted after it was taken out, on all of their Devices
+    /// (#280).
+    MoveArea(String, usize),
     /// Switches every card of the list shown to the compact view or the
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
@@ -3422,7 +3458,9 @@ impl App {
         let written = match asked {
             FeedbackAsk::Notes(on) => {
                 if on && self.feedback.pack.is_none() {
-                    self.feedback.pack = Some(self.store.pack_of_all(&HashSet::new())?);
+                    // The Areas in the person's own order (#280).
+                    let shown = |a: &Area| area_name(&t, a);
+                    self.feedback.pack = Some(self.store.pack_of_all_by(&HashSet::new(), shown)?);
                 }
                 self.feedback.notes = on;
                 return Ok(());
@@ -5040,7 +5078,10 @@ impl App {
         let mut names = std::collections::HashMap::new();
         let mut shown_people = std::collections::HashMap::new();
         let mut mine = std::collections::HashMap::new();
-        for area in places.areas()? {
+        // In the person's own order (#280), the sidebar's and every list
+        // of Areas read from here.
+        let t = self.t;
+        for area in PersonSettings::new(&self.store).areas_in_order_by(|a| area_name(&t, a))? {
             let topics = places.topics(&area.id)?;
             access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
             if let Some(grants) = self.store.grants_of(&area.id)? {
@@ -5936,6 +5977,11 @@ impl App {
                 } else {
                     self.store.remove_local_setting(&setting)?;
                 }
+            }
+            Action::MoveArea(area, index) => {
+                let t = self.t;
+                PersonSettings::new(&self.store)
+                    .move_area_by(&area, index, |a| area_name(&t, a))?;
             }
             Action::SwitchView(id) => {
                 if let Some(key) = self.cards_key() {
@@ -8867,6 +8913,13 @@ impl App {
                 .place_menu()
                 .filter(|p| p.manages && !typing && !egui::Popup::is_any_open(ui.ctx()))
                 .map(|p| p.id);
+            // Alt+Up and Alt+Down move the Area shown in the person's own
+            // order, whoever manages it (#280); taken before the list's
+            // Up and Down, which take them with Alt too.
+            let moves = self
+                .place_menu()
+                .filter(|p| p.area && !typing && !egui::Popup::is_any_open(ui.ctx()))
+                .map(|p| p.id);
             // Esc over the list drops the cards selected (#148); over a
             // dialog or menu it is theirs, in a field the field's.
             let clears = self.top_dialog().is_none()
@@ -8896,6 +8949,16 @@ impl App {
                 // field and over a menu it rests.
                 if let Some(id) = renames.filter(|_| i.consume_key(Modifiers::NONE, Key::F2)) {
                     actions.push(Action::Rename(id));
+                }
+                if let Some(id) = &moves {
+                    for (key, up) in [(Key::ArrowUp, true), (Key::ArrowDown, false)] {
+                        // At an end the Area stays.
+                        if i.consume_key(Modifiers::ALT, key)
+                            && let Some(index) = self.view.area_step(id, up)
+                        {
+                            actions.push(Action::MoveArea(id.clone(), index));
+                        }
+                    }
                 }
                 // Ctrl+Shift+M before Ctrl+M, which takes it with Shift too
                 // (#274).
@@ -9099,12 +9162,19 @@ impl App {
                     }
                 });
                 ui.add_space(4.0);
+                let mut blocks = Vec::new();
                 for (area, topics) in &self.view.areas {
                     let colour = area_colour(area.colour.as_deref()).unwrap_or(text);
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
                     let name = area_name(&t, area);
-                    let resp = row(ui, tones, on, 0.0, icon, &name, true);
+                    // Dragged by its row into the person's own order
+                    // (#280); a card dropped on it files.
+                    let resp = row(ui, tones, on, 0.0, icon, &name, true)
+                        .interact(Sense::click_and_drag());
+                    if resp.drag_started() {
+                        egui::DragAndDrop::set_payload(ui.ctx(), DraggedArea(area.id.clone()));
+                    }
                     place_row(&resp, &area.id, actions);
                     // The chevron at its end folds or unfolds its Topics,
                     // which this Device keeps (#279).
@@ -9148,6 +9218,14 @@ impl App {
                                 (t.share_area(), Action::Share(area.id.clone())),
                             ]);
                         }
+                        // The order is the person's own, so every Area
+                        // moves, a Shared one too; not past an end
+                        // (#280).
+                        for (label, up) in [(t.area_move_up(), true), (t.area_move_down(), false)] {
+                            if let Some(index) = self.view.area_step(&area.id, up) {
+                                items.push((label, Action::MoveArea(area.id.clone(), index)));
+                            }
+                        }
                         // Copies of what anyone may read (#165).
                         items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
                         if people.is_some() {
@@ -9164,6 +9242,7 @@ impl App {
                             }
                         }
                     });
+                    let row_rect = resp.rect;
                     for topic in topics {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         // A folded Area still shows the Topic shown, which
@@ -9192,7 +9271,13 @@ impl App {
                             }
                         });
                     }
+                    blocks.push(AreaRows {
+                        id: area.id.clone(),
+                        row: row_rect,
+                        bottom: ui.min_rect().bottom(),
+                    });
                 }
+                area_drop(ui, tones, &blocks, actions);
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
                 let trash = Some((icons::OPEN_TRASH, text));
@@ -9858,6 +9943,31 @@ impl App {
                         None,
                         place.is_some(),
                         Action::ExportPack(id.clone()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                // Any Area moves, a Shared one too; not past an end
+                // (#280).
+                let step = |up| {
+                    place
+                        .as_ref()
+                        .filter(|p| p.area)
+                        .and_then(|p| self.view.area_step(&p.id, up))
+                };
+                let (up, down) = (step(true), step(false));
+                let items = [
+                    (
+                        t.area_move_up(),
+                        keys_with(Modifiers::ALT, Key::ArrowUp),
+                        up.is_some(),
+                        Action::MoveArea(id.clone(), up.unwrap_or_default()),
+                    ),
+                    (
+                        t.area_move_down(),
+                        keys_with(Modifiers::ALT, Key::ArrowDown),
+                        down.is_some(),
+                        Action::MoveArea(id.clone(), down.unwrap_or_default()),
                     ),
                 ];
                 menu_entries(ui, items, actions);
@@ -13592,6 +13702,10 @@ impl App {
     /// The card's text next to the pointer while a card is dragged, and
     /// how many go while several are (#148).
     fn dragged(&self, ctx: &egui::Context, tones: Tones) {
+        if let Some(area) = egui::DragAndDrop::payload::<DraggedArea>(ctx) {
+            self.dragged_area(ctx, tones, &area.0);
+            return;
+        }
         let Some(dragged) = egui::DragAndDrop::payload::<DraggedNotes>(ctx) else {
             return;
         };
@@ -13623,6 +13737,31 @@ impl App {
                             ui.label(RichText::new(many).strong().color(text));
                         }
                         ui.label(RichText::new(placed.note.visible_text()).color(text));
+                    });
+            });
+    }
+
+    /// The name of the Area `id` next to the pointer while its row is
+    /// dragged in the sidebar (#280).
+    fn dragged_area(&self, ctx: &egui::Context, tones: Tones, id: &str) {
+        let (Some(area), Some(pos)) = (self.view.area(id), ctx.pointer_interact_pos()) else {
+            return;
+        };
+        let name = area_name(&self.t, area);
+        ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+        egui::Area::new(Id::new("dragged"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(pos + egui::vec2(14.0, 14.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                Frame::NONE
+                    .fill(tones.card)
+                    .corner_radius(8)
+                    .inner_margin(Margin::same(8))
+                    .show(ui, |ui| {
+                        ui.set_max_width(240.0);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(name).color(text));
                     });
             });
     }
@@ -13668,11 +13807,61 @@ fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
     if resp.clicked() {
         actions.push(Action::Select(Selection::Place(place.to_string())));
     }
-    if let Some(dragged) = resp.dnd_release_payload::<DraggedNotes>() {
+    // egui takes whatever is carried before it looks at its kind, so an
+    // Area dragged over the row stays carried for its own drop (#280).
+    let cards = egui::DragAndDrop::has_payload_of_type::<DraggedNotes>(&resp.ctx);
+    if cards && let Some(dragged) = resp.dnd_release_payload::<DraggedNotes>() {
         actions.push(Action::File {
             notes: dragged.0.clone(),
             place: place.to_string(),
         });
+    }
+}
+
+/// An Area's rows in the sidebar, for where a dragged Area goes (#280):
+/// its id, its own row and the bottom of what follows it, its Topics
+/// and who shares it.
+struct AreaRows {
+    id: String,
+    row: egui::Rect,
+    bottom: f32,
+}
+
+/// The drop of an Area dragged by its row in the sidebar (#280): a line
+/// in the gap between the Areas it would go into, and its move there
+/// once let go. Away from the Areas, and in the gaps beside the Area
+/// itself, it stays and nothing is written.
+fn area_drop(ui: &mut Ui, tones: Tones, blocks: &[AreaRows], actions: &mut Vec<Action>) {
+    let Some(dragged) = egui::DragAndDrop::payload::<DraggedArea>(ui.ctx()) else {
+        return;
+    };
+    let (Some(first), Some(last), Some(pos)) = (
+        blocks.first(),
+        blocks.last(),
+        ui.ctx().pointer_interact_pos(),
+    ) else {
+        return;
+    };
+    let around = egui::Rect::from_x_y_ranges(
+        first.row.x_range(),
+        (first.row.top() - 15.0)..=(last.bottom + 15.0),
+    );
+    let Some(from) = blocks.iter().position(|b| b.id == dragged.0) else {
+        return;
+    };
+    // The gap above the first Area whose row's middle lies below the
+    // pointer: over an Area's Topics, the one after it.
+    let slot = blocks.iter().filter(|b| b.row.center().y < pos.y).count();
+    let Some(index) = area_dropped_at(from, slot).filter(|_| around.contains(pos)) else {
+        return;
+    };
+    let y = blocks
+        .get(slot)
+        .map_or(last.bottom + 2.0, |b| b.row.top() - 2.0);
+    let line = egui::Stroke::new(2.0, tones.accent);
+    ui.painter().hline(first.row.x_range(), y, line);
+    if ui.input(|i| i.pointer.any_released()) {
+        actions.push(Action::MoveArea(dragged.0.clone(), index));
     }
 }
 

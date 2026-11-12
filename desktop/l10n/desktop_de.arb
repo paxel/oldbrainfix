@@ -335,5 +335,7 @@
   "menuAiPort": "KI-Port …",
   "sidebarUnsorted": "Unsortiert {count}",
   "areaTopicsFold": "Themen von {area} einklappen",
-  "areaTopicsUnfold": "Themen von {area} aufklappen"
+  "areaTopicsUnfold": "Themen von {area} aufklappen",
+  "areaMoveUp": "Nach oben verschieben",
+  "areaMoveDown": "Nach unten verschieben"
 }

@@ -624,5 +624,9 @@
   "areaTopicsFold": "Hide the Topics of {area}",
   "@areaTopicsFold": {"description": "The chevron beside an Area in the desktop's sidebar while its Topics show (#279): what a screen reader hears and the tooltip.", "placeholders": {"area": {"type": "String"}}},
   "areaTopicsUnfold": "Show the Topics of {area}",
-  "@areaTopicsUnfold": {"description": "The chevron beside an Area in the desktop's sidebar while its Topics are folded (#279).", "placeholders": {"area": {"type": "String"}}}
+  "@areaTopicsUnfold": {"description": "The chevron beside an Area in the desktop's sidebar while its Topics are folded (#279).", "placeholders": {"area": {"type": "String"}}},
+  "areaMoveUp": "Move up",
+  "@areaMoveUp": {"description": "In the desktop's Area menu and an Area's right-click in the sidebar (#280): moves the Area one place up in the person's own order of the Areas; Alt+Up does the same."},
+  "areaMoveDown": "Move down",
+  "@areaMoveDown": {"description": "In the desktop's Area menu and an Area's right-click in the sidebar (#280): moves the Area one place down in the person's own order of the Areas; Alt+Down does the same."}
 }

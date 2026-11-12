@@ -1219,7 +1219,14 @@ replace a law of Both apps where they say so. A desktop law marked
   People), and all of them while no Area or Topic shows or a dialog
   lies over the list, the Note dialog included, so that none acts on a
   place behind it. F2 rests in a text field and while a menu is open.
-  The sidebar's right-click stays, and keeps New Topic.
+  The sidebar's right-click stays, and keeps New Topic. Move up
+  (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
+  the person's own order (#280), for whoever is in it, greyed for a
+  Topic and at the ends, where the right-click leaves them out.
+- **The sidebar's Areas are dragged by their rows** (#280, Q676): a
+  line shows the gap the Area goes into; let go where it stands or
+  away from the Areas, it stays and nothing is written. A card dropped
+  on an Area's row files there instead.
 - **The AI menu leads to the AI port** (#279): AI port… opens the
   Settings at the AI port's card, and Review the AI Task shows the
   review of the AI Task that waits, greyed while none waits or the port

@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 
 use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
 use oldbrainfix_core::app_link::AppLink;
-use oldbrainfix_core::{Notes, Places, Result, Store};
+use oldbrainfix_core::{Notes, PersonSettings, Places, Result, Store};
 
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -83,7 +83,8 @@ pub fn targets(store: &Store, t: &L10n, advanced: bool) -> Result<Vec<Target>> {
     }
     out.push(page(AppLink::Guide(None, None), t.link_to_guide()));
     let places = Places::new(store);
-    for area in places.areas()? {
+    // In the person's own order, as the sidebar has them (#280).
+    for area in PersonSettings::new(store).areas_in_order_by(|a| area_name(t, a))? {
         let name = area_name(t, &area);
         let topics = places.topics(&area.id)?;
         out.push(Target {
