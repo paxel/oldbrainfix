@@ -5827,4 +5827,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String notesSelected(int count) {
     return '$count selected';
   }
+
+  @override
+  String get leaveDiscardTitle => 'Discard changes?';
+
+  @override
+  String get leaveDiscardBody =>
+      'It can\'t be saved as it is, so leaving drops it.';
+
+  @override
+  String get leaveDiscard => 'Discard';
+
+  @override
+  String get leaveKeepEditing => 'Keep editing';
 }

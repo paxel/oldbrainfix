@@ -1574,5 +1574,9 @@
   "selectNotes": "Auswählen",
   "selectNote": "Diese Notiz auswählen",
   "stopSelecting": "Auswahl beenden",
-  "notesSelected": "{count} ausgewählt"
+  "notesSelected": "{count} ausgewählt",
+  "leaveDiscardTitle": "Änderungen verwerfen?",
+  "leaveDiscardBody": "So lässt es sich nicht speichern; beim Verlassen geht es verloren.",
+  "leaveDiscard": "Verwerfen",
+  "leaveKeepEditing": "Weiter bearbeiten"
 }

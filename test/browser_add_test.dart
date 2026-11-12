@@ -547,25 +547,80 @@ void main() {
     }
   });
 
-  group('leaving without saving makes nothing', () {
-    testWidgets('the name dialogs, the Tally and the Session', (tester) async {
+  group('leaving (#275)', () {
+    final discardDialog = find.text('Discard changes?');
+
+    Future<void> back(WidgetTester tester) async {
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a name dialog left with Cancel, or a page left as it '
+        'opened, makes nothing', (tester) async {
       await openPage(tester, _Page.area);
       for (final kind in [NewKind.checklist, NewKind.shopping, NewKind.frog]) {
         await pick(tester, kind);
         await tap(tester, find.text('Cancel'));
       }
       await pick(tester, NewKind.tally);
-      await tester.enterText(key('tally-form-name'), 'Reading');
-      await tester.enterText(key('tally-form-field-name-0'), 'Pages');
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await back(tester);
       await pick(tester, NewKind.session);
-      await tester.enterText(key('session-form-name'), 'Morning');
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await back(tester);
+      expect(discardDialog, findsNothing);
+      expect(find.byType(SessionFormScreen), findsNothing);
       expect(notes.all(), isEmpty);
       expect(Routines(store).all(), isEmpty);
       expect(Frogs(store).open(), isEmpty);
+    });
+
+    testWidgets('the Tally page saves by Back', (tester) async {
+      await openPage(tester, _Page.area);
+      await pick(tester, NewKind.tally);
+      await tester.enterText(key('tally-form-name'), 'Reading');
+      await tester.enterText(key('tally-form-field-name-0'), 'Pages');
+      await back(tester);
+      expect(discardDialog, findsNothing);
+      expect(find.byType(TallyFormScreen), findsNothing);
+      expect(only().place, home.id);
+      final fields = Tallies(store).byNote(only().id)!.fields;
+      expect(fields.map((f) => f.name), ['Pages']);
+    });
+
+    testWidgets('the Tally page without a name asks; Keep editing shows what '
+        'to fix, Discard makes nothing', (tester) async {
+      await openPage(tester, _Page.area);
+      await pick(tester, NewKind.tally);
+      await tester.enterText(key('tally-form-field-name-0'), 'Pages');
+      await back(tester);
+      expect(discardDialog, findsOneWidget);
+      await tap(tester, key('leave-keep-editing'));
+      expect(find.byType(TallyFormScreen), findsOneWidget);
+      expect(find.text('Give it a name.'), findsOneWidget);
+      await back(tester);
+      await tap(tester, key('leave-discard'));
+      expect(find.byType(TallyFormScreen), findsNothing);
+      expect(notes.all(), isEmpty);
+    });
+
+    testWidgets('the Session page asks while no Tally is ticked, then saves '
+        'by Back', (tester) async {
+      final reading = notes.capture('Reading', place: home.id).id;
+      Tallies(store).addField(reading, name: 'Pages');
+      await openPage(tester, _Page.area);
+      await pick(tester, NewKind.session);
+      await tester.enterText(key('session-form-name'), 'Morning');
+      await back(tester);
+      expect(discardDialog, findsOneWidget);
+      await tap(tester, key('leave-keep-editing'));
+      expect(key('session-pool-error'), findsOneWidget);
+      expect(Sessions(store).all(), isEmpty);
+
+      await tap(tester, key('session-pool-$reading'));
+      await back(tester);
+      expect(discardDialog, findsNothing);
+      expect(find.byType(SessionFormScreen), findsNothing);
+      final session = Sessions(store).all().single;
+      expect(session.pool, [reading]);
     });
   });
 }

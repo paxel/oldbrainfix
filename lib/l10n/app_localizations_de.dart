@@ -5897,4 +5897,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String notesSelected(int count) {
     return '$count ausgewählt';
   }
+
+  @override
+  String get leaveDiscardTitle => 'Änderungen verwerfen?';
+
+  @override
+  String get leaveDiscardBody =>
+      'So lässt es sich nicht speichern; beim Verlassen geht es verloren.';
+
+  @override
+  String get leaveDiscard => 'Verwerfen';
+
+  @override
+  String get leaveKeepEditing => 'Weiter bearbeiten';
 }

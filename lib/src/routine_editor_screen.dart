@@ -8,6 +8,7 @@ import 'calendar_platform.dart';
 import 'capture_choices.dart';
 import 'iphone_words.dart';
 import 'l10n.dart';
+import 'leave_saves.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
@@ -53,8 +54,9 @@ Future<bool> spawnFromNote(
 
 /// Opens the editor of a new Routine, Reminder or Session ([spawn]) for
 /// the Note being captured, [draft], which is not written yet (#113):
-/// Save hands back what was set up, for Capture to write with the Note;
-/// null when it was left without Save.
+/// Save, or leaving with a change that can be saved (#275), hands back
+/// what was set up, for Capture to write with the Note; null when it was
+/// left unchanged or discarded.
 Future<ScheduleChoice?> chooseSchedule(
   BuildContext context,
   Notes notes,
@@ -112,8 +114,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// when ignored: its own interval or this Device's default from
 /// Settings. A folded Escalation section below it turns on the
 /// full-screen alarm after a number of ignored Re-nags (3 when first
-/// turned on). Save writes the Routine; leaving without saving drops the
-/// edit. A saved Routine's history
+/// turned on). Save writes the Routine, and so does leaving by Back with
+/// a change that can be saved (#275); one that can't, no text, no
+/// weekday or a changed schedule that never happens, asks once whether
+/// to discard it. A saved Routine's history
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
 ///
@@ -235,6 +239,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// The chips a new Reminder offers, at the last change (#271).
   List<QuickReminder> _quick = const [];
 
+  /// The schedule and the whole edit as the page opened, to tell on
+  /// leaving whether anything changed (#275).
+  late final String _scheduleAsOpened;
+  late final String _asOpened;
+
   @override
   void initState() {
     super.initState();
@@ -276,6 +285,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     }
     _text.addListener(_typed);
     _update();
+    _scheduleAsOpened = _scheduleKey();
+    _asOpened = _editKey();
   }
 
   @override
@@ -501,6 +512,36 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _change(() => _times = [..._times, ClockTime(picked.hour, picked.minute)]);
   }
 
+  /// The schedule edited, as text, to tell whether it changed.
+  String _scheduleKey() => switch (_schedule) {
+    final s? => '${s.start}|${s.times.join(',')}|${s.rule?.format() ?? ''}',
+    null => 'none|$_advanced|${_rule.text.trim()}',
+  };
+
+  /// Everything Save writes, as text, to tell whether it changed.
+  String _editKey() => [
+    _scheduleKey(),
+    _renag?.inMinutes ?? '',
+    _escalation ?? '',
+    _text.text.trim(),
+    _draft?.signature ?? '',
+  ].join('\n');
+
+  bool _changed() => !_locked && _editKey() != _asOpened;
+
+  /// Whether leaving may save (#275): what Save takes, a new Session's
+  /// pool chosen, and a schedule that still happens, unless it is the
+  /// one the page opened with, such as a past Reminder's.
+  bool _leaveValid() =>
+      _canSave &&
+      (_draft?.valid ?? true) &&
+      (_next.isNotEmpty || _scheduleKey() == _scheduleAsOpened);
+
+  /// Keep editing: a new Session's pool shows its error.
+  void _keepEditing() {
+    if (_draft case final draft?) setState(() => draft.checked = true);
+  }
+
   /// A Routine saves whatever became of its Note; a new one needs a Note
   /// in the lists to spawn from, or a text for one.
   bool get _canSave {
@@ -624,32 +665,41 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ? (once ? t.newReminder : t.newRoutine)
             : (once ? t.reminder : t.routine));
     final note = _note;
-    return Scaffold(
-      appBar: pageBar(
-        context,
-        title: title,
-        actions: [
-          if (routine != null)
-            CalendarButton(choices: () => _calendarChoices(routine)),
-          if (routine != null && !routine.isReminder)
-            IconButton(
-              tooltip: t.historyTitle,
-              onPressed: () => openHistory(context, widget.notes, routine),
-              icon: const Icon(Icons.history),
-            ),
-          if (routine != null && !_locked)
-            IconButton(
-              tooltip: t.delete,
-              onPressed: _delete,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          if (!_locked)
-            TextButton(onPressed: _canSave ? _save : null, child: Text(t.save)),
-        ],
-      ),
-      body: AbsorbPointer(
-        absorbing: _locked,
-        child: _body(context, t, locale, routine, note, once: once),
+    return LeaveSaves(
+      changed: _changed,
+      valid: _leaveValid,
+      save: _save,
+      onKeep: _keepEditing,
+      child: Scaffold(
+        appBar: pageBar(
+          context,
+          title: title,
+          actions: [
+            if (routine != null)
+              CalendarButton(choices: () => _calendarChoices(routine)),
+            if (routine != null && !routine.isReminder)
+              IconButton(
+                tooltip: t.historyTitle,
+                onPressed: () => openHistory(context, widget.notes, routine),
+                icon: const Icon(Icons.history),
+              ),
+            if (routine != null && !_locked)
+              IconButton(
+                tooltip: t.delete,
+                onPressed: _delete,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            if (!_locked)
+              TextButton(
+                onPressed: _canSave ? _save : null,
+                child: Text(t.save),
+              ),
+          ],
+        ),
+        body: AbsorbPointer(
+          absorbing: _locked,
+          child: _body(context, t, locale, routine, note, once: once),
+        ),
       ),
     );
   }

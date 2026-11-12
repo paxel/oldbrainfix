@@ -3111,5 +3111,12 @@
     "placeholders": {
       "count": {"type": "int"}
     }
-  }
+  },
+  "leaveDiscardTitle": "Discard changes?",
+  "@leaveDiscardTitle": {"description": "Title of the dialog asked when an edit page that cannot be saved as it is is left by Back."},
+  "leaveDiscardBody": "It can't be saved as it is, so leaving drops it.",
+  "leaveDiscard": "Discard",
+  "@leaveDiscard": {"description": "Button of the leave dialog that closes the page without saving."},
+  "leaveKeepEditing": "Keep editing",
+  "@leaveKeepEditing": {"description": "Button of the leave dialog that stays on the page."}
 }

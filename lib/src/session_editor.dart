@@ -147,6 +147,16 @@ class SessionDraft {
 
   bool get valid => pool.isNotEmpty;
 
+  /// What it holds, as text, to tell whether it changed (#275); the
+  /// filter is a view and does not count.
+  String get signature => [
+    pool.join(','),
+    count,
+    [for (final day in counts.keys.toList()..sort()) '$day:${counts[day]}']
+        .join(','),
+    rule.name,
+  ].join('|');
+
   /// Whether the picker is ordered by hand for Rolling: with more than
   /// one Tally and no [filter].
   bool get ordersByHand =>

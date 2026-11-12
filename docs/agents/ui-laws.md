@@ -37,8 +37,14 @@ replace a law of Both apps where they say so. A desktop law marked
   show, ticks the filter hides stay and a line counts them, "New Tally"
   starts its name with the tags picked, and Rolling's order moves only
   unfiltered. The filter is a view, kept while the page is open, never
-  stored. Leaving a name dialog or one of
-  the pages without Create or Save makes nothing.
+  stored. Leaving a name dialog without Create makes nothing. **Leaving
+  saves what is valid and asks only about what isn't** (#275, Q658):
+  the Tally and Session pages, the Routine editor and a Tally entry,
+  left by Back, the swipe back or the bar's arrow, save as their Save
+  does once something changed; when it can't be saved, a schedule that
+  never happens or an empty required value, they ask once "Discard
+  changes?", Discard or Keep editing, which shows what to fix. Left as
+  they opened they make nothing; a Tally made on the way stays.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'leave_saves.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
@@ -86,7 +87,10 @@ class _SetDraft {
 /// a set after the first can be removed. Then the date it counts for,
 /// today for a new one, and one line of text. A value left empty is
 /// none. An entry that exists has Delete in the bar, which asks once; it
-/// can be restored. Leaving without Save changes nothing.
+/// can be restored. Leaving by Back saves a
+/// change as Save does (#275); one that can't be saved, a value that is
+/// no number or a new entry left empty, asks once whether to discard it.
+/// Left as it opened, targets and all, it writes nothing.
 ///
 /// With [record], a new entry is saved through it instead, such as for a
 /// Session's pick (ADR 0029); it counts for now, so the date does not
@@ -131,6 +135,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
 
   /// The sets as the page opened, to write only what changed.
   var _asOpened = const <Map<String, String>>[];
+  late final Map<String, bool> _ticksAsOpened;
   late final _line = TextEditingController(text: _entry?.line ?? '');
   final _lineFocus = FocusNode();
 
@@ -152,6 +157,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
   void initState() {
     super.initState();
     _dayAsOpened = _day;
+    _ticksAsOpened = {..._ticked};
   }
 
   @override
@@ -227,7 +233,33 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     );
   }
 
-  void _save() {
+  /// Whether anything differs from the page as it opened (#275).
+  bool _changed() {
+    if (_day != _dayAsOpened) return true;
+    if (_line.text.trim() != (_entry?.line ?? '').trim()) return true;
+    for (final MapEntry(:key, :value) in _ticked.entries) {
+      if (_ticksAsOpened[key] != value) return true;
+    }
+    if (_sets.length != _asOpened.length) return true;
+    for (final (i, set) in _sets.indexed) {
+      for (final field in _fields) {
+        final typed = set.values[field.id]?.text.trim() ?? '';
+        if (typed != (_asOpened[i][field.id] ?? '').trim()) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Whether Save would save: every value a number or empty, and a new
+  /// entry not empty.
+  bool _valid() {
+    final (:parsed, :invalid) = _parse();
+    return invalid.isEmpty && !_isEmpty(parsed);
+  }
+
+  /// The values of each set, null where empty or no number, and the
+  /// values that are no number, as `<set>:<field id>`.
+  ({List<Map<String, double?>> parsed, Set<String> invalid}) _parse() {
     final parsed = <Map<String, double?>>[];
     final invalid = <String>{};
     for (final (i, set) in _sets.indexed) {
@@ -244,13 +276,21 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
       }
       parsed.add(row);
     }
+    return (parsed: parsed, invalid: invalid);
+  }
+
+  /// A new entry with nothing in it.
+  bool _isEmpty(List<Map<String, double?>> parsed) =>
+      _entry == null &&
+      _line.text.trim().isEmpty &&
+      !_ticked.values.any((on) => on) &&
+      parsed.every((row) => row.values.every((value) => value == null));
+
+  void _save() {
+    final (:parsed, :invalid) = _parse();
     final line = _line.text.trim();
     final entry = _entry;
-    final empty =
-        entry == null &&
-        line.isEmpty &&
-        !_ticked.values.any((on) => on) &&
-        parsed.every((row) => row.values.every((value) => value == null));
+    final empty = _isEmpty(parsed);
     setState(() {
       _invalid = invalid;
       _empty = empty && invalid.isEmpty;
@@ -382,94 +422,101 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final date = DateFormat.yMMMEd(Localizations.localeOf(context).toString());
     final countsInSets = _tally?.countsInSets ?? false;
     final inSets = countsInSets || _sets.length > 1;
-    return Scaffold(
-      appBar: pageBar(
-        context,
-        title: entry == null ? t.tallyNewEntry : t.tallyEntry,
-        actions: [
-          if (entry != null && store.mayChange(entry.id))
-            IconButton(
-              key: const ValueKey('tally-entry-trash'),
-              tooltip: t.delete,
-              onPressed: () => _delete(entry),
-              icon: const Icon(Icons.delete_outline),
-            ),
-          TextButton(
-            key: const ValueKey('tally-entry-save'),
-            onPressed: _save,
-            child: Text(t.save),
-          ),
-        ],
-      ),
-      // A short page, built whole, so a field to fix can come into view.
-      body: SingleChildScrollView(
-        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_checks.isNotEmpty)
-              EditorPanel(
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: Column(
-                    children: [
-                      for (final field in _checks)
-                        CheckboxListTile(
-                          key: ValueKey('tally-check-${field.id}'),
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(field.name),
-                          value: _ticked[field.id] ?? false,
-                          onChanged: (on) =>
-                              setState(() => _ticked[field.id] = on ?? false),
-                        ),
-                    ],
-                  ),
-                ),
+    return LeaveSaves(
+      changed: _changed,
+      valid: _valid,
+      save: _save,
+      // Save shows what to fix without saving.
+      onKeep: _save,
+      child: Scaffold(
+        appBar: pageBar(
+          context,
+          title: entry == null ? t.tallyNewEntry : t.tallyEntry,
+          actions: [
+            if (entry != null && store.mayChange(entry.id))
+              IconButton(
+                key: const ValueKey('tally-entry-trash'),
+                tooltip: t.delete,
+                onPressed: () => _delete(entry),
+                icon: const Icon(Icons.delete_outline),
               ),
-            for (var i = 0; i < _sets.length; i++) ..._setFields(i, inSets),
-            if (countsInSets && _fields.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
-                    key: const ValueKey('tally-add-set'),
-                    onPressed: _sets.length < TallyKeys.maxSets
-                        ? _addSet
-                        : null,
-                    icon: const Icon(Icons.add),
-                    label: Text(t.tallyAddSet),
-                  ),
-                ),
-              ),
-            if (entry != null || widget.record == null)
-              EditorPanel(
-                heading: t.tallyEntryDate,
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    key: const ValueKey('tally-entry-date'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_outlined),
-                    title: Text(date.format(_day)),
-                    onTap: _pickDay,
-                  ),
-                ),
-              ),
-            EditorPanel(
-              child: TextField(
-                key: const ValueKey('tally-entry-line'),
-                controller: _line,
-                focusNode: _lineFocus,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: t.tallyEntryLine,
-                  errorText: _empty ? t.tallyEntryEmpty : null,
-                ),
-              ),
+            TextButton(
+              key: const ValueKey('tally-entry-save'),
+              onPressed: _save,
+              child: Text(t.save),
             ),
           ],
+        ),
+        // A short page, built whole, so a field to fix can come into view.
+        body: SingleChildScrollView(
+          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_checks.isNotEmpty)
+                EditorPanel(
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Column(
+                      children: [
+                        for (final field in _checks)
+                          CheckboxListTile(
+                            key: ValueKey('tally-check-${field.id}'),
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: Text(field.name),
+                            value: _ticked[field.id] ?? false,
+                            onChanged: (on) =>
+                                setState(() => _ticked[field.id] = on ?? false),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              for (var i = 0; i < _sets.length; i++) ..._setFields(i, inSets),
+              if (countsInSets && _fields.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      key: const ValueKey('tally-add-set'),
+                      onPressed: _sets.length < TallyKeys.maxSets
+                          ? _addSet
+                          : null,
+                      icon: const Icon(Icons.add),
+                      label: Text(t.tallyAddSet),
+                    ),
+                  ),
+                ),
+              if (entry != null || widget.record == null)
+                EditorPanel(
+                  heading: t.tallyEntryDate,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      key: const ValueKey('tally-entry-date'),
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_outlined),
+                      title: Text(date.format(_day)),
+                      onTap: _pickDay,
+                    ),
+                  ),
+                ),
+              EditorPanel(
+                child: TextField(
+                  key: const ValueKey('tally-entry-line'),
+                  controller: _line,
+                  focusNode: _lineFocus,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: t.tallyEntryLine,
+                    errorText: _empty ? t.tallyEntryEmpty : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

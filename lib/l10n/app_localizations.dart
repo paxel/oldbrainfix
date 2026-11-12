@@ -9499,6 +9499,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} selected'**
   String notesSelected(int count);
+
+  /// Title of the dialog asked when an edit page that cannot be saved as it is is left by Back.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get leaveDiscardTitle;
+
+  /// No description provided for @leaveDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It can\'t be saved as it is, so leaving drops it.'**
+  String get leaveDiscardBody;
+
+  /// Button of the leave dialog that closes the page without saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get leaveDiscard;
+
+  /// Button of the leave dialog that stays on the page.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get leaveKeepEditing;
 }
 
 class _AppLocalizationsDelegate
