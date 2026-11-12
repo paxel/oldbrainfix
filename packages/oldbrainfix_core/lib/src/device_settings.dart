@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'nudges.dart';
 import 'schedule.dart';
+import 'schedule_sentence.dart';
 import 'shopping_lists.dart';
 import 'store.dart';
 import 'tally_units.dart';
@@ -82,6 +83,9 @@ extension DeviceSettings on Store {
   /// When all-day Occurrences start to ring when nothing else is set
   /// (#201).
   static final defaultAllDayFrom = ClockTime(15, 0);
+
+  /// When the day starts without Quiet Hours (#271).
+  static final defaultDayStart = ClockTime(9, 0);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -165,6 +169,22 @@ extension DeviceSettings on Store {
   bool get quietHoursOn => localSetting(_quietHoursOff) != 'true';
 
   set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
+
+  /// When this Device's day starts, at which a Reminder for "tomorrow"
+  /// rings (#271): when its Quiet Hours end, or 09:00 while they are
+  /// switched off or empty.
+  ClockTime get dayStart {
+    final quiet = quietHours;
+    return quietHoursOn && quiet.start != quiet.end
+        ? quiet.end
+        : defaultDayStart;
+  }
+
+  /// Now by the store's clock on [wallClock], with this Device's
+  /// [dayStart]: what the schedule sentence's relative words and the
+  /// quick Reminder chips are read at (#271).
+  SentenceNow sentenceNow(WallClock wallClock) =>
+      SentenceNow.at(wallClock(clock().toUtc()), dayStart);
 
   /// From when on this Device an all-day Occurrence rings, on the wall
   /// clock; before that it only shows on the Agenda (#201).

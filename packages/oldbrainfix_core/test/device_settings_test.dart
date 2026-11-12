@@ -38,6 +38,26 @@ void main() {
     expect(store.allDayFrom, ClockTime(15, 0), reason: 'unreadable: default');
   });
 
+  test('the day starts when the Quiet Hours end, at 09:00 without them', () {
+    final store = Store.inMemory(
+      clock: () => DateTime.utc(2026, 11, 3, 13, 20, 59),
+    );
+    addTearDown(store.close);
+    expect(store.dayStart, ClockTime(8, 0), reason: 'default 22:00-08:00');
+    store.quietHours = QuietHours(ClockTime(23, 30), ClockTime(6, 45));
+    expect(store.dayStart, ClockTime(6, 45));
+    // Now on the wall clock, an hour ahead of UTC here, to the minute.
+    expect(
+      store.sentenceNow((utc) => utc.add(const Duration(hours: 1))),
+      SentenceNow(Day(2026, 11, 3), ClockTime(14, 20), ClockTime(6, 45)),
+    );
+    store.quietHours = QuietHours(ClockTime(7, 0), ClockTime(7, 0));
+    expect(store.dayStart, ClockTime(9, 0), reason: 'empty');
+    store.quietHours = QuietHours(ClockTime(23, 30), ClockTime(6, 45));
+    store.quietHoursOn = false;
+    expect(store.dayStart, ClockTime(9, 0), reason: 'switched off');
+  });
+
   test('the Starter Set is offered until this Device has offered it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

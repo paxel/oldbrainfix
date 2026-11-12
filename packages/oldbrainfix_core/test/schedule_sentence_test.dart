@@ -265,7 +265,15 @@ void main() {
 
   group('suggestions', () {
     test('the next word', () {
-      expect(suggested('', 'en'), ['Once', 'Every', 'Weekdays']);
+      expect(suggested('', 'en'), [
+        'Once',
+        'Every',
+        'Weekdays',
+        'Today',
+        'Tonight',
+        'Tomorrow',
+        'In',
+      ]);
       expect(suggested('Ev', 'en'), ['Every']);
       expect(suggested('Every ', 'en'), [
         'day',
@@ -314,6 +322,160 @@ void main() {
       const text = 'Every 2 we at 08:00';
       final [weeks] = suggestSchedule(text, 10, 'en');
       expect((weeks.start, weeks.end, weeks.text), (8, 10, 'weeks'));
+    });
+  });
+
+  group('relative words (#271)', () {
+    // A Tuesday afternoon; the day starts at 07:30.
+    final now = SentenceNow(today, at(14, 20), at(7, 30));
+    SimpleSchedule? read(String text, String locale, [SentenceNow? at]) =>
+        readScheduleAt(text, locale, at ?? now).schedule;
+    SimpleSchedule once(Day day, [ClockTime? time]) =>
+        SimpleSchedule(const SimpleRepeat.once(), day, [?time]);
+    final tomorrow = today.addDays(1);
+
+    test('a day, at the day start, 19:00 or the time typed', () {
+      expect(read('tomorrow', 'en'), once(tomorrow, at(7, 30)));
+      expect(read('Tomorrow 7 pm', 'en'), once(tomorrow, at(19)));
+      expect(read('tomorrow at 7:30pm', 'en'), once(tomorrow, at(19, 30)));
+      expect(read('tomorrow evening', 'en'), once(tomorrow, at(19)));
+      expect(read('tonight', 'en'), once(today, at(19)));
+      expect(read('Tonight 8 PM', 'en'), once(today, at(20)));
+      expect(read('today', 'en'), once(today));
+      expect(read('today at 17:00', 'en'), once(today, at(17)));
+      expect(read('morgen', 'de'), once(tomorrow, at(7, 30)));
+      expect(read('morgen 19 Uhr', 'de'), once(tomorrow, at(19)));
+      expect(read('Morgen um 8 Uhr', 'de'), once(tomorrow, at(8)));
+      expect(read('heute Abend', 'de'), once(today, at(19)));
+      expect(read('heute Abend um 20:30', 'de'), once(today, at(20, 30)));
+      expect(read('heute', 'de'), once(today));
+      // As the day of Once, as a new Reminder's line shows it.
+      expect(read('Once tomorrow at 15:00', 'en'), once(tomorrow, at(15)));
+      expect(read('Once on tomorrow', 'en'), once(tomorrow, at(7, 30)));
+      expect(read('Einmal am morgen um 15:00', 'de'), once(tomorrow, at(15)));
+    });
+
+    test('in minutes and hours from now, over midnight', () {
+      expect(read('in 30 minutes', 'en'), once(today, at(14, 50)));
+      expect(read('in 2 hours', 'en'), once(today, at(16, 20)));
+      expect(read('in an hour', 'en'), once(today, at(15, 20)));
+      expect(read('In 1 h', 'en'), once(today, at(15, 20)));
+      expect(read('in 2 Stunden', 'de'), once(today, at(16, 20)));
+      expect(read('in einer Minute', 'de'), once(today, at(14, 21)));
+      final late = SentenceNow(Day(2026, 12, 31), at(23, 30), at(7, 30));
+      expect(read('in 1 hour', 'en', late), once(Day(2027, 1, 1), at(0, 30)));
+      expect(read('in 90 min', 'en', late), once(Day(2027, 1, 1), at(1)));
+    });
+
+    test('in days and weeks, at the day start or the time typed', () {
+      expect(read('in 3 days', 'en'), once(today.addDays(3), at(7, 30)));
+      expect(read('in a week', 'en'), once(today.addDays(7), at(7, 30)));
+      expect(read('in 2 weeks 9 am', 'en'), once(today.addDays(14), at(9)));
+      expect(read('in 3 Tagen', 'de'), once(today.addDays(3), at(7, 30)));
+      expect(read('in einer Woche', 'de'), once(today.addDays(7), at(7, 30)));
+    });
+
+    test('times with am, pm and Uhr read in every sentence', () {
+      expect(
+        readSchedule('Every day at 7 pm', 'en', today).schedule,
+        SimpleSchedule(const SimpleRepeat.every(1, RepeatUnit.days), today, [
+          at(19),
+        ]),
+      );
+      expect(read('today 12 am', 'en'), once(today, at(0)));
+      expect(read('today 12 pm', 'en'), once(today, at(12)));
+      expect(
+        readSchedule('Jeden Tag um 8 Uhr', 'de', today).schedule,
+        SimpleSchedule(const SimpleRepeat.every(1, RepeatUnit.days), today, [
+          at(8),
+        ]),
+      );
+    });
+
+    List<String> unknownAt(String text, String locale) => [
+      for (final r in readScheduleAt(text, locale, now).unknown)
+        text.substring(r.start, r.end),
+    ];
+
+    test('what does not fit is marked and changes nothing', () {
+      expect(unknownAt('today 13 pm', 'en'), ['13 pm']);
+      expect(unknownAt('today 0 am', 'en'), ['0 am']);
+      expect(unknownAt('heute 25 Uhr', 'de'), ['25 Uhr']);
+      expect(unknownAt('in 0 minutes', 'en'), ['in', '0', 'minutes']);
+      expect(read('in 0 minutes', 'en'), isNull);
+      expect(unknownAt('in 3', 'en'), ['in', '3']);
+      expect(unknownAt('in 2 hours at 08:00', 'en'), ['08:00']);
+      expect(unknownAt('tomorrow, 3 times', 'en'), ['3', 'times']);
+      // "am" is German for "on".
+      expect(unknownAt('Einmal am 5.11.', 'de'), isEmpty);
+    });
+
+    test('they are read only at a now', () {
+      expect(readSchedule('tomorrow', 'en', today).schedule, isNull);
+      expect(unknown('tomorrow', 'en'), ['tomorrow']);
+      expect(unknown('in 2 hours', 'en'), ['in', '2', 'hours']);
+    });
+
+    test('they are suggested', () {
+      expect(suggested('T', 'en'), ['Today', 'Tonight', 'Tomorrow']);
+      expect(suggested('Tomorrow ', 'en'), ['evening', 'at']);
+      expect(suggested('Tonight ', 'en'), ['at']);
+      expect(suggested('In 2 ', 'en'), ['minutes', 'hours', 'days', 'weeks']);
+      expect(suggested('in a ', 'en'), ['minute', 'hour', 'day', 'week']);
+      expect(suggested('H', 'de'), ['Heute']);
+      expect(suggested('Heute ', 'de'), ['Abend', 'um']);
+      expect(suggested('In 3 T', 'de'), ['Tagen']);
+      expect(suggested('Tomorrow 7 ', 'en'), isEmpty);
+    });
+
+    test('the chips are their words read at now', () {
+      expect(quickReminders(now), [
+        QuickReminder(QuickChip.inAnHour, today, at(15, 20)),
+        QuickReminder(QuickChip.tonight, today, at(19)),
+        QuickReminder(QuickChip.tomorrow, tomorrow, at(7, 30)),
+        QuickReminder(QuickChip.inAWeek, today.addDays(7), at(7, 30)),
+      ]);
+      const words = {
+        'en': {
+          QuickChip.inAnHour: 'in 1 hour',
+          QuickChip.tonight: 'tonight',
+          QuickChip.tomorrow: 'tomorrow',
+          QuickChip.inAWeek: 'in 1 week',
+        },
+        'de': {
+          QuickChip.inAnHour: 'in 1 Stunde',
+          QuickChip.tonight: 'heute Abend',
+          QuickChip.tomorrow: 'morgen',
+          QuickChip.inAWeek: 'in 1 Woche',
+        },
+      };
+      for (final moment in [
+        now,
+        SentenceNow(Day(2026, 12, 31), at(23, 30), at(9)),
+        SentenceNow(today, at(0), at(6, 15)),
+      ]) {
+        for (final chip in quickReminders(moment)) {
+          for (final MapEntry(key: locale, value: word) in words.entries) {
+            expect(
+              read(word[chip.chip] ?? '', locale, moment),
+              chip.schedule,
+              reason: '$moment $locale',
+            );
+          }
+        }
+      }
+    });
+
+    test('"Tonight" is offered while 19:00 is still to come', () {
+      final evening = SentenceNow(today, at(19), at(7, 30));
+      expect(
+        [for (final c in quickReminders(evening)) c.chip],
+        [QuickChip.inAnHour, QuickChip.tomorrow, QuickChip.inAWeek],
+      );
+      expect(
+        quickReminders(SentenceNow(today, at(18, 59), at(7, 30)))[1].chip,
+        QuickChip.tonight,
+      );
     });
   });
 }

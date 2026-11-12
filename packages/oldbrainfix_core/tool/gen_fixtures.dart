@@ -8004,7 +8004,9 @@ Map<String, Object?> _textTags() {
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
 /// the simple editor written in English and German and read back, more
 /// texts read as typed with the parts not understood, and the words
-/// suggested at a cursor. Offsets are counted in code points.
+/// suggested at a cursor; then at held moments the relative words of a
+/// Reminder read and the quick Reminder chips (#271). Offsets are
+/// counted in code points.
 Map<String, Object?> _scheduleSentences() {
   final today = Day(2026, 11, 3);
   ClockTime at(int hour, [int minute = 0]) => ClockTime(hour, minute);
@@ -8094,6 +8096,12 @@ Map<String, Object?> _scheduleSentences() {
       'Every day 🧠 at 08:00',
       'Every day at 08:00 Mon',
       'Jeden Tag',
+      'Every day at 7 pm',
+      'Every day at 7:30PM, 12 am and 12 pm.',
+      'Every day at 13 pm, 0 am, 7:5 pm',
+      'Every month on day 15 am',
+      'tomorrow',
+      'Every day at 19 Uhr',
     ],
     'de': [
       'Einmal',
@@ -8114,6 +8122,12 @@ Map<String, Object?> _scheduleSentences() {
       'Jede Woche um 08:00, bis',
       'Täglich um 08:00',
       'Every day',
+      'Jeden Tag um 19 Uhr',
+      'Jeden Tag um 8:30 UHR.',
+      'Jeden Tag um 24 Uhr',
+      'Jeden Monat am 15 Uhr',
+      'Jeden Tag um 7 pm',
+      'morgen',
     ],
   };
   const cursors = {
@@ -8141,6 +8155,19 @@ Map<String, Object?> _scheduleSentences() {
       'every d',
       'Every day at 08:00 and ',
       'zzz ',
+      'T',
+      'Tomorrow ',
+      'Tonight ',
+      'Today e',
+      'In ',
+      'In 2 ',
+      'in a ',
+      'in 1 h',
+      'Tomorrow 7 pm ',
+      'in 3 days ',
+      'Tomorrow 7 ',
+      'Once on 1/1, 3 ',
+      'Once t',
     ],
     'de': [
       '',
@@ -8155,6 +8182,89 @@ Map<String, Object?> _scheduleSentences() {
       'Jeden Tag um 08:00, 13:3',
       'Einmal ',
       'Jeden Tag ',
+      'H',
+      'Heute ',
+      'Heute Abend ',
+      'Morgen ',
+      'In 3 T',
+      'in einer ',
+      'in 2 St',
+    ],
+  };
+  const relative = {
+    'en': [
+      'today',
+      'Today at 17:00',
+      'tonight',
+      'tonight 8 pm',
+      'TOMORROW',
+      'Tomorrow 7 pm',
+      'tomorrow at 7:30pm',
+      'tomorrow evening',
+      'tomorrow night',
+      'today evening, at 9 pm',
+      'in 30 minutes',
+      'in 2 hours',
+      'in an hour',
+      'In 1 h',
+      'in 90 min',
+      'in 3 days',
+      'in a week',
+      'in 2 weeks 9 am',
+      'in 1 week at 10:00',
+      'in 2 hours at 08:00',
+      'in 2 hours 08:00, 09:00',
+      'tomorrow 7 pm 8 pm',
+      'tomorrow, 3 times',
+      'tomorrow until 12/1',
+      'tomorrow from 12/1',
+      'today 13 pm',
+      'today 0 am',
+      'today 12 am',
+      'today 12 pm',
+      'in 0 minutes',
+      'in',
+      'in 3',
+      'in 3 months',
+      'in 123456 days',
+      'in 99999 weeks',
+      'in 99999 minutes',
+      'Once tomorrow',
+      'Once on tomorrow at 15:00',
+      'Once on today evening',
+      'Once on tonight 8 pm',
+      'Once in 3 days',
+      'Every day tomorrow',
+      'heute',
+      'Every day at 7 pm',
+      'tomorrow 🧠 7 pm',
+    ],
+    'de': [
+      'heute',
+      'heute Abend',
+      'heute Abend um 20:30',
+      'Morgen',
+      'morgen 19 Uhr',
+      'Morgen um 8 Uhr',
+      'morgen Abend',
+      'morgen 19:30 Uhr.',
+      'in 2 Stunden',
+      'in einer Minute',
+      'in 3 Tagen',
+      'in 3 Tage',
+      'in einer Woche',
+      'in 2 Std.',
+      'in 1 h',
+      'heute 25 Uhr',
+      'heute 25\u00a0Uhr',
+      'morgen 19\u202fUhr, einmal',
+      'Einmal am morgen um 15:00',
+      'Einmal morgen',
+      'in 0 Minuten',
+      'morgen 7 pm',
+      'Einmal am 5.11.',
+      'tonight',
+      'Jeden Tag um 19 Uhr',
     ],
   };
   int points(String text, int at) => text.substring(0, at).runes.length;
@@ -8175,8 +8285,10 @@ Map<String, Object?> _scheduleSentences() {
           'start': s.start.toString(),
           'times': [for (final t in s.times) t.toString()],
         };
-  Object? readJson(String locale, String text) {
-    final read = readSchedule(text, locale, today);
+  Object? readJson(String locale, String text, [SentenceNow? now]) {
+    final read = now == null
+        ? readSchedule(text, locale, today)
+        : readScheduleAt(text, locale, now);
     return {
       'locale': locale,
       'schedule': scheduleJson(read.schedule),
@@ -8219,6 +8331,33 @@ Map<String, Object?> _scheduleSentences() {
         ],
         'text': 'Every 2 we at 08:00',
       },
+    ],
+    'relative': [
+      for (final now in [
+        SentenceNow(today, at(14, 20), at(7, 30)),
+        SentenceNow(today, at(19), at(8)),
+        SentenceNow(Day(2026, 12, 31), at(23, 30), at(9)),
+        SentenceNow(today, at(0), at(6, 15)),
+      ])
+        {
+          'now': {
+            'dayStart': now.dayStart.toString(),
+            'time': now.time.toString(),
+            'today': now.today.toString(),
+          },
+          'quick': [
+            for (final q in quickReminders(now))
+              {
+                'chip': q.chip.name,
+                'day': q.day.toString(),
+                'time': q.time.toString(),
+              },
+          ],
+          'read': [
+            for (final MapEntry(key: locale, value: texts) in relative.entries)
+              for (final text in texts) readJson(locale, text, now),
+          ],
+        },
     ],
     'today': today.toString(),
     'written': [

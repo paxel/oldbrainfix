@@ -7080,13 +7080,18 @@ fn sentence_repeat(value: &Value) -> Option<oldbrainfix_core::SimpleRepeat> {
 
 #[test]
 fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
-    use oldbrainfix_core::schedule_sentence::{SimpleSchedule, read, sentence, suggest};
+    use oldbrainfix_core::schedule_sentence::{
+        QuickChip, SentenceNow, SimpleSchedule, quick_reminders, read, read_at, sentence, suggest,
+    };
     let fixture = read_json(&fixtures().join("schedule_sentences.json"))?;
     let today = Day::parse(fixture["today"].as_str().ok_or("today")?).ok_or("day")?;
     // Byte offsets in `text` as the generator counts them: in code points.
     let points = |text: &str, at: usize| text.get(..at).map(|t| t.chars().count());
-    let read_json = |locale: &str, text: &str| {
-        let read = read(text, locale, today);
+    let read_json = |locale: &str, text: &str, now: Option<&SentenceNow>| {
+        let read = match now {
+            Some(now) => read_at(text, locale, now),
+            None => read(text, locale, today),
+        };
         json!({
             "locale": locale,
             "schedule": sentence_schedule_json(read.schedule.as_ref()),
@@ -7117,7 +7122,7 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
         assert_eq!(&sentence_schedule_json(Some(&schedule)), value, "{case}");
         let text = sentence(&schedule, locale, today);
         assert_eq!(text, case["sentence"], "{case}");
-        assert_eq!(read_json(locale, &text), case["read"], "{case}");
+        assert_eq!(read_json(locale, &text, None), case["read"], "{case}");
         // The round trip.
         assert_eq!(
             read(&text, locale, today).schedule,
@@ -7130,7 +7135,7 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
     for case in typed {
         let locale = case["locale"].as_str().ok_or("locale")?;
         let text = case["text"].as_str().ok_or("text")?;
-        assert_eq!(&read_json(locale, text), case, "{text:?}");
+        assert_eq!(&read_json(locale, text, None), case, "{text:?}");
     }
     let suggested = fixture["suggested"].as_array().ok_or("suggested")?;
     assert!(suggested.len() >= 30);
@@ -7153,6 +7158,46 @@ fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
             })
             .collect();
         assert_eq!(&Value::Array(ours), &case["suggestions"], "{text:?}");
+    }
+    // The relative words and the quick Reminder chips at held moments
+    // (#271).
+    let moments = fixture["relative"].as_array().ok_or("relative")?;
+    assert!(moments.len() >= 4);
+    let time = |v: &Value| v.as_str().and_then(ClockTime::parse).ok_or("time");
+    for moment in moments {
+        let held = &moment["now"];
+        let now = SentenceNow {
+            today: Day::parse(held["today"].as_str().ok_or("today")?).ok_or("day")?,
+            time: time(&held["time"])?,
+            day_start: time(&held["dayStart"])?,
+        };
+        let quick: Vec<Value> = quick_reminders(&now)
+            .into_iter()
+            .map(|q| {
+                json!({
+                    "chip": match q.chip {
+                        QuickChip::InAnHour => "inAnHour",
+                        QuickChip::Tonight => "tonight",
+                        QuickChip::Tomorrow => "tomorrow",
+                        QuickChip::InAWeek => "inAWeek",
+                    },
+                    "day": q.day.to_string(),
+                    "time": q.time.to_string(),
+                })
+            })
+            .collect();
+        assert_eq!(&Value::Array(quick), &moment["quick"], "{held}");
+        let reads = moment["read"].as_array().ok_or("read")?;
+        assert!(reads.len() >= 50);
+        for case in reads {
+            let locale = case["locale"].as_str().ok_or("locale")?;
+            let text = case["text"].as_str().ok_or("text")?;
+            assert_eq!(
+                &read_json(locale, text, Some(&now)),
+                case,
+                "{held} {text:?}"
+            );
+        }
     }
     Ok(())
 }

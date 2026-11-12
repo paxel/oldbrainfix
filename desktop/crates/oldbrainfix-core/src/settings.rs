@@ -6,7 +6,8 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::entry::{dart_iso, parse_time};
 use crate::nudges::QuietHours;
-use crate::schedule::ClockTime;
+use crate::schedule::{ClockTime, WallClock};
+use crate::schedule_sentence::SentenceNow;
 use crate::shopping_lists::ShoppingAgenda;
 use crate::store::Store;
 use crate::tally_units::{self, UnitSystem};
@@ -152,6 +153,9 @@ pub const DEFAULT_ALL_DAY_FROM: ClockTime = ClockTime {
     minute: 0,
 };
 
+/// When the day starts without Quiet Hours (#271).
+pub const DEFAULT_DAY_START: ClockTime = ClockTime { hour: 9, minute: 0 };
+
 /// This Device's settings in the store's local settings.
 pub struct DeviceSettings<'a> {
     store: &'a Store,
@@ -226,6 +230,25 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_quiet_hours_on(&self, on: bool) -> Result<()> {
         self.store
             .set_local_setting(QUIET_HOURS_OFF, &(!on).to_string())
+    }
+
+    /// When this Device's day starts, at which a Reminder for "tomorrow"
+    /// rings (#271): when its Quiet Hours end, or 09:00 while they are
+    /// switched off or empty.
+    pub fn day_start(&self) -> Result<ClockTime> {
+        let quiet = self.quiet_hours()?;
+        Ok(if self.quiet_hours_on()? && quiet.start != quiet.end {
+            quiet.end
+        } else {
+            DEFAULT_DAY_START
+        })
+    }
+
+    /// Now by the store's clock on `wall`, with this Device's
+    /// [`day_start`](Self::day_start): what the schedule sentence's
+    /// relative words and the quick Reminder chips are read at (#271).
+    pub fn sentence_now(&self, wall: &WallClock) -> Result<SentenceNow> {
+        Ok(SentenceNow::at(wall(self.store.now()), self.day_start()?))
     }
 
     /// From when on this Device an all-day Occurrence rings, on the
@@ -485,6 +508,49 @@ mod tests {
         assert_eq!(settings.quiet_hours()?, DEFAULT_QUIET_HOURS);
         store.set_local_setting(ALL_DAY_FROM, "noon")?;
         assert_eq!(settings.all_day_from()?, DEFAULT_ALL_DAY_FROM);
+        Ok(())
+    }
+
+    #[test]
+    fn the_day_starts_when_the_quiet_hours_end_at_nine_without_them() -> Result<()> {
+        use chrono::TimeZone;
+        let Some(now) = Utc.with_ymd_and_hms(2026, 11, 3, 13, 20, 59).single() else {
+            return Err(Error::Invalid("now".into()));
+        };
+        let store = Store::in_memory(Box::new(move || now), || {
+            Ok(crate::signing::SigningKey::from_seed([1; 32]))
+        })?;
+        let settings = DeviceSettings::new(&store);
+        let at = |hour, minute| ClockTime { hour, minute };
+        // The default 22:00-08:00.
+        assert_eq!(settings.day_start()?, at(8, 0));
+        settings.set_quiet_hours(QuietHours {
+            start: at(23, 30),
+            end: at(6, 45),
+        })?;
+        assert_eq!(settings.day_start()?, at(6, 45));
+        // Now on the wall clock, an hour ahead of UTC here, to the minute.
+        let wall = |utc: DateTime<Utc>| (utc + Duration::hours(1)).naive_utc();
+        assert_eq!(
+            settings.sentence_now(&wall)?,
+            SentenceNow {
+                today: crate::schedule::Day::new(2026, 11, 3),
+                time: at(14, 20),
+                day_start: at(6, 45),
+            }
+        );
+        // Empty.
+        settings.set_quiet_hours(QuietHours {
+            start: at(7, 0),
+            end: at(7, 0),
+        })?;
+        assert_eq!(settings.day_start()?, DEFAULT_DAY_START);
+        settings.set_quiet_hours(QuietHours {
+            start: at(23, 30),
+            end: at(6, 45),
+        })?;
+        settings.set_quiet_hours_on(false)?;
+        assert_eq!(settings.day_start()?, DEFAULT_DAY_START);
         Ok(())
     }
 
