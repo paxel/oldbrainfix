@@ -630,7 +630,7 @@
   "areaMoveDown": "Move down",
   "@areaMoveDown": {"description": "In the desktop's Area menu and an Area's right-click in the sidebar (#280): moves the Area one place down in the person's own order of the Areas; Alt+Down does the same."},
   "lineDrag": "Drag to move: {line}",
-  "@lineDrag": {"description": "Name and tooltip of the handle at the end of a Checklist Line in the Note dialog (#283), beside its ⋮: dragging it up or down moves the Line within its group or the top level.", "placeholders": {"line": {"type": "String"}}},
+  "@lineDrag": {"description": "Name and tooltip of the handle at the end of a Checklist Line or an open Shopping List Line in the Note dialog (#283), beside its ⋮: dragging it up or down moves the Line within its group or the top level, a Shopping List's among its open Lines.", "placeholders": {"line": {"type": "String"}}},
   "hotkeyRecord": "Record keys",
   "@hotkeyRecord": {"description": "Button beside the hotkey field in the desktop settings (#283): a click starts recording the next key chord pressed as the hotkey."},
   "hotkeyRecording": "Press the keys…",

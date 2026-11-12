@@ -694,8 +694,8 @@ class ShoppingLists {
   /// and check them: anywhere it holds a role.
   bool mayCheck(String noteId) => store.mayWriteIn(noteId);
 
-  /// Whether this Device may rename and delete the Line [lineId] and set
-  /// its reappear time: as for a Checklist's Line.
+  /// Whether this Device may rename, delete and move the Line [lineId]
+  /// and set its reappear time: as for a Checklist's Line.
   bool mayEdit(String lineId) => Checklists(store).mayEdit(lineId);
 
   /// Adds [text] to the Shopping List of [noteId] at [at], an index in
@@ -792,6 +792,35 @@ class ShoppingLists {
     final fields = _requireEditable(lineId);
     if (Reappear.read(fields[ShoppingKeys.reappear]) == reappear) return;
     store.append(lineId, ShoppingKeys.reappear, reappear.code);
+  }
+
+  /// Moves the open Line [lineId] to just before the open Line [before],
+  /// or after the open Lines (#283): its key goes where [add] puts a new
+  /// Line there, so a struck Line keeps its place among the open ones for
+  /// when it comes back. A struck Line does not move. Where it is
+  /// already, nothing is written.
+  void move(String lineId, WallClock wallClock, {String? before}) {
+    _requireEditable(lineId);
+    final (list, line) = _requireShown(lineId, wallClock);
+    if (line.struck) {
+      throw ArgumentError.value(lineId, 'lineId', 'a struck Line');
+    }
+    final from = list.open.indexWhere((l) => l.id == lineId);
+    final rest = ShoppingList(list.noteId, list.making, [
+      for (final l in list.lines)
+        if (l.id != lineId) l,
+    ], list._gone);
+    final others = rest.open;
+    int? at;
+    if (before != null) {
+      if (before == lineId) return;
+      at = others.indexWhere((l) => l.id == before);
+      if (at < 0) {
+        throw ArgumentError.value(before, 'before', 'not an open Line');
+      }
+    }
+    if ((at ?? others.length) == from) return;
+    store.append(lineId, ChecklistKeys.order, _keyAt(rest, at));
   }
 
   /// Deletes the Line [lineId]. It can be restored.

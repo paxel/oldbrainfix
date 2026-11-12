@@ -4195,6 +4195,37 @@ fn write_shopping_lists(store: &Store) -> Built {
     let yeast = line(&pantry, "Yeast")?;
     lists.uncheck(&yeast, &wall)?;
     lists.check(&yeast, &wall)?;
+    // Moved by hand (#283): Soap before Eggs, so before the keys of the
+    // struck Lines between Milk and Eggs, Tea to the top and Milk after
+    // the open ones; before itself and where it is already, nothing.
+    let errands = notes
+        .capture("Errands\nMilk\nBread\nHam\nEggs\nTea\nSoap", None, None)?
+        .id;
+    lists.make(&errands)?;
+    for text in ["Bread", "Ham"] {
+        lists.set_reappear(
+            &line(&errands, text)?,
+            Reappear::After(1, ReappearUnit::Week),
+        )?;
+        lists.check(&line(&errands, text)?, &wall)?;
+    }
+    lists.move_line(
+        &line(&errands, "Soap")?,
+        &wall,
+        Some(&line(&errands, "Eggs")?),
+    )?;
+    lists.move_line(
+        &line(&errands, "Tea")?,
+        &wall,
+        Some(&line(&errands, "Milk")?),
+    )?;
+    lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
+    lists.move_line(
+        &line(&errands, "Eggs")?,
+        &wall,
+        Some(&line(&errands, "Eggs")?),
+    )?;
+    lists.move_line(&line(&errands, "Milk")?, &wall, None)?;
     Ok(())
 }
 

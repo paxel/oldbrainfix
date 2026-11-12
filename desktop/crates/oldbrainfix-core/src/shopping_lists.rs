@@ -983,8 +983,8 @@ impl<'a> ShoppingLists<'a> {
         self.store.may_write_in(note_id)
     }
 
-    /// Whether this Device may rename and delete the Line `line_id` and
-    /// set its reappear time: as for a Checklist's Line.
+    /// Whether this Device may rename, delete and move the Line `line_id`
+    /// and set its reappear time: as for a Checklist's Line.
     pub fn may_edit(&self, line_id: &str) -> Result<bool> {
         Checklists::new(self.store).may_edit(line_id)
     }
@@ -1107,6 +1107,51 @@ impl<'a> ShoppingLists<'a> {
         }
         self.store
             .append(line_id, keys::REAPPEAR, Some(&reappear.code()), None)
+            .map(drop)
+    }
+
+    /// Moves the open Line `line_id` to just before the open Line `before`,
+    /// or after the open Lines (#283): its key goes where
+    /// [`ShoppingLists::add_at`] puts a new Line there, so a struck Line
+    /// keeps its place among the open ones for when it comes back. A
+    /// struck Line does not move. Where it is already, nothing is written.
+    pub fn move_line(&self, line_id: &str, wall: &WallClock, before: Option<&str>) -> Result<()> {
+        self.require_editable(line_id)?;
+        let (list, line) = self.require_shown(line_id, wall, false)?;
+        if line.struck {
+            return Err(Error::Invalid(format!(
+                "a struck Line does not move: {line_id}"
+            )));
+        }
+        let from = list.open().iter().position(|l| l.id == line_id);
+        let rest = ShoppingList {
+            lines: list
+                .lines
+                .iter()
+                .filter(|l| l.id != line_id)
+                .cloned()
+                .collect(),
+            ..list
+        };
+        let others = rest.open();
+        let mut at = None;
+        if let Some(before) = before {
+            if before == line_id {
+                return Ok(());
+            }
+            at = Some(
+                others
+                    .iter()
+                    .position(|l| l.id == before)
+                    .ok_or_else(|| Error::Invalid(format!("not an open Line: {before}")))?,
+            );
+        }
+        if Some(at.unwrap_or(others.len())) == from {
+            return Ok(());
+        }
+        let key = key_at(&rest, at);
+        self.store
+            .append(line_id, checklist_keys::ORDER, Some(&key), None)
             .map(drop)
     }
 
@@ -2024,6 +2069,64 @@ mod tests {
     }
 
     #[test]
+    fn an_open_line_moves_before_another_or_after_and_a_struck_one_keeps_its_place() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nBread\nHam\nJam\nEggs\nTea\nSoap", None)?;
+        weekly(&ann, &note)?;
+        let lists = ShoppingLists::new(&ann);
+        let id = |text: &str| id_of(&ann, &note, text);
+        for text in ["Bread", "Ham", "Jam"] {
+            lists.check(&id(text)?, &wall)?;
+        }
+        lists.move_line(&id("Soap")?, &wall, Some(&id("Eggs")?))?;
+        lists.move_line(&id("Tea")?, &wall, Some(&id("Milk")?))?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Tea", "Milk", "Soap", "Eggs", "~Bread", "~Ham", "~Jam"]
+        );
+        lists.move_line(&id("Milk")?, &wall, None)?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Tea", "Soap", "Eggs", "Milk", "~Bread", "~Ham", "~Jam"]
+        );
+        // The struck ones lay between Milk and Eggs, so Soap went before
+        // them.
+        clock.set(utc(11, 23, 0, 0)?);
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Tea", "Soap", "Bread", "Ham", "Jam", "Eggs", "Milk"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_struck_line_does_not_move_and_where_a_line_is_already_nothing_is_written() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nTea\nJam", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let milk = id_of(&ann, &note, "Milk")?;
+        let eggs = id_of(&ann, &note, "Eggs")?;
+        let jam = id_of(&ann, &note, "Jam")?;
+        let tea = id_of(&ann, &note, "Tea")?;
+        lists.check(&tea, &wall)?;
+        assert!(lists.move_line(&tea, &wall, None).is_err());
+        assert!(lists.move_line(&milk, &wall, Some(&tea)).is_err());
+        assert!(lists.move_line(&milk, &wall, Some("line:none")).is_err());
+        let before = ann.all_entries()?.len();
+        lists.move_line(&milk, &wall, Some(&milk))?;
+        lists.move_line(&milk, &wall, Some(&eggs))?;
+        lists.move_line(&jam, &wall, None)?;
+        assert_eq!(ann.all_entries()?.len(), before);
+        lists.move_line(&jam, &wall, Some(&milk))?;
+        assert_eq!(shown(&ann, &note)?, ["Jam", "Milk", "Eggs", "~Tea"]);
+        lists.delete(&milk)?;
+        assert!(lists.move_line(&milk, &wall, None).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn a_name_it_has_adds_nothing_and_brings_a_struck_or_gone_line_back() -> TestResult {
         let clock = Clock::new()?;
         let ann = clock.device(1, "Ann")?;
@@ -2224,6 +2327,32 @@ mod tests {
             line_of(&ann, &note, "Milk")?.reappear,
             Reappear::After(2, ReappearUnit::Week)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_member_moves_their_own_lines_not_another_persons() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let area = ann.share(&house.id)?;
+        invite(&ann, &ben, &area)?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs\nTea", Some(&area))?;
+        exchange(&ben, &ann)?;
+        let lists = ShoppingLists::new(&ben);
+        let milk = id_of(&ben, &note, "Milk")?;
+        let bread = lists.add(&note, "Bread", &wall)?;
+        assert!(lists.move_line(&milk, &wall, None).is_err());
+        lists.move_line(&bread, &wall, Some(&milk))?;
+        // As a modified app would.
+        let forged = ben.append(&milk, checklist_keys::ORDER, Some("zz"), None)?;
+        exchange(&ben, &ann)?;
+        let held: Vec<String> = ann.all_entries()?.iter().map(Entry::id).collect();
+        assert!(held.contains(&forged.id()));
+        assert_eq!(shown(&ann, &note)?, ["Bread", "Milk", "Eggs", "Tea"]);
+        ShoppingLists::new(&ann).move_line(&bread, &wall, None)?;
+        assert_eq!(shown(&ann, &note)?, ["Milk", "Eggs", "Tea", "Bread"]);
         Ok(())
     }
 

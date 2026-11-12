@@ -602,20 +602,27 @@ fn step_keys(step: LineStep) -> Option<KeyboardShortcut> {
 /// The menu of a Line, from its ⋮ and a right-click on it, Move up and
 /// Move down with their keys beside them: the step clicked.
 fn line_menu(ui: &mut Ui, t: &L10n, steps: &[LineStep]) -> Option<LineStep> {
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
     let mut picked = None;
     for step in steps {
-        let mut button = egui::Button::new(RichText::new(step_label(t, *step)).color(text));
-        if let Some(keys) = step_keys(*step) {
-            let keys = ui.ctx().format_shortcut(&keys);
-            button = button.shortcut_text(RichText::new(keys).color(weak));
-        }
-        if ui.add(button).clicked() {
+        if step_button(ui, t, *step) {
             picked = Some(*step);
         }
     }
     picked
+}
+
+/// The entry of `step` in a Line's menu, with its keys beside it, as a
+/// Shopping List's menu has Move up and Move down too (#283): whether it
+/// was clicked.
+pub fn step_button(ui: &mut Ui, t: &L10n, step: LineStep) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let mut button = egui::Button::new(RichText::new(step_label(t, step)).color(text));
+    if let Some(keys) = step_keys(step) {
+        let keys = ui.ctx().format_shortcut(&keys);
+        button = button.shortcut_text(RichText::new(keys).color(weak));
+    }
+    ui.add(button).clicked()
 }
 
 /// The handle a Line is dragged by (#283), beside its ⋮: the pointer a
@@ -718,8 +725,12 @@ pub type Trailing<'a, P> = &'a dyn Fn(&mut Ui, &ShownLine) -> Option<P>;
 const TRAILING_ROOM: f32 = 112.0;
 
 /// Where the rows drawn go, each as [`DragRow`], while the Lines with ⋮
-/// have a handle to drag them by (#283).
-pub type Drags<'a> = Option<&'a mut Vec<DragRow>>;
+/// have a handle to drag them by (#283); without `checked` a checked Line
+/// has none, as a Shopping List's struck Lines do not move.
+pub struct Drags<'a> {
+    pub rows: &'a mut Vec<DragRow>,
+    pub checked: bool,
+}
 
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
@@ -732,7 +743,7 @@ pub fn lines(
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     (checks, on): (bool, Option<&RoutineOccurrence>),
-    (menus, field, drags): (Option<LineMenus>, Option<FieldFor>, Drags),
+    (menus, field, drags): (Option<LineMenus>, Option<FieldFor>, Option<Drags>),
     actions: &mut Vec<ChecklistAction>,
 ) {
     let menu = |ui: &mut Ui, id: &str| menus.and_then(|(_, steps)| line_menu(ui, t, &steps(id)));
@@ -762,15 +773,16 @@ const TO_MIDDLE: f32 = 5.0;
 /// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
 /// takes the clicks, a right-click with the menu it draws; with
 /// `trailing`, what it draws at each Line's end, before ⋮; with `drags`,
-/// the Lines with ⋮ have a handle beside it, and the rows go there
-/// (#283). What is asked, in the order clicked.
+/// the Lines with ⋮ have a handle beside it, a checked one as `drags`
+/// says, and the rows go there (#283). What is asked, in the order
+/// clicked.
 pub fn line_rows<P>(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     checks: bool,
     (menus, mut field, trailing): (Option<MenuOf<P>>, Option<FieldFor>, Option<Trailing<P>>),
-    mut drags: Drags,
+    mut drags: Option<Drags>,
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
@@ -781,6 +793,7 @@ pub fn line_rows<P>(
     ui.vertical(|ui| {
         let handles = drags.is_some();
         grouped(ui, shown, gap, &mut |ui, line| {
+            let handle = drags.as_ref().is_some_and(|d| d.checked || !line.checked);
             let row = ui.horizontal(|ui| {
                 let toggled = ui
                     .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
@@ -847,8 +860,11 @@ pub fn line_rows<P>(
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let more =
                             icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak);
-                        if handles {
+                        if handle {
                             drag_handle(ui, t, line, weak);
+                        } else if handles {
+                            // Its room kept, so the badges stay in line.
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover());
                         }
                         (more, trailing.and_then(|trailing| trailing(ui, line)))
                     })
@@ -861,8 +877,8 @@ pub fn line_rows<P>(
                     asked.push(LineAsk::Menu(line.id.clone(), step));
                 }
             });
-            if let Some(rows) = drags.as_deref_mut() {
-                rows.push(DragRow {
+            if let Some(drags) = drags.as_mut() {
+                drags.rows.push(DragRow {
                     id: line.id.clone(),
                     in_group: line.in_group,
                     rect: row.response.rect,
@@ -1072,7 +1088,14 @@ pub fn section(
             (t, tones),
             &rows,
             (shown.checks, list.on.as_ref()),
-            (Some((&menus, &steps)), Some(&mut field), Some(&mut drags)),
+            (
+                Some((&menus, &steps)),
+                Some(&mut field),
+                Some(Drags {
+                    rows: &mut drags,
+                    checked: true,
+                }),
+            ),
             actions,
         );
         for asked in typing {
@@ -1091,7 +1114,9 @@ pub fn section(
                 asked => ChecklistAction::Typed(asked),
             });
         }
-        line_drop_shown(ui, tones, typed, &drags, actions);
+        if let Some((from, before)) = line_drop_shown(ui, tones, typed, &drags) {
+            actions.push(ChecklistAction::Drop(from, before));
+        }
         // Show on the Agenda and Back to a plain Note are the Note
         // dialog's badges (#160).
         if shown.checks
@@ -1108,22 +1133,19 @@ pub fn section(
     });
 }
 
-/// The drop of a Line dragged by its handle in the editor (#283): a line
-/// in the gap it would go into, and its move there once let go. An empty
-/// new Line is no place to go to.
-fn line_drop_shown(
+/// The drop of a Line dragged by its handle in the editor among the rows
+/// `drawn` (#283): a line in the gap it would go into, and once let go
+/// the key of its typed row with the key of the row it goes before, or
+/// `None` at the end of its level. An empty new Line is no place to go
+/// to.
+pub fn line_drop_shown(
     ui: &Ui,
     tones: Tones,
     typed: &TypedLines,
     drawn: &[DragRow],
-    actions: &mut Vec<ChecklistAction>,
-) {
-    let Some(dragged) = egui::DragAndDrop::payload::<DraggedLine>(ui.ctx()) else {
-        return;
-    };
-    let Some(pos) = ui.ctx().pointer_interact_pos() else {
-        return;
-    };
+) -> Option<(u64, Option<u64>)> {
+    let dragged = egui::DragAndDrop::payload::<DraggedLine>(ui.ctx())?;
+    let pos = ui.ctx().pointer_interact_pos()?;
     let rows: Vec<DragRow> = drawn
         .iter()
         .filter(|r| {
@@ -1133,25 +1155,17 @@ fn line_drop_shown(
         })
         .cloned()
         .collect();
-    let Some(drop) = line_drop(&rows, &dragged.0, pos) else {
-        return;
-    };
+    let drop = line_drop(&rows, &dragged.0, pos)?;
     ui.painter()
         .hline(drop.x, drop.y, egui::Stroke::new(2.0, tones.accent));
     if !ui.input(|i| i.pointer.any_released()) {
-        return;
+        return None;
     }
     let key = |id: &str| typed.shown(id).map(|row| row.key);
-    let Some(from) = key(&dragged.0) else {
-        return;
-    };
+    let from = key(&dragged.0)?;
     match drop.before {
-        Some(before) => {
-            if let Some(before) = key(&before) {
-                actions.push(ChecklistAction::Drop(from, Some(before)));
-            }
-        }
-        None => actions.push(ChecklistAction::Drop(from, None)),
+        Some(before) => Some((from, Some(key(&before)?))),
+        None => Some((from, None)),
     }
 }
 

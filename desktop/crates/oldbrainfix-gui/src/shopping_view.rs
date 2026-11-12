@@ -16,6 +16,10 @@
 //! once. For such a Line, ⋮ and a right-click on its box's row hold
 //! Delete, which asks nothing: the deleted Lines fold under "Removed
 //! Lines", each with Restore, and Ctrl+Z brings the last one back (#268).
+//! An open one also has Move up and Move down there, which Alt+Up and
+//! Alt+Down in its field take too, and the handle beside its ⋮ drags it
+//! up or down, a line showing the gap it goes into: each among the open
+//! Lines as they show, a struck Line staying where it is (#283).
 //! "Back to a plain Note" is a badge
 //! of the Note dialog (#160), as is "Show on the Agenda" (#186), whose
 //! three ways the card's ⋮ offers as radio buttons too.
@@ -31,7 +35,9 @@ use oldbrainfix_core::{
 };
 
 use crate::app::embossed;
-use crate::checklist_view::{self, CardMenu, LineAsk, RemovedAsk, RemovedLines, ShownLine};
+use crate::checklist_view::{
+    self, CardMenu, Drags, LineAsk, LineStep, RemovedAsk, RemovedLines, ShownLine,
+};
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
@@ -46,6 +52,10 @@ pub enum ShopStep {
     /// Opens its reappear time dialog (#195).
     PickReappear,
     Reappear(Reappear),
+    /// Move up and Move down among the open Lines (#283), which the
+    /// editor asks as a [`ShoppingAction::Drop`].
+    Up,
+    Down,
     Delete,
 }
 
@@ -67,6 +77,23 @@ pub enum ShoppingAction {
     OnAgenda(String, ShoppingOnAgenda),
     /// Something asked of "Removed Lines" (#268).
     Removed(RemovedAsk),
+    /// The Line of the typed row with this key moved to just before the
+    /// row of the other key, or after the open Lines (#283): dragged, or
+    /// by Move up and Move down, Alt+Up and Alt+Down.
+    Drop(u64, Option<u64>),
+}
+
+/// Where the row `key` of the open rows `open`, in the order they show,
+/// goes by Move up, or with `up` false by Move down (#283): before the row
+/// of the key given, after the open Lines with `Some(None)`; `None` at its
+/// end.
+pub fn moved(open: &[u64], key: u64, up: bool) -> Option<Option<u64>> {
+    let at = open.iter().position(|k| *k == key)?;
+    if up {
+        return Some(Some(*open.get(at.checked_sub(1)?)?));
+    }
+    open.get(at + 1)?;
+    Some(open.get(at + 2).copied())
 }
 
 /// The Shopping List of the selected Note as its editor shows it.
@@ -279,12 +306,21 @@ pub fn reappear_editor(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<Reapp
         .then_some(Reappear::After(count, picked))
 }
 
-/// The menu of a Line, from its ⋮ and a right-click on it: "Delete for
+/// The menu of a Line, from its ⋮ and a right-click on it: Move up and
+/// Move down with their keys as far as `(up, down)` say, and "Delete for
 /// good"; the step clicked.
-fn line_menu(ui: &mut Ui, t: &L10n) -> Option<ShopStep> {
-    theme::destructive(ui, true, t.shopping_delete_for_good())
-        .clicked()
-        .then_some(ShopStep::Delete)
+fn line_menu(ui: &mut Ui, t: &L10n, (up, down): (bool, bool)) -> Option<ShopStep> {
+    let mut picked = None;
+    if up && checklist_view::step_button(ui, t, LineStep::Up) {
+        picked = Some(ShopStep::Up);
+    }
+    if down && checklist_view::step_button(ui, t, LineStep::Down) {
+        picked = Some(ShopStep::Down);
+    }
+    if theme::destructive(ui, true, t.shopping_delete_for_good()).clicked() {
+        picked = Some(ShopStep::Delete);
+    }
+    picked
 }
 
 /// How many Lines of `list` are open, on a compact card.
@@ -308,9 +344,7 @@ pub fn section(
     let list = &shown.list;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.shopping_heading()).strong().color(text));
-        let menu = |ui: &mut Ui, _: &str| line_menu(ui, t);
         let menued = typed.with_menus(&shown.editable);
-        let menus = (&menued, &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>);
         let lines = shown_lines(t, list);
         let rows: Vec<ShownLine> = typed
             .rows
@@ -336,6 +370,29 @@ pub fn section(
                 }
             })
             .collect();
+        // The rows of the open Lines, which move among themselves (#283);
+        // an empty new Line is no place to go to.
+        let open: Vec<u64> = typed
+            .rows
+            .iter()
+            .zip(&rows)
+            .filter(|(row, line)| !line.checked && (row.id.is_some() || !row.typed().is_empty()))
+            .map(|(row, _)| row.key)
+            .collect();
+        let keys: Vec<(u64, String)> = typed
+            .rows
+            .iter()
+            .map(|row| (row.key, row.shown_id()))
+            .collect();
+        let key_of = |id: &str| keys.iter().find(|(_, i)| i == id).map(|(key, _)| *key);
+        let moves = |id: &str| {
+            let can = |up| {
+                key_of(id).is_some_and(|key| menued.contains(id) && moved(&open, key, up).is_some())
+            };
+            (can(true), can(false))
+        };
+        let menu = |ui: &mut Ui, id: &str| line_menu(ui, t, moves(id));
+        let menus = (&menued, &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>);
         // A new Line, and one this Device may change, by anyone who may add.
         let in_place = |row: &TypedLine| {
             shown.checks && row.id.as_ref().is_none_or(|id| shown.editable.contains(id))
@@ -347,6 +404,7 @@ pub fn section(
             .map(|r| r.key)
             .collect();
         let mut typing = Vec::new();
+        let mut drags = Vec::new();
         let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
             let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
                 return false;
@@ -382,16 +440,43 @@ pub fn section(
             &rows,
             shown.checks,
             (Some(menus), Some(&mut field), Some(&trailing)),
-            None,
+            Some(Drags {
+                rows: &mut drags,
+                checked: false,
+            }),
         );
+        // Move up and Move down, and Alt+Up and Alt+Down, among the open
+        // rows as they show (#283).
+        let step_to = |key: u64, up: bool| {
+            let (_, id) = keys.iter().find(|(k, _)| *k == key)?;
+            if !menued.contains(id) {
+                return None;
+            }
+            moved(&open, key, up).map(|before| ShoppingAction::Drop(key, before))
+        };
         for asked in asked {
-            actions.push(match asked {
-                LineAsk::Check(id, checked) => ShoppingAction::Check(id, checked),
-                LineAsk::Menu(id, step) => ShoppingAction::Step(id, step),
+            actions.extend(match asked {
+                LineAsk::Check(id, checked) => Some(ShoppingAction::Check(id, checked)),
+                LineAsk::Menu(id, step @ (ShopStep::Up | ShopStep::Down)) => {
+                    key_of(&id).and_then(|key| step_to(key, step == ShopStep::Up))
+                }
+                LineAsk::Menu(id, step) => Some(ShoppingAction::Step(id, step)),
             });
         }
         // Back to a plain Note is the Note dialog's kind badge (#160).
-        actions.extend(typing.into_iter().map(ShoppingAction::Typed));
+        for asked in typing {
+            actions.extend(match asked {
+                Typing::Move(key, up) => step_to(key, up),
+                asked => Some(ShoppingAction::Typed(asked)),
+            });
+        }
+        let drawn: Vec<_> = drags
+            .into_iter()
+            .filter(|row| key_of(&row.id).is_some_and(|key| open.contains(&key)))
+            .collect();
+        if let Some((from, before)) = checklist_view::line_drop_shown(ui, tones, typed, &drawn) {
+            actions.push(ShoppingAction::Drop(from, before));
+        }
         let mut removed = Vec::new();
         checklist_view::removed_lines(ui, t, &list.note_id, &shown.removed, &mut removed);
         actions.extend(removed.into_iter().map(ShoppingAction::Removed));

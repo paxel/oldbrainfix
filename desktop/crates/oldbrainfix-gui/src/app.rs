@@ -7428,6 +7428,9 @@ impl App {
                         self.badge = Some(NoteBadge::Reappear);
                     }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
+                    // The editor asks them as a drop, among the open rows
+                    // as they show (#283).
+                    ShopStep::Up | ShopStep::Down => {}
                     // Without asking; Ctrl+Z and "Removed Lines" bring it
                     // back (#268).
                     ShopStep::Delete => {
@@ -7441,6 +7444,41 @@ impl App {
                 }
             }
             ShoppingAction::Removed(asked) => self.removed_lines(asked, true)?,
+            ShoppingAction::Drop(from, before) => {
+                // A new Line is stored first, and what was typed, so the
+                // move lands among the Lines as shown (#283).
+                let Some(shown) = self.lines.keyed(from).map(|row| row.shown_id()) else {
+                    return Ok(());
+                };
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &shown)? else {
+                    return Ok(());
+                };
+                self.lines.keep(&self.store, &*self.wall)?;
+                let before = match before {
+                    Some(key) => match self.lines.keyed(key).and_then(|row| row.id.clone()) {
+                        Some(id) => Some(id),
+                        None => return Ok(()),
+                    },
+                    None => None,
+                };
+                // A sync meanwhile may have struck or taken either.
+                let open = |id: &str| -> oldbrainfix_core::Result<bool> {
+                    Ok(self.shopping_line_of(id, false)?.is_some_and(|l| !l.struck))
+                };
+                if !open(&id)?
+                    || !lists.may_edit(&id)?
+                    || before.as_deref().is_some_and(|b| b == id)
+                {
+                    return Ok(());
+                }
+                if let Some(before) = &before
+                    && !open(before)?
+                {
+                    return Ok(());
+                }
+                lists.move_line(&id, &*self.wall, before.as_deref())?;
+                self.lines.move_row(&id, before.as_deref());
+            }
             ShoppingAction::OnAgenda(note, shows) => {
                 // It may have gone to the trash or back to a plain Note
                 // meanwhile.

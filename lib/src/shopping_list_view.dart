@@ -379,7 +379,7 @@ class _ReappearDialogState extends State<ReappearDialog> {
 }
 
 /// What the menu of a Shopping List's Line does.
-enum _ShopStep { delete }
+enum _ShopStep { up, down, delete }
 
 /// The Shopping List part of a Note's editor (#122), nothing while the
 /// Note is none: its Lines with their boxes, typed in place as one block
@@ -389,7 +389,9 @@ enum _ShopStep { delete }
 /// the list is read anew, then it shows below the open ones. A name the
 /// list has already brings its Line back instead. Each Line ends in the
 /// badge of its reappear time (#195), whose tap opens its dialog where
-/// this Device may change the Line; ⋮ of such a Line has Delete. "Back to
+/// this Device may change the Line; ⋮ of such a Line has Delete, and of
+/// an open one Move up and Move down among the open Lines as they show,
+/// which moves its row there too (#283). "Back to
 /// a plain Note" is in the editor's
 /// kind badge (#160). What is typed is stored as the cursor leaves a Line
 /// and whenever [typed] says so; a Line left empty goes as the editor is
@@ -600,6 +602,22 @@ class _ShoppingSectionState extends State<ShoppingSection>
         Offset.zero & overlay.size,
       ),
       items: [
+        for (final (step, icon, label) in [
+          (_ShopStep.up, Icons.arrow_upward, t.checklistMoveUp),
+          (_ShopStep.down, Icons.arrow_downward, t.checklistMoveDown),
+        ])
+          if (!line.struck && _moveTo(id, up: step == _ShopStep.up).$1)
+            PopupMenuItem(
+              key: ValueKey('shopping-${step.name}'),
+              value: step,
+              child: Row(
+                children: [
+                  Icon(icon),
+                  const SizedBox(width: 12),
+                  Flexible(child: Text(label)),
+                ],
+              ),
+            ),
         PopupMenuItem(
           key: const ValueKey('shopping-delete'),
           value: _ShopStep.delete,
@@ -617,6 +635,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
     // A sync while the menu was open may have taken it away.
     if (!linesWritable || !showsLine(id)) return;
     switch (picked) {
+      case _ShopStep.up || _ShopStep.down:
+        _move(id, up: picked == _ShopStep.up);
       case _ShopStep.delete:
         _lists.delete(id);
         offerLineUndo(
@@ -629,6 +649,41 @@ class _ShoppingSectionState extends State<ShoppingSection>
         );
     }
     setState(_load);
+  }
+
+  /// Where the open Line [id] goes by Move up, or with [up] false by Move
+  /// down, among the open Lines as their rows show (#283): whether it
+  /// can, and the Line it goes before, null after the open ones.
+  (bool, String?) _moveTo(String id, {required bool up}) {
+    final open = [
+      for (final row in rows)
+        if (placesAmong(row)) ?row.id,
+    ];
+    final at = open.indexOf(id);
+    if (at < 0) return (false, null);
+    if (up) return at > 0 ? (true, open[at - 1]) : (false, null);
+    if (at + 1 >= open.length) return (false, null);
+    return (true, at + 2 < open.length ? open[at + 2] : null);
+  }
+
+  /// Moves the open Line [id] one place up, or with [up] false down, and
+  /// its row with it, as rows stay where they are while the editor is
+  /// open (#283).
+  void _move(String id, {required bool up}) {
+    final (moves, before) = _moveTo(id, up: up);
+    if (!moves || !_lists.mayEdit(id)) return;
+    // A sync while the menu was open may have struck either.
+    final list = _lists.byNote(widget.noteId, deviceWallClock);
+    bool open(String? line) =>
+        line == null || list?.line(line)?.struck == false;
+    if (!open(id) || !open(before)) return;
+    _lists.move(id, deviceWallClock, before: before);
+    final row = rows.firstWhere((r) => r.id == id);
+    final rest = [...rows]..remove(row);
+    final at = before == null
+        ? rest.lastIndexWhere(placesAmong) + 1
+        : rest.indexWhere((r) => r.id == before);
+    rows = rest..insert(at < 0 ? rows.indexOf(row) : at, row);
   }
 
   /// Brings the deleted Line [id] back from "Removed Lines".

@@ -568,7 +568,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "move_line",
-            "Moves a Line of a Checklist, with its group, to just before another Line, or to the end. A single Line put before a Line of a group joins that group.",
+            "Moves a Line of a Checklist, with its group, to just before another Line, or to the end. A single Line put before a Line of a group joins that group. On a Shopping List an open Line moves to just before another open Line, or after the open ones; a struck Line does not move.",
             false,
             json!({"before": string("The id of the Line it goes before; the end when left out"), "id": id("Line")}),
             &["id"],
@@ -2074,8 +2074,12 @@ impl Store {
                 done(line)
             }
             "move_line" => {
-                let line = self.checklist_line(id()?)?;
-                checklists.move_line(line, optional_text(args, "before"))?;
+                let line = id()?;
+                let before = optional_text(args, "before");
+                match self.list_of_line(line)? {
+                    CHECKLIST => checklists.move_line(line, before)?,
+                    _ => shopping.move_line(line, wall, before)?,
+                }
                 done(line)
             }
             "group_line" => {
@@ -2861,6 +2865,22 @@ mod tests {
             |s, a| Ok(lines(s, &arg(a, "note")?)?[0].text == "Passport"),
         )?;
         lands_as_pending(
+            "move_line",
+            |s| {
+                let note = shopping_list(s, "Shop\nMilk\nEggs")?;
+                let list = ShoppingLists::new(s)
+                    .by_note(&note, &utc)?
+                    .ok_or("a list")?;
+                Ok(json!({"id": list.lines[0].id, "note": note}))
+            },
+            |s, a| {
+                let list = ShoppingLists::new(s)
+                    .by_note(&arg(a, "note")?, &utc)?
+                    .ok_or("a list")?;
+                Ok(list.lines[0].text == "Eggs")
+            },
+        )?;
+        lands_as_pending(
             "group_line",
             |s| {
                 let note = checklist(s, "Trip\nBag\nSocks")?;
@@ -3104,7 +3124,7 @@ mod tests {
         )?;
         assert!(added.is_error, "{added:?}");
         let ticked = call(&store, &task, "move_line", &json!({"id": milk.lines[0].id}))?;
-        assert!(ticked.is_error, "a Shopping List's Lines do not move");
+        assert!(ticked.is_error, "a struck Line does not move");
         assert!(
             store
                 .pending_set(&task)?

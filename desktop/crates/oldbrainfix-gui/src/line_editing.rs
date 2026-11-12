@@ -12,8 +12,8 @@
 //! to type in, an empty one at its end while it has none, so a new list
 //! starts with one. A Checklist's rows follow its order; a Shopping
 //! List's stay where they are while the editor is open, a Line checked
-//! there in its row, and a new one is added among the open Lines where it
-//! was typed.
+//! there in its row, a new one is added among the open Lines where it was
+//! typed, and a Line moved goes where it was moved to (#283).
 //!
 //! What is typed is stored as the cursor leaves a Line and whenever the
 //! editor saves ([`TypedLines::keep`]); as the editor is left
@@ -125,7 +125,7 @@ pub enum Typing {
     /// Tab, or with `false` Shift+Tab.
     Indent(u64, bool),
     /// Alt+Up, or with `false` Alt+Down (#283): the list moves the Line
-    /// by its own steps, a Shopping List's not at all.
+    /// by its own steps, a Shopping List among its open Lines.
     Move(u64, bool),
     /// The cursor left it.
     Store(u64),
@@ -376,6 +376,28 @@ impl TypedLines {
         self.rows = rows;
     }
 
+    /// Moves the row of the Line `id` to just before the row of the Line
+    /// `before`, or with `None` after the last row of an open Line: where
+    /// a Shopping List's Line was moved to, as its rows stay where they
+    /// are (#283). Its key stays, so its field keeps the keyboard.
+    pub fn move_row(&mut self, id: &str, before: Option<&str>) {
+        let of =
+            |rows: &[TypedLine], id: &str| rows.iter().position(|r| r.id.as_deref() == Some(id));
+        let Some(from) = of(&self.rows, id) else {
+            return;
+        };
+        let row = self.rows.remove(from);
+        let at = match before {
+            Some(before) => of(&self.rows, before),
+            None => (0..self.rows.len())
+                .rev()
+                .find(|at| self.places_among(*at))
+                .map(|at| at + 1),
+        };
+        self.rows
+            .insert(at.unwrap_or(from).min(self.rows.len()), row);
+    }
+
     /// Whether the Line of the row at `at` counts for the place a new
     /// Line is added at: every stored one; on a Shopping List the open
     /// ones alone.
@@ -570,7 +592,8 @@ impl TypedLines {
             Typing::Split(key, at) => self.split(store, wall, key, at),
             Typing::Join(key) => self.join(store, wall, key),
             Typing::Indent(key, under) => self.indent(store, key, under),
-            // A Checklist moves it as its ⋮ does (`checklist_view`).
+            // The list moves it as its ⋮ does (`checklist_view`,
+            // `shopping_view`).
             Typing::Move(..) => Ok(()),
             Typing::Store(key) => match self.at(key) {
                 Some(at) => self.store_row(store, wall, at).map(|_| ()),

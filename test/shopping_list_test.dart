@@ -550,6 +550,40 @@ void main() {
       expect(shown(note), ['[x] Milk']);
     });
 
+    testWidgets('⋮ on an open Line moves it among the open ones, its row '
+        'with it; a struck one stays (#283)', (tester) async {
+      final note = notes.capture('Shop\nMilk\nBread\nEggs\nTea').id;
+      lists.make(note);
+      final bread = idOf(note, 'Bread');
+      lists.check(bread, deviceWallClock);
+      await openEditor(tester, 'Shop');
+      final milk = idOf(note, 'Milk');
+      final eggs = idOf(note, 'Eggs');
+      final tea = idOf(note, 'Tea');
+      await lineMenu(tester, milk);
+      expect(key('shopping-up'), findsNothing);
+      await tap(tester, key('shopping-down'));
+      expect(shown(note), ['Eggs', 'Milk', 'Tea', '[x] Bread']);
+      expect(top(tester, milk), greaterThan(top(tester, eggs)));
+      // Never among the struck ones.
+      await lineMenu(tester, tea);
+      expect(key('shopping-down'), findsNothing);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Eggs', 'Tea', 'Milk', '[x] Bread']);
+      await lineMenu(tester, bread);
+      expect(key('shopping-up'), findsNothing);
+      expect(key('shopping-down'), findsNothing);
+      await closeMenu(tester);
+      // Checked here, Tea keeps its row; Milk moves past it.
+      await tap(tester, key('checklist-check-$tea'));
+      await lineMenu(tester, milk);
+      await tap(tester, key('shopping-up'));
+      expect(shown(note), ['Milk', 'Eggs', '[x] Bread', '[x] Tea']);
+      expect(top(tester, milk), lessThan(top(tester, eggs)));
+      expect(top(tester, eggs), lessThan(top(tester, tea)));
+      expect(top(tester, tea), lessThan(top(tester, bread)));
+    });
+
     testWidgets('a deleted Line comes back from the folded "Removed Lines" '
         '(#268)', (tester) async {
       final note = notes.capture('Shop\nMilk\nEggs').id;

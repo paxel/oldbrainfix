@@ -8,7 +8,9 @@
 //! back, Backspace at the start joins, the rows stay where they are while
 //! the editor is open, and the typed order is kept the next time; the
 //! Line menu sets the reappear time and deletes without asking, "Removed
-//! Lines" and Ctrl+Z bringing it back (#268); full cards check, compact cards count the open Lines; a Member
+//! Lines" and Ctrl+Z bringing it back (#268); Alt+Up and Alt+Down, the
+//! menu's Move up and Move down and the handle move an open Line among
+//! the open ones, a struck one staying (#283); full cards check, compact cards count the open Lines; a Member
 //! checks and adds but changes only their own Lines; and a Line Conflict
 //! is named as a Shopping List's. Today's
 //! Agenda shows each Shopping List with open Lines as chosen for it
@@ -505,6 +507,200 @@ fn lines_are_renamed_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
 }
 
 /// Gives each Line of the Shopping List of `note` a week (#195).
+/// Presses Alt with `key`.
+fn alt(harness: &mut Harness<'_, App>, key: egui::Key) {
+    harness.key_press_modifiers(egui::Modifiers::ALT, key);
+    harness.run();
+}
+
+/// A store, a Note of it and the window open on that Note.
+type Opened = (Arc<Store>, String, Harness<'static, App>);
+
+/// The Shopping List of [`SHOPPING`] with "Tea" after it and "Bread"
+/// struck, its window open on it.
+fn with_struck_bread() -> Result<Opened, Box<dyn std::error::Error>> {
+    let (store, note, _) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    lists.add(&note, "Tea", &utc)?;
+    lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
+    let harness = window(&store, Some(&note));
+    Ok((store, note, harness))
+}
+
+#[test]
+fn alt_up_alt_down_and_the_menu_move_an_open_line_among_the_open_ones() -> TestResult {
+    let (_store, note, mut harness) = with_struck_bread()?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // One place up, the cursor staying in it (#283).
+    into_line(&mut harness, "Tea")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Tea", "Apples", "✓ Bread"]
+    );
+    assert_eq!(rows(&harness), ["Milk", "Tea", "Apples", "Bread"]);
+    assert_eq!(focused(&harness).as_deref(), Some("Tea"));
+    alt(&mut harness, egui::Key::ArrowUp);
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    // Down to the last open one, never among the struck ones.
+    into_line(&mut harness, "Milk")?;
+    alt(&mut harness, egui::Key::ArrowDown);
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Apples", "Milk", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Milk"));
+    // A struck Line stays, and so does the cursor.
+    into_line(&mut harness, "Bread")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Apples", "Milk", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Bread"));
+    // ⋮ names the keys, as far as the Line can go; a struck one has
+    // neither.
+    click(&mut harness, "More: Tea")?;
+    assert!(!shows(&harness, "Move up Alt+Up"));
+    assert!(shows(&harness, "Move down Alt+Down"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    click(&mut harness, "More: Bread")?;
+    assert!(!shows(&harness, "Move up Alt+Up"));
+    assert!(!shows(&harness, "Move down Alt+Down"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    click(&mut harness, "More: Milk")?;
+    click(&mut harness, "Move up Alt+Up")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_line_checked_in_the_editor_stays_in_its_row_as_others_move_past_it() -> TestResult {
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    tick(&mut harness, "Bread")?;
+    assert_eq!(rows(&harness), ["Milk", "Bread", "Apples"]);
+    // Past Bread to just before Milk, the open one above it (#283).
+    into_line(&mut harness, "Apples")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(rows(&harness), ["Apples", "Milk", "Bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Apples", "Milk", "✓ Bread"]);
+    // To the end of the open ones, after Milk's row.
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(rows(&harness), ["Milk", "Apples", "Bread"]);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    // A new Line moves once it holds text, stored first.
+    to_end_of(&mut harness, "Apples")?;
+    press(&mut harness, egui::Key::Enter);
+    type_line(&mut harness, "Salt");
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Salt", "Apples", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Salt"));
+    Ok(())
+}
+
+/// Presses at `from`, moves a little, then to `to`, and lets go there,
+/// as a hand drags.
+fn drag(harness: &mut Harness<'_, App>, from: egui::Pos2, to: egui::Pos2) {
+    harness.run_steps(50);
+    harness.drag_at(from);
+    harness.run();
+    harness.hover_at(from + egui::vec2(0.0, 8.0));
+    harness.run();
+    harness.hover_at(to);
+    harness.run();
+    harness.event(egui::Event::PointerButton {
+        pos: to,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+}
+
+/// The middle of the handle of the Line `text`.
+fn handle(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let label = format!("Drag to move: {text}");
+    let node = harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?;
+    Ok(node.rect().center())
+}
+
+/// Just inside the top of the editor's row of the Line `text`, or with
+/// `under` just inside its bottom.
+fn edge(
+    harness: &Harness<'_, App>,
+    text: &str,
+    under: bool,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let node = boxes(harness, text).pop().ok_or(format!("{text:?}"))?;
+    let rect = node.rect();
+    let y = if under {
+        rect.bottom() - 3.0
+    } else {
+        rect.top() + 3.0
+    };
+    Ok(egui::pos2(rect.right() + 40.0, y))
+}
+
+#[test]
+fn an_open_line_is_dragged_by_its_handle_among_the_open_ones() -> TestResult {
+    let (_store, note, mut harness) = with_struck_bread()?;
+    // A struck Line has no handle (#283).
+    assert!(shows(&harness, "Drag to move: Tea"));
+    assert!(!shows(&harness, "Drag to move: Bread"));
+    let (from, to) = (handle(&harness, "Tea")?, edge(&harness, "Milk", false)?);
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Tea", "Milk", "Apples", "✓ Bread"]
+    );
+    assert_eq!(rows(&harness), ["Tea", "Milk", "Apples", "Bread"]);
+    // After the last open one, not among the struck ones.
+    let (from, to) = (handle(&harness, "Tea")?, edge(&harness, "Apples", true)?);
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    // Where it stands, onto the struck one and away from the Lines, it
+    // stays.
+    let (from, to) = (handle(&harness, "Apples")?, edge(&harness, "Apples", true)?);
+    drag(&mut harness, from, to);
+    let (from, to) = (handle(&harness, "Milk")?, edge(&harness, "Bread", true)?);
+    drag(&mut harness, from, to);
+    let from = handle(&harness, "Milk")?;
+    drag(&mut harness, from, egui::pos2(from.x, 2300.0));
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Milk", "Apples", "Tea", "✓ Bread"]
+    );
+    Ok(())
+}
+
 fn weekly(store: &Store, note: &str) -> TestResult {
     let lists = ShoppingLists::new(store);
     for line in list_of(store, note)?.lines {

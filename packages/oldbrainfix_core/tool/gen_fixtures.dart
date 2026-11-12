@@ -1477,7 +1477,10 @@ final _scenarios = <Scenario>[
         'year, none, which stays struck, and none given a day after its '
         'check; an Unsorted Note beside them; then a Line checked Once that '
         'day, struck for the day on the Agenda, a gone one brought back by '
-        'its box and one checked again last (#276).',
+        'its box and one checked again last (#276); last, open Lines moved '
+        'by hand before another, past the keys of two struck ones that come '
+        'back a week on, and after the open ones, a move before itself and '
+        'one to where it is writing nothing (#283).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1633,6 +1636,27 @@ final _scenarios = <Scenario>[
       lists
         ..uncheck(yeast, wall)
         ..check(yeast, wall);
+      // Moved by hand (#283): Soap before Eggs, so before the keys of the
+      // struck Lines between Milk and Eggs, Tea to the top and Milk after
+      // the open ones; before itself and where it is already, nothing.
+      final errands = notes
+          .capture('Errands\nMilk\nBread\nHam\nEggs\nTea\nSoap')
+          .id;
+      lists.make(errands);
+      for (final text in ['Bread', 'Ham']) {
+        lists
+          ..setReappear(
+            line(errands, text),
+            Reappear.after(1, ReappearUnit.week),
+          )
+          ..check(line(errands, text), wall);
+      }
+      lists
+        ..move(line(errands, 'Soap'), wall, before: line(errands, 'Eggs'))
+        ..move(line(errands, 'Tea'), wall, before: line(errands, 'Milk'))
+        ..move(line(errands, 'Milk'), wall)
+        ..move(line(errands, 'Eggs'), wall, before: line(errands, 'Eggs'))
+        ..move(line(errands, 'Milk'), wall);
     },
   ),
   (

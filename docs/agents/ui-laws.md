@@ -646,9 +646,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.
-- On a Shopping List the open Lines keep the order they were typed in,
-  also the next time; a Line checked while the editor is open stays in
-  its row, and shows below the open ones the next time. A name the list
+- On a Shopping List the open Lines keep the order the user gives them,
+  as typed in or moved by ⋮ Move up and Move down (#283), also the next
+  time; a Line checked while the editor is open stays in its row, and
+  shows below the open ones the next time. A struck Line does not move;
+  it comes back where it was among the open ones. A name the list
   has already brings its Line back instead of a second.
 - ⋮ of a Line holds the rest (moving it, Delete); a long press in a
   Line's text selects, as in any field.
@@ -1457,8 +1459,11 @@ replace a law of Both apps where they say so. A desktop law marked
   is, by the same rule: a line shows the gap within its group or the
   top level it goes into; let go where it stands or away from its
   level, it stays and nothing is written. Into a group and out stays
-  with Tab and Shift+Tab. A Shopping List's Lines keep the order they
-  were typed in, with no handle; Alt+Up and Alt+Down do nothing there.
+  with Tab and Shift+Tab. **A Shopping List's open Lines move the same
+  way** (#283, Q678 (b)): Alt+Up and Alt+Down, ⋮ Move up and Move down
+  and the handle move one among the open Lines as they show; a struck
+  Line has no handle nor Move up and Move down, the keys do nothing in
+  it, and no open Line goes among the struck ones.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,
