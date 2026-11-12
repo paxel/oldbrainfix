@@ -8,8 +8,9 @@ every release.
 - Google Play: `io.github.paxel.oldbrainfix`. The tag pipeline uploads the
   bundle to the internal track; promotion is done in the Play Console.
 - App Store: the app record for bundle id `io.github.paxel.oldbrainfix`
-  (the same id as the Android package), Apple id `<to be filled in by the
-  user>`, SKU `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
+  (the same id as the Android package), Apple id `6830820925`
+  (<https://apps.apple.com/app/id6830820925>, live since 0.5.1), SKU
+  `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
   pipeline uploads each build to TestFlight once the Apple secrets exist
   (`docs/agents/ios-release.md`); a manual dispatch with `publish` and
   `submit_app_store` also submits it for App Store review with the
