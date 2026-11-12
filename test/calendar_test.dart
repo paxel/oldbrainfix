@@ -51,6 +51,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   /// Opens the editor of the Note [id] from the Agenda.
   Future<void> edit(WidgetTester tester, String id) async {
     final agenda = tester.element(find.byType(AgendaScreen));
@@ -70,7 +81,7 @@ void main() {
     testWidgets('a Routine opens the calendar app filled in', (tester) async {
       routines.create('pills', daily([at(8)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
 
       await tap(tester, calendarButton);
@@ -86,7 +97,7 @@ void main() {
     testWidgets('several times per day: one choice per time', (tester) async {
       routines.create('pills', daily([at(8), at(20)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
 
       await tap(tester, calendarButton);
       expect(find.text('Add to calendar: Every day · 08:00'), findsOneWidget);

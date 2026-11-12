@@ -100,6 +100,7 @@ class MainActivity : FlutterActivity() {
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) pickOf(intent)?.let { pickOpened = it }
+        if (savedInstanceState == null) occurrenceOf(intent)?.let { occurrenceOpened = it }
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -107,9 +108,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge, the Changes Nudge, the Agenda
-     * widget's Unsorted count or a pick on it opened the running app: the
-     * app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge, an
+     * Occurrence's notification, the Agenda widget's Unsorted count or a
+     * pick on it opened the running app: the app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -128,6 +129,10 @@ class MainActivity : FlutterActivity() {
         }
         pickOf(intent)?.let {
             pickOpened = it
+            actionsArrived()
+        }
+        occurrenceOf(intent)?.let {
+            occurrenceOpened = it
             actionsArrived()
         }
         // Something was shared in while the app runs: it takes it now.
@@ -511,6 +516,10 @@ class MainActivity : FlutterActivity() {
                     "pickOpened" -> {
                         result.success(pickOpened)
                         pickOpened = null
+                    }
+                    "occurrenceOpened" -> {
+                        result.success(occurrenceOpened)
+                        occurrenceOpened = null
                     }
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
@@ -1030,6 +1039,11 @@ class MainActivity : FlutterActivity() {
         return mapOf("session" to session, "occurrence" to occurrence, "note" to note)
     }
 
+    /** The Occurrence whose notification was tapped (#270), as the app reads it, or null. */
+    private fun occurrenceOf(intent: Intent?): Map<String, String>? = intent?.let {
+        OccurrenceOpen.of({ key -> it.getStringExtra(key) }, it.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0)
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -1104,6 +1118,9 @@ class MainActivity : FlutterActivity() {
 
         /** The pick tapped on the Agenda widget whose entry form the app has not opened yet. */
         private var pickOpened: Map<String, String>? = null
+
+        /** The Occurrence whose notification was tapped and whose Note the app has not opened yet. */
+        private var occurrenceOpened: Map<String, String>? = null
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null

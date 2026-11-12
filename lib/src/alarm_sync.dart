@@ -76,6 +76,7 @@ class AlarmSync extends ChangeNotifier {
   var _changesOpened = false;
   var _unsortedOpened = false;
   WidgetPick? _pickOpened;
+  OpenedOccurrence? _occurrenceOpened;
 
   AlarmSync({
     required this.store,
@@ -162,6 +163,14 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// The Occurrence whose notification was tapped and whose Note is
+  /// still to open, or null; taking it clears it (#270).
+  OpenedOccurrence? takeOccurrenceOpened() {
+    final opened = _occurrenceOpened;
+    _occurrenceOpened = null;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -212,11 +221,13 @@ class AlarmSync extends ChangeNotifier {
     final changesOpened = await platform.changesOpened();
     final unsortedOpened = await platform.unsortedOpened();
     final pickOpened = await platform.pickOpened();
+    final occurrenceOpened = await platform.occurrenceOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
     if (changesOpened) _changesOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
     if (pickOpened != null) _pickOpened = pickOpened;
+    if (occurrenceOpened != null) _occurrenceOpened = occurrenceOpened;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -236,7 +247,8 @@ class AlarmSync extends ChangeNotifier {
             nudgeOpened ||
             changesOpened ||
             unsortedOpened ||
-            pickOpened != null)) {
+            pickOpened != null ||
+            occurrenceOpened != null)) {
       notifyListeners();
     }
   });

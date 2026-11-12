@@ -18,6 +18,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
 import 'package:oldbrainfix/src/lock_screen.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/missed_summary_card.dart';
 import 'package:oldbrainfix/src/notes_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
@@ -177,6 +178,23 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('unlockPin')));
       expect(lockScreen, findsNothing);
       expect(find.text('Call the vet'), findsWidgets);
+    });
+
+    testWidgets("an Occurrence's notification tapped opens its Note only "
+        'after the unlock (#270)', (tester) async {
+      final routine = routines.create('Call the vet', daily(10));
+      alarms.tapOccurrence((
+        routineId: routine.id,
+        occurrenceKey: '2026-10-24T10:00',
+      ));
+      await start(tester);
+
+      expect(lockScreen, findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
+      await tap(tester, find.byKey(const ValueKey('unlockPin')));
+      expect(lockScreen, findsNothing);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
     });
 
     testWidgets('opens with biometrics where they are on', (tester) async {
@@ -511,16 +529,45 @@ void main() {
       expect(routines.byId(routine.id)?.doneAt(occurrence), isNotNull);
     });
 
-    testWidgets('asks for the PIN before a Masked row opens its Routine', (
-      tester,
-    ) async {
+    testWidgets('asks for the PIN before a Masked row opens its Note '
+        '(#270)', (tester) async {
       lockedDoctor();
       await start(tester);
 
       await tap(tester, find.text(en.maskedRoutineAt('10:00')).first);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      await enterPin(tester, pin);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.text('Pills'), findsOneWidget);
+    });
+
+    testWidgets("asks for the PIN before a Masked row's Edit schedule opens "
+        'its Routine (#270)', (tester) async {
+      final (:routine, doctor: _, note: _) = lockedDoctor();
+      await start(tester);
+
+      await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
+      await tap(tester, find.byKey(const ValueKey('row-schedule')));
       expect(find.byType(RoutineEditorScreen), findsNothing);
       await enterPin(tester, pin);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
+    });
+
+    testWidgets("asks for the PIN before a tap on a locked Area's "
+        'notification opens its Note (#270)', (tester) async {
+      final (:routine, doctor: _, note: _) = lockedDoctor();
+      await start(tester);
+
+      alarms.tapOccurrence((
+        routineId: routine.id,
+        occurrenceKey: '2026-10-24T10:00',
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      await enterPin(tester, pin);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.text('Pills'), findsOneWidget);
     });
 
     testWidgets('asks for the PIN before a Masked row shares its file', (

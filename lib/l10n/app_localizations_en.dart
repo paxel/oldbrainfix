@@ -776,6 +776,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notToday => 'Not today';
 
   @override
+  String get editSchedule => 'Edit schedule';
+
+  @override
   String get notTodayQuestion => 'Skip it, or tomorrow at the same time?';
 
   @override

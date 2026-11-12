@@ -47,6 +47,7 @@ void main() {
               return null;
             case 'ringing':
             case 'pickOpened':
+            case 'occurrenceOpened':
               return null;
             case 'nudgeOpened':
             case 'changesOpened':

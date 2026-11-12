@@ -30,7 +30,7 @@ enum AlarmsChannel {
         result(false)
         return
       }
-      if background && call.method == "pickOpened" {
+      if background && ["pickOpened", "occurrenceOpened"].contains(call.method) {
         result(nil)
         return
       }
@@ -86,6 +86,9 @@ enum AlarmsChannel {
       result(WidgetOpens.takeUnsorted())
     case "pickOpened":
       result(WidgetOpens.takePick())
+    case "occurrenceOpened":
+      result(scheduler.occurrenceOpened)
+      scheduler.occurrenceOpened = nil
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -207,6 +210,10 @@ final class AlarmScheduler {
   var nudgeOpened = false
   var changesOpened = false
 
+  /// The Occurrence whose notification was tapped and whose Note the
+  /// app has not opened yet (#270), as the app reads it.
+  var occurrenceOpened: [String: String]?
+
   private var tail: Task<Void, Never>?
 
   private static let planFile = "plan.json"
@@ -278,6 +285,9 @@ final class AlarmScheduler {
       nudgeOpened = true
     case .openChanges:
       changesOpened = true
+    case .openOccurrence:
+      if routine.isEmpty || occurrence.isEmpty { return replan() }
+      occurrenceOpened = ["routine": routine, "occurrence": occurrence]
     case .open:
       return replan()
     }

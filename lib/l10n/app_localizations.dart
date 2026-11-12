@@ -1280,6 +1280,12 @@ abstract class AppLocalizations {
   /// **'Not today'**
   String get notToday;
 
+  /// In the menu of an Occurrence's row on the Agenda (#270): opens the Routine or Reminder editor, as a tap on the row opens its Note.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit schedule'**
+  String get editSchedule;
+
   /// The text of an Occurrence's notification once Not today was tapped, above Skip and Tomorrow (#269).
   ///
   /// In en, this message translates to:

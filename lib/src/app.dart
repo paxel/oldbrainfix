@@ -38,6 +38,7 @@ import 'location.dart';
 import 'lock_platform.dart';
 import 'lock_screen.dart';
 import 'look.dart';
+import 'note_editor_screen.dart';
 import 'nudge_screen.dart';
 import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
@@ -609,6 +610,7 @@ class _HomeState extends State<_Home> {
   var _changesWaiting = false;
   var _unsortedWaiting = false;
   WidgetPick? _pickWaiting;
+  OpenedOccurrence? _occurrenceWaiting;
 
   /// Whether the bundles of the Changes Nudge are going out now.
   var _sendingChanges = false;
@@ -633,6 +635,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_changesOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.alarms.addListener(_pickOpened);
+    widget.alarms.addListener(_occurrenceOpened);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
@@ -770,6 +773,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_changesOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.alarms.removeListener(_pickOpened);
+    widget.alarms.removeListener(_occurrenceOpened);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
@@ -866,6 +870,10 @@ class _HomeState extends State<_Home> {
     if (_pickWaiting case final pick?) {
       _pickWaiting = null;
       unawaited(_openPick(pick));
+    }
+    if (_occurrenceWaiting case final opened?) {
+      _occurrenceWaiting = null;
+      unawaited(_openOccurrence(opened));
     }
   }
 
@@ -1014,6 +1022,44 @@ class _HomeState extends State<_Home> {
       if (!open || !mounted) return;
     }
     await openPick(context, widget.notes, today, picked);
+    lock?.closeAreas();
+  }
+
+  /// Opens the Note of an Occurrence whose notification was tapped
+  /// (#270); behind the App Lock it waits for the unlock.
+  void _occurrenceOpened() {
+    if (!mounted) return;
+    final opened = widget.alarms.takeOccurrenceOpened();
+    if (opened == null) return;
+    if (widget.lock.locked) {
+      _occurrenceWaiting = opened;
+      return;
+    }
+    unawaited(_openOccurrence(opened));
+  }
+
+  /// Opens the editor of the Note of [opened]'s Routine, as a tap on its
+  /// row on the Agenda does: its locked Area first. A Routine or Note no
+  /// longer there, or in the trash, opens nothing, the Agenda being open.
+  Future<void> _openOccurrence(OpenedOccurrence opened) async {
+    final store = widget.store;
+    final routine = Routines(store).byId(opened.routineId);
+    if (routine == null || routine.isTrashed) return;
+    final note = widget.notes.byId(routine.noteId);
+    if (note == null || note.isTrashed) return;
+    final lock = LockScope.of(context);
+    final areaId = AreaLocks(store).lockedAreaOf(note);
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await openNote(context, widget.notes, widget.places, note);
     lock?.closeAreas();
   }
 

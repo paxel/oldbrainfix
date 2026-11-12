@@ -780,6 +780,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get notToday => 'Nicht heute';
 
   @override
+  String get editSchedule => 'Plan bearbeiten';
+
+  @override
   String get notTodayQuestion => 'Auslassen oder morgen zur selben Zeit?';
 
   @override

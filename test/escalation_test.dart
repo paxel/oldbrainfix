@@ -47,6 +47,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   group('Escalation in the Routine editor', () {
     Future<void> openSection(WidgetTester tester) async {
       final section = find.text('Escalation');
@@ -68,7 +79,7 @@ void main() {
       final pills = routines.create('pills', daily([at(20)]));
       await start(tester);
       expect(alarms.armed.first.alarm.escalation, isNull);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await openSection(tester);
       expect(find.text('Off: it only Re-nags'), findsOneWidget);
       expect(find.byKey(const ValueKey('escalationAfter')), findsNothing);
@@ -106,7 +117,7 @@ void main() {
       try {
         routines.create('pills', daily([at(20)]));
         await start(tester);
-        await tap(tester, find.text('pills').first);
+        await editSchedule(tester, find.text('pills').first);
         await openSection(tester);
         expect(find.text('Escalate to an iPhone alarm'), findsOneWidget);
         expect(find.textContaining('full-screen'), findsNothing);
@@ -125,7 +136,7 @@ void main() {
       final pills = routines.create('pills', daily([at(20)]));
       routines.setEscalation(pills.id, 4);
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await openSection(tester);
       final column = find.byKey(const ValueKey('escalationAfter'));
       expect(find.byType(DropdownButton<int>), findsNothing);
@@ -142,7 +153,7 @@ void main() {
       final pills = routines.create('pills', daily([at(20)]));
       routines.setEscalation(pills.id, 2);
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await openSection(tester);
       expect(
         find.text('Full-screen alarm after 2 ignored Re-nags'),

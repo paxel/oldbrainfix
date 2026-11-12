@@ -18,7 +18,8 @@ import android.os.Build
  * three actions, so Snooze turns the same notification into the three
  * snooze choices (10 min, 30 min, 1 h), and Not today into Skip and
  * Tomorrow (#269). Every action is a broadcast, so it works from the
- * lock screen without opening the app.
+ * lock screen without opening the app; a tap on the notification
+ * itself opens its Note (#270).
  */
 object Notifications {
     private const val ESCALATED_CHANNEL = "escalated"
@@ -278,7 +279,7 @@ object Notifications {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(alertOnce)
             .setAutoCancel(true)
-            .setContentIntent(openApp(context))
+            .setContentIntent(openNote(context, alarm))
             .setActions(*actions.toTypedArray())
             .build()
         manager.notify(AlarmPlan.notificationId(alarm.routine, alarm.occurrence), notification)
@@ -327,6 +328,21 @@ object Notifications {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
+
+    /**
+     * Opens the app on the editor of [alarm]'s Note (#270). Its own
+     * request code per Occurrence, as extras alone do not tell two
+     * PendingIntents apart.
+     */
+    private fun openNote(context: Context, alarm: Alarm): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        OccurrenceOpen.extras(alarm).forEach { (key, value) -> intent.putExtra(key, value) }
+        return PendingIntent.getActivity(
+            context, AlarmPlan.notificationId(alarm.routine, alarm.occurrence), intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
 
     private fun action(
         context: Context,

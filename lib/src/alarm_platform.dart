@@ -234,6 +234,10 @@ class ChecklistTapped extends AlarmAction {
 /// [sessionId], whose entry form opens.
 typedef WidgetPick = ({String sessionId, String occurrenceKey, String noteId});
 
+/// An Occurrence's notification tapped (#270): the Occurrence
+/// [occurrenceKey] of the Routine [routineId], whose Note opens.
+typedef OpenedOccurrence = ({String routineId, String occurrenceKey});
+
 /// A snooze tapped on the Nudge: the Notes Unsorted then wait until
 /// [until].
 class NudgeSnoozed extends AlarmAction {
@@ -321,6 +325,10 @@ abstract interface class AlarmPlatform {
   /// asked, or null; asking clears it.
   Future<WidgetPick?> pickOpened();
 
+  /// The Occurrence whose notification was tapped since this was last
+  /// asked, or null; asking clears it.
+  Future<OpenedOccurrence?> occurrenceOpened();
+
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
 
@@ -387,6 +395,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<WidgetPick?> pickOpened() async => null;
+
+  @override
+  Future<OpenedOccurrence?> occurrenceOpened() async => null;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -561,6 +572,19 @@ class AndroidAlarms implements AlarmPlatform {
       (final String session, final String occurrence, final String note)
           when session.isNotEmpty && occurrence.isNotEmpty && note.isNotEmpty =>
         (sessionId: session, occurrenceKey: occurrence, noteId: note),
+      _ => null,
+    };
+  }
+
+  @override
+  Future<OpenedOccurrence?> occurrenceOpened() async {
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('occurrenceOpened'),
+    );
+    return switch ((raw?['routine'], raw?['occurrence'])) {
+      (final String routine, final String occurrence)
+          when routine.isNotEmpty && occurrence.isNotEmpty =>
+        (routineId: routine, occurrenceKey: occurrence),
       _ => null,
     };
   }

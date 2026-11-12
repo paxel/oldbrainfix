@@ -55,6 +55,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   /// From the Agenda, opens the editor of the Note showing [text].
   Future<void> openNote(WidgetTester tester, String text) async {
     await tap(tester, find.byTooltip('Search and browse'));
@@ -193,7 +204,7 @@ void main() {
       final pills = notes.capture('pills');
       routines.spawn(pills.id, daily([at(20)]));
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.text('pills'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       await tap(tester, find.byTooltip('Move to trash'));
@@ -208,7 +219,7 @@ void main() {
       final tuesday = notes.capture('dentist Tuesday');
       routines.spawn(tuesday.id, daily([at(20)]));
       await start(tester);
-      await tap(tester, find.text('dentist Tuesday').first);
+      await editSchedule(tester, find.text('dentist Tuesday').first);
       await tap(tester, find.text('dentist Tuesday'));
       await tap(tester, find.byTooltip('Merge into…'));
       await tap(tester, find.text('dentist'));
@@ -248,7 +259,7 @@ void main() {
         'undoes it, and the trash restores it', (tester) async {
       final routine = routines.create('pills', daily([at(20)]));
       await startWeek(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(RoutineEditorScreen), findsNothing);
@@ -258,7 +269,7 @@ void main() {
       expect(routines.byId(routine.id)?.isTrashed, isFalse);
       expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
 
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
       expect(routines.byId(routine.id)?.isTrashed, isTrue);
 

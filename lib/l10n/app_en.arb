@@ -423,6 +423,8 @@
   "snooze60": "1 h",
   "notToday": "Not today",
   "@notToday": {"description": "Beside Snooze on an Occurrence's notification, in the Agenda row's menu and in the Note editor's Due line (#269): opens Skip and Tomorrow. CONTEXT.md, Not today."},
+  "editSchedule": "Edit schedule",
+  "@editSchedule": {"description": "In the menu of an Occurrence's row on the Agenda (#270): opens the Routine or Reminder editor, as a tap on the row opens its Note."},
   "notTodayQuestion": "Skip it, or tomorrow at the same time?",
   "@notTodayQuestion": {"description": "The text of an Occurrence's notification once Not today was tapped, above Skip and Tomorrow (#269)."},
   "skip": "Skip",

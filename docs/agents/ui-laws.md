@@ -134,18 +134,22 @@ replace a law of Both apps where they say so. A desktop law marked
   Area's colour and icon and, on an Occurrence, ⋮; the entries are
   indented so their boxes stand where the heading's words begin, a Line
   under another Line one step further, and every entry looks alike: its
-  box and its words. A tap on a heading opens its list or Routine, a
-  tap on an entry's words what its heading opens (a pick its entry
-  form), a box checks its entry. One card holds a group. Which Lines a
+  box and its words. A tap on a heading opens its list or Note (#270:
+  an Occurrence's the editor of its Note, with its Due line once it
+  is due), a tap on
+  an entry's words what its heading opens (a pick its entry form), a
+  box checks its entry. One card holds a group. Which Lines a
   Checklist's group shows is decided in one place (`agendaLines`, on the
   desktop `agenda_lines`).
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
   press: **Snooze** (10 min, 30 min, 1 h) while it is due, started and
   not yet Missed, and **Not today** (Skip, and Tomorrow) while it is
   neither Done nor skipped and this Device may check it off (#269), each
-  under its heading; then History for a Routine, and Share, which hands
-  the Routine as its whole series with its end, or the Reminder, to
-  another app as a calendar file. History and Share ask a Masked row's
+  under its heading; then **Edit schedule**, which opens the Routine or
+  Reminder editor (#270), as the Routine's badge in the Note editor
+  does; History for a Routine, and Share, which hands the Routine as
+  its whole series with its end, or the Reminder, to another app as a
+  calendar file. Edit schedule, History and Share ask a Masked row's
   Area to open first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines (#143, #208): its name as the heading, without a
@@ -1001,6 +1005,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
+- **A tap on an Occurrence's notification opens the editor of its
+  Note** (#270), with Done, Snooze and Not today in its Due line, over
+  whatever the app showed; a locked Area asks to open first, and behind
+  the App Lock it opens after the unlock. A Routine or Note gone or in
+  the trash opens only the app.
 - **On Android an Occurrence's notification has three buttons** (#269,
   Q650): Done · Snooze · Not today, as Android shows no more. Snooze
   replaces them in place with 10 min, 30 min and 1 h, and Not today with

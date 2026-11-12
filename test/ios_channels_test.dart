@@ -16,6 +16,7 @@ import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/location.dart';
 import 'package:oldbrainfix/src/lock_platform.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/ocr_platform.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
@@ -264,6 +265,52 @@ void main() {
     expect(acknowledged.last, 2);
     expect(pending, isEmpty);
     expect(find.byType(UnsortedScreen), findsOneWidget);
+  });
+
+  testWidgets("a tap on an Occurrence's notification opens its Note, as "
+      'AlarmsChannel.swift tells it once (#270)', (tester) async {
+    store
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    final routine = Routines(store).create(
+      'pills',
+      Schedule(
+        start: Day(2026, 10, 1),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Map<String, String>? opened = {
+      'routine': routine.id,
+      'occurrence': '2026-10-24T08:00',
+    };
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('io.github.paxel.oldbrainfix/alarms'),
+          (call) async {
+            switch (call.method) {
+              case 'occurrenceOpened':
+                final answer = opened;
+                opened = null;
+                return answer;
+              case 'pending':
+                return const <Object?>[];
+              case 'nudgeOpened':
+              case 'changesOpened':
+              case 'unsortedOpened':
+                return false;
+              case 'permissions':
+                return {'notifications': true, 'alarms': true};
+              default:
+                return null;
+            }
+          },
+        );
+    await start(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(opened, isNull);
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
   });
 
   testWidgets('on the iPhone a page pushed on the Agenda goes back with '

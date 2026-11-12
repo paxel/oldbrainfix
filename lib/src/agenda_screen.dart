@@ -50,7 +50,7 @@ import 'text_marks_view.dart';
 import 'unit_system.dart';
 
 /// What the menu of an Occurrence's row does.
-enum _RowChoice { history, share }
+enum _RowChoice { schedule, history, share }
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours, then
@@ -800,9 +800,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  /// A tap on an Occurrence opens the editor of its Note, with Done,
+  /// Snooze and Not today at its top once it is due (#270); its locked
+  /// Area first. One whose Note is gone or in the trash opens its Routine
+  /// instead, the only place left to see it.
   Future<void> _openRow(AgendaRow row) async {
     if (!await _openAreaOf(row) || !mounted) return;
-    await openRoutine(context, widget.notes, widget.places, row.routine);
+    final note = row.note;
+    if (note == null || note.isTrashed) {
+      await openRoutine(context, widget.notes, widget.places, row.routine);
+    } else {
+      await openNote(context, widget.notes, widget.places, note);
+    }
     if (!mounted) return;
     _closeAreas();
     _routineEdited();
@@ -810,16 +819,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// The ⋮ of an Occurrence's row, or a long press on it, opens a menu
   /// where the finger is: Snooze and Not today while it can be answered
-  /// (#269), a Routine's history, and Share, which hands the Routine as
-  /// its whole series, or the Reminder, to another app as a calendar
-  /// file. History and Share open a locked Area first, as a Masked row
-  /// tells nothing until then; Snooze and Not today answer it as its box
-  /// does. Null when there is nothing to offer.
-  void Function(Offset at)? _rowMenu(AgendaRow row) {
+  /// (#269), Edit schedule, which opens its Routine (#270), a Routine's
+  /// history, and Share, which hands the Routine as its whole series, or
+  /// the Reminder, to another app as a calendar file. Edit schedule,
+  /// History and Share open a locked Area first, as a Masked row tells
+  /// nothing until then; Snooze and Not today answer it as its box does.
+  void Function(Offset at) _rowMenu(AgendaRow row) {
     final history = !row.routine.isReminder;
     final share = CalendarScope.of(context).available;
-    final answers = row.done == null && row.skipped == null;
-    if (!history && !share && !answers) return null;
     return (at) => _showRowMenu(row, at, history: history, share: share);
   }
 
@@ -861,7 +868,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
     final items = [
       ...answers,
-      if (answers.isNotEmpty && (history || share)) const PopupMenuDivider(),
+      if (answers.isNotEmpty) const PopupMenuDivider(),
+      item(_RowChoice.schedule, Icons.edit_calendar_outlined, t.editSchedule),
       if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
       if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
     ];
@@ -889,6 +897,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
     }
     if (!await _openAreaOf(row) || !mounted) return;
     switch (choice) {
+      case _RowChoice.schedule:
+        await openRoutine(context, widget.notes, widget.places, row.routine);
+        if (!mounted) return;
+        _closeAreas();
+        _routineEdited();
+        return;
       case _RowChoice.history:
         await openHistory(context, widget.notes, row.routine);
       case _RowChoice.share:
@@ -1045,8 +1059,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// The Lines of a Routine spawned from a Checklist under its title, as
   /// checked for this Occurrence, checkable where this Device may check
-  /// it off, on every day shown; a tap on one's words opens the Routine
-  /// as the heading does. Nothing on a Masked row.
+  /// it off, on every day shown; a tap on one's words opens the Note as
+  /// the heading does (#270). Nothing on a Masked row.
   List<Widget> _routineLines(PlacedRow placed) {
     final (:row, :masked, :lines, area: _, session: _, picks: _) = placed;
     if (masked || lines == null) return const [];

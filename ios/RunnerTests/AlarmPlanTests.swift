@@ -186,6 +186,17 @@ class AlarmPlanTests: XCTestCase {
       .openChanges)
   }
 
+  func testATapOnAnOccurrencesNotificationOpensItsNote() {
+    XCTAssertEqual(
+      NotificationAnswer.of(
+        category: NotificationAnswer.alarmCategory, action: NotificationAnswer.defaultAction),
+      .openOccurrence)
+    XCTAssertEqual(
+      NotificationAnswer.of(
+        category: NotificationAnswer.pastAlarmCategory, action: NotificationAnswer.defaultAction),
+      .openOccurrence)
+  }
+
   func testNotTodaysActionsMapToTheirAnswers() {
     XCTAssertEqual(
       NotificationAnswer.of(category: NotificationAnswer.alarmCategory, action: "obf.skip"), .skip)

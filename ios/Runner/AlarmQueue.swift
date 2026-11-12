@@ -148,6 +148,9 @@ enum NotificationAnswer: Equatable {
   case nudgeSnooze(minutes: Int)
   case openNudge
   case openChanges
+  /// The Occurrence's notification itself was tapped: its Note opens
+  /// (#270).
+  case openOccurrence
   /// Opens the app and changes nothing.
   case open
 
@@ -170,6 +173,7 @@ enum NotificationAnswer: Equatable {
   static func of(category: String, action: String) -> NotificationAnswer {
     switch category {
     case alarmCategory, pastAlarmCategory:
+      if action == defaultAction { return .openOccurrence }
       if action == doneAction { return .done }
       if action == skipAction { return .skip }
       if action == tomorrowAction && category == alarmCategory { return .tomorrow }

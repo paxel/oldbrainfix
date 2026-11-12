@@ -71,6 +71,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Routine of the Agenda row [row] through its menu's Edit
+  /// schedule, as a tap on the row opens its Note (#270).
+  Future<void> editSchedule(WidgetTester tester, Finder row) async {
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-schedule')));
+    await tester.pumpAndSettle();
+  }
+
   final page = find.byType(RoutineHistoryScreen);
 
   /// The dots of the days that came to [outcome].
@@ -99,7 +110,7 @@ void main() {
         'the log', (tester) async {
       pills();
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       await tap(tester, historyButton);
       expect(page, findsOneWidget);
@@ -158,7 +169,7 @@ void main() {
         at: DateTime(2026, 10, 23, 8, 30),
       );
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       await tester.scrollUntilVisible(
         find.textContaining('Done late: '),
@@ -176,7 +187,7 @@ void main() {
     ) async {
       pills();
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       expect(streak, findsOneWidget);
 
@@ -193,7 +204,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, historyButton);
       expect(streak, findsNothing);
       expect(find.text('Now'), findsNothing);
@@ -229,7 +240,7 @@ void main() {
       expect(find.text('History'), findsNothing);
       await tester.tapAt(Offset.zero);
       await tester.pumpAndSettle();
-      await tap(tester, find.text('call mum'));
+      await editSchedule(tester, find.text('call mum'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(historyButton, findsNothing);
     });
@@ -243,7 +254,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       pills();
       await start(tester);
-      await tap(tester, find.text('pills').first);
+      await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Verlauf'));
       expect(page, findsOneWidget);
 

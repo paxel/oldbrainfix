@@ -1293,9 +1293,11 @@ void _storeScreenshots({required bool iphone}) {
         }
 
         frame('7-history.png', (tester) async {
-          final t = await start(tester, _Seeded(texts));
-          await tap(tester, find.text(texts.snack).first);
-          await tap(tester, find.byTooltip(t.historyTitle));
+          await start(tester, _Seeded(texts));
+          // From the row's menu, as a tap opens the Note (#270).
+          await tester.longPress(find.text(texts.snack).first);
+          await tester.pumpAndSettle();
+          await tap(tester, find.byKey(const ValueKey('row-history')));
           expect(find.byType(RoutineHistoryScreen), findsOneWidget);
           backArrow();
         });
@@ -1576,10 +1578,13 @@ void main() {
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
           });
 
-          /// The snack's Routine in its editor.
+          /// The snack's Routine in its editor, through its row's Edit
+          /// schedule (#270).
           Future<AppLocalizations> snackEditor(WidgetTester tester) async {
             final t = await start(tester, seed());
-            await _tap(tester, find.text(texts.snack).first);
+            await tester.longPress(find.text(texts.snack).first);
+            await tester.pumpAndSettle();
+            await _tap(tester, find.byKey(const ValueKey('row-schedule')));
             expect(find.byType(RoutineEditorScreen), findsOneWidget);
             return t;
           }
