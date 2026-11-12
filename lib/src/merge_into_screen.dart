@@ -31,17 +31,18 @@ Future<bool> mergeNote(
 
 /// Picks the Note to merge the Note [noteId] into: every other Note as a
 /// card, newest first, with a search field over them. Pops with the
-/// picked Note's id.
+/// picked Note's id. Without [noteId], for several Notes (#273), every
+/// Note is offered.
 class MergeIntoScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
-  final String noteId;
+  final String? noteId;
 
   const MergeIntoScreen({
     super.key,
     required this.notes,
     required this.places,
-    required this.noteId,
+    this.noteId,
   });
 
   @override

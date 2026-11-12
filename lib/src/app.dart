@@ -1257,6 +1257,7 @@ class _HomeState extends State<_Home> {
                 places: widget.places,
                 trail: widget.trail,
                 onBack: _pager.showAgenda,
+                pageShown: _pager.shown,
               ),
             ),
           ),

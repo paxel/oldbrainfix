@@ -5813,4 +5813,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linesRemoved => 'Removed Lines';
+
+  @override
+  String get selectNotes => 'Select';
+
+  @override
+  String get selectNote => 'Select this Note';
+
+  @override
+  String get stopSelecting => 'Stop selecting';
+
+  @override
+  String notesSelected(int count) {
+    return '$count selected';
+  }
 }

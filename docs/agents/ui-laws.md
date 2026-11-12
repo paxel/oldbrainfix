@@ -758,7 +758,8 @@ replace a law of Both apps where they say so. A desktop law marked
   picks the Note. A tap on a link in its text, a formatted text's or a
   bare `http://` or `https://` address (#222), opens that link instead; a
   long press on it is still the card's. A tap on a row or card never
-  opens a menu.
+  opens a menu, nor selects it: a list selects with its boxes (see
+  Cards, #273).
 - **An app link opens its place without asking** (#261, ADR 0046): a
   Note, an Area or Topic, the Agenda, Unsorted or one of the app's
   pages, as its own menu opens it. A target this Device cannot see is an
@@ -789,7 +790,9 @@ replace a law of Both apps where they say so. A desktop law marked
   "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
   label removed", "Transcript removed"), and so does a Skip or Tomorrow
   made in the app ("Skipped", "The day after instead", #269), whose undo
-  takes the skip back; one made on a notification offers none. It ends
+  takes the skip back; one made on a notification offers none. A
+  selection moved to the Trash is one offer for all of its Notes (#273).
+  It ends
   with "Undo"; its
   tap undoes it, and a screen reader hears "Undo" as the tap's hint. It
   shows before what waits, a newer one takes the place of the one
@@ -951,6 +954,27 @@ replace a law of Both apps where they say so. A desktop law marked
 - In the Note editor a text that is only read, the Note's or a
   Section's, selects with a long press, with Copy in the system's menu
   (#183).
+- **Several Notes are selected with "Select"** (#273, Q655): every Note
+  list, Unsorted and its Nudge page, an Area, a Topic, All Notes, the
+  search's hits and the Trash, has Select in its bar while it shows a
+  card this Device may change, as a long press opens the editor and a
+  tap switches the view.
+  It puts a box at the top left of every card this Device may change
+  (ADR 0013); only the box ticks, a tap and a long press on the card
+  still do what they do. While it selects the bar's title says how many
+  are ticked ("3 selected") and its buttons are, in this order, Stop
+  selecting, File into…, Merge into…, Importance and Move to trash, in
+  the Trash Stop selecting and Restore, each greyed while none is
+  ticked. File into… opens the picker of #272, marking the place when
+  all of them sit in one; Merge into… opens the Note picker with every
+  Note, the ticked ones included, and a ticked Note picked takes the
+  others in, all in one go; Importance opens its three at the button.
+  An action ends the selection; Move to trash asks nothing and offers
+  one undo for all of them at the top (#268). Back and swipe right drop
+  the selection and stay on the page, as do Stop selecting and a search
+  emptied; on the Areas list beside the Agenda back leaves for the
+  Agenda, and leaving drops it too. The cards a reload no longer shows
+  leave the selection.
 
 ### Dialogs and pages
 

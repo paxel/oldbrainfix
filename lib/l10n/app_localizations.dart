@@ -9475,6 +9475,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Removed Lines'**
   String get linesRemoved;
+
+  /// Bar action of a Note list on the phone (#273): shows a box on every card this Device may change, to act on several Notes at once.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get selectNotes;
+
+  /// Screen reader label of the box on a Note card while its list selects (#273).
+  ///
+  /// In en, this message translates to:
+  /// **'Select this Note'**
+  String get selectNote;
+
+  /// First bar button while a Note list selects (#273): drops the selection and hides the boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop selecting'**
+  String get stopSelecting;
+
+  /// Title of a Note list while it selects (#273): how many Notes are selected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String notesSelected(int count);
 }
 
 class _AppLocalizationsDelegate

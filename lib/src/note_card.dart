@@ -339,6 +339,12 @@ class NoteCard extends StatelessWidget {
   /// null.
   final NoteOccurrences? occurrences;
 
+  /// Puts the Note into a list's selection or takes it out (#273): a
+  /// box at the card's top left, ticked while [selected]; the only thing
+  /// that does, as a tap still switches the view. No box when null.
+  final ValueChanged<bool>? onSelect;
+  final bool selected;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -375,6 +381,8 @@ class NoteCard extends StatelessWidget {
     this.boxes,
     this.onTable,
     this.occurrences,
+    this.onSelect,
+    this.selected = false,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -590,6 +598,24 @@ class NoteCard extends StatelessWidget {
             ),
           ),
           Column(children: [?menu, ?marker]),
+        ],
+      );
+    }
+    if (onSelect case final select?) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            // Beside the text's first line, clear of the coloured edge.
+            padding: EdgeInsets.only(top: menu == null ? 0 : 8, right: 4),
+            child: Checkbox(
+              key: ValueKey('select-${note.id}'),
+              value: selected,
+              semanticLabel: t.selectNote,
+              onChanged: (on) => select(on ?? false),
+            ),
+          ),
+          Expanded(child: content),
         ],
       );
     }

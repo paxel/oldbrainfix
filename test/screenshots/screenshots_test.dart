@@ -1553,6 +1553,16 @@ void main() {
             await start(tester, seed());
             await _tap(tester, find.byKey(const ValueKey('unsortedBanner')));
             expect(find.byType(UnsortedScreen), findsOneWidget);
+            // Two of them ticked for File into… in the bar (#273).
+            await _tap(tester, find.byKey(const ValueKey('selectNotes')));
+            final boxes = find.byWidgetPredicate(
+              (w) =>
+                  w is Checkbox &&
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('select-'),
+            );
+            await _tap(tester, boxes.at(0));
+            await _tap(tester, boxes.at(1));
           });
 
           /// The boiler's Note, with its two Amends, in the Note editor.

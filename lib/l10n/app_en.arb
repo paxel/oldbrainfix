@@ -3098,5 +3098,18 @@
   "undoTomorrow": "The day after instead",
   "@undoTomorrow": {"description": "Announced after Not today ▸ Tomorrow in the app (#269); its tap takes it back, and the Occurrence added tomorrow goes."},
   "linesRemoved": "Removed Lines",
-  "@linesRemoved": {"description": "Folded heading under a Checklist's or Shopping List's Lines in the Note editor: the deleted Lines, each with Restore."}
+  "@linesRemoved": {"description": "Folded heading under a Checklist's or Shopping List's Lines in the Note editor: the deleted Lines, each with Restore."},
+  "selectNotes": "Select",
+  "@selectNotes": {"description": "Bar action of a Note list on the phone (#273): shows a box on every card this Device may change, to act on several Notes at once."},
+  "selectNote": "Select this Note",
+  "@selectNote": {"description": "Screen reader label of the box on a Note card while its list selects (#273)."},
+  "stopSelecting": "Stop selecting",
+  "@stopSelecting": {"description": "First bar button while a Note list selects (#273): drops the selection and hides the boxes."},
+  "notesSelected": "{count} selected",
+  "@notesSelected": {
+    "description": "Title of a Note list while it selects (#273): how many Notes are selected.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  }
 }

@@ -693,7 +693,9 @@ class BrowserSearchField extends StatelessWidget {
 /// ⋮ opens the editor (#114).
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
 /// [showPlace] says which cards name where they are filed: those the
-/// screen does not name already.
+/// screen does not name already. While [selected] is given the list
+/// selects (#273): each card this Device may change has a box, ticked
+/// for those in it, whose tap runs [onSelect].
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
@@ -707,6 +709,8 @@ List<Widget> diaryCards(
   bool compact = false,
   Set<String> switched = const {},
   void Function(Note note)? onSwitch,
+  Set<String>? selected,
+  void Function(Note note, bool on)? onSelect,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
@@ -784,6 +788,10 @@ List<Widget> diaryCards(
           occurrences: (read: () => todayOf(note), routines: routines),
           onTap: onSwitch == null ? null : () => onSwitch(note),
           onEdit: () => onOpen(note),
+          onSelect: selected == null || onSelect == null || !changes
+              ? null
+              : (on) => onSelect(note, on),
+          selected: selected?.contains(note.id) ?? false,
         ),
   ];
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -10,11 +11,13 @@ import 'browser.dart';
 import 'browser_add.dart';
 import 'file_into_screen.dart';
 import 'frogs_screen.dart';
+import 'home_pages.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'note_selection.dart';
 import 'notes_screen.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
@@ -41,6 +44,10 @@ class AreasScreen extends StatefulWidget {
   /// page's.
   final VoidCallback? onBack;
 
+  /// The page of the two shown, when this is the page beside the Agenda:
+  /// leaving it drops the selection (#273), as back there leaves too.
+  final ValueListenable<int>? pageShown;
+
   const AreasScreen({
     super.key,
     required this.notes,
@@ -48,6 +55,7 @@ class AreasScreen extends StatefulWidget {
     required this.trail,
     this.query = '',
     this.onBack,
+    this.pageShown,
   });
 
   @override
@@ -55,7 +63,7 @@ class AreasScreen extends StatefulWidget {
 }
 
 class _AreasScreenState extends State<AreasScreen>
-    with ReloadsOnLogChange, FoldsNoteCards {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
   late final _query = TextEditingController(text: widget.query);
   List<Area> _areas = const [];
 
@@ -79,10 +87,37 @@ class _AreasScreenState extends State<AreasScreen>
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.pageShown?.addListener(_pageChanged);
+  }
+
+  @override
+  void didUpdateWidget(AreasScreen old) {
+    super.didUpdateWidget(old);
+    if (old.pageShown != widget.pageShown) {
+      old.pageShown?.removeListener(_pageChanged);
+      widget.pageShown?.addListener(_pageChanged);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.pageShown?.removeListener(_pageChanged);
     _query.dispose();
     super.dispose();
   }
+
+  /// The Agenda came in its place: the selection goes (#273).
+  void _pageChanged() {
+    if (widget.pageShown?.value != HomePager.areas) stopSelecting();
+  }
+
+  /// [child] under the selection's back, when this page is a route of
+  /// its own; beside the Agenda back leaves for it, which drops the
+  /// selection.
+  Widget _selectionBack(Widget child) =>
+      widget.onBack == null ? selectionBack(child) : child;
 
   /// Reads the Areas, sorted by the name the reader sees, and the hits
   /// of the search.
@@ -111,6 +146,7 @@ class _AreasScreenState extends State<AreasScreen>
       lock: LockScope.of(context),
       people: _filter,
     );
+    keepShown(_hits);
   }
 
   void _filtered(PersonFilter people) => setState(() {
@@ -119,6 +155,12 @@ class _AreasScreenState extends State<AreasScreen>
   });
 
   void _reload() => setState(_load);
+
+  /// The search changed; with no hits to show the selection goes too.
+  void _searched(String query) {
+    if (query.trim().isEmpty) stopSelecting();
+    _reload();
+  }
 
   /// A tag tapped on a hit searches for it here.
   void _searchTag(BuildContext _, String query) {
@@ -360,84 +402,102 @@ class _AreasScreenState extends State<AreasScreen>
       back: widget.onBack == null,
       child: TagSearchScope(
         onSearch: _searchTag,
-        child: Scaffold(
-          appBar: pageBar(
-            context,
-            title: t.areasTitle,
-            onBack: widget.onBack,
-            actions: [
-              // Only the search's hits are Notes on this level.
-              if (searching) ...[
-                PersonFilterButton(
-                  store: widget.places.store,
-                  filter: _filter,
-                  onChanged: _filtered,
-                ),
-                CompactNotesButton(compact: compact, onChanged: setCompact),
-              ],
-              IconButton(
-                tooltip: t.allNotesTitle,
-                onPressed: _openAllNotes,
-                icon: const Icon(Icons.notes),
-              ),
-              IconButton(
-                tooltip: t.frogsTitle,
-                onPressed: _openFrogs,
-                icon: const FrogIcon(),
-              ),
-              IconButton(
-                tooltip: t.trashTitle,
-                onPressed: _openTrash,
-                // A bin with an arrow up opens the Trash; the plain bin
-                // deletes (#166).
-                icon: const Icon(Icons.restore_from_trash),
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              BrowserSearchField(
-                controller: _query,
-                hint: t.searchAllHint,
-                onChanged: (_) => _reload(),
-              ),
-              if (searching)
-                PersonFilterChips(
-                  store: widget.places.store,
-                  filter: _filter,
-                  onChanged: _filtered,
-                ),
-              Expanded(
-                child: ListView(
-                  padding: clearOfFloatingButtons(
-                    context,
-                    const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  children: searching
-                      ? _hitCards(
-                          context,
-                          _hits,
-                          _file,
-                          _merge,
-                          _openNote,
-                          _schedule,
-                          widget.notes,
-                          _reload,
-                          // Hits from every Area.
-                          (_) => true,
+        child: _selectionBack(
+          Scaffold(
+            appBar: pageBar(
+              context,
+              title: selecting
+                  ? t.notesSelected(selected.length)
+                  : t.areasTitle,
+              onBack: widget.onBack,
+              actions: selecting
+                  ? noteSelectionActions(
+                      context,
+                      widget.notes,
+                      widget.places,
+                      _hits,
+                      _reload,
+                    )
+                  : [
+                      // Only the search's hits are Notes on this level.
+                      if (searching) ...[
+                        PersonFilterButton(
+                          store: widget.places.store,
+                          filter: _filter,
+                          onChanged: _filtered,
+                        ),
+                        CompactNotesButton(
                           compact: compact,
-                          switched: switched,
-                          onSwitch: switchView,
-                        )
-                      : _areaRows(t),
+                          onChanged: setCompact,
+                        ),
+                      ],
+                      IconButton(
+                        tooltip: t.allNotesTitle,
+                        onPressed: _openAllNotes,
+                        icon: const Icon(Icons.notes),
+                      ),
+                      IconButton(
+                        tooltip: t.frogsTitle,
+                        onPressed: _openFrogs,
+                        icon: const FrogIcon(),
+                      ),
+                      IconButton(
+                        tooltip: t.trashTitle,
+                        onPressed: _openTrash,
+                        // A bin with an arrow up opens the Trash; the plain bin
+                        // deletes (#166).
+                        icon: const Icon(Icons.restore_from_trash),
+                      ),
+                      if (searching && mayTick(_hits)) selectButton(context),
+                    ],
+            ),
+            body: Column(
+              children: [
+                BrowserSearchField(
+                  controller: _query,
+                  hint: t.searchAllHint,
+                  onChanged: _searched,
                 ),
-              ),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton(
-            tooltip: t.newArea,
-            onPressed: _add,
-            child: const Icon(Icons.add),
+                if (searching)
+                  PersonFilterChips(
+                    store: widget.places.store,
+                    filter: _filter,
+                    onChanged: _filtered,
+                  ),
+                Expanded(
+                  child: ListView(
+                    padding: clearOfFloatingButtons(
+                      context,
+                      const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    children: searching
+                        ? _hitCards(
+                            context,
+                            _hits,
+                            _file,
+                            _merge,
+                            _openNote,
+                            _schedule,
+                            widget.notes,
+                            _reload,
+                            // Hits from every Area.
+                            (_) => true,
+                            compact: compact,
+                            switched: switched,
+                            onSwitch: switchView,
+                            selected: selecting ? selected : null,
+                            onSelect: setSelected,
+                          )
+                        : _areaRows(t),
+                  ),
+                ),
+              ],
+            ),
+            floatingActionButton: FloatingActionButton(
+              tooltip: t.newArea,
+              onPressed: _add,
+              child: const Icon(Icons.add),
+            ),
           ),
         ),
       ),
@@ -472,7 +532,7 @@ class AreaScreen extends StatefulWidget {
 }
 
 class _AreaScreenState extends State<AreaScreen>
-    with ReloadsOnLogChange, FoldsNoteCards {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
   final _query = TextEditingController();
   Area? _area;
   List<Topic> _topics = const [];
@@ -533,6 +593,7 @@ class _AreaScreenState extends State<AreaScreen>
             for (final placed in found)
               if (placed.note.place == widget.areaId) placed,
           ];
+    keepShown(_diary);
   }
 
   void _reload() => setState(_load);
@@ -719,6 +780,8 @@ class _AreaScreenState extends State<AreaScreen>
         compact: compact,
         switched: switched,
         onSwitch: switchView,
+        selected: selecting ? selected : null,
+        onSelect: setSelected,
       ),
     ];
   }
@@ -731,86 +794,101 @@ class _AreaScreenState extends State<AreaScreen>
     final searching = _query.text.trim().isNotEmpty;
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
-      child: Scaffold(
-        appBar: pageBar(
-          context,
-          title: areaName(t, area),
-          actions: [
-            PersonFilterButton(
-              store: widget.places.store,
-              filter: _filter,
-              onChanged: _filtered,
-            ),
-            ...diaryActions(
-              context,
-              order: _order,
-              hideUnimportant: _hideUnimportant,
-              onOrder: (order) => setState(() {
-                _order = order;
-                _load();
-              }),
-              onHideUnimportant: (hide) => setState(() {
-                _hideUnimportant = hide;
-                _load();
-              }),
-            ),
-            CompactNotesButton(compact: compact, onChanged: setCompact),
-          ],
-        ),
-        body: Column(
-          children: [
-            BrowserSearchField(
-              controller: _query,
-              hint: t.searchAreaHint,
-              onChanged: (_) => _reload(),
-            ),
-            PersonFilterChips(
-              store: widget.places.store,
-              filter: _filter,
-              onChanged: _filtered,
-            ),
-            Expanded(
-              child: ListView(
-                // Where this Device may not write, no "+" floats to clear.
-                padding: _writes
-                    ? clearOfFloatingButtons(
-                        context,
-                        const EdgeInsets.symmetric(vertical: 8),
-                      )
-                    : clearOfSystemBars(
-                        context,
-                        const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                children: searching
-                    ? _hitCards(
-                        context,
-                        _diary,
-                        _file,
-                        _merge,
-                        _openNote,
-                        _schedule,
-                        widget.notes,
-                        _reload,
-                        // A hit in one of the Topics names it.
-                        (placed) => placed.note.place != widget.areaId,
-                        compact: compact,
-                        switched: switched,
-                        onSwitch: switchView,
-                      )
-                    : _browsing(t, area),
+      child: selectionBack(
+        Scaffold(
+          appBar: pageBar(
+            context,
+            title: selecting
+                ? t.notesSelected(selected.length)
+                : areaName(t, area),
+            actions: selecting
+                ? noteSelectionActions(
+                    context,
+                    widget.notes,
+                    widget.places,
+                    _diary,
+                    _reload,
+                  )
+                : [
+                    PersonFilterButton(
+                      store: widget.places.store,
+                      filter: _filter,
+                      onChanged: _filtered,
+                    ),
+                    ...diaryActions(
+                      context,
+                      order: _order,
+                      hideUnimportant: _hideUnimportant,
+                      onOrder: (order) => setState(() {
+                        _order = order;
+                        _load();
+                      }),
+                      onHideUnimportant: (hide) => setState(() {
+                        _hideUnimportant = hide;
+                        _load();
+                      }),
+                    ),
+                    CompactNotesButton(compact: compact, onChanged: setCompact),
+                    if (mayTick(_diary)) selectButton(context),
+                  ],
+          ),
+          body: Column(
+            children: [
+              BrowserSearchField(
+                controller: _query,
+                hint: t.searchAreaHint,
+                onChanged: (_) => _reload(),
               ),
-            ),
-          ],
-        ),
-        floatingActionButton: !_writes
-            ? null
-            : Builder(
-                builder: (button) => FloatingActionButton(
-                  tooltip: t.addHere,
-                  onPressed: () => _add(button),
-                  child: const Icon(Icons.add),
+              PersonFilterChips(
+                store: widget.places.store,
+                filter: _filter,
+                onChanged: _filtered,
+              ),
+              Expanded(
+                child: ListView(
+                  // Where this Device may not write, no "+" floats to clear.
+                  padding: _writes
+                      ? clearOfFloatingButtons(
+                          context,
+                          const EdgeInsets.symmetric(vertical: 8),
+                        )
+                      : clearOfSystemBars(
+                          context,
+                          const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                  children: searching
+                      ? _hitCards(
+                          context,
+                          _diary,
+                          _file,
+                          _merge,
+                          _openNote,
+                          _schedule,
+                          widget.notes,
+                          _reload,
+                          // A hit in one of the Topics names it.
+                          (placed) => placed.note.place != widget.areaId,
+                          compact: compact,
+                          switched: switched,
+                          onSwitch: switchView,
+                          selected: selecting ? selected : null,
+                          onSelect: setSelected,
+                        )
+                      : _browsing(t, area),
                 ),
               ),
+            ],
+          ),
+          floatingActionButton: !_writes
+              ? null
+              : Builder(
+                  builder: (button) => FloatingActionButton(
+                    tooltip: t.addHere,
+                    onPressed: () => _add(button),
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+        ),
       ),
     );
   }
@@ -836,7 +914,7 @@ class TopicScreen extends StatefulWidget {
 }
 
 class _TopicScreenState extends State<TopicScreen>
-    with ReloadsOnLogChange, FoldsNoteCards {
+    with ReloadsOnLogChange, FoldsNoteCards, SelectsNotes {
   final _query = TextEditingController();
   late Topic? _topic;
   late List<PlacedNote> _diary;
@@ -871,6 +949,7 @@ class _TopicScreenState extends State<TopicScreen>
       hideUnimportant: _hideUnimportant,
       people: _filter,
     );
+    keepShown(_diary);
   }
 
   void _reload() => setState(_load);
@@ -951,107 +1030,124 @@ class _TopicScreenState extends State<TopicScreen>
     if (topic == null) return Scaffold(appBar: AppBar());
     final searching = _query.text.trim().isNotEmpty;
     return BrowserSwipes(
-      child: Scaffold(
-        appBar: pageBar(
-          context,
-          title: topicName(t, topic),
-          actions: [
-            PersonFilterButton(
-              store: widget.places.store,
-              filter: _filter,
-              onChanged: _filtered,
-            ),
-            ...diaryActions(
-              context,
-              order: _order,
-              hideUnimportant: _hideUnimportant,
-              onOrder: (order) => setState(() {
-                _order = order;
-                _load();
-              }),
-              onHideUnimportant: (hide) => setState(() {
-                _hideUnimportant = hide;
-                _load();
-              }),
-            ),
-            CompactNotesButton(compact: compact, onChanged: setCompact),
-          ],
-        ),
-        body: Column(
-          children: [
-            BrowserSearchField(
-              controller: _query,
-              hint: t.searchTopicHint,
-              onChanged: (_) => _reload(),
-            ),
-            PersonFilterChips(
-              store: widget.places.store,
-              filter: _filter,
-              onChanged: _filtered,
-            ),
-            Expanded(
-              child: ListView(
-                // Where this Device may not write, no "+" floats to clear.
-                padding: _writes
-                    ? clearOfFloatingButtons(
-                        context,
-                        const EdgeInsets.symmetric(vertical: 8),
-                      )
-                    : clearOfSystemBars(
-                        context,
-                        const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                children: searching
-                    ? _hitCards(
-                        context,
-                        _diary,
-                        _file,
-                        _merge,
-                        _openNote,
-                        _schedule,
-                        widget.notes,
-                        _reload,
-                        // Every hit is in the Topic of the title.
-                        (_) => false,
-                        compact: compact,
-                        switched: switched,
-                        onSwitch: switchView,
-                      )
-                    : _diary.isEmpty
-                    ? [
-                        BrowserEmpty(
-                          text: _filter.isEveryone
-                              ? t.noNotesHere
-                              : t.nothingFound,
-                        ),
-                      ]
-                    : diaryCards(
-                        context,
-                        _diary,
-                        _file,
-                        _merge,
-                        _openNote,
-                        notes: widget.notes,
-                        onChanged: _reload,
-                        showPlace: (_) => false,
-                        onSchedule: _schedule,
-                        compact: compact,
-                        switched: switched,
-                        onSwitch: switchView,
-                      ),
+      child: selectionBack(
+        Scaffold(
+          appBar: pageBar(
+            context,
+            title: selecting
+                ? t.notesSelected(selected.length)
+                : topicName(t, topic),
+            actions: selecting
+                ? noteSelectionActions(
+                    context,
+                    widget.notes,
+                    widget.places,
+                    _diary,
+                    _reload,
+                  )
+                : [
+                    PersonFilterButton(
+                      store: widget.places.store,
+                      filter: _filter,
+                      onChanged: _filtered,
+                    ),
+                    ...diaryActions(
+                      context,
+                      order: _order,
+                      hideUnimportant: _hideUnimportant,
+                      onOrder: (order) => setState(() {
+                        _order = order;
+                        _load();
+                      }),
+                      onHideUnimportant: (hide) => setState(() {
+                        _hideUnimportant = hide;
+                        _load();
+                      }),
+                    ),
+                    CompactNotesButton(compact: compact, onChanged: setCompact),
+                    if (mayTick(_diary)) selectButton(context),
+                  ],
+          ),
+          body: Column(
+            children: [
+              BrowserSearchField(
+                controller: _query,
+                hint: t.searchTopicHint,
+                onChanged: (_) => _reload(),
               ),
-            ),
-          ],
-        ),
-        floatingActionButton: !_writes
-            ? null
-            : Builder(
-                builder: (button) => FloatingActionButton(
-                  tooltip: t.addHere,
-                  onPressed: () => _add(button),
-                  child: const Icon(Icons.add),
+              PersonFilterChips(
+                store: widget.places.store,
+                filter: _filter,
+                onChanged: _filtered,
+              ),
+              Expanded(
+                child: ListView(
+                  // Where this Device may not write, no "+" floats to clear.
+                  padding: _writes
+                      ? clearOfFloatingButtons(
+                          context,
+                          const EdgeInsets.symmetric(vertical: 8),
+                        )
+                      : clearOfSystemBars(
+                          context,
+                          const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                  children: searching
+                      ? _hitCards(
+                          context,
+                          _diary,
+                          _file,
+                          _merge,
+                          _openNote,
+                          _schedule,
+                          widget.notes,
+                          _reload,
+                          // Every hit is in the Topic of the title.
+                          (_) => false,
+                          compact: compact,
+                          switched: switched,
+                          onSwitch: switchView,
+                          selected: selecting ? selected : null,
+                          onSelect: setSelected,
+                        )
+                      : _diary.isEmpty
+                      ? [
+                          BrowserEmpty(
+                            text: _filter.isEveryone
+                                ? t.noNotesHere
+                                : t.nothingFound,
+                          ),
+                        ]
+                      : diaryCards(
+                          context,
+                          _diary,
+                          _file,
+                          _merge,
+                          _openNote,
+                          notes: widget.notes,
+                          onChanged: _reload,
+                          showPlace: (_) => false,
+                          onSchedule: _schedule,
+                          compact: compact,
+                          switched: switched,
+                          onSwitch: switchView,
+                          selected: selecting ? selected : null,
+                          onSelect: setSelected,
+                        ),
                 ),
               ),
+            ],
+          ),
+          floatingActionButton: !_writes
+              ? null
+              : Builder(
+                  builder: (button) => FloatingActionButton(
+                    tooltip: t.addHere,
+                    onPressed: () => _add(button),
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+        ),
       ),
     );
   }
@@ -1094,6 +1190,8 @@ List<Widget> _hitCards(
   required bool compact,
   required Set<String> switched,
   required void Function(Note note) onSwitch,
+  Set<String>? selected,
+  void Function(Note note, bool on)? onSelect,
 }) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -1109,6 +1207,8 @@ List<Widget> _hitCards(
         compact: compact,
         switched: switched,
         onSwitch: onSwitch,
+        selected: selected,
+        onSelect: onSelect,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.
