@@ -55,6 +55,14 @@ Der aus der Sprachaufnahme einer Notiz erkannte Text, neben der Aufnahme aufbewa
 Der in einem Foto oder Bildschirmfoto einer Notiz erkannte Text, neben dem Foto aufbewahrt, nie an seiner Stelle.
 _Avoid_: OCR (in der App), Bildunterschrift
 
+**Anhang** [Attachment]:
+Eine Datei jeder Art an einer Notiz, etwa ein Brief als PDF, ein Word-Dokument, eine Tabelle oder ein `.zip`, mit ihrem Namen, ihrer Art und ihrer Größe aufbewahrt und auf alle Geräte synchronisiert. Eine Notiz, die nur aus einer Datei gemacht wurde, zeigt die Datei als ihre Karte.
+_Avoid_: Dokument, Upload, Datei (in der App, wo die Datei einer Notiz gemeint ist)
+
+**Anhangtext** [Attachment Text]:
+Der aus einem Anhang gelesene Text, wo sein Format es erlaubt, neben dem Anhang aufbewahrt, nie an seiner Stelle. Kommt er vom Computer, zeigt das Handy bis dahin, dass der Text vom Computer folgt.
+_Avoid_: OCR, extrahierter Text, Vorschau
+
 **Abschnitt** [Section]:
 Ein datierter Teil einer Notiz, angelegt durch Ergänzen oder Zusammenführen, mit seinem eigenen Erfassungskontext. Sein Text wird an Ort und Stelle verbessert wie der Text der Notiz, von denselben Personen; er behält sein Datum und seinen Platz und zeigt, wann er zuletzt geändert wurde und wer ihn bearbeitet hat.
 _Avoid_: Kommentar, Aktualisierung, Revision

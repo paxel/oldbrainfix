@@ -22,9 +22,9 @@ use rustls::{DigitallySignedStruct, SignatureScheme};
 use serde_json::Value;
 
 use crate::lan::{
-    DEVICE_HEADER, FORMAT_HEADER, FormatRange, INVITE_HEADER, Joining, MAX_ENTRIES_BYTES,
-    OWN_FORMATS, PIN_HEADER, PairInfo, Session, TYPED_FINGERPRINT_BYTES, apply_answer_as,
-    fingerprint_of, is_private_host, sync_request_as,
+    DEVICE_HEADER, FORMAT_HEADER, FormatRange, INVITE_HEADER, Joining, MAX_BLOB_BYTES,
+    MAX_ENTRIES_BYTES, OWN_FORMATS, PIN_HEADER, PairInfo, Session, TYPED_FINGERPRINT_BYTES,
+    apply_answer_as, fingerprint_of, is_private_host, sync_request_as,
 };
 use crate::pairing::PairedDevice;
 use crate::store::Store;
@@ -368,7 +368,13 @@ impl Client {
         tls.write_all(head.as_bytes()).map_err(broken)?;
         tls.write_all(body).map_err(broken)?;
         tls.flush().map_err(broken)?;
-        read_answer(&mut BufReader::new(tls)).map_err(broken)
+        // A blob may weigh more than a sync body (ADR 0003, 0047).
+        let limit = if path.starts_with("/blob/") {
+            MAX_BLOB_BYTES
+        } else {
+            MAX_ENTRIES_BYTES
+        };
+        read_answer(&mut BufReader::new(tls), limit).map_err(broken)
     }
 }
 
@@ -382,8 +388,8 @@ enum Broken {
 }
 
 /// Reads one answer: by its length, in chunks, or up to the end, never
-/// more than [`MAX_ENTRIES_BYTES`].
-fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
+/// more than `limit` bytes.
+fn read_answer<R: BufRead>(reader: &mut R, limit: usize) -> std::io::Result<(u16, Answer)> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let status: u16 = line
@@ -414,10 +420,9 @@ fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
         .is_some_and(|v| v.to_lowercase().contains("chunked"));
     let length: Option<usize> = answer.header("content-length").and_then(|v| v.parse().ok());
     let body = if chunked {
-        crate::lan::read_chunked(reader, MAX_ENTRIES_BYTES)?
-            .ok_or_else(|| std::io::Error::other("too long"))?
+        crate::lan::read_chunked(reader, limit)?.ok_or_else(|| std::io::Error::other("too long"))?
     } else if let Some(length) = length {
-        if length > MAX_ENTRIES_BYTES {
+        if length > limit {
             return Err(std::io::Error::other("too long"));
         }
         let mut body = vec![0u8; length];
@@ -425,16 +430,14 @@ fn read_answer<R: BufRead>(reader: &mut R) -> std::io::Result<(u16, Answer)> {
         body
     } else {
         let mut body = Vec::new();
-        let read = reader
-            .take(MAX_ENTRIES_BYTES as u64 + 1)
-            .read_to_end(&mut body);
+        let read = reader.take(limit as u64 + 1).read_to_end(&mut body);
         // A host that closes without saying goodbye still said it all.
         if let Err(e) = read
             && body.is_empty()
         {
             return Err(e);
         }
-        if body.len() > MAX_ENTRIES_BYTES {
+        if body.len() > limit {
             return Err(std::io::Error::other("too long"));
         }
         body
@@ -506,6 +509,23 @@ mod tests {
     use std::thread::JoinHandle;
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    #[test]
+    fn an_answer_may_weigh_as_much_as_its_limit_and_no_more() -> TestResult {
+        // Just past a sync body's limit: too much for one, not for a blob.
+        let length = MAX_ENTRIES_BYTES + 1;
+        let answer = || {
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {length}\r\n\r\n");
+            BufReader::new(
+                std::io::Cursor::new(head.into_bytes())
+                    .chain(std::io::repeat(7).take(length as u64)),
+            )
+        };
+        assert!(read_answer(&mut answer(), MAX_ENTRIES_BYTES).is_err());
+        let (status, got) = read_answer(&mut answer(), MAX_BLOB_BYTES)?;
+        assert_eq!((status, got.body.len()), (200, length));
+        Ok(())
+    }
 
     fn open(path: &Path, seed: u8) -> Result<Store> {
         Store::open(path, ticking(), move || {

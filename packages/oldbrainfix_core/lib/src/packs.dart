@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'blobs.dart';
 import 'checklists.dart';
+import 'file_text.dart';
 import 'frogs.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
@@ -31,7 +32,8 @@ import 'text_format.dart';
 /// (the Lines of a Checklist unticked, a Shopping List's open with their
 /// reappear times, a Tally's fields, a Session's pool, counts and rule),
 /// its Routines and Reminders with their schedules, an open Frog, and
-/// those of its photos, recordings, Photo Texts and Transcripts that are
+/// those of its photos, recordings, attached files (ADR 0047), Photo
+/// Texts, Transcripts and Attachment Texts that are
 /// ticked. Never a Tally's entries, ticks, check-offs, its Capture
 /// Context or its history.
 ///
@@ -176,8 +178,10 @@ class PackSession {
   });
 }
 
-/// A photo or a voice recording of a Pack's Note: its hash, whether its
-/// file goes along, its size then, and its Photo Text or Transcript.
+/// A photo, a voice recording or an attached file of a Pack's Note: its
+/// hash, whether its file goes along, its size then, and its Photo Text,
+/// Transcript or Attachment Text; an attached file with its name, media
+/// type and pages.
 class PackFile {
   final String hash;
 
@@ -191,8 +195,17 @@ class PackFile {
   /// How many bytes the file has; 0 without it.
   final int size;
 
-  /// The Photo Text or Transcript, or null when none goes along.
+  /// The Photo Text, Transcript or Attachment Text, or null when none
+  /// goes along.
   final String? text;
+
+  /// An attached file's name and media type, as kept ([cleanName],
+  /// [cleanType]); empty for a photo or a recording.
+  final String name;
+  final String mediaType;
+
+  /// How many pages an attached file has, when they were counted.
+  final int? pages;
 
   const PackFile(
     this.hash, {
@@ -200,6 +213,9 @@ class PackFile {
     this.hasFile = false,
     this.size = 0,
     this.text,
+    this.name = '',
+    this.mediaType = '',
+    this.pages,
   });
 }
 
@@ -239,6 +255,9 @@ class PackNote {
   final List<PackFile> photos;
   final List<PackFile> recordings;
 
+  /// Its attached files (ADR 0047).
+  final List<PackFile> attachments;
+
   const PackNote({
     this.area,
     this.topic,
@@ -257,6 +276,7 @@ class PackNote {
     this.frog = false,
     this.photos = const [],
     this.recordings = const [],
+    this.attachments = const [],
   });
 
   /// The kind it is.
@@ -292,6 +312,10 @@ enum PackItemKind {
   photoText,
   recording,
   transcript,
+
+  /// An attached file (ADR 0047), and its Attachment Text.
+  file,
+  fileText,
   routine,
   reminder,
   frog,
@@ -336,6 +360,8 @@ abstract final class PackItemKeys {
   static String photo(int i, int j) => 'n$i.p$j';
   static String photoText(int i, int j) => 'n$i.pt$j';
   static String recording(int i, int j) => 'n$i.a$j';
+  static String file(int i, int j) => 'n$i.d$j';
+  static String fileText(int i, int j) => 'n$i.dt$j';
   static String transcript(int i, int j) => 'n$i.at$j';
   static String routine(int i, int j) => 'n$i.r$j';
   static String frog(int i) => 'n$i.f';
@@ -390,6 +416,24 @@ extension PackTree on Pack {
             PackItem(
               key: PackItemKeys.transcript(i, j),
               kind: PackItemKind.transcript,
+              note: i,
+              index: j,
+              size: _utf8Length(text),
+            ),
+        ],
+        for (final (j, d) in note.attachments.indexed) ...[
+          if (d.hasFile)
+            PackItem(
+              key: PackItemKeys.file(i, j),
+              kind: PackItemKind.file,
+              note: i,
+              index: j,
+              size: _base64Length(d.size),
+            ),
+          if (d.text case final text?)
+            PackItem(
+              key: PackItemKeys.fileText(i, j),
+              kind: PackItemKind.fileText,
               note: i,
               index: j,
               size: _utf8Length(text),
@@ -468,13 +512,17 @@ extension PackTree on Pack {
         if (a.hasFile) PackItemKeys.recording(i, j),
         if (a.text != null) PackItemKeys.transcript(i, j),
       ],
+      for (final (j, d) in note.attachments.indexed) ...[
+        if (d.hasFile) PackItemKeys.file(i, j),
+        if (d.text != null) PackItemKeys.fileText(i, j),
+      ],
       for (final (j, _) in note.routines.indexed) PackItemKeys.routine(i, j),
       if (note.frog) PackItemKeys.frog(i),
     ],
   };
 
   /// What is ticked when an export starts (Q468): everything but the
-  /// Reminders, the photos and the recordings.
+  /// Reminders, the photos, the recordings and the attached files.
   Set<String> exportTicks() => {
     for (final (i, note) in notes.indexed) ...[
       PackItemKeys.note(i),
@@ -482,6 +530,8 @@ extension PackTree on Pack {
         if (p.text != null) PackItemKeys.photoText(i, j),
       for (final (j, a) in note.recordings.indexed)
         if (a.text != null) PackItemKeys.transcript(i, j),
+      for (final (j, d) in note.attachments.indexed)
+        if (d.text != null) PackItemKeys.fileText(i, j),
       for (final (j, r) in note.routines.indexed)
         if (!r.once) PackItemKeys.routine(i, j),
       if (note.frog) PackItemKeys.frog(i),
@@ -604,6 +654,9 @@ extension PackTree on Pack {
       hasFile: withFile && f.hasFile,
       size: withFile && f.hasFile ? f.size : 0,
       text: withText ? f.text : null,
+      name: f.name,
+      mediaType: f.mediaType,
+      pages: f.pages,
     );
     return Pack(
       card: card,
@@ -660,6 +713,16 @@ extension PackTree on Pack {
                     case final f when f.hasFile || f.text != null)
                   f,
             ],
+            attachments: [
+              for (final (j, d) in notes[i].attachments.indexed)
+                if (file(
+                      d,
+                      ticks.contains(PackItemKeys.file(i, j)),
+                      ticks.contains(PackItemKeys.fileText(i, j)),
+                    )
+                    case final f when f.hasFile || f.text != null)
+                  f,
+            ],
           ),
       ],
     );
@@ -694,11 +757,16 @@ Map<String, Object?> _noteJson(
                 (throw StateError('no bytes of $kind ${f.hash}')),
           ),
         'hash': f.hash,
+        if (kind == 'file') 'name': f.name,
+        if (kind == 'file') 'pages': ?f.pages,
         'text': ?f.text,
+        if (kind == 'file') 'type': f.mediaType,
       },
   ];
   return {
     'area': ?n.area,
+    if (files && n.attachments.isNotEmpty)
+      'attachments': filesJson(n.attachments, 'file'),
     if (n.fields.isNotEmpty) 'bar': ?n.bar?.name,
     if (n.fields.isNotEmpty)
       'fields': [
@@ -985,6 +1053,10 @@ PackNote _note(Object? json) {
       for (final a in _optional<List<Object?>>(json, 'recordings') ?? const [])
         _file(a),
     ],
+    attachments: [
+      for (final d in _optional<List<Object?>>(json, 'attachments') ?? const [])
+        _attached(d),
+    ],
   );
 }
 
@@ -1075,6 +1147,37 @@ PackFile _file(Object? json) {
     );
   }
   throw const NotAPack();
+}
+
+/// [f] with the name, media type and pages of the attached file [a].
+PackFile _attachedFile(PackFile f, Attachment a) => PackFile(
+  f.hash,
+  hasFile: f.hasFile,
+  size: f.size,
+  text: f.text,
+  name: a.name,
+  mediaType: a.mediaType,
+  pages: a.pages,
+);
+
+/// An attached file of a Pack's Note: as [_file], with its name, media
+/// type and pages, each read as an attached file's field reads them
+/// ([Attachment.read]); a name or type that is there but no string, or
+/// pages that are no whole number, make the Pack none.
+PackFile _attached(Object? json) {
+  final file = _file(json);
+  if (json is! Map<Object?, Object?>) throw const NotAPack();
+  final pages = _index(json, 'pages');
+  return PackFile(
+    file.hash,
+    bytes: file.bytes,
+    hasFile: file.hasFile,
+    size: file.size,
+    text: file.text,
+    name: cleanName(_optional<String>(json, 'name') ?? ''),
+    mediaType: cleanType(_optional<String>(json, 'type') ?? ''),
+    pages: pages != null && pages <= 1 << 53 ? pages : null,
+  );
 }
 
 // --------------------------------------------------------------- export
@@ -1365,6 +1468,10 @@ extension PackExport on Store {
         for (final hash in [...note.recordings, ...note.removedRecordings])
           file('audio', hash, note.transcripts[hash]),
       ],
+      attachments: [
+        for (final a in [...note.attachments, ...note.removedAttachments])
+          _attachedFile(file('file', a.hash, note.attachmentTexts[a.hash]), a),
+      ],
     );
   }
 
@@ -1394,12 +1501,12 @@ extension PackExport on Store {
 }
 
 /// A Pack to write, with what it needs of a Store: its key and the
-/// photos and recordings its files are read from. It can be sent to
-/// another isolate, which writes it there.
+/// photos, recordings and attached files its files are read from. It can
+/// be sent to another isolate, which writes it there.
 class PackWrite {
   final Pack _pack;
   final SigningKey? _key;
-  final ({Blobs photos, Blobs audio}) _blobs;
+  final ({Blobs photos, Blobs audio, Blobs files}) _blobs;
 
   const PackWrite._(this._pack, this._key, this._blobs);
 
@@ -1407,9 +1514,12 @@ class PackWrite {
   Uint8List encode() => encodePack(
     _pack,
     key: _key,
-    // A Pack's files are photos and recordings, nothing else.
-    bytesOf: (kind, hash) =>
-        (kind == 'photo' ? _blobs.photos : _blobs.audio).get(hash),
+    // A Pack's files are photos, recordings and attached files.
+    bytesOf: (kind, hash) => switch (kind) {
+      'photo' => _blobs.photos,
+      'audio' => _blobs.audio,
+      _ => _blobs.files,
+    }.get(hash),
   );
 }
 
@@ -1590,6 +1700,13 @@ extension PackImport on Store {
                 null => a.hash,
               },
           ],
+          attachments: [
+            for (final d in n.attachments)
+              switch (d.bytes) {
+                final bytes? => putFile(bytes),
+                null => d.hash,
+              },
+          ],
         ),
     ];
     return batch(() {
@@ -1681,7 +1798,8 @@ extension PackImport on Store {
     String place,
     DateTime now,
     String? badge,
-    ({List<String> photos, List<String> recordings}) hashes,
+    ({List<String> photos, List<String> recordings, List<String> attachments})
+    hashes,
   ) {
     append(id, NoteKeys.type, NoteKeys.typeNote);
     append(id, NoteKeys.captured, now.toIso8601String());
@@ -1717,6 +1835,25 @@ extension PackImport on Store {
       final hash = hashes.recordings[j];
       append(id, NoteKeys.audio(hash), a.hasFile ? NoteKeys.audioAdded : null);
       if (a.text case final text?) append(id, NoteKeys.transcript(hash), text);
+    }
+    for (final (j, d) in n.attachments.indexed) {
+      final hash = hashes.attachments[j];
+      final value = d.hasFile
+          ? Attachment(
+              hash: hash,
+              name: d.name,
+              mediaType: d.mediaType,
+              size: d.size,
+              pages: d.pages,
+              computer: FileTexts.computerReads(
+                FileTexts.kindOf(d.name, d.mediaType),
+                d.size,
+                d.pages,
+              ),
+            ).value
+          : null;
+      append(id, NoteKeys.file(hash), value);
+      if (d.text case final text?) append(id, NoteKeys.fileText(hash), text);
     }
     if (n.lines case final lines?) {
       final making = Store.newId();

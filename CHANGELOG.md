@@ -39,6 +39,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a new Tally entry starts each field without a target with its value in your latest entry, selected so that typing replaces it.
 - On the phone and the desktop, a compact card's ⋮ on the phone and a card's ⋮ and right-click on the desktop offer Routine… and Reminder…, in Advanced also Frog and Session…, beside File into… and Merge into…; on the phone a card's ⋮ puts Send to a person, Share to an app, Copy text and Export as Pack… under one Share…, and a detailed card's pencil opens the Note editor in one tap.
 - On the desktop, back and forward show each place with the search, person filter and scroll position it was left with, instead of clearing them; a place shown anew starts with none and at the top.
+- Sync over the local network carries a photo or voice recording of up to 256 MiB, as bundles and Backups do, instead of 64 MiB.
 
 ### Fixed
 

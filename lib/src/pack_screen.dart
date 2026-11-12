@@ -610,7 +610,10 @@ class PackTreeView extends StatelessWidget {
     },
     PackItemKind.photo => const Icon(Icons.photo_outlined),
     PackItemKind.photoText ||
-    PackItemKind.transcript => const Icon(Icons.notes),
+    PackItemKind.transcript ||
+    PackItemKind.fileText => const Icon(Icons.notes),
+    // Until attached files get their own look (#267).
+    PackItemKind.file => const Icon(Icons.attach_file),
     PackItemKind.recording => const Icon(Icons.mic_none),
     PackItemKind.routine => const Icon(Icons.repeat),
     PackItemKind.reminder => const Icon(Icons.notifications_outlined),
@@ -647,6 +650,12 @@ class PackTreeView extends StatelessWidget {
         scheduleText(t, locale, note.routines[i]),
       ),
       (PackItemKind.frog, _) => t.packFrog,
+      // The file's name and size, its text's start, until attached files
+      // get words of their own (#267).
+      (PackItemKind.file, final i?) =>
+        '${note.attachments[i].name} '
+            '(${packSizeText(locale, note.attachments[i].size)})',
+      (PackItemKind.fileText, final i?) => start(note.attachments[i].text),
       _ => '',
     };
   }

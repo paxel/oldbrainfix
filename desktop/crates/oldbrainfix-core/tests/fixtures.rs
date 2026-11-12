@@ -37,22 +37,23 @@ use oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, CaptureContext, CapturedDetail, Checklist, Checklists, ClockTime,
-    Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports, ListOnAgenda, Note,
-    Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, ReappearUnit, Recurrence,
-    RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section,
-    SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists, ShoppingOnAgenda,
-    SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod, TallyRule,
-    UnitSystem, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Attachment, Blob, CaptureContext, CapturedDetail, Checklist, Checklists,
+    ClockTime, Conflict, Day, Frog, Frogs, ImportFile, ImportSummary, Importance, Imports,
+    ListOnAgenda, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear, ReappearUnit,
+    Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
+    Section, SessionRule, Sessions, ShoppingAgendaRow, ShoppingList, ShoppingLists,
+    ShoppingOnAgenda, SigningKey, SimpleRepeat, Store, Tallies, Tally, TallyEntry, TallyPeriod,
+    TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 30] = [
+const SCENARIOS: [&str; 31] = [
     "area-order",
     "area-order-shown",
+    "attachments",
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -196,7 +197,7 @@ fn load(scenario: &str, now: &str) -> Result<Store, Box<dyn std::error::Error>> 
 }
 
 fn note_json(note: &Note) -> Value {
-    json!({
+    let mut out = json!({
         "id": note.id,
         "text": note.text,
         "textFormat": note.text_format,
@@ -218,6 +219,59 @@ fn note_json(note: &Note) -> Value {
         "removedTranscripts": note.removed_transcripts,
         "removedPhotoTexts": note.removed_photo_texts,
         "wordless": note.wordless().name(),
+    });
+    if let Some(all) = out.as_object_mut() {
+        all.extend(files_json(
+            &note.attachments,
+            &note.attachment_texts,
+            &note.removed_attachments,
+            &note.removed_attachment_texts,
+        ));
+        if !note.attachments.is_empty() {
+            all.insert(
+                "aloneFile".into(),
+                json!(note.alone_file().map(|a| a.hash.clone())),
+            );
+        }
+    }
+    out
+}
+
+/// The attached files of a Note or Section in the shape of the
+/// generator's `_files`: only when it has any.
+fn files_json(
+    files: &[Attachment],
+    texts: &BTreeMap<String, String>,
+    removed: &[Attachment],
+    removed_texts: &[String],
+) -> serde_json::Map<String, Value> {
+    let mut out = serde_json::Map::new();
+    if files.is_empty() && texts.is_empty() && removed.is_empty() && removed_texts.is_empty() {
+        return out;
+    }
+    out.insert(
+        "attachments".into(),
+        json!(files.iter().map(attachment_json).collect::<Vec<_>>()),
+    );
+    out.insert("attachmentTexts".into(), json!(texts));
+    out.insert(
+        "removedAttachments".into(),
+        json!(removed.iter().map(attachment_json).collect::<Vec<_>>()),
+    );
+    out.insert("removedAttachmentTexts".into(), json!(removed_texts));
+    out
+}
+
+/// An attached file in the shape of the generator's `_attachment`.
+fn attachment_json(a: &Attachment) -> Value {
+    json!({
+        "hash": a.hash,
+        "name": a.name,
+        "type": a.media_type,
+        "size": a.size,
+        "pages": a.pages,
+        "computer": a.computer,
+        "kind": a.kind().name(),
     })
 }
 
@@ -243,7 +297,7 @@ fn context_json(context: &CaptureContext) -> Value {
 }
 
 fn section_json(section: &Section) -> Value {
-    json!({
+    let mut out = json!({
         "id": section.id,
         "noteId": section.note_id,
         "text": section.text,
@@ -262,7 +316,16 @@ fn section_json(section: &Section) -> Value {
         "removedPhotoTexts": section.removed_photo_texts,
         "modified": section.modified.map(dart_iso),
         "editedBy": section.edited_by.as_ref().map(|by| json!({"id": by.id, "name": by.name})),
-    })
+    });
+    if let Some(all) = out.as_object_mut() {
+        all.extend(files_json(
+            &section.attachments,
+            &section.attachment_texts,
+            &section.removed_attachments,
+            &section.removed_attachment_texts,
+        ));
+    }
+    out
 }
 
 fn blobs_json(list: &[Blob]) -> Value {
@@ -348,6 +411,16 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             for hash in &note.recordings {
                 if notes.may_remove_transcript(id, hash)? {
                     refs.push(format!("transcript/{hash}"));
+                }
+            }
+            for a in &note.attachments {
+                if notes.may_remove_attachment(id, &a.hash)? {
+                    refs.push(format!("file/{}", a.hash));
+                }
+            }
+            for a in &note.attachments {
+                if notes.may_remove_attachment_text(id, &a.hash)? {
+                    refs.push(format!("fileText/{}", a.hash));
                 }
             }
             if !refs.is_empty() {
@@ -441,6 +514,135 @@ fn every_scenario_reads_as_the_dart_core_reads_it() -> TestResult {
         let store = load(scenario, now)?;
         let actual = read(&store)?;
         assert_eq!(actual, expected, "{scenario}");
+    }
+    Ok(())
+}
+
+/// The items of a Pack's tree in the shape of the generator's
+/// `_packItems`.
+fn pack_items(items: &[oldbrainfix_core::PackItem]) -> Value {
+    json!(
+        items
+            .iter()
+            .map(|i| json!({
+                "key": i.key,
+                "kind": i.kind.name(),
+                "size": i.size,
+                "children": pack_items(&i.children),
+            }))
+            .collect::<Vec<_>>()
+    )
+}
+
+#[test]
+fn attached_files_wait_are_found_and_go_in_a_pack_as_the_dart_core_has_them() -> TestResult {
+    let dir = fixtures().join("attachments");
+    let now = read_json(&dir.join("expected.json"))?["now"]
+        .as_str()
+        .ok_or("now")?
+        .to_string();
+    let store = load("attachments", &now)?;
+    for (hash, bytes) in files(&dir.join("files"))? {
+        assert!(store.put_blob("file", &hash, &bytes)?, "{hash}");
+    }
+    let notes = Notes::new(&store);
+    let expected = read_json(&dir.join("attachments.json"))?;
+    let mut search = serde_json::Map::new();
+    for query in expected["search"].as_object().ok_or("search")?.keys() {
+        let ids: Vec<String> = Search::new(&store)
+            .notes(query, None)?
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        search.insert(query.clone(), json!(ids));
+    }
+    let area = Places::new(&store).areas()?[0].id.clone();
+    let pack = store.pack_of(&area, &std::collections::HashSet::new())?;
+    let sorted = |ticks: oldbrainfix_core::PackTicks| ticks.into_iter().collect::<Vec<_>>();
+    let actual = json!({
+        "unreadPhone": blobs_json(&notes.unread_attachments(false)?),
+        "unreadComputer": blobs_json(&notes.unread_attachments(true)?),
+        "search": search,
+        "missing": store.missing_blobs()?,
+        "tree": pack_items(&pack.tree()),
+        "all": sorted(pack.all_keys()),
+        "start": sorted(pack.export_ticks()),
+        "size": pack.size(&pack.all_keys()),
+    });
+    assert_eq!(actual, expected);
+    // The same Pack, byte for byte, and the Dart core's opens alike.
+    let theirs = std::fs::read(dir.join("pack.obfpack"))?;
+    assert_eq!(store.write_pack(&pack, &pack.all_keys(), false)?, theirs);
+    let opened = store.open_pack(&theirs)?.map_err(|e| e.name())?;
+    assert_eq!(pack_items(&opened.pack.tree()), expected["tree"]);
+    Ok(())
+}
+
+#[test]
+fn attached_files_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::file_text::{self, FileKind, FileReading};
+    use oldbrainfix_core::notes::{clean_name, clean_type};
+    let expected = read_json(&fixtures().join("file_texts.json"))?;
+    let kind_of = |name: &str| -> FileKind {
+        [
+            FileKind::Pdf,
+            FileKind::Docx,
+            FileKind::Xlsx,
+            FileKind::Odt,
+            FileKind::Ods,
+            FileKind::Text,
+            FileKind::Other,
+        ]
+        .into_iter()
+        .find(|k| k.name() == name)
+        .unwrap_or(FileKind::Other)
+    };
+    for file in expected["files"].as_array().ok_or("files")? {
+        let name = file["name"].as_str().ok_or("name")?;
+        let kind = file_text::kind_of(name, file["type"].as_str().ok_or("type")?);
+        assert_eq!(kind.name(), file["kind"], "{name}");
+        let bytes = BASE64.decode(file["bytes"].as_str().ok_or("bytes")?)?;
+        let read = match file_text::read(kind, &bytes) {
+            FileReading::Text(text) => json!({"text": text}),
+            FileReading::Pdf => json!("pdf"),
+            FileReading::Nothing => json!("nothing"),
+        };
+        assert_eq!(read, file["read"], "{name}");
+    }
+    for k in expected["kinds"].as_array().ok_or("kinds")? {
+        let name = k["name"].as_str().ok_or("name")?;
+        let kind = file_text::kind_of(name, k["type"].as_str().ok_or("type")?);
+        assert_eq!(kind.name(), k["kind"], "{name}");
+        assert_eq!(file_text::media_type_of(name), k["mediaType"], "{name}");
+    }
+    for v in expected["values"].as_array().ok_or("values")? {
+        let value = v["value"].as_str().ok_or("value")?;
+        let read = Attachment::read(&"a".repeat(64), value);
+        assert_eq!(attachment_json(&read), v["read"], "{value}");
+    }
+    for n in expected["names"].as_array().ok_or("names")? {
+        assert_eq!(clean_name(n["name"].as_str().ok_or("name")?), n["kept"]);
+    }
+    for t in expected["types"].as_array().ok_or("types")? {
+        assert_eq!(clean_type(t["type"].as_str().ok_or("type")?), t["kept"]);
+    }
+    for c in expected["computer"].as_array().ok_or("computer")? {
+        let reads = file_text::computer_reads(
+            kind_of(c["kind"].as_str().ok_or("kind")?),
+            c["size"].as_u64().ok_or("size")?,
+            c["pages"].as_u64(),
+        );
+        assert_eq!(json!(reads), c["reads"], "{c}");
+    }
+    for t in expected["tidy"].as_array().ok_or("tidy")? {
+        assert_eq!(
+            file_text::tidy(t["text"].as_str().ok_or("text")?),
+            t["kept"]
+        );
+    }
+    for p in expected["pages"].as_array().ok_or("pages")? {
+        let pages: Vec<String> = serde_json::from_value(p["pages"].clone())?;
+        assert_eq!(file_text::join_pages(&pages), p["joined"]);
     }
     Ok(())
 }
@@ -2155,6 +2357,147 @@ fn write_media(store: &Store) -> Built {
     Ok(())
 }
 
+/// A zipped file the generator's `attachments` scenario attaches, as it
+/// wrote it out under `inputs/`.
+fn input(name: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(std::fs::read(
+        fixtures().join("attachments").join("inputs").join(name),
+    )?)
+}
+
+/// The generator's `attachments` scenario.
+fn write_attachments(store: &Store) -> Built {
+    use oldbrainfix_core::NewFile;
+    use oldbrainfix_core::file_text::{self, FileKind, FileReading};
+    let file = |name, media_type, bytes, pages| NewFile {
+        name,
+        media_type,
+        bytes,
+        pages,
+    };
+    let notes = Notes::new(store);
+    let papers = Places::new(store).add_area("Papers")?.id;
+    let empty = input("Empty.docx")?;
+    let lease = notes.capture_with_files(
+        "Lease",
+        Some(&papers),
+        None,
+        &[],
+        &[],
+        &[
+            file(
+                "Lease.pdf",
+                "application/pdf",
+                b"%PDF-1.4 the lease",
+                Some(2),
+            ),
+            file("Scan.pdf", "", b"%PDF-1.4 a scan", Some(40)),
+            file("notes.md", "", b"# Notes\r\nKeys: 2  \r\n", None),
+            file("plan.dwg", "", b"AC1032 plan", None),
+            file("Empty.docx", "", &empty, None),
+        ],
+    )?;
+    let hash = |i: usize| lease.attachments[i].hash.clone();
+    let (pdf, md, docx) = (hash(0), hash(2), hash(4));
+    notes.set_attachment_text(&lease.id, &pdf, "  Rent due \r\n\r\n\r\n on the first ")?;
+    let md_bytes = store.file(&md).ok_or("the Markdown file")?;
+    if let FileReading::Text(text) = file_text::read(FileKind::Text, &md_bytes) {
+        notes.set_attachment_text(&lease.id, &md, &text)?;
+    }
+    notes.set_attachment_text(&lease.id, &docx, "")?;
+    let brief = input("Brief.odt")?;
+    let letter = notes.capture_with_files(
+        "",
+        None,
+        None,
+        &[],
+        &[],
+        &[file(
+            "Brief.odt",
+            "application/vnd.oasis.opendocument.text",
+            &brief,
+            None,
+        )],
+    )?;
+    let odt = &letter.attachments[0];
+    let odt_bytes = store.file(&odt.hash).ok_or("the text")?;
+    if let FileReading::Text(text) = file_text::read(odt.kind(), &odt_bytes) {
+        notes.set_attachment_text(&letter.id, &odt.hash, &text)?;
+    }
+    let costs = input("Costs.xlsx")?;
+    let bills = notes.capture_with_files(
+        "Bills",
+        Some(&papers),
+        None,
+        &[],
+        &[],
+        &[
+            file("Costs.xlsx", "", &costs, None),
+            file("power.txt", "", b"Power bill March", None),
+        ],
+    )?;
+    let (xlsx, txt) = (
+        bills.attachments[0].hash.clone(),
+        bills.attachments[1].hash.clone(),
+    );
+    notes.set_attachment_text(&bills.id, &xlsx, "Costs\nRent\t950.5")?;
+    notes.set_attachment_text(&bills.id, &txt, "Power bill March")?;
+    notes.remove_attachment_text(&bills.id, &xlsx)?;
+    notes.remove_attachment(&bills.id, &txt)?;
+    let target = notes.capture("Moving", None, None)?;
+    let ods = input("Plan.ods")?;
+    let plan = notes.capture_with_files(
+        "",
+        None,
+        None,
+        &[],
+        &[],
+        &[file("Plan.ods", "", &ods, None)],
+    )?;
+    notes.merge(&plan.id, &target.id)?;
+    notes.attach_file(
+        &target.id,
+        &file("boxes.csv", "application/octet-stream", b"box;room", None),
+    )?;
+    let gone = notes.capture_with_files(
+        "Old",
+        None,
+        None,
+        &[],
+        &[],
+        &[file("old.txt", "", b"old", None)],
+    )?;
+    notes.trash(&gone.id)?;
+    store.append(
+        &lease.id,
+        &note_keys::file(&"c".repeat(64)),
+        Some(concat!(
+            r#"{"name":"C:\\x\\inv\u202Efdp.exe","pages":-1,"size":3.0,"#,
+            r#""type":"Application/X-Thing; a=b"}"#
+        )),
+        None,
+    )?;
+    Ok(())
+}
+
+#[test]
+fn attached_files_are_kept_as_the_dart_core_keeps_them() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Store::open(
+        &dir.path().join("oldbrainfix.db"),
+        Box::new(Utc::now),
+        || Ok(writer_key()),
+    )?;
+    write_attachments(&store)?;
+    let ours = files(&dir.path().join("files"))?;
+    let theirs = files(&fixtures().join("attachments").join("files"))?;
+    assert!(!theirs.is_empty());
+    // The trashed Note's file stays until the trash is purged; the removed
+    // one is gone in both.
+    assert_eq!(ours, theirs);
+    Ok(())
+}
+
 /// The files under `dir` of a scenario's folder, by name.
 /// A file's name and bytes.
 type Named = (String, Vec<u8>);
@@ -2204,9 +2547,10 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 30] = [
+    let writers: [(&str, Writer); 31] = [
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
+        ("attachments", write_attachments),
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),

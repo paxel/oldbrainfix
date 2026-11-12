@@ -681,6 +681,48 @@ void main() {
       }
     });
 
+    test('an attached file comes back whole and into a copy', () async {
+      final old = fullDevice(dir);
+      addTearDown(old.close);
+      final notes = Notes(old);
+      final pills = notes.all().single;
+      final lease = notes.attachFile(
+        pills.id,
+        NewFile(
+          name: 'Lease.pdf',
+          bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 lease')),
+          pages: 1,
+        ),
+      );
+      notes.setAttachmentText(pills.id, lease, 'Rent due');
+      final code = await setUpBackups(old, passphrase, kdf: cheap);
+      final path = '${dir.path}/f.$backupExtension';
+      await writeBackup(old, path);
+      final key = decodeRecoveryCode(code)!;
+      final restored = fresh('f');
+      addTearDown(restored.close);
+      await restoreBackup(restored, path, key);
+      expect(restored.file(lease), old.file(lease));
+      final other = fresh('g');
+      addTearDown(other.close);
+      final opened = await openBackupNotes(other, path, key);
+      final i = opened.pack.notes.indexWhere((n) => n.attachments.isNotEmpty);
+      await addBackupNotes(
+        other,
+        opened,
+        opened.pack.tick(opened.pack.backupTicks(), PackItemKeys.note(i), true),
+        wallClock: wall,
+        suffix: 'Backup',
+        noArea: 'From a Backup',
+      );
+      final copy = Notes(other)
+          .all()
+          .firstWhere((n) => n.attachments.isNotEmpty);
+      expect(copy.attachments.single.name, 'Lease.pdf');
+      expect(other.file(lease), old.file(lease));
+      expect(copy.attachmentTexts[lease], 'Rent due');
+    });
+
     test('refuses as restoring does: a wrong key, a later format, a file '
         'that is no Backup, a damaged one', () async {
       final (old, path, key) = await withNotes();

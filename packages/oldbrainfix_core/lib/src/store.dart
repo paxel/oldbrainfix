@@ -39,8 +39,9 @@ class StoreNeedsUpdate implements Exception {
 /// The store never reads the wall clock on its own: [clock] is handed in,
 /// so tests and the fixture generator get a reproducible log.
 ///
-/// Photo and voice recording bytes live outside the log, content-addressed
-/// by SHA-256: `photos` and `audio` directories next to the database file,
+/// Photo, voice recording and attached file bytes live outside the log,
+/// content-addressed by SHA-256: `photos`, `audio` and `files`
+/// directories next to the database file,
 /// or memory for [Store.inMemory].
 ///
 /// Pending Changes (ADR 0022) lie beside it, in a `pending` directory:
@@ -51,12 +52,22 @@ class Store {
   final Database _db;
   final Blobs _photos;
   final Blobs _audio;
+
+  /// The files attached to Notes (ADR 0047), kept as they are.
+  final Blobs _files;
   final PendingFiles _pendingFiles;
 
   /// Where the store reads "now" for [Entry.recorded] and default dates.
   final DateTime Function() clock;
 
-  Store._(this._db, this.clock, this._photos, this._audio, this._pendingFiles);
+  Store._(
+    this._db,
+    this.clock,
+    this._photos,
+    this._audio,
+    this._files,
+    this._pendingFiles,
+  );
 
   final _listeners = <void Function()>[];
   var _inBatch = false;
@@ -132,6 +143,7 @@ class Store {
       newKey,
       FileBlobs('$dir/photos'),
       FileBlobs('$dir/audio'),
+      FileBlobs('$dir/files'),
       FilePendingFiles('$dir/pending'),
     );
   }
@@ -144,6 +156,7 @@ class Store {
     sqlite3.openInMemory(),
     clock,
     newKey,
+    MemoryBlobs(),
     MemoryBlobs(),
     MemoryBlobs(),
     MemoryPendingFiles(),
@@ -167,6 +180,7 @@ class Store {
     SigningKey Function() newKey,
     Blobs photos,
     Blobs audio,
+    Blobs files,
     PendingFiles pending,
   ) {
     // The background sync may hold the file a moment while the app opens:
@@ -211,7 +225,7 @@ class Store {
     // Today's tables: a database from before the version was recorded
     // gets it. A later version adds its steps here, one per version.
     if (version == 0) db.execute('PRAGMA user_version = $storeVersion');
-    final store = Store._(db, clock, photos, audio, pending);
+    final store = Store._(db, clock, photos, audio, files, pending);
     if (store.localSetting('device') == null) {
       final key = newKey();
       store.setLocalSetting('device', deviceIdFromKey(key.publicKey));
@@ -322,24 +336,42 @@ class Store {
   /// here.
   Uint8List? audio(String hash) => _audio.get(hash);
 
-  /// The photos and the voice recordings kept here, to read them off
-  /// this isolate, as a Pack is written ([PackWrite]).
-  ({Blobs photos, Blobs audio}) get blobs => (photos: _photos, audio: _audio);
+  // --------------------------------------------------------------- files
 
-  /// The bytes of the [kind] (`photo` or `audio`) blob [hash], or null.
-  Uint8List? blob(String kind, String hash) => switch (kind) {
-    'photo' => _photos.get(hash),
-    'audio' => _audio.get(hash),
+  /// Keeps the bytes of a file attached to a Note as they are and returns
+  /// the hash they are kept under (ADR 0047). The same file twice is
+  /// kept once.
+  String putFile(Uint8List bytes) {
+    final hash = sha256.convert(bytes).toString();
+    _files.put(hash, bytes);
+    return hash;
+  }
+
+  /// The bytes of the attached file [hash], or null when they are not
+  /// here.
+  Uint8List? file(String hash) => _files.get(hash);
+
+  /// The photos, the voice recordings and the attached files kept here,
+  /// to read them off this isolate, as a Pack is written ([PackWrite]).
+  ({Blobs photos, Blobs audio, Blobs files}) get blobs =>
+      (photos: _photos, audio: _audio, files: _files);
+
+  /// The blobs of [kind]: `photo`, `audio` or `file`.
+  Blobs? _blobsOf(String kind) => switch (kind) {
+    'photo' => _photos,
+    'audio' => _audio,
+    'file' => _files,
     _ => null,
   };
 
+  /// The bytes of the [kind] (`photo`, `audio` or `file`) blob [hash], or
+  /// null.
+  Uint8List? blob(String kind, String hash) => _blobsOf(kind)?.get(hash);
+
   /// Lets go of the bytes of the [kind] blob [hash]; returns whether
   /// they were here. Only the log says when that is right (ADR 0020).
-  bool dropBlob(String kind, String hash) => switch (kind) {
-    'photo' => _photos.remove(hash),
-    'audio' => _audio.remove(hash),
-    _ => false,
-  };
+  bool dropBlob(String kind, String hash) =>
+      _blobsOf(kind)?.remove(hash) ?? false;
 
   /// Keeps [bytes] another Device holds under [hash], as they are: they
   /// were made the way this Device makes them over there. Bytes whose
@@ -347,14 +379,9 @@ class Store {
   /// returns whether they were.
   bool putBlob(String kind, String hash, Uint8List bytes) {
     if (sha256.convert(bytes).toString() != hash) return false;
-    switch (kind) {
-      case 'photo':
-        _photos.put(hash, bytes);
-      case 'audio':
-        _audio.put(hash, bytes);
-      default:
-        return false;
-    }
+    final blobs = _blobsOf(kind);
+    if (blobs == null) return false;
+    blobs.put(hash, bytes);
     return true;
   }
 

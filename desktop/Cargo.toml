@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/oldbrainfix-core",
     "crates/oldbrainfix-l10n",
+    "crates/oldbrainfix-pdf",
     "crates/oldbrainfix-whisper",
     "crates/oldbrainfix-gui",
 ]

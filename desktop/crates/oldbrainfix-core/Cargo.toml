@@ -41,7 +41,9 @@ hmac = "0.12"
 curve25519-dalek = { version = "4.1", default-features = false }
 # The bundle file (ADR 0003): a zip of stored files only, as the Dart
 # core's `archive` writes it; no compression, no encryption of its own.
-zip = { version = "=9.1.2", default-features = false }
+# Deflate reads the attached office files (ADR 0047), as the gui's zip
+# already does.
+zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # Backups (ADR 0016): the passphrase's key by Argon2id, as the Dart
 # core's `cryptography` derives it.
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
@@ -52,6 +54,8 @@ qrcode = { version = "0.14", default-features = false }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 # Profile initials by what people see as one character.
 unicode-segmentation = "1.13"
+# The text of an attached PDF (ADR 0047), pure Rust like the rest.
+oldbrainfix-pdf = { path = "../oldbrainfix-pdf" }
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

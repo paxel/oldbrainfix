@@ -18,6 +18,7 @@ export 'src/checklists.dart';
 export 'src/conflicts.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
+export 'src/file_text.dart';
 export 'src/folder_sync.dart' hide entriesSealedWith;
 export 'src/frogs.dart';
 export 'src/help_notes.dart';

@@ -1,6 +1,7 @@
 //! Finding Notes by what they say, as the Dart core's `Search` finds
 //! them: their text, the Transcripts of their voice recordings, the Photo
-//! Texts of their photos and the same of their Sections (Amends and
+//! Texts of their photos, the names and Attachment Texts of their
+//! attached files (ADR 0047) and the same of their Sections (Amends and
 //! merged Notes), the text lines of the entries of a Tally and the Lines
 //! of a Checklist or a Shopping List, but those gone. A formatted text
 //! counts as it reads without its marks (ADR 0033), a text in a format
@@ -25,7 +26,8 @@ impl<'a> Search<'a> {
         Search { store }
     }
 
-    /// The Notes whose text, Transcripts or Photo Texts, or those of one
+    /// The Notes whose text, Transcripts, Photo Texts, file names or
+    /// Attachment Texts, or those of one
     /// of their Sections, or the text line of an entry of their Tally, or
     /// a Line of their Checklist or Shopping List, hold `query`, ignoring
     /// case, newest capture first. The query counts as typed, inner spaces included; only its
@@ -58,6 +60,8 @@ impl<'a> Search<'a> {
                 holds(&note.visible_text())
                     || note.transcripts.values().any(holds)
                     || note.photo_texts.values().any(holds)
+                    || note.attachment_texts.values().any(holds)
+                    || note.attachments.iter().any(|a| holds(&a.name))
                     || sections.get(&note.id).is_some_and(|s| s.iter().any(holds))
             })
             .collect())
@@ -78,6 +82,8 @@ impl<'a> Search<'a> {
                 list.push(note.visible_text());
                 list.extend(note.transcripts.into_values());
                 list.extend(note.photo_texts.into_values());
+                list.extend(note.attachment_texts.into_values());
+                list.extend(note.attachments.into_iter().map(|a| a.name));
             }
         }
         for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
@@ -211,6 +217,38 @@ mod tests {
                 .set_photo_text(&voice.id, &voice.recordings[0], "x")
                 .is_err()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn attachment_texts_and_file_names_are_searched_and_a_removed_text_is_not() -> Result<()> {
+        use crate::notes::NewFile;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let file = |name: &'static str, bytes: &'static [u8]| NewFile {
+            name,
+            media_type: "",
+            bytes,
+            pages: None,
+        };
+        let letter =
+            notes.capture_with_files("", None, None, &[], &[], &[file("Lease.txt", b"lease")])?;
+        let hash = &letter.attachments[0].hash;
+        notes.set_attachment_text(&letter.id, hash, "Rent due on the first")?;
+        let target = notes.capture("Papers", None, None)?;
+        let merged =
+            notes.capture_with_files("", None, None, &[], &[], &[file("plan.dwg", b"dwg")])?;
+        notes.merge(&merged.id, &target.id)?;
+        let search = Search::new(&store);
+        let ids = |q| -> Result<Vec<String>> {
+            Ok(search.notes(q, None)?.into_iter().map(|n| n.id).collect())
+        };
+        assert_eq!(ids("RENT DUE")?, vec![letter.id.clone()]);
+        assert_eq!(ids("lease.t")?, vec![letter.id.clone()]);
+        assert_eq!(ids("plan.dwg")?, vec![target.id.clone()]);
+        notes.remove_attachment_text(&letter.id, hash)?;
+        assert!(ids("rent")?.is_empty());
+        assert_eq!(ids("lease")?, vec![letter.id.clone()]);
         Ok(())
     }
 

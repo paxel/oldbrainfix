@@ -34,6 +34,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:image/image.dart' as img;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -2138,7 +2139,434 @@ final _scenarios = <Scenario>[
       routines.unmarkDone(bank.id, on(3, _at(10)));
     },
   ),
+  (
+    name: 'attachments',
+    about:
+        'Attached files (ADR 0047): a Note with a PDF of two pages and one '
+        'of forty, which only a computer reads, a Markdown file read as it '
+        'reads, a file without text and a Word document whose text a '
+        'Device found empty; a Note made from an OpenDocument text alone, '
+        'its text read; a Note with a workbook whose text was removed while '
+        'it stays, and a text file removed while its text stays; a Note '
+        'with a spreadsheet merged into another; a file attached later with '
+        'its media type said by its name; a trashed Note whose file waits '
+        'for nothing; and a file another Device attached with a name of '
+        'folders, marks that turn the text and a type of another shape. Its '
+        '`attachments.json`: the files waiting to be read on a phone and on '
+        'a computer, what each Note may remove, searches for file names and '
+        'Attachment Texts, the tree of the Pack of the Area, and that Pack '
+        'with every item ticked (`pack.obfpack`); the zipped files attached '
+        '(`inputs/`).',
+    build: (store) {
+      final notes = Notes(store);
+      final papers = Places(store).addArea('Papers').id;
+      final lease = notes.capture(
+        'Lease',
+        place: papers,
+        files: [
+          NewFile(
+            name: 'Lease.pdf',
+            mediaType: 'application/pdf',
+            bytes: _bytesOf('%PDF-1.4 the lease'),
+            pages: 2,
+          ),
+          NewFile(
+            name: 'Scan.pdf',
+            bytes: _bytesOf('%PDF-1.4 a scan'),
+            pages: 40,
+          ),
+          NewFile(
+            name: 'notes.md',
+            bytes: _bytesOf('# Notes\r\nKeys: 2  \r\n'),
+          ),
+          NewFile(name: 'plan.dwg', bytes: _bytesOf('AC1032 plan')),
+          NewFile(name: 'Empty.docx', bytes: _attachmentInputs['Empty.docx']!),
+        ],
+      );
+      final [pdf, _, md, _, docx] = [for (final a in lease.attachments) a.hash];
+      notes.setAttachmentText(
+        lease.id,
+        pdf,
+        '  Rent due \r\n\r\n\r\n on the first ',
+      );
+      final mdBytes = store.file(md)!;
+      if (FileTexts.read(FileKind.text, mdBytes) case TextRead(:final text)) {
+        notes.setAttachmentText(lease.id, md, text);
+      }
+      notes.setAttachmentText(lease.id, docx, '');
+      final letter = notes.capture(
+        '',
+        files: [
+          NewFile(
+            name: 'Brief.odt',
+            mediaType: 'application/vnd.oasis.opendocument.text',
+            bytes: _attachmentInputs['Brief.odt']!,
+          ),
+        ],
+      );
+      final odt = letter.attachments.single;
+      if (FileTexts.read(odt.kind, store.file(odt.hash)!) case TextRead(
+        :final text,
+      )) {
+        notes.setAttachmentText(letter.id, odt.hash, text);
+      }
+      final bills = notes.capture(
+        'Bills',
+        place: papers,
+        files: [
+          NewFile(name: 'Costs.xlsx', bytes: _attachmentInputs['Costs.xlsx']!),
+          NewFile(name: 'power.txt', bytes: _bytesOf('Power bill March')),
+        ],
+      );
+      final [xlsx, txt] = [for (final a in bills.attachments) a.hash];
+      notes.setAttachmentText(bills.id, xlsx, 'Costs\nRent\t950.5');
+      notes.setAttachmentText(bills.id, txt, 'Power bill March');
+      notes.removeAttachmentText(bills.id, xlsx);
+      notes.removeAttachment(bills.id, txt);
+      final target = notes.capture('Moving');
+      final plan = notes.capture(
+        '',
+        files: [
+          NewFile(name: 'Plan.ods', bytes: _attachmentInputs['Plan.ods']!),
+        ],
+      );
+      notes.merge(plan.id, target.id);
+      notes.attachFile(
+        target.id,
+        NewFile(
+          name: 'boxes.csv',
+          mediaType: 'application/octet-stream',
+          bytes: _bytesOf('box;room'),
+        ),
+      );
+      final gone = notes.capture(
+        'Old',
+        files: [NewFile(name: 'old.txt', bytes: _bytesOf('old'))],
+      );
+      notes.trash(gone.id);
+      // As another Device's app would write it, which this one reads as
+      // data: a name of folders and marks that turn the text, a size
+      // that is no whole number, a type of another shape and pages below
+      // zero.
+      store.append(
+        lease.id,
+        NoteKeys.file('c' * 64),
+        r'{"name":"C:\\x\\inv\u202Efdp.exe","pages":-1,"size":3.0,'
+        r'"type":"Application/X-Thing; a=b"}',
+      );
+    },
+  ),
 ];
+
+/// [text] as bytes.
+Uint8List _bytesOf(String text) => Uint8List.fromList(utf8.encode(text));
+
+/// The zipped files the `attachments` scenario attaches, by name: the
+/// desktop core attaches the same bytes, written out under `inputs/`.
+final _attachmentInputs = {
+  'Empty.docx': _zipOf({'word/document.xml': '<w:p/>'}),
+  'Brief.odt': _zipOf({
+    'mimetype': 'application/vnd.oasis.opendocument.text',
+    'content.xml':
+        '<office:body><office:text><text:p>Grüße aus Bern'
+        '<text:s text:c="2"/>😀 ﬁ</text:p></office:text></office:body>',
+  }),
+  'Costs.xlsx': _zipOf(_workbook),
+  'Plan.ods': _zipOf({'content.xml': '<a/>'}),
+};
+
+/// The texts of attached files, the kinds of names and the values of
+/// attached files as both cores read them (ADR 0047).
+Map<String, Object?> _fileTexts() {
+  Uint8List stored(Map<String, String> parts) {
+    final archive = Archive();
+    for (final MapEntry(:key, :value) in parts.entries) {
+      archive.add(
+        ArchiveFile.bytes(key, utf8.encode(value))
+          ..compression = CompressionType.none,
+      );
+    }
+    return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2026));
+  }
+
+  Uint8List bytes(List<int> list) => Uint8List.fromList(list);
+  final latin1Part = Archive()
+    ..add(
+      ArchiveFile.bytes('word/document.xml', [
+        ...utf8.encode('<w:p><w:t>Gr'),
+        0xfc,
+        ...utf8.encode('</w:t></w:p>'),
+      ])..compression = CompressionType.deflate,
+    );
+  final files = <(String, String, Uint8List)>[
+    (
+      'Letter.docx',
+      '',
+      _zipOf({
+        'word/document.xml':
+            '<?xml version="1.0"?><w:document xmlns:w="x"><w:body>'
+            '<w:p><w:r><w:t>Dear Ms Weber,</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t xml:space="preserve">Total: </w:t><w:tab/>'
+            '<w:t>12 &amp; 50 &#8364; &#x1F600; &#0; &nbsp;</w:t></w:r>'
+            '<w:del><w:r><w:delText>gone</w:delText></w:r></w:del>'
+            '<w:r><w:br/><w:t>next</w:t><w:cr/><w:t/></w:r></w:p>'
+            '<w:p/><!-- a <w:t>comment</w:t> --><w:p><w:r>'
+            '<w:instrText>PAGE</w:instrText>'
+            "<w:t a='>'><![CDATA[a<b]]></w:t></w:r></w:p>"
+            '</w:body></w:document>',
+        'word/header1.xml': '<w:p><w:t>Not read</w:t></w:p>',
+      }),
+    ),
+    (
+      'stored.docx',
+      '',
+      stored({
+        'word/document.xml': '<w:p><w:t>Stored, not deflated</w:t></w:p>',
+      }),
+    ),
+    (
+      'latin.docx',
+      '',
+      ZipEncoder().encodeBytes(latin1Part, modified: DateTime.utc(2026)),
+    ),
+    ('Broken.docx', '', _bytesOf('PK\u0003\u0004 broken')),
+    ('no-part.docx', '', _zipOf({'other.xml': '<w:t>x</w:t>'})),
+    ('Costs.xlsx', '', _zipOf(_workbook)),
+    (
+      'Brief',
+      'application/vnd.oasis.opendocument.text',
+      _zipOf({
+        'content.xml':
+            '<office:document-content><office:automatic-styles><style:style/>'
+            '</office:automatic-styles><office:body><office:text>'
+            '<text:tracked-changes><text:changed-region><text:deletion>'
+            '<text:p>old</text:p></text:deletion></text:changed-region>'
+            '</text:tracked-changes>'
+            '<text:h text:outline-level="1">Lease</text:h>'
+            '<text:p>A<text:s text:c="3"/>B<text:tab/>C<text:line-break/>D '
+            '<text:span>E</text:span><text:s text:c="0x2"/>F'
+            '<text:s text:c="500"/>|</text:p>'
+            '<text:p/><text:p>Grüße 😀<text:s/>ﬁ</text:p></office:text>'
+            '</office:body></office:document-content>',
+      }),
+    ),
+    (
+      'Plan.ods',
+      '',
+      _zipOf({
+        'content.xml':
+            '<office:body><office:spreadsheet><table:table table:name="Plan">'
+            '<table:table-row><table:table-cell><text:p>Mon</text:p>'
+            '</table:table-cell><table:table-cell '
+            'table:number-columns-repeated="2"><text:p>x\ty</text:p>'
+            '</table:table-cell><table:table-cell '
+            'table:number-columns-repeated="1000"/></table:table-row>'
+            '<table:table-row table:number-rows-repeated="1048000">'
+            '<table:table-cell table:number-columns-repeated="1024"/>'
+            '</table:table-row><table:table-row '
+            'table:number-rows-repeated="2"><table:table-cell/>'
+            '<table:table-cell><text:p>a</text:p><text:p>b<text:s '
+            'text:c="2"/>c</text:p></table:table-cell>'
+            '<table:covered-table-cell/></table:table-row>'
+            '</table:table><table:table table:name="None"/>'
+            '<table:table table:name="Two"><table:table-row '
+            'table:number-rows-repeated="0"><table:table-cell>'
+            '<text:p>z</text:p></table:table-cell></table:table-row>'
+            '</table:table></office:spreadsheet></office:body>',
+      }),
+    ),
+    (
+      'notes.md',
+      '',
+      bytes([
+        0xef, 0xbb, 0xbf, ...utf8.encode('# Title\r\n\r\n\r\n\r\nline  \r'), //
+        0x07, ...utf8.encode('end\n'),
+      ]),
+    ),
+    (
+      'old.TXT',
+      '',
+      bytes([...utf8.encode('Gr'), 0xfc, 0xdf, 0x65, 0x20, 0x80]),
+    ),
+    ('zero.txt', '', bytes([0x61, 0, 0x62])),
+    ('list', 'text/csv', _bytesOf('a;b\n\n\n\nc;d\t\t ')),
+    ('Scan.pdf', '', _bytesOf('%PDF-1.4 scan')),
+    ('archive.zip', 'application/zip', _zipOf({'a.txt': 'a'})),
+  ];
+  const values = [
+    '{"name":"Lease.pdf","pages":2,"size":14,"type":"application/pdf"}',
+    '{"computer":true,"name":"Scan.pdf","pages":40,"size":9,"type":"application/pdf"}',
+    r'{"name":"../../.bashrc","size":5,"type":"Text/Plain; charset=utf-8"}',
+    r'{"computer":"yes","name":"inv\u202Efdp.exe\u0007","pages":1.0,"size":-3,"type":"<script>"}',
+    '{"name":"..","pages":9007199254740993,"size":9007199254740992}',
+    '{"name":" ","size":18446744073709551615}',
+    '{"name":"a","size":1e3,"type":"a/b/c"}',
+    '{"computer":false,"name":"x","type":"text/"}',
+    '{"name":"z","pages":-0.0,"size":-0.0}',
+    '{"name":"y","name":"twice","pages":3,"pages":"4"}',
+    '',
+    'null',
+    '[1]',
+    '"name"',
+    '{"name":3}',
+    '{',
+    'added',
+  ];
+  const names = [
+    'Brief.pdf',
+    r'C:\Users\ann\ Brief.pdf ',
+    '/home/ann/.hidden',
+    '.',
+    '..',
+    'a\u200Fb\u2066c\u200Ed\u0085e',
+    ' \u00a0Grüße.odt\u00a0',
+    '',
+  ];
+  const types = [
+    'application/pdf',
+    'Application/PDF; q=1',
+    'application/vnd.oasis.opendocument.text',
+    'text',
+    'text/',
+    '/plain',
+    'tëxt/plain',
+    'a b/c',
+    'x/y+z.1-2_3',
+    '',
+  ];
+  const kinds = [
+    ('Brief.PDF', ''),
+    ('a.docx', 'application/zip'),
+    ('a.XLSX', ''),
+    ('a.odt', ''),
+    ('a.Ods', ''),
+    ('notes.markdown', ''),
+    ('a.text', ''),
+    ('t.tsv', ''),
+    ('scan', 'application/pdf'),
+    ('plan.dwg', 'application/pdf'),
+    ('plan.dwg', ''),
+    ('README', 'text/markdown'),
+    ('noending.', 'text/plain'),
+    ('a.pdf.zip', ''),
+  ];
+  return {
+    'files': [
+      for (final (name, type, data) in files)
+        {
+          'name': name,
+          'type': type,
+          'bytes': base64.encode(data),
+          'kind': FileTexts.kindOf(name, type).name,
+          'read': switch (FileTexts.read(FileTexts.kindOf(name, type), data)) {
+            TextRead(:final text) => {'text': text},
+            PdfToRead() => 'pdf',
+            NoTextRead() => 'nothing',
+          },
+        },
+    ],
+    'kinds': [
+      for (final (name, type) in kinds)
+        {
+          'name': name,
+          'type': type,
+          'kind': FileTexts.kindOf(name, type).name,
+          'mediaType': FileTexts.mediaTypeOf(name),
+        },
+    ],
+    'values': [
+      for (final value in values)
+        {'value': value, 'read': _attachment(Attachment.read('a' * 64, value))},
+    ],
+    'names': [
+      for (final name in names) {'name': name, 'kept': cleanName(name)},
+    ],
+    'types': [
+      for (final type in types) {'type': type, 'kept': cleanType(type)},
+    ],
+    'computer': [
+      for (final (kind, size, pages) in [
+        (FileKind.pdf, 1 << 30, 10),
+        (FileKind.pdf, 100, 11),
+        (FileKind.pdf, 100, null),
+        (FileKind.docx, FileTexts.phoneBytes, null),
+        (FileKind.ods, FileTexts.phoneBytes + 1, 1),
+        (FileKind.text, FileTexts.phoneBytes + 1, null),
+        (FileKind.other, 1 << 30, null),
+      ])
+        {
+          'kind': kind.name,
+          'size': size,
+          'pages': pages,
+          'reads': FileTexts.computerReads(kind, size, pages),
+        },
+    ],
+    'tidy': [
+      for (final text in [
+        '  a \t\n\n\n\n b\u0085\u001bc \n',
+        '\r\n\r\nTitle\r\rbody\u000b\u007f\u009f\u00a0 ',
+        '\t\tindented\n\n\n',
+        '',
+        ' \n \n\t',
+        'Grüße 😀\u2028next',
+      ])
+        {'text': text, 'kept': FileTexts.tidy(text)},
+    ],
+    'pages': [
+      for (final pages in [
+        ['Page 1 ', ' \n', '\nPage 3'],
+        <String>[],
+        ['', ' '],
+        ['a\n\n\n\nb', 'c'],
+      ])
+        {'pages': pages, 'joined': FileTexts.joinPages(pages)},
+    ],
+  };
+}
+
+/// A zip of [parts], each deflated as office programs write them, dated
+/// alike every time.
+Uint8List _zipOf(Map<String, String> parts) {
+  final archive = Archive();
+  for (final MapEntry(:key, :value) in parts.entries) {
+    archive.add(
+      ArchiveFile.bytes(key, utf8.encode(value))
+        ..compression = CompressionType.deflate,
+    );
+  }
+  return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2026));
+}
+
+/// The parts of a workbook of two sheets in another order than their
+/// files, with shared strings, a phonetic guide, a truth value and an
+/// inline string.
+const _workbook = {
+  'xl/workbook.xml':
+      '<workbook xmlns:r="r"><sheets>'
+      '<sheet name="Costs" sheetId="2" r:id="rId2"/>'
+      '<sheet name="Empty" r:id="rId3"/>'
+      '<sheet name="Notes" sheetId="1" r:id="rId1"/></sheets></workbook>',
+  'xl/_rels/workbook.xml.rels':
+      '<Relationships>'
+      '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/>'
+      '<Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/>'
+      '<Relationship Id="rId3" Target="./worksheets/sheet3.xml"/>'
+      '</Relationships>',
+  'xl/sharedStrings.xml':
+      '<sst><si><t>Rent</t></si><si><r><t>Pow</t></r><r><t>er</t></r>'
+      '<rPh><t>ignored</t></rPh></si><si/></sst>',
+  'xl/worksheets/sheet1.xml':
+      '<worksheet><sheetData><row><c t="str"><v>x</v></c></row>'
+      '</sheetData></worksheet>',
+  'xl/worksheets/sheet2.xml':
+      '<worksheet><sheetData>'
+      '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>950.5</v></c>'
+      '</row><row r="2"><c t="s"><v> 1 </v></c><c/><c t="b"><v>1</v></c>'
+      '<c/></row><row r="3"><c t="inlineStr"><is><t>a\nb</t></is></c>'
+      '<c t="s"><v>0x1</v></c><c t="s"><v>+1</v></c></row><row r="4"/>'
+      '</sheetData></worksheet>',
+  'xl/worksheets/sheet3.xml': '<worksheet><sheetData/></worksheet>',
+};
 
 /// Grant values as a Device of a later version may write them, for the
 /// `markers` scenario's `markers.json`.
@@ -3323,6 +3751,42 @@ Map<String, Object?> _note(Note note) => {
   'removedTranscripts': note.removedTranscripts,
   'removedPhotoTexts': note.removedPhotoTexts,
   'wordless': note.wordless.name,
+  ..._files(
+    note.attachments,
+    note.attachmentTexts,
+    note.removedAttachments,
+    note.removedAttachmentTexts,
+  ),
+  if (note.attachments.isNotEmpty) 'aloneFile': note.aloneFile?.hash,
+};
+
+/// The attached files of a Note or Section, only when it has any, so a
+/// log without them reads as before (ADR 0047).
+Map<String, Object?> _files(
+  List<Attachment> files,
+  Map<String, String> texts,
+  List<Attachment> removed,
+  List<String> removedTexts,
+) => {
+  if (files.isNotEmpty ||
+      texts.isNotEmpty ||
+      removed.isNotEmpty ||
+      removedTexts.isNotEmpty) ...{
+    'attachments': [for (final a in files) _attachment(a)],
+    'attachmentTexts': texts,
+    'removedAttachments': [for (final a in removed) _attachment(a)],
+    'removedAttachmentTexts': removedTexts,
+  },
+};
+
+Map<String, Object?> _attachment(Attachment a) => {
+  'hash': a.hash,
+  'name': a.name,
+  'type': a.mediaType,
+  'size': a.size,
+  'pages': a.pages,
+  'computer': a.computer,
+  'kind': a.kind.name,
 };
 
 /// [context] beyond its capture time, which [_note] and [_section]
@@ -3371,6 +3835,12 @@ Map<String, Object?> _section(Section section) => {
   'removedRecordings': section.removedRecordings,
   'removedTranscripts': section.removedTranscripts,
   'removedPhotoTexts': section.removedPhotoTexts,
+  ..._files(
+    section.attachments,
+    section.attachmentTexts,
+    section.removedAttachments,
+    section.removedAttachmentTexts,
+  ),
   'modified': section.modified?.toUtc().toIso8601String(),
   'editedBy': switch (section.editedBy) {
     final by? => {'id': by.id, 'name': by.name},
@@ -3391,6 +3861,10 @@ List<String> _removable(Notes notes, Note note) => [
     if (notes.mayRemovePhotoText(note.id, hash)) 'ocr/$hash',
   for (final hash in note.recordings)
     if (notes.mayRemoveTranscript(note.id, hash)) 'transcript/$hash',
+  for (final a in note.attachments)
+    if (notes.mayRemoveAttachment(note.id, a.hash)) 'file/${a.hash}',
+  for (final a in note.attachments)
+    if (notes.mayRemoveAttachmentText(note.id, a.hash)) 'fileText/${a.hash}',
 ];
 
 List<Map<String, String>> _blobs(List<({String noteId, String hash})> list) => [
@@ -3476,6 +3950,49 @@ Map<String, Object?> _expected(Store store) {
   };
 }
 
+/// What the `attachments` scenario reads beyond [_expected]: the files
+/// waiting to be read on a phone and on a computer, what each Note may
+/// remove, searches for file names and Attachment Texts, and the tree of
+/// [pack] with its keys, kinds and sizes.
+Map<String, Object?> _attachmentsOf(Store store, Pack pack) {
+  final notes = Notes(store);
+  return {
+    'unreadPhone': _blobs(notes.unreadAttachments(computer: false)),
+    'unreadComputer': _blobs(notes.unreadAttachments(computer: true)),
+    'search': {
+      for (final query in const [
+        'rent due',
+        'LEASE.PDF',
+        'grüße',
+        'keys: 2',
+        'boxes.csv',
+        'plan.ods',
+        'power bill',
+        'costs',
+        'invfdp',
+        'old.txt',
+      ])
+        query: [for (final n in Search(store).notes(query)) n.id],
+    },
+    'missing': store.missingBlobs(),
+    'tree': _packItems(pack.tree()),
+    'all': pack.allKeys().toList()..sort(),
+    'start': pack.exportTicks().toList()..sort(),
+    'size': pack.size(pack.allKeys()),
+  };
+}
+
+/// [items] of a Pack's tree with their keys, kinds and sizes.
+List<Map<String, Object?>> _packItems(List<PackItem> items) => [
+  for (final i in items)
+    {
+      'key': i.key,
+      'kind': i.kind.name,
+      'size': i.size,
+      'children': _packItems(i.children),
+    },
+];
+
 /// What a Note hands to another app (#129), as the fixtures hold it.
 Map<String, Object?> _share(NoteShare share) => {
   'html': share.html,
@@ -3514,6 +4031,7 @@ void _writeBlobs(Store store, Directory out) {
     for (final (dir, hashes, bytes) in [
       ('photos', note.photos, store.photo),
       ('audio', note.recordings, store.audio),
+      ('files', [for (final a in note.attachments) a.hash], store.file),
     ]) {
       for (final hash in hashes) {
         final held = bytes(hash);
@@ -10061,6 +10579,18 @@ Future<void> main(List<String> args) async {
     'marks, with a `-` inside and at the end, and those that are none: '
     'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
     '`\\` or `&`, as in "C#" and web addresses.\n'
+    '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
+    'file its name, media type and bytes, the kind it is and what reading '
+    'it gives: Word documents, workbooks, OpenDocument texts and '
+    'spreadsheets, deflated and stored, with tabs, breaks, spaces, deleted '
+    'text, field codes, phonetic guides, repeated cells and rows, '
+    'references and CDATA, damaged ones, parts that are no UTF-8, text '
+    'files in UTF-8 with and without a byte order mark, in Windows-1252 '
+    'and holding a zero, a PDF and a file without text; the kinds and '
+    'media types of names and types; the values of attached files as '
+    'another Device may write them, crafted ones among them, read as data; '
+    'names and types as kept; who reads a file by its kind, size and '
+    'pages (Q645); texts tidied and page texts joined.\n'
     '- `schedule_sentences.json`: schedules as sentences (ADR 0044) on a '
     'held day: each schedule of the simple editor written in English and '
     'German and read back, texts read as typed with the parts not '
@@ -10318,6 +10848,10 @@ Future<void> main(List<String> args) async {
     File('${root.path}/text_tags.json'),
     '${_json.convert(_textTags())}\n',
   );
+  _write(
+    File('${root.path}/file_texts.json'),
+    '${_json.convert(_fileTexts())}\n',
+  );
   _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
   _write(
     File('${root.path}/schedule_sentences.json'),
@@ -10460,6 +10994,21 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/markers.json'),
           '${_json.convert(_markers(store))}\n',
+        );
+      }
+      if (scenario.name == 'attachments') {
+        for (final MapEntry(:key, :value) in _attachmentInputs.entries) {
+          File('${out.path}/inputs/$key')
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(value);
+        }
+        final area = Places(store).areas().single.id;
+        final pack = store.packOf(area);
+        File('${out.path}/pack.$packExtension')
+            .writeAsBytesSync(store.writePack(pack, pack.allKeys()));
+        _write(
+          File('${out.path}/attachments.json'),
+          '${_json.convert(_attachmentsOf(store, pack))}\n',
         );
       }
       if (ShoppingLists(store).ofNotes(noteIds, _frogDay(0)).isNotEmpty) {

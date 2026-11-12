@@ -2,6 +2,7 @@
 //! them: the text, the capture time, the Importance, where a Note is
 //! filed, whether it is in the trash, what was merged into it, and its
 //! photos and voice recordings with their Photo Texts and Transcripts,
+//! the files attached to it with their Attachment Texts (ADR 0047),
 //! and the Capture Context of Notes and Sections. Every write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
@@ -11,6 +12,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::boxes::{self, Boxes};
 use crate::entry::{Entry, dart_iso, parse_time};
+use crate::file_text::{self, FileKind};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
 use crate::profile::Profile;
@@ -61,6 +63,17 @@ pub mod keys {
     /// text was found; absent means not read (yet); null means removed
     /// while the photo stays (ADR 0025).
     pub const OCR_PREFIX: &str = "ocr:";
+    /// One field per attached file (ADR 0047), `file:<hash>` = its name,
+    /// media type and size as JSON ([`super::Attachment`]), so files
+    /// attached on two Devices at once are both kept. The bytes are in
+    /// the store's files, under the hash. Null once the file was removed
+    /// and its Attachment Text kept, as for photos (ADR 0020).
+    pub const FILE_PREFIX: &str = "file:";
+    /// The Attachment Text of an attached file, `fileText:<hash>` = the
+    /// text read out of it, on the Note holding `file:<hash>`. An empty
+    /// text means no text was found; absent means not read (yet); null
+    /// means removed while the file stays (ADR 0025).
+    pub const FILE_TEXT_PREFIX: &str = "fileText:";
     /// Where a Note or Section was captured, `<latitude>,<longitude>`;
     /// absent while unknown.
     pub const LOCATION: &str = "location";
@@ -90,6 +103,14 @@ pub mod keys {
 
     pub fn ocr(hash: &str) -> String {
         format!("{OCR_PREFIX}{hash}")
+    }
+
+    pub fn file(hash: &str) -> String {
+        format!("{FILE_PREFIX}{hash}")
+    }
+
+    pub fn file_text(hash: &str) -> String {
+        format!("{FILE_TEXT_PREFIX}{hash}")
     }
 
     /// Field keys of a Section.
@@ -313,6 +334,19 @@ pub struct Note {
     /// The hashes of its photos whose Photo Text was removed while the
     /// photo stays, as for `removed_transcripts`.
     pub removed_photo_texts: Vec<String>,
+    /// The files attached to it (ADR 0047), in the order they were
+    /// attached.
+    pub attachments: Vec<Attachment>,
+    /// The Attachment Texts of its files, by file hash; a file not read
+    /// yet, or of a kind without text, has none.
+    pub attachment_texts: BTreeMap<String, String>,
+    /// Its files that were removed while their Attachment Text stays, in
+    /// the order they were attached, as they were before; the text is in
+    /// `attachment_texts`.
+    pub removed_attachments: Vec<Attachment>,
+    /// The hashes of its files whose Attachment Text was removed while
+    /// the file stays, as for `removed_photo_texts`.
+    pub removed_attachment_texts: Vec<String>,
     /// The boxes of `text` as they show now, in the order they come (ADR
     /// 0035); none in a text this version may not change.
     pub boxes: Vec<ShownBox>,
@@ -351,6 +385,22 @@ impl Note {
     /// [`Notes::default_nudge`] after it.
     pub fn nudge_at(&self) -> DateTime<Utc> {
         self.nudge.unwrap_or(self.captured + Notes::default_nudge())
+    }
+
+    /// The file a Note made from a file alone shows as its card (ADR
+    /// 0047): its one attached file, while its text is blank and it has
+    /// no photo, recording or other file, removed ones included.
+    pub fn alone_file(&self) -> Option<&Attachment> {
+        let [file] = self.attachments.as_slice() else {
+            return None;
+        };
+        let alone = dart_trim(&self.shown_text()).is_empty()
+            && self.photos.is_empty()
+            && self.removed_photos.is_empty()
+            && self.recordings.is_empty()
+            && self.removed_recordings.is_empty()
+            && self.removed_attachments.is_empty();
+        alone.then_some(file)
     }
 
     /// What the Note is titled as while its text is blank: a voice
@@ -402,6 +452,13 @@ pub struct Section {
     /// [`Note::removed_photo_texts`].
     pub removed_transcripts: Vec<String>,
     pub removed_photo_texts: Vec<String>,
+    /// A merged Note's attached files with their Attachment Texts, those
+    /// removed and those whose texts were removed, as for
+    /// [`Note::attachments`]; an Amend has none.
+    pub attachments: Vec<Attachment>,
+    pub attachment_texts: BTreeMap<String, String>,
+    pub removed_attachments: Vec<Attachment>,
+    pub removed_attachment_texts: Vec<String>,
     /// The boxes of `text` as they show now, as for [`Note::boxes`].
     pub boxes: Vec<ShownBox>,
     /// When `text` was last edited, as the Dart core's `modified` (#183):
@@ -414,6 +471,17 @@ pub struct Section {
     /// of their Devices; `None` while it was never edited (`modified` is
     /// `None`) and for a writer not known.
     pub edited_by: Option<Profile>,
+}
+
+/// An error unless `file` is small enough to attach.
+fn require_size(file: &NewFile) -> Result<()> {
+    if file.bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(Error::Invalid(format!(
+            "{} is larger than {MAX_FILE_BYTES} bytes",
+            file.name
+        )));
+    }
+    Ok(())
 }
 
 /// An error unless `format` is a format this version writes.
@@ -474,6 +542,145 @@ pub struct Blob {
     pub hash: String,
 }
 
+/// The largest file that can be attached: the most a bundle, a Backup
+/// and the local network carry of one (ADR 0003, 0047).
+pub const MAX_FILE_BYTES: u64 = 256 << 20;
+
+/// The largest whole number a size or a page count is read as: what a
+/// double holds exactly, so both cores read the same.
+const MAX_COUNT: u64 = 1 << 53;
+
+/// The most characters of a file's name kept.
+const MAX_NAME_CHARS: usize = 255;
+
+/// The media type of a file no app named one for.
+pub const UNKNOWN_TYPE: &str = "application/octet-stream";
+
+/// A file attached to a Note (ADR 0047): its bytes are a blob, kept by
+/// its hash; the rest is what the attaching Device wrote down. Another
+/// person's Device may have written it, so it is read as data only: a
+/// name without folders or control characters, a media type of the
+/// usual shape, numbers that are whole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attachment {
+    pub hash: String,
+    /// Its file name, without any folder; empty when none was given.
+    pub name: String,
+    /// Its media type in lower case, such as `application/pdf`;
+    /// [`UNKNOWN_TYPE`] when none was given.
+    pub media_type: String,
+    /// Its size in bytes.
+    pub size: u64,
+    /// How many pages it has, when the attaching Device counted them.
+    pub pages: Option<u64>,
+    /// Whether only a computer reads its text (Q645,
+    /// [`file_text::computer_reads`]); until one has, a phone shows that
+    /// the text follows from the computer.
+    pub computer: bool,
+}
+
+impl Attachment {
+    /// What the file is, as far as its text goes.
+    pub fn kind(&self) -> FileKind {
+        file_text::kind_of(&self.name, &self.media_type)
+    }
+
+    /// The attachment `hash` from the value of its field: whatever does
+    /// not read is left empty, never an error.
+    pub fn read(hash: &str, value: &str) -> Attachment {
+        let json = serde_json::from_str::<serde_json::Value>(value).ok();
+        let object = json.as_ref().and_then(serde_json::Value::as_object);
+        let field = |key: &str| object.and_then(|o| o.get(key));
+        let count = |key: &str| {
+            field(key)
+                .and_then(serde_json::Value::as_u64)
+                .filter(|n| *n <= MAX_COUNT)
+        };
+        Attachment {
+            hash: hash.to_string(),
+            name: clean_name(field("name").and_then(|v| v.as_str()).unwrap_or("")),
+            media_type: clean_type(field("type").and_then(|v| v.as_str()).unwrap_or("")),
+            size: count("size").unwrap_or(0),
+            pages: count("pages"),
+            computer: field("computer") == Some(&serde_json::Value::Bool(true)),
+        }
+    }
+
+    /// The value of its field: JSON, keys sorted, `computer` only when
+    /// true and `pages` only when counted.
+    pub fn value(&self) -> String {
+        let mut out = serde_json::Map::new();
+        if self.computer {
+            out.insert("computer".into(), true.into());
+        }
+        out.insert("name".into(), self.name.clone().into());
+        if let Some(pages) = self.pages {
+            out.insert("pages".into(), pages.into());
+        }
+        out.insert("size".into(), self.size.into());
+        out.insert("type".into(), self.media_type.clone().into());
+        serde_json::Value::Object(out).to_string()
+    }
+}
+
+/// A file to attach: its name, the media type the app was told (empty,
+/// or `application/octet-stream`, for the one its name's ending says,
+/// [`file_text::media_type_of`]), its bytes and, for a PDF, how many
+/// pages it has when the app counted them ([`crate::pdf::page_count`] on
+/// the desktop).
+#[derive(Debug, Clone, Copy)]
+pub struct NewFile<'b> {
+    pub name: &'b str,
+    pub media_type: &'b str,
+    pub bytes: &'b [u8],
+    pub pages: Option<u64>,
+}
+
+/// `name` as a file's name is kept: the part after its last `/` or `\`,
+/// without control characters and the marks that turn the direction of
+/// text (which could make `exe.pdf` of `fdp.exe`), its blanks at the
+/// ends trimmed, at most [`MAX_NAME_CHARS`] characters; `.` and `..` are
+/// no name.
+pub fn clean_name(name: &str) -> String {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let kept: String = base
+        .chars()
+        .filter(|&c| {
+            !(c < ' '
+                || ('\u{7f}'..='\u{9f}').contains(&c)
+                || ('\u{202a}'..='\u{202e}').contains(&c)
+                || ('\u{2066}'..='\u{2069}').contains(&c)
+                || c == '\u{200e}'
+                || c == '\u{200f}')
+        })
+        .collect();
+    let trimmed: String = dart_trim(&kept).chars().take(MAX_NAME_CHARS).collect();
+    let trimmed = dart_trim(&trimmed);
+    if trimmed == "." || trimmed == ".." {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// `media_type` as a file's media type is kept: in lower case, without
+/// its parameters, when it has the shape `type/subtype` of letters,
+/// digits and `!#$&^_.+-`, at most 127 characters; [`UNKNOWN_TYPE`]
+/// otherwise.
+pub fn clean_type(media_type: &str) -> String {
+    let bare = media_type.split(';').next().unwrap_or("");
+    let lower = dart_trim(bare).to_ascii_lowercase();
+    let part = |p: &str| {
+        !p.is_empty()
+            && p.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"!#$&^_.+-".contains(&b))
+    };
+    match lower.split_once('/') {
+        Some((top, sub)) if lower.len() <= 127 && part(top) && part(sub) => lower,
+        _ => UNKNOWN_TYPE.to_string(),
+    }
+}
+
 /// Reading Notes.
 pub struct Notes<'a> {
     store: &'a Store,
@@ -504,7 +711,7 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
-        self.capture_full(text, text_format::PLAIN, place, nudge_in, &[], &[])
+        self.capture_full(text, text_format::PLAIN, place, nudge_in, &[], &[], &[])
     }
 
     /// Captures a new Note as [`Notes::capture`] does, its text in
@@ -516,7 +723,7 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
-        self.capture_full(text, format, place, nudge_in, &[], &[])
+        self.capture_full(text, format, place, nudge_in, &[], &[], &[])
     }
 
     /// Captures a new Note as [`Notes::capture`] does, with `photos` and
@@ -537,9 +744,36 @@ impl<'a> Notes<'a> {
             nudge_in,
             photos,
             recordings,
+            &[],
         )
     }
 
+    /// Captures a new Note as [`Notes::capture_with`] does, with `files`
+    /// attached (ADR 0047): the text may be empty for a Note made from a
+    /// file alone, which shows the file as its card
+    /// ([`Note::alone_file`]). The files are kept as they are; one larger
+    /// than [`MAX_FILE_BYTES`] is refused and nothing is written.
+    pub fn capture_with_files(
+        &self,
+        text: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+        photos: &[Vec<u8>],
+        recordings: &[Vec<u8>],
+        files: &[NewFile],
+    ) -> Result<Note> {
+        self.capture_full(
+            text,
+            text_format::PLAIN,
+            place,
+            nudge_in,
+            photos,
+            recordings,
+            files,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn capture_full(
         &self,
         text: &str,
@@ -548,8 +782,12 @@ impl<'a> Notes<'a> {
         nudge_in: Option<Duration>,
         photos: &[Vec<u8>],
         recordings: &[Vec<u8>],
+        files: &[NewFile],
     ) -> Result<Note> {
         require_format(format)?;
+        for file in files {
+            require_size(file)?;
+        }
         if let Some(place) = place
             && !Places::new(self.store).is_place(place)?
         {
@@ -574,6 +812,10 @@ impl<'a> Notes<'a> {
             .iter()
             .map(|r| self.store.put_audio(r))
             .collect::<Result<Vec<_>>>()?;
+        let files = files
+            .iter()
+            .map(|f| self.keep_file(f))
+            .collect::<Result<Vec<_>>>()?;
         self.store.batch(|| {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
@@ -592,6 +834,9 @@ impl<'a> Notes<'a> {
             }
             for hash in &audio {
                 s.append(&id, &keys::audio(hash), Some(keys::ADDED), at)?;
+            }
+            for file in &files {
+                s.append(&id, &keys::file(&file.hash), Some(&file.value()), at)?;
             }
             Ok(())
         })?;
@@ -640,6 +885,179 @@ impl<'a> Notes<'a> {
     /// reading it.
     pub fn has_recording(&self, hash: &str) -> bool {
         self.store.has_blob("audio", hash)
+    }
+
+    /// Attaches the file `file` to the Note `note_id` (ADR 0047), its
+    /// bytes kept as they are; returns the hash they are kept under. A
+    /// file larger than [`MAX_FILE_BYTES`] is refused. The same file
+    /// attached again keeps one field, written anew.
+    pub fn attach_file(&self, note_id: &str, file: &NewFile) -> Result<String> {
+        self.require_note(note_id)?;
+        require_size(file)?;
+        let attachment = self.keep_file(file)?;
+        self.store.append(
+            note_id,
+            &keys::file(&attachment.hash),
+            Some(&attachment.value()),
+            None,
+        )?;
+        Ok(attachment.hash)
+    }
+
+    /// Keeps the bytes of `file` and gives what its field holds.
+    fn keep_file(&self, file: &NewFile) -> Result<Attachment> {
+        let hash = self.store.put_file(file.bytes)?;
+        let name = clean_name(file.name);
+        // A type not named is the one its name's ending says.
+        let media_type = match clean_type(file.media_type) {
+            t if t == UNKNOWN_TYPE => file_text::media_type_of(&name).to_string(),
+            t => t,
+        };
+        let size = file.bytes.len() as u64;
+        let pages = file.pages.filter(|p| *p <= MAX_COUNT);
+        let kind = file_text::kind_of(&name, &media_type);
+        Ok(Attachment {
+            hash,
+            computer: file_text::computer_reads(kind, size, pages),
+            name,
+            media_type,
+            size,
+            pages,
+        })
+    }
+
+    /// The bytes of the attached file `hash`, or `None` when they are not
+    /// on this Device (yet).
+    pub fn file_bytes(&self, hash: &str) -> Option<Vec<u8>> {
+        self.store.file(hash)
+    }
+
+    /// Whether the attached file `hash` is on this Device, without
+    /// reading it.
+    pub fn has_file(&self, hash: &str) -> bool {
+        self.store.has_blob("file", hash)
+    }
+
+    /// Keeps `text`, tidied ([`file_text::tidy`]), as the Attachment Text
+    /// of the file `hash` of the Note `note_id`, a merged one included,
+    /// next to the file. An empty text records that no text was found,
+    /// so the file is not read again. Given again, as when reading the
+    /// file again, it replaces the Attachment Text, a removed one
+    /// included.
+    pub fn set_attachment_text(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        self.store
+            .append(
+                note_id,
+                &keys::file_text(hash),
+                Some(&file_text::tidy(text)),
+                None,
+            )
+            .map(drop)
+    }
+
+    /// The attached files whose text is still to be read, newest capture
+    /// first: those of a kind with text ([`FileKind::has_text`]) without
+    /// an Attachment Text, nor one that was removed, on every Note not in
+    /// the trash, merged ones included. On a phone (`computer` false)
+    /// those only a computer reads are left out (Q645).
+    pub fn unread_attachments(&self, computer: bool) -> Result<Vec<Blob>> {
+        let waits = |note: &Note, file: &Attachment| {
+            file.kind().has_text()
+                && (computer || !file.computer)
+                && !note.attachment_texts.contains_key(&file.hash)
+                && !note.removed_attachment_texts.contains(&file.hash)
+        };
+        let mut notes = Vec::new();
+        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+            if let Some(note) = self.by_id(&id)?
+                && !note.is_trashed()
+                && note.attachments.iter().any(|a| waits(&note, a))
+            {
+                notes.push(note);
+            }
+        }
+        // By id within one capture time, so both cores list them alike.
+        notes.sort_by(|a, b| b.captured.cmp(&a.captured).then_with(|| a.id.cmp(&b.id)));
+        let mut out = Vec::new();
+        for note in &notes {
+            for file in &note.attachments {
+                if waits(note, file) {
+                    out.push(Blob {
+                        note_id: note.id.clone(),
+                        hash: file.hash.clone(),
+                    });
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Whether this Device may remove the attached file `hash` of the
+    /// Note `note_id`, a merged one included, and keep its Attachment
+    /// Text, as for [`Notes::may_remove_photo`]: the file has one that
+    /// is not empty, and the Note is this Device's to change.
+    pub fn may_remove_attachment(&self, note_id: &str, hash: &str) -> Result<bool> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Ok(false);
+        };
+        if !note.attachments.iter().any(|a| a.hash == hash)
+            || !has_text(note.attachment_texts.get(hash))
+        {
+            return Ok(false);
+        }
+        self.store.may_change(note_id)
+    }
+
+    /// Removes the attached file `hash` from the Note `note_id` and keeps
+    /// its Attachment Text, which search still finds, as
+    /// [`Notes::remove_photo`] does (ADR 0020). Refused unless
+    /// [`Notes::may_remove_attachment`].
+    pub fn remove_attachment(&self, note_id: &str, hash: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        if !self.may_remove_attachment(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the file {hash} of {note_id} may not be removed here"
+            )));
+        }
+        self.store.append(note_id, &keys::file(hash), None, None)?;
+        self.store.drop_removed_blobs().map(drop)
+    }
+
+    /// Whether this Device may remove the Attachment Text of the file
+    /// `hash` of the Note `note_id` and keep the file, as for
+    /// [`Notes::may_remove_photo_text`].
+    pub fn may_remove_attachment_text(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove_attachment(note_id, hash)
+    }
+
+    /// Removes the Attachment Text of the file `hash` from the Note
+    /// `note_id`; the file stays (ADR 0025). Search no longer finds the
+    /// text, and the file is not read again until
+    /// [`Notes::set_attachment_text`] is given a new one. Refused unless
+    /// [`Notes::may_remove_attachment_text`].
+    pub fn remove_attachment_text(&self, note_id: &str, hash: &str) -> Result<()> {
+        self.require_attached(note_id, hash)?;
+        if !self.may_remove_attachment_text(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the Attachment Text of {hash} may not be removed here"
+            )));
+        }
+        self.store
+            .append(note_id, &keys::file_text(hash), None, None)
+            .map(drop)
+    }
+
+    /// An error unless `hash` is a file attached to the Note `note_id`.
+    fn require_attached(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.attachments.iter().any(|a| a.hash == hash));
+        if held {
+            Ok(())
+        } else {
+            Err(Error::Invalid(format!("not a file of {note_id}: {hash}")))
+        }
     }
 
     /// Keeps `text`, trimmed, as the Transcript of the voice recording
@@ -1361,6 +1779,22 @@ impl<'a> Notes<'a> {
         };
         let removed_transcripts = removed_texts(&recordings, keys::transcript);
         let removed_photo_texts = removed_texts(&photos, keys::ocr);
+        let attachment_texts = texts(&fields, keys::FILE_TEXT_PREFIX);
+        let attachments: Vec<Attachment> = fields
+            .iter()
+            .filter_map(|(key, value)| {
+                let hash = key.strip_prefix(keys::FILE_PREFIX)?;
+                Some(Attachment::read(hash, value?))
+            })
+            .collect();
+        let hashes: Vec<String> = attachments.iter().map(|a| a.hash.clone()).collect();
+        let removed_attachment_texts = removed_texts(&hashes, keys::file_text);
+        let gone = removed(keys::FILE_PREFIX, &attachment_texts);
+        let removed_attachments = if gone.is_empty() {
+            Vec::new()
+        } else {
+            self.as_attached(id, &gone)?
+        };
         let boxes = self.boxes(id, &text, &fields)?;
         Ok(Some(Note {
             id: id.to_string(),
@@ -1385,8 +1819,36 @@ impl<'a> Notes<'a> {
             photo_texts,
             removed_transcripts,
             removed_photo_texts,
+            attachments,
+            attachment_texts,
+            removed_attachments,
+            removed_attachment_texts,
             boxes,
         }))
+    }
+
+    /// The removed files `hashes` of the Note `id` as they were attached:
+    /// each by the value of its field that wins by latest wins among
+    /// those that name the file.
+    fn as_attached(&self, id: &str, hashes: &[String]) -> Result<Vec<Attachment>> {
+        let history = self.store.history(id)?;
+        Ok(hashes
+            .iter()
+            .map(|hash| {
+                let field = keys::file(hash);
+                let mut held: Option<&Entry> = None;
+                for e in &history {
+                    if e.field == field
+                        && e.value.is_some()
+                        && held
+                            .is_none_or(|h| Store::latest_wins(e, h) == std::cmp::Ordering::Greater)
+                    {
+                        held = Some(e);
+                    }
+                }
+                Attachment::read(hash, held.and_then(|e| e.value.as_deref()).unwrap_or(""))
+            })
+            .collect())
     }
 
     /// The boxes of the stored `text` of `id` with the ticks that count
@@ -1588,6 +2050,10 @@ impl<'a> Notes<'a> {
             removed_recordings: note.removed_recordings,
             removed_transcripts: note.removed_transcripts,
             removed_photo_texts: note.removed_photo_texts,
+            attachments: note.attachments,
+            attachment_texts: note.attachment_texts,
+            removed_attachments: note.removed_attachments,
+            removed_attachment_texts: note.removed_attachment_texts,
             boxes: note.boxes,
             modified,
             edited_by,
@@ -1649,6 +2115,10 @@ impl<'a> Notes<'a> {
             removed_recordings: Vec::new(),
             removed_transcripts: Vec::new(),
             removed_photo_texts: Vec::new(),
+            attachments: Vec::new(),
+            attachment_texts: BTreeMap::new(),
+            removed_attachments: Vec::new(),
+            removed_attachment_texts: Vec::new(),
             boxes,
             modified,
             edited_by,
@@ -3629,6 +4099,344 @@ mod tests {
         for store in [&ann, &ben] {
             assert_eq!(place_of(store, &theirs.id)?, Some(area.clone()));
             assert!(Notes::new(store).unsorted()?.is_empty());
+        }
+        Ok(())
+    }
+
+    // ------------------------------------------ attached files (ADR 0047)
+
+    fn new_file<'b>(name: &'b str, bytes: &'b [u8], pages: Option<u64>) -> NewFile<'b> {
+        NewFile {
+            name,
+            media_type: "",
+            bytes,
+            pages,
+        }
+    }
+
+    #[test]
+    fn a_file_is_attached_as_it_is_and_waits_to_be_read_where_its_kind_allows() -> TestResult {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let big = vec![b'a'; (file_text::PHONE_BYTES + 1) as usize];
+        let note = notes.capture_with_files(
+            "Papers",
+            None,
+            None,
+            &[],
+            &[],
+            &[
+                new_file("Lease.pdf", b"%PDF-1.4 lease", Some(2)),
+                new_file("Scan.pdf", b"%PDF-1.4 scan", Some(40)),
+                new_file("notes.md", b"# Notes", None),
+                new_file("big.txt", &big, None),
+                new_file("plan.dwg", b"dwg", None),
+            ],
+        )?;
+        let names: Vec<&str> = note.attachments.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(
+            names,
+            ["Lease.pdf", "Scan.pdf", "notes.md", "big.txt", "plan.dwg"]
+        );
+        let computer: Vec<bool> = note.attachments.iter().map(|a| a.computer).collect();
+        assert_eq!(computer, [false, true, false, true, false]);
+        let lease = &note.attachments[0];
+        assert_eq!(lease.media_type, "application/pdf");
+        assert_eq!((lease.size, lease.pages), (14, Some(2)));
+        assert_eq!(
+            store
+                .current(&note.id, &keys::file(&lease.hash))?
+                .as_deref(),
+            Some(r#"{"name":"Lease.pdf","pages":2,"size":14,"type":"application/pdf"}"#)
+        );
+        assert_eq!(
+            notes.file_bytes(&lease.hash).as_deref(),
+            Some(&b"%PDF-1.4 lease"[..])
+        );
+        assert!(notes.has_file(&lease.hash) && !notes.has_photo(&lease.hash));
+        let hashes =
+            |blobs: Vec<Blob>| -> Vec<String> { blobs.into_iter().map(|b| b.hash).collect() };
+        let h = |i: usize| note.attachments[i].hash.clone();
+        assert_eq!(hashes(notes.unread_attachments(false)?), [h(0), h(2)]);
+        assert_eq!(
+            hashes(notes.unread_attachments(true)?),
+            [h(0), h(1), h(2), h(3)]
+        );
+        notes.set_attachment_text(&note.id, &h(0), "  Rent \r\n\r\n\r\n due ")?;
+        notes.set_attachment_text(&note.id, &h(2), "")?;
+        let read = notes.by_id(&note.id)?.ok_or("note")?;
+        assert_eq!(
+            read.attachment_texts.get(&h(0)).map(String::as_str),
+            Some("Rent\n\n due")
+        );
+        assert_eq!(hashes(notes.unread_attachments(true)?), [h(1), h(3)]);
+        assert!(
+            notes
+                .set_attachment_text(&note.id, &"0".repeat(64), "x")
+                .is_err()
+        );
+        assert!(
+            notes
+                .attach_file("note:none", &new_file("a.txt", b"a", None))
+                .is_err()
+        );
+        assert_eq!(read.alone_file(), None, "it has words and five files");
+        // Neither waits in the trash.
+        notes.trash(&note.id)?;
+        assert!(notes.unread_attachments(true)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_made_from_a_file_alone_shows_the_file() -> TestResult {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let letter = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[new_file("Letter.odt", b"PK", None)],
+        )?;
+        assert_eq!(
+            letter.alone_file().map(|a| a.name.as_str()),
+            Some("Letter.odt")
+        );
+        let hash = notes.attach_file(&letter.id, &new_file("Other.ods", b"PK2", None))?;
+        assert_eq!(notes.by_id(&letter.id)?.ok_or("note")?.alone_file(), None);
+        let with_photo = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[photo(1)],
+            &[],
+            &[new_file("a.zip", b"z", None)],
+        )?;
+        assert_eq!(with_photo.alone_file(), None);
+        let worded = notes.capture_with_files(
+            "About it",
+            None,
+            None,
+            &[],
+            &[],
+            &[new_file("a.zip", b"z", None)],
+        )?;
+        assert_eq!(worded.alone_file(), None);
+        assert_eq!(
+            notes.by_id(&letter.id)?.ok_or("note")?.attachments[1].hash,
+            hash
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn removing_a_files_text_keeps_the_file_and_removing_a_file_keeps_its_text() -> TestResult {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let note = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[
+                new_file("Lease.txt", b"lease", None),
+                new_file("Bill.txt", b"bill", None),
+                new_file("x.zip", b"zip", None),
+            ],
+        )?;
+        let [lease, bill, zip] = [0, 1, 2].map(|i| note.attachments[i].hash.clone());
+        notes.set_attachment_text(&note.id, &lease, "Rent due")?;
+        notes.set_attachment_text(&note.id, &bill, "Power bill")?;
+        // Nothing would be left of a file without a text (ADR 0020).
+        assert!(!notes.may_remove_attachment(&note.id, &zip)?);
+        assert!(notes.remove_attachment(&note.id, &zip).is_err());
+        notes.remove_attachment_text(&note.id, &bill)?;
+        let read = notes.by_id(&note.id)?.ok_or("note")?;
+        assert_eq!(read.removed_attachment_texts, vec![bill.clone()]);
+        assert!(read.attachments.iter().any(|a| a.hash == bill));
+        assert!(notes.has_file(&bill));
+        assert!(
+            !notes
+                .unread_attachments(true)?
+                .iter()
+                .any(|b| b.hash == bill)
+        );
+        assert!(!notes.may_remove_attachment_text(&note.id, &bill)?);
+        notes.remove_attachment(&note.id, &lease)?;
+        let read = notes.by_id(&note.id)?.ok_or("note")?;
+        assert!(!read.attachments.iter().any(|a| a.hash == lease));
+        let removed: Vec<&str> = read
+            .removed_attachments
+            .iter()
+            .map(|a| a.name.as_str())
+            .collect();
+        assert_eq!(removed, ["Lease.txt"]);
+        assert_eq!(
+            read.attachment_texts.get(&lease).map(String::as_str),
+            Some("Rent due")
+        );
+        assert_eq!(notes.file_bytes(&lease), None, "its bytes go");
+        assert!(!store.knows_blob(&format!("file/{lease}"))?);
+        assert!(store.missing_blobs()?.is_empty());
+        // Reading the text again ends its removal.
+        notes.set_attachment_text(&note.id, &bill, "Power bill, March")?;
+        let read = notes.by_id(&note.id)?.ok_or("note")?;
+        assert!(read.removed_attachment_texts.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn what_another_device_wrote_of_a_file_is_read_as_data_only() {
+        let hash = "a".repeat(64);
+        let read = |value: &str| Attachment::read(&hash, value);
+        let plain = read(r#"{"name":"../../.bashrc","size":5,"type":"Text/Plain; charset=utf-8"}"#);
+        assert_eq!(
+            (plain.name.as_str(), plain.media_type.as_str()),
+            (".bashrc", "text/plain")
+        );
+        assert_eq!((plain.size, plain.pages, plain.computer), (5, None, false));
+        let crafted = read(
+            r#"{"computer":"yes","name":"inv\u202Efdp.exe\u0007","pages":1.0,"size":-3,"type":"<script>"}"#,
+        );
+        assert_eq!(crafted.name, "invfdp.exe");
+        assert_eq!(crafted.media_type, UNKNOWN_TYPE);
+        assert_eq!(
+            (crafted.size, crafted.pages, crafted.computer),
+            (0, None, false)
+        );
+        let huge = read(r#"{"name":"..","pages":9007199254740993,"size":9007199254740992}"#);
+        assert_eq!(
+            (huge.name.as_str(), huge.pages, huge.size),
+            ("", None, 1 << 53)
+        );
+        for garbled in ["", "null", "[1]", "\"name\"", "{\"name\":3}"] {
+            let a = read(garbled);
+            assert_eq!(
+                (a.name.as_str(), a.media_type.as_str(), a.size),
+                ("", UNKNOWN_TYPE, 0)
+            );
+        }
+        assert_eq!(clean_name("C:\\Users\\ann\\ Brief.pdf "), "Brief.pdf");
+        assert_eq!(clean_name(&"ä".repeat(300)).chars().count(), 255);
+        assert_eq!(
+            clean_type("application/vnd.oasis.opendocument.text"),
+            "application/vnd.oasis.opendocument.text"
+        );
+        assert_eq!(clean_type("text"), UNKNOWN_TYPE);
+        assert_eq!(clean_type("tëxt/plain"), UNKNOWN_TYPE);
+    }
+
+    #[test]
+    fn a_file_goes_only_to_the_people_of_its_area() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, private) = household(&ann, &ben)?;
+        let notes = Notes::new(&ann);
+        let inside = notes.capture("In", Some(&area), None)?;
+        let outside = notes.capture("Out", Some(&private), None)?;
+        let lease = notes.attach_file(&inside.id, &new_file("Lease.pdf", b"lease", None))?;
+        let bill = notes.attach_file(&outside.id, &new_file("Bill.pdf", b"bill", None))?;
+        let areas = ann.areas_shared_with(&ben.device_id()?)?;
+        assert!(ann.blob_in(&format!("file/{lease}"), &areas)?);
+        assert!(!ann.blob_in(&format!("file/{bill}"), &areas)?);
+        Ok(())
+    }
+
+    #[test]
+    fn the_local_network_carries_a_file_as_large_as_a_bundle_does() {
+        assert_eq!(
+            crate::lan::MAX_BLOB_BYTES as u64,
+            crate::bundle::MAX_BLOB_BYTES
+        );
+        assert_eq!(crate::lan::MAX_BLOB_BYTES as u64, MAX_FILE_BYTES);
+    }
+
+    #[test]
+    fn a_file_and_its_text_travel_to_the_other_device() -> TestResult {
+        let devices = Devices::new();
+        let phone = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        exchange(&desk, &phone, None)?;
+        let scan = Notes::new(&phone).capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[new_file("Scan.pdf", b"%PDF-1.4 thick", Some(30))],
+        )?;
+        let hash = scan.attachments[0].hash.clone();
+        assert!(
+            Notes::new(&phone).unread_attachments(false)?.is_empty(),
+            "left to the computer"
+        );
+        exchange(&desk, &phone, None)?;
+        assert_eq!(desk.missing_blobs()?, Vec::<String>::new());
+        assert_eq!(
+            Notes::new(&desk).file_bytes(&hash).as_deref(),
+            Some(&b"%PDF-1.4 thick"[..])
+        );
+        let waiting = Notes::new(&desk).unread_attachments(true)?;
+        let waiting: Vec<&str> = waiting.iter().map(|b| b.hash.as_str()).collect();
+        assert_eq!(waiting, [hash.as_str()]);
+        Notes::new(&desk).set_attachment_text(&scan.id, &hash, "Page one\n\nPage two")?;
+        exchange(&desk, &phone, None)?;
+        let read = note(&phone, &scan.id)?;
+        assert_eq!(
+            read.attachment_texts.get(&hash).map(String::as_str),
+            Some("Page one\n\nPage two")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_machine_gives_anothers_file_its_text_and_only_the_owner_removes_it() -> TestResult
+    {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let lease = Notes::new(&ann).capture_with_files(
+            "Lease",
+            Some(&area),
+            None,
+            &[],
+            &[],
+            &[
+                new_file("Lease.docx", b"PK lease", None),
+                new_file("Bill.txt", b"bill", None),
+            ],
+        )?;
+        let [docx, bill] = [0, 1].map(|i| lease.attachments[i].hash.clone());
+        Notes::new(&ann).set_attachment_text(&lease.id, &bill, "Power bill")?;
+        exchange(&ben, &ann, None)?;
+        // Ben's machine reads the file for Ann's Note.
+        Notes::new(&ben).set_attachment_text(&lease.id, &docx, "Rent due")?;
+        assert!(!Notes::new(&ben).may_remove_attachment_text(&lease.id, &bill)?);
+        // As a modified app would write them: a removal and a file of his.
+        ben.append(&lease.id, &keys::file_text(&bill), None, None)?;
+        ben.append(
+            &lease.id,
+            &keys::file(&"b".repeat(64)),
+            Some(r#"{"name":"x.exe","size":1,"type":"application/x"}"#),
+            None,
+        )?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let read = note(store, &lease.id)?;
+            assert_eq!(
+                read.attachment_texts.get(&docx).map(String::as_str),
+                Some("Rent due")
+            );
+            assert_eq!(
+                read.attachment_texts.get(&bill).map(String::as_str),
+                Some("Power bill")
+            );
+            assert!(read.removed_attachment_texts.is_empty());
+            assert_eq!(read.attachments.len(), 2, "his file on her Note is ignored");
         }
         Ok(())
     }

@@ -862,10 +862,10 @@ fn opened(path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<(Header, [u8; KEY
     Ok((header, content_key))
 }
 
-/// Whether `bytes` are the `kind` blob `hash`: a photo or a recording
-/// whose SHA-256 is `hash`.
+/// Whether `bytes` are the `kind` blob `hash`: a photo, a recording or
+/// an attached file whose SHA-256 is `hash`.
 fn is_blob(kind: &str, hash: &str, bytes: &[u8]) -> bool {
-    matches!(kind, "photo" | "audio") && hex::encode(Sha256::digest(bytes)) == hash
+    matches!(kind, "photo" | "audio" | "file") && hex::encode(Sha256::digest(bytes)) == hash
 }
 
 /// What a blob read from a Backup is handed to: its kind, its hash and
@@ -1255,7 +1255,11 @@ pub fn add_notes(
     let picked = opened.pack.picked(ticks);
     let mut needed: HashSet<String> = HashSet::new();
     for n in &picked.notes {
-        for (kind, files) in [("photo", &n.photos), ("audio", &n.recordings)] {
+        for (kind, files) in [
+            ("photo", &n.photos),
+            ("audio", &n.recordings),
+            ("file", &n.attachments),
+        ] {
             for f in files.iter().filter(|f| f.has_file) {
                 needed.insert(format!("{kind}/{}", f.hash));
             }
@@ -2157,6 +2161,64 @@ mod tests {
             assert_eq!(e.device, own);
             assert!(!old_ids.contains(&e.entity), "{}", e.entity);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_backup_carries_attached_files_back_whole_and_into_copies() -> Result<()> {
+        use crate::notes::NewFile;
+        use crate::packs::item_keys;
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        let notes = Notes::new(&old);
+        let pills = notes.all()?.into_iter().next().ok_or(damaged_err())?;
+        let lease = notes.attach_file(
+            &pills.id,
+            &NewFile {
+                name: "Lease.pdf",
+                media_type: "",
+                bytes: b"%PDF-1.4 lease",
+                pages: Some(1),
+            },
+        )?;
+        notes.set_attachment_text(&pills.id, &lease, "Rent due")?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("f.{EXTENSION}"));
+        write_backup(&old, &path, &mut system_random)?;
+        let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        let restored = device(dir.path(), "new", &held(20), 2)?;
+        restore(&restored, &path, &key)?;
+        assert_eq!(restored.file(&lease), old.file(&lease));
+        let other = device(dir.path(), "other", &held(20), 3)?;
+        let opened = open_notes(&other, &path, &key, &HashSet::new(), by_name)?;
+        let i = opened
+            .pack
+            .notes
+            .iter()
+            .position(|n| !n.attachments.is_empty())
+            .ok_or(damaged_err())?;
+        let ticks = opened
+            .pack
+            .tick(&opened.pack.backup_ticks(), &item_keys::note(i), true);
+        add_notes(
+            &other,
+            &opened,
+            &ticks,
+            &utc_wall,
+            "Backup",
+            "From a Backup",
+        )?;
+        let copy = Notes::new(&other)
+            .all()?
+            .into_iter()
+            .find(|n| !n.attachments.is_empty())
+            .ok_or(damaged_err())?;
+        assert_eq!(copy.attachments[0].name, "Lease.pdf");
+        assert_eq!(other.file(&lease), old.file(&lease));
+        assert_eq!(
+            copy.attachment_texts.get(&lease).map(String::as_str),
+            Some("Rent due")
+        );
         Ok(())
     }
 

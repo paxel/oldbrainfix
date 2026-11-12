@@ -640,6 +640,17 @@ void main() {
       final areas = ann.areasSharedWith(ben.deviceId);
       expect(ann.blobIn('photo/${inside.photos.single}', areas), isTrue);
       expect(ann.blobIn('photo/${outside.photos.single}', areas), isFalse);
+      // An attached file goes as a photo does (ADR 0047).
+      final lease = Notes(ann).attachFile(
+        inside.id,
+        NewFile(name: 'Lease.pdf', bytes: Uint8List.fromList([1, 2, 3])),
+      );
+      final bill = Notes(ann).attachFile(
+        outside.id,
+        NewFile(name: 'Bill.pdf', bytes: Uint8List.fromList([4, 5, 6])),
+      );
+      expect(ann.blobIn('file/$lease', areas), isTrue);
+      expect(ann.blobIn('file/$bill', areas), isFalse);
     });
   });
 

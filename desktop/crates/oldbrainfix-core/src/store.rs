@@ -8,9 +8,10 @@
 //! a whole, holds the connection on its own, so two threads never write
 //! into each other's transaction or take the same dseq.
 //!
-//! Photo and voice recording bytes live outside the log, content-addressed
-//! by SHA-256: `photos` and `audio` directories next to the database file,
-//! as the Dart core keeps them, or memory for an in-memory store.
+//! Photo, voice recording and attached file bytes live outside the log,
+//! content-addressed by SHA-256: `photos`, `audio` and `files`
+//! directories next to the database file, as the Dart core keeps them,
+//! or memory for an in-memory store.
 //!
 //! Pending Changes (ADR 0022) lie beside it, in a `pending` directory:
 //! every read of what the log holds now ([`Store::history`],
@@ -256,6 +257,8 @@ pub struct Store {
     ids: IdMaker,
     photos: Box<dyn Blobs>,
     audio: Box<dyn Blobs>,
+    /// The files attached to Notes (ADR 0047), kept as they are.
+    files: Box<dyn Blobs>,
     /// What the roles of the Shared Areas allow, worked out after every
     /// change ([`Store::judged`]).
     judged: Mutex<Option<Arc<JudgedLog>>>,
@@ -298,21 +301,22 @@ impl Store {
         let dir = path.parent().unwrap_or(Path::new("."));
         let photos = Box::new(FileBlobs::new(dir.join("photos"))?);
         let audio = Box::new(FileBlobs::new(dir.join("audio"))?);
+        let files = Box::new(FileBlobs::new(dir.join("files"))?);
         let pending = Box::new(FilePendingFiles::new(dir.join("pending")));
-        Self::init(db, clock, new_key, photos, audio, pending)
+        Self::init(db, clock, new_key, [photos, audio, files], pending)
     }
 
     /// Opens a throwaway in-memory store (tests).
     pub fn in_memory(clock: Clock, new_key: impl FnOnce() -> Result<SigningKey>) -> Result<Store> {
         let photos = Box::<MemoryBlobs>::default();
         let audio = Box::<MemoryBlobs>::default();
+        let files = Box::<MemoryBlobs>::default();
         let pending = Box::<MemoryPendingFiles>::default();
         Self::init(
             Connection::open_in_memory()?,
             clock,
             new_key,
-            photos,
-            audio,
+            [photos, audio, files],
             pending,
         )
     }
@@ -321,8 +325,7 @@ impl Store {
         db: Connection,
         clock: Clock,
         new_key: impl FnOnce() -> Result<SigningKey>,
-        photos: Box<dyn Blobs>,
-        audio: Box<dyn Blobs>,
+        [photos, audio, files]: [Box<dyn Blobs>; 3],
         pending_files: Box<dyn PendingFiles>,
     ) -> Result<Store> {
         // Read before anything is written: a database of a newer version
@@ -345,6 +348,7 @@ impl Store {
             ids: Box::new(random_id),
             photos,
             audio,
+            files,
             judged: Mutex::new(None),
             generation: std::sync::atomic::AtomicU64::new(0),
             worked_out: Mutex::new(WorkedOut::default()),
@@ -638,33 +642,52 @@ impl Store {
         self.audio.get(hash)
     }
 
-    /// Whether the bytes of the `kind` (`photo` or `audio`) blob `hash`
-    /// are here, without reading them.
-    pub fn has_blob(&self, kind: &str, hash: &str) -> bool {
+    // ------------------------------------------------------------- files
+
+    /// Keeps the bytes of a file attached to a Note as they are and
+    /// returns the hash they are kept under (ADR 0047). The same file
+    /// twice is kept once.
+    pub fn put_file(&self, bytes: &[u8]) -> Result<String> {
+        self.refuse_while_drafting()?;
+        let hash = hex::encode(Sha256::digest(bytes));
+        self.files.put(&hash, bytes)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the attached file `hash`, or `None` when they are
+    /// not here.
+    pub fn file(&self, hash: &str) -> Option<Vec<u8>> {
+        self.files.get(hash)
+    }
+
+    /// The blobs of `kind`: `photo`, `audio` or `file`.
+    fn blobs_of(&self, kind: &str) -> Option<&dyn Blobs> {
         match kind {
-            "photo" => self.photos.has(hash),
-            "audio" => self.audio.has(hash),
-            _ => false,
+            "photo" => Some(self.photos.as_ref()),
+            "audio" => Some(self.audio.as_ref()),
+            "file" => Some(self.files.as_ref()),
+            _ => None,
         }
     }
 
-    /// The bytes of the `kind` (`photo` or `audio`) blob `hash`.
+    /// Whether the bytes of the `kind` (`photo`, `audio` or `file`) blob
+    /// `hash` are here, without reading them.
+    pub fn has_blob(&self, kind: &str, hash: &str) -> bool {
+        self.blobs_of(kind).is_some_and(|b| b.has(hash))
+    }
+
+    /// The bytes of the `kind` (`photo`, `audio` or `file`) blob `hash`.
     pub fn blob(&self, kind: &str, hash: &str) -> Option<Vec<u8>> {
-        match kind {
-            "photo" => self.photos.get(hash),
-            "audio" => self.audio.get(hash),
-            _ => None,
-        }
+        self.blobs_of(kind)?.get(hash)
     }
 
     /// Lets go of the bytes of the `kind` blob `hash`; returns whether
     /// they were here. Only the log says when that is right (ADR 0020).
     pub fn drop_blob(&self, kind: &str, hash: &str) -> Result<bool> {
         self.refuse_while_drafting()?;
-        match kind {
-            "photo" => self.photos.remove(hash),
-            "audio" => self.audio.remove(hash),
-            _ => Ok(false),
+        match self.blobs_of(kind) {
+            Some(blobs) => blobs.remove(hash),
+            None => Ok(false),
         }
     }
 
@@ -676,10 +699,9 @@ impl Store {
         if hex::encode(Sha256::digest(bytes)) != hash {
             return Ok(false);
         }
-        match kind {
-            "photo" => self.photos.put(hash, bytes)?,
-            "audio" => self.audio.put(hash, bytes)?,
-            _ => return Ok(false),
+        match self.blobs_of(kind) {
+            Some(blobs) => blobs.put(hash, bytes)?,
+            None => return Ok(false),
         }
         Ok(true)
     }
@@ -2060,6 +2082,7 @@ pub(crate) mod tests {
         // goes ahead.
         std::fs::remove_dir_all(dir.path().join("photos"))?;
         std::fs::remove_dir_all(dir.path().join("audio"))?;
+        std::fs::remove_dir_all(dir.path().join("files"))?;
         for newer in [2, 1000, -1] {
             set_version(&path, newer)?;
             let before = files(dir.path())?;
@@ -2072,6 +2095,7 @@ pub(crate) mod tests {
             );
             assert_eq!(files(dir.path())?, before, "{newer}");
             assert!(!dir.path().join("photos").exists());
+            assert!(!dir.path().join("files").exists());
             assert_eq!(version_of(&path)?, newer);
         }
         set_version(&path, 1)?;
@@ -2155,6 +2179,16 @@ pub(crate) mod tests {
         assert_eq!(store.audio(&photo), None);
         assert!(store.has_blob("photo", &photo) && store.has_blob("audio", &audio));
         assert!(!store.has_blob("audio", &photo) && !store.has_blob("photo", "../x"));
+        // An attached file is kept as it is, JPEG metadata and all.
+        let jpeg = b"\xFF\xD8\xFF\xE1\x00\x04GPS\xFF\xDA\x00\x02";
+        let file = store.put_file(jpeg)?;
+        assert_eq!(file, hex::encode(Sha256::digest(jpeg)));
+        assert_eq!(std::fs::read(dir.path().join("files").join(&file))?, jpeg);
+        assert_eq!(store.file(&file).as_deref(), Some(&jpeg[..]));
+        assert!(store.has_blob("file", &file) && !store.has_blob("photo", &file));
+        assert!(!store.put_blob("file", &file, b"other")?);
+        assert!(store.drop_blob("file", &file)?);
+        assert!(!store.has_blob("file", &file));
         assert!(store.all_entries()?.is_empty());
         Ok(())
     }

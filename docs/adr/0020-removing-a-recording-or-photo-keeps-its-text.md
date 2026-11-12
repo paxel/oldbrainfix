@@ -28,3 +28,7 @@ An older version reads the null as every version reads it: the hash is not among
 ## Blocks (ADR 0021)
 
 Amended by ADR 0021 (#90): blocking a person deletes the bytes of their photos and recordings that nothing else in the log refers to, with no removal entry; their copies in the shared folder stay.
+
+## Attached files (ADR 0047)
+
+Amended by #267: an attached file is removed as a photo is: `file:<hash>` set to null, refused unless the file has an Attachment Text that is not empty, which stays and is still found, and its bytes go once nothing in the log names them (`mayRemoveAttachment`, `removeAttachment`; `may_remove_attachment`, `remove_attachment`). `file` is a blob kind beside `photo` and `audio`, so `removedBlobs` and `dropRemovedBlobs` let its bytes go by the same rules. The Note lists such a file among its removed ones with the name and type it had (`removedAttachments`), read from the last value its field held.

@@ -887,10 +887,10 @@ class _Payload {
   return (header, contentKey);
 }
 
-/// Whether [bytes] are the [kind] blob [hash]: a photo or a recording
-/// whose SHA-256 is [hash].
+/// Whether [bytes] are the [kind] blob [hash]: a photo, a recording or an
+/// attached file whose SHA-256 is [hash].
 bool _isBlob(String kind, String hash, Uint8List bytes) =>
-    (kind == 'photo' || kind == 'audio') &&
+    (kind == 'photo' || kind == 'audio' || kind == 'file') &&
     sha256.convert(bytes).toString() == hash;
 
 /// Reads the payload of the Backup at [path], its [header] opened with
@@ -1285,6 +1285,8 @@ Future<PackAdded> addBackupNotes(
         if (p.hasFile) 'photo/${p.hash}',
       for (final a in n.recordings)
         if (a.hasFile) 'audio/${a.hash}',
+      for (final d in n.attachments)
+        if (d.hasFile) 'file/${d.hash}',
     ],
   };
   if (needed.isNotEmpty) {

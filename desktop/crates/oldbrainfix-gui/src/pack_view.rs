@@ -374,7 +374,9 @@ fn icon(pack: &Pack, item: &PackItem) -> char {
             }
         }
         PackItemKind::Photo => PHOTO_ICON,
-        PackItemKind::PhotoText | PackItemKind::Transcript => TEXT_ICON,
+        PackItemKind::PhotoText | PackItemKind::Transcript | PackItemKind::FileText => TEXT_ICON,
+        // Until attached files get their own look (#267).
+        PackItemKind::File => icons::ALL_NOTES,
         PackItemKind::Recording => RECORDING_ICON,
         PackItemKind::Routine => icons::REPEAT,
         PackItemKind::Reminder => REMINDER_ICON,
@@ -408,6 +410,12 @@ fn label(t: &L10n, pack: &Pack, item: &PackItem) -> String {
         PackItemKind::Transcript => t.pack_transcript(&start(
             note.recordings.get(at).and_then(|a| a.text.as_ref()),
         )),
+        // The file's name and size, its text's start, until attached
+        // files get words of their own (#267).
+        PackItemKind::File => note.attachments.get(at).map_or_else(String::new, |d| {
+            format!("{} ({})", d.name, size_text(t, d.size))
+        }),
+        PackItemKind::FileText => start(note.attachments.get(at).and_then(|d| d.text.as_ref())),
         PackItemKind::Routine => t.pack_routine(
             &note
                 .routines

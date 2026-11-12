@@ -144,7 +144,7 @@ pub const PIN_FAILURES_TOTAL: u32 = 20;
 
 /// The most a sync body or a blob may weigh.
 pub const MAX_ENTRIES_BYTES: usize = 64 << 20;
-pub const MAX_BLOB_BYTES: usize = 64 << 20;
+pub const MAX_BLOB_BYTES: usize = 256 << 20;
 
 /// How much of the fingerprint a typed code carries.
 pub const TYPED_FINGERPRINT_BYTES: usize = 8;

@@ -641,3 +641,9 @@ class Imports {
     return x.length.compareTo(y.length);
   }
 }
+
+/// The text of a text file's [bytes] as an Import reads it: UTF-8 without
+/// the byte order mark before it, else Windows-1252; line breaks as `\n`.
+/// Null for bytes holding a zero. An attached text file's Attachment Text
+/// is read so too (ADR 0047).
+String? decodeTextFile(Uint8List bytes) => Imports._decode(bytes);

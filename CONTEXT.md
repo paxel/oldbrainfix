@@ -57,6 +57,14 @@ Text recognised from a Note's voice recording, kept next to the recording. Only 
 Text recognised in a Note's photo or screenshot, kept next to the photo. Only the machine writes it; the user can copy it into the Note's text, replacing or appending, or remove it while the photo stays, and read the text again. The photo can be removed and the Photo Text stays.
 _Avoid_: OCR (in the UI), caption
 
+**Attachment**:
+A file of any kind attached to a Note, such as a letter as a PDF, a Word document, a spreadsheet or a `.zip`, kept with its name, type and size and synced to every Device of the user and of the people in its Shared Area (ADR 0047). A Note can hold several next to its text, photos and recordings; a merged Note's travel with it. A Note made from a file alone shows the file as its card. There is no Kind for documents. The file can be removed while its Attachment Text stays, as a photo can. German: Anhang.
+_Avoid_: document (any file can be one), upload, file (in the UI where a Note's file is meant)
+
+**Attachment Text**:
+The text read out of an Attachment where its format allows: a PDF's own text and the text of its scanned pages, the text of `.docx`, `.odt`, `.xlsx` and `.ods` files, plain text and Markdown; other files have none. Only the machine writes it and it stays plain; search finds it as it finds a Photo Text, and the user can remove it while the file stays and read the file again. The Device that attaches a file reads it, unless it is a phone and the file a PDF of more than ten pages or larger than 10 MiB: then a computer reads it once it has the file, and until then the phone shows that the text follows from the computer. German: Anhangtext.
+_Avoid_: OCR, extracted text, preview
+
 **Section**:
 A dated part of a Note, added by Amend or Merge, carrying its own Capture Context. Its text is fixed in place as the Note's is, by the same people; it keeps its date and its place, and shows when it was last modified and who edited it.
 _Avoid_: comment, update, revision

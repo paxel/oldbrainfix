@@ -3,9 +3,9 @@
 //! screens read from it and write to it, Notes with their Sections, Areas
 //! and Topics, Routines and Reminders with the alarm plan, the Nudge,
 //! the Missed Summary, their history and their calendar file, Frogs with today's pick, Tallies with their entries and charts, Checklists and Shopping Lists with their Lines, this Device's settings, and the question marks of
-//! the background; and of the photos and voice recordings kept beside
-//! the log, with their Photo Texts and Transcripts and the search over
-//! them; and the LAN sync between Devices with its pair codes, keys and
+//! the background; and of the photos, voice recordings and attached
+//! files kept beside the log, with their Photo Texts, Transcripts and
+//! Attachment Texts and the search over them; and the LAN sync between Devices with its pair codes, keys and
 //! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the Packs of copied Notes one hands another, the encrypted Backups with their Recovery Sheet, the user's own Profile, and the Imports of a folder of files and of a Google Keep export. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
@@ -28,6 +28,7 @@ pub mod conflicts;
 pub mod discovery;
 pub mod entry;
 pub mod error;
+pub mod file_text;
 pub mod folder;
 pub mod frogs;
 pub mod help_notes;
@@ -94,6 +95,7 @@ pub use checklists::{
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
+pub use file_text::{FileKind, FileReading};
 pub use frogs::{Frog, Frogs, FrogsToday};
 pub use help_notes::{HelpNotes, HelpTexts, WhatsNew, compare_versions, parse_whats_new};
 pub use history::{
@@ -103,9 +105,12 @@ pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
 pub use note_history::{NoteChange, NoteChangeKind, NoteHistory};
 pub use notes::{
-    Blob, CaptureContext, CapturedDetail, Importance, Note, Notes, Section, SourceApp, Wordless,
+    Attachment, Blob, CaptureContext, CapturedDetail, Importance, NewFile, Note, Notes, Section,
+    SourceApp, Wordless,
 };
 pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};
+/// The text of a PDF and the scans of its pages without one (ADR 0047).
+pub use oldbrainfix_pdf as pdf;
 pub use overrides::PersonOverride;
 pub use packs::{
     OpenedPack, Pack, PackAdded, PackError, PackFrom, PackItem, PackItemKind, PackNote, PackTicks,

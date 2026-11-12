@@ -21,3 +21,7 @@ Amended for #105: phones and tablets host LAN sync as the computer does, so two 
 
 - Two phones meet in the background only while one runs its background sync and hosts and the other's run looks for it; with Android's period of about 15 minutes this can take several periods. With the app open on either, they sync within a minute.
 - Every Device that joined once holds a certificate, also one that never shows a code.
+
+## A file of up to 256 MiB (#267)
+
+Amended by #267 (ADR 0047): over the local network a blob may now weigh 256 MiB, as much as a bundle and a Backup carry of one (`MAX_BLOB_BYTES` in `lan.rs`, `maxBlobBytes` in `lan.dart`), up from 64 MiB, both as a host takes it and as a joining Device reads it back (`join.rs`, `lan.dart`), so an attached file of any size that can be attached syncs by every transport. A sync body of entries stays at 64 MiB.

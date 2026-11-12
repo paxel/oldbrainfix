@@ -30,7 +30,7 @@ use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
 use crate::note_history::NoteHistory;
 use crate::note_kinds;
-use crate::notes::{CapturedDetail, Importance, Note, Notes};
+use crate::notes::{Attachment, CapturedDetail, Importance, Note, Notes};
 use crate::people::PersonFilter;
 use crate::person_settings::PersonSettings;
 use crate::places::{NotesGo, Places};
@@ -53,6 +53,15 @@ use crate::{Error, Result};
 pub const PHOTO_EDGE: u32 = 1024;
 /// The longest side a photo may be asked for at most.
 pub const PHOTO_EDGE_MAX: u32 = 2048;
+
+/// The most characters of an Attachment Text `read_note` hands out;
+/// `read_attachment_text` reads the rest (ADR 0047).
+pub const ATTACHMENT_TEXT_CHARS: usize = 4000;
+
+/// The characters `read_attachment_text` hands out unless asked for
+/// fewer, and the most it hands out at once.
+pub const ATTACHMENT_READ_CHARS: usize = 20_000;
+pub const ATTACHMENT_READ_MAX: usize = 50_000;
 /// The largest photo read, by side.
 const PHOTO_READ_MAX: u32 = 20_000;
 
@@ -159,7 +168,7 @@ pub fn tools() -> Vec<Value> {
     let mut all = vec![
         tool(
             "list_notes",
-            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts or Photo Texts hold a search. Each names its kind (plain, checklist, shoppingList, tally or session), the format of its text (textFormat: plain, markdown for formatted text, or code for a text shown as written in a fixed-width font), its open Frog and the Routines that run its Session.",
+            "Lists Notes: the Unsorted ones, all, those in the trash or in one Area or Topic, or those whose text, Transcripts, Photo Texts, attached files' names or Attachment Texts hold a search. Each names its kind (plain, checklist, shoppingList, tally or session), the format of its text (textFormat: plain, markdown for formatted text, or code for a text shown as written in a fixed-width font), its open Frog and the Routines that run its Session.",
             true,
             json!({
                 "place": string("Only the Notes in this Area or Topic (an Area's Topics included)"),
@@ -170,7 +179,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -185,6 +194,18 @@ pub fn tools() -> Vec<Value> {
                 "size": {"description": "The longest side in pixels, 1024 when left out, at most 2048", "type": "integer"},
             }),
             &["note", "photo"],
+        ),
+        tool(
+            "read_attachment_text",
+            "Reads the Attachment Text of one file attached to a Note, the text read out of it, from a character on: for a text read_note cuts. The file's bytes are never handed out.",
+            true,
+            json!({
+                "file": string("The file's hash, as read_note lists it"),
+                "from": {"description": "The character to start at, counted from 0; 0 when left out", "type": "integer"},
+                "note": id("Note"),
+                "size": {"description": "How many characters, 20000 when left out, at most 50000", "type": "integer"},
+            }),
+            &["note", "file"],
         ),
         tool(
             "list_places",
@@ -994,6 +1015,44 @@ fn newest_first(mut found: Vec<(DateTime<Utc>, Value)>) -> Value {
     Value::Array(found.into_iter().map(|(_, v)| v).collect())
 }
 
+/// The attached `files` and those `removed` while their texts stay, with
+/// their Attachment Texts cut after [`ATTACHMENT_TEXT_CHARS`], as
+/// `read_note` hands them out: never their bytes.
+fn attachments_json(
+    files: &[Attachment],
+    removed: &[Attachment],
+    texts: &BTreeMap<String, String>,
+    removed_texts: &[String],
+) -> Vec<Value> {
+    files
+        .iter()
+        .map(|a| (a, false))
+        .chain(removed.iter().map(|a| (a, true)))
+        .map(|(a, gone)| {
+            let text = texts.get(&a.hash);
+            let state = match text {
+                _ if removed_texts.contains(&a.hash) => "removed",
+                Some(t) if t.is_empty() => "empty",
+                Some(_) => "read",
+                None if !a.kind().has_text() => "none",
+                None if a.computer => "fromComputer",
+                None => "waiting",
+            };
+            json!({
+                "file": a.hash,
+                "fileRemoved": gone,
+                "name": a.name,
+                "pages": a.pages,
+                "size": a.size,
+                "text": text.map(|t| t.chars().take(ATTACHMENT_TEXT_CHARS).collect::<String>()),
+                "textLength": text.map(|t| t.chars().count()),
+                "textState": state,
+                "type": a.media_type,
+            })
+        })
+        .collect()
+}
+
 fn texts_of(map: &std::collections::BTreeMap<String, String>, key: &str) -> Vec<Value> {
     map.iter()
         .map(|(hash, text)| json!({key: hash, "text": text}))
@@ -1214,6 +1273,12 @@ impl Store {
                             "boxes": boxes_json(&s.boxes),
                             "mayEdit": notes.may_edit_section(&s.id)?,
                             "modified": s.modified.map(dart_iso),
+                            "attachments": attachments_json(
+                                &s.attachments,
+                                &s.removed_attachments,
+                                &s.attachment_texts,
+                                &s.removed_attachment_texts,
+                            ),
                             "photoTexts": texts_of(&s.photo_texts, "photo"),
                             "photos": s.photos,
                             "text": s.text,
@@ -1266,6 +1331,15 @@ impl Store {
                 let mut out = note_summary(&note, &kind);
                 if let Some(all) = out.as_object_mut() {
                     all.insert("agenda".into(), json!(agenda));
+                    all.insert(
+                        "attachments".into(),
+                        json!(attachments_json(
+                            &note.attachments,
+                            &note.removed_attachments,
+                            &note.attachment_texts,
+                            &note.removed_attachment_texts,
+                        )),
+                    );
                     all.insert("name".into(), json!(name));
                     all.insert("description".into(), json!(description));
                     all.insert("boxes".into(), json!(boxes_json(&note.boxes)));
@@ -1321,6 +1395,37 @@ impl Store {
                     content: vec![ToolContent::Jpeg(jpeg)],
                     is_error: false,
                 }
+            }
+            "read_attachment_text" => {
+                let id = text_arg(args, "note")?;
+                let hash = text_arg(args, "file")?;
+                let mut text = notes
+                    .by_id(id)?
+                    .and_then(|n| n.attachment_texts.get(hash).cloned());
+                if text.is_none() {
+                    text = notes
+                        .sections(id)?
+                        .into_iter()
+                        .find_map(|s| s.attachment_texts.get(hash).cloned());
+                }
+                let text = text
+                    .ok_or_else(|| Error::Invalid(format!("no Attachment Text {hash} on {id}")))?;
+                let count = |key: &str, default: usize, most: usize| {
+                    args.get(key)
+                        .and_then(Value::as_u64)
+                        .map_or(default, |n| usize::try_from(n).unwrap_or(most))
+                        .min(most)
+                };
+                let total = text.chars().count();
+                let from = count("from", 0, total);
+                let size = count("size", ATTACHMENT_READ_CHARS, ATTACHMENT_READ_MAX);
+                let part: String = text.chars().skip(from).take(size).collect();
+                ToolOutput::json(&json!({
+                    "file": hash,
+                    "from": from,
+                    "text": part,
+                    "total": total,
+                }))
             }
             "list_places" => {
                 let places = Places::new(self);
@@ -2270,6 +2375,77 @@ mod tests {
         )?;
         assert!(elsewhere.is_error);
         assert!(call(&store, &task, "send_note", &json!({})).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn attached_files_are_read_with_their_texts_but_never_their_bytes() -> TestResult {
+        use crate::notes::NewFile;
+        let store = store();
+        let notes = Notes::new(&store);
+        let long = "Rent ".repeat(1000);
+        let file = |name, bytes, pages| NewFile {
+            name,
+            media_type: "",
+            bytes,
+            pages,
+        };
+        let lease = notes.capture_with_files(
+            "",
+            None,
+            None,
+            &[],
+            &[],
+            &[
+                file("Lease.pdf", b"%PDF-1.4 lease", Some(2)),
+                file("Scan.pdf", b"%PDF-1.4 scan", Some(40)),
+                file("plan.dwg", b"dwg", None),
+            ],
+        )?;
+        let [pdf, scan, dwg] = [0, 1, 2].map(|i| lease.attachments[i].hash.clone());
+        notes.set_attachment_text(&lease.id, &pdf, &long)?;
+        let task = store.open_ai_task()?;
+        let read = json_of(&call(&store, &task, "read_note", &json!({"id": lease.id}))?)?;
+        let files = read["attachments"].as_array().ok_or("attachments")?;
+        assert_eq!(files.len(), 3);
+        assert_eq!(files[0]["name"], json!("Lease.pdf"));
+        assert_eq!(files[0]["type"], json!("application/pdf"));
+        assert_eq!(files[0]["size"], json!(14));
+        assert_eq!(files[0]["pages"], json!(2));
+        assert_eq!(files[0]["textState"], json!("read"));
+        assert_eq!(files[0]["textLength"], json!(4999));
+        assert_eq!(
+            files[0]["text"].as_str().map(|t| t.chars().count()),
+            Some(ATTACHMENT_TEXT_CHARS)
+        );
+        assert_eq!(files[1]["textState"], json!("fromComputer"));
+        assert_eq!(files[2]["textState"], json!("none"));
+        assert!(!read.to_string().contains("%PDF"), "no bytes go out");
+
+        let rest = json_of(&call(
+            &store,
+            &task,
+            "read_attachment_text",
+            &json!({"note": lease.id, "file": pdf, "from": 4990, "size": 100}),
+        )?)?;
+        assert_eq!(
+            rest,
+            json!({"file": pdf, "from": 4990, "text": "Rent Rent", "total": 4999})
+        );
+        for hash in [&scan, &dwg] {
+            let none = call(
+                &store,
+                &task,
+                "read_attachment_text",
+                &json!({"note": lease.id, "file": hash}),
+            )?;
+            assert!(none.is_error);
+        }
+        // No tool attaches a file or writes its text.
+        assert!(tools().iter().all(|t| {
+            let name = t.get("name").and_then(Value::as_str).unwrap_or("");
+            name.starts_with("read") || !name.contains("attach")
+        }));
         Ok(())
     }
 

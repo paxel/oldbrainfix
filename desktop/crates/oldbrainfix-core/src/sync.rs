@@ -1,7 +1,7 @@
 //! Delta exchange between Devices, as the Dart core's `Sync` does it
 //! (ADR 0002, 0003): every Device tells the other the newest entry it
-//! holds from each Device, only what is missing travels, the photo and
-//! voice recording bytes after it, and keys travel along so every entry
+//! holds from each Device, only what is missing travels, the photo,
+//! voice recording and attached file bytes after it, and keys travel along so every entry
 //! is checked against the key of the Device that signed it. Local
 //! settings never travel (ADR 0008).
 
@@ -20,9 +20,10 @@ use crate::store::Store;
 const KEY_PREFIX: &str = "key:";
 
 /// The blob kinds and the field prefixes naming them.
-pub const BLOB_KINDS: [(&str, &str); 2] = [
+pub const BLOB_KINDS: [(&str, &str); 3] = [
     ("photo", note_keys::PHOTO_PREFIX),
     ("audio", note_keys::AUDIO_PREFIX),
+    ("file", note_keys::FILE_PREFIX),
 ];
 
 /// The kind and hash of a blob reference `photo/<hash>`.
@@ -262,7 +263,7 @@ impl Store {
     }
 
     /// The blobs the log refers to whose bytes are not here, as
-    /// `photo/<hash>` and `audio/<hash>`, sorted.
+    /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted.
     pub fn missing_blobs(&self) -> Result<Vec<String>> {
         let mut missing = BTreeSet::new();
         for (kind, prefix) in BLOB_KINDS {

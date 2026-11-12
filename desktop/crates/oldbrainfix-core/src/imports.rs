@@ -601,7 +601,7 @@ fn format_of(base: &str) -> Option<(&str, &'static str)> {
 /// else Windows-1252, the encoding of older text files on Windows,
 /// which reads every byte; line breaks as `\n`. `None` for bytes holding
 /// a zero, which no text file does.
-fn decode(bytes: &[u8]) -> Option<String> {
+pub(crate) fn decode(bytes: &[u8]) -> Option<String> {
     let utf8 = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
     let text = match std::str::from_utf8(utf8) {
         Ok(text) => text.to_string(),

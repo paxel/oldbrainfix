@@ -338,10 +338,11 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         if (full(a)) return true;
         if (a != AreaAccess.member) return false;
         // Any Note gets its texts from a Member's machine; removing one
-        // is the owner's (ADR 0025).
+        // is the owner's (ADR 0025, 0047).
         if (e.value != null &&
             (e.field.startsWith(NoteKeys.transcriptPrefix) ||
-                e.field.startsWith(NoteKeys.ocrPrefix))) {
+                e.field.startsWith(NoteKeys.ocrPrefix) ||
+                e.field.startsWith(NoteKeys.fileTextPrefix))) {
           return true;
         }
         // Anyone ticks the boxes of any text (ADR 0035).
@@ -863,6 +864,7 @@ extension SharedAreas on Store {
     final prefix = switch (ref.substring(0, slash)) {
       'photo' => NoteKeys.photoPrefix,
       'audio' => NoteKeys.audioPrefix,
+      'file' => NoteKeys.filePrefix,
       _ => null,
     };
     if (prefix == null) return false;

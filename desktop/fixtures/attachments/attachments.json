@@ -1,0 +1,165 @@
+{
+  "unreadPhone": [
+    {
+      "noteId": "note:00000000000000000000000000000006",
+      "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000005",
+      "hash": "f5bf2db642f8f7bb0c39837e6fa8f70f7fb55f034e4e9c825847007d13fb35a4"
+    }
+  ],
+  "unreadComputer": [
+    {
+      "noteId": "note:00000000000000000000000000000006",
+      "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000005",
+      "hash": "f5bf2db642f8f7bb0c39837e6fa8f70f7fb55f034e4e9c825847007d13fb35a4"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000002",
+      "hash": "00d5228c923a31c458518926ae2f123193a2925bf0fe66ec0dcd719302c05060"
+    }
+  ],
+  "search": {
+    "rent due": [
+      "note:00000000000000000000000000000002"
+    ],
+    "LEASE.PDF": [
+      "note:00000000000000000000000000000002"
+    ],
+    "grüße": [
+      "note:00000000000000000000000000000003"
+    ],
+    "keys: 2": [
+      "note:00000000000000000000000000000002"
+    ],
+    "boxes.csv": [
+      "note:00000000000000000000000000000005"
+    ],
+    "plan.ods": [
+      "note:00000000000000000000000000000005"
+    ],
+    "power bill": [
+      "note:00000000000000000000000000000004"
+    ],
+    "costs": [
+      "note:00000000000000000000000000000004"
+    ],
+    "invfdp": [
+      "note:00000000000000000000000000000002"
+    ],
+    "old.txt": []
+  },
+  "missing": [
+    "file/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  ],
+  "tree": [
+    {
+      "key": "a0",
+      "kind": "area",
+      "size": 0,
+      "children": [
+        {
+          "key": "n0",
+          "kind": "note",
+          "size": 42,
+          "children": [
+            {
+              "key": "n0.d0",
+              "kind": "file",
+              "size": 1640,
+              "children": []
+            },
+            {
+              "key": "n0.dt1",
+              "kind": "fileText",
+              "size": 16,
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "n1",
+          "kind": "note",
+          "size": 42,
+          "children": [
+            {
+              "key": "n1.d0",
+              "kind": "file",
+              "size": 24,
+              "children": []
+            },
+            {
+              "key": "n1.dt0",
+              "kind": "fileText",
+              "size": 23,
+              "children": []
+            },
+            {
+              "key": "n1.d1",
+              "kind": "file",
+              "size": 20,
+              "children": []
+            },
+            {
+              "key": "n1.d2",
+              "kind": "file",
+              "size": 28,
+              "children": []
+            },
+            {
+              "key": "n1.dt2",
+              "kind": "fileText",
+              "size": 15,
+              "children": []
+            },
+            {
+              "key": "n1.d3",
+              "kind": "file",
+              "size": 16,
+              "children": []
+            },
+            {
+              "key": "n1.d4",
+              "kind": "file",
+              "size": 188,
+              "children": []
+            },
+            {
+              "key": "n1.dt4",
+              "kind": "fileText",
+              "size": 0,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "all": [
+    "n0",
+    "n0.d0",
+    "n0.dt1",
+    "n1",
+    "n1.d0",
+    "n1.d1",
+    "n1.d2",
+    "n1.d3",
+    "n1.d4",
+    "n1.dt0",
+    "n1.dt2",
+    "n1.dt4"
+  ],
+  "start": [
+    "n0",
+    "n0.dt1",
+    "n1",
+    "n1.dt0",
+    "n1.dt2",
+    "n1.dt4"
+  ],
+  "size": 2054
+}

@@ -3321,6 +3321,7 @@ dependencies = [
  "hmac",
  "image",
  "mdns-sd",
+ "oldbrainfix-pdf",
  "parking_lot",
  "qrcode",
  "rcgen",
@@ -3385,6 +3386,15 @@ version = "0.6.0"
 dependencies = [
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "oldbrainfix-pdf"
+version = "0.6.0"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "image",
 ]
 
 [[package]]

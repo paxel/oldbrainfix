@@ -38,6 +38,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop beginnt ein neuer Eintrag einer Strichliste jedes Feld ohne Ziel mit seinem Wert aus deinem letzten Eintrag, markiert, sodass Tippen ihn ersetzt.
 - Auf dem Handy und dem Desktop bieten das ⋮ einer kompakten Karte auf dem Handy und das ⋮ und der Rechtsklick einer Karte auf dem Desktop neben Ablegen in … und Zusammenführen mit … auch Routine … und Erinnerung … an, in Erweitert dazu Frosch und Einheit …; auf dem Handy fasst das ⋮ einer Karte An eine Person senden, Mit einer App teilen, Text kopieren und Als Paket exportieren… unter einem Teilen … zusammen, und der Stift einer Karte in der Detailansicht öffnet den Notiz-Editor mit einem Tippen.
 - Auf dem Desktop zeigen Zurück und Vorwärts jeden Ort mit der Suche, dem Filter nach Person und der Scroll-Position, mit denen er verlassen wurde, statt sie zu leeren; ein neu gezeigter Ort beginnt ohne sie und oben.
+- Die Synchronisierung im lokalen Netz überträgt ein Foto oder eine Sprachaufnahme bis 256 MiB, wie Bündel und Sicherungen, statt bis 64 MiB.
 
 ### Behoben
 

@@ -9,8 +9,8 @@
 //! (the Lines of a Checklist unticked, a Shopping List's open with their
 //! reappear times, a Tally's fields, a Session's pool, counts and rule),
 //! its Routines and Reminders with their schedules, an open Frog, and
-//! those of its photos, recordings, Photo Texts and Transcripts that are
-//! ticked. Never a Tally's entries, ticks, check-offs, its Capture
+//! those of its photos, recordings, attached files (ADR 0047), Photo
+//! Texts, Transcripts and Attachment Texts that are ticked. Never a Tally's entries, ticks, check-offs, its Capture
 //! Context or its history.
 //!
 //! The file is one JSON object, keys sorted and no spaces, the same
@@ -35,9 +35,10 @@ use crate::checklists::{
     Checklists, NewLine, keys as checklist_keys, order as line_order, write_line,
 };
 use crate::entry::{Entry, dart_iso};
+use crate::file_text;
 use crate::frogs::{Frogs, keys as frog_keys};
 use crate::note_kinds::NoteKind;
-use crate::notes::{Note, Notes, keys as note_keys};
+use crate::notes::{Attachment, Note, Notes, keys as note_keys};
 use crate::person_settings::PersonSettings;
 use crate::places::{Area, Places, keys as place_keys};
 use crate::profile::Profile;
@@ -168,8 +169,10 @@ pub struct PackSession {
     pub rule: SessionRule,
 }
 
-/// A photo or a voice recording of a Pack's Note: its hash, whether its
-/// file goes along, its size then, and its Photo Text or Transcript.
+/// A photo, a voice recording or an attached file of a Pack's Note: its
+/// hash, whether its file goes along, its size then, and its Photo
+/// Text, Transcript or Attachment Text; an attached file with its name,
+/// media type and pages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackFile {
     pub hash: String,
@@ -180,8 +183,16 @@ pub struct PackFile {
     pub has_file: bool,
     /// How many bytes the file has; 0 without it.
     pub size: usize,
-    /// The Photo Text or Transcript, or none when none goes along.
+    /// The Photo Text, Transcript or Attachment Text, or none when none
+    /// goes along.
     pub text: Option<String>,
+    /// An attached file's name and media type, as kept
+    /// ([`crate::notes::clean_name`], [`crate::notes::clean_type`]);
+    /// empty for a photo or a recording.
+    pub name: String,
+    pub media_type: String,
+    /// How many pages an attached file has, when they were counted.
+    pub pages: Option<u64>,
 }
 
 /// A Note of a Pack.
@@ -214,6 +225,8 @@ pub struct PackNote {
     pub frog: bool,
     pub photos: Vec<PackFile>,
     pub recordings: Vec<PackFile>,
+    /// Its attached files (ADR 0047).
+    pub attachments: Vec<PackFile>,
 }
 
 impl PackNote {
@@ -256,6 +269,9 @@ pub enum PackItemKind {
     PhotoText,
     Recording,
     Transcript,
+    /// An attached file (ADR 0047), and its Attachment Text.
+    File,
+    FileText,
     Routine,
     Reminder,
     Frog,
@@ -272,6 +288,8 @@ impl PackItemKind {
             PackItemKind::PhotoText => "photoText",
             PackItemKind::Recording => "recording",
             PackItemKind::Transcript => "transcript",
+            PackItemKind::File => "file",
+            PackItemKind::FileText => "fileText",
             PackItemKind::Routine => "routine",
             PackItemKind::Reminder => "reminder",
             PackItemKind::Frog => "frog",
@@ -324,8 +342,9 @@ impl PackItem {
 
 /// The keys of Pack items: `n<i>` for the Pack's Note i, `n<i>.p<j>` and
 /// `n<i>.pt<j>` for its photo j and that photo's text, `n<i>.a<j>` and
-/// `n<i>.at<j>` for a recording and its Transcript, `n<i>.r<j>` for its
-/// Routine or Reminder j, `n<i>.f` for its Frog.
+/// `n<i>.at<j>` for a recording and its Transcript, `n<i>.d<j>` and
+/// `n<i>.dt<j>` for an attached file and its Attachment Text,
+/// `n<i>.r<j>` for its Routine or Reminder j, `n<i>.f` for its Frog.
 pub mod item_keys {
     pub fn note(i: usize) -> String {
         format!("n{i}")
@@ -345,6 +364,14 @@ pub mod item_keys {
 
     pub fn transcript(i: usize, j: usize) -> String {
         format!("n{i}.at{j}")
+    }
+
+    pub fn file(i: usize, j: usize) -> String {
+        format!("n{i}.d{j}")
+    }
+
+    pub fn file_text(i: usize, j: usize) -> String {
+        format!("n{i}.dt{j}")
     }
 
     pub fn routine(i: usize, j: usize) -> String {
@@ -453,6 +480,23 @@ impl Pack {
                 ));
             }
         }
+        for (j, d) in note.attachments.iter().enumerate() {
+            if d.has_file {
+                let key = item_keys::file(i, j);
+                let size = base64_length(d.size);
+                children.push(PackItem::of(key, PackItemKind::File, i, Some(j), size));
+            }
+            if let Some(text) = &d.text {
+                let key = item_keys::file_text(i, j);
+                children.push(PackItem::of(
+                    key,
+                    PackItemKind::FileText,
+                    i,
+                    Some(j),
+                    text.len(),
+                ));
+            }
+        }
         for (j, r) in note.routines.iter().enumerate() {
             let kind = if r.once() {
                 PackItemKind::Reminder
@@ -520,6 +564,14 @@ impl Pack {
                     out.insert(item_keys::transcript(i, j));
                 }
             }
+            for (j, d) in note.attachments.iter().enumerate() {
+                if d.has_file {
+                    out.insert(item_keys::file(i, j));
+                }
+                if d.text.is_some() {
+                    out.insert(item_keys::file_text(i, j));
+                }
+            }
             for j in 0..note.routines.len() {
                 out.insert(item_keys::routine(i, j));
             }
@@ -531,7 +583,7 @@ impl Pack {
     }
 
     /// What is ticked when an export starts (Q468): everything but the
-    /// Reminders, the photos and the recordings.
+    /// Reminders, the photos, the recordings and the attached files.
     pub fn export_ticks(&self) -> PackTicks {
         let mut out = PackTicks::new();
         for (i, note) in self.notes.iter().enumerate() {
@@ -544,6 +596,11 @@ impl Pack {
             for (j, a) in note.recordings.iter().enumerate() {
                 if a.text.is_some() {
                     out.insert(item_keys::transcript(i, j));
+                }
+            }
+            for (j, d) in note.attachments.iter().enumerate() {
+                if d.text.is_some() {
+                    out.insert(item_keys::file_text(i, j));
                 }
             }
             for (j, r) in note.routines.iter().enumerate() {
@@ -721,6 +778,9 @@ impl Pack {
                 has_file,
                 size: if has_file { f.size } else { 0 },
                 text: if with_text { f.text.clone() } else { None },
+                name: f.name.clone(),
+                media_type: f.media_type.clone(),
+                pages: f.pages,
             };
             (out.has_file || out.text.is_some()).then_some(out)
         };
@@ -784,6 +844,18 @@ impl Pack {
                         )
                     })
                     .collect(),
+                attachments: n
+                    .attachments
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, d)| {
+                        file(
+                            d,
+                            ticks.contains(&item_keys::file(i, j)),
+                            ticks.contains(&item_keys::file_text(i, j)),
+                        )
+                    })
+                    .collect(),
             })
             .collect();
         Pack {
@@ -798,11 +870,12 @@ impl Pack {
 
 const FROG_JSON: &str = "true";
 
-/// Reads the bytes of a `kind` (`photo` or `audio`) file by its hash.
+/// Reads the bytes of a `kind` (`photo`, `audio` or `file`) file by its
+/// hash.
 pub type BytesOf<'a> = dyn Fn(&str, &str) -> Option<Vec<u8>> + 'a;
 
-/// The size of the bytes of the `kind` (`photo` or `audio`) file `hash`
-/// held, none for none.
+/// The size of the bytes of the `kind` (`photo`, `audio` or `file`) file
+/// `hash` held, none for none.
 pub type SizeOf<'a> = dyn Fn(&str, &str) -> Option<usize> + 'a;
 
 /// [`Store::pack_of_everything`]'s Pack, as the Dart core's record.
@@ -842,8 +915,17 @@ fn note_json(n: &PackNote, files: Option<&BytesOf>) -> Result<Value> {
                 pairs.push(("bytes", json!(BASE64.encode(bytes))));
             }
             pairs.push(("hash", json!(f.hash)));
+            if kind == "file" {
+                pairs.push(("name", json!(f.name)));
+                if let Some(pages) = f.pages {
+                    pairs.push(("pages", json!(pages)));
+                }
+            }
             if let Some(text) = &f.text {
                 pairs.push(("text", json!(text)));
+            }
+            if kind == "file" {
+                pairs.push(("type", json!(f.media_type)));
             }
             out.push(object(pairs));
         }
@@ -852,6 +934,11 @@ fn note_json(n: &PackNote, files: Option<&BytesOf>) -> Result<Value> {
     let mut pairs = Vec::new();
     if let Some(area) = n.area {
         pairs.push(("area", json!(area)));
+    }
+    if let Some(bytes_of) = files
+        && !n.attachments.is_empty()
+    {
+        pairs.push(("attachments", files_json(&n.attachments, "file", bytes_of)?));
     }
     if !n.fields.is_empty()
         && let Some(bar) = n.bar
@@ -1281,6 +1368,10 @@ fn note(json: &Value) -> Option<PackNote> {
         .iter()
         .map(file)
         .collect::<Option<_>>()?;
+    let attachments = optional_list(json, "attachments")?
+        .iter()
+        .map(attached)
+        .collect::<Option<_>>()?;
     Some(PackNote {
         area,
         topic,
@@ -1299,6 +1390,7 @@ fn note(json: &Value) -> Option<PackNote> {
         frog,
         photos,
         recordings,
+        attachments,
     })
 }
 
@@ -1391,6 +1483,29 @@ fn file(json: &Value) -> Option<PackFile> {
         size: bytes.as_ref().map_or(0, Vec::len),
         bytes,
         text,
+        name: String::new(),
+        media_type: String::new(),
+        pages: None,
+    })
+}
+
+/// An attached file of a Pack's Note: as [`file`], with its name, media
+/// type and pages, each read as an attached file's field reads them
+/// ([`Attachment::read`]); a name or type that is there but no string,
+/// or pages that are no whole number, make the Pack none.
+fn attached(json: &Value) -> Option<PackFile> {
+    let map = json.as_object()?;
+    let name = optional_str(map, "name")?.unwrap_or("");
+    let media_type = optional_str(map, "type")?.unwrap_or("");
+    let pages = match present(map, "pages") {
+        None => None,
+        Some(p) => Some(p.as_i64().and_then(|p| u64::try_from(p).ok())?),
+    };
+    Some(PackFile {
+        name: crate::notes::clean_name(name),
+        media_type: crate::notes::clean_type(media_type),
+        pages: pages.filter(|p| *p <= 1 << 53),
+        ..file(json)?
     })
 }
 
@@ -1686,6 +1801,9 @@ impl Store {
                 has_file: size.is_some(),
                 size: size.unwrap_or(0),
                 text: text.cloned(),
+                name: String::new(),
+                media_type: String::new(),
+                pages: None,
             }
         };
         let mut routines = Routines::new(self).of_note(id)?;
@@ -1783,6 +1901,17 @@ impl Store {
                 .chain(&note.removed_recordings)
                 .map(|hash| file("audio", hash, note.transcripts.get(hash)))
                 .collect(),
+            attachments: note
+                .attachments
+                .iter()
+                .chain(&note.removed_attachments)
+                .map(|a| PackFile {
+                    name: a.name.clone(),
+                    media_type: a.media_type.clone(),
+                    pages: a.pages,
+                    ..file("file", &a.hash, note.attachment_texts.get(&a.hash))
+                })
+                .collect(),
         })
     }
 
@@ -1850,6 +1979,7 @@ pub struct PackFrom {
 struct Kept {
     photos: Vec<String>,
     recordings: Vec<String>,
+    attachments: Vec<String>,
 }
 
 impl Store {
@@ -1989,7 +2119,18 @@ impl Store {
                     None => a.hash.clone(),
                 });
             }
-            kept.push(Kept { photos, recordings });
+            let mut attachments = Vec::new();
+            for d in &n.attachments {
+                attachments.push(match &d.bytes {
+                    Some(bytes) => self.put_file(bytes)?,
+                    None => d.hash.clone(),
+                });
+            }
+            kept.push(Kept {
+                photos,
+                recordings,
+                attachments,
+            });
         }
         self.batch(|| {
             let mut taken: HashSet<String> = Places::new(self)
@@ -2135,6 +2276,25 @@ impl Store {
             self.append(id, &note_keys::audio(hash), added, None)?;
             if let Some(text) = &a.text {
                 self.append(id, &note_keys::transcript(hash), Some(text), None)?;
+            }
+        }
+        for (d, hash) in n.attachments.iter().zip(&kept.attachments) {
+            let value = d.has_file.then(|| {
+                let kind = file_text::kind_of(&d.name, &d.media_type);
+                let size = d.size as u64;
+                Attachment {
+                    hash: hash.clone(),
+                    name: d.name.clone(),
+                    media_type: d.media_type.clone(),
+                    size,
+                    pages: d.pages,
+                    computer: file_text::computer_reads(kind, size, d.pages),
+                }
+                .value()
+            });
+            self.append(id, &note_keys::file(hash), value.as_deref(), None)?;
+            if let Some(text) = &d.text {
+                self.append(id, &note_keys::file_text(hash), Some(text), None)?;
             }
         }
         if let Some(lines) = &n.lines {
@@ -2774,6 +2934,87 @@ mod tests {
         assert!(ben.photo(&second.photos[0]).is_some());
         assert_eq!(ben.audio(&second.recordings[0]), Some(bytes(2, 600)));
         assert!(second.transcripts.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn an_attached_file_goes_with_its_name_only_when_ticked_and_its_text_without_it() -> TestResult
+    {
+        use crate::notes::NewFile;
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let papers = Places::new(&ann).add_area("Papers")?.id;
+        let notes = Notes::new(&ann);
+        let lease = notes.capture_with_files(
+            "Lease",
+            Some(&papers),
+            None,
+            &[],
+            &[],
+            &[
+                NewFile {
+                    name: "Lease.pdf",
+                    media_type: "application/pdf",
+                    bytes: b"%PDF-1.4 lease",
+                    pages: Some(12),
+                },
+                NewFile {
+                    name: "plan.dwg",
+                    media_type: "",
+                    bytes: b"dwg",
+                    pages: None,
+                },
+            ],
+        )?;
+        let pdf = lease.attachments[0].hash.clone();
+        notes.set_attachment_text(&lease.id, &pdf, "Rent due")?;
+        let pack = ann.pack_of(&lease.id, &HashSet::new())?;
+        let kinds: Vec<PackItemKind> = pack.tree()[0].children[0]
+            .children
+            .iter()
+            .map(|c| c.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                PackItemKind::File,
+                PackItemKind::FileText,
+                PackItemKind::File
+            ]
+        );
+        let ticks = pack.export_ticks();
+        assert!(ticks.contains(&item_keys::file_text(0, 0)));
+        assert!(!ticks.contains(&item_keys::file(0, 0)));
+        let open = opened(&ben, &ann.write_pack(&pack, &ticks, false)?)?;
+        let files = &open.pack.notes[0].attachments;
+        assert_eq!(files.len(), 1, "the file without a text stays out");
+        assert!(!files[0].has_file);
+        assert_eq!(files[0].text.as_deref(), Some("Rent due"));
+        add(&ben, &open, true)?;
+        let added = texts(&ben)?.into_iter().next().ok_or("the Note")?;
+        assert!(added.attachments.is_empty());
+        assert_eq!(added.removed_attachments.len(), 1);
+        assert_eq!(
+            added.attachment_texts.values().collect::<Vec<_>>(),
+            ["Rent due"]
+        );
+
+        let whole = opened(&ben, &ann.write_pack(&pack, &pack.all_keys(), false)?)?;
+        add(&ben, &whole, true)?;
+        let second = texts(&ben)?
+            .into_iter()
+            .find(|n| !n.attachments.is_empty())
+            .ok_or("the Note with its files")?;
+        let names: Vec<&str> = second.attachments.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["Lease.pdf", "plan.dwg"]);
+        assert_eq!(second.attachments[0].pages, Some(12));
+        assert!(second.attachments[0].computer, "more than ten pages");
+        assert_eq!(second.attachments[1].media_type, "application/octet-stream");
+        assert_eq!(ben.file(&pdf).as_deref(), Some(&b"%PDF-1.4 lease"[..]));
+        assert_eq!(
+            second.attachment_texts.get(&pdf).map(String::as_str),
+            Some("Rent due")
+        );
         Ok(())
     }
 

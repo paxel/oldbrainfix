@@ -491,10 +491,11 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                     return false;
                 }
                 // Any Note gets its texts from a Member's machine;
-                // removing one is the owner's (ADR 0025).
+                // removing one is the owner's (ADR 0025, 0047).
                 if e.value.is_some()
                     && (e.field.starts_with(note_keys::TRANSCRIPT_PREFIX)
-                        || e.field.starts_with(note_keys::OCR_PREFIX))
+                        || e.field.starts_with(note_keys::OCR_PREFIX)
+                        || e.field.starts_with(note_keys::FILE_TEXT_PREFIX))
                 {
                     return true;
                 }
@@ -1186,10 +1187,8 @@ impl Store {
         let Some((kind, hash)) = reference.split_once('/') else {
             return Ok(false);
         };
-        let prefix = match kind {
-            "photo" => note_keys::PHOTO_PREFIX,
-            "audio" => note_keys::AUDIO_PREFIX,
-            _ => return Ok(false),
+        let Some((_, prefix)) = crate::sync::BLOB_KINDS.iter().find(|(k, _)| *k == kind) else {
+            return Ok(false);
         };
         let field = format!("{prefix}{hash}");
         for (entity, f) in self.fields_with_prefix(&field)? {

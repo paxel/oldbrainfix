@@ -6,7 +6,8 @@ import 'tallies.dart';
 import 'text_format.dart';
 
 /// Finding Notes by what they say: their text, the Transcripts of their
-/// voice recordings, the Photo Texts of their photos and the same of
+/// voice recordings, the Photo Texts of their photos, the names and
+/// Attachment Texts of their attached files (ADR 0047) and the same of
 /// their Sections (Amends and merged Notes), the text lines of the
 /// entries of a Tally and the Lines of a Checklist or a Shopping List,
 /// but those gone. Capture Context joins later.
@@ -17,7 +18,8 @@ class Search {
 
   Search(this.store);
 
-  /// The Notes whose text, Transcripts or Photo Texts, or those of one of
+  /// The Notes whose text, Transcripts, Photo Texts, file names or
+  /// Attachment Texts, or those of one of
   /// their Sections, or the text line of an entry of their Tally, or a
   /// Line of their Checklist or Shopping List, hold
   /// [query], ignoring case, newest capture first.
@@ -43,6 +45,8 @@ class Search {
         if (holds(note.visibleText) ||
             note.transcripts.values.any(holds) ||
             note.photoTexts.values.any(holds) ||
+            note.attachmentTexts.values.any(holds) ||
+            note.attachments.any((a) => holds(a.name)) ||
             (sections[note.id] ?? const []).any(holds))
           note,
     ];
@@ -63,6 +67,8 @@ class Search {
           note.visibleText,
           ...note.transcripts.values,
           ...note.photoTexts.values,
+          ...note.attachmentTexts.values,
+          for (final file in note.attachments) file.name,
         ]);
       }
     }

@@ -124,7 +124,7 @@ const pinFailuresTotal = 20;
 /// The most a sync body or a blob may weigh; a peer with the PIN must not
 /// be able to fill the memory.
 const maxEntriesBytes = 64 << 20;
-const maxBlobBytes = 64 << 20;
+const maxBlobBytes = 256 << 20;
 
 /// What one side of a session brought in: from whom, what was new here,
 /// the Moment before it, what the signatures said, and the Conflicts
@@ -806,9 +806,13 @@ Future<SyncResult> _sync(
         if (body != null) req.add(body);
         res = await req.close();
         final bytes = BytesBuilder(copy: false);
+        // A blob may weigh more than a sync body (ADR 0003, 0047).
+        final limit = path.startsWith('/blob/')
+            ? maxBlobBytes
+            : maxEntriesBytes;
         await for (final chunk in res) {
           bytes.add(chunk);
-          if (bytes.length > maxEntriesBytes) {
+          if (bytes.length > limit) {
             throw const SyncException(SyncFailure.failed);
           }
         }

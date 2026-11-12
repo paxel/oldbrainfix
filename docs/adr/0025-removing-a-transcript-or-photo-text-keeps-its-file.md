@@ -32,3 +32,7 @@ Amended by ADR 0033 (#127): "Replace Note text" and "Append to Note text" go thr
 
 - A text removed on a Device with an older version still around can come back from that Device until it is updated.
 - A removed text stays in the log, as an edited Note text does.
+
+## Attachment Texts (ADR 0047)
+
+Amended by #267: the text read out of an attached file, `fileText:<hash>`, follows the same rules as a Photo Text: removing it is a null that keeps the file, absent means not read and empty means nothing found, it is removed only by the Note's owner or a Manager in a Shared Area while a Member's machine may add one to any Note, and reading again writes a new one that ends the removal (`mayRemoveAttachmentText`, `removeAttachmentText`, `setAttachmentText`; `may_remove_attachment_text` … in Rust).
