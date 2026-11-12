@@ -306,7 +306,7 @@ pub fn form(
                         let size = pack_view::size_text(t, worked.1);
                         ui.label(RichText::new(t.pack_size(&size)).strong().color(text));
                         pack_view::tick_buttons(ui, t, pack, &mut form.ticks);
-                        pack_view::tree(ui, t, pack, &mut form.ticks);
+                        pack_view::tree(ui, t, pack, &mut form.ticks, &Default::default());
                     });
             }
             ui.separator();

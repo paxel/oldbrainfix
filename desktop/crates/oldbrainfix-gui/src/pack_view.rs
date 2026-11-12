@@ -8,6 +8,7 @@
 //! Desktop, "Dialogs"); an item under a Note not ticked cannot be ticked.
 
 use std::cell::Cell;
+use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
 use oldbrainfix_core::{
@@ -113,7 +114,7 @@ pub fn export_form(
             .color(text),
     );
     tick_buttons(ui, t, pack, ticks);
-    tree(ui, t, pack, ticks);
+    tree(ui, t, pack, ticks, &BTreeSet::new());
     ui.separator();
     tick_with_hint(ui, profile, t.pack_add_profile(), t.pack_add_profile_hint());
     let picked = worked.of(pack, ticks).0 > 0;
@@ -162,7 +163,7 @@ pub fn import_form(
     }
     let pack = &opened.pack;
     tick_buttons(ui, t, pack, ticks);
-    tree(ui, t, pack, ticks);
+    tree(ui, t, pack, ticks, &BTreeSet::new());
     ui.separator();
     if opened.from.is_some() {
         tick_with_hint(ui, claim, t.pack_claim(), t.pack_claim_hint());
@@ -225,8 +226,15 @@ pub(crate) fn nothing_ticked(ui: &mut Ui, t: &L10n, picked: bool) {
 /// The tree of `pack`, as high as the window allows: an Area and a Topic
 /// as headings, each other item a box with its words and its icon at the
 /// end, as the phone's; a box changes the ticks by the Session rule
-/// (Q458).
-pub(crate) fn tree(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
+/// (Q458). A Note whose index is in `trashed`, from a Backup's Trash
+/// (#285), says "In the Trash" under its words, not by colour alone.
+pub(crate) fn tree(
+    ui: &mut Ui,
+    t: &L10n,
+    pack: &Pack,
+    ticks: &mut PackTicks,
+    trashed: &BTreeSet<usize>,
+) {
     let high = (ui.ctx().content_rect().height() - 360.0).max(200.0);
     // Up to `high`, not held to the room left under it: the dialog finds
     // its place over the window from its size, and a tree held to that
@@ -240,7 +248,8 @@ pub(crate) fn tree(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 4.0;
                 for item in pack.tree() {
-                    row(ui, t, pack, ticks, (&item, 0, true), &mut changed);
+                    let shown = (pack, &*ticks, trashed);
+                    row(ui, t, shown, (&item, 0, true), &mut changed);
                 }
             });
     });
@@ -254,8 +263,7 @@ pub(crate) fn tree(ui: &mut Ui, t: &L10n, pack: &Pack, ticks: &mut PackTicks) {
 fn row(
     ui: &mut Ui,
     t: &L10n,
-    pack: &Pack,
-    ticks: &PackTicks,
+    (pack, ticks, trashed): (&Pack, &PackTicks, &BTreeSet<usize>),
     (item, depth, enabled): (&PackItem, usize, bool),
     changed: &mut Option<(String, bool)>,
 ) {
@@ -283,7 +291,13 @@ fn row(
                 ui.label(RichText::new(name).size(size).strong().color(text));
             });
             for child in &item.children {
-                row(ui, t, pack, ticks, (child, depth + 1, true), changed);
+                row(
+                    ui,
+                    t,
+                    (pack, ticks, trashed),
+                    (child, depth + 1, true),
+                    changed,
+                );
             }
         }
         _ => {
@@ -310,13 +324,28 @@ fn row(
                     icons::show(ui, icon(pack, item), 18.0, weak);
                 });
             });
+            let in_trash =
+                item.kind == PackItemKind::Note && item.note.is_some_and(|i| trashed.contains(&i));
+            if in_trash {
+                ui.horizontal(|ui| {
+                    // Under the words, past the box.
+                    ui.add_space(indent + 18.0);
+                    ui.label(RichText::new(t.backup_note_trashed()).small().color(weak));
+                });
+            }
             let under = if item.kind == PackItemKind::Note {
                 enabled && ticked
             } else {
                 enabled
             };
             for child in &item.children {
-                row(ui, t, pack, ticks, (child, depth + 1, under), changed);
+                row(
+                    ui,
+                    t,
+                    (pack, ticks, trashed),
+                    (child, depth + 1, under),
+                    changed,
+                );
             }
         }
     }

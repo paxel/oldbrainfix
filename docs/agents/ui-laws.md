@@ -449,8 +449,10 @@ replace a law of Both apps where they say so. A desktop law marked
   tree, all ticked, under who it is from; its ticks ("Add my Profile",
   "Claim as mine") go below their text.
 - **"Open a Backup…"** (#285) is on the Backups page, in a card of its
-  own ("Take Notes back"), set up or not. It picks the file (on
-  Android the file picker starts in the Backups folder), asks for the
+  own ("Take Notes back"), set up or not, and on the desktop also in the
+  File menu, its page then alone, without the way back to Backups. It
+  picks the file (on Android and the desktop the file picker starts in
+  the Backups folder), asks for the
   passphrase or the recovery key as restoring does and refuses what
   restoring refuses, announced at the top. Then the same page shows the
   Pack's tree under the Backup's date: no Note ticked, everything under

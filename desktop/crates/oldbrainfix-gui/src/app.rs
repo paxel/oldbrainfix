@@ -110,7 +110,9 @@ use crate::app_links;
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
 use crate::background;
-use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
+use crate::backup_view::{
+    self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
+};
 use crate::backups;
 use crate::capture_choices::{
     self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
@@ -251,6 +253,9 @@ pub enum Page {
     People,
     /// The Backups and the recovery sheet; Sync ▸ Backups….
     Backups,
+    /// A Backup opened to take Notes back from it (#285): Open a
+    /// Backup… on the Backups dialog or in the File menu.
+    BackupNotes,
     /// The LAN sync this Device hosts while it shows, the Conflicts, the
     /// shared folder, the bundles and the paired Devices; Sync ▸ Sync now.
     Sync,
@@ -471,6 +476,24 @@ enum PackDid {
     /// The Pack saved, from the export or, with `true`, from Send
     /// feedback.
     Saved(std::result::Result<(), String>, bool),
+    /// The Backup at the path opened to take Notes back from it (#285);
+    /// none when what was typed does not open it.
+    BackupOpened(
+        std::path::PathBuf,
+        oldbrainfix_core::Result<Option<backup::OpenedBackup>>,
+    ),
+    /// The Notes ticked on a Backup opened added (#285).
+    BackupAdded(oldbrainfix_core::Result<oldbrainfix_core::PackAdded>),
+}
+
+/// What a Pack's work off the window's thread is doing: opening a Pack,
+/// which the line under the menu bar says, saving one, which greys
+/// Save…, or reading a Backup opened (#285), which its page shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackWork {
+    Opening,
+    Saving,
+    Backup,
 }
 
 /// The file at `path` as far as it may be a Pack (#165).
@@ -1647,6 +1670,8 @@ enum Action {
     ShowUpdate,
     /// Something asked of the Backups dialog.
     Backup(BackupAction),
+    /// Something asked on the page of a Backup opened (#285).
+    BackupNotes(BackupNotesAction),
     /// Something asked of the own Profile in the Profile dialog.
     Profile(ProfileAction),
     /// Opens another person's Profile (#52).
@@ -1933,8 +1958,8 @@ pub struct App {
     /// it, the window reads it itself.
     agenda_reads: Option<AgendaReads>,
     /// The Pack work running on threads of their own, on connections
-    /// the Agenda's opener hands them, with whether each opens a Pack.
-    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, bool)>,
+    /// the Agenda's opener hands them, with what each does.
+    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, PackWork)>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
@@ -2032,6 +2057,12 @@ pub struct App {
     /// Ask where to save the Recovery Sheet and which Backup to restore.
     sheet_saver: FileSaver,
     backup_opener: FolderPicker,
+    /// Asks which Backup to take Notes back from, starting in the
+    /// Backups folder (#285).
+    backup_notes_opener: FilePickerIn,
+    /// The Backup opened to take Notes back from it, while its page is
+    /// among the dialogs (#285).
+    backup_notes: Option<BackupNotes>,
     /// Makes the own Profile from this computer's login, or fills in the
     /// defaults of one there (ADR 0017).
     profile_defaults: ProfileDefaults,
@@ -2062,6 +2093,10 @@ pub type ProfileDefaults = Box<dyn Fn(&Store) -> oldbrainfix_core::Result<Profil
 
 /// Asks for a folder, or a file to open, with the dialog's title.
 pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
+
+/// Asks for a file to open, with the dialog's title and the folder it
+/// starts in.
+pub type FilePickerIn = Box<dyn Fn(&str, Option<&std::path::Path>) -> Option<std::path::PathBuf>>;
 
 /// Asks for files to open, with the dialog's title; none when cancelled.
 pub type FilesPicker = Box<dyn Fn(&str) -> Vec<std::path::PathBuf>>;
@@ -2433,6 +2468,15 @@ impl App {
                 sheet_dialog(title).set_file_name(name).save_file()
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
+            backup_notes_opener: Box::new(|title, folder| {
+                let dialog = backup_dialog(title);
+                match folder {
+                    Some(folder) => dialog.set_directory(folder),
+                    None => dialog,
+                }
+                .pick_file()
+            }),
+            backup_notes: None,
             profile_defaults: Box::new(login::apply_system_defaults),
             help_version: None,
             ai_port: None,
@@ -2541,6 +2585,12 @@ impl App {
         self.backup_opener = opener;
     }
 
+    /// Hands in the dialog asking which Backup to take Notes back from,
+    /// given the folder it starts in (#285).
+    pub fn set_backup_notes_opener(&mut self, opener: FilePickerIn) {
+        self.backup_notes_opener = opener;
+    }
+
     /// Makes the own Profile with `defaults` instead of this computer's
     /// login once the first start's view is answered; tests hand one in.
     pub fn set_profile_defaults(&mut self, defaults: ProfileDefaults) {
@@ -2608,6 +2658,7 @@ impl App {
                 }
             }
             BackupAction::Weekly(on) => self.store.set_backups_weekly(on)?,
+            BackupAction::OpenNotes => self.open_backup_notes()?,
             BackupAction::Now => match backups::now(&self.store) {
                 // Shown as the last Backup on the card: no announcement
                 // (UI laws).
@@ -3275,7 +3326,7 @@ impl App {
             }
             PackFile::Large => {
                 let path = path.to_path_buf();
-                self.pack_aside(true, move |store| {
+                self.pack_aside(PackWork::Opening, move |store| {
                     let opened = read_pack_file(&path).map(|bytes| store.open_pack(&bytes));
                     PackDid::Opened(opened, path)
                 });
@@ -3327,7 +3378,7 @@ impl App {
     /// Opens the Pack `bytes` of the file at `path` (#165) off the
     /// window's thread.
     fn open_pack(&mut self, bytes: Vec<u8>, path: std::path::PathBuf) {
-        self.pack_aside(true, move |store| {
+        self.pack_aside(PackWork::Opening, move |store| {
             PackDid::Opened(Some(store.open_pack(&bytes)), path)
         });
     }
@@ -3335,9 +3386,13 @@ impl App {
     /// Runs `work` on a Pack on a thread of its own, on a connection the
     /// Agenda's opener hands it (#207), its result taken in by
     /// [`App::pack_arrived`]; without the opener, the window runs it
-    /// itself. `opening` when it opens a Pack: the line under the menu
-    /// bar shows meanwhile.
-    fn pack_aside(&mut self, opening: bool, work: impl FnOnce(&Store) -> PackDid + Send + 'static) {
+    /// itself. `kind` says what it does: while it opens a Pack, the line
+    /// under the menu bar shows.
+    fn pack_aside(
+        &mut self,
+        kind: PackWork,
+        work: impl FnOnce(&Store) -> PackDid + Send + 'static,
+    ) {
         let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone()) else {
             let done = work(&self.store);
             self.pack_done(done);
@@ -3351,17 +3406,21 @@ impl App {
             let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
             drop(sent.send(PackDone { done, wrote }));
         });
-        self.pack_work.push((arrives, opening));
+        self.pack_work.push((arrives, kind));
     }
 
     /// Whether a Pack is being opened off the window's thread.
     fn pack_opening(&self) -> bool {
-        self.pack_work.iter().any(|(_, opening)| *opening)
+        self.pack_work
+            .iter()
+            .any(|(_, kind)| *kind == PackWork::Opening)
     }
 
     /// Whether a Pack is being saved off the window's thread.
     fn pack_saving(&self) -> bool {
-        self.pack_work.iter().any(|(_, opening)| !*opening)
+        self.pack_work
+            .iter()
+            .any(|(_, kind)| *kind == PackWork::Saving)
     }
 
     /// Takes in what the Pack threads did once it is in; the window
@@ -3399,6 +3458,8 @@ impl App {
             PackDid::Opened(None, path) => self.import_bundle(&path),
             PackDid::Saved(saved, false) => self.pack_saved(saved),
             PackDid::Saved(saved, true) => self.feedback_saved(saved),
+            PackDid::BackupOpened(path, opened) => self.backup_notes_opened(&path, opened),
+            PackDid::BackupAdded(added) => self.backup_notes_added(added),
         }
     }
 
@@ -3506,7 +3567,7 @@ impl App {
                     path.set_extension(packs::EXTENSION);
                 }
                 let (pack, ticks) = (pack.clone(), self.feedback.ticks.clone());
-                self.pack_aside(false, move |store| {
+                self.pack_aside(PackWork::Saving, move |store| {
                     PackDid::Saved(write_pack_file(store, &pack, &ticks, false, &path), true)
                 });
                 return Ok(());
@@ -3551,7 +3612,7 @@ impl App {
             path.set_extension(packs::EXTENSION);
         }
         let (pack, ticks, profile) = (pack.as_ref().clone(), ticks.clone(), *profile);
-        self.pack_aside(false, move |store| {
+        self.pack_aside(PackWork::Saving, move |store| {
             PackDid::Saved(write_pack_file(store, &pack, &ticks, profile, &path), false)
         });
     }
@@ -3572,6 +3633,188 @@ impl App {
                 (t.pack_not_written_cause(), t.nothing_lost_fix()),
                 format!("pack: {e}"),
             ),
+        }
+    }
+
+    /// Open a Backup… (#285): the file asked for in the Backups folder,
+    /// then, for a Backup, its page over the Backups dialog, or alone
+    /// from the File menu; a file that is none, or of a later format, is
+    /// announced at the top, why behind the click.
+    fn open_backup_notes(&mut self) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let folder = self
+            .store
+            .backup_folder()
+            .ok()
+            .flatten()
+            .map(std::path::PathBuf::from);
+        let Some(path) = (self.backup_notes_opener)(t.restore_open_title(), folder.as_deref())
+        else {
+            return Ok(());
+        };
+        let (cause, details) = match backup::read_header(&path) {
+            Ok(Some(header)) => {
+                self.backup_notes = Some(BackupNotes::new(path, header));
+                return self.act(if self.page() == Some(Page::Backups) {
+                    Action::PageInto(Page::BackupNotes)
+                } else {
+                    Action::OpenPage(Page::BackupNotes)
+                });
+            }
+            Err(oldbrainfix_core::Error::Backup(backup::Problem::NeedsUpdate)) => (
+                (t.restore_needs_update(), t.update_open_again_fix()),
+                "backup: a Backup of a later format",
+            ),
+            _ => (
+                (t.restore_not_a_backup(), t.restore_pick_fix()),
+                "backup: no Backup header in the file picked",
+            ),
+        };
+        self.announce_failure(
+            t.backup_not_opened(),
+            t.backup_not_opened_title(),
+            cause,
+            details.into(),
+        );
+        Ok(())
+    }
+
+    /// The page of a Backup opened is gone from the dialogs: so is what
+    /// it held (#285).
+    fn backup_notes_left(&mut self) {
+        if !self.pages.contains(&Page::BackupNotes) {
+            self.backup_notes = None;
+        }
+    }
+
+    /// Open or Add on the page of a Backup opened (#285), off the
+    /// window's thread: the passphrase's key is slow to make on purpose,
+    /// and the whole file is read each time.
+    fn backup_notes_action(&mut self, asked: BackupNotesAction) {
+        let Some(state) = &mut self.backup_notes else {
+            return;
+        };
+        if state.busy {
+            return;
+        }
+        match asked {
+            BackupNotesAction::Open => {
+                let code = state.code.trim().to_string();
+                // Said red under the field.
+                if !code.is_empty() && oldbrainfix_core::recovery::decode_code(&code).is_none() {
+                    state.code_invalid = true;
+                    return;
+                }
+                let passphrase = state.passphrase.clone();
+                let (path, header) = (state.path.clone(), state.header.clone());
+                state.busy = true;
+                let t = self.t;
+                self.pack_aside(PackWork::Backup, move |store| {
+                    let key = if code.is_empty() {
+                        backup::unlock(&header, Some(&passphrase), None)
+                    } else {
+                        backup::unlock(&header, None, Some(&code))
+                    };
+                    // The desktop has no Area Locks: no Area is closed.
+                    let opened = key.and_then(|key| {
+                        key.map(|key| {
+                            backup::open_notes(store, &path, &key, &HashSet::new(), |a| {
+                                area_name(&t, a)
+                            })
+                        })
+                        .transpose()
+                    });
+                    PackDid::BackupOpened(path, opened)
+                });
+            }
+            BackupNotesAction::Add => {
+                let Some(opened) = state.opened.as_deref().cloned() else {
+                    return;
+                };
+                let ticks = state.ticks.clone();
+                state.busy = true;
+                let (t, wall) = (self.t, self.wall.clone());
+                self.pack_aside(PackWork::Backup, move |store| {
+                    PackDid::BackupAdded(backup::add_notes(
+                        store,
+                        &opened,
+                        &ticks,
+                        &*wall,
+                        t.backup_suffix(),
+                        t.backup_no_area(),
+                    ))
+                });
+            }
+        }
+    }
+
+    /// The Backup at `path` read (#285): its Notes on its page, or why it
+    /// did not open, announced at the top of the page, which stays for
+    /// another try. Closed meanwhile, or opened again, it shows nothing.
+    fn backup_notes_opened(
+        &mut self,
+        path: &std::path::Path,
+        opened: oldbrainfix_core::Result<Option<backup::OpenedBackup>>,
+    ) {
+        let t = self.t;
+        let waiting = |s: &&mut BackupNotes| s.busy && s.opened.is_none() && s.path == path;
+        let Some(state) = self.backup_notes.as_mut().filter(waiting) else {
+            return;
+        };
+        let (cause, details) = match opened {
+            Ok(Some(opened)) => {
+                state.show(opened);
+                return;
+            }
+            Ok(None) => (
+                (t.restore_wrong(), t.restore_wrong_fix()),
+                "backup: the passphrase or recovery key does not open it".to_string(),
+            ),
+            Err(e) => (backup_view::open_refusal(&t, &e), format!("backup: {e}")),
+        };
+        state.busy = false;
+        self.announce_failure(
+            t.backup_not_opened(),
+            t.backup_not_opened_title(),
+            cause,
+            details,
+        );
+    }
+
+    /// Add on a Backup opened done (#285): announced as a Pack's, its page
+    /// closed back to the Backups dialog; a failure leaves the page open
+    /// and the log as it was.
+    fn backup_notes_added(&mut self, added: oldbrainfix_core::Result<oldbrainfix_core::PackAdded>) {
+        let t = self.t;
+        match added {
+            Ok(added) => {
+                // Not a page opened again meanwhile.
+                let adding = self
+                    .backup_notes
+                    .as_ref()
+                    .is_some_and(|s| s.busy && s.opened.is_some());
+                if adding && self.page() == Some(Page::BackupNotes) {
+                    self.pages.pop();
+                }
+                self.backup_notes_left();
+                self.notice = Some(t.pack_added(added.notes as i64));
+            }
+            Err(e) => {
+                if let Some(state) = &mut self.backup_notes {
+                    state.busy = false;
+                }
+                let cause = if matches!(e, oldbrainfix_core::Error::Backup(_)) {
+                    t.backup_add_damaged_cause()
+                } else {
+                    t.restore_failed_cause()
+                };
+                self.announce_failure(
+                    t.backup_notes_not_added(),
+                    t.backup_notes_not_added_title(),
+                    (cause, t.backup_add_damaged_fix()),
+                    format!("backup: {e}"),
+                );
+            }
         }
     }
 
@@ -5716,6 +5959,7 @@ impl App {
                 self.pages = vec![page];
                 // Opened anew, the Settings show everything (#282).
                 self.settings_query.clear();
+                self.backup_notes_left();
             }
             Action::PageInto(page) => {
                 if page == Page::Feedback {
@@ -5725,10 +5969,12 @@ impl App {
             }
             Action::PageBack => {
                 self.pages.pop();
+                self.backup_notes_left();
             }
             Action::ClosePage => {
                 self.pages.clear();
                 self.settings_query.clear();
+                self.backup_notes_left();
             }
             Action::NewNote => {
                 // One dialog at a time: the Note open is kept and closed.
@@ -6671,6 +6917,7 @@ impl App {
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
+            Action::BackupNotes(asked) => self.backup_notes_action(asked),
             Action::Profile(asked) => self.profile_action(asked)?,
             Action::OpenPerson(id) => self.open_person(id, SendBack::No)?,
             Action::Person(asked) => self.person_action(asked)?,
@@ -8826,6 +9073,8 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.agenda_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
+        // However its page went, what a Backup opened held goes with it.
+        self.backup_notes_left();
         self.feedback.busy = self.pack_saving();
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
@@ -10037,6 +10286,12 @@ impl App {
                     (t.menu_import(), None, true, Action::AskImport),
                     (t.menu_open_pack(), None, true, Action::OpenPack),
                     (
+                        t.backup_open(),
+                        None,
+                        true,
+                        Action::Backup(BackupAction::OpenNotes),
+                    ),
+                    (
                         t.save_as_markdown(),
                         None,
                         may(|n| n.amends),
@@ -10484,6 +10739,13 @@ impl App {
                     }
                     Page::Profile | Page::People | Page::Backups => {
                         self.profile_pane(ui, tones, actions, page);
+                    }
+                    Page::BackupNotes => {
+                        if let Some(state) = &mut self.backup_notes {
+                            let mut asked = None;
+                            backup_view::notes_page(ui, &t, &self.wall, state, &mut asked);
+                            actions.extend(asked.map(Action::BackupNotes));
+                        }
                     }
                     Page::Sync | Page::Pair => {
                         let wall = self.wall.clone();
@@ -13030,6 +13292,12 @@ impl App {
                             backup_view::card(ui, &t, store, wall, backup_form, &mut backup);
                             actions.extend(backup.into_iter().map(Action::Backup));
                         });
+                        // Take Notes back (#285), set up or not.
+                        embossed(ui, tones, false, None, |ui| {
+                            if backup_view::notes_card(ui, &t) {
+                                actions.push(Action::Backup(BackupAction::OpenNotes));
+                            }
+                        });
                     }
                     // People (#52): every Profile kept here, each opening
                     // it; the blocked ones (#90) in a fold of their own,
@@ -14350,6 +14618,7 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::Profile => t.profile_title(),
         Page::People => t.people_title(),
         Page::Backups => t.profile_backups(),
+        Page::BackupNotes => t.backup_open_page_title(),
         Page::Sync => t.sync_title(),
         Page::Pair => t.menu_pair(),
     }
