@@ -31,3 +31,7 @@ Amended by #197: Simple or Advanced is the second setting of the person, kept th
 ## The last Shopping List (#276)
 
 Amended by #276: the Shopping List a capture on a Device went into last is a setting of that Device (`lastShoppingList`, the list's Note id), put at the top of the lists Add to a Shopping List offers. An empty value reads as none, and it may name a list gone since, which the pick does not list. Capturing writes it; the user never sets it, so the AI port has no tool for it.
+
+## The window's geometry (#278)
+
+Amended by #278: on the desktop the window's size and position, whether it is maximized, the sidebar's width and the Note dialog's size are settings of that Device (`windowSize`, `windowPosition`, `windowMaximized`, `sidebarWidth`, `noteDialogSize`), written as the user leaves them and read at the next start. A position the system does not tell, as on Wayland, is not written, and one on no monitor any more opens the window centred. The user never sets them by name, so the AI port has no tool for them.

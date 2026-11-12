@@ -1140,6 +1140,12 @@ replace a law of Both apps where they say so. A desktop law marked
   New Tally page and the Session pages once something changed, and ask
   "Discard changes?" only about a change that can't be saved; Cancel
   leaves without saving.
+- **The window keeps its geometry on each computer** (#278): its size
+  and position, whether it is maximized, the sidebar's width and the
+  Note dialog's size are settings of the Device (ADR 0008) and come
+  back at the next start; a position on no monitor any more opens the
+  window centred. The Note dialog is resized by its edges and corners,
+  staying centred.
 - **On the desktop nothing floats over a list** (#158); every list ends
   with the same room after its last card, so that card scrolls fully
   into view.
@@ -1153,7 +1159,9 @@ replace a law of Both apps where they say so. A desktop law marked
   browser does: the arrows at the top of the list, Alt+Left and
   Alt+Right, and the mouse's back and forward buttons; the keys rest
   while text is being typed. Showing a new place forgets what lay
-  ahead. Over a dialog, back leads to the dialog it was opened from, or
+  ahead. **Back and forward show each place as it was left** (#278):
+  its search, its person filter and how far its list was scrolled; a
+  place shown anew starts with none and at the top. Over a dialog, back leads to the dialog it was opened from, or
   closes it; over a photo or table full screen, it closes that. They
   take the place of the phone's swipes.
 - **The path beside the arrows leads up the levels**, such as "Areas ›

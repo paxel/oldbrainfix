@@ -181,9 +181,20 @@ use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::text_menu::{self, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::undo::Undo;
+use crate::window_sizes;
+
+/// What a place was left with (#278), for back and forward to show it
+/// so again, as a browser shows a page again: its search, its person
+/// filter and how far its list was scrolled.
+#[derive(Debug, Clone, Default)]
+struct Left {
+    query: String,
+    people: PersonFilter,
+    scroll: f32,
+}
 
 /// What the middle pane shows.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Selection {
     /// The Occurrences of today and the six days after, the Missed
     /// Summary and the Unsorted count.
@@ -1674,8 +1685,22 @@ pub struct App {
     /// The table shown full screen over the window, while one is (#128).
     table: Option<TableView>,
     /// Where back and forward lead through the places the list showed
-    /// (#145).
-    nav: Navigation<Selection>,
+    /// (#145), each as it was left (#278).
+    nav: Navigation<Selection, Left>,
+    /// How far the list of the place shown is scrolled, as it was drawn
+    /// last, for back and forward to bring again (#278).
+    list_offset: f32,
+    /// How far the list of the place just reached is to be scrolled,
+    /// until it is drawn (#278).
+    scroll_restore: Option<f32>,
+    /// The sidebar's width as kept on this computer (#278), and as it
+    /// was drawn last.
+    sidebar_kept: f32,
+    sidebar_shown: f32,
+    /// The Note dialog's size as kept on this computer (#278), none for
+    /// the first start's, and as it was drawn last.
+    note_kept: Option<egui::Vec2>,
+    note_shown: Option<egui::Vec2>,
     /// The dialogs holding what were views of their own, the one shown
     /// last; back leads through the others (#145).
     pages: Vec<Page>,
@@ -2178,6 +2203,9 @@ impl App {
         let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
         // The system's when it cannot be read.
         let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
+        // As they were left on this computer (#278).
+        let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
+        let note_kept = window_sizes::note_dialog_size(&store);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -2191,6 +2219,12 @@ impl App {
             viewer: None,
             table: None,
             nav: Navigation::default(),
+            list_offset: 0.0,
+            scroll_restore: None,
+            sidebar_kept: sidebar,
+            sidebar_shown: sidebar,
+            note_kept,
+            note_shown: None,
             pages: Vec::new(),
             last_field: None,
             clip: None,
@@ -4517,6 +4551,16 @@ impl App {
         self.refresh();
     }
 
+    /// What the Notes shown are searched for.
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    /// How far the list shown is scrolled, as it was drawn last (#278).
+    pub fn list_scrolled(&self) -> f32 {
+        self.list_offset
+    }
+
     /// Whose Notes the middle shows (#53).
     pub fn people_filter(&self) -> &PersonFilter {
         &self.people
@@ -4718,7 +4762,7 @@ impl App {
             && view.area(id).is_none()
             && view.topic(id).is_none()
         {
-            self.arrive(Selection::All);
+            self.arrive(Selection::All, Left::default());
             read = self.read();
         }
         // A Routine gone meanwhile has no History to show: back where it
@@ -4726,8 +4770,12 @@ impl App {
         if let (Ok(view), Selection::History(_)) = (&read, &self.selection)
             && view.history.is_none()
         {
-            let back = self.nav.back(self.selection.clone());
-            self.arrive(back.unwrap_or(Selection::Agenda));
+            let left = self.left();
+            let (to, left) = self
+                .nav
+                .back(self.selection.clone(), left)
+                .unwrap_or((Selection::Agenda, Left::default()));
+            self.arrive(to, left);
             read = self.read();
         }
         // Back and forward lead to no place gone meanwhile.
@@ -4959,6 +5007,17 @@ impl App {
     /// The Conflicts an automatic sync brought, as announced at the top.
     pub fn arrived_conflicts(&self) -> usize {
         self.arrived
+    }
+
+    /// The sidebar's width as drawn last (#278).
+    pub fn sidebar_width(&self) -> f32 {
+        self.sidebar_shown
+    }
+
+    /// The Note dialog's size as drawn last, none before it opened
+    /// (#278).
+    pub fn note_dialog_size(&self) -> Option<egui::Vec2> {
+        self.note_shown
     }
 
     fn read(&self) -> oldbrainfix_core::Result<View> {
@@ -6135,14 +6194,16 @@ impl App {
             }
             Action::Back => {
                 self.save_text()?;
-                if let Some(to) = self.nav.back(self.selection.clone()) {
-                    self.arrive(to);
+                let left = self.left();
+                if let Some((to, left)) = self.nav.back(self.selection.clone(), left) {
+                    self.arrive(to, left);
                 }
             }
             Action::Forward => {
                 self.save_text()?;
-                if let Some(to) = self.nav.forward(self.selection.clone()) {
-                    self.arrive(to);
+                let left = self.left();
+                if let Some((to, left)) = self.nav.forward(self.selection.clone(), left) {
+                    self.arrive(to, left);
                 }
             }
             Action::Toggle(routine, occurrence) => {
@@ -8289,18 +8350,32 @@ impl App {
     /// Shows `to` in the list, back leading to the place it leaves
     /// (#145).
     fn go(&mut self, to: Selection) {
-        self.nav.went(self.selection.clone(), &to);
-        self.arrive(to);
+        let left = self.left();
+        self.nav.went(self.selection.clone(), left, &to);
+        self.arrive(to, Left::default());
     }
 
-    /// Shows `to` in the list; every level has a search and a person
-    /// filter of its own, as on the phone.
-    fn arrive(&mut self, to: Selection) {
+    /// What the place shown is left with (#278).
+    fn left(&self) -> Left {
+        Left {
+            query: self.query.clone(),
+            people: self.people.clone(),
+            scroll: self.list_offset,
+        }
+    }
+
+    /// Shows `to` in the list as it was `left` (#278), a place new to
+    /// the history with an empty `left`: every level has a search and a
+    /// person filter of its own, as on the phone, and its list scrolls
+    /// to where it was, a new one to the top.
+    fn arrive(&mut self, to: Selection, left: Left) {
         if to != self.selection {
-            self.query.clear();
-            self.people = PersonFilter::default();
+            self.query = left.query;
+            self.people = left.people;
             // The cards selected were those of the list left (#148).
             self.cards.clear();
+            self.list_offset = left.scroll;
+            self.scroll_restore = Some(left.scroll);
         }
         self.selection = to;
     }
@@ -8844,18 +8919,40 @@ impl App {
             self.welcome_view(ui, tones, actions);
             return;
         }
-        egui::Panel::left("places")
+        // As wide as it was left (#278), the list keeping room in a
+        // smaller window.
+        let room = (ui.available_width() - 360.0).max(window_sizes::MIN_SIDEBAR);
+        let sidebar = egui::Panel::left("places")
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .resizable(true)
-            .default_size(260.0)
-            .min_size(180.0)
+            .default_size(self.sidebar_kept.min(room))
+            .min_size(window_sizes::MIN_SIDEBAR)
             .show(ui, |ui| self.places_pane(ui, tones, &mut actions));
+        self.sidebar_shown = sidebar.response.rect.width();
+        // Kept once its border is let go, as egui names the border.
+        let border = ui
+            .ctx()
+            .read_response(Id::new("places").with("__resize"))
+            .is_some_and(|r| r.drag_stopped());
+        if border && (self.sidebar_shown - self.sidebar_kept).abs() >= 1.0 {
+            self.sidebar_kept = self.sidebar_shown;
+            if let Err(e) = window_sizes::keep_sidebar_width(&self.store, self.sidebar_shown) {
+                eprintln!("sidebar width: {e}");
+            }
+        }
+        // The place just reached scrolls to where it was left (#278).
+        if let Some(offset) = self.scroll_restore.take() {
+            ui.data_mut(|d| d.insert_temp(Id::new(LIST_RESTORE), (offset, RESTORE_FRAMES)));
+        }
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| {
                 self.nav_row(ui, &mut actions);
                 self.notes_pane(ui, tones, &mut actions);
             });
+        if let Some(offset) = ui.data_mut(|d| d.remove_temp::<f32>(Id::new(LIST_OFFSET))) {
+            self.list_offset = offset;
+        }
         // The dialogs of what were views, under the dialogs they open.
         self.page_dialog(ui.ctx(), tones, &mut actions);
         // The Note open (#146), and the quick note, under the pages and
@@ -9996,14 +10093,15 @@ impl App {
         {
             actions.push(Action::CloseNote);
         }
-        let size = egui::vec2(
-            (under.width() - 120.0).clamp(320.0, 760.0),
-            (under.height() - 60.0).max(240.0),
-        );
+        // As large as it was left on this computer (#278), in the room
+        // the window has.
+        let size = window_sizes::note_dialog(self.note_kept, under.size());
+        self.note_shown = Some(size);
         let frame = Frame::NONE
             .fill(tones.background)
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
+        let mut resized = None;
         egui::Area::new(Id::new("note dialog"))
             .order(egui::Order::Foreground)
             .fixed_pos(under.min)
@@ -10051,7 +10149,16 @@ impl App {
                         });
                     },
                 );
+                // Its edges and corners resize it, over what lies at them.
+                resized = note_dialog_edges(ui, shown, size);
             });
+        if let Some((wanted, done)) = resized {
+            let wanted = window_sizes::note_dialog(Some(wanted), under.size());
+            self.note_kept = Some(wanted);
+            if done && let Err(e) = window_sizes::keep_note_dialog_size(&self.store, wanted) {
+                eprintln!("Note dialog size: {e}");
+            }
+        }
         self.badge_dialog(ctx, tones, actions);
     }
 
@@ -10818,7 +10925,9 @@ impl App {
             }
             return;
         }
-        let output = list_scroll(ui, "notes", |ui| {
+        // Each place's list scrolls on its own (#278).
+        let place = self.selection.clone();
+        let output = list_scroll(ui, ("notes", place), |ui| {
             // Room for the emboss around every card.
             ui.spacing_mut().item_spacing.y = 16.0;
             ui.add_space(4.0);
@@ -16972,21 +17081,151 @@ struct CardClicks {
 /// window's edge, the list's "+" being at its top.
 pub(crate) const LIST_END: f32 = 24.0;
 
+/// How far into and beyond the Note dialog's edge its border grabs.
+const EDGE_IN: f32 = 4.0;
+const EDGE_OUT: f32 = 6.0;
+
+/// The Note dialog's edges and corners, `shown` around its content of
+/// `size` (#278): dragged, they resize it, both sides alike as it stays
+/// centred, the pointer staying on the edge. The size wanted while one
+/// is dragged, and whether it was let go.
+fn note_dialog_edges(
+    ui: &mut Ui,
+    shown: egui::Rect,
+    size: egui::Vec2,
+) -> Option<(egui::Vec2, bool)> {
+    use egui::CursorIcon;
+    let (inner, outer) = (shown.shrink(EDGE_IN), shown.expand(EDGE_OUT));
+    let corner = 2.0 * (EDGE_IN + EDGE_OUT);
+    let x = |left: bool| {
+        if left {
+            outer.left()..=inner.left()
+        } else {
+            inner.right()..=outer.right()
+        }
+    };
+    let y = |top: bool| {
+        if top {
+            outer.top()..=inner.top()
+        } else {
+            inner.bottom()..=outer.bottom()
+        }
+    };
+    // Each edge with the way it grows the dialog: -1 left or up, 1 right
+    // or down, 0 not.
+    let edges: [(&str, egui::Rect, egui::Vec2, CursorIcon); 8] = [
+        (
+            "left",
+            egui::Rect::from_x_y_ranges(x(true), inner.top() + corner..=inner.bottom() - corner),
+            egui::vec2(-1.0, 0.0),
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            "right",
+            egui::Rect::from_x_y_ranges(x(false), inner.top() + corner..=inner.bottom() - corner),
+            egui::vec2(1.0, 0.0),
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            "top",
+            egui::Rect::from_x_y_ranges(inner.left() + corner..=inner.right() - corner, y(true)),
+            egui::vec2(0.0, -1.0),
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            "bottom",
+            egui::Rect::from_x_y_ranges(inner.left() + corner..=inner.right() - corner, y(false)),
+            egui::vec2(0.0, 1.0),
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            "top left",
+            egui::Rect::from_min_max(outer.min, outer.min + egui::Vec2::splat(corner)),
+            egui::vec2(-1.0, -1.0),
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            "bottom right",
+            egui::Rect::from_min_max(outer.max - egui::Vec2::splat(corner), outer.max),
+            egui::vec2(1.0, 1.0),
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            "top right",
+            egui::Rect::from_min_max(
+                egui::pos2(outer.right() - corner, outer.top()),
+                egui::pos2(outer.right(), outer.top() + corner),
+            ),
+            egui::vec2(1.0, -1.0),
+            CursorIcon::ResizeNeSw,
+        ),
+        (
+            "bottom left",
+            egui::Rect::from_min_max(
+                egui::pos2(outer.left(), outer.bottom() - corner),
+                egui::pos2(outer.left() + corner, outer.bottom()),
+            ),
+            egui::vec2(-1.0, 1.0),
+            CursorIcon::ResizeNeSw,
+        ),
+    ];
+    let mut resized = None;
+    for (name, rect, grows, cursor) in edges {
+        // Not a stop for Tab: the keyboard has nothing to do there.
+        let edge = ui.interact(rect, Id::new("note dialog edge").with(name), Sense::DRAG);
+        if edge.hovered() || edge.dragged() {
+            ui.ctx().set_cursor_icon(cursor);
+        }
+        if edge.dragged() || edge.drag_stopped() {
+            // Centred, it grows on both sides by what the edge moved.
+            let wanted = size + edge.drag_delta() * grows * 2.0;
+            resized = Some((wanted, edge.drag_stopped()));
+        }
+    }
+    resized
+}
+
+/// Where the window's [`App`] hands the list of the place it reached
+/// how far to scroll (#278), with the frames left to try, and where the
+/// list drawn tells it how far it is scrolled.
+const LIST_RESTORE: &str = "list scroll restore";
+const LIST_OFFSET: &str = "list scroll offset";
+
+/// The frames a list keeps scrolling to where it was while it is
+/// shorter than that, its cards still finding their height (#278).
+const RESTORE_FRAMES: u8 = 10;
+
 /// A list's vertical scrolling, as every list of the window has it: the
-/// one place its end gets [`LIST_END`] of room (#158).
+/// one place its end gets [`LIST_END`] of room (#158), and where a place
+/// reached by back or forward scrolls to where it was left (#278).
 pub(crate) fn list_scroll<R>(
     ui: &mut Ui,
-    id: &str,
+    id: impl egui::AsIdSalt,
     content: impl FnOnce(&mut Ui) -> R,
 ) -> egui::scroll_area::ScrollAreaOutput<R> {
-    egui::ScrollArea::vertical()
+    let restore_id = Id::new(LIST_RESTORE);
+    let restore: Option<(f32, u8)> = ui.data_mut(|d| d.remove_temp(restore_id));
+    let mut area = egui::ScrollArea::vertical()
         .id_salt(id)
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            let shown = content(ui);
-            ui.add_space(LIST_END);
-            shown
-        })
+        .auto_shrink([false, false]);
+    if let Some((offset, _)) = restore {
+        area = area.vertical_scroll_offset(offset);
+    }
+    let output = area.show(ui, |ui| {
+        let shown = content(ui);
+        ui.add_space(LIST_END);
+        shown
+    });
+    let at = output.state.offset.y;
+    // Not as far as it was: tried again while its cards grow.
+    if let Some((offset, frames)) = restore
+        && at + 0.5 < offset
+        && frames > 0
+    {
+        ui.data_mut(|d| d.insert_temp(restore_id, (offset, frames - 1)));
+    }
+    ui.data_mut(|d| d.insert_temp(Id::new(LIST_OFFSET), at));
+    output
 }
 
 /// "+" at the top of a list (#146, #161): with one kind it makes that at

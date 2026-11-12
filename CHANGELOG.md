@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, every Note list (Unsorted, an Area, a Topic, All Notes, the search's hits and the Trash) has Select in its bar, which puts a box on each card, and the Notes ticked are filed with File into…, merged into one Note with Merge into…, given an Importance or moved to the Trash at once, with one undo at the top for all of them, or restored together in the Trash. On the desktop the cards selected with Ctrl-click or Shift-click offer the same in a card's right-click menu and in the Note menu, and Ctrl+Z takes back the trash or the Merge of all of them at once.
 - On the desktop, the card lists work with keys: Up and Down move the selection, Shift+Up and Shift+Down extend it, Ctrl+A selects all cards, Enter opens the Note, Delete moves the cards selected to the Trash for Ctrl+Z to bring back, 1, 2 and 3 make them Important, Normal or Unimportant, Ctrl+Shift+M merges them, and Down in the search field goes to the first card found; Unsorted and the Trash have a search field too, which Ctrl+F there reaches instead of going to All Notes, and the Trash's also finds its Routines, Reminders and Frogs by their Note.
 - On the desktop, Ctrl+Enter runs the main action of every dialog, such as Save, Create or Send, also in the Routine editor, a Tally entry and the New Tally and Session pages, the first field of a dialog such as a name, the Routine editor or a Tally entry has the cursor as it opens, Ctrl+1, Ctrl+2 and Ctrl+3 in the quick note and the capture popup save with a Nudge in 10 min, 30 min or 1 h, and Shift+Enter in the popup starts a new line while Enter still saves.
+- On the desktop, the window opens as large and where it was closed, maximized if it was, with the sidebar as wide and the Note dialog as large as they were left, each kept on this computer only; a window whose monitor is gone opens centred, and the Note dialog is resized by dragging its edges and corners.
 
 ### Changed
 
@@ -27,6 +28,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a tap or click on a Shopping List's or Checklist's heading on the Agenda opens the list with the cursor in a new empty Line after the open ones, on the phone with the keyboard up; left unused, that Line is dropped.
 - On the phone and the desktop, Add to a Shopping List on the capture screen or in the quick note's More menu names the list and picks it at once while there is only one, such as "Add to Weekly", and otherwise lists the list used last at the top.
 - On the phone and the desktop, a new Tally entry starts each field without a target with its value in your latest entry, selected so that typing replaces it.
+- On the desktop, back and forward show each place with the search, person filter and scroll position it was left with, instead of clearing them; a place shown anew starts with none and at the top.
 
 ### Fixed
 

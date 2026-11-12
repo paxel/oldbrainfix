@@ -65,6 +65,7 @@ use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::system_theme::SystemTheme;
 use oldbrainfix_gui::theme;
 use oldbrainfix_gui::tray::{self, Command, OnClose, Tray};
+use oldbrainfix_gui::window_sizes::{self, WindowPlace};
 use oldbrainfix_gui::{App, instance, local_wall};
 
 /// The window's context while it is open, to wake it from other threads.
@@ -118,6 +119,25 @@ struct Native {
     new_popup: NewPopup,
     popup: Option<CapturePopup>,
     system_theme: SystemTheme,
+    /// Where the window is kept (#278), and where and how large it was
+    /// while it showed last, as it was kept until then.
+    store: Arc<Store>,
+    place: WindowPlace,
+}
+
+impl Native {
+    /// Notes where and how large the window is while it shows (#278).
+    fn note_place(&mut self, ctx: &egui::Context) {
+        let zoom = ctx.zoom_factor();
+        self.place = ctx.input(|i| window_sizes::noticed(self.place, i.viewport(), zoom));
+    }
+
+    /// Keeps where and how large the window was, for the next start.
+    fn keep_place(&self) {
+        if let Err(e) = window_sizes::keep_window(&self.store, &self.place) {
+            eprintln!("window size: {e}");
+        }
+    }
 }
 
 impl eframe::App for Native {
@@ -151,6 +171,7 @@ impl eframe::App for Native {
             self.app.set_shown(false);
         }
         if ctx.input(|i| i.viewport().close_requested()) {
+            self.keep_place();
             let quitting = self.quit.load(Ordering::SeqCst);
             match tray::on_close(tray, tray::IN_EVENT_LOOP, quitting) {
                 OnClose::Hide => {
@@ -184,6 +205,8 @@ impl eframe::App for Native {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.app.show(ui);
+        // Drawn only while it shows, not while in the tray.
+        self.note_place(ui.ctx());
         let ctx = ui.ctx();
         // File ▸ Quick note: the popup, as the hotkey opens it.
         if self.app.take_quick_note() {
@@ -206,6 +229,7 @@ impl eframe::App for Native {
             popup.leave();
         }
         self.app.flush();
+        self.keep_place();
     }
 }
 
@@ -313,9 +337,13 @@ struct Shell {
 
 impl Shell {
     /// Runs `app` in a native window with `viewport` until it closes.
+    /// Runs `app` in a window opened as `viewport` says; one `placed`
+    /// where it was left (#278) is centred instead where it no longer
+    /// lies on a monitor enough to grab it.
     fn run(
         &self,
         viewport: egui::ViewportBuilder,
+        placed: Option<egui::Rect>,
         app: Box<dyn eframe::App + '_>,
     ) -> Result<(), String> {
         let options = eframe::NativeOptions {
@@ -329,6 +357,43 @@ impl Shell {
             Box::new(move |cc| {
                 if let Ok(mut held) = window.lock() {
                     *held = Some(cc.egui_ctx.clone());
+                }
+                // Made, still hidden, it knows the monitors: where it
+                // was left lies on none of them enough to grab it, as
+                // when the monitor it was on is gone, it is centred on
+                // the main one (#278). Where the system tells no
+                // monitors it stays.
+                if let (Some(placed), Some(window)) = (placed, cc.winit_window()) {
+                    let monitors: Vec<egui::Rect> = window
+                        .available_monitors()
+                        .map(|m| {
+                            let scale = m.scale_factor() as f32;
+                            let (at, size) = (m.position(), m.size());
+                            egui::Rect::from_min_size(
+                                egui::pos2(at.x as f32, at.y as f32) / scale,
+                                egui::vec2(size.width as f32, size.height as f32) / scale,
+                            )
+                        })
+                        .collect();
+                    let main = window
+                        .primary_monitor()
+                        .or_else(|| window.available_monitors().next());
+                    if let Some(main) = main
+                        && !window_sizes::on_a_monitor(placed, &monitors)
+                    {
+                        // In the monitor's pixels, as the window moves.
+                        let (at, size, outer) = (main.position(), main.size(), window.outer_size());
+                        let screen = egui::Rect::from_min_size(
+                            egui::pos2(at.x as f32, at.y as f32),
+                            egui::vec2(size.width as f32, size.height as f32),
+                        );
+                        let outer = egui::vec2(outer.width as f32, outer.height as f32);
+                        let centred = window_sizes::centred(outer, screen);
+                        let mut to = at;
+                        to.x = centred.x.round() as i32;
+                        to.y = centred.y.round() as i32;
+                        window.set_outer_position(to);
+                    }
                 }
                 // On the main thread with its event loop running, where
                 // Windows and macOS put a tray up.
@@ -382,12 +447,22 @@ impl Shell {
             Some(self.speech.clone()),
         );
         let quit = Arc::new(AtomicBool::new(false));
-        let viewport = egui::ViewportBuilder::default()
+        // Where and as large as it was left on this computer (#278),
+        // read again at every opening.
+        let kept = window_sizes::window(&self.store);
+        let mut viewport = egui::ViewportBuilder::default()
             .with_title(app.t().app_title())
             // The app id a launcher entry's StartupWMClass names.
             .with_app_id(APP_ID)
-            .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([800.0, 480.0]);
+            .with_inner_size(kept.size)
+            .with_min_inner_size(window_sizes::MIN_WINDOW)
+            .with_maximized(kept.maximized);
+        if let Some(at) = kept.position {
+            viewport = viewport.with_position(at);
+        }
+        let placed = kept
+            .position
+            .map(|at| egui::Rect::from_min_size(at, kept.size));
         let native = Native {
             app,
             commands: self.commands.clone(),
@@ -397,8 +472,10 @@ impl Shell {
             new_popup: self.new_popup.clone(),
             popup: None,
             system_theme: self.system_theme.clone(),
+            store: self.store.clone(),
+            place: kept,
         };
-        self.run(viewport, Box::new(native))?;
+        self.run(viewport, placed, Box::new(native))?;
         // Where the tray lives in the window's event loop, its end is the
         // app's: nothing hears the tray or the hotkey after it.
         Ok(quit.load(Ordering::SeqCst) || self.tray.borrow().is_none() || tray::IN_EVENT_LOOP)
@@ -428,7 +505,7 @@ impl Shell {
             zoom: Some(zoom),
             system_theme: self.system_theme.clone(),
         };
-        self.run(viewport, Box::new(window))?;
+        self.run(viewport, None, Box::new(window))?;
         Ok(next.get())
     }
 }
