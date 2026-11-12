@@ -254,7 +254,8 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
     if (_loaded) return;
     _loaded = true;
     // In the person's own order, as on the Areas list (#280).
-    _areas = widget.places.store.areasInOrder();
+    final t = context.t;
+    _areas = widget.places.store.areasInOrder(shown: (a) => areaName(t, a));
     _read();
   }
 

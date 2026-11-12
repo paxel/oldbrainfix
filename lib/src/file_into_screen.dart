@@ -62,7 +62,7 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
     final store = places.store;
     _tree = [
       // The Areas in the person's own order (#280), their Topics by name.
-      for (final area in store.areasInOrder())
+      for (final area in store.areasInOrder(shown: (a) => areaName(t, a)))
         if (store.mayWriteIn(area.id))
           if (lock?.isAreaClosed(area.id) ?? false)
             (area: area, topics: <Topic>[], addsTopic: false)

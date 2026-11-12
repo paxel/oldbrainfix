@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use serde_json::{Value, json};
 
 use crate::places::{Area, Places};
-use crate::store::Store;
+use crate::search::lower_case;
+use crate::store::{Store, utf16_cmp};
 use crate::{Error, Result};
 
 /// Where the person's own settings lie in the log.
@@ -95,12 +96,107 @@ impl<'a> PersonSettings<'a> {
             .own_current(keys::ENTITY, keys::FEATURES, &mut HashMap::new())
     }
 
+    /// Every Area in the person's own order (#280), as
+    /// [`Self::areas_in_order_by`] lists them by stored name.
+    pub fn areas_in_order(&self) -> Result<Vec<Area>> {
+        self.areas_in_order_by(stored_name)
+    }
+
     /// Every Area in the person's own order (#280), as the Areas list and
     /// the sidebar show them: those in the stored order first, as it has
     /// them, then the Areas missing from it (a new one, a Shared Area
-    /// joined later) by name, as [`Places::areas`] lists them. With no
-    /// order stored, all of them by name.
-    pub fn areas_in_order(&self) -> Result<Vec<Area>> {
+    /// joined later) by the name `shown` gives each, the one the app
+    /// shows, in lower case; equal names go by id. With no order stored,
+    /// all of them by that name. As the Dart core's `areasInOrder`.
+    pub fn areas_in_order_by(&self, shown: impl Fn(&Area) -> String) -> Result<Vec<Area>> {
+        self.ordered(&shown)
+    }
+
+    /// Puts the Area `area_id` at `index` of [`Self::areas_in_order`], as
+    /// [`Self::move_area_by`] by stored name.
+    pub fn move_area(&self, area_id: &str, index: usize) -> Result<()> {
+        self.move_area_by(area_id, index, stored_name)
+    }
+
+    /// Puts the Area `area_id` at `index` of [`Self::areas_in_order_by`]
+    /// by `shown`, counted after it was taken out, for all of the user's
+    /// own Devices. An index past the end puts it last. The whole order
+    /// is stored, so a new Area goes to the end. Refused when `area_id` is
+    /// no Area.
+    pub fn move_area_by(
+        &self,
+        area_id: &str,
+        index: usize,
+        shown: impl Fn(&Area) -> String,
+    ) -> Result<()> {
+        let mut ids = self.shown_area_ids(&shown)?;
+        let Some(at) = ids.iter().position(|id| id == area_id) else {
+            return Err(Error::Invalid(format!("not an Area: {area_id}")));
+        };
+        let id = ids.remove(at);
+        ids.insert(index.min(ids.len()), id);
+        self.store_area_order(&ids, &shown)
+    }
+
+    /// Puts the Areas in the order of `area_ids`, as
+    /// [`Self::set_area_order_by`] by stored name.
+    pub fn set_area_order<S: AsRef<str>>(&self, area_ids: &[S]) -> Result<()> {
+        self.set_area_order_by(area_ids, stored_name)
+    }
+
+    /// Puts the Areas in the order of `area_ids` for all of the user's
+    /// own Devices; the Areas it leaves out follow in the order
+    /// [`Self::areas_in_order_by`] by `shown` had them. Ids that are no
+    /// Area are skipped.
+    pub fn set_area_order_by<S: AsRef<str>>(
+        &self,
+        area_ids: &[S],
+        shown: impl Fn(&Area) -> String,
+    ) -> Result<()> {
+        let had = self.shown_area_ids(&shown)?;
+        let mut ids: Vec<String> = Vec::new();
+        for id in area_ids.iter().map(AsRef::as_ref) {
+            if had.iter().any(|s| s == id) && !ids.iter().any(|i| i == id) {
+                ids.push(id.to_string());
+            }
+        }
+        for id in had {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        self.store_area_order(&ids, &shown)
+    }
+
+    /// Puts the Area `to` where `from` stands in the stored order, as a
+    /// starter Area shared under a new id (#280). Nothing when `from` is
+    /// not in it: `to` is then missing from it too, in the same place by
+    /// name. As the Dart core's `putAreaInPlaceOf`.
+    pub fn put_area_in_place_of(&self, from: &str, to: &str) -> Result<()> {
+        let held = self.held_area_order()?;
+        if !held.iter().any(|id| id == from) {
+            return Ok(());
+        }
+        let areas: Vec<String> = Places::new(self.store)
+            .areas()?
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+        let mut ids: Vec<String> = Vec::new();
+        for id in held {
+            let id = if id == from { to.to_string() } else { id };
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        ids.retain(|id| areas.contains(id));
+        let value = json!(ids).to_string();
+        self.store
+            .append(keys::ENTITY, keys::AREA_ORDER, Some(&value), None)
+            .map(drop)
+    }
+
+    fn ordered(&self, shown: &dyn Fn(&Area) -> String) -> Result<Vec<Area>> {
         let mut by_name: Vec<Option<Area>> = Places::new(self.store)
             .areas()?
             .into_iter()
@@ -113,50 +209,18 @@ impl<'a> PersonSettings<'a> {
                 .find(|a| a.as_ref().is_some_and(|a| a.id == id));
             ordered.extend(slot.and_then(Option::take));
         }
-        ordered.extend(by_name.into_iter().flatten());
+        ordered.extend(by_shown_name(by_name.into_iter().flatten(), shown));
         Ok(ordered)
     }
 
-    /// Puts the Area `area_id` at `index` of [`Self::areas_in_order`],
-    /// counted after it was taken out, for all of the user's own Devices.
-    /// An index past the end puts it last. The whole order is stored, so
-    /// a new Area goes to the end. Refused when `area_id` is no Area.
-    pub fn move_area(&self, area_id: &str, index: usize) -> Result<()> {
-        let mut ids = self.shown_area_ids()?;
-        let Some(at) = ids.iter().position(|id| id == area_id) else {
-            return Err(Error::Invalid(format!("not an Area: {area_id}")));
-        };
-        let id = ids.remove(at);
-        ids.insert(index.min(ids.len()), id);
-        self.store_area_order(&ids)
+    fn shown_area_ids(&self, shown: &dyn Fn(&Area) -> String) -> Result<Vec<String>> {
+        Ok(self.ordered(shown)?.into_iter().map(|a| a.id).collect())
     }
 
-    /// Puts the Areas in the order of `area_ids` for all of the user's
-    /// own Devices; the Areas it leaves out follow in the order they had.
-    /// Ids that are no Area are skipped.
-    pub fn set_area_order<S: AsRef<str>>(&self, area_ids: &[S]) -> Result<()> {
-        let shown = self.shown_area_ids()?;
-        let mut ids: Vec<String> = Vec::new();
-        for id in area_ids.iter().map(AsRef::as_ref) {
-            if shown.iter().any(|s| s == id) && !ids.iter().any(|i| i == id) {
-                ids.push(id.to_string());
-            }
-        }
-        for id in shown {
-            if !ids.contains(&id) {
-                ids.push(id);
-            }
-        }
-        self.store_area_order(&ids)
-    }
-
-    fn shown_area_ids(&self) -> Result<Vec<String>> {
-        Ok(self.areas_in_order()?.into_iter().map(|a| a.id).collect())
-    }
-
-    /// Stores `ids` as the order; the order already shown writes nothing.
-    fn store_area_order(&self, ids: &[String]) -> Result<()> {
-        if self.shown_area_ids()? == ids {
+    /// Stores `ids` as the order; the order already shown by `shown`
+    /// writes nothing.
+    fn store_area_order(&self, ids: &[String], shown: &dyn Fn(&Area) -> String) -> Result<()> {
+        if self.shown_area_ids(shown)? == ids {
             return Ok(());
         }
         let value = json!(ids).to_string();
@@ -183,6 +247,30 @@ impl<'a> PersonSettings<'a> {
             })
             .collect())
     }
+}
+
+/// The stored name of `area`, for the calls that take no name shown.
+fn stored_name(area: &Area) -> String {
+    area.name.clone()
+}
+
+/// `areas` by the name `shown` gives each, in lower case as Dart's
+/// `toLowerCase` has it and compared by UTF-16 code units, as the apps
+/// listed the Areas before #280; equal names go by id, so the order is
+/// the same every time and in both cores.
+fn by_shown_name(
+    areas: impl IntoIterator<Item = Area>,
+    shown: &dyn Fn(&Area) -> String,
+) -> Vec<Area> {
+    let mut keyed: Vec<(Area, String)> = areas
+        .into_iter()
+        .map(|area| {
+            let key = lower_case(&shown(&area));
+            (area, key)
+        })
+        .collect();
+    keyed.sort_by(|a, b| utf16_cmp(&a.1, &b.1).then_with(|| utf16_cmp(&a.0.id, &b.0.id)));
+    keyed.into_iter().map(|(area, _)| area).collect()
 }
 
 #[cfg(test)]
@@ -599,6 +687,125 @@ mod tests {
         ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
         assert!(ann.all_entries()?.iter().any(|e| e.id() == forged.id()));
         assert_eq!(ids(&ann)?, [attic, area]);
+        Ok(())
+    }
+
+    /// The starter Areas as a German phone shows them.
+    fn de(area: &Area) -> String {
+        match area.starter.as_deref() {
+            Some("household") => "Haushalt",
+            Some("work") => "Arbeit",
+            Some("car") => "Auto",
+            Some("health") => "Gesundheit",
+            _ => area.name.as_str(),
+        }
+        .to_string()
+    }
+
+    fn shown(store: &Store) -> Made<Vec<String>> {
+        let areas = PersonSettings::new(store).areas_in_order_by(de)?;
+        Ok(areas.iter().map(de).collect())
+    }
+
+    fn starter(slug: &str) -> String {
+        crate::places::starter_id(crate::places::keys::TYPE_AREA, slug)
+    }
+
+    /// Ann with the whole Starter Set.
+    fn starter_set() -> Made<Store> {
+        let ann = device(1, "Ann")?;
+        Places::new(&ann).plant_starter_set(&["household", "work", "car", "health"])?;
+        Ok(ann)
+    }
+
+    #[test]
+    fn until_moved_the_areas_go_by_the_name_shown_in_lower_case() -> TestResult {
+        let ann = starter_set()?;
+        assert_eq!(shown(&ann)?, ["Arbeit", "Auto", "Gesundheit", "Haushalt"]);
+        assert_eq!(names(&ann)?, ["Car", "Health", "Household", "Work"]);
+        let places = Places::new(&ann);
+        places.add_area("bike")?;
+        places.add_area("Zoo")?;
+        assert_eq!(
+            shown(&ann)?,
+            ["Arbeit", "Auto", "bike", "Gesundheit", "Haushalt", "Zoo"]
+        );
+        assert_eq!(
+            names(&ann)?,
+            ["bike", "Car", "Health", "Household", "Work", "Zoo"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_move_counts_its_place_in_the_order_shown() -> TestResult {
+        let ann = starter_set()?;
+        let settings = PersonSettings::new(&ann);
+        let written = ann.all_entries()?.len();
+        settings.move_area_by(&starter("work"), 0, de)?;
+        settings.set_area_order_by(&[starter("work"), starter("car")], de)?;
+        assert_eq!(ann.all_entries()?.len(), written);
+        settings.move_area_by(&starter("household"), 1, de)?;
+        assert_eq!(shown(&ann)?, ["Arbeit", "Haushalt", "Auto", "Gesundheit"]);
+        assert_eq!(
+            ann.current(keys::ENTITY, keys::AREA_ORDER)?,
+            Some(
+                json!([
+                    starter("work"),
+                    starter("household"),
+                    starter("car"),
+                    starter("health")
+                ])
+                .to_string()
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_areas_left_out_of_a_new_order_keep_the_order_shown() -> TestResult {
+        let ann = starter_set()?;
+        PersonSettings::new(&ann).set_area_order_by(&[starter("health")], de)?;
+        assert_eq!(shown(&ann)?, ["Gesundheit", "Arbeit", "Auto", "Haushalt"]);
+        Ok(())
+    }
+
+    #[test]
+    fn those_missing_from_the_order_go_by_the_name_shown() -> TestResult {
+        let ann = starter_set()?;
+        PersonSettings::new(&ann).move_area_by(&starter("health"), 0, de)?;
+        let places = Places::new(&ann);
+        for name in ["Zoo", "Bike", "apple"] {
+            places.add_area(name)?;
+        }
+        assert_eq!(shown(&ann)?[4..], ["apple", "Bike", "Zoo"]);
+        Ok(())
+    }
+
+    #[test]
+    fn sharing_a_starter_area_leaves_those_missing_from_the_order_by_name() -> TestResult {
+        let ann = starter_set()?;
+        PersonSettings::new(&ann).move_area_by(&starter("health"), 0, de)?;
+        let places = Places::new(&ann);
+        places.add_area("Banana")?;
+        places.add_area("apple")?;
+        let shared = ann.share(&starter("car"))?;
+        assert_ne!(shared, starter("car"));
+        let third = PersonSettings::new(&ann).areas_in_order_by(de)?;
+        assert_eq!(third.get(2).map(|a| a.id.as_str()), Some(shared.as_str()));
+        places.add_area("avocado")?;
+        assert_eq!(
+            shown(&ann)?,
+            [
+                "Gesundheit",
+                "Arbeit",
+                "Auto",
+                "Haushalt",
+                "apple",
+                "avocado",
+                "Banana"
+            ]
+        );
         Ok(())
     }
 

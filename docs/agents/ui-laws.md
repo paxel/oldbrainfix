@@ -674,11 +674,14 @@ replace a law of Both apps where they say so. A desktop law marked
   in the device format, values translated, storage keys never.
 - **The Areas stand in the person's own order** (#280): on the phone's
   Areas list, the desktop's sidebar and every list of Areas (File
-  into…, Area Locks, Link to…), the same on all of the person's
-  Devices, a setting of the person (ADR 0040), so the others of a
-  Shared Area keep their own. Until the first move they stand in the
-  core's order, by stored name, and a new Area sorts in among them;
-  after it a new Area goes to the end. Topics stay by name.
+  into…, Area Locks, Link to…, Notes for the feedback), the same on all
+  of the person's Devices, a setting of the person (ADR 0040), so the
+  others of a Shared Area keep their own. Until the first move they
+  stand by the name the app shows, in lower case, a starter Area by its
+  translated name, and a new Area sorts in among them; after it a new
+  Area goes to the end. Every list passes the core the name it shows,
+  so a move counts its place in the order on screen. Topics stay by
+  name.
 
 ### Wording
 

@@ -544,6 +544,57 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'area-order-shown',
+    about:
+        'The person\'s own order of the Areas by the name the app shows '
+        '(#280), German names for the starter Areas here: the whole Starter '
+        'Set and "bike", "Bike", "İnbox", "Zoo", "ΣΑΣ", "σας", "～" and "😀" '
+        'with no order, by the name shown in lower case, "Bike" after '
+        '"bike" by id; the first Area shown moved to the front and an order '
+        'naming it, which write nothing; a starter Area moved to the second '
+        'place as shown; "Banana" and "apple" missing from the order by '
+        'name in lower case; a starter Area shared under a new id, keeping '
+        'its place, and "avocado" after it still among those missing by '
+        'name. `area_order.json` holds the Areas in order after each length '
+        'of the log, by stored name and by the name shown.',
+    build: (store) {
+      const german = {
+        'household': 'Haushalt',
+        'work': 'Arbeit',
+        'car': 'Auto',
+        'health': 'Gesundheit',
+      };
+      String de(Area area) => german[area.starter] ?? area.name;
+      final places = Places(store);
+      void read() => _areaOrderShownReads.add({
+        'entries': store.allEntries().length,
+        'stored': [for (final area in store.areasInOrder()) area.id],
+        'shown': [for (final area in store.areasInOrder(shown: de)) area.id],
+      });
+      String starter(String slug) => Places.starterId(PlaceKeys.typeArea, slug);
+      places.plantStarterSet(german.keys.toSet());
+      for (final name in ['bike', 'Bike', 'İnbox', 'Zoo', 'ΣΑΣ', 'σας']) {
+        places.addArea(name);
+      }
+      places.addArea('～');
+      places.addArea('😀');
+      Notes(store).capture('Oil change', place: starter('car'));
+      read();
+      store.moveArea(starter('work'), 0, shown: de);
+      store.setAreaOrder([starter('work')], shown: de);
+      read();
+      store.moveArea(starter('household'), 1, shown: de);
+      read();
+      places.addArea('Banana');
+      places.addArea('apple');
+      read();
+      store.share(starter('car'));
+      read();
+      places.addArea('avocado');
+      read();
+    },
+  ),
+  (
     name: 'help',
     about:
         'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
@@ -4359,6 +4410,9 @@ final _featureReads = <Map<String, Object>>[];
 
 /// What the `area-order` scenario read after each of its steps.
 final _areaOrderReads = <Map<String, Object>>[];
+
+/// What the `area-order-shown` scenario read after each of its steps.
+final _areaOrderShownReads = <Map<String, Object>>[];
 
 /// The ids each step of the `help` scenario made.
 final _helpMade = <List<String>>[];
@@ -9645,6 +9699,10 @@ Future<void> main(List<String> args) async {
     '- `area-order/area_order.json`: the ids of the Areas in the person\'s '
     'own order after the first entries of the `area-order` log, as many as '
     'each read gives.\n'
+    '- `area-order-shown/area_order.json`: the ids of the Areas in the '
+    'person\'s own order after the first entries of the `area-order-shown` '
+    'log, as many as each read gives, by stored name (`stored`) and by the '
+    'name the app shows (`shown`).\n'
     '- `help/help.json`: the ids of the help Notes each step of the `help` '
     'scenario made, in the order it made them.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
@@ -10125,6 +10183,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/area_order.json'),
           '${_json.convert({'reads': _areaOrderReads})}\n',
+        );
+      }
+      if (scenario.name == 'area-order-shown') {
+        _write(
+          File('${out.path}/area_order.json'),
+          '${_json.convert({'reads': _areaOrderShownReads})}\n',
         );
       }
       if (scenario.name == 'help') {

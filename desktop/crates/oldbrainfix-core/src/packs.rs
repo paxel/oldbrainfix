@@ -38,7 +38,8 @@ use crate::entry::{Entry, dart_iso};
 use crate::frogs::{Frogs, keys as frog_keys};
 use crate::note_kinds::NoteKind;
 use crate::notes::{Note, Notes, keys as note_keys};
-use crate::places::{Places, keys as place_keys};
+use crate::person_settings::PersonSettings;
+use crate::places::{Area, Places, keys as place_keys};
 use crate::profile::Profile;
 use crate::routines::{Routines, keys as routine_keys};
 use crate::schedule::{Day, Schedule, WallClock};
@@ -1418,16 +1419,29 @@ impl Store {
         self.pack_of_notes(&picked, closed)
     }
 
-    /// The Pack of everything the tree may offer for feedback (#214), as
-    /// the Dart core's `packOfAll`: each Area by name, but those of
-    /// `closed`, with its own Notes and then its Topics' Notes as
-    /// [`Store::pack_of`] lists them, then the Notes filed into no Area,
-    /// newest capture first; nothing in the trash or merged.
+    /// The Pack of everything the tree may offer for feedback, as
+    /// [`Store::pack_of_all_by`] with the Areas missing from the person's
+    /// own order by stored name.
     pub fn pack_of_all(&self, closed: &HashSet<String>) -> Result<Pack> {
+        self.pack_of_all_by(closed, |a| a.name.clone())
+    }
+
+    /// The Pack of everything the tree may offer for feedback (#214), as
+    /// the Dart core's `packOfAll`: each Area in the person's own order,
+    /// as [`PersonSettings::areas_in_order_by`] by `shown` lists them
+    /// (#280), but those of `closed`, with its own Notes and then its
+    /// Topics' Notes as [`Store::pack_of`] lists them, then the Notes
+    /// filed into no Area, newest capture first; nothing in the trash or
+    /// merged.
+    pub fn pack_of_all_by(
+        &self,
+        closed: &HashSet<String>,
+        shown: impl Fn(&Area) -> String,
+    ) -> Result<Pack> {
         let places = Places::new(self);
         let all = Notes::new(self).all()?;
         let mut ids = Vec::new();
-        for area in places.areas()? {
+        for area in PersonSettings::new(self).areas_in_order_by(shown)? {
             if closed.contains(&area.id) {
                 continue;
             }
@@ -2407,6 +2421,30 @@ mod tests {
         let all: Vec<_> = of_note.notes.iter().map(|n| n.text.as_str()).collect();
         assert_eq!(all, ["Training", "Laps", "Digging"]);
         assert!(of_note.notes[1..].iter().all(|n| n.outside));
+        Ok(())
+    }
+
+    #[test]
+    fn the_pack_of_everything_follows_the_persons_order_and_the_name_shown() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let h = health(&ann)?;
+        PersonSettings::new(&ann).move_area(&h.area, 0)?;
+        let places = Places::new(&ann);
+        let notes = Notes::new(&ann);
+        notes.capture("Boxes", Some(&places.add_area("attic")?.id), None)?;
+        notes.capture("Tyres", Some(&places.add_area("Bike")?.id), None)?;
+        let names =
+            |pack: &Pack| -> Vec<String> { pack.areas.iter().map(|a| a.name.clone()).collect() };
+        let pack = ann.pack_of_all(&HashSet::new())?;
+        assert_eq!(names(&pack), ["Health", "Garden", "attic", "Bike"]);
+        let shown = ann.pack_of_all_by(&HashSet::new(), |a| {
+            if a.name == "attic" {
+                "Loft".to_string()
+            } else {
+                a.name.clone()
+            }
+        })?;
+        assert_eq!(names(&shown), ["Health", "Garden", "Bike", "attic"]);
         Ok(())
     }
 

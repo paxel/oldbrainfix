@@ -178,6 +178,30 @@ void main() {
       expect(session.session!.pool, [indexOf(closed, 'Laps')]);
     });
 
+    test("of everything in the person's own order of the Areas (#280), "
+        'those missing from it by the name the app shows', () {
+      final h = health();
+      ann.moveArea(h.area, 0);
+      final places = Places(ann);
+      Notes(ann).capture('Boxes', place: places.addArea('attic').id);
+      Notes(ann).capture('Tyres', place: places.addArea('Bike').id);
+      expect(ann.packOfAll().areas.map((a) => a.name), [
+        'Health',
+        'Garden',
+        'attic',
+        'Bike',
+      ]);
+      final shown = ann.packOfAll(
+        shown: (a) => a.name == 'attic' ? 'Loft' : a.name,
+      );
+      expect(shown.areas.map((a) => a.name), [
+        'Health',
+        'Garden',
+        'Bike',
+        'attic',
+      ]);
+    });
+
     test('everything is ticked but Reminders and files; the size follows '
         'the ticks', () {
       final h = health();

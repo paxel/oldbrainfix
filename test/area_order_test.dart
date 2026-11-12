@@ -110,6 +110,74 @@ void main() {
     expect(shown(tester, AreasScreen, names), ['Household', 'Car', 'Work']);
   });
 
+  testWidgets('in German the Areas go by the names shown until one is '
+      'moved, and a drag moves the row dragged', (tester) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('de')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    store.close();
+    store = Store.inMemory()..starterSetOffered = true;
+    places = Places(store)..plantStarterSet({'household', 'work', 'car'});
+    String id(String slug) => Places.starterId(PlaceKeys.typeArea, slug);
+    tall(tester);
+    await tester.pumpWidget(OldBrainFixApp(store: store));
+    await tester.tap(find.byTooltip('Suchen und stöbern'));
+    await tester.pumpAndSettle();
+    const german = ['Haushalt', 'Arbeit', 'Auto'];
+    expect(shown(tester, AreasScreen, german), ['Arbeit', 'Auto', 'Haushalt']);
+
+    final from = tester.getCenter(key('area-row-${id('car')}'));
+    final past = tester.getCenter(key('area-row-${id('household')}'));
+    final drag = await tester.startGesture(
+      tester.getCenter(key('area-move-${id('car')}')),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    final step = (past.dy - from.dy + 20) / 10;
+    for (var i = 0; i < 10; i++) {
+      await drag.moveBy(Offset(0, step));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect(
+      [for (final a in store.areasInOrder()) a.id],
+      [id('work'), id('household'), id('car')],
+    );
+    expect(shown(tester, AreasScreen, german), ['Arbeit', 'Haushalt', 'Auto']);
+  });
+
+  testWidgets('in German Link to… lists the Areas by the names shown', (
+    tester,
+  ) async {
+    store.close();
+    store = Store.inMemory()..starterSetOffered = true;
+    places = Places(store)..plantStarterSet({'household', 'work', 'car'});
+    tall(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('de'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => pickLinkTarget(context, Notes(store), places),
+            child: const Text('pick'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('pick'));
+    await tester.pumpAndSettle();
+    await tester.enterText(key('linkToSearch'), 'a');
+    await tester.pumpAndSettle();
+    const german = ['Haushalt', 'Arbeit', 'Auto'];
+    final labels = [
+      for (final w in tester.widgetList<Text>(find.byType(Text)))
+        if (w.data case final data? when german.contains(data)) data,
+    ];
+    expect(labels, ['Arbeit', 'Auto', 'Haushalt']);
+  });
+
   testWidgets('a long press on an Area moves nothing', (tester) async {
     await openAreas(tester);
     final row = key('area-row-${car.id}');

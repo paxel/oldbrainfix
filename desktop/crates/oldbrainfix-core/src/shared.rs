@@ -763,8 +763,6 @@ impl Store {
             return Ok(area.to_string());
         }
         self.batch(|| {
-            let settings = PersonSettings::new(self);
-            let before = settings.areas_in_order()?;
             let starter = self
                 .current(area, place_keys::STARTER)?
                 .map(|slug| starter_id(place_keys::TYPE_AREA, &slug));
@@ -776,17 +774,7 @@ impl Store {
             // A starter Area shared under a new id keeps its place in the
             // person's own order (#280).
             if id != area {
-                let moved: Vec<&str> = before
-                    .iter()
-                    .map(|a| {
-                        if a.id == area {
-                            id.as_str()
-                        } else {
-                            a.id.as_str()
-                        }
-                    })
-                    .collect();
-                settings.set_area_order(&moved)?;
+                PersonSettings::new(self).put_area_in_place_of(area, &id)?;
             }
             let me = self.device_id()?;
             // Without a Profile yet (only in tests) the Device stands for

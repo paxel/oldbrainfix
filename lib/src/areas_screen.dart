@@ -120,11 +120,15 @@ class _AreasScreenState extends State<AreasScreen>
   Widget _selectionBack(Widget child) =>
       widget.onBack == null ? selectionBack(child) : child;
 
+  /// The name an Area is shown by here, which orders those missing from
+  /// the person's own order (#280).
+  String _shown(Area area) => areaName(context.t, area);
+
   /// Reads the Areas, in the person's own order (#280), and the hits of
   /// the search.
   void _load() {
     final store = widget.places.store;
-    _areas = store.areasInOrder();
+    _areas = store.areasInOrder(shown: _shown);
     _access = {for (final a in _areas) a.id: store.accessIn(a.id)};
     _people = {
       for (final a in _areas)
@@ -372,7 +376,7 @@ class _AreasScreenState extends State<AreasScreen>
   /// The Area at [from] dragged to [to], counted after it was taken
   /// out: its new place, on all of the person's Devices (#280).
   void _moved(int from, int to) => setState(() {
-    widget.places.store.moveArea(_areas[from].id, to);
+    widget.places.store.moveArea(_areas[from].id, to, shown: _shown);
     _load();
   });
 

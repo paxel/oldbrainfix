@@ -6,6 +6,7 @@ import 'checklists.dart';
 import 'frogs.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
+import 'person_settings.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'routines.dart';
@@ -1112,14 +1113,18 @@ extension PackExport on Store {
   }
 
   /// The Pack of everything the tree may offer for feedback (#214): each
-  /// Area by name, but those of [closed], with its own Notes and then its
+  /// Area in the person's own order, as [areasInOrder] by [shown] lists
+  /// them (#280), but those of [closed], with its own Notes and then its
   /// Topics' Notes as [packOf] lists them, then the Notes filed into no
   /// Area, newest capture first; nothing in the trash or merged.
-  Pack packOfAll({Set<String> closed = const {}}) {
+  Pack packOfAll({
+    Set<String> closed = const {},
+    String Function(Area area)? shown,
+  }) {
     final places = Places(this);
     final all = Notes(this).all();
     final ids = [
-      for (final area in places.areas())
+      for (final area in areasInOrder(shown: shown))
         if (!closed.contains(area.id)) ...[
           area.id,
           for (final t in places.topics(area.id)) t.id,

@@ -553,13 +553,10 @@ extension SharedAreas on Store {
   String share(String areaId) {
     if (isShared(areaId)) return areaId;
     return batch(() {
-      final before = [for (final area in areasInOrder()) area.id];
       final id = areaId == _starterAreaId(areaId) ? _rehome(areaId) : areaId;
       // A starter Area shared under a new id keeps its place in the
       // person's own order (#280).
-      if (id != areaId) {
-        setAreaOrder([for (final a in before) a == areaId ? id : a]);
-      }
+      if (id != areaId) putAreaInPlaceOf(areaId, id);
       // Without a Profile yet (only in tests) the Device stands for it.
       final profile = ownProfile?.id ?? deviceId;
       final grant = Grant(AreaRole.manager, profile).encode();

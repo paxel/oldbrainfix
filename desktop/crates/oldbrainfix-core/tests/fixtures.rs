@@ -50,8 +50,9 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 29] = [
+const SCENARIOS: [&str; 30] = [
     "area-order",
+    "area-order-shown",
     "boxes",
     "checklist-agenda",
     "checklist-routines",
@@ -1674,6 +1675,66 @@ fn the_areas_read_in_the_persons_own_order_as_the_dart_core_reads_them() -> Test
     Ok(())
 }
 
+/// The starter Areas of the generator's `area-order-shown` scenario as
+/// it shows them: in German.
+fn german_area(area: &oldbrainfix_core::places::Area) -> String {
+    match area.starter.as_deref() {
+        Some("household") => "Haushalt",
+        Some("work") => "Arbeit",
+        Some("car") => "Auto",
+        Some("health") => "Gesundheit",
+        _ => area.name.as_str(),
+    }
+    .to_string()
+}
+
+/// The generator's `area-order-shown` scenario (#280).
+fn write_area_order_shown(store: &Store) -> Built {
+    use oldbrainfix_core::PersonSettings;
+    let places = Places::new(store);
+    let settings = PersonSettings::new(store);
+    let starter = |slug: &str| oldbrainfix_core::places::starter_id(place_keys::TYPE_AREA, slug);
+    places.plant_starter_set(&["household", "work", "car", "health"])?;
+    for name in ["bike", "Bike", "İnbox", "Zoo", "ΣΑΣ", "σας", "～", "😀"] {
+        places.add_area(name)?;
+    }
+    Notes::new(store).capture("Oil change", Some(&starter("car")), None)?;
+    settings.move_area_by(&starter("work"), 0, german_area)?;
+    settings.set_area_order_by(&[starter("work")], german_area)?;
+    settings.move_area_by(&starter("household"), 1, german_area)?;
+    places.add_area("Banana")?;
+    places.add_area("apple")?;
+    store.share(&starter("car"))?;
+    places.add_area("avocado")?;
+    Ok(())
+}
+
+#[test]
+fn the_areas_read_by_the_name_shown_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::PersonSettings;
+    let path = fixtures().join("area-order-shown").join("area_order.json");
+    let expected = read_json(&path)?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    assert!(!reads.is_empty());
+    let entries = log("area-order-shown")?;
+    for read in reads {
+        let length = read["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        let settings = PersonSettings::new(&store);
+        let ids = |areas: Vec<oldbrainfix_core::places::Area>| -> Vec<String> {
+            areas.into_iter().map(|a| a.id).collect()
+        };
+        let stored = ids(settings.areas_in_order()?);
+        assert_eq!(json!(stored), read["stored"], "after {length} entries");
+        let shown = ids(settings.areas_in_order_by(german_area)?);
+        assert_eq!(json!(shown), read["shown"], "after {length} entries");
+    }
+    Ok(())
+}
+
 /// The texts of the generator's `help` scenario, English or German.
 fn help_texts(german: bool) -> oldbrainfix_core::HelpTexts<'static> {
     const EN: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
@@ -2143,8 +2204,9 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 29] = [
+    let writers: [(&str, Writer); 30] = [
         ("area-order", write_area_order),
+        ("area-order-shown", write_area_order_shown),
         ("boxes", write_boxes),
         ("checklist-agenda", write_checklist_agenda),
         ("checklist-routines", write_checklist_routines),

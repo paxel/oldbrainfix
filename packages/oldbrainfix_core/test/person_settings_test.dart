@@ -212,6 +212,97 @@ void main() {
     });
   });
 
+  group('the order of the Areas by the name the app shows', () {
+    // The starter Areas as a German phone shows them.
+    const german = {
+      'household': 'Haushalt',
+      'work': 'Arbeit',
+      'car': 'Auto',
+      'health': 'Gesundheit',
+    };
+    String de(Area area) => german[area.starter] ?? area.name;
+    late Places places;
+    List<String> shown(Store store) => [
+      for (final area in store.areasInOrder(shown: de)) de(area),
+    ];
+    String id(String slug) => Places.starterId(PlaceKeys.typeArea, slug);
+
+    setUp(() {
+      places = Places(ann)..plantStarterSet(german.keys.toSet());
+    });
+
+    test('until moved, by the name shown, in lower case', () {
+      expect(shown(ann), ['Arbeit', 'Auto', 'Gesundheit', 'Haushalt']);
+      expect(
+        [for (final a in ann.areasInOrder()) a.name],
+        ['Car', 'Health', 'Household', 'Work'],
+      );
+      places.addArea('bike');
+      places.addArea('Zoo');
+      expect(shown(ann), [
+        'Arbeit',
+        'Auto',
+        'bike',
+        'Gesundheit',
+        'Haushalt',
+        'Zoo',
+      ]);
+      expect(
+        [for (final a in ann.areasInOrder()) a.name],
+        ['bike', 'Car', 'Health', 'Household', 'Work', 'Zoo'],
+      );
+    });
+
+    test('a move counts its place in the order shown', () {
+      final written = ann.allEntries().length;
+      ann.moveArea(id('work'), 0, shown: de);
+      ann.setAreaOrder([id('work'), id('car')], shown: de);
+      expect(ann.allEntries().length, written);
+      ann.moveArea(id('household'), 1, shown: de);
+      expect(shown(ann), ['Arbeit', 'Haushalt', 'Auto', 'Gesundheit']);
+      expect(
+        jsonDecode(
+          ann.current(PersonSettingKeys.entity, PersonSettingKeys.areaOrder) ??
+              'null',
+        ),
+        [id('work'), id('household'), id('car'), id('health')],
+      );
+    });
+
+    test('the Areas left out of a new order keep the order shown', () {
+      ann.setAreaOrder([id('health')], shown: de);
+      expect(shown(ann), ['Gesundheit', 'Arbeit', 'Auto', 'Haushalt']);
+    });
+
+    test('those missing from the order by the name shown', () {
+      ann.moveArea(id('health'), 0, shown: de);
+      places.addArea('Zoo');
+      places.addArea('Bike');
+      places.addArea('apple');
+      expect(shown(ann).skip(4), ['apple', 'Bike', 'Zoo']);
+    });
+
+    test('sharing a starter Area leaves those missing from the order '
+        'by name', () {
+      ann.moveArea(id('health'), 0, shown: de);
+      places.addArea('Banana');
+      places.addArea('apple');
+      final shared = ann.share(id('car'));
+      expect(shared, isNot(id('car')));
+      expect(ann.areasInOrder(shown: de)[2].id, shared);
+      places.addArea('avocado');
+      expect(shown(ann), [
+        'Gesundheit',
+        'Arbeit',
+        'Auto',
+        'Haushalt',
+        'apple',
+        'avocado',
+        'Banana',
+      ]);
+    });
+  });
+
   group('in a Shared Area', () {
     late Store ben;
     late String area;
