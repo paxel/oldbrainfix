@@ -1,0 +1,190 @@
+{
+  "notes": [
+    {
+      "text": "#Life/Health/back pain\n#life/work and #life/work"
+    },
+    {
+      "text": "Physio #life/health/Back #garten",
+      "amends": [
+        "then #Life/health",
+        "#life/health/knee"
+      ]
+    },
+    {
+      "text": "**#Life/Health** `#code/x` [#label](https://x.org/#dest)",
+      "format": "markdown"
+    },
+    {
+      "text": "#code/a #script",
+      "format": "code"
+    },
+    {
+      "text": "gone #trash/x",
+      "trashed": true
+    },
+    {
+      "text": "merged #merged/in #garten",
+      "into": 1
+    },
+    {
+      "text": "#Garten #GARTEN/beet #İzmir/ΟΔΟΣ #𝔸x/y"
+    },
+    {
+      "text": "https://example.org/#top #a//b #a/-c C# #b/"
+    }
+  ],
+  "suggestions": {
+    "#": [
+      "#a",
+      "#b",
+      "#garten",
+      "#garten/beet",
+      "#İzmir",
+      "#İzmir/ΟΔΟΣ",
+      "#label",
+      "#life",
+      "#life/health",
+      "#life/health/Back",
+      "#life/health/knee",
+      "#life/work",
+      "#merged",
+      "#merged/in",
+      "#𝔸x",
+      "#𝔸x/y"
+    ],
+    "#l": [
+      "#label",
+      "#life",
+      "#life/health",
+      "#life/health/Back",
+      "#life/health/knee",
+      "#life/work"
+    ],
+    "#LIFE/": [
+      "#life/health",
+      "#life/health/Back",
+      "#life/health/knee",
+      "#life/work"
+    ],
+    "#life/health/b": [
+      "#life/health/Back"
+    ],
+    "#g": [
+      "#garten",
+      "#garten/beet"
+    ],
+    "garten": [],
+    "#i": [
+      "#İzmir",
+      "#İzmir/ΟΔΟΣ"
+    ],
+    "#izmir/οδοσ": [
+      "#İzmir/ΟΔΟΣ"
+    ],
+    "#x": []
+  },
+  "tree": [
+    {
+      "children": [],
+      "name": "a",
+      "notes": 1,
+      "tag": "#a"
+    },
+    {
+      "children": [],
+      "name": "b",
+      "notes": 1,
+      "tag": "#b"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "name": "beet",
+          "notes": 1,
+          "tag": "#garten/beet"
+        }
+      ],
+      "name": "garten",
+      "notes": 2,
+      "tag": "#garten"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "name": "ΟΔΟΣ",
+          "notes": 1,
+          "tag": "#İzmir/ΟΔΟΣ"
+        }
+      ],
+      "name": "İzmir",
+      "notes": 1,
+      "tag": "#İzmir"
+    },
+    {
+      "children": [],
+      "name": "label",
+      "notes": 1,
+      "tag": "#label"
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [],
+              "name": "Back",
+              "notes": 2,
+              "tag": "#life/health/Back"
+            },
+            {
+              "children": [],
+              "name": "knee",
+              "notes": 1,
+              "tag": "#life/health/knee"
+            }
+          ],
+          "name": "health",
+          "notes": 3,
+          "tag": "#life/health"
+        },
+        {
+          "children": [],
+          "name": "work",
+          "notes": 1,
+          "tag": "#life/work"
+        }
+      ],
+      "name": "life",
+      "notes": 3,
+      "tag": "#life"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "name": "in",
+          "notes": 1,
+          "tag": "#merged/in"
+        }
+      ],
+      "name": "merged",
+      "notes": 1,
+      "tag": "#merged"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "name": "y",
+          "notes": 1,
+          "tag": "#𝔸x/y"
+        }
+      ],
+      "name": "𝔸x",
+      "notes": 1,
+      "tag": "#𝔸x"
+    }
+  ]
+}

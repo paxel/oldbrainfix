@@ -112,7 +112,7 @@ A ☐ (open), ✅ (done) or ❌ (failed) anywhere in a Note's or Section's text,
 _Avoid_: status mark (its earlier name), checkbox (a Line of a Checklist has the checkbox)
 
 **Tag**:
-A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag and there is no list of Tags; it is no Topic and no part of the Capture Context. German: #Wort.
+A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. A "/" inside nests it, such as "#life/health/back", and the search for "#life" finds it. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag; the tag tree lists the Tags of the Notes by their levels, read from their texts. It is no Topic and no part of the Capture Context. German: #Wort.
 _Avoid_: label, keyword, hashtag
 
 **App link**:

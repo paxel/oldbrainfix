@@ -110,7 +110,7 @@ Ein ☐ (offen), ✅ (erledigt) oder ❌ (gescheitert) irgendwo im Text einer No
 _Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
 
 **#Wort** [Tag]:
-Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
+Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Ein „/“ darin verschachtelt es, etwa „#leben/gesundheit/rücken“, und die Suche nach „#leben“ findet es. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert; die Liste der #Wörter nach ihren Ebenen wird aus den Texten der Notizen gelesen. Es ist kein Thema und kein Teil des Erfassungskontexts.
 _Avoid_: Etikett, Schlagwort, Hashtag
 
 **App-Link** [App link]:

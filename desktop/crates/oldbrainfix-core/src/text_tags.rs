@@ -1,10 +1,12 @@
 //! Tags in user text (ADR 0032), as the Dart core's `text_tags.dart`
 //! finds them: a `#word` in any text is drawn highlighted, and a click on
-//! it searches for it. Nothing is stored for a tag and there is no list
-//! of them; it is part of the text.
+//! it searches for it. Nothing is stored for a tag; it is part of the
+//! text, and the tag tree is read from the texts ([`crate::tag_tree`]).
 //!
 //! A tag is a `#` followed by letters, digits, `_` and `-`, at least one
 //! letter among them, the first no `-` and any `-` at its end left out.
+//! A `/` inside parts a nested tag, such as "#life/health": each part
+//! starts as the tag does, so a `/` at the end, `//` and `/-` end it.
 //! Before the `#` comes the start of the text or a character that is no
 //! letter, digit, `_` or `-` and no `#`, `/`, `\` or `&`, so neither "C#"
 //! nor a web address's "/#top" is one. A letter is a character of
@@ -40,7 +42,16 @@ pub fn find(text: &str) -> Vec<FoundTag> {
         }
         let mut stop = from;
         let mut letters = false;
-        for (i, c) in text.get(from..).unwrap_or_default().char_indices() {
+        let rest = text.get(from..).unwrap_or_default();
+        for (i, c) in rest.char_indices() {
+            if c == '/' {
+                let next = rest.get(i + 1..).and_then(|r| r.chars().next());
+                if i == 0 || !next.is_some_and(|n| n != '-' && in_tag(n)) {
+                    break;
+                }
+                at = from + i + 1;
+                continue;
+            }
             if !in_tag(c) || (i == 0 && c == '-') {
                 break;
             }
@@ -171,6 +182,33 @@ mod tests {
         assert!(written("C# F#m x#a 1#a _#a -#a https://a.org/#top \\#e &#x27;").is_empty());
         assert_eq!(written("#v2 #3d #Ⅻ"), vec!["#v2", "#3d", "#Ⅻ"]);
         assert_eq!(written("#a#b"), vec!["#a"]);
+    }
+
+    #[test]
+    fn a_slash_parts_a_nested_tag_each_part_starting_as_a_tag_does() {
+        assert_eq!(
+            tags("#life/health/back #Life/Work"),
+            vec![
+                ("#life/health/back", "#life/health/back".to_string()),
+                ("#Life/Work", "#life/work".to_string()),
+            ]
+        );
+        assert_eq!(
+            written("#a/ #a-/ #a/- #a/-b #a//b #a/b#c #a/b/ (#a/b). #a-/b"),
+            vec![
+                "#a", "#a", "#a", "#a", "#a", "#a/b", "#a/b", "#a/b", "#a-/b"
+            ]
+        );
+        assert_eq!(
+            written("#q1/2026 #2026/q1 #to-do/x_y"),
+            vec!["#q1/2026", "#2026/q1", "#to-do/x_y"]
+        );
+        assert!(written("#/a #1/2 #2024/05 # /a #-/a").is_empty());
+        assert_eq!(
+            written("x/#a https://example.org/#top/a page.html#a/b #a/#b"),
+            vec!["#a"]
+        );
+        assert_eq!(written("#c/d"), vec!["#c/d"]);
     }
 
     #[test]

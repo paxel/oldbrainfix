@@ -24,6 +24,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy legt Zum Startbildschirm hinzufügen im ⋮ der Karte einer Strichliste eine Verknüpfung auf den Startbildschirm, die den Eintrag der Strichliste direkt öffnet, hinter der App-Sperre nach dem Entsperren, und nach dem Speichern zum Startbildschirm zurückkehrt; auf dem iPhone legt Zum App-Symbol hinzufügen die Strichliste stattdessen unter die Aktionen, die ein langes Drücken auf das App-Symbol zeigt.
 - Auf dem Handy und dem Desktop öffnet „Sicherung öffnen …“ auf der Seite Sicherungen, auf dem Desktop auch im Menü Datei, eine Sicherungsdatei mit der Passphrase oder dem Wiederherstellungsschlüssel und zeigt ihre Notizen als Baum eines Pakets unter ihrem Datum, die aus ihrem Papierkorb gekennzeichnet und auf dem Handy die eines gesperrten Bereichs, der zu ist, erst nach dem Entsperren, und „Hinzufügen“ holt die angehakten als Kopien in neue Bereiche zurück, ohne die Sicherung wiederherzustellen oder sonst etwas zu ändern.
 - Auf dem Desktop öffnet „In eigenem Fenster öffnen“ im Notiz-Dialog und im Menü einer Karte die Notiz in einem eigenen Fenster neben dem Hauptfenster, ein Fenster je Notiz, zum Lesen und Bearbeiten, mit „Im Vordergrund halten“, das es über allen anderen Fenstern hält (unter Wayland ausgegraut, das es nicht erlaubt).
+- Auf dem Handy und dem Desktop darf ein #Wort ein „/“ enthalten, das es verschachtelt, etwa „#leben/gesundheit/rücken“; es wird als ein #Wort gezeichnet und öffnet die Suche danach, und die Suche nach „#leben“ findet es.
 
 ### Geändert
 
@@ -39,6 +40,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop bieten das ⋮ einer kompakten Karte auf dem Handy und das ⋮ und der Rechtsklick einer Karte auf dem Desktop neben Ablegen in … und Zusammenführen mit … auch Routine … und Erinnerung … an, in Erweitert dazu Frosch und Einheit …; auf dem Handy fasst das ⋮ einer Karte An eine Person senden, Mit einer App teilen, Text kopieren und Als Paket exportieren… unter einem Teilen … zusammen, und der Stift einer Karte in der Detailansicht öffnet den Notiz-Editor mit einem Tippen.
 - Auf dem Desktop zeigen Zurück und Vorwärts jeden Ort mit der Suche, dem Filter nach Person und der Scroll-Position, mit denen er verlassen wurde, statt sie zu leeren; ein neu gezeigter Ort beginnt ohne sie und oben.
 - Die Synchronisierung im lokalen Netz überträgt ein Foto oder eine Sprachaufnahme bis 256 MiB, wie Bündel und Sicherungen, statt bis 64 MiB.
+- Auf dem Handy und dem Desktop liest die Suche einen Volltextindex statt jeder Notiz und findet so dieselben Notizen in einer großen Sammlung schneller.
 
 ### Behoben
 

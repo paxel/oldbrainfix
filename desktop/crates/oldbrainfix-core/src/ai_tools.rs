@@ -43,6 +43,7 @@ use crate::shopping_lists::{
     ListOnAgenda, Reappear, ReappearUnit, ShoppingLists, ShoppingOnAgenda, keys as shopping_keys,
 };
 use crate::store::Store;
+use crate::tag_tree::{TagNode, TagTree};
 use crate::tallies::{Tallies, Tally, TallyPeriod};
 use crate::tally_units::{self, TallyRule, UnitSystem};
 use crate::text_boxes::ShownBox;
@@ -210,6 +211,13 @@ pub fn tools() -> Vec<Value> {
         tool(
             "list_places",
             "Lists the Areas in the person's own order, a setting of the person kept on all of their own Devices that cannot be changed here (Areas missing from it, such as new ones, come last by name), with their Topics, and whether each Area is shared and what this Device may do there.",
+            true,
+            json!({}),
+            &[],
+        ),
+        tool(
+            "list_tags",
+            "Lists the tags written in the Notes, words with # in front such as #garten, nested by a / as in #life/health/back, by their levels: each with its name and whole tag as written most often, how many Notes hold it or a tag under it, and the tags under it. Only Notes neither in the trash nor merged count, with their Sections; a tag in code, in a link's address or in a Code text is none. list_notes with a tag as its search finds the Notes holding it or a tag under it.",
             true,
             json!({}),
             &[],
@@ -1447,6 +1455,18 @@ impl Store {
                     }));
                 }
                 ToolOutput::json(&Value::Array(out))
+            }
+            "list_tags" => {
+                fn node(n: &TagNode) -> Value {
+                    json!({
+                        "children": n.children.iter().map(node).collect::<Vec<_>>(),
+                        "name": n.name,
+                        "notes": n.notes,
+                        "tag": n.tag,
+                    })
+                }
+                let tree = TagTree::new(self).tree()?;
+                ToolOutput::json(&Value::Array(tree.iter().map(node).collect()))
             }
             "list_routines" => {
                 let routines = Routines::new(self);
@@ -2741,6 +2761,33 @@ mod tests {
             .take(2)
             .collect();
         assert_eq!(ids, [work, home]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_tags_list_by_their_levels_and_a_drafted_one_shows() -> TestResult {
+        let store = store();
+        let notes = Notes::new(&store);
+        notes.capture("#Life/health/back and #life/work", None, None)?;
+        notes.capture("#Life/health", None, None)?;
+        let gone = notes.capture("#gone", None, None)?;
+        notes.trash(&gone.id)?;
+        let task = store.open_ai_task()?;
+        let added = call(&store, &task, "capture_note", &json!({"text": "#garten"}))?;
+        assert!(!added.is_error, "{added:?}");
+        let listed = json_of(&call(&store, &task, "list_tags", &json!({}))?)?;
+        assert_eq!(
+            listed,
+            json!([
+                {"children": [], "name": "garten", "notes": 1, "tag": "#garten"},
+                {"children": [
+                    {"children": [
+                        {"children": [], "name": "back", "notes": 1, "tag": "#Life/health/back"},
+                    ], "name": "health", "notes": 2, "tag": "#Life/health"},
+                    {"children": [], "name": "work", "notes": 1, "tag": "#Life/work"},
+                ], "name": "Life", "notes": 2, "tag": "#Life"},
+            ])
+        );
         Ok(())
     }
 

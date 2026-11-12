@@ -8913,6 +8913,11 @@ Map<String, Object?> _textTags() {
     '#Müll #Straße #ÄRGER #日記 #дача #𝔸x #İzmir #ΟΔΟΣ #ǅx',
     '#garten. #garten, (#garten) "#garten"! #garten🌱 „#h“ *#i* 🌱#j',
     '#a#b #c/d #e\'s',
+    // Nested tags (#267): a / inside, each part starting as a tag does.
+    '#life/health/back #Life/Work #a/ #a-/ #a/- #a/-b #a//b #a/b#c '
+        '(#a/b). #a-/b #İzmir/ΟΔΟΣ/𝔸x',
+    '#/a #1/2 #2024/05 #q1/2026 #2026/q1 x/#a https://example.org/#top/a '
+        'page.html#a/b #a/#b #a/b/',
     '#to-do #Garten- und Balkonpflanzen #a-- #-a #- #--',
     '#1 issue #126 #2024 #_ #1_2 #² #v2 #2024plan #3d #Ⅻ',
     '# Heading\n## Part\n#\n##double ###three # ',
@@ -8940,6 +8945,78 @@ Map<String, Object?> _textTags() {
         },
     ],
   };
+}
+
+/// The tag tree (#267): the Notes captured, each with its format, its
+/// Amends, the one it is merged into and whether it is trashed, then the
+/// tree read from them and the suggestions for what is typed.
+Map<String, Object?> _tagTree() {
+  const captured = [
+    {'text': '#Life/Health/back pain\n#life/work and #life/work'},
+    {
+      'text': 'Physio #life/health/Back #garten',
+      'amends': ['then #Life/health', '#life/health/knee'],
+    },
+    {
+      'text': '**#Life/Health** `#code/x` [#label](https://x.org/#dest)',
+      'format': TextFormats.markdown,
+    },
+    {'text': '#code/a #script', 'format': TextFormats.code},
+    {'text': 'gone #trash/x', 'trashed': true},
+    {'text': 'merged #merged/in #garten', 'into': 1},
+    {'text': '#Garten #GARTEN/beet #İzmir/ΟΔΟΣ #𝔸x/y'},
+    {'text': 'https://example.org/#top #a//b #a/-c C# #b/'},
+  ];
+  const typed = [
+    '#',
+    '#l',
+    '#LIFE/',
+    '#life/health/b',
+    '#g',
+    'garten',
+    '#i',
+    '#izmir/οδοσ',
+    '#x',
+  ];
+  var at = DateTime.utc(2026, 11, 12, 8);
+  final store = Store.inMemory(
+    clock: () => at,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  try {
+    final notes = Notes(store);
+    final ids = <String>[];
+    for (final note in captured) {
+      at = at.add(const Duration(minutes: 1));
+      final format = note['format'] as String? ?? TextFormats.plain;
+      final id = notes.capture(note['text'] as String, format: format).id;
+      ids.add(id);
+      for (final amend in note['amends'] as List<String>? ?? const <String>[]) {
+        at = at.add(const Duration(minutes: 1));
+        notes.amend(id, amend);
+      }
+    }
+    for (final (i, note) in captured.indexed) {
+      if (note['into'] case final int into) notes.merge(ids[i], ids[into]);
+      if (note['trashed'] == true) notes.trash(ids[i]);
+    }
+    Object? node(TagNode n) => {
+      'children': [for (final c in n.children) node(c)],
+      'name': n.name,
+      'notes': n.notes,
+      'tag': n.tag,
+    };
+    final tree = TagTree(store);
+    return {
+      'notes': captured,
+      'suggestions': {
+        for (final t in typed) t: [for (final n in tree.suggestions(t)) n.tag],
+      },
+      'tree': [for (final n in tree.tree()) node(n)],
+    };
+  } finally {
+    store.close();
+  }
 }
 
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
@@ -10578,7 +10655,13 @@ Future<void> main(List<String> args) async {
     'many scripts, after spaces of any kind, punctuation, emoji and status '
     'marks, with a `-` inside and at the end, and those that are none: '
     'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
-    '`\\` or `&`, as in "C#" and web addresses.\n'
+    '`\\` or `&`, as in "C#" and web addresses; nested tags with a `/` '
+    'inside, at the end, doubled and before a `-` (#267).\n'
+    '- `tag_tree.json`: the tag tree (#267): Notes captured in a fresh '
+    'store, plain, formatted and as code, with Amends, a Merge and one '
+    'trashed, and the tree read from them by its levels, each tag as '
+    'written most often with its count of Notes, and the suggestions for '
+    'what is typed.\n'
     '- `file_texts.json`: the texts of attached files (ADR 0047): for each '
     'file its name, media type and bytes, the kind it is and what reading '
     'it gives: Word documents, workbooks, OpenDocument texts and '
@@ -10848,6 +10931,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/text_tags.json'),
     '${_json.convert(_textTags())}\n',
   );
+  _write(File('${root.path}/tag_tree.json'), '${_json.convert(_tagTree())}\n');
   _write(
     File('${root.path}/file_texts.json'),
     '${_json.convert(_fileTexts())}\n',

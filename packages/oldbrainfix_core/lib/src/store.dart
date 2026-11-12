@@ -1177,6 +1177,22 @@ class Store {
   };
 
   /// Entities whose `$type` was [type] at some time, the shown pending
+  /// sets included, in the order [entitiesOfType] keeps: for a list of
+  /// some of them in that order (ADR 0048).
+  @internal
+  Set<String> everOfType(String type) => _everOfType(type);
+
+  /// The entities the shown pending sets change: what the search index
+  /// does not hold, read as they are on each search (ADR 0048).
+  @internal
+  Set<String> get shownEntities => {for (final e in _shown) e.entity};
+
+  /// The database, for the search index's own tables beside the log
+  /// (ADR 0048); nothing else reads or writes through it.
+  @internal
+  Database get database => _db;
+
+  /// Entities whose `$type` was [type] at some time, the shown pending
   /// sets included.
   Set<String> _everOfType(String type) => {
     for (final r in _db.select(

@@ -57,6 +57,7 @@ export 'src/shopping_lists.dart';
 export 'src/signing.dart';
 export 'src/store.dart';
 export 'src/sync.dart';
+export 'src/tag_tree.dart';
 export 'src/tallies.dart';
 export 'src/tally_units.dart';
 export 'src/text_boxes.dart';

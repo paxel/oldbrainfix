@@ -1469,9 +1469,21 @@ impl Store {
         Ok(out)
     }
 
+    /// The connection, for the search index's own tables beside the log
+    /// (ADR 0048), held while `body` runs; nothing else reads or writes
+    /// through it.
+    pub(crate) fn with_connection<T>(
+        &self,
+        body: impl FnOnce(&Connection) -> Result<T>,
+    ) -> Result<T> {
+        let db = self.db.lock();
+        body(&db)
+    }
+
     /// Entities whose `$type` was `ty` at some time, the shown pending
-    /// sets included.
-    fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
+    /// sets included, in the order [`Store::entities_of_type`] keeps:
+    /// also for a list of some of them in that order (ADR 0048).
+    pub(crate) fn ever_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let mut ids: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(

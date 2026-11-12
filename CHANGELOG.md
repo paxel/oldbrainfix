@@ -25,6 +25,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, Add to home screen in a Tally card's ⋮ puts a shortcut on the home screen that opens the Tally's entry page directly, after the unlock behind the App Lock, and goes back to the home screen once the entry is saved; on the iPhone, Add to the app icon puts the Tally among the actions of the app icon's long press instead.
 - On the phone and the desktop, Open a Backup… on the Backups page, on the desktop also in the File menu, opens a Backup file with the passphrase or the recovery key and shows its Notes as a Pack's tree under its date, those from its Trash marked and on the phone those of a closed locked Area only once unlocked, and Add brings the ticked ones back as copies in new Areas without restoring the Backup or changing anything else.
 - On the desktop, "Open in its own window" in the Note dialog and a card's menu opens the Note in a window of its own beside the main window, one window per Note, for reading and editing, with "Keep on top" to keep it above all other windows (greyed on Wayland, which does not allow it).
+- On the phone and the desktop, a tag may hold a "/" to nest it, such as "#life/health/back", which is drawn as one tag and opens the search for it, and the search for "#life" finds it.
 
 ### Changed
 
@@ -40,6 +41,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a compact card's ⋮ on the phone and a card's ⋮ and right-click on the desktop offer Routine… and Reminder…, in Advanced also Frog and Session…, beside File into… and Merge into…; on the phone a card's ⋮ puts Send to a person, Share to an app, Copy text and Export as Pack… under one Share…, and a detailed card's pencil opens the Note editor in one tap.
 - On the desktop, back and forward show each place with the search, person filter and scroll position it was left with, instead of clearing them; a place shown anew starts with none and at the top.
 - Sync over the local network carries a photo or voice recording of up to 256 MiB, as bundles and Backups do, instead of 64 MiB.
+- On the phone and the desktop, search reads a full-text index instead of every Note, so it finds the same Notes faster in a large collection.
 
 ### Fixed
 

@@ -7676,6 +7676,75 @@ fn tags_are_found_as_the_dart_core_finds_them() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn the_tag_tree_is_read_as_the_dart_core_reads_it() -> TestResult {
+    use oldbrainfix_core::{TagNode, TagTree};
+    let fixture = read_json(&fixtures().join("tag_tree.json"))?;
+    let captured = fixture["notes"].as_array().ok_or("notes")?;
+    let at = std::sync::Arc::new(std::sync::Mutex::new(parse_time(
+        "2026-11-12T08:00:00.000Z",
+    )?));
+    let clock = at.clone();
+    let store = Store::in_memory(
+        Box::new(move || clock.lock().map(|t| *t).unwrap_or_default()),
+        || Ok(SigningKey::from_seed([9; 32])),
+    )?;
+    let tick = || {
+        if let Ok(mut t) = at.lock() {
+            *t += chrono::Duration::minutes(1);
+        }
+    };
+    let notes = Notes::new(&store);
+    let mut ids = Vec::new();
+    for note in captured {
+        tick();
+        let text = note["text"].as_str().ok_or("text")?;
+        let format = note["format"].as_str().unwrap_or("plain");
+        let id = notes.capture_as(text, format, None, None)?.id;
+        for amend in note["amends"].as_array().into_iter().flatten() {
+            tick();
+            notes.amend(&id, amend.as_str().ok_or("amend")?)?;
+        }
+        ids.push(id);
+    }
+    for (i, note) in captured.iter().enumerate() {
+        if let Some(into) = note["into"].as_u64() {
+            let into = usize::try_from(into)?;
+            notes.merge(&ids[i], &ids[into])?;
+        }
+        if note["trashed"].as_bool() == Some(true) {
+            notes.trash(&ids[i])?;
+        }
+    }
+    fn node(n: &TagNode) -> Value {
+        json!({
+            "children": n.children.iter().map(node).collect::<Vec<_>>(),
+            "name": n.name,
+            "notes": n.notes,
+            "tag": n.tag,
+        })
+    }
+    let tree = TagTree::new(&store);
+    let mut suggestions = serde_json::Map::new();
+    for typed in fixture["suggestions"]
+        .as_object()
+        .ok_or("suggestions")?
+        .keys()
+    {
+        let tags: Vec<String> = tree
+            .suggestions(typed)?
+            .into_iter()
+            .map(|n| n.tag)
+            .collect();
+        suggestions.insert(typed.clone(), json!(tags));
+    }
+    assert_eq!(json!(suggestions), fixture["suggestions"]);
+    let ours: Vec<Value> = tree.tree()?.iter().map(node).collect();
+    assert_eq!(json!(ours), fixture["tree"]);
+    assert!(ours.len() >= 4);
+    Ok(())
+}
+
 // --------------------------------------------------- Schedule sentences
 
 /// `repeat` as the generator writes it.

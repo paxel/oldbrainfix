@@ -99,3 +99,7 @@ Amended by #276 (ADR 0030): `read_note` lists a Shopping List's Lines checked On
 ## The Areas in the person's own order (#280)
 
 Amended by #280 (ADR 0040): `list_places` lists the Areas in the person's own order, as the apps show them; an Area drafted in the AI Task is missing from the order and comes after those in it, by name among the missing ones. The order is a setting of the person, and no tool writes a setting, so it is read only. No trust rule changed.
+
+## The tag tree (#267)
+
+Amended by #267 (ADR 0032): `list_tags` reads the tag tree, each tag by its levels with its name and whole tag as written most often and its count of Notes, as the apps will show it, a Note drafted in the AI Task included. It only reads, since a tag is part of a text, which the tools that change texts already draft. No trust rule changed.

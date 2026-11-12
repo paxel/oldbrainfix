@@ -4,11 +4,11 @@ A `#word` in a text, such as "#Garten", is drawn highlighted, and a tap or a cli
 
 ## A tag is part of the text
 
-Nothing is stored for a tag and there is no list of tags. A tag is signed, synced, judged by the roles of a Shared Area (ADR 0013), won by latest wins and made a Conflict with the rest of the text (ADR 0011), and a text with tags reads the same on a Device that does not know them.
+Nothing is stored for a tag; the tag tree (#267, below) is read from the texts. A tag is signed, synced, judged by the roles of a Shared Area (ADR 0013), won by latest wins and made a Conflict with the rest of the text (ADR 0011), and a text with tags reads the same on a Device that does not know them.
 
 ## What counts as a tag
 
-A tag is a `#` (U+0023) followed by tag characters: letters, digits, `_` and `-`. A letter is a character of Unicode's Alphabetic property, so umlauts, "ß" and every script count; a digit is a character of its number categories. Both cores take these properties from Unicode as their platform knows it; the characters people type agree, while a character added to Unicode lately may not.
+A tag is a `#` (U+0023) followed by tag characters: letters, digits, `_` and `-`, and `/` inside since #267 (below). A letter is a character of Unicode's Alphabetic property, so umlauts, "ß" and every script count; a digit is a character of its number categories. Both cores take these properties from Unicode as their platform knows it; the characters people type agree, while a character added to Unicode lately may not.
 
 - The tag runs to the first character that is no tag character, so "#garten." and "(#garten)" hold "#garten", and "#a#b" holds "#a".
 - The first character after the `#` is no `-`, and any `-` at the end are left out, so "#Garten- und Balkonpflanzen" holds "#Garten". A `-` inside counts: "#to-do".
@@ -27,11 +27,26 @@ The search stays as it is: a query is found in a text as typed, ignoring case, i
 
 Amended by ADR 0033 (#127): in a formatted text, a `#word` inside inline code or inside a link's destination is no tag; one in a link's label, a heading's text or bold is. Search looks in a formatted text's visible text, without its marks.
 
+## Nested tags and the tag tree
+
+Amended by #267 (Q623, Q639): `/` is a tag character, so "#life/health/back" is one tag, nested in three levels. A Note can sit in several branches at once ("#health/back" and "#insurance/claims"), where a Topic holds it in one place, and Obsidian reads the same tags. A tag still needs no field, sync, role or conflict rule of its own, since it is part of the text.
+
+- Each part between two `/` starts as the tag does: with a tag character that is no `-`. So "#/a" is no tag, a `/` at the end is left out as a `-` is ("#life/" holds "#life"), and `//` or `/-` ends the tag ("#a//b" and "#a/-b" hold "#a"). Inside a part a `-` counts as before; "#a-/b" is one tag.
+- The tag still needs a letter somewhere: "#2024/05" is no tag, "#q1/2026" is one.
+- A `#` after a `/` stays no tag, so "x/#a", "example.org/#top/a" and "#a/#b" hold no tag after the `/`. A `#` after a letter, as in "page.html#a/b", is none either.
+- The tag as searched is lowered as before, the `/` kept. The search for "#life" finds "#life/health/back", since it searches by prefix, and the search for "#life/" its tags below.
+- A label of another app still becomes a flat tag (`fromLabel`, `from_label`): its `/` becomes a `-` like any other character that is no letter, digit or `_`, so the tags an Import wrote stay the same.
+
+The tag tree (`TagTree`, `tag_tree.rs`) lists every tag by its levels. It reads the texts of the Notes neither in the trash nor merged and of their Sections, the merged Notes' texts among them, with each text's tags as it draws them: none in a Code text, none in code, in a link's destination or in a web address (ADR 0033). Nothing is stored for it. Each level is one node: its name is the part as it is written most often, counted over every tag in the texts, the first by UTF-16 code units on a tie; its tag is `#` and the names down to it, which is what a tap or click on it searches for; its count is the number of Notes holding it or a tag below it, each Note once. The nodes of a level come in the order of their names in lower case, by UTF-16 code units. The suggestions for a search being typed are the nodes whose tag begins with what is typed, ignoring case, each before those below it, and none when it does not begin with `#`. The fixture `tag_tree.json` holds both, and `text_tags.json` the nested tags. The AI port reads the tree with `list_tags` (ADR 0026).
+
 ## Considered Options
 
 - Searching for a tag as a whole tag, so that "#garten" does not find "#Gartenarbeit" (rejected: a query being typed would find nothing until the tag is complete, and a Note filed under a longer tag would be missed).
 - Numbers as tags (rejected: "#126" and "Gleis #3" are numbers people write, not labels).
 - Only `_` and no `-` in tags (rejected: German compounds and "to-do" are written with `-`).
+- `//` inside a nested tag kept, as an empty level (rejected: a level without a name could not be shown or searched for; `//` is more often a web address or a typo).
+- A label of another app with a `/` imported as a nested tag (rejected: Keep's labels are flat, and the tags of earlier Imports would differ from new ones).
+- The tag tree from every text search reads, Transcripts and Photo Texts included (rejected: a "#" heard or photographed is no tag the user wrote, and no text draws it as one).
 
 ## Consequences
 
