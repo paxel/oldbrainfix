@@ -7,8 +7,8 @@
 //! (#109).
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::offers::Transport;
@@ -17,8 +17,8 @@ use oldbrainfix_core::{
     SigningKey, Store, WireEntry,
 };
 use oldbrainfix_gui::alerts::{
-    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NOT_TODAY, NUDGE_KEY, Notice, OPEN, SKIP, SNOOZE,
-    SNOOZE_10, TOMORROW, Tap, occurrence_key,
+    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NOT_TODAY, NUDGE_KEY, Notice, OPEN, OccurrenceWanted,
+    SKIP, SNOOZE, SNOOZE_10, TOMORROW, Tap, occurrence_key,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::notify::{Recorded, RecordingNotifier};
@@ -436,6 +436,35 @@ fn snooze_and_not_today_show_their_choices_in_place_and_skip_stops_the_alarm() -
     clock.set("2026-10-26T07:05:01.000Z")?;
     alerts.tick(&store, &berlin)?;
     assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    Ok(())
+}
+
+/// A click on an Occurrence's notification, or its "Open Old Brain Fix",
+/// opens the window with its Note (#270); the Nudge's and the Catch-up
+/// Notification's only the window, an answer neither.
+#[test]
+fn a_click_on_an_occurrences_notification_asks_for_its_note() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
+    alerts.set_occurrence_wanted(wanted.clone());
+    let pills = pills(&store)?;
+    let eight = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(8, 0));
+    let key = occurrence_key(&pills, &eight);
+    let held = |wanted: &OccurrenceWanted| wanted.lock().map(|w| w.clone()).ok().flatten();
+    let at = clock.set("2026-10-26T07:01:00.000Z")?;
+    for other in [NUDGE_KEY, CATCH_UP_KEY, CHANGES_KEY] {
+        alerts.apply(&store, &berlin, &tap(other, OPEN, at))?;
+        assert_eq!(held(&wanted), None, "{other}");
+    }
+    alerts.apply(&store, &berlin, &tap(&key, SNOOZE, at))?;
+    assert_eq!(held(&wanted), None);
+    assert!(alerts.open_requested, "the Nudge's click opened the window");
+    alerts.open_requested = false;
+    alerts.apply(&store, &berlin, &tap(&key, OPEN, at))?;
+    assert_eq!(held(&wanted), Some(pills));
+    assert!(alerts.open_requested);
     Ok(())
 }
 

@@ -104,7 +104,7 @@ use oldbrainfix_core::{
 
 use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
-use crate::alerts::Event;
+use crate::alerts::{Event, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
 use crate::auto_sync::Syncing;
@@ -1249,6 +1249,9 @@ enum Action {
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
+    /// A click on the notification of an Occurrence of this Routine
+    /// (#270): its Note opens in the Note dialog, while it is there.
+    OpenNotified(String),
     /// Saves one calendar file of every Routine and Reminder, in the
     /// order their page lists them (#115).
     ExportRoutines,
@@ -1738,6 +1741,9 @@ pub struct App {
     /// Raised by a click on the Changes Nudge: the bundles of the people
     /// waiting are to be saved (#109).
     changes_wanted: Option<Arc<AtomicBool>>,
+    /// Holds the Routine whose Occurrence's notification was clicked:
+    /// its Note is to open (#270).
+    occurrence_wanted: Option<OccurrenceWanted>,
     /// Ask the system's dialogs where to save a bundle and which one to
     /// import.
     bundle_saver: FileSaver,
@@ -2147,6 +2153,7 @@ impl App {
             pack_work: Vec::new(),
             unsorted_wanted: None,
             changes_wanted: None,
+            occurrence_wanted: None,
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
@@ -4170,6 +4177,12 @@ impl App {
         self.changes_wanted = Some(wanted);
     }
 
+    /// Opens the Note dialog of the Note of the Routine a click on an
+    /// Occurrence's notification put into `wanted` (#270).
+    pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
+        self.occurrence_wanted = Some(wanted);
+    }
+
     /// Syncs through the shared folder now: on the folder thread, or here
     /// when there is none.
     fn folder_now(&mut self) -> oldbrainfix_core::Result<()> {
@@ -5956,6 +5969,23 @@ impl App {
                     self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
                     self.tally_form = None;
                 }
+            }
+            Action::OpenNotified(id) => {
+                let routines = Routines::new(&self.store);
+                let Some(routine) = routines.by_id(&id)?.filter(|r| !r.is_trashed()) else {
+                    return Ok(());
+                };
+                // Gone or in the trash, it opens just the window.
+                let Some(note) = routines.note(&routine)?.filter(|n| !n.is_trashed()) else {
+                    return Ok(());
+                };
+                // A Routine editor or Tally form open keeps its draft, over
+                // the Note dialog.
+                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
+                let opened = self.act(Action::SelectNote(note.id));
+                self.editor = editor;
+                self.tally_form = tally_form;
+                opened?;
             }
             Action::NewRoutine { note, reminder } => {
                 self.save_text()?;
@@ -8351,6 +8381,14 @@ impl App {
             .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
         {
             actions.push(Action::SendWaitingChanges);
+            ui.ctx().request_repaint();
+        }
+        if let Some(routine) = self
+            .occurrence_wanted
+            .as_ref()
+            .and_then(|wanted| wanted.lock().ok().and_then(|mut held| held.take()))
+        {
+            actions.push(Action::OpenNotified(routine));
             ui.ctx().request_repaint();
         }
         let files: Vec<(String, Vec<u8>)> = dropped
@@ -14852,10 +14890,22 @@ fn agenda_entry(
     .inner
 }
 
+/// What a click on an Occurrence on the Agenda opens, its heading's text
+/// or a Checklist Routine's Line's words (#270): the Note dialog of its
+/// Note, whose Due line answers it; the editor of its Routine while the
+/// Note is gone or in the trash, the only place left to see it.
+fn occurrence_opens(row: &AgendaRow) -> Action {
+    match &row.note {
+        Some(note) if !note.is_trashed() => Action::SelectNote(note.id.clone()),
+        _ => Action::OpenRoutine(row.routine.id.clone()),
+    }
+}
+
 /// One Occurrence on the Agenda as a group (#208): the heading an
 /// embossed card's top, with the box to check it off, its time, its
 /// Note's text, its Area's colour and icon, and its ⋮; a click on the
-/// text opens its Routine, a right-click on it the menu of ⋮. A skipped
+/// text opens its Note ([`occurrence_opens`]), a right-click on it the
+/// menu of ⋮. A skipped
 /// one stays struck for the day, as a Done one, saying so under its
 /// text, and the one Tomorrow added says where it came from (#269).
 /// Under it a Session's picks today, each with its box showing whether it has an
@@ -14864,7 +14914,8 @@ fn agenda_entry(
 /// own box only shows Done: once every pick has an entry it checks
 /// itself, and nothing else checks it. A Routine spawned from a
 /// Checklist lists its Lines under it, checked for this Occurrence; once
-/// every Line is checked, its box stays checked too (#121). Where
+/// every Line is checked, its box stays checked too (#121), a Line's
+/// words opening what the heading opens. Where
 /// `hides_checked` (#217), the checked Lines and the picks with an entry
 /// are left out.
 fn agenda_row(
@@ -14937,7 +14988,7 @@ fn agenda_row(
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
             if open.clicked() {
-                actions.push(Action::OpenRoutine(routine.id.clone()));
+                actions.push(occurrence_opens(&row.row));
             }
             // The same menu from a right-click and from ⋮.
             let history = !routine.is_reminder();
@@ -14960,6 +15011,9 @@ fn agenda_row(
                 }
             });
             match picked {
+                Some(OccurrencePick::Schedule) => {
+                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                }
                 Some(OccurrencePick::History) => {
                     actions.push(Action::Select(Selection::History(routine.id.clone())));
                 }
@@ -14995,7 +15049,7 @@ fn agenda_row(
                     )));
                 }
                 if clicks.words {
-                    actions.push(Action::OpenRoutine(routine.id.clone()));
+                    actions.push(occurrence_opens(&row.row));
                 }
             }
         }
@@ -15181,6 +15235,7 @@ fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
 /// What was picked in an Occurrence's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrencePick {
+    Schedule,
     History,
     Share,
     Answer(Answer),
@@ -15188,7 +15243,8 @@ enum OccurrencePick {
 
 /// An Occurrence's menu, from a right-click on it or its ⋮, as the
 /// phone's: Snooze and Not today as far as `answers` allows (#269), each
-/// under its heading, then History for a Routine (`history`), and Share,
+/// under its heading, then Edit schedule, which opens its Routine or
+/// Reminder editor (#270), History for a Routine (`history`), and Share,
 /// which saves its Routine as the whole series with its end, or its
 /// Reminder, as a calendar file. What was picked.
 fn occurrence_menu(
@@ -15201,6 +15257,12 @@ fn occurrence_menu(
     let mut picked = occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer);
     if answers.any() {
         ui.separator();
+    }
+    if ui
+        .button(RichText::new(t.edit_schedule()).color(text))
+        .clicked()
+    {
+        picked = Some(OccurrencePick::Schedule);
     }
     if history
         && ui

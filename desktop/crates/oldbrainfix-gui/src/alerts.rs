@@ -12,7 +12,8 @@
 //! and Not today with Skip and Tomorrow, as the phone's Android
 //! notification does (Q650), as Windows toasts and some Linux desktops
 //! show only a few buttons. What is tapped comes back as [`Tap`]s and is
-//! applied to the log; a click on the Nudge opens the
+//! applied to the log; a click on an Occurrence's notification opens
+//! the window with its Note (#270), a click on the Nudge the
 //! window on Unsorted, as the phone's Nudge screen, and a click on the
 //! Changes Nudge asks the window to send each person waiting their
 //! bundle (#109). Quiet
@@ -20,9 +21,9 @@
 //! on this Device nothing shows (ADR 0008).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
 use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan};
@@ -163,6 +164,10 @@ pub fn occurrence_key(routine_id: &str, occurrence: &Occurrence) -> String {
     oldbrainfix_core::alarms::snooze_key(routine_id, occurrence)
 }
 
+/// The Routine whose Occurrence's notification was clicked, held until
+/// the window opens its Note (#270).
+pub type OccurrenceWanted = Arc<Mutex<Option<String>>>;
+
 /// The Routine and Occurrence a notification's key names.
 fn split_key(key: &str) -> Option<(&str, &str)> {
     key.rsplit_once('@')
@@ -235,6 +240,9 @@ pub struct Alerts {
     changed: Arc<AtomicU64>,
     /// Asked for by a click on a notification: the window is to open.
     pub open_requested: bool,
+    /// Given the Routine by a click on an Occurrence's notification: the
+    /// window is to open its Note.
+    occurrence_wanted: OccurrenceWanted,
     /// Raised by a click on the Nudge: the window is to show Unsorted.
     unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge: the window is to send each
@@ -254,6 +262,7 @@ impl Alerts {
             shown: BTreeMap::new(),
             changed,
             open_requested: false,
+            occurrence_wanted: Arc::new(Mutex::new(None)),
             unsorted_wanted: Arc::new(AtomicBool::new(false)),
             changes_wanted: Arc::new(AtomicBool::new(false)),
             ringer: None,
@@ -270,6 +279,13 @@ impl Alerts {
     /// Unsorted ([`crate::App::set_unsorted_wanted`]).
     pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
         self.unsorted_wanted = wanted;
+    }
+
+    /// Puts the Routine into `wanted` when an Occurrence's notification
+    /// is clicked, for the window to open its Note
+    /// ([`crate::App::set_occurrence_wanted`]).
+    pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
+        self.occurrence_wanted = wanted;
     }
 
     /// Raises `wanted` when the Changes Nudge is clicked, for the window
@@ -295,6 +311,12 @@ impl Alerts {
             }
             if tap.key == NUDGE_KEY {
                 self.unsorted_wanted.store(true, Ordering::SeqCst);
+            }
+            if let Some((routine, occurrence)) = split_key(&tap.key)
+                && Occurrence::parse(occurrence).is_some()
+                && let Ok(mut wanted) = self.occurrence_wanted.lock()
+            {
+                *wanted = Some(routine.to_string());
             }
             self.open_requested = true;
             return Ok(());

@@ -40,7 +40,7 @@ use std::sync::{Arc, Mutex};
 use oldbrainfix_core::{
     APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store, ThemeChoice,
 };
-use oldbrainfix_gui::alerts::{self, Alerts, Event};
+use oldbrainfix_gui::alerts::{self, Alerts, Event, OccurrenceWanted};
 use oldbrainfix_gui::app::BIGGER_ZOOM;
 use oldbrainfix_gui::auto_sync::{self, Syncing};
 use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
@@ -296,6 +296,9 @@ struct Shell {
     /// Raised by a click on the Changes Nudge, for the window to save the
     /// bundles.
     changes_wanted: Arc<AtomicBool>,
+    /// Given the Routine by a click on an Occurrence's notification, for
+    /// the window to open its Note.
+    occurrence_wanted: OccurrenceWanted,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
     tray: TrayHeld,
@@ -355,6 +358,7 @@ impl Shell {
         app.set_agenda_store(move || agenda.clone());
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
+        app.set_occurrence_wanted(self.occurrence_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
@@ -697,12 +701,14 @@ fn run() -> Result<i32, String> {
     let changes = Arc::new(AtomicU64::new(0));
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
+    let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
     {
         let store = store.clone();
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
+        alerts.set_occurrence_wanted(occurrence_wanted.clone());
         alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
         let wake_window = waker(&window);
@@ -933,6 +939,7 @@ fn run() -> Result<i32, String> {
         syncing,
         unsorted_wanted,
         changes_wanted,
+        occurrence_wanted,
         handed,
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),

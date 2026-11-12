@@ -1277,6 +1277,11 @@ replace a law of Both apps where they say so. A desktop law marked
   time?", Tomorrow only for an Occurrence of today or later. On macOS it
   has no buttons; there is no full-screen alarm. A click on the Nudge
   opens the window on Unsorted, in place of the phone's Nudge screen.
+- **A click on an Occurrence's notification opens its Note dialog**
+  (#270), the body or "Open Old Brain Fix" alike: the window comes up
+  with the Note dialog of its Note and its Due line, over whatever it
+  showed; a Routine editor or Tally form open stays over it with its
+  draft. A Routine or Note gone or in the trash opens only the window.
 
 ### What the desktop does not have
 

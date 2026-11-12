@@ -139,6 +139,24 @@ fn top(harness: &Harness<'_, App>, label: &str) -> f32 {
     harness.get_by_label(label).rect().top()
 }
 
+/// Opens the Routine editor of the first row of `title` on the Agenda
+/// from "Edit schedule" in its ⋮ (#270).
+fn edit_schedule(harness: &mut Harness<'_, App>, title: &str) -> TestResult {
+    harness
+        .query_all_by_label(&format!("More for {title}"))
+        .next()
+        .ok_or(format!("a {title} row"))?
+        .click();
+    harness.run();
+    harness
+        .query_all_by_role_and_label(Role::Button, "Edit schedule")
+        .last()
+        .ok_or("Edit schedule")?
+        .click();
+    harness.run();
+    Ok(())
+}
+
 fn routine_of(
     app: &App,
     text: &str,
@@ -657,13 +675,9 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
     // (#268), brought back by Ctrl+Z, and restored from the trash.
     harness.get_by_label("Agenda").click();
     harness.run();
-    // Every other day of the week has its row; any opens the Routine.
-    harness
-        .query_all_by_role_and_label(Role::Button, "Night meds")
-        .next()
-        .ok_or("a Night meds row")?
-        .click();
-    harness.run();
+    // Every other day of the week has its row; Edit schedule in the ⋮
+    // of any opens the Routine (#270).
+    edit_schedule(&mut harness, "Night meds")?;
     assert!(shows(&harness, "Routine"));
     harness.get_by_label("Delete").click();
     harness.run();
@@ -675,12 +689,7 @@ fn deleting_a_note_takes_its_routines_along_and_a_routine_goes_to_the_trash() ->
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
     harness.run();
     assert!(routine_of(harness.state(), "Night meds").is_ok());
-    harness
-        .query_all_by_role_and_label(Role::Button, "Night meds")
-        .next()
-        .ok_or("a Night meds row")?
-        .click();
-    harness.run();
+    edit_schedule(&mut harness, "Night meds")?;
     harness.get_by_label("Delete").click();
     harness.run();
     assert!(routine_of(harness.state(), "Night meds").is_err());

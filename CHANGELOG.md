@@ -16,7 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - On the phone and the desktop, Sync picks a sync bundle's Device or Everything with radio buttons instead of a dropdown.
 - On the phone and the desktop, deleting what can be restored no longer asks first: a Note moved to the Trash, a Routine or Reminder, a Frog, a Tally entry, a Line, the "From …" label, a Transcript or a Photo Text goes at once. On the phone the announcement at the top undoes it with a tap for 10 seconds; on the desktop Ctrl+Z and Edit ▸ Undo undo the last delete, check-off, filing or Merge. A Checklist and a Shopping List show their deleted Lines under the folded "Removed Lines" in the Note editor and the desktop's Note dialog, each with Restore.
-- On the phone, a tap on an Occurrence on the Agenda or on its notification opens the editor of its Note, with Done, Snooze and Not today at the top once it is due, instead of the Routine editor or the app as it was; Edit schedule in the row's ⋮ and the Routine's badge in the Note editor open the schedule.
+- On the phone and the desktop, a tap or click on an Occurrence on the Agenda or on its notification opens its Note in the editor or the desktop's Note dialog, with Done, Snooze and Not today at the top once it is due, instead of the Routine editor or the app as it was; Edit schedule in the row's ⋮ (on the desktop also its right-click menu) and the Routine's badge open the schedule.
 
 ### Fixed
 
