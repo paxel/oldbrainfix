@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'boxes.dart';
 import 'entry.dart';
 import 'file_text.dart';
+import 'hidden_from_ai.dart';
 import 'named_places.dart';
 import 'places.dart';
 import 'profiles.dart';
@@ -1154,11 +1155,17 @@ class Notes {
   static bool _hasText(String? text) => text != null && text.trim().isNotEmpty;
 
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
-  /// wherever it was before.
+  /// wherever it was before. A Note Hidden from AI, by its own mark or
+  /// its Area's, does not go into a Shared Area ([HiddenFromAiRefused],
+  /// #267).
   void file(String noteId, String placeId) {
     _requireNote(noteId);
     if (!Places(store).isPlace(placeId)) {
       throw ArgumentError.value(placeId, 'placeId', 'not an Area or Topic');
+    }
+    final area = store.areaOf(placeId);
+    if (area != null && store.isShared(area)) {
+      store.refuseHiddenFromAi(store.hiddenFromAiBy(noteId));
     }
     store.append(noteId, NoteKeys.place, placeId);
   }

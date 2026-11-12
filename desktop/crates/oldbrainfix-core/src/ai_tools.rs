@@ -1099,7 +1099,8 @@ impl Store {
     /// it as it was, and says why in an output marked as an error. An
     /// error only for a tool there is none of.
     /// `wall` is this computer's clock, for the days of the user's data
-    /// and for a Shopping List's struck Lines.
+    /// and for a Shopping List's struck Lines. It runs as the AI sees the
+    /// store ([`Store::for_ai`]): what is Hidden from AI does not exist.
     pub fn ai_tool(
         &self,
         task: &str,
@@ -1110,12 +1111,15 @@ impl Store {
         if !is_tool(name) {
             return Err(Error::Invalid(format!("no tool {name}")));
         }
-        let done = if reads_only(name) {
-            self.ai_read(name, args, wall)
-        } else {
-            self.drafting(task, || self.ai_change(name, args, wall))
-                .map(|value| ToolOutput::json(&value))
-        };
+        // What is Hidden from AI does not exist for it (#267, ADR 0049).
+        let done = self.for_ai(|| {
+            if reads_only(name) {
+                self.ai_read(name, args, wall)
+            } else {
+                self.drafting(task, || self.ai_change(name, args, wall))
+                    .map(|value| ToolOutput::json(&value))
+            }
+        });
         Ok(done.unwrap_or_else(|e| ToolOutput::failed(&e.to_string())))
     }
 
@@ -1172,9 +1176,23 @@ impl Store {
         if let (Some(session), Some(all)) =
             (Sessions::new(self).by_id(&routine.id)?, out.as_object_mut())
         {
-            all.insert("session".into(), setup_json(&session.setup, None));
+            let setup = self.seen_setup(&session.setup)?;
+            all.insert("session".into(), setup_json(&setup, None));
         }
         Ok(out)
+    }
+
+    /// `setup` as the AI sees it: its pool without the Tallies Hidden
+    /// from AI (#267).
+    fn seen_setup(&self, setup: &SessionSetup) -> Result<SessionSetup> {
+        let mut seen = setup.clone();
+        seen.pool.clear();
+        for id in &setup.pool {
+            if !self.ai_hides(id)? {
+                seen.pool.push(id.clone());
+            }
+        }
+        Ok(seen)
     }
 
     fn routines_value(&self, routines: &[Routine]) -> Result<Value> {
@@ -1312,7 +1330,7 @@ impl Store {
                     Some(setup) => {
                         let runs = sessions.of_note(id)?;
                         let runs = runs.iter().map(|s| s.id().to_string()).collect();
-                        setup_json(&setup, Some(runs))
+                        setup_json(&self.seen_setup(&setup)?, Some(runs))
                     }
                     None => Value::Null,
                 };
@@ -1728,14 +1746,22 @@ impl Store {
                 if Notes::new(self).by_id(note)?.is_none() {
                     return Err(Error::Invalid(format!("not a Note: {note}")));
                 }
+                // An Area, Topic or Note Hidden from AI it was filed in
+                // or merged into reads as none (#267).
+                let seen = |value: Option<String>| -> Result<Option<String>> {
+                    match value {
+                        Some(v) if self.ai_hides(&v)? => Ok(None),
+                        other => Ok(other),
+                    }
+                };
                 for c in NoteHistory::new(self).of(note)? {
-                    if !range.holds(day(c.at)) {
+                    if !range.holds(day(c.at)) || self.ai_hides(&c.entity)? {
                         continue;
                     }
                     let value = json!({
-                        "after": c.after,
+                        "after": seen(c.after)?,
                         "at": dart_iso(c.at),
-                        "before": c.before,
+                        "before": seen(c.before)?,
                         "by": c.by.as_ref().map(|p| p.name.clone()),
                         "change": c.kind.name(),
                         "day": day(c.at).to_string(),
@@ -1760,6 +1786,10 @@ impl Store {
                     }
                     let mut tallies = Vec::new();
                     for note in picks {
+                        // A pick of a Tally Hidden from AI is not there.
+                        if self.ai_hides(note)? {
+                            continue;
+                        }
                         let entries: Vec<Value> = marks
                             .entries_for(self, key, note)?
                             .iter()
@@ -1879,7 +1909,17 @@ impl Store {
                     other => return Err(Error::Invalid(format!("notesGo cannot be {other}"))),
                 };
                 let place = id()?;
-                if places.topic_by_id(place)?.is_some() {
+                let topic = places.topic_by_id(place)?.is_some();
+                // A Note Hidden from AI would be left behind in a deleted
+                // place or moved unseen (#267): the user deletes it.
+                if (topic || places.area_by_id(place)?.is_some())
+                    && self.holds_hidden_from_ai(place)?
+                {
+                    return Err(Error::Invalid(format!(
+                        "{place} can only be deleted in the app"
+                    )));
+                }
+                if topic {
                     places.delete_topic(place, go)?;
                 } else {
                     places.delete_area(place, go)?;
@@ -2061,7 +2101,16 @@ impl Store {
                 let note = id()?;
                 let mut set = false;
                 if args.get("pool").is_some() {
-                    sessions.set_pool(note, &strings_arg(args, "pool")?)?;
+                    let mut pool = strings_arg(args, "pool")?;
+                    // The Tallies Hidden from AI it held stay, unseen (#267).
+                    if let Some(setup) = sessions.setup_of(note)? {
+                        for id in self.hidden_of(&setup.pool)? {
+                            if !pool.contains(&id) {
+                                pool.push(id);
+                            }
+                        }
+                    }
+                    sessions.set_pool(note, &pool)?;
                     set = true;
                 }
                 if let Some(count) = count_arg(args)? {

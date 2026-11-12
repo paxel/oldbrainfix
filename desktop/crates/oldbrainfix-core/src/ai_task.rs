@@ -150,11 +150,13 @@ fn is_weekday_count(field: &str) -> bool {
     (1..=7).any(|weekday| field == session_keys::count_on(weekday))
 }
 
-/// Which thread drafts into which set, and which read the log alone.
+/// Which thread drafts into which set, which read the log alone, and
+/// which read as the AI ([`Store::for_ai`]).
 #[derive(Default)]
 pub(crate) struct Scopes {
     drafting: HashMap<ThreadId, String>,
     log_only: HashMap<ThreadId, usize>,
+    pub(crate) for_ai: HashMap<ThreadId, crate::hidden::AiView>,
 }
 
 /// Ends a scope of [`Scopes`] for the thread, also when its body panics.
@@ -381,6 +383,11 @@ impl Store {
     /// the Shared Area allows, as the log has it, as the screens ask
     /// before they write.
     fn check_ai_draft(&self, entity: &str, field: &str, value: Option<&str>) -> Result<()> {
+        // What is Hidden from AI does not exist for it (#267): refused as
+        // an unknown id, before anything below reads it.
+        if self.draft_reaches_hidden(entity, field, value)? {
+            return Err(Error::Invalid(format!("not known: {entity}")));
+        }
         let refuse = |why: &str| {
             Err(Error::Invalid(format!(
                 "not for an AI Task: {field} of {entity}, {why}"

@@ -759,10 +759,13 @@ impl Store {
     /// fresh ids first when it has a Starter Set id, then makes this
     /// Device its first Manager, under the own Profile, and every own
     /// paired Device a Manager with it. Returns the id it goes on under.
+    /// A hidden Area, or one holding hidden Notes, is not shared
+    /// ([`Error::HiddenFromAi`], #267), and nothing changes.
     pub fn share(&self, area: &str) -> Result<String> {
         if self.is_shared(area)? {
             return Ok(area.to_string());
         }
+        Store::refuse_hidden_from_ai(self.hidden_from_ai_in(area)?)?;
         self.batch(|| {
             let starter = self
                 .current(area, place_keys::STARTER)?

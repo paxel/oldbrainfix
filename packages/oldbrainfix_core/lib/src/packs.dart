@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'blobs.dart';
 import 'checklists.dart';
 import 'file_text.dart';
+import 'hidden_from_ai.dart';
 import 'frogs.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
@@ -1182,6 +1183,11 @@ PackFile _attached(Object? json) {
 
 // --------------------------------------------------------------- export
 
+/// What a Pack does with a Note Hidden from AI (#267): one picked for
+/// export is [refused], the feedback of everything leaves it [leftOut],
+/// a Backup opened here keeps it ([kept]), as it is the user's own.
+enum _Hidden { refused, leftOut, kept }
+
 extension PackExport on Store {
   /// The Pack of everything the tree may offer when exporting from the
   /// Area, Topic or Note [from] (Q468): from a Note, that Note; from a
@@ -1194,7 +1200,8 @@ extension PackExport on Store {
   /// own Area and Topic, but for those filed into an Area of [closed]:
   /// the locked Areas not open now, whose Tallies the app does not show.
   /// Only the names of the Areas and Topics go along (Q469). Nothing in
-  /// the trash or merged into another Note.
+  /// the trash or merged into another Note. Refused when a Note it would
+  /// hold is Hidden from AI ([HiddenFromAiRefused], #267).
   Pack packOf(String from, {Set<String> closed = const {}}) {
     final notes = Notes(this);
     final places = Places(this);
@@ -1219,14 +1226,15 @@ extension PackExport on Store {
       }
       picked = [note];
     }
-    return _packOfNotes(picked, closed);
+    return _packOfNotes(picked, closed, hidden: _Hidden.refused);
   }
 
   /// The Pack of everything the tree may offer for feedback (#214): each
   /// Area in the person's own order, as [areasInOrder] by [shown] lists
   /// them (#280), but those of [closed], with its own Notes and then its
   /// Topics' Notes as [packOf] lists them, then the Notes filed into no
-  /// Area, newest capture first; nothing in the trash or merged.
+  /// Area, newest capture first; nothing in the trash or merged, and
+  /// nothing Hidden from AI (#267), which the user did not pick.
   Pack packOfAll({
     Set<String> closed = const {},
     String Function(Area area)? shown,
@@ -1240,13 +1248,17 @@ extension PackExport on Store {
           for (final t in places.topics(area.id)) t.id,
         ],
     ];
-    return _packOfNotes([
-      for (final id in ids)
+    return _packOfNotes(
+      [
+        for (final id in ids)
+          for (final n in all)
+            if (n.place == id) n,
         for (final n in all)
-          if (n.place == id) n,
-      for (final n in all)
-        if (n.place == null) n,
-    ], closed);
+          if (n.place == null) n,
+      ],
+      closed,
+      hidden: _Hidden.leftOut,
+    );
   }
 
   /// The Pack of a Backup opened to take Notes back from it (#285): every
@@ -1312,16 +1324,28 @@ extension PackExport on Store {
   /// The Pack of [picked], in their order, and the Tallies their Sessions
   /// pick from that are not among them after them, but for those filed
   /// into an Area of [closed]; the files' sizes from [sizeOf] when given.
-  /// [seen] gets the Notes in the order the Pack holds them.
+  /// [seen] gets the Notes in the order the Pack holds them. What is
+  /// Hidden from AI goes as [hidden] says.
   Pack _packOfNotes(
     List<Note> picked,
     Set<String> closed, {
     int? Function(String kind, String hash)? sizeOf,
     List<Note>? seen,
+    _Hidden hidden = _Hidden.kept,
   }) {
     final notes = Notes(this);
     final places = Places(this);
-    final order = [...picked];
+    final marks = hidden == _Hidden.kept
+        ? const <String>{}
+        : hiddenFromAiMarks();
+    List<String> marksOf(String id) =>
+        marks.isEmpty ? const [] : hiddenFromAiBy(id, marks);
+    bool leftOut(String id) =>
+        hidden == _Hidden.leftOut && marksOf(id).isNotEmpty;
+    final order = [
+      for (final n in picked)
+        if (!leftOut(n.id)) n,
+    ];
     final sessions = Sessions(this);
     // The Tallies the Sessions pick from that are not among them.
     for (var k = 0; k < order.length; k++) {
@@ -1330,7 +1354,7 @@ extension PackExport on Store {
       for (final t in sessions.pool(setup)) {
         if (order.any((n) => n.id == t)) continue;
         final tally = notes.byId(t);
-        if (tally == null) continue;
+        if (tally == null || leftOut(t)) continue;
         final place = tally.place;
         final area = place == null
             ? null
@@ -1338,6 +1362,11 @@ extension PackExport on Store {
         if (area != null && closed.contains(area)) continue;
         order.add(tally);
       }
+    }
+    if (hidden == _Hidden.refused) {
+      refuseHiddenFromAi(
+        {for (final n in order) ...marksOf(n.id)}.toList()..sort(),
+      );
     }
     final index = {for (final (i, n) in order.indexed) n.id: i};
     final areas = <String, int>{};

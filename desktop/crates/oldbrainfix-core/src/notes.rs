@@ -1326,11 +1326,18 @@ impl<'a> Notes<'a> {
     }
 
     /// Files the Note `note_id` into the Area or Topic `place_id`, out of
-    /// wherever it was before.
+    /// wherever it was before. A Note Hidden from AI, by its own mark or
+    /// its Area's, does not go into a Shared Area
+    /// ([`Error::HiddenFromAi`], #267).
     pub fn file(&self, note_id: &str, place_id: &str) -> Result<()> {
         self.require_note(note_id)?;
         if !Places::new(self.store).is_place(place_id)? {
             return Err(Error::Invalid(format!("not an Area or Topic: {place_id}")));
+        }
+        if let Some(area) = self.store.area_of(place_id)?
+            && self.store.is_shared(&area)?
+        {
+            Store::refuse_hidden_from_ai(self.store.hidden_from_ai_by(note_id)?)?;
         }
         self.store
             .append(note_id, keys::PLACE, Some(place_id), None)

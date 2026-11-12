@@ -1518,6 +1518,16 @@ fn utc(at: DateTime<Utc>) -> chrono::NaiveDateTime {
     at.naive_utc()
 }
 
+/// What a Pack does with a Note Hidden from AI (#267), as the Dart
+/// core's: one picked for export is refused, the feedback of everything
+/// leaves it out, a Backup opened here keeps it, as it is the user's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Hidden {
+    Refused,
+    LeftOut,
+    Kept,
+}
+
 impl Store {
     /// The Pack of everything the tree may offer when exporting from the
     /// Area, Topic or Note `from` (Q468), as the Dart core's `packOf`:
@@ -1531,7 +1541,8 @@ impl Store {
     /// filed into an Area of `closed`: the locked Areas not open now,
     /// whose Tallies the app does not show. Only the names of the Areas
     /// and Topics go along (Q469). Nothing in the trash or merged into
-    /// another Note.
+    /// another Note. Refused when a Note it would hold is Hidden from AI
+    /// ([`Error::HiddenFromAi`], #267).
     pub fn pack_of(&self, from: &str, closed: &HashSet<String>) -> Result<Pack> {
         let notes = Notes::new(self);
         let places = Places::new(self);
@@ -1557,7 +1568,7 @@ impl Store {
                 .ok_or_else(|| Error::Invalid(format!("not an Area, Topic or Note: {from}")))?;
             vec![note]
         };
-        self.pack_of_notes(&picked, closed)
+        self.pack_of_notes(&picked, closed, Hidden::Refused)
     }
 
     /// The Pack of everything the tree may offer for feedback, as
@@ -1573,7 +1584,8 @@ impl Store {
     /// (#280), but those of `closed`, with its own Notes and then its
     /// Topics' Notes as [`Store::pack_of`] lists them, then the Notes
     /// filed into no Area, newest capture first; nothing in the trash or
-    /// merged.
+    /// merged, and nothing Hidden from AI (#267), which the user did not
+    /// pick.
     pub fn pack_of_all_by(
         &self,
         closed: &HashSet<String>,
@@ -1599,7 +1611,7 @@ impl Store {
             .cloned()
             .collect();
         picked.extend(all.iter().filter(|n| n.place.is_none()).cloned());
-        self.pack_of_notes(&picked, closed)
+        self.pack_of_notes(&picked, closed, Hidden::LeftOut)
     }
 
     /// The Pack of a Backup opened to take Notes back from it (#285), as
@@ -1653,7 +1665,7 @@ impl Store {
             .cloned()
             .collect();
         picked.extend(kept.iter().filter(|n| n.place.is_none()).cloned());
-        let (pack, order) = self.pack_of_notes_by(&picked, closed, size_of)?;
+        let (pack, order) = self.pack_of_notes_by(&picked, closed, size_of, Hidden::Kept)?;
         let mut trashed = BTreeSet::new();
         for (i, id) in order.iter().enumerate() {
             if notes.by_id(id)?.is_some_and(|n| n.is_trashed()) {
@@ -1669,10 +1681,16 @@ impl Store {
 
     /// The Pack of `picked`, in their order, and the Tallies their
     /// Sessions pick from that are not among them after them, but for
-    /// those filed into an Area of `closed`.
-    fn pack_of_notes(&self, picked: &[Note], closed: &HashSet<String>) -> Result<Pack> {
+    /// those filed into an Area of `closed`; what is Hidden from AI goes
+    /// as `hidden` says.
+    fn pack_of_notes(
+        &self,
+        picked: &[Note],
+        closed: &HashSet<String>,
+        hidden: Hidden,
+    ) -> Result<Pack> {
         let held = |kind: &str, hash: &str| self.blob(kind, hash).map(|b| b.len());
-        Ok(self.pack_of_notes_by(picked, closed, &held)?.0)
+        Ok(self.pack_of_notes_by(picked, closed, &held, hidden)?.0)
     }
 
     /// [`Store::pack_of_notes`] with the files' sizes from `size_of`, and
@@ -1682,17 +1700,31 @@ impl Store {
         picked: &[Note],
         closed: &HashSet<String>,
         size_of: &SizeOf,
+        hidden: Hidden,
     ) -> Result<(Pack, Vec<String>)> {
         let notes = Notes::new(self);
         let places = Places::new(self);
-        let mut order: Vec<String> = picked.iter().map(|n| n.id.clone()).collect();
+        let marks = match hidden {
+            Hidden::Kept => BTreeSet::new(),
+            _ => self.hidden_from_ai_marks()?,
+        };
+        let marks_of = |id: &str| self.hidden_by(id, &marks);
+        let left_out = |id: &str| -> Result<bool> {
+            Ok(hidden == Hidden::LeftOut && !marks_of(id)?.is_empty())
+        };
+        let mut order: Vec<String> = Vec::new();
+        for n in picked {
+            if !left_out(&n.id)? {
+                order.push(n.id.clone());
+            }
+        }
         let sessions = Sessions::new(self);
         // The Tallies the Sessions pick from that are not among them.
         let mut k = 0;
         while let Some(id) = order.get(k).cloned() {
             if let Some(setup) = sessions.setup_of(&id)? {
                 for t in sessions.pool(&setup)? {
-                    if order.contains(&t) {
+                    if order.contains(&t) || left_out(&t)? {
                         continue;
                     }
                     let place = notes.by_id(&t)?.and_then(|n| n.place);
@@ -1710,6 +1742,15 @@ impl Store {
                 }
             }
             k += 1;
+        }
+        if hidden == Hidden::Refused {
+            let mut found: BTreeSet<String> = BTreeSet::new();
+            for id in &order {
+                found.extend(marks_of(id)?);
+            }
+            let mut found: Vec<String> = found.into_iter().collect();
+            found.sort_by(|a, b| crate::store::utf16_cmp(a, b));
+            Store::refuse_hidden_from_ai(found)?;
         }
         let index: HashMap<String, usize> = order
             .iter()

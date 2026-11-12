@@ -5,6 +5,7 @@ import 'area_keys.dart';
 import 'box_keys.dart';
 import 'checklists.dart';
 import 'entry.dart';
+import 'hidden_from_ai.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'pending.dart';
@@ -527,12 +528,16 @@ List<Recipient> sentItemRecipients(Store store) {
 /// time. With [cancel] it goes out as the cancellation of that id. It
 /// carries the own Profile, which the app makes at its first start.
 /// Only a link one of the user's own Devices wrote counts (ADR 0015).
+/// A Note Hidden from AI is refused ([HiddenFromAiRefused], #267).
 SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final notes = Notes(store);
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged) {
     throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
   }
+  // A Note Hidden from AI goes to nobody, its cancellation neither, as it
+  // carries the text again (#267).
+  store.refuseHiddenFromAi(store.hiddenFromAiBy(noteId));
   final profile = SignedProfile.fromJson(store.ownProfileForOthers);
   if (profile == null) throw StateError('no own Profile to send with');
   final field = SentKeys.sent(store.deviceId);

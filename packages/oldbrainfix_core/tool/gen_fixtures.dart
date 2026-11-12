@@ -596,6 +596,98 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'hidden-from-ai',
+    about:
+        'Hidden from AI (#267): a Note in a Topic of an Area and its Amend, '
+        'a Note of the Area itself, a Note filed nowhere with another '
+        'merged into it, and a Note of a second Area; the first Area '
+        'marked, then the Note filed nowhere, the same again, which writes '
+        'nothing; a value no app writes on the Note of the second Area; '
+        'the mark taken off the Note filed nowhere and set again; an Area '
+        'shared; refused: the first Area shared, the second shared once its '
+        'Note is marked, the marked Note and the Note of the first Area filed '
+        'into the Shared Area, the Note of the first Area sent, Packs of the '
+        'second Area and of the marked Note; the Note of the first Area filed out of it, and the '
+        'mark taken off the first Area. `hidden_from_ai.json` holds after '
+        'each length of the log the marks, the marks hiding each entity and '
+        'where the mark may be set, and each refusal with the marks named.',
+    build: (store) {
+      final places = Places(store);
+      final notes = Notes(store);
+      final health = places.addArea('Health').id;
+      final back = places.addTopic(health, 'Back').id;
+      final home = places.addArea('Home').id;
+      final physio = notes.capture('Physio #health/back', place: back).id;
+      final exercises = notes.amend(physio, 'Exercises').id;
+      final doctor = notes.capture('Doctor', place: health).id;
+      final diary = notes.capture('Diary').id;
+      final later = notes.capture('Diary, later').id;
+      notes.merge(later, diary);
+      final recipe = notes.capture('Recipe', place: home).id;
+      final watched = [
+        health,
+        back,
+        home,
+        physio,
+        exercises,
+        doctor,
+        diary,
+        later,
+        recipe,
+      ];
+      final offered = [health, back, home, physio, diary, 'note:gone'];
+      void read() => _hiddenFromAiReads.add({
+        'entries': store.allEntries().length,
+        'marks': store.hiddenFromAiMarks().toList()..sort(),
+        'hidden': {for (final id in watched) id: store.hiddenFromAiBy(id)},
+        'mayHide': {for (final id in offered) id: store.mayHideFromAi(id)},
+      });
+      void refused(String action, List<String> ids, void Function() act) {
+        try {
+          act();
+        } on HiddenFromAiRefused catch (e) {
+          _hiddenFromAiRefusals.add({
+            'entries': store.allEntries().length,
+            'action': action,
+            'ids': ids,
+            'marks': e.marks,
+          });
+          return;
+        }
+        throw StateError('$action was not refused');
+      }
+
+      read();
+      store.setHiddenFromAi(health, true);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      store.append(HiddenFromAiKeys.of(recipe), HiddenFromAiKeys.hidden, 'yes');
+      read();
+      store.setHiddenFromAi(diary, false);
+      read();
+      store.setHiddenFromAi(diary, true);
+      read();
+      final family = store.share(places.addArea('Family').id);
+      read();
+      refused('share', [health], () => store.share(health));
+      store.setHiddenFromAi(recipe, true);
+      read();
+      refused('share', [home], () => store.share(home));
+      refused('file', [diary, family], () => notes.file(diary, family));
+      refused('file', [doctor, family], () => notes.file(doctor, family));
+      refused('send', [doctor], () => sentItemOf(store, doctor));
+      refused('pack', [home], () => store.packOf(home));
+      refused('pack', [diary], () => store.packOf(diary));
+      notes.file(doctor, home);
+      read();
+      store.setHiddenFromAi(health, false);
+      read();
+    },
+  ),
+  (
     name: 'help',
     about:
         'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
@@ -4952,6 +5044,13 @@ final _featureReads = <Map<String, Object>>[];
 
 /// What the `area-order` scenario read after each of its steps.
 final _areaOrderReads = <Map<String, Object>>[];
+
+/// What the `hidden-from-ai` scenario read after each of its steps.
+final _hiddenFromAiReads = <Map<String, Object>>[];
+
+/// What the `hidden-from-ai` scenario had refused, at which length of
+/// its log.
+final _hiddenFromAiRefusals = <Map<String, Object>>[];
 
 /// What the `area-order-shown` scenario read after each of its steps.
 final _areaOrderShownReads = <Map<String, Object>>[];
@@ -10534,6 +10633,11 @@ Future<void> main(List<String> args) async {
     'person\'s own order after the first entries of the `area-order-shown` '
     'log, as many as each read gives, by stored name (`stored`) and by the '
     'name the app shows (`shown`).\n'
+    '- `hidden-from-ai/hidden_from_ai.json`: after the first entries of the '
+    '`hidden-from-ai` log, as many as each read gives, the Notes and Areas '
+    'marked Hidden from AI, the marks hiding each entity and whether the '
+    'mark may be set on each id; and each refusal, the action with its ids '
+    'and the marks it named, at the length of the log it was tried on.\n'
     '- `help/help.json`: the ids of the help Notes each step of the `help` '
     'scenario made, in the order it made them.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
@@ -11060,6 +11164,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/area_order.json'),
           '${_json.convert({'reads': _areaOrderShownReads})}\n',
+        );
+      }
+      if (scenario.name == 'hidden-from-ai') {
+        _write(
+          File('${out.path}/hidden_from_ai.json'),
+          '${_json.convert({'reads': _hiddenFromAiReads, 'refusals': _hiddenFromAiRefusals})}\n',
         );
       }
       if (scenario.name == 'help') {

@@ -559,12 +559,16 @@ impl Store {
     /// With `cancel` it goes out as the cancellation of that id. It
     /// carries the own Profile, which the app makes at its first start.
     /// Only a link one of the user's own Devices wrote counts (ADR 0015).
+    /// A Note Hidden from AI is refused ([`Error::HiddenFromAi`], #267).
     pub fn sent_item_of(&self, note_id: &str, cancel: bool) -> Result<SentItem> {
         let notes = Notes::new(self);
         let note = notes
             .by_id(note_id)?
             .filter(|n| !n.is_trashed() && !n.is_merged())
             .ok_or_else(|| Error::Invalid(format!("not a Note in the lists: {note_id}")))?;
+        // A Note Hidden from AI goes to nobody, its cancellation neither,
+        // as it carries the text again (#267).
+        Store::refuse_hidden_from_ai(self.hidden_from_ai_by(note_id)?)?;
         let profile = self
             .own_profile_for_others()?
             .as_ref()

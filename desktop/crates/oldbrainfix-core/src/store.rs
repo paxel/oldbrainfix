@@ -281,8 +281,9 @@ pub struct Store {
     /// The pending sets held, and what is worked out from the shown ones
     /// after every change. Never held while the connection is taken.
     pending: Mutex<PendingState>,
-    /// The pending set each thread drafts into ([`Store::drafting`]) and
-    /// the threads that read the log alone ([`Store::log_only`]).
+    /// The pending set each thread drafts into ([`Store::drafting`]), the
+    /// threads that read the log alone ([`Store::log_only`]) and those
+    /// that read as the AI ([`Store::for_ai`]).
     pub(crate) scopes: Mutex<crate::ai_task::Scopes>,
 }
 
@@ -434,18 +435,19 @@ impl Store {
     /// they show changes, as the Dart core's `workedOut`: the log, or the
     /// shown pending sets. An entry another store open on the same file
     /// wrote counts too, by the log's high-water mark. Inside
-    /// [`Store::log_only`], which shows the log alone, it is worked out
-    /// anew and not kept.
+    /// [`Store::log_only`], which shows the log alone, and inside
+    /// [`Store::for_ai`], which leaves out what is Hidden from AI, it is
+    /// worked out anew and not kept.
     pub(crate) fn worked_out<T: Send + Sync + 'static>(
         &self,
         key: &'static str,
         build: impl FnOnce() -> Result<T>,
     ) -> Result<Arc<T>> {
-        let log_only = self.reads_log_only();
+        let fresh = self.reads_log_only() || self.reads_for_ai();
         // Read before the lock is taken: a write takes the connection
         // first, then this lock.
         let seq = self.current_seq()?;
-        if !log_only {
+        if !fresh {
             let mut worked = self.worked_out.lock();
             if worked.seq != seq {
                 worked.seq = seq;
@@ -459,7 +461,7 @@ impl Store {
         }
         let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
         let value = Arc::new(build()?);
-        if !log_only {
+        if !fresh {
             let after = self.current_seq()?;
             let mut worked = self.worked_out.lock();
             // Kept only when nothing changed while it was worked out.
@@ -948,6 +950,15 @@ impl Store {
         if more {
             logged.sort();
         }
+        if self.reads_for_ai() {
+            let mut left = Vec::with_capacity(logged.len());
+            for (entity, field) in logged {
+                if !self.ai_hides(&entity)? {
+                    left.push((entity, field));
+                }
+            }
+            logged = left;
+        }
         Ok(logged)
     }
 
@@ -1255,6 +1266,26 @@ impl Store {
 
     /// The entities whose id starts with `prefix`, sorted.
     pub fn entities_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
+        let mut found = self.entities_with_prefix_all(prefix)?;
+        if self.reads_for_ai() {
+            found = self.left_for_ai(found)?;
+        }
+        Ok(found)
+    }
+
+    /// What the AI sees of `ids` ([`Store::for_ai`]): those not Hidden
+    /// from AI.
+    fn left_for_ai(&self, ids: Vec<String>) -> Result<Vec<String>> {
+        let mut left = Vec::with_capacity(ids.len());
+        for id in ids {
+            if !self.ai_hides(&id)? {
+                left.push(id);
+            }
+        }
+        Ok(left)
+    }
+
+    fn entities_with_prefix_all(&self, prefix: &str) -> Result<Vec<String>> {
         let mut logged: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
@@ -1286,6 +1317,9 @@ impl Store {
         #[cfg(test)]
         self.history_reads
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.ai_hides(entity)? {
+            return Ok(Vec::new());
+        }
         let shown = self.shown()?;
         if shown.is_empty() {
             return self.logged_history(entity);
@@ -1309,6 +1343,9 @@ impl Store {
     /// pending change among them: what decides where an entity is
     /// sealed, and what the user's own Devices wrote.
     pub fn logged_history(&self, entity: &str) -> Result<Vec<Entry>> {
+        if self.ai_hides(entity)? {
+            return Ok(Vec::new());
+        }
         let all = self.entries(
             &format!("SELECT * FROM entries WHERE {APPLIED} AND entity = ? ORDER BY seq"),
             params![entity],
@@ -1391,7 +1428,7 @@ impl Store {
         let mut ids: Vec<&str> = Vec::new();
         let mut wanted = std::collections::HashSet::new();
         for id in entities {
-            if wanted.insert(id) {
+            if !self.ai_hides(id)? && wanted.insert(id) {
                 ids.push(id);
             }
         }
@@ -1497,6 +1534,9 @@ impl Store {
             if e.field == "$type" && e.value.as_deref() == Some(ty) && !ids.contains(&e.entity) {
                 ids.push(e.entity.clone());
             }
+        }
+        if self.reads_for_ai() {
+            ids = self.left_for_ai(ids)?;
         }
         Ok(ids)
     }

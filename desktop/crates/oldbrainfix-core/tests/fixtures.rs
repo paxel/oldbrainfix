@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 31] = [
+const SCENARIOS: [&str; 32] = [
     "area-order",
     "area-order-shown",
     "attachments",
@@ -64,6 +64,7 @@ const SCENARIOS: [&str; 31] = [
     "formats",
     "frogs",
     "help",
+    "hidden-from-ai",
     "history",
     "import",
     "keep",
@@ -1877,6 +1878,110 @@ fn the_areas_read_in_the_persons_own_order_as_the_dart_core_reads_them() -> Test
     Ok(())
 }
 
+/// The generator's `hidden-from-ai` scenario (#267).
+fn write_hidden_from_ai(store: &Store) -> Built {
+    use oldbrainfix_core::Error;
+    use oldbrainfix_core::hidden::keys;
+    let places = Places::new(store);
+    let notes = Notes::new(store);
+    let refused = |done: Result<(), Error>| match done {
+        Err(Error::HiddenFromAi(_)) => Ok(()),
+        other => Err(format!("not refused: {other:?}")),
+    };
+    let health = places.add_area("Health")?.id;
+    let back = places.add_topic(&health, "Back")?.id;
+    let home = places.add_area("Home")?.id;
+    let physio = notes.capture("Physio #health/back", Some(&back), None)?.id;
+    notes.amend(&physio, "Exercises")?;
+    let doctor = notes.capture("Doctor", Some(&health), None)?.id;
+    let diary = notes.capture("Diary", None, None)?.id;
+    let later = notes.capture("Diary, later", None, None)?.id;
+    notes.merge(&later, &diary)?;
+    let recipe = notes.capture("Recipe", Some(&home), None)?.id;
+    store.set_hidden_from_ai(&health, true)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    store.append(&keys::of(&recipe), keys::HIDDEN, Some("yes"), None)?;
+    store.set_hidden_from_ai(&diary, false)?;
+    store.set_hidden_from_ai(&diary, true)?;
+    let family = store.share(&places.add_area("Family")?.id)?;
+    refused(store.share(&health).map(drop))?;
+    store.set_hidden_from_ai(&recipe, true)?;
+    refused(store.share(&home).map(drop))?;
+    refused(notes.file(&diary, &family))?;
+    refused(notes.file(&doctor, &family))?;
+    refused(store.sent_item_of(&doctor, false).map(drop))?;
+    let none = std::collections::HashSet::new();
+    refused(store.pack_of(&home, &none).map(drop))?;
+    refused(store.pack_of(&diary, &none).map(drop))?;
+    notes.file(&doctor, &home)?;
+    store.set_hidden_from_ai(&health, false)?;
+    Ok(())
+}
+
+#[test]
+fn what_is_hidden_from_ai_reads_and_is_refused_as_the_dart_core_has_it() -> TestResult {
+    use oldbrainfix_core::Error;
+    let path = fixtures()
+        .join("hidden-from-ai")
+        .join("hidden_from_ai.json");
+    let expected = read_json(&path)?;
+    let reads = expected["reads"].as_array().ok_or("reads")?;
+    let refusals = expected["refusals"].as_array().ok_or("refusals")?;
+    assert!(!reads.is_empty() && !refusals.is_empty());
+    let entries = log("hidden-from-ai")?;
+    let up_to = |value: &Value| -> Result<Store, Box<dyn std::error::Error>> {
+        let length = value["entries"].as_u64().ok_or("entries")? as usize;
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || Ok(writer_key()))?;
+        for entry in &entries[..length] {
+            store.insert(entry)?;
+        }
+        Ok(store)
+    };
+    for read in reads {
+        let store = up_to(read)?;
+        let length = &read["entries"];
+        let marks: Vec<String> = store.hidden_from_ai_marks()?.into_iter().collect();
+        assert_eq!(json!(marks), read["marks"], "after {length} entries");
+        for (id, by) in read["hidden"].as_object().ok_or("hidden")? {
+            assert_eq!(
+                json!(store.hidden_from_ai_by(id)?),
+                *by,
+                "{id} after {length}"
+            );
+        }
+        for (id, may) in read["mayHide"].as_object().ok_or("mayHide")? {
+            assert_eq!(
+                json!(store.may_hide_from_ai(id)?),
+                *may,
+                "{id} after {length}"
+            );
+        }
+    }
+    for refusal in refusals {
+        let store = up_to(refusal)?;
+        let ids: Vec<&str> = refusal["ids"]
+            .as_array()
+            .ok_or("ids")?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let none = std::collections::HashSet::new();
+        let done = match (refusal["action"].as_str(), ids.as_slice()) {
+            (Some("share"), [area]) => store.share(area).map(drop),
+            (Some("file"), [note, place]) => Notes::new(&store).file(note, place),
+            (Some("send"), [note]) => store.sent_item_of(note, false).map(drop),
+            (Some("pack"), [from]) => store.pack_of(from, &none).map(drop),
+            other => return Err(format!("no action {other:?}").into()),
+        };
+        let Err(Error::HiddenFromAi(marks)) = done else {
+            return Err(format!("not refused: {refusal} {done:?}").into());
+        };
+        assert_eq!(json!(marks), refusal["marks"], "{refusal}");
+    }
+    Ok(())
+}
+
 /// The starter Areas of the generator's `area-order-shown` scenario as
 /// it shows them: in German.
 fn german_area(area: &oldbrainfix_core::places::Area) -> String {
@@ -2547,7 +2652,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 31] = [
+    let writers: [(&str, Writer); 32] = [
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
         ("attachments", write_attachments),
@@ -2561,6 +2666,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("formats", write_formats),
         ("frogs", write_frogs),
         ("help", write_help),
+        ("hidden-from-ai", write_hidden_from_ai),
         ("history", write_history),
         ("import", write_import),
         ("keep", write_keep),

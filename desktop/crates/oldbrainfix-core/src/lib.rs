@@ -32,6 +32,7 @@ pub mod file_text;
 pub mod folder;
 pub mod frogs;
 pub mod help_notes;
+pub mod hidden;
 pub mod history;
 pub mod ics;
 pub mod imports;

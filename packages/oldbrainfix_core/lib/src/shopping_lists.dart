@@ -309,12 +309,14 @@ class ShoppingList {
   List<ShoppingLine> checkedOn(Day day, WallClock wallClock) {
     final checked = [
       for (final l in [...lines, ..._gone])
-        if (l.checkedOn(day, wallClock)) l,
+        if (l.checkedAt case final at? when l.checkedOn(day, wallClock))
+          (line: l, at: at),
     ];
-    return checked..sort((a, b) {
-      final byAt = a.checkedAt!.compareTo(b.checkedAt!);
-      return byAt != 0 ? byAt : a.id.compareTo(b.id);
+    checked.sort((a, b) {
+      final byAt = a.at.compareTo(b.at);
+      return byAt != 0 ? byAt : a.line.id.compareTo(b.line.id);
     });
+    return [for (final c in checked) c.line];
   }
 
   /// The Lines that came back by themselves at the start of [day].

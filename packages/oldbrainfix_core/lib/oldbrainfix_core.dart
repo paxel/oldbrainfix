@@ -22,6 +22,7 @@ export 'src/file_text.dart';
 export 'src/folder_sync.dart' hide entriesSealedWith;
 export 'src/frogs.dart';
 export 'src/help_notes.dart';
+export 'src/hidden_from_ai.dart';
 export 'src/history.dart';
 export 'src/host_identity.dart';
 export 'src/ics.dart';

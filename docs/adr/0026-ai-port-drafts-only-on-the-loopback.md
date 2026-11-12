@@ -103,3 +103,7 @@ Amended by #280 (ADR 0040): `list_places` lists the Areas in the person's own or
 ## The tag tree (#267)
 
 Amended by #267 (ADR 0032): `list_tags` reads the tag tree, each tag by its levels with its name and whole tag as written most often and its count of Notes, as the apps will show it, a Note drafted in the AI Task included. It only reads, since a tag is part of a text, which the tools that change texts already draft. No trust rule changed.
+
+## Hidden from AI (#267)
+
+Amended by #267 (ADR 0049): every tool runs as the AI sees the store (`Store::for_ai`, inside `Store::ai_tool`), so a Note or Area marked Hidden from AI, the Notes in such an Area and everything on them do not exist for it: not in a read, a search, a list, a count, the tag tree, a Session's pool or picks, a Note's history, or anything worked out and kept for the screens. A tool given such an id answers as for an id there never was. A further trust rule: before anything else, a draft on a hidden entity, or one filing, merging or putting something onto a hidden Note, Area or Topic, is refused as unknown, whatever call writes it. `set_session` keeps the hidden Tallies of a pool the AI rewrites, and `delete_place` refuses a place holding a hidden Note. No tool reads or writes the mark.

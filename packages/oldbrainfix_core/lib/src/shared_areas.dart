@@ -5,6 +5,7 @@ import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
 import 'frogs.dart';
+import 'hidden_from_ai.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'person_settings.dart';
@@ -550,9 +551,12 @@ extension SharedAreas on Store {
   /// Device plants it under the same one (a Starter Set Area), then
   /// makes this Device its first Manager, under the own Profile, and
   /// every own paired Device a Manager with it. Returns the id the Area
-  /// goes on under. An Area already shared stays as it is.
+  /// goes on under. An Area already shared stays as it is. A hidden Area,
+  /// or one holding hidden Notes, is not shared ([HiddenFromAiRefused],
+  /// #267), and nothing changes.
   String share(String areaId) {
     if (isShared(areaId)) return areaId;
+    refuseHiddenFromAi(hiddenFromAiIn(areaId));
     return batch(() {
       final id = areaId == _starterAreaId(areaId) ? _rehome(areaId) : areaId;
       // A starter Area shared under a new id keeps its place in the
