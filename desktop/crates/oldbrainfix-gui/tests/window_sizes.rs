@@ -111,6 +111,14 @@ fn dialog_right(harness: &Harness<'_, App>) -> f32 {
         + 16.0
 }
 
+/// The sidebar's Unsorted, with how many Notes it holds (#279).
+fn unsorted_row(harness: &Harness<'_, App>) -> String {
+    match Notes::new(harness.state().store()).unsorted() {
+        Ok(notes) if !notes.is_empty() => format!("Unsorted {}", notes.len()),
+        _ => "Unsorted".to_string(),
+    }
+}
+
 #[test]
 fn the_sidebar_opens_as_wide_as_it_was_left() -> TestResult {
     let store = store()?;
@@ -129,7 +137,7 @@ fn dragging_the_sidebar_border_keeps_its_width() -> TestResult {
     let store = store()?;
     let mut harness = harness(&store, Selection::All);
     // A click elsewhere keeps nothing.
-    harness.get_by_label("Unsorted").click();
+    harness.get_by_label(&unsorted_row(&harness)).click();
     harness.run();
     assert_eq!(store.local_setting(SIDEBAR_WIDTH)?, None);
     let border = harness.state().sidebar_width();
@@ -226,7 +234,7 @@ fn back_and_forward_bring_the_search_and_the_scroll_again() -> TestResult {
     // Unsorted, a place new to the history: its own search, at the top.
     // The sidebar's row, ahead of the cards naming it.
     harness
-        .get_all_by_label("Unsorted")
+        .get_all_by_label(&unsorted_row(&harness))
         .next()
         .ok_or("Unsorted")?
         .click();

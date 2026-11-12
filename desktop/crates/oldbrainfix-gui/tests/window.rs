@@ -117,12 +117,19 @@ fn has_card(harness: &Harness<'_, App>, text: &str) -> bool {
         .is_some()
 }
 
+/// The sidebar's Unsorted, with how many Notes it holds (#279).
+fn unsorted_row(harness: &Harness<'_, App>) -> String {
+    match Notes::new(harness.state().store()).unsorted() {
+        Ok(notes) if !notes.is_empty() => format!("Unsorted {}", notes.len()),
+        _ => "Unsorted".to_string(),
+    }
+}
+
 #[test]
 fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     let mut harness = harness("places", "en")?;
     for label in [
         "All Notes",
-        "Unsorted",
         "Areas",
         "Household",
         "Kitchen",
@@ -131,6 +138,7 @@ fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     ] {
         assert!(shows(&harness, label), "{label}");
     }
+    assert!(shows(&harness, &unsorted_row(&harness)));
     // A renamed starter keeps the name it was given.
     assert!(shows(&harness, "Bike"));
     let kettle = card(&harness, "Descale the kettle").rect();
@@ -160,7 +168,7 @@ fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     assert!(!shows(&harness, "Descale the kettle"));
 
     // The Note whose Topic vanished is Unsorted again.
-    harness.get_by_label("Unsorted").click();
+    harness.get_by_label(&unsorted_row(&harness)).click();
     harness.run();
     assert!(shows(&harness, "Where did this go?"));
     assert!(!shows(&harness, "Descale the kettle"));
@@ -956,7 +964,7 @@ fn back_and_forward_walk_the_places_shown_and_the_path_leads_up() -> TestResult 
     assert_eq!(harness.state().selection(), &household);
 
     // While typing, Alt+arrows stay with the text.
-    harness.get_by_label("Unsorted").click();
+    harness.get_by_label(&unsorted_row(&harness)).click();
     harness.run();
     harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();

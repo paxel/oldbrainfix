@@ -612,5 +612,17 @@
   "captureNudgeKeysHint": "Ctrl+Enter saves it with a Nudge in 1 h. Ctrl+1, Ctrl+2 and Ctrl+3 save it with one in 10 min, 30 min or 1 h.",
   "@captureNudgeKeysHint": {"description": "In the desktop's quick note under the Nudge buttons while something is typed (#277); Cmd on macOS is not named, as in the other key hints."},
   "popupNudgeKeysHint": "Enter saves it with a Nudge in 1 h. Ctrl+1, Ctrl+2 and Ctrl+3 save it with one in 10 min, 30 min or 1 h. Shift+Enter starts a new line. Esc keeps what is typed the same way; empty, it just closes.",
-  "@popupNudgeKeysHint": {"description": "Under the Nudge buttons of the desktop's capture popup (#277)."}
+  "@popupNudgeKeysHint": {"description": "Under the Nudge buttons of the desktop's capture popup (#277)."},
+  "menuArea": "Area",
+  "@menuArea": {"description": "The desktop menu bar's menu for the Area or Topic the list shows (#279): Rename, Colour and icon, Share…, People, Export as Pack… and Delete; greyed where it may not do them or no Area or Topic shows."},
+  "menuAi": "AI",
+  "@menuAi": {"description": "The desktop menu bar's menu of the AI port (#279): 'menuAiPort' and the review of the AI Task that waits."},
+  "menuAiPort": "AI port…",
+  "@menuAiPort": {"description": "AI ▸ AI port…: opens the Settings at the card of the AI port (#279)."},
+  "sidebarUnsorted": "Unsorted {count}",
+  "@sidebarUnsorted": {"description": "Unsorted in the desktop's sidebar while it holds Notes, with how many (#279).", "placeholders": {"count": {"type": "int"}}},
+  "areaTopicsFold": "Hide the Topics of {area}",
+  "@areaTopicsFold": {"description": "The chevron beside an Area in the desktop's sidebar while its Topics show (#279): what a screen reader hears and the tooltip.", "placeholders": {"area": {"type": "String"}}},
+  "areaTopicsUnfold": "Show the Topics of {area}",
+  "@areaTopicsUnfold": {"description": "The chevron beside an Area in the desktop's sidebar while its Topics are folded (#279).", "placeholders": {"area": {"type": "String"}}}
 }

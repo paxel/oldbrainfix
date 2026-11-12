@@ -1126,9 +1126,9 @@ replace a law of Both apps where they say so. A desktop law marked
 ### The window
 
 - The desktop window is a classic desktop window (#145): **the menu
-  bar** on top (File, Edit, View, Note, Sync, Help); **the sidebar** on
-  the left with the Agenda, Unsorted, All Notes, Frogs, the Areas with
-  their Topics and the Trash, marking the place shown; **the list** in
+  bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
+  sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
+  Areas with their Topics and the Trash, marking the place shown; **the list** in
   the middle. **A Note opens as a dialog over the window** (#146), one at
   a time, over the list and the sidebar but not the menu bar, which
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
@@ -1140,6 +1140,13 @@ replace a law of Both apps where they say so. A desktop law marked
   New Tally page and the Session pages once something changed, and ask
   "Discard changes?" only about a change that can't be saved; Cancel
   leaves without saving.
+- **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
+  7", #279), as the one list that asks to be emptied; no other place
+  shows a count, and an empty Unsorted shows none. **An Area with Topics
+  folds and unfolds them with the chevron at the end of its row**
+  (#279), a click on it selecting nothing; this Device keeps each fold
+  (ADR 0008), as lists keep theirs, Areas starting unfolded. A folded
+  Area still shows the Topic shown under it, marked.
 - **The window keeps its geometry on each computer** (#278): its size
   and position, whether it is maximized, the sidebar's width and the
   Note dialog's size are settings of the Device (ADR 0008) and come
@@ -1188,6 +1195,19 @@ replace a law of Both apps where they say so. A desktop law marked
   finds its Routines, Reminders and Frogs by their Note), else All
   Notes'. On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture.
+- **The Area menu acts on the Area or Topic the list shows** (#279):
+  Rename (F2), Colour and icon, Share…, People, Export as Pack… and
+  Delete, the sidebar right-click's entries, each greyed where that
+  menu would leave it out (a Topic has no Colour and icon, Share… or
+  People), and all of them while no Area or Topic shows or a dialog
+  lies over the list, the Note dialog included, so that none acts on a
+  place behind it. F2 rests in a text field and while a menu is open.
+  The sidebar's right-click stays, and keeps New Topic.
+- **The AI menu leads to the AI port** (#279): AI port… opens the
+  Settings at the AI port's card, and Review the AI Task shows the
+  review of the AI Task that waits, greyed while none waits or the port
+  is open. Ask… joins it with the Ask panel (#267); until then it is
+  left out, not greyed.
 - **Edit ▸ Undo and Ctrl+Z take back the last delete, check-off,
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
   desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while

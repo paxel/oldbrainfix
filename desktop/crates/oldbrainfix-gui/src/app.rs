@@ -513,6 +513,12 @@ fn show_ticks_key(note: &str) -> String {
 #[derive(Debug, Clone, Default)]
 struct View {
     areas: Vec<(Area, Vec<Topic>)>,
+    /// The Areas whose Topics this Device keeps folded in the sidebar
+    /// (#279), by id.
+    folded: HashSet<String>,
+    /// How many Notes Unsorted holds, beside its name in the sidebar
+    /// (#279).
+    unsorted: usize,
     /// What this Device may do in each Area, and who shares the shared
     /// ones.
     access: std::collections::HashMap<String, AreaAccess>,
@@ -1238,6 +1244,11 @@ enum Action {
     SwitchView(String),
     /// Keeps a fold of a card open, by its setting, or forgets it (#189).
     Fold(String, bool),
+    /// Opens the Settings at the AI port's card: AI ▸ AI port… (#279).
+    OpenAiPort,
+    /// Folds the Topics of this Area in the sidebar, or unfolds them, and
+    /// keeps that on this Device (#279).
+    FoldArea(String, bool),
     /// Switches every card of the list shown to the compact view or the
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
@@ -5479,6 +5490,14 @@ impl App {
         }
         Ok(View {
             areas,
+            folded: self
+                .store
+                .local_settings_with_prefix(AREA_FOLDED)?
+                .into_iter()
+                .filter(|(_, v)| v == "true")
+                .filter_map(|(k, _)| k.strip_prefix(AREA_FOLDED).map(str::to_string))
+                .collect(),
+            unsorted: notes.unsorted()?.len(),
             access,
             people,
             names,
@@ -5900,6 +5919,19 @@ impl App {
             Action::Fold(setting, open) => {
                 // Nothing kept means folded, the default.
                 if open {
+                    self.store.set_local_setting(&setting, "true")?;
+                } else {
+                    self.store.remove_local_setting(&setting)?;
+                }
+            }
+            Action::OpenAiPort => {
+                self.settings_section = Some((AI_PORT_SECTION.to_string(), 2));
+                self.act(Action::OpenPage(Page::Settings))?;
+            }
+            Action::FoldArea(area, folded) => {
+                // Nothing kept means unfolded, the default.
+                let setting = format!("{AREA_FOLDED}{area}");
+                if folded {
                     self.store.set_local_setting(&setting, "true")?;
                 } else {
                     self.store.remove_local_setting(&setting)?;
@@ -8831,6 +8863,10 @@ impl App {
             let filing = self.file_into_notes();
             let merging = self.merge_action();
             let typing = ui.ctx().text_edit_focused();
+            let renames = self
+                .place_menu()
+                .filter(|p| p.manages && !typing && !egui::Popup::is_any_open(ui.ctx()))
+                .map(|p| p.id);
             // Esc over the list drops the cards selected (#148); over a
             // dialog or menu it is theirs, in a field the field's.
             let clears = self.top_dialog().is_none()
@@ -8855,6 +8891,11 @@ impl App {
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
+                }
+                // F2 renames the Area or Topic shown (#279); in a text
+                // field and over a menu it rests.
+                if let Some(id) = renames.filter(|_| i.consume_key(Modifiers::NONE, Key::F2)) {
+                    actions.push(Action::Rename(id));
                 }
                 // Ctrl+Shift+M before Ctrl+M, which takes it with Shift too
                 // (#274).
@@ -9030,9 +9071,15 @@ impl App {
             .id_salt("places")
             .show(ui, |ui| {
                 let text = ui.visuals().text_color();
+                // Unsorted, the one list that asks to be emptied, says how
+                // many it holds (#279).
+                let unsorted = match self.view.unsorted {
+                    0 => t.unsorted().to_string(),
+                    count => t.sidebar_unsorted(count as i64),
+                };
                 let rows = [
                     (Selection::Agenda, icons::AGENDA, t.agenda_title()),
-                    (Selection::Unsorted, icons::UNSORTED, t.unsorted()),
+                    (Selection::Unsorted, icons::UNSORTED, unsorted.as_str()),
                     (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Frogs, icons::FROG, t.frogs_title()),
                 ];
@@ -9056,8 +9103,16 @@ impl App {
                     let colour = area_colour(area.colour.as_deref()).unwrap_or(text);
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
-                    let resp = row(ui, tones, on, 0.0, icon, &area_name(&t, area), true);
+                    let name = area_name(&t, area);
+                    let resp = row(ui, tones, on, 0.0, icon, &name, true);
                     place_row(&resp, &area.id, actions);
+                    // The chevron at its end folds or unfolds its Topics,
+                    // which this Device keeps (#279).
+                    let folded = self.view.folded.contains(&area.id);
+                    if !topics.is_empty() && area_fold(ui, &t, resp.rect, (&name, &area.id), folded)
+                    {
+                        actions.push(Action::FoldArea(area.id.clone(), !folded));
+                    }
                     let access = self.view.access.get(&area.id).copied();
                     let manages =
                         matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
@@ -9111,6 +9166,11 @@ impl App {
                     });
                     for topic in topics {
                         let on = self.selection == Selection::Place(topic.id.clone());
+                        // A folded Area still shows the Topic shown, which
+                        // the sidebar marks.
+                        if folded && !on {
+                            continue;
+                        }
                         let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
                         // Export as Pack… for anyone who may read it
@@ -9301,6 +9361,35 @@ impl App {
             checklist: may.amends && self.view.makes_checklist,
             shopping: may.amends && self.view.makes_shopping,
             tally: may.amends && may.changes && plain,
+        })
+    }
+
+    /// What the Area menu may do to the Area or Topic the list shows
+    /// (#279), as the sidebar's right-click offers it: none while another
+    /// place shows or a dialog lies over the list, the Note dialog and a
+    /// photo or table full screen too.
+    fn place_menu(&self) -> Option<PlaceMenu> {
+        let Selection::Place(id) = &self.selection else {
+            return None;
+        };
+        if self.top_dialog().is_some()
+            || self.dialog.is_some()
+            || self.badge.is_some()
+            || self.viewer.is_some()
+            || self.table.is_some()
+        {
+            return None;
+        }
+        let (area, of_area) = match self.view.area(id) {
+            Some(area) => (area.id.clone(), true),
+            None => (self.view.topic(id)?.area_id.clone(), false),
+        };
+        let access = self.view.access.get(&area).copied();
+        Some(PlaceMenu {
+            id: id.clone(),
+            area: of_area,
+            manages: matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager)),
+            shared: self.view.people.contains_key(&area),
         })
     }
 
@@ -9611,10 +9700,11 @@ impl App {
         Ok(())
     }
 
-    /// The menu bar (#145): File, Edit, View, Note, Sync and Help, each
-    /// entry with its keys where it has some, the Note menu's greyed
-    /// while no Note is open, but File into… for the cards selected
-    /// (#148). A pick closes its menu, also one by keyboard or screen
+    /// The menu bar (#145): File, Edit, View, Area (#279), Note, AI
+    /// (#279), Sync and Help, each entry with its keys where it has some,
+    /// the Note menu's greyed while no Note is open, but File into… for
+    /// the cards selected (#148), the Area menu's while no Area or Topic
+    /// shows. A pick closes its menu, also one by keyboard or screen
     /// reader.
     fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
         let t = self.t;
@@ -9655,6 +9745,8 @@ impl App {
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
+        let place = self.place_menu();
+        let reviews = self.ai_port.is_none() && self.view.ai_task.is_some();
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
@@ -9742,6 +9834,39 @@ impl App {
                         }
                     }
                 });
+            });
+            // The Area or Topic the list shows, as the sidebar's
+            // right-click offers it (#279); F2 renames.
+            ui.menu_button(RichText::new(t.menu_area()).color(text), |ui| {
+                let id = place.as_ref().map(|p| p.id.clone()).unwrap_or_default();
+                let manages = place.as_ref().is_some_and(|p| p.manages);
+                let of_area = place.as_ref().is_some_and(|p| p.area && p.manages);
+                let shared = place.as_ref().is_some_and(|p| p.area && p.shared);
+                let items = [
+                    (
+                        t.rename(),
+                        keys_with(Modifiers::NONE, Key::F2),
+                        manages,
+                        Action::Rename(id.clone()),
+                    ),
+                    (t.area_look(), None, of_area, Action::Look(id.clone())),
+                    (t.share_area(), None, of_area, Action::Share(id.clone())),
+                    (t.people_title(), None, shared, Action::People(id.clone())),
+                    // Copies of what anyone may read (#165).
+                    (
+                        t.export_as_pack(),
+                        None,
+                        place.is_some(),
+                        Action::ExportPack(id.clone()),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
+                ui.separator();
+                menu_entries(
+                    ui,
+                    [(t.delete(), None, manages, Action::Delete(id.clone()))],
+                    actions,
+                );
             });
             ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
                 let items = [
@@ -9897,6 +10022,20 @@ impl App {
                     )
                 };
                 menu_entries(ui, [last], actions);
+            });
+            // The AI port (#279): its card in the Settings, and the review
+            // of the AI Task that waits, greyed while none does.
+            ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
+                let items = [
+                    (t.menu_ai_port(), None, true, Action::OpenAiPort),
+                    (
+                        t.ai_review_title(),
+                        None,
+                        reviews,
+                        Action::Ai(AiAction::Review),
+                    ),
+                ];
+                menu_entries(ui, items, actions);
             });
             ui.menu_button(RichText::new(t.menu_sync()).color(text), |ui| {
                 let items = [
@@ -13172,6 +13311,7 @@ impl App {
                     ui.label(RichText::new(t.bigger_detail()).small().color(weak));
                 });
                 let ai_shown = ai_view::PortShown {
+                    at: section.as_deref() == Some(AI_PORT_SECTION),
                     url: ai_url.as_deref(),
                     waiting: ai_waiting,
                     copied: ai_copied,
@@ -13490,6 +13630,40 @@ impl App {
 
 /// Selects the Area or Topic `place` when its row is clicked, and files
 /// the cards dropped on it there, all those dragged together (#148).
+/// The chevron at the end of the sidebar's row `rect` of the Area `area`
+/// (its name and id), which has Topics: whether it was clicked to fold
+/// them, or to unfold them while `folded` (#279); a screen reader hears
+/// what the click does.
+fn area_fold(ui: &mut Ui, t: &L10n, rect: egui::Rect, area: (&str, &str), folded: bool) -> bool {
+    let (name, id) = area;
+    let said = if folded {
+        t.area_topics_unfold(name)
+    } else {
+        t.area_topics_fold(name)
+    };
+    let chevron = egui::Rect::from_center_size(
+        egui::pos2(rect.right() - 18.0, rect.center().y),
+        egui::vec2(24.0, 24.0),
+    );
+    let resp = ui.interact(chevron, Id::new(("area fold", id)), Sense::click());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &said));
+    if ui.is_rect_visible(chevron) {
+        theme::icon_button_back(ui, &resp, chevron);
+        let icon = if folded {
+            icons::EXPAND_MORE
+        } else {
+            icons::EXPAND_LESS
+        };
+        icons::paint(
+            ui.painter(),
+            chevron.shrink(2.0),
+            icon,
+            ui.visuals().weak_text_color(),
+        );
+    }
+    resp.on_hover_text(said).clicked()
+}
+
 fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
     if resp.clicked() {
         actions.push(Action::Select(Selection::Place(place.to_string())));
@@ -13500,6 +13674,16 @@ fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
             place: place.to_string(),
         });
     }
+}
+
+/// What the Area menu may do to the Area or Topic shown (#279), by its
+/// id: whether it is an Area, whether this Device manages its Area and
+/// whether that is shared.
+struct PlaceMenu {
+    id: String,
+    area: bool,
+    manages: bool,
+    shared: bool,
 }
 
 /// What the Note menu may do to the Note shown (#145), by its id.
@@ -13828,6 +14012,15 @@ fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
 /// The setting of this Device that keeps the "Blocked" section of People
 /// open (#90), the phone's.
 const BLOCKED_OPEN: &str = "peopleBlockedOpen";
+
+/// Where AI ▸ AI port… opens the Settings (#279): at the AI port's card,
+/// which no app link names.
+const AI_PORT_SECTION: &str = "ai port";
+
+/// What the settings of this Device start with that keep an Area's Topics
+/// folded in the sidebar, the Area's id after it (#279); none kept means
+/// unfolded.
+const AREA_FOLDED: &str = "areaTopicsFolded:";
 
 /// The local setting that keeps the Frog view's "Done" section open, as
 /// the phone names it.

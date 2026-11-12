@@ -35,3 +35,7 @@ Amended by #276: the Shopping List a capture on a Device went into last is a set
 ## The window's geometry (#278)
 
 Amended by #278: on the desktop the window's size and position, whether it is maximized, the sidebar's width and the Note dialog's size are settings of that Device (`windowSize`, `windowPosition`, `windowMaximized`, `sidebarWidth`, `noteDialogSize`), written as the user leaves them and read at the next start. A position the system does not tell, as on Wayland, is not written, and one on no monitor any more opens the window centred. The user never sets them by name, so the AI port has no tool for them.
+
+## The sidebar's folds (#279)
+
+Amended by #279: on the desktop, which Areas show their Topics folded in the sidebar is a setting of that Device (`areaTopicsFolded:<Area id>`, `true` while folded), as the folds of cards are; none kept means unfolded. The chevron writes it; the user never sets it by name, so the AI port has no tool for it.

@@ -588,6 +588,8 @@ fn tally_change(
 /// What the AI port's card shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PortShown<'a> {
+    /// Whether the Settings opened at the card, by AI ▸ AI port… (#279).
+    pub at: bool,
     /// Where a client reaches the port while it is open.
     pub url: Option<&'a str>,
     /// Whether an AI Task waits for its review.
@@ -610,7 +612,13 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.ai_port_title()).strong().color(text));
+        let title = ui.label(RichText::new(t.ai_port_title()).strong().color(text));
+        if shown.at {
+            title.scroll_to_me_animation(
+                Some(egui::Align::TOP),
+                egui::style::ScrollAnimation::none(),
+            );
+        }
         ui.label(RichText::new(t.ai_port_intro()).small().color(weak));
         let Some(url) = shown.url else {
             if shown.waiting {

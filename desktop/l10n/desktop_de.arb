@@ -329,5 +329,11 @@
   "searchUnsortedHint": "In Unsortiert suchen",
   "searchTrashHint": "Im Papierkorb suchen",
   "captureNudgeKeysHint": "Strg+Enter speichert sie, mit einem Stupser in 1 Std. Strg+1, Strg+2 und Strg+3 speichern sie mit einem in 10 Min., 30 Min. oder 1 Std.",
-  "popupNudgeKeysHint": "Enter speichert sie, mit einem Stupser in 1 Std. Strg+1, Strg+2 und Strg+3 speichern sie mit einem in 10 Min., 30 Min. oder 1 Std. Umschalt+Enter beginnt eine neue Zeile. Esc behält Getipptes genauso; leer schließt es nur."
+  "popupNudgeKeysHint": "Enter speichert sie, mit einem Stupser in 1 Std. Strg+1, Strg+2 und Strg+3 speichern sie mit einem in 10 Min., 30 Min. oder 1 Std. Umschalt+Enter beginnt eine neue Zeile. Esc behält Getipptes genauso; leer schließt es nur.",
+  "menuArea": "Bereich",
+  "menuAi": "KI",
+  "menuAiPort": "KI-Port …",
+  "sidebarUnsorted": "Unsortiert {count}",
+  "areaTopicsFold": "Themen von {area} einklappen",
+  "areaTopicsUnfold": "Themen von {area} aufklappen"
 }

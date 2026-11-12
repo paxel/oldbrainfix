@@ -473,7 +473,7 @@ fn the_sidebar_marks_the_place_shown() -> TestResult {
     };
     assert!(marked(&harness, "Agenda"));
     for place in [
-        "Unsorted",
+        "Unsorted 1",
         "All Notes",
         "Frogs",
         "Household",
@@ -489,7 +489,7 @@ fn the_sidebar_marks_the_place_shown() -> TestResult {
     let top = |label: &str| harness.get_by_label(label).rect().top();
     let order = [
         top("Agenda"),
-        top("Unsorted"),
+        top("Unsorted 1"),
         top("All Notes"),
         top("Frogs"),
         top("Household"),

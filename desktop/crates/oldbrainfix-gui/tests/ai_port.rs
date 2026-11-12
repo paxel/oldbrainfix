@@ -30,7 +30,7 @@ use std::time::{Duration as StdDuration, Instant};
 
 use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::ai_port::{Reach, docker_bridge};
 use oldbrainfix_core::schedule::{ClockTime, Day, Schedule};
 use oldbrainfix_core::tallies::Tallies;
@@ -467,6 +467,7 @@ fn the_docker_choice_without_a_bridge_says_so_and_does_not_open() {
                 oldbrainfix_gui::theme::install(ui.ctx());
                 let tones = oldbrainfix_gui::theme::tones(ui.visuals());
                 let shown = PortShown {
+                    at: false,
                     url: None,
                     waiting: false,
                     copied: None,
@@ -492,4 +493,102 @@ fn the_docker_choice_without_a_bridge_says_so_and_does_not_open() {
 
 fn shows_in<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
+}
+
+/// The menu bar's `menu`, ahead of the window's widgets of the same name
+/// (#279).
+fn bar<'a>(harness: &'a Harness<'_, App>, menu: &'a str) -> egui_kittest::Node<'a> {
+    match harness.get_all_by_label(menu).next() {
+        Some(node) => node,
+        None => panic!("no menu {menu}"),
+    }
+}
+
+/// Whether `entry` of the menu bar's AI menu can be picked; the menu
+/// stays open.
+fn ai_entry_enabled(harness: &mut Harness<'_, App>, entry: &str) -> bool {
+    bar(harness, "AI").click();
+    harness.run_steps(4);
+    match harness.get_all_by_label(entry).last() {
+        Some(node) => !node.accesskit_node().is_disabled(),
+        None => panic!("no {entry}"),
+    }
+}
+
+#[test]
+fn the_ai_menu_opens_the_settings_at_the_port_card() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    // Low enough that the card lies under the Settings' first one.
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 420.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            App::new(store.clone(), "en"),
+        );
+    harness.run();
+    let card_top =
+        |harness: &Harness<'_, App>| match harness.get_all_by_label(t.ai_port_title()).last() {
+            Some(node) => node.rect().top(),
+            None => panic!("no {}", t.ai_port_title()),
+        };
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    // Low in the dialog, at its bottom edge.
+    let low = card_top(&harness);
+    harness.state_mut().close_page();
+    harness.run();
+
+    assert!(ai_entry_enabled(&mut harness, "AI port…"));
+    click(&mut harness, "AI port…");
+    harness.run();
+    assert_eq!(harness.state().page(), Some(Page::Settings));
+    let top = card_top(&harness);
+    assert!(
+        top + 100.0 < low,
+        "scrolled up to the top: {top}, from {low}"
+    );
+    assert!(shows(&harness, t.ai_port_open()));
+    Ok(())
+}
+
+#[test]
+fn the_ai_menu_reviews_the_task_that_waits_and_is_greyed_without_one() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let milk = Notes::new(&store).capture("Milk", None, None)?;
+    let mut harness = window(App::new(store.clone(), "en"));
+    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
+    bar(&harness, "AI").click();
+    harness.run_steps(4);
+
+    // The menu bar is under the Settings dialog: they close for it.
+    harness.state_mut().open(Page::Settings);
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_open());
+    harness.state_mut().close_page();
+    harness.run_steps(4);
+    // Open, the task does not wait yet.
+    assert!(!ai_entry_enabled(&mut harness, t.ai_review_title()));
+    bar(&harness, "AI").click();
+    harness.run_steps(4);
+    let task = task(&harness)?;
+    store.drafting(&task, || Notes::new(&store).edit(&milk.id, "Milk and eggs"))?;
+    harness.state_mut().open(Page::Settings);
+    harness.run_steps(4);
+    click(&mut harness, t.ai_port_done());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+
+    harness.state_mut().select(Selection::Agenda);
+    harness.run_steps(4);
+    assert!(ai_entry_enabled(&mut harness, t.ai_review_title()));
+    click(&mut harness, t.ai_review_title());
+    assert_eq!(harness.state().selection(), &Selection::AiReview);
+    assert!(shows(&harness, &t.ai_after("Milk and eggs")));
+    // The menu closed with the pick.
+    assert!(!shows(&harness, "AI port…"));
+    Ok(())
 }
