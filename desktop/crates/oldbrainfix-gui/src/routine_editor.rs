@@ -11,7 +11,9 @@
 //! A Routine of a Session Note only says when it runs it: the setup lies
 //! on the Note, on its page (#191), and making a plain Note a Session
 //! shows the setup alone ([`RoutineEditor::make_session`]). Save
-//! writes it; leaving without saving drops the edit. Opened from a
+//! writes it, and so does leaving it by Esc, a click beside it or back
+//! with a change that can be saved (#275, [`crate::leave_saves`]); Cancel
+//! drops the edit. Opened from a
 //! capture for the Note not written yet (#113), Save hands back what was
 //! set up instead ([`RoutineEditor::choice`]), as the phone's
 //! `chooseSchedule`. A saved Routine has History beside its heading, as
@@ -34,9 +36,10 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{chip_row, embossed, icon_button, pill};
-use crate::capture_choices::ScheduleChoice;
+use crate::capture_choices::{ScheduleChoice, SessionChoice};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::schedule_text::{
     clock_text, day_text, occurrence_time, schedule_text, weekday_long, weekday_text,
 };
@@ -175,6 +178,23 @@ pub struct RoutineEditor {
     /// and said when missing, which `name_missing` holds.
     named: bool,
     name_missing: bool,
+    /// What Save writes, as the editor opened, to tell on leaving whether
+    /// anything changed (#275).
+    opened: Edited,
+}
+
+/// What Save writes of the editor, to compare with how it opened: the
+/// schedule, or while there is none the rule typed, Re-nag, Escalation,
+/// the text and a Session's part; not the view, such as the sentence,
+/// the time being typed or the pool's filter.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct Edited {
+    schedule: Option<Schedule>,
+    rule: Option<(bool, String)>,
+    renag: Option<i64>,
+    escalation: Option<i64>,
+    text: String,
+    session: Option<SessionChoice>,
 }
 
 impl RoutineEditor {
@@ -246,9 +266,10 @@ impl RoutineEditor {
             place: None,
             named: false,
             name_missing: false,
+            opened: Edited::default(),
         };
         editor.update();
-        editor
+        editor.opened_now()
     }
 
     /// The New Session page (#161): its name, its pool of `draft` with
@@ -269,7 +290,7 @@ impl RoutineEditor {
         draft.new_tally = true;
         editor.session = Some(draft);
         editor.update();
-        editor
+        editor.opened_now()
     }
 
     /// The setup's page of a Session made of the plain Note `note` from
@@ -291,7 +312,7 @@ impl RoutineEditor {
         let mut draft = draft;
         draft.new_tally = true;
         editor.session = Some(draft);
-        editor
+        editor.opened_now()
     }
 
     /// Whether it makes its plain Note a Session (#191).
@@ -331,7 +352,7 @@ impl RoutineEditor {
     /// Makes it a new Session, `draft` for its part.
     pub fn with_session(mut self, draft: SessionDraft) -> RoutineEditor {
         self.session = Some(draft);
-        self
+        self.opened_now()
     }
 
     /// The Session's part, when it is one.
@@ -394,13 +415,62 @@ impl RoutineEditor {
             place: None,
             named: false,
             name_missing: false,
+            opened: Edited::default(),
         };
         match SimpleRepeat::of(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
             None => editor.advanced = true,
         }
         editor.update();
-        editor
+        editor.opened_now()
+    }
+
+    /// What Save writes of it now.
+    fn edited(&self) -> Edited {
+        Edited {
+            schedule: self.schedule.clone(),
+            rule: self
+                .schedule
+                .is_none()
+                .then(|| (self.advanced, self.rule.trim().to_string())),
+            renag: self.renag,
+            escalation: self.escalation,
+            text: self.text.trim().to_string(),
+            session: self.session.as_ref().map(SessionDraft::choice),
+        }
+    }
+
+    /// Takes what it holds now as how it opened.
+    fn opened_now(mut self) -> RoutineEditor {
+        self.opened = self.edited();
+        self
+    }
+
+    /// Whether anything Save writes differs from how it opened (#275).
+    pub fn changed(&self) -> bool {
+        self.edited() != self.opened
+    }
+
+    /// Whether leaving may save (#275): what Save takes, a Session's part
+    /// and name that need no fixing, and a schedule that still happens,
+    /// unless it is the one it opened with, such as a past Reminder's.
+    pub fn leave_valid(&self) -> bool {
+        self.can_save()
+            && self.session.as_ref().is_none_or(SessionDraft::valid)
+            && !(self.named && self.text.trim().is_empty())
+            && (self.makes || !self.next.is_empty() || self.schedule == self.opened.schedule)
+    }
+
+    /// What leaving it comes to (#275).
+    pub fn leaving(&self) -> Leaving {
+        Leaving::of(self.changed(), self.leave_valid())
+    }
+
+    /// Keep editing after "Discard changes?": a missing name and a
+    /// Session's part to fix say so under their fields, as Save does.
+    pub fn show_what_to_fix(&mut self) {
+        self.name_missing = self.named && self.text.trim().is_empty();
+        self.session_to_fix();
     }
 
     fn take_simple(&mut self, simple: &SimpleRepeat) {

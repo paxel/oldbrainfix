@@ -46,6 +46,7 @@ pub mod keep_import;
 pub mod l10n;
 #[cfg(target_os = "linux")]
 pub mod launcher;
+pub mod leave_saves;
 pub mod line_editing;
 pub mod login;
 pub mod media;

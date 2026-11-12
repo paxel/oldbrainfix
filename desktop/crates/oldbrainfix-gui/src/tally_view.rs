@@ -30,6 +30,7 @@ use crate::app::{chip_row, embossed, icon_button, when};
 use crate::capture_choices::TallyFieldChoice;
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::profile_view;
 use crate::schedule_text::{day_text, month_short};
 use crate::setting_badges::BadgeValue::{self, Icon, Text};
@@ -1278,7 +1279,11 @@ impl FieldForm {
 /// values of the set before; a set after the first can be removed. Then
 /// the day it counts for, today for a new one, at the same time of day;
 /// and one line of text. A value left empty is none. An entry that exists
-/// has Delete, which asks nothing; Ctrl+Z restores it (#268).
+/// has Delete, which asks nothing; Ctrl+Z restores it (#268). Leaving it
+/// by Esc, a click beside it or back saves a change as Save does (#275);
+/// one that can't be saved, a value that is no number or a new entry left
+/// empty, asks once whether to discard it. Left as it opened, targets and
+/// all, it writes nothing; Cancel writes nothing either.
 ///
 /// For a Session's pick (ADR 0029) a new entry is recorded for its
 /// Occurrence instead; it counts for now, so the day does not show.
@@ -1295,6 +1300,9 @@ pub struct EntryForm {
     opened: Vec<Vec<String>>,
     /// Each Check field shown, whether it is ticked.
     pub checks: Vec<(TallyField, bool)>,
+    /// The ticks as the page opened, to tell on leaving whether anything
+    /// changed (#275).
+    checks_opened: Vec<bool>,
     /// Whether the Tally counts in sets: "Add set" shows then.
     counts_in_sets: bool,
     pub line: String,
@@ -1346,7 +1354,7 @@ impl EntryForm {
                     .collect()
             })
             .collect();
-        let checks = tally
+        let checks: Vec<(TallyField, bool)> = tally
             .checks()
             .into_iter()
             .map(|f| {
@@ -1371,6 +1379,7 @@ impl EntryForm {
             fields,
             opened: sets.clone(),
             sets,
+            checks_opened: checks.iter().map(|(_, on)| *on).collect(),
             checks,
             counts_in_sets: tally.counts_in_sets,
             day,
@@ -1405,8 +1414,9 @@ impl EntryForm {
         }
     }
 
-    /// Writes the entry when nothing needs fixing; whether it did.
-    pub fn save(&mut self, store: &Store, wall: &WallClock) -> oldbrainfix_core::Result<bool> {
+    /// The values of each set, `None` where empty or no number, and the
+    /// values that are no number, as `<set>:<field id>`.
+    fn parsed(&self) -> (Vec<BTreeMap<String, Option<f64>>>, HashSet<String>) {
         let mut parsed: Vec<BTreeMap<String, Option<f64>>> = Vec::new();
         let mut invalid = HashSet::new();
         for (i, set) in self.sets.iter().enumerate() {
@@ -1425,13 +1435,59 @@ impl EntryForm {
             }
             parsed.push(row);
         }
-        let line = self.line.trim().to_string();
-        self.empty = self.entry.is_none()
-            && invalid.is_empty()
-            && line.is_empty()
+        (parsed, invalid)
+    }
+
+    /// A new entry with nothing in it, its values `parsed`.
+    fn is_empty(&self, parsed: &[BTreeMap<String, Option<f64>>]) -> bool {
+        self.entry.is_none()
+            && self.line.trim().is_empty()
             && !self.checks.iter().any(|(_, on)| *on)
-            && parsed.iter().all(|row| row.values().all(Option::is_none));
-        let day_wrong = Day::parse(self.day_text.trim()) != Some(self.day);
+            && parsed.iter().all(|row| row.values().all(Option::is_none))
+    }
+
+    /// Whether the day typed is no day, or not the one shown.
+    fn day_wrong(&self) -> bool {
+        Day::parse(self.day_text.trim()) != Some(self.day)
+    }
+
+    /// Whether Save would save: every value a number or empty, the day a
+    /// day, and a new entry not empty.
+    pub fn valid(&self) -> bool {
+        let (parsed, invalid) = self.parsed();
+        invalid.is_empty() && !self.day_wrong() && !self.is_empty(&parsed)
+    }
+
+    /// Whether anything differs from the page as it opened (#275).
+    pub fn changed(&self) -> bool {
+        let typed = |sets: &[Vec<String>]| -> Vec<Vec<String>> {
+            sets.iter()
+                .map(|set| set.iter().map(|v| v.trim().to_string()).collect())
+                .collect()
+        };
+        let line_opened = self.entry.as_ref().map_or("", |e| e.line.as_str());
+        self.day != self.day_as_opened
+            || self.day_text.trim() != self.day_as_opened.to_string()
+            || self.line.trim() != line_opened.trim()
+            || self
+                .checks
+                .iter()
+                .map(|(_, on)| *on)
+                .ne(self.checks_opened.iter().copied())
+            || typed(&self.sets) != typed(&self.opened)
+    }
+
+    /// What leaving the page comes to (#275).
+    pub fn leaving(&self) -> Leaving {
+        Leaving::of(self.changed(), self.valid())
+    }
+
+    /// Says under each field what to fix, the first taking the keyboard,
+    /// as Save and Keep editing do; whether anything needs fixing.
+    pub fn show_what_to_fix(&mut self) -> bool {
+        let (parsed, invalid) = self.parsed();
+        self.empty = invalid.is_empty() && self.is_empty(&parsed);
+        let day_wrong = self.day_wrong();
         // The field to fix takes the keyboard.
         let first_invalid = (0..self.sets.len()).find_map(|i| {
             self.fields
@@ -1443,9 +1499,16 @@ impl EntryForm {
             .or_else(|| day_wrong.then(|| DAY_FIELD.to_string()))
             .or_else(|| self.empty.then(|| LINE_FIELD.to_string()));
         self.invalid = invalid;
-        if self.focus.is_some() {
+        self.focus.is_some()
+    }
+
+    /// Writes the entry when nothing needs fixing; whether it did.
+    pub fn save(&mut self, store: &Store, wall: &WallClock) -> oldbrainfix_core::Result<bool> {
+        if self.show_what_to_fix() {
             return Ok(false);
         }
+        let (parsed, _) = self.parsed();
+        let line = self.line.trim().to_string();
         let held = |row: &BTreeMap<String, Option<f64>>| -> BTreeMap<String, f64> {
             row.iter()
                 .filter_map(|(id, value)| Some((id.clone(), (*value)?)))

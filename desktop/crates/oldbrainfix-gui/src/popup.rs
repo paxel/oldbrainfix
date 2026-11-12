@@ -24,6 +24,9 @@
 //! instead of the Nudge buttons and no Nudge. Esc on a page goes back to
 //! the capture without its choice, as do Alt+Left and the mouse's back
 //! button; naming a new place in File into…, they go back to its list.
+//! On the page of a Routine, Reminder or Session they hand back a change
+//! that can be taken as its Save does, and ask "Discard changes?" about
+//! one that can't (#275, [`crate::leave_saves`]).
 //! A place made there stays, the Note saved or not.
 //!
 //! Its microphone button records voice into the same Note: recording
@@ -67,6 +70,7 @@ use crate::file_into::{self, FileIntoPicker, Picked};
 use crate::format_bar::{self, Format};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::leave_saves::Leaving;
 use crate::media::{Clipboard, Recorder};
 use crate::media_view::{self, Voice};
 use crate::paste;
@@ -186,6 +190,8 @@ pub struct CapturePopup {
     transcriber: Option<(Enricher, Option<SpeechModel>)>,
     wall: Wall,
     page: Option<Page>,
+    /// Whether "Discard changes?" shows over the page left (#275).
+    discarding: bool,
     /// The region the system reports, for the units of a Tally.
     region: Option<String>,
     /// What this Device's quick note shows (#142), read with the Areas.
@@ -216,6 +222,7 @@ impl CapturePopup {
             transcriber: None,
             wall: Arc::new(local_wall),
             page: None,
+            discarding: false,
             region: region_of(sys_locale::get_locale().as_deref()),
             quick: QuickNote::default(),
         };
@@ -535,8 +542,11 @@ impl CapturePopup {
             {
                 picker.back();
                 self.show_page(ui);
+            } else if self.discarding {
+                self.show_page(ui);
+                self.discard_question(ui.ctx(), escape || back);
             } else if escape || back {
-                self.close_page(ui.ctx());
+                self.leave_page(ui.ctx());
             } else {
                 self.show_page(ui);
             }
@@ -783,8 +793,54 @@ impl CapturePopup {
         }
     }
 
+    /// Leaves the page by Esc or back (#275): the Routine editor's change
+    /// that can be taken is handed back as its Save does, one that can't
+    /// asks first; anything else goes back to the capture.
+    fn leave_page(&mut self, ctx: &egui::Context) {
+        let leaving = match &self.page {
+            Some(Page::Schedule(editor)) => editor.leaving(),
+            _ => Leaving::Close,
+        };
+        match leaving {
+            Leaving::Close => self.close_page(ctx),
+            Leaving::Save => match self.page_asked(PageAsk::Schedule(Intent::Save)) {
+                Ok(true) => self.close_page(ctx),
+                Ok(false) => self.discarding = true,
+                Err(e) => self.error = Some(Failure::of(&self.t, &e)),
+            },
+            Leaving::Ask => self.discarding = true,
+        }
+    }
+
+    /// "Discard changes?" over the page; Esc, back and a click beside it
+    /// keep editing, as Keep editing does, which says what to fix.
+    fn discard_question(&mut self, ctx: &egui::Context, left: bool) {
+        let t = self.t;
+        let modal = egui::Modal::new(Id::new("popup discard")).show(ctx, |ui| {
+            ui.set_width(320.0);
+            crate::leave_saves::question(ui, &t)
+        });
+        let answer = modal
+            .inner
+            .or((left || modal.should_close()).then_some(false));
+        match answer {
+            Some(true) => {
+                self.discarding = false;
+                self.close_page(ctx);
+            }
+            Some(false) => {
+                self.discarding = false;
+                if let Some(Page::Schedule(editor)) = &mut self.page {
+                    editor.show_what_to_fix();
+                }
+            }
+            None => {}
+        }
+    }
+
     /// Back to the capture, its size and the field.
     fn close_page(&mut self, ctx: &egui::Context) {
+        self.discarding = false;
         self.page = None;
         self.focus = true;
         ctx.send_viewport_cmd(ViewportCommand::InnerSize(SIZE.into()));

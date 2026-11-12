@@ -134,6 +134,7 @@ use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::keep_import::KeepSource;
 use crate::l10n::{self, L10n};
+use crate::leave_saves::{self, Leaving};
 use crate::line_editing::{Listed, TypedLines};
 use crate::login;
 use crate::media::{
@@ -910,6 +911,9 @@ enum Dialog {
     },
     /// Whether every change of the AI Task is rejected (#112).
     RejectAi,
+    /// "Discard changes?" on leaving an edit dialog whose change can't be
+    /// saved (#275).
+    Discard(Leave),
     /// The name of a new Checklist, Shopping List or Frog made from "+"
     /// (#161).
     NewKind {
@@ -963,10 +967,41 @@ impl TopDialog {
         match self {
             TopDialog::Note => Action::CloseNote,
             TopDialog::QuickNote => Action::CloseQuickNote,
-            TopDialog::Editor => Action::Editor(Intent::Close),
-            TopDialog::TallyForm => Action::TallyForm(FormIntent::Close),
-            TopDialog::TallyPage => Action::TallyPage(PageIntent::Close),
+            TopDialog::Editor => Action::Leave(Leave::Editor),
+            TopDialog::TallyForm => Action::Leave(Leave::TallyForm),
+            TopDialog::TallyPage => Action::Leave(Leave::TallyPage),
             TopDialog::Page => Action::PageBack,
+        }
+    }
+}
+
+/// The edit dialogs that save on leaving (#275, UI laws, "Navigation"):
+/// Esc, a click beside them, Alt+Left and the mouse's back button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Leave {
+    /// The Routine or Reminder editor, and the Session pages it draws.
+    Editor,
+    /// The entry page; the field page closes as Cancel does.
+    TallyForm,
+    TallyPage,
+}
+
+impl Leave {
+    /// What its Save asks.
+    fn save(self) -> Action {
+        match self {
+            Leave::Editor => Action::Editor(Intent::Save),
+            Leave::TallyForm => Action::TallyForm(FormIntent::Save),
+            Leave::TallyPage => Action::TallyPage(PageIntent::Save),
+        }
+    }
+
+    /// What closing it without saving asks.
+    fn close(self) -> Action {
+        match self {
+            Leave::Editor => Action::Editor(Intent::Close),
+            Leave::TallyForm => Action::TallyForm(FormIntent::Close),
+            Leave::TallyPage => Action::TallyPage(PageIntent::Close),
         }
     }
 }
@@ -1102,6 +1137,13 @@ enum Action {
     CreateNamed,
     /// Something asked of the New Tally page (#161).
     TallyPage(PageIntent),
+    /// Leaves an edit dialog (#275): unchanged it closes, a change that
+    /// can be saved is saved, one that can't asks "Discard changes?".
+    Leave(Leave),
+    /// Discard: the dialog closes without saving.
+    Discard(Leave),
+    /// Keep editing: the dialog stays and says what to fix.
+    KeepEditing(Leave),
     /// File ▸ Quick note: the capture popup, as the hotkey opens it.
     QuickNote,
     /// File ▸ Quit: the app ends, also where the tray would keep it.
@@ -5523,6 +5565,46 @@ impl App {
             Action::Add(kind) => self.add(kind)?,
             Action::CreateNamed => self.create_named()?,
             Action::TallyPage(intent) => self.tally_page_action(intent)?,
+            Action::Leave(from) => {
+                let leaving = match from {
+                    Leave::Editor => self.editor.as_ref().map(RoutineEditor::leaving),
+                    Leave::TallyForm => self.tally_form.as_ref().map(|form| match form {
+                        TallyForm::Entry(form) => form.leaving(),
+                        TallyForm::Field(_) => Leaving::Close,
+                    }),
+                    Leave::TallyPage => self.tally_page.as_ref().map(TallyPage::leaving),
+                };
+                match leaving {
+                    Some(Leaving::Close) => return self.act(from.close()),
+                    Some(Leaving::Save) => return self.act(from.save()),
+                    Some(Leaving::Ask) => self.dialog = Some(Dialog::Discard(from)),
+                    None => {}
+                }
+            }
+            Action::Discard(from) => {
+                self.dialog = None;
+                return self.act(from.close());
+            }
+            Action::KeepEditing(from) => {
+                self.dialog = None;
+                match from {
+                    Leave::Editor => {
+                        if let Some(editor) = &mut self.editor {
+                            editor.show_what_to_fix();
+                        }
+                    }
+                    Leave::TallyForm => {
+                        if let Some(TallyForm::Entry(form)) = &mut self.tally_form {
+                            form.show_what_to_fix();
+                        }
+                    }
+                    Leave::TallyPage => {
+                        if let Some(page) = &mut self.tally_page {
+                            page.show_what_to_fix();
+                        }
+                    }
+                }
+            }
             Action::QuickNote => self.quick_note_wanted = true,
             Action::Quit => self.quit_wanted = true,
             Action::Find => {
@@ -10198,8 +10280,10 @@ impl App {
 
     /// The Routine or Reminder editor, the New Session page and a Tally's
     /// field or entry page, each as a dialog over the window, over the
-    /// Note or the quick note they were opened from. Esc, a click beside
-    /// it and Cancel leave it without saving.
+    /// Note or the quick note they were opened from. Esc and a click
+    /// beside it leave it as back does (#275): the editor and the entry
+    /// page save a change that can be saved and ask about one that can't;
+    /// the field page, and Cancel on any, close without saving.
     fn editor_dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
         if self.editor.is_none() && self.tally_form.is_none() {
             return;
@@ -10232,17 +10316,17 @@ impl App {
             });
         actions.extend(asked);
         if modal.should_close() {
-            actions.push(if self.editor.is_some() {
-                Action::Editor(Intent::Close)
+            actions.push(Action::Leave(if self.editor.is_some() {
+                Leave::Editor
             } else {
-                Action::TallyForm(FormIntent::Close)
-            });
+                Leave::TallyForm
+            }));
         }
     }
 
     /// The New Tally page (#161), as a dialog over the window or over the
-    /// New Session page it was opened from. Leaving it without Save makes
-    /// nothing.
+    /// New Session page it was opened from. Esc and a click beside it
+    /// leave it as back does, saving what can be saved (#275).
     fn tally_page_dialog(&mut self, ctx: &egui::Context, tones: Tones, actions: &mut Vec<Action>) {
         let Some(page) = &mut self.tally_page else {
             return;
@@ -10267,7 +10351,7 @@ impl App {
             });
         actions.extend(asked.map(Action::TallyPage));
         if modal.should_close() {
-            actions.push(Action::TallyPage(PageIntent::Close));
+            actions.push(Action::Leave(Leave::TallyPage));
         }
     }
 
@@ -12006,6 +12090,11 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
+                    Dialog::Discard(from) => match leave_saves::question(ui, &t) {
+                        Some(true) => actions.push(Action::Discard(*from)),
+                        Some(false) => actions.push(Action::KeepEditing(*from)),
+                        None => {}
+                    },
                     Dialog::RejectAi => {
                         title(ui, t.ai_reject_question());
                         let text = ui.visuals().text_color();
@@ -12055,6 +12144,8 @@ impl App {
                 } => Action::CancelBlock,
                 // Naming a new place goes back to the list (#272).
                 Dialog::FileInto { picker, .. } if picker.naming() => Action::FileIntoBack,
+                // Left, the question keeps the edit (#275).
+                Dialog::Discard(from) => Action::KeepEditing(*from),
                 _ => Action::CloseDialog,
             });
         }

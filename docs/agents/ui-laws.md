@@ -40,11 +40,13 @@ replace a law of Both apps where they say so. A desktop law marked
   stored. Leaving a name dialog without Create makes nothing. **Leaving
   saves what is valid and asks only about what isn't** (#275, Q658):
   the Tally and Session pages, the Routine editor and a Tally entry,
-  left by Back, the swipe back or the bar's arrow, save as their Save
-  does once something changed; when it can't be saved, a schedule that
+  left by Back, the swipe back or the bar's arrow, on the desktop by
+  Esc, a click beside the dialog, Alt+Left or the mouse's back button,
+  save as their Save does once something changed; when it can't be saved, a schedule that
   never happens or an empty required value, they ask once "Discard
   changes?", Discard or Keep editing, which shows what to fix. Left as
-  they opened they make nothing; a Tally made on the way stays.
+  they opened they make nothing; a Tally made on the way stays. The
+  desktop's Cancel leaves without saving.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
   bug. A menu opens where the finger is; choices that outgrow a menu
   are a page.
@@ -1109,7 +1111,12 @@ replace a law of Both apps where they say so. A desktop law marked
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
   Alt+Left, the mouse's back button and a click beside it. The Routine
   editor, a Tally's pages and the New Tally page open as dialogs over
-  the dialog or the list they were opened from.
+  the dialog or the list they were opened from. **A click beside one of
+  these dialogs saves as leaving does** (#275): it, Esc, Alt+Left and
+  the mouse's back button save the Routine editor, a Tally entry, the
+  New Tally page and the Session pages once something changed, and ask
+  "Discard changes?" only about a change that can't be saved; Cancel
+  leaves without saving.
 - **On the desktop nothing floats over a list** (#158); every list ends
   with the same room after its last card, so that card scrolls fully
   into view.
