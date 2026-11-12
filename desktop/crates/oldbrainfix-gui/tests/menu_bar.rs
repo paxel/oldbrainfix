@@ -232,6 +232,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     let mut harness = window(App::new(store, "en"));
     for entry in [
         "File into… Ctrl+M",
+        "Merge into…",
+        "Importance ⏵",
         "Routine…",
         "Reminder…",
         "Make it a Checklist",
@@ -248,6 +250,8 @@ fn the_note_menu_is_greyed_without_a_note_and_acts_on_the_one_shown() -> TestRes
     harness.run();
     for entry in [
         "File into… Ctrl+M",
+        "Merge into…",
+        "Importance ⏵",
         "Routine…",
         "Reminder…",
         "Frog",

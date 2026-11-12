@@ -538,6 +538,9 @@ struct View {
     /// cards, a table full screen (#128): its to change, not in the
     /// trash, in a format known here.
     card_changes: HashSet<String>,
+    /// The Notes listed this Device may change ([`Store::may_change`]),
+    /// in the trash too: what a selection acts on (#273).
+    card_may: HashSet<String>,
     /// How the boxes of each Note's and Section's text listed or shown
     /// show (ADR 0035), by its id: their states, and with Show ticks on
     /// what each says after it.
@@ -745,8 +748,10 @@ enum Dialog {
         area: String,
     },
     Delete(Deleting),
-    /// Picking the Note to merge the selected one into, by id and text.
+    /// Picking the Note to merge `notes` into, by id and text: the
+    /// selected one, or the cards selected (#273).
     Merge {
+        notes: Vec<String>,
         query: String,
         others: Vec<(String, String)>,
     },
@@ -1233,6 +1238,15 @@ enum Action {
     /// Reminders, without asking (#262, #268).
     Trash,
     Restore,
+    /// The cards selected, or the one right-clicked (#273): into the
+    /// trash together, with one undo.
+    TrashNotes(Vec<String>),
+    /// Back from the trash together (#273).
+    RestoreNotes(Vec<String>),
+    /// This Importance for each of them (#273).
+    ImportanceOf(Vec<String>, Importance),
+    /// Asks which Note they are merged into, together (#273).
+    AskMergeNotes(Vec<String>),
     /// Merges the selected Note into this one.
     Merge(String),
     NewArea,
@@ -4972,9 +4986,14 @@ impl App {
             }
         }
         let mut card_changes = HashSet::new();
+        let mut card_may = HashSet::new();
         for p in &placed {
             let note = &p.note;
-            if !note.is_trashed() && note.text_editable && store.may_change(&note.id)? {
+            if !store.may_change(&note.id)? {
+                continue;
+            }
+            card_may.insert(note.id.clone());
+            if !note.is_trashed() && note.text_editable {
                 card_changes.insert(note.id.clone());
             }
         }
@@ -5306,6 +5325,7 @@ impl App {
             sessions,
             card_sessions,
             card_changes,
+            card_may,
             box_looks,
             box_ticks,
             show_ticks,
@@ -5412,6 +5432,7 @@ impl App {
                 | Action::NewTopic(_)
                 | Action::Rename(_)
                 | Action::StartMerge
+                | Action::AskMergeNotes(_)
                 | Action::Share(_)
         ) {
             self.focus = true;
@@ -5836,12 +5857,33 @@ impl App {
                 }
             }
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
+            Action::TrashNotes(ids) => self.trash_notes(&ids)?,
+            Action::RestoreNotes(ids) => self.restore_notes(&ids)?,
+            Action::ImportanceOf(ids, importance) => self.importance_of(&ids, importance)?,
+            Action::AskMergeNotes(ids) => {
+                let others = self.merge_candidates("", &ids)?;
+                self.dialog = Some(Dialog::Merge {
+                    notes: ids,
+                    query: String::new(),
+                    others,
+                });
+            }
             Action::Merge(into) => {
-                self.save_text()?;
-                Notes::new(&self.store).merge(&selected, &into)?;
-                self.dialog = None;
-                self.undo = Some(Undo::Merge(selected.clone()));
-                self.selected_note = Some(into);
+                let merging = match self.dialog.take() {
+                    Some(Dialog::Merge { notes, .. }) => notes,
+                    other => {
+                        self.dialog = other;
+                        Vec::new()
+                    }
+                };
+                if self.note_open() && merging == [selected.as_str()] {
+                    self.save_text()?;
+                    Notes::new(&self.store).merge(&selected, &into)?;
+                    self.undo = Some(Undo::Merge(selected.clone()));
+                    self.selected_note = Some(into);
+                } else {
+                    self.merge_notes(&merging, &into)?;
+                }
             }
             Action::NewArea => {
                 self.dialog = Some(Dialog::NewPlace {
@@ -5866,15 +5908,17 @@ impl App {
             Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
             Action::StartMerge => {
-                let others = self.merge_candidates("", &selected)?;
+                let merging = vec![selected.clone()];
+                let others = self.merge_candidates("", &merging)?;
                 self.dialog = Some(Dialog::Merge {
+                    notes: merging,
                     query: String::new(),
                     others,
                 });
             }
             Action::MergeQuery => {
-                if let Some(Dialog::Merge { query, .. }) = &self.dialog {
-                    let found = self.merge_candidates(&query.clone(), &selected)?;
+                if let Some(Dialog::Merge { notes, query, .. }) = &self.dialog {
+                    let found = self.merge_candidates(&query.clone(), &notes.clone())?;
                     if let Some(Dialog::Merge { others, .. }) = &mut self.dialog {
                         *others = found;
                     }
@@ -7754,17 +7798,23 @@ impl App {
         }
     }
 
-    /// The Notes the Note `selected` can be merged into that the core's
-    /// search finds for `query`, by id and the title they show under.
+    /// The Notes the Notes `merging` can be merged into that the core's
+    /// search finds for `query`, by id and the title they show under: a
+    /// single one is not offered itself, several are, as one of them
+    /// picked takes the others in (#273).
     fn merge_candidates(
         &self,
         query: &str,
-        selected: &str,
+        merging: &[String],
     ) -> oldbrainfix_core::Result<Vec<(String, String)>> {
+        let alone = match merging {
+            [one] => Some(one.as_str()),
+            _ => None,
+        };
         Ok(Search::new(&self.store)
             .notes(query, None)?
             .into_iter()
-            .filter(|n| n.id != selected)
+            .filter(|n| Some(n.id.as_str()) != alone)
             .map(|n| (n.id.clone(), row_title(&self.t, Some(&n))))
             .collect())
     }
@@ -8949,6 +8999,18 @@ impl App {
         Some(self.cards.in_order(&self.shown_cards()))
     }
 
+    /// The cards selected that the Note menu's Merge into…, Importance,
+    /// Delete and Restore act on while no Note is open (#273): those this
+    /// Device may change, in the list's order.
+    fn menu_cards(&self) -> Vec<String> {
+        if self.note_open() {
+            return Vec::new();
+        }
+        let mut chosen = self.cards.in_order(&self.shown_cards());
+        chosen.retain(|id| self.view.card_may.contains(id));
+        chosen
+    }
+
     /// The ids of the Notes the list shows, in its order.
     fn shown_cards(&self) -> Vec<String> {
         self.view.notes.iter().map(|p| p.note.id.clone()).collect()
@@ -9043,6 +9105,98 @@ impl App {
         Ok(())
     }
 
+    /// Moves the Notes `ids` to the trash in one go (#273), each with its
+    /// Routines and Reminders, without asking; Ctrl+Z brings all of them
+    /// back. One in the trash already or this Device may not change
+    /// stays.
+    fn trash_notes(&mut self, ids: &[String]) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut going = Vec::new();
+        for id in ids {
+            let listed = notes.by_id(id)?.is_some_and(|n| !n.is_trashed());
+            if listed && self.store.may_change(id)? {
+                going.push(id.clone());
+            }
+        }
+        self.cards.clear();
+        if going.is_empty() {
+            return Ok(());
+        }
+        let routines = Routines::new(&self.store);
+        self.store
+            .batch(|| going.iter().try_for_each(|id| routines.trash_note(id)))?;
+        self.undo = Some(Undo::Notes(going));
+        Ok(())
+    }
+
+    /// Brings the Notes `ids` back from the trash in one go (#273), each
+    /// with the Routines and Reminders that went with it.
+    fn restore_notes(&mut self, ids: &[String]) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut back = Vec::new();
+        for id in ids {
+            let trashed = notes.by_id(id)?.is_some_and(|n| n.is_trashed());
+            if trashed && self.store.may_change(id)? {
+                back.push(id.as_str());
+            }
+        }
+        self.cards.clear();
+        let routines = Routines::new(&self.store);
+        self.store
+            .batch(|| back.iter().try_for_each(|id| routines.restore_note(id)))
+    }
+
+    /// Gives the Notes `ids` the Importance `importance` in one go
+    /// (#273); one that has it already writes nothing.
+    fn importance_of(
+        &mut self,
+        ids: &[String],
+        importance: Importance,
+    ) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let mut setting = Vec::new();
+        for id in ids {
+            let other = notes
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && n.importance != importance);
+            if other && self.store.may_change(id)? {
+                setting.push(id.as_str());
+            }
+        }
+        self.cards.clear();
+        self.store.batch(|| {
+            setting
+                .iter()
+                .try_for_each(|id| notes.set_importance(id, importance))
+        })
+    }
+
+    /// Merges the Notes `ids` into the Note `into` in one go (#273), as
+    /// Merge into… for the cards selected asks; `into` among them takes
+    /// the others in. One a sync took out of the lists meanwhile, or this
+    /// Device may not change, stays; Ctrl+Z takes back all of them.
+    fn merge_notes(&mut self, ids: &[String], into: &str) -> oldbrainfix_core::Result<()> {
+        let notes = Notes::new(&self.store);
+        let listed = |id: &str| -> oldbrainfix_core::Result<bool> {
+            Ok(notes
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged()))
+        };
+        let mut going = Vec::new();
+        for id in ids {
+            if id != into && listed(id)? && self.store.may_change(id)? {
+                going.push(id.as_str());
+            }
+        }
+        self.cards.clear();
+        if going.is_empty() || !listed(into)? {
+            return Ok(());
+        }
+        let merged = notes.merge_all(&going, into)?;
+        self.undo = Some(Undo::Merged(merged));
+        Ok(())
+    }
+
     /// The menu bar (#145): File, Edit, View, Note, Sync and Help, each
     /// entry with its keys where it has some, the Note menu's greyed
     /// while no Note is open, but File into… for the cards selected
@@ -9060,8 +9214,25 @@ impl App {
         };
         let note = self.note_menu();
         let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
-        // File into… also files the cards selected in the list (#148).
+        // File into… also files the cards selected in the list (#148),
+        // and Merge into…, Importance and Delete, or Restore in the
+        // trash, act on them (#273).
         let filing = self.file_into_notes();
+        let chosen = self.menu_cards();
+        let in_trash = self.selection == Selection::Trash;
+        let listed = !chosen.is_empty() && !in_trash;
+        let open = note.as_ref().is_some_and(|n| n.changes);
+        let restores = self.view.may.changes
+            && self
+                .view
+                .detail
+                .as_ref()
+                .is_some_and(|(p, _)| p.note.is_trashed());
+        let merge = if open {
+            Action::StartMerge
+        } else {
+            Action::AskMergeNotes(chosen.clone())
+        };
         let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
@@ -9162,6 +9333,24 @@ impl App {
                         filing.is_some(),
                         Action::AskFileInto(filing.clone().unwrap_or_default()),
                     ),
+                    (t.merge_into(), None, open || listed, merge),
+                ];
+                menu_entries(ui, items, actions);
+                let weighs = open || listed;
+                ui.add_enabled_ui(weighs, |ui| {
+                    ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                        // One that has it already writes nothing.
+                        if let Some(importance) = importance_entries(ui, &t) {
+                            let weighed = if open {
+                                vec![id.clone()]
+                            } else {
+                                chosen.clone()
+                            };
+                            actions.push(Action::ImportanceOf(weighed, importance));
+                        }
+                    });
+                });
+                let items = [
                     (
                         t.menu_routine(),
                         None,
@@ -9262,11 +9451,23 @@ impl App {
                     actions,
                 );
                 ui.separator();
-                menu_entries(
-                    ui,
-                    [(t.delete(), None, may(|n| n.changes), Action::Trash)],
-                    actions,
-                );
+                // In the trash its Notes are restored instead, as the
+                // Note dialog restores the one open there.
+                let last = if restores {
+                    (t.restore(), None, true, Action::Restore)
+                } else if in_trash && !open {
+                    (
+                        t.restore(),
+                        None,
+                        !chosen.is_empty(),
+                        Action::RestoreNotes(chosen.clone()),
+                    )
+                } else if open {
+                    (t.delete(), None, true, Action::Trash)
+                } else {
+                    (t.delete(), None, listed, Action::TrashNotes(chosen.clone()))
+                };
+                menu_entries(ui, [last], actions);
             });
             ui.menu_button(RichText::new(t.menu_sync()).color(text), |ui| {
                 let items = [
@@ -10317,6 +10518,7 @@ impl App {
                     session_shown: self.view.card_sessions.get(id),
                     menu: self.card_menu.as_ref(),
                     changes: self.view.card_changes.contains(id),
+                    may: self.view.card_may.contains(id),
                     boxes: CardBoxes {
                         looks: &self.view.box_looks,
                         ticks: &self.view.box_ticks,
@@ -10353,12 +10555,21 @@ impl App {
                         .map(|asked| Action::CardTally(id.clone(), asked)),
                 );
                 actions.extend(clicks.session.into_iter().map(Action::Session));
-                if let Some(Action::AskFileInto(_)) = clicks.picked {
-                    // The right-click's File into… files the cards selected
-                    // with it.
-                    actions.push(Action::AskFileInto(self.cards.moving(id, &order)));
-                } else if let Some(picked) = clicks.picked {
-                    actions.push(picked);
+                if let Some(picked) = clicks.picked {
+                    // The right-click's File into…, Merge into…,
+                    // Importance, Move to trash and Restore act on the
+                    // cards selected with it (#148, #273).
+                    let along = || self.cards.moving(id, &order);
+                    actions.push(match picked {
+                        Action::AskFileInto(_) => Action::AskFileInto(along()),
+                        Action::AskMergeNotes(_) => Action::AskMergeNotes(along()),
+                        Action::ImportanceOf(_, importance) => {
+                            Action::ImportanceOf(along(), importance)
+                        }
+                        Action::TrashNotes(_) => Action::TrashNotes(along()),
+                        Action::RestoreNotes(_) => Action::RestoreNotes(along()),
+                        other => other,
+                    });
                 } else if let Some(tag) = clicks.tag {
                     actions.push(Action::SearchFor(tag));
                 } else if let Some((routine, occurrence)) = clicks.occurrence {
@@ -11269,7 +11480,7 @@ impl App {
                     }
                     Dialog::Look { area } => look_form(ui, &t, view.area(area), actions),
                     Dialog::Delete(deleting) => delete_form(ui, &t, deleting, actions),
-                    Dialog::Merge { query, others } => {
+                    Dialog::Merge { query, others, .. } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
                     Dialog::Share { area, role, afar } => {
@@ -12838,6 +13049,24 @@ struct NoteMenu {
     checklist: bool,
     shopping: bool,
     tally: bool,
+}
+
+/// Important, Normal and Unimportant, as a menu's entries (#273): the
+/// one picked, which closes the menu.
+fn importance_entries(ui: &mut Ui, t: &L10n) -> Option<Importance> {
+    let text = ui.visuals().text_color();
+    let mut picked = None;
+    for (importance, label) in [
+        (Importance::Important, t.importance_important()),
+        (Importance::Normal, t.importance_normal()),
+        (Importance::Unimportant, t.importance_unimportant()),
+    ] {
+        if ui.button(RichText::new(label).color(text)).clicked() {
+            picked = Some(importance);
+            ui.close();
+        }
+    }
+    picked
 }
 
 /// The entries of a menu of the menu bar: each label with its keys, if
@@ -16276,6 +16505,9 @@ struct CardLook<'a> {
     /// Whether this Device may change its text, its tables full screen
     /// (#128).
     changes: bool,
+    /// Whether this Device may change it: merge, weight, trash or
+    /// restore it with the cards selected (#273).
+    may: bool,
     /// How the boxes of its text and its Sections' show, by id, those of
     /// them this Device may tick, and whether Show ticks is on for it
     /// (ADR 0035).
@@ -17720,6 +17952,21 @@ fn note_card(
         {
             picked = Some(Action::AskFileInto(vec![note.id.clone()]));
         }
+        // These too with the cards selected along (#273).
+        let one = || vec![note.id.clone()];
+        if look.may {
+            if ui
+                .button(RichText::new(t.merge_into()).color(text))
+                .clicked()
+            {
+                picked = Some(Action::AskMergeNotes(one()));
+            }
+            ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                if let Some(importance) = importance_entries(ui, t) {
+                    picked = Some(Action::ImportanceOf(one(), importance));
+                }
+            });
+        }
         // A Shopping List's ways onto the Agenda before "Back to a plain
         // Note", as on the phone (#186).
         if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m)) {
@@ -17777,6 +18024,15 @@ fn note_card(
                 });
             }
         }
+        if look.may {
+            ui.separator();
+            if ui
+                .button(RichText::new(t.move_to_trash()).color(text))
+                .clicked()
+            {
+                picked = Some(Action::TrashNotes(one()));
+            }
+        }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.
         if picked.is_some() {
@@ -17800,6 +18056,16 @@ fn note_card(
         let more = more.on_hover_text(&label);
         egui::Popup::menu(&more).show(&mut entries);
         resp.context_menu(&mut entries);
+    } else if note.is_trashed() && look.may {
+        // In the trash a right-click restores it, with the cards selected
+        // along (#273); it has no ⋮.
+        resp.context_menu(|ui| {
+            let text = ui.visuals().text_color();
+            if ui.button(RichText::new(t.restore()).color(text)).clicked() {
+                picked = Some(Action::RestoreNotes(vec![note.id.clone()]));
+                ui.close();
+            }
+        });
     }
     if menu_opened {
         ui.ctx().request_repaint();

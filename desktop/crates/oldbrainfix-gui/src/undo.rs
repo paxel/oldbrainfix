@@ -1,7 +1,8 @@
 //! What Ctrl+Z and Edit ▸ Undo take back on the desktop (#268, Q646
 //! (c)): the last delete of what can be restored, check-off, Skip or
 //! Tomorrow (#269), filing or Merge, in place of asking before it. Deleting what comes back asks
-//! nothing; deleting for good still asks once.
+//! nothing; deleting for good still asks once. The cards selected and
+//! moved to the trash or merged together come back with one (#273).
 //!
 //! An undo uses the restore the cores have and writes nothing more than
 //! it does. Where a sync, the Trash or another step got there first and
@@ -16,6 +17,9 @@ use oldbrainfix_core::{
 pub enum Undo {
     /// A Note moved to the trash, with its Routines and Reminders.
     Note(String),
+    /// The Notes selected and moved to the trash together, each with its
+    /// Routines and Reminders (#273).
+    Notes(Vec<String>),
     /// A Routine or Reminder moved to the trash on its own.
     Routine(String),
     /// A Frog moved to the trash.
@@ -41,6 +45,8 @@ pub enum Undo {
     },
     /// The Note with this id merged into another.
     Merge(String),
+    /// The Notes selected and merged into another together (#273).
+    Merged(Vec<String>),
     /// The Occurrence of the Routine checked off, and the Note that went
     /// to the trash with it, if one did (#211, #215).
     Done {
@@ -67,6 +73,9 @@ impl Undo {
     pub fn apply(self, store: &Store) -> oldbrainfix_core::Result<()> {
         match self {
             Undo::Note(id) => restore_note(store, &id)?,
+            Undo::Notes(ids) => {
+                store.batch(|| ids.iter().try_for_each(|id| restore_note(store, id)))?;
+            }
             Undo::Routine(id) => {
                 let routines = Routines::new(store);
                 if routines.by_id(&id)?.is_some_and(|r| r.is_trashed())
@@ -128,6 +137,8 @@ impl Undo {
                     notes.undo_merge(&id)?;
                 }
             }
+            // Each one a sync or another step left merged.
+            Undo::Merged(ids) => drop(Notes::new(store).undo_merge_all(&ids)?),
             Undo::Done {
                 routine,
                 occurrence,

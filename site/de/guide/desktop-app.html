@@ -143,7 +143,11 @@
   Strichlisten, Einheiten und Frösche</a>), <strong>An eine Person senden</strong>, <strong>Als Text
   kopieren</strong>, <strong>Als Markdown speichern …</strong>, <strong>Als Paket
   exportieren…</strong>, <strong>„Von …“ entfernen</strong> bei einer Notiz aus einem Paket, das
-  nicht als deins übernommen wurde, und, wo die Notiz Kästchen hat, <strong>Ticks zeigen</strong>. Eine Karte, die auf einen Bereich oder ein Thema in der Seitenleiste
+  nicht als deins übernommen wurde, wo die Notiz Kästchen hat, <strong>Ticks zeigen</strong> und, bei
+  einer Notiz, die du ändern darfst, <strong>Zusammenführen mit …</strong> und
+  <strong>Wichtigkeit</strong> nach Ablegen in … und <strong>In den Papierkorb</strong> zuletzt. Im
+  Papierkorb hat eine Karte kein ⋮; ihr Rechtsklick bietet nur <strong>Wiederherstellen</strong>.
+  Eine Karte, die auf einen Bereich oder ein Thema in der Seitenleiste
   gezogen wird, wird dort abgelegt, eine unsortierte verlässt dabei Unsortiert; Notizen im
   Papierkorb lassen sich nicht ziehen.
 </p>
@@ -158,6 +162,16 @@
   enthalten, die andere geschrieben haben und die nur ein Verwalter verschiebt: Sie bleiben, wo sie
   sind, und eine Zeile oben sagt, dass nicht jede Notiz abgelegt wurde; ihr Klick zeigt, wie viele
   verschoben wurden und wie viele geblieben sind.
+</p>
+<p>
+  Zusammenführen mit …, Wichtigkeit, In den Papierkorb und Wiederherstellen im Rechtsklick-Menü einer
+  ausgewählten Karte wirken ebenso auf alle ausgewählten Karten, wie auch <strong>Notiz ▸
+  Zusammenführen mit …</strong>, <strong>Wichtigkeit</strong>, <strong>Löschen</strong> und im
+  Papierkorb <strong>Wiederherstellen</strong>, solange keine Notiz offen ist. Zusammenführen mit …
+  bietet jede Notiz an, die ausgewählten eingeschlossen: Eine gewählte ausgewählte Notiz nimmt die
+  anderen auf, und die Liste bleibt. In den Papierkorb fragt nichts; Strg+Z holt alle auf einmal
+  zurück und nimmt ebenso ein Zusammenführen aller zurück. Eine Notiz, die du nicht ändern darfst,
+  bleibt, wie sie ist. Jedes davon beendet die Auswahl.
 </p>
 </box-more>
 </guide-box>
@@ -254,9 +268,9 @@
 <box-more>
 <ul>
   <li><strong>Datei</strong>: <strong>Neue Notiz</strong> (Strg+N) öffnet die Schnellnotiz als Dialog über dem Fenster, der Cursor in ihrem Feld, abgelegt in den Bereich oder das Thema, das die Liste zeigt (siehe <a href="capture-and-sort.html#auf-dem-desktop">Erfassen und sortieren</a>). <strong>Schnellnotiz</strong> öffnet das Erfassen-Fenster, wie das Tastenkürzel. <strong>Importieren …</strong> öffnet den Dialog „Import“ mit <strong>Ein Ordner …</strong>, das Notizen aus einem Ordner mit Markdown- oder Textdateien macht, und <strong>Google Keep …</strong>, das sie aus einem Export von Keep aus Google Takeout macht (siehe <a href="getting-started.html#notizen-aus-einer-anderen-app-importieren">Notizen aus einer anderen App importieren</a>). <strong>Paket öffnen …</strong> öffnet ein Paket, das dir jemand geschickt hat (siehe <a href="sharing-and-sync.html">Teilen und abgleichen</a>). <strong>Als Markdown speichern …</strong> speichert die Notiz im Notiz-Dialog. <strong>Beenden</strong> beendet die App, auch wo das Schließen des Fensters sie im Infobereich lässt.</li>
-  <li><strong>Bearbeiten</strong>: <strong>Rückgängig</strong> (Strg+Z) nimmt das letzte Löschen, Abhaken, Ablegen oder Zusammenführen zurück; es ist ausgegraut, solange es nichts zurückzunehmen gibt. <strong>Ausschneiden</strong>, <strong>Kopieren</strong> und <strong>Einfügen</strong> für das Textfeld, in dem der Cursor war. <strong>Suchen</strong> (Strg+F) setzt den Cursor ins Suchfeld, in das von Alle Notizen, wo die Liste keines hat. <strong>Einstellungen …</strong> (Strg+,) öffnet die Einstellungen.</li>
+  <li><strong>Bearbeiten</strong>: <strong>Rückgängig</strong> (Strg+Z) nimmt das letzte Löschen, Abhaken, Ablegen oder Zusammenführen zurück, das aller ausgewählten Karten auf einmal, wo sie zusammen gingen; es ist ausgegraut, solange es nichts zurückzunehmen gibt. <strong>Ausschneiden</strong>, <strong>Kopieren</strong> und <strong>Einfügen</strong> für das Textfeld, in dem der Cursor war. <strong>Suchen</strong> (Strg+F) setzt den Cursor ins Suchfeld, in das von Alle Notizen, wo die Liste keines hat. <strong>Einstellungen …</strong> (Strg+,) öffnet die Einstellungen.</li>
   <li><strong>Ansicht</strong>: Agenda, Unsortiert, Alle Notizen, Frösche und Alle Routinen und Erinnerungen; <strong>Detailansichten</strong> und <strong>Kompaktansichten</strong> für die Karten der gezeigten Liste; <strong>Design</strong> (siehe <a href="#design-und-groesse-aendern">Design und Größe ändern</a>).</li>
-  <li><strong>Notiz</strong>, für die Notiz im Notiz-Dialog: <strong>Ablegen in …</strong> (Strg+M), das nach dem Bereich oder Thema fragt und, solange keine Notiz offen ist, die in der Liste ausgewählten Karten ablegt, <strong>Routine …</strong>, <strong>Erinnerung …</strong>, <strong>Frosch</strong> und <strong>Einheit</strong>, <strong>Zur Checkliste machen</strong>, <strong>Zur Einkaufsliste machen</strong>, <strong>Zur Strichliste machen</strong>, <strong>An eine Person senden</strong>, <strong>Als Text kopieren</strong>, <strong>Als Paket exportieren…</strong>, <strong>Verlauf</strong> und <strong>Löschen</strong>. Frosch, Einheit und Zur Strichliste machen stehen nur in Erweitert. Sie sind ausgegraut, solange keine Notiz offen ist, bis auf Ablegen in …, solange Karten ausgewählt sind, und jeder einzelne dort, wo auch der Notiz-Dialog ihn nicht anbietet.</li>
+  <li><strong>Notiz</strong>, für die Notiz im Notiz-Dialog: <strong>Ablegen in …</strong> (Strg+M), das nach dem Bereich oder Thema fragt und, solange keine Notiz offen ist, die in der Liste ausgewählten Karten ablegt, <strong>Zusammenführen mit …</strong>, <strong>Wichtigkeit</strong>, <strong>Routine …</strong>, <strong>Erinnerung …</strong>, <strong>Frosch</strong> und <strong>Einheit</strong>, <strong>Zur Checkliste machen</strong>, <strong>Zur Einkaufsliste machen</strong>, <strong>Zur Strichliste machen</strong>, <strong>An eine Person senden</strong>, <strong>Als Text kopieren</strong>, <strong>Als Paket exportieren…</strong>, <strong>Verlauf</strong> und <strong>Löschen</strong>, im Papierkorb an dessen Stelle <strong>Wiederherstellen</strong>, solange keine Notiz offen ist. Frosch, Einheit und Zur Strichliste machen stehen nur in Erweitert. Sie sind ausgegraut, solange keine Notiz offen ist, bis auf Ablegen in …, Zusammenführen mit …, Wichtigkeit, Löschen und Wiederherstellen, solange Karten ausgewählt sind, auf die sie dann wirken, und jeder einzelne dort, wo auch der Notiz-Dialog ihn nicht anbietet.</li>
   <li><strong>Synchronisieren</strong>: <strong>Jetzt synchronisieren</strong>, <strong>Gerät koppeln</strong>, <strong>Menschen</strong>, <strong>Profil</strong> und <strong>Sicherungen …</strong>, jeweils ein Dialog (siehe <a href="#einen-dialog-schliessen-oder-darin-zurueckgehen">Einen Dialog schließen oder darin zurückgehen</a>).</li>
   <li><strong>Hilfe</strong>: <strong>Anleitung</strong> öffnet diese Seite im Browser; <strong>Über Old Brain Fix</strong> zeigt die Version, die Dokumentation und die Datenschutzerklärung, den Quellcode und jede Fremdkomponente mit ihrer Lizenz.</li>
 </ul>

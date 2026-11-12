@@ -1132,8 +1132,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Every menu entry acts on what it names and closes its menu**, also
   when picked by keyboard or screen reader; the Note menu acts on the
   Note in the Note dialog and is greyed while none is open, each entry
-  as far as the dialog offers it, but File into… acts on the cards
-  selected in the list while no Note is open (#148). Its keys (Ctrl+N,
+  as far as the dialog offers it, but File into…, Merge into…,
+  Importance and Delete, in the Trash Restore in Delete's place, act on
+  the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
   Ctrl+F, Ctrl+M, Ctrl+,; Cmd on macOS) stand beside the entries and
   work while typing, over the Note dialog too, not while another dialog
   is open. On the desktop the menu bar leads to Settings, Backups and
@@ -1142,7 +1143,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Skip or Tomorrow made in the app (#269), filing or Merge** (#268), the
   desktop's offer to undo, with no announcement: Edit ▸ Undo is first in its menu and greyed while
   nothing waits; Ctrl+Z works over the list and the Note dialog but not
-  in a text field, where it undoes the typing. Only the last one waits.
+  in a text field, where it undoes the typing. Only the last one waits;
+  cards selected and moved to the trash or merged together come back
+  with one (#273).
 - **Keys finish what is typed** (draft, #196): Ctrl+Enter (Cmd on
   macOS) saves the quick note's Note and the text being edited in the
   Note dialog, while Enter alone starts a new line; Enter in a one-line
@@ -1215,6 +1218,19 @@ replace a law of Both apps where they say so. A desktop law marked
   thicker outline, and say so to a screen reader; Esc and showing
   another place drop the selection. A double-click or Edit opens the
   Note dialog.
+- **A selection is acted on from a card's right-click** (#273, Q656):
+  its menu offers, after File into…, Merge into… and Importance ▸
+  Important, Normal or Unimportant, and Move to trash last, each only on
+  a card this Device may change; a card in the Trash has no ⋮, and its
+  right-click offers Restore alone. On a selected card each acts on all
+  the cards selected, on another on that card alone, as File into…
+  does, and the Note menu offers the same while no Note is open (see
+  Menu bar and keys). Merge into… opens the Note picker with every Note,
+  the selected ones included, and a selected Note picked takes the
+  others in, all in one go, the list staying shown; Move to trash asks
+  nothing. A Note this Device may not change stays as it is, without an
+  announcement. An action ends the selection; Ctrl+Z takes back the
+  trash or the Merge of all of them at once.
 - **In the Note dialog a text that is only read selects with the
   mouse** and copies with Ctrl+C (Cmd on macOS): another person's text,
   the Note's in the trash, a Section's (#183), a Transcript, a Photo

@@ -1,4 +1,5 @@
-//! The cards selected in a Note list (#148), to move several at once: a
+//! The cards selected in a Note list (#148), to move, merge, weight,
+//! trash or restore several at once (#273): a
 //! click selects one card, Ctrl-click (Cmd on macOS) adds or takes away
 //! one, Shift-click selects the run from the card clicked last to this
 //! one in the order the list shows them. Esc and showing another place

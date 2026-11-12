@@ -993,6 +993,24 @@ fn all_guide_frames() -> TestResult {
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().select(Selection::Unsorted);
             harness.run();
+            // Both Unsorted cards selected, each click after a pause, and
+            // the right-click menu of one open on them (#273).
+            let [.., warranty, book] = texts.filed;
+            for (text, modifiers) in [
+                (warranty, egui::Modifiers::NONE),
+                (book, egui::Modifiers::COMMAND),
+            ] {
+                harness.run_steps(50);
+                harness
+                    .get_by_role_and_label(Role::Button, text)
+                    .click_modifiers(modifiers);
+                harness.run();
+            }
+            harness.run_steps(50);
+            harness
+                .get_by_role_and_label(Role::Button, book)
+                .click_secondary();
+            harness.run();
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("capture-and-sort", "sort-later"),
