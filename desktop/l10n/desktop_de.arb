@@ -341,5 +341,8 @@
   "lineDrag": "Zum Verschieben ziehen: {line}",
   "hotkeyRecord": "Tasten aufnehmen",
   "hotkeyRecording": "Tasten drücken …",
-  "hotkeyRecordingHint": "Halte Strg, Alt oder beide und drücke einen Buchstaben, eine Ziffer, F1 bis F12 oder die Leertaste. Esc bricht ab."
+  "hotkeyRecordingHint": "Halte Strg, Alt oder beide und drücke einen Buchstaben, eine Ziffer, F1 bis F12 oder die Leertaste. Esc bricht ab.",
+  "noteWindowOpen": "In eigenem Fenster öffnen",
+  "noteWindowKeepOnTop": "Im Vordergrund halten",
+  "noteWindowKeepOnTopWayland": "Unter Wayland kann keine App ihr Fenster im Vordergrund halten. Das Fenstermenü deiner Arbeitsumgebung kann es anbieten, wie KDEs „Im Vordergrund halten“."
 }

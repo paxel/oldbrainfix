@@ -36,6 +36,10 @@ Amended by #276: the Shopping List a capture on a Device went into last is a set
 
 Amended by #278: on the desktop the window's size and position, whether it is maximized, the sidebar's width and the Note dialog's size are settings of that Device (`windowSize`, `windowPosition`, `windowMaximized`, `sidebarWidth`, `noteDialogSize`), written as the user leaves them and read at the next start. A position the system does not tell, as on Wayland, is not written, and one on no monitor any more opens the window centred. The user never sets them by name, so the AI port has no tool for them.
 
+## A Note window's size (#287)
+
+Amended by #287: on the desktop the size of a Note in a window of its own is a setting of that Device (`noteWindowSize`, `width,height` in the app's points, which "Bigger text and icons" enlarges as the window opens), written as a Note window closes and read as the next one opens; none kept, or one too small, opens it at 560 × 680. Whether a Note window is kept on top is not kept: it starts off each time. The user never sets the size by name, so the AI port has no tool for it.
+
 ## The sidebar's folds (#279)
 
 Amended by #279: on the desktop, which Areas show their Topics folded in the sidebar is a setting of that Device (`areaTopicsFolded:<Area id>`, `true` while folded), as the folds of cards are; none kept means unfolded. The chevron writes it; the user never sets it by name, so the AI port has no tool for it.

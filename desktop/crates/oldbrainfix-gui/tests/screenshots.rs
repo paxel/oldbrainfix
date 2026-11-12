@@ -49,6 +49,7 @@ use oldbrainfix_gui::feedback_view::FeedbackFacts;
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
+use oldbrainfix_gui::window_sizes;
 use oldbrainfix_gui::{App, Page, Selection};
 use oldbrainfix_whisper::model::{ModelDir, Outcome as ModelOutcome};
 use parking_lot::Mutex;
@@ -706,6 +707,36 @@ fn match_frame<S>(
     )))
 }
 
+/// Compares the Note `note` of `store` in a window of its own (#287), as
+/// large as a first one opens, in `locale` and `theme`, with the guide
+/// frame `path`, as [`match_frame`] does. It has no frame of the system's
+/// around it.
+fn note_window_frame(
+    store: Arc<Store>,
+    (locale, theme): (&str, egui::Theme),
+    note: &str,
+    path: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let mut app = App::for_note_window(store, locale, note, true);
+    app.set_wall_clock(Arc::new(utc));
+    let size = window_sizes::DEFAULT_NOTE_WINDOW;
+    let margin = (2 * MARGIN) as f32;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(size.x + margin, size.y + margin))
+        .with_theme(theme)
+        .wgpu()
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show_note_window(ui);
+            },
+            app,
+        );
+    harness.input_mut().system_theme = Some(theme);
+    harness.run_steps(4);
+    match_frame(&mut harness, path)
+}
+
 /// The window over the demo store in `x`'s words, in `locale` and `theme`,
 /// on the Agenda.
 fn window(
@@ -1060,6 +1091,14 @@ fn all_guide_frames() -> TestResult {
             problems.extend(match_frame(
                 &mut harness,
                 &box_frame("capture-and-sort", "edit"),
+            )?);
+            // That Note in a window of its own (#287), Keep on top above
+            // it.
+            problems.extend(note_window_frame(
+                harness.state().shared_store(),
+                (language, theme),
+                &tap,
+                &box_frame(DESKTOP, "note-window"),
             )?);
             // The menu bar's Note menu over it, for that Note.
             harness

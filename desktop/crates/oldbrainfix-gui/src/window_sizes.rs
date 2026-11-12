@@ -1,5 +1,5 @@
-//! The window's size and position, the sidebar's width and the Note
-//! dialog's size (#278), kept on this computer as settings of this
+//! The window's size and position, the sidebar's width, the Note
+//! dialog's size (#278) and a Note window's (#287), kept on this computer as settings of this
 //! Device (ADR 0008) and brought back at the next start. Sizes and
 //! positions are logical points, as the window is opened with them,
 //! unzoomed.
@@ -18,6 +18,10 @@ pub const WINDOW_MAXIMIZED: &str = "windowMaximized";
 pub const SIDEBAR_WIDTH: &str = "sidebarWidth";
 /// The Note dialog's size, `width,height`.
 pub const NOTE_DIALOG_SIZE: &str = "noteDialogSize";
+/// The size of a Note in its own window (#287), `width,height`: the
+/// last one closed, the one the next opens at. Unlike the others, in the
+/// app's points, as a window of the running app is opened with them.
+pub const NOTE_WINDOW_SIZE: &str = "noteWindowSize";
 
 /// The window's size at the first start.
 pub const DEFAULT_WINDOW: Vec2 = Vec2::new(1280.0, 800.0);
@@ -28,6 +32,8 @@ pub const DEFAULT_SIDEBAR: f32 = 260.0;
 pub const MIN_SIDEBAR: f32 = 180.0;
 /// The smallest the Note dialog gets.
 pub const MIN_NOTE_DIALOG: Vec2 = Vec2::new(320.0, 240.0);
+/// A Note window's size until one was closed (#287).
+pub const DEFAULT_NOTE_WINDOW: Vec2 = Vec2::new(560.0, 680.0);
 
 /// How much of the window has to lie on a monitor for it to open where
 /// it was, in each direction: enough to grab it.
@@ -114,6 +120,24 @@ pub fn note_dialog_size(store: &Store) -> Option<Vec2> {
 
 pub fn keep_note_dialog_size(store: &Store, size: Vec2) -> Result<()> {
     keep(store, NOTE_DIALOG_SIZE, &format_pair(size.x, size.y))
+}
+
+/// The size a Note window opens at (#287): the last one's closed, the
+/// first one's where nothing was kept or it cannot be read.
+pub fn note_window_size(store: &Store) -> Vec2 {
+    store
+        .local_setting(NOTE_WINDOW_SIZE)
+        .ok()
+        .flatten()
+        .as_deref()
+        .and_then(pair)
+        .map(|(w, h)| Vec2::new(w, h))
+        .filter(|s| s.x >= MIN_NOTE_DIALOG.x && s.y >= MIN_NOTE_DIALOG.y)
+        .unwrap_or(DEFAULT_NOTE_WINDOW)
+}
+
+pub fn keep_note_window_size(store: &Store, size: Vec2) -> Result<()> {
+    keep(store, NOTE_WINDOW_SIZE, &format_pair(size.x, size.y))
 }
 
 /// Writes `value` unless it is there already.
@@ -254,6 +278,20 @@ mod tests {
         keep_note_dialog_size(&store, Vec2::new(1000.2, 650.0))?;
         assert_eq!(sidebar_width(&store), Some(333.0));
         assert_eq!(note_dialog_size(&store), Some(Vec2::new(1000.0, 650.0)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_window_opens_as_large_as_the_last_one_closed() -> Result<()> {
+        let store = store();
+        assert_eq!(note_window_size(&store), DEFAULT_NOTE_WINDOW);
+        keep_note_window_size(&store, Vec2::new(480.4, 900.0))?;
+        assert_eq!(note_window_size(&store), Vec2::new(480.0, 900.0));
+        // Too small or unreadable: the first one's.
+        store.set_local_setting(NOTE_WINDOW_SIZE, "100,100")?;
+        assert_eq!(note_window_size(&store), DEFAULT_NOTE_WINDOW);
+        store.set_local_setting(NOTE_WINDOW_SIZE, "tall")?;
+        assert_eq!(note_window_size(&store), DEFAULT_NOTE_WINDOW);
         Ok(())
     }
 

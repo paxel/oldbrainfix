@@ -636,5 +636,11 @@
   "hotkeyRecording": "Press the keys…",
   "@hotkeyRecording": {"description": "The hotkey's record button while it records (#283): the next chord pressed becomes the hotkey."},
   "hotkeyRecordingHint": "Hold Ctrl, Alt or both and press a letter, a digit, F1 to F12 or Space. Esc cancels.",
-  "@hotkeyRecordingHint": {"description": "Under the hotkey field while a chord is recorded (#283); Super chords are typed into the field instead."}
+  "@hotkeyRecordingHint": {"description": "Under the hotkey field while a chord is recorded (#283); Super chords are typed into the field instead."},
+  "noteWindowOpen": "Open in its own window",
+  "@noteWindowOpen": {"description": "The Note dialog's button beside its cross and an entry of a card's ⋮ and right-click menu on the desktop (#287): the Note opens in a window of its own beside the main window, one window per Note; a second click brings that window forward."},
+  "noteWindowKeepOnTop": "Keep on top",
+  "@noteWindowKeepOnTop": {"description": "Checkbox at the top of a Note's own window on the desktop (#287): the window stays above all other windows while it is open; off as it opens."},
+  "noteWindowKeepOnTopWayland": "Wayland lets no app keep its window on top. Your desktop's own window menu may offer it, as KDE's \"Keep above others\" does.",
+  "@noteWindowKeepOnTopWayland": {"description": "Under the greyed Keep on top of a Note's own window on Wayland (#287): why it cannot be ticked, and where the desktop may offer the same."}
 }

@@ -36,6 +36,8 @@ pub const UNCHECKED: char = '\u{e158}';
 pub const INBOX: char = '\u{e40c}';
 pub const HISTORY: char = '\u{e314}';
 pub const CLOSE: char = '\u{e16a}';
+/// `open_in_new`: a Note in a window of its own (#287).
+pub const OPEN_IN_NEW: char = '\u{e45c}';
 pub const NOTE: char = '\u{e605}';
 pub const PREVIOUS: char = '\u{e15e}';
 pub const NEXT: char = '\u{e15f}';

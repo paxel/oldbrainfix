@@ -162,6 +162,15 @@ pub struct TypedLines {
 }
 
 impl TypedLines {
+    /// None yet, their rows keyed after `base`: a Note window's (#287),
+    /// whose fields are not to share an id with another window's.
+    pub fn keyed_after(base: u64) -> TypedLines {
+        TypedLines {
+            next: base,
+            ..TypedLines::default()
+        }
+    }
+
     /// A row for the Line `id` holding `text`, or a new one.
     fn row(&mut self, id: Option<String>, text: &str, in_group: bool) -> TypedLine {
         self.next += 1;

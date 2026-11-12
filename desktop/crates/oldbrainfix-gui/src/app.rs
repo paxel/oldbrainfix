@@ -149,6 +149,7 @@ use crate::media_view::{
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::note_window::{self, Alone, Shown};
 use crate::occurrence_answers::{self, Answer, Answers};
 use crate::pack_view::{self, PackAsk};
 use crate::paste;
@@ -1229,6 +1230,12 @@ enum Action {
     CloseQuickNote,
     /// Closes the Note dialog, keeping what was typed (#146).
     CloseNote,
+    /// Opens the Note in a window of its own beside the main window, or
+    /// brings its window forward where it has one (#287).
+    OpenWindow(String),
+    /// Keeps the Note window on top of the other windows, or no more
+    /// (#287).
+    KeepOnTop(bool),
     /// Opens the small editor of a badge of the Note dialog, or closes
     /// it (#160).
     Badge(Option<NoteBadge>),
@@ -2085,6 +2092,39 @@ pub struct App {
     /// The alarm sound file last looked at and whether it rings or the
     /// own chime rings in its place, decoded once per file chosen.
     sound_rung: Option<(String, Rung)>,
+    /// The Notes open in windows of their own beside this one (#287),
+    /// each shown by an App of its own drawn as a viewport of this
+    /// window's.
+    note_windows: Vec<NoteWindow>,
+    /// What this App holds of being such a window, while it is one.
+    alone: Option<Alone>,
+    /// Bumped by the window and its Note windows as each reads the log
+    /// anew or did something, shared by them: the others read it again
+    /// (#287). What it was as this App read it last.
+    writes: Arc<AtomicU64>,
+    seen_writes: u64,
+    /// Whether a window can be kept on top here: not on Wayland (#287).
+    pin_works: bool,
+    /// How many Note windows were opened, each having its own viewport
+    /// and its own ids for the fields of its Lines (#287); where those
+    /// ids start here.
+    windows_opened: u64,
+    lines_base: u64,
+    /// What a Note window was asked that the main window does (#287):
+    /// showing a place or a dialog, opening another Note.
+    for_main: Vec<Action>,
+}
+
+/// A Note in a window of its own (#287): the App showing it and its
+/// viewport, and whether it is to come forward.
+struct NoteWindow {
+    app: Box<App>,
+    viewport: egui::ViewportId,
+    size: egui::Vec2,
+    forward: bool,
+    /// Opened this frame: drawn from the next, once the dialog it may
+    /// have shown in is gone.
+    fresh: bool,
 }
 
 /// Makes or fills in the own Profile in a store with this computer's
@@ -2293,7 +2333,18 @@ impl App {
     /// The window over `store`, speaking `locale`, showing the Agenda on
     /// the system's local time.
     pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
-        let store = store.into();
+        let mut app = App::bare(store.into(), locale);
+        app.refresh();
+        // An AI Task left when the window went waits for its review.
+        match app.review_ai() {
+            Ok(()) => app.refresh(),
+            Err(e) => app.error = Some(e.to_string()),
+        }
+        app
+    }
+
+    /// The App over `store` before it read anything.
+    fn bare(store: Arc<Store>, locale: &str) -> App {
         let read_at = store.now();
         // Normal speed when it cannot be read.
         let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
@@ -2485,17 +2536,115 @@ impl App {
             ai_copied: None,
             sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
             sound_rung: None,
+            note_windows: Vec::new(),
+            alone: None,
+            writes: Arc::new(AtomicU64::new(0)),
+            seen_writes: 0,
+            pin_works: note_window::pin_works_here(),
+            windows_opened: 0,
+            lines_base: 0,
+            for_main: Vec::new(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
-        app.refresh();
-        // An AI Task left when the window went waits for its review.
-        match app.review_ai() {
-            Ok(()) => app.refresh(),
-            Err(e) => app.error = Some(e.to_string()),
-        }
         app
+    }
+
+    /// The App of a window of its own showing only the Note `note`
+    /// (#287), speaking `locale`, as the main window opens one; whether it
+    /// can be kept on top of the others in `pin_works`. Its frames are
+    /// drawn by [`App::show_note_window`].
+    pub fn for_note_window(store: Arc<Store>, locale: &str, note: &str, pin_works: bool) -> App {
+        let mut app = App::alone_app(store, L10n::new(locale), note, (pin_works, 1));
+        app.refresh();
+        app
+    }
+
+    /// Opens the Note `id` in a window of its own (#287), as the Note
+    /// dialog's button and the card's menu do.
+    pub fn open_in_window(&mut self, id: &str) {
+        self.apply(Action::OpenWindow(id.to_string()));
+    }
+
+    /// The log, shared with the windows of the Notes (#287).
+    pub fn shared_store(&self) -> Arc<Store> {
+        self.store.clone()
+    }
+
+    /// As [`App::for_note_window`], the `serial`th window opened, before
+    /// it read anything: the ids of the fields of its Lines start apart
+    /// from every other window's.
+    fn alone_app(store: Arc<Store>, t: L10n, note: &str, (pin_works, serial): (bool, u64)) -> App {
+        let mut app = App::bare(store, "en");
+        app.t = t;
+        app.alone = Some(Alone::of(note, pin_works));
+        app.pin_works = pin_works;
+        app.lines_base = serial << 32;
+        app.lines = TypedLines::keyed_after(app.lines_base);
+        // No list shows, so none is read beyond what costs nothing.
+        app.selection = Selection::SentItemsWaiting;
+        app.selected_note = Some(note.to_string());
+        app
+    }
+
+    /// The Notes open in windows of their own (#287), in the order they
+    /// opened.
+    pub fn note_windows(&self) -> Vec<&str> {
+        self.note_windows
+            .iter()
+            .filter_map(|w| w.app.alone.as_ref().map(|a| a.note.as_str()))
+            .collect()
+    }
+
+    /// The App showing the Note `note` in its own window, while it has
+    /// one (#287).
+    pub fn note_window(&self, note: &str) -> Option<&App> {
+        self.note_windows
+            .iter()
+            .map(|w| &*w.app)
+            .find(|app| app.alone.as_ref().is_some_and(|a| a.note == note))
+    }
+
+    /// The window the Note `note` shows in as it is drawn, while it has
+    /// one (#287).
+    pub fn note_window_viewport(&self, note: &str) -> Option<egui::ViewportBuilder> {
+        let window = self
+            .note_windows
+            .iter()
+            .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == note))?;
+        Some(window.app.note_window_builder(window.size))
+    }
+
+    /// Whether this App's Note window is kept on top of the others, while
+    /// it is one (#287).
+    pub fn kept_on_top(&self) -> Option<bool> {
+        self.alone.as_ref().map(Alone::kept_on_top)
+    }
+
+    /// Closes the Note window of `note`, as its cross does (#287).
+    pub fn close_note_window(&mut self, note: &str) {
+        for window in &mut self.note_windows {
+            if let Some(alone) = &mut window.app.alone
+                && alone.note == note
+            {
+                alone.close_asked = true;
+            }
+        }
+    }
+
+    /// Whether a window can be kept on top of the others here, as the
+    /// Note windows opened from now on find it (#287): not on Wayland.
+    pub fn set_pin_works(&mut self, works: bool) {
+        self.pin_works = works;
+    }
+
+    /// The window this App's Note shows in, opened as large as `size`.
+    fn note_window_builder(&self, size: egui::Vec2) -> egui::ViewportBuilder {
+        let note = self.view.detail.as_ref().map(|(p, _)| &p.note);
+        let text = note.map(|n| n.visible_text()).unwrap_or_default();
+        let title = note_window::title(&text, self.t.app_title());
+        note_window::viewport(&title, size, self.kept_on_top().unwrap_or(false))
     }
 
     /// Shows the known units of Tallies as `region`, an ISO country code,
@@ -5025,6 +5174,8 @@ impl App {
     /// quick note's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the open Note's edited text.
     pub fn flush(&mut self) {
+        // The Note windows go with the window (#287).
+        self.close_note_windows();
         if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
@@ -5172,9 +5323,17 @@ impl App {
                 capture_choices::may_spawn(&self.store, place.as_deref()).unwrap_or(true);
         }
         self.read_at = self.store.now();
-        self.arrived = self.conflicts_arrived();
+        // A Note window (#287) leaves what is announced to the main one.
+        let main = self.alone.is_none();
+        if main {
+            self.arrived = self.conflicts_arrived();
+        }
         // What the hosts and the folder found that needs an update.
-        for (source, update) in self.store.take_update_notices().unwrap_or_default() {
+        let updates = match main {
+            true => self.store.take_update_notices().unwrap_or_default(),
+            false => Vec::new(),
+        };
+        for (source, update) in updates {
             let text = update_notice_text(&self.t, &self.store, &source, update);
             let details = format!("update needed: {update:?} ({source})");
             self.updates.push_back(UpdateNotice {
@@ -5186,7 +5345,9 @@ impl App {
         // "Which one is you?" opens once it comes up, and goes once it was
         // answered here or on another Device.
         match (&self.view.profile_question, &self.dialog) {
-            (Some(_), None) if !self.question_later => self.dialog = Some(Dialog::WhichProfile),
+            (Some(_), None) if main && !self.question_later => {
+                self.dialog = Some(Dialog::WhichProfile)
+            }
             (None, Some(Dialog::WhichProfile)) => self.dialog = None,
             _ => {}
         }
@@ -5250,7 +5411,11 @@ impl App {
             self.text_focus = true;
         }
         // The Agenda as it is now, on its thread where it has one (#207).
-        self.read_agenda_aside();
+        if main {
+            self.read_agenda_aside();
+            // Read anew: the Note windows read too (#287).
+            self.seen_writes = self.writes.fetch_add(1, Ordering::SeqCst) + 1;
+        }
         self.kick();
     }
 
@@ -5366,6 +5531,8 @@ impl App {
         let routines = Routines::new(&self.store);
         let search = Search::new(&self.store);
         let shown = match &self.selection {
+            // A Note window shows its Note alone (#287).
+            _ if self.alone.is_some() => Vec::new(),
             Selection::Agenda
             | Selection::SentItemsWaiting
             | Selection::AreaOffersWaiting
@@ -5904,6 +6071,18 @@ impl App {
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
         let done = self.act(action);
+        // One place per Note (#287): a Note open in its own window comes
+        // forward there, not in the dialog.
+        if let Some(id) = &self.selected_note
+            && let Some(window) = self
+                .note_windows
+                .iter_mut()
+                .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == *id))
+        {
+            window.forward = true;
+            self.selected_note = None;
+            self.start_lines = false;
+        }
         // The session runs exactly while the Sync or Pair dialog shows,
         // or the first start's adding of a Device of one's own.
         let adding = self.welcome.as_ref().is_some_and(|w| w.adding);
@@ -5930,6 +6109,11 @@ impl App {
         }
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
+        }
+        // What a Note window did, the main window and the others read
+        // (#287).
+        if self.alone.is_some() {
+            self.seen_writes = self.writes.fetch_add(1, Ordering::SeqCst) + 1;
         }
     }
 
@@ -5992,6 +6176,12 @@ impl App {
                 self.capture_focus = false;
             }
             Action::CloseNote => self.leave_note()?,
+            Action::OpenWindow(id) => self.open_note_window(&id)?,
+            Action::KeepOnTop(on) => {
+                if let Some(alone) = &mut self.alone {
+                    alone.on_top = on;
+                }
+            }
             Action::Badge(open) => self.badge = open,
             Action::Add(kind) => self.add(kind)?,
             Action::CreateNamed => self.create_named()?,
@@ -7763,7 +7953,7 @@ impl App {
                 // Its rows start again from the Lines of the new list, what
                 // was typed kept above.
                 if shown {
-                    self.lines = TypedLines::default();
+                    self.lines = TypedLines::keyed_after(self.lines_base);
                 }
             }
             Kind::Checklist => {
@@ -8376,6 +8566,99 @@ impl App {
             self.tally_form = None;
         }
         Ok(())
+    }
+
+    /// Opens the Note `id` in a window of its own (#287), what was typed
+    /// into it in the dialog kept, or brings its window forward where it
+    /// has one. A Note in the trash, and a Note window, opens none.
+    fn open_note_window(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        if let Some(window) = self
+            .note_windows
+            .iter_mut()
+            .find(|w| w.app.alone.as_ref().is_some_and(|a| a.note == id))
+        {
+            window.forward = true;
+            return Ok(());
+        }
+        let listed = Notes::new(&self.store)
+            .by_id(id)?
+            .is_some_and(|n| !n.is_trashed() && !n.is_merged());
+        if self.alone.is_some() || !listed {
+            return Ok(());
+        }
+        if self.selected_note.as_deref() == Some(id) {
+            self.leave_note()?;
+        }
+        self.windows_opened += 1;
+        let serial = self.windows_opened;
+        let mut app = App::alone_app(self.store.clone(), self.t, id, (self.pin_works, serial));
+        app.wall = self.wall.clone();
+        app.region = self.region.clone();
+        app.speed = self.speed;
+        app.changes = self.changes.clone();
+        app.seen_changes = self.seen_changes;
+        app.wake = self.wake.clone();
+        app.redraw = self.redraw.clone();
+        app.writes = self.writes.clone();
+        app.seen_writes = self.writes.load(Ordering::SeqCst);
+        // Read with what is lent to it while it draws.
+        self.lend(&mut app);
+        app.refresh();
+        self.lend(&mut app);
+        self.note_windows.push(NoteWindow {
+            app: Box::new(app),
+            viewport: note_window::viewport_id(serial),
+            size: window_sizes::note_window_size(&self.store),
+            forward: false,
+            fresh: true,
+        });
+        Ok(())
+    }
+
+    /// Lends the App of a Note window (#287) what there is one of: the
+    /// one Undo slot (#268), the microphone, the speakers, the clipboard,
+    /// the threads making texts, the system's dialogs and the openers.
+    /// Called again, it takes them back.
+    fn lend(&mut self, to: &mut App) {
+        use std::mem::swap;
+        swap(&mut self.undo, &mut to.undo);
+        swap(&mut self.recorder, &mut to.recorder);
+        swap(&mut self.player, &mut to.player);
+        swap(&mut self.playing, &mut to.playing);
+        swap(&mut self.clipboard, &mut to.clipboard);
+        swap(&mut self.transcriber, &mut to.transcriber);
+        swap(&mut self.reader, &mut to.reader);
+        swap(&mut self.speech, &mut to.speech);
+        swap(&mut self.url_opener, &mut to.url_opener);
+        swap(&mut self.linked_file_opener, &mut to.linked_file_opener);
+        swap(&mut self.files_picker, &mut to.files_picker);
+        swap(&mut self.item_saver, &mut to.item_saver);
+        swap(&mut self.pack_saver, &mut to.pack_saver);
+        swap(&mut self.calendar_saver, &mut to.calendar_saver);
+        swap(&mut self.markdown_saver, &mut to.markdown_saver);
+        swap(&mut self.photo_saver, &mut to.photo_saver);
+        swap(&mut self.photo_opener, &mut to.photo_opener);
+    }
+
+    /// Closes every Note window (#287), what was typed into each kept, as
+    /// the main window closes or hides into the tray.
+    fn close_note_windows(&mut self) {
+        for mut window in std::mem::take(&mut self.note_windows) {
+            self.lend(&mut window.app);
+            // A dialog over its Note leaves as leaving it saves (#275).
+            if let Some(top) = window.app.top_dialog().filter(|t| *t != TopDialog::Note) {
+                window.app.apply(top.back());
+            }
+            if let Err(e) = window.app.leave_note() {
+                self.error = Some(e.to_string());
+            }
+            self.lend(&mut window.app);
+            if let Some(size) = window.app.alone.as_ref().and_then(|a| a.size)
+                && let Err(e) = window_sizes::keep_note_window_size(&self.store, size)
+            {
+                eprintln!("Note window size: {e}");
+            }
+        }
     }
 
     /// Closes the Note dialog, keeping what was typed into it: its text,
@@ -9087,6 +9370,8 @@ impl App {
             .as_ref()
             .map(|c| c.load(Ordering::SeqCst))
             .is_some_and(|c| c != self.seen_changes);
+        // Or a Note window did something (#287).
+        let changed = changed || self.writes.load(Ordering::SeqCst) != self.seen_writes;
         if changed || self.store.now() - self.read_at >= Duration::seconds(30) {
             if let Some(c) = &self.changes {
                 self.seen_changes = c.load(Ordering::SeqCst);
@@ -9544,6 +9829,8 @@ impl App {
         for action in actions {
             self.apply(action);
         }
+        // The Notes in windows of their own, beside this one (#287).
+        self.show_note_windows(ui.ctx());
         // Once the Settings no longer show Record keys, recording stops
         // (#283).
         if !std::mem::take(&mut self.hotkey_recording.drawn) {
@@ -9571,6 +9858,302 @@ impl App {
                 None => ui.ctx().open_url(egui::OpenUrl::new_tab(url)),
             }
         }
+    }
+
+    /// Draws each Note window (#287) as a viewport of this window's, with
+    /// what is lent to it, and does what each asked of this window; a
+    /// window closed keeps its size for the next.
+    fn show_note_windows(&mut self, ctx: &egui::Context) {
+        if self.note_windows.is_empty() {
+            return;
+        }
+        let mut windows = std::mem::take(&mut self.note_windows);
+        let mut asked = Vec::new();
+        let mut closed = false;
+        windows.retain_mut(|window| {
+            if std::mem::take(&mut window.fresh) {
+                ctx.request_repaint();
+                return true;
+            }
+            if std::mem::take(&mut window.forward) {
+                ctx.send_viewport_cmd_to(window.viewport, egui::ViewportCommand::Focus);
+            }
+            self.lend(&mut window.app);
+            let builder = window.app.note_window_builder(window.size);
+            let app = &mut window.app;
+            let shown = ctx.show_viewport_immediate(window.viewport, builder, |ui, class| {
+                app.note_window_frame(ui, class)
+            });
+            self.lend(&mut window.app);
+            asked.append(&mut window.app.for_main);
+            if shown == Shown::Open {
+                return true;
+            }
+            closed = true;
+            // What went wrong as it closed, announced here.
+            if let Some(e) = window.app.error.take() {
+                self.error = Some(e);
+            }
+            if let Some(size) = window.app.alone.as_ref().and_then(|a| a.size)
+                && let Err(e) = window_sizes::keep_note_window_size(&self.store, size)
+            {
+                eprintln!("Note window size: {e}");
+            }
+            false
+        });
+        windows.append(&mut self.note_windows);
+        self.note_windows = windows;
+        // What a window closing kept, and what one asked of this window,
+        // shows here at once.
+        if closed {
+            self.refresh();
+        }
+        if closed || !asked.is_empty() {
+            ctx.request_repaint();
+        }
+        for action in asked {
+            self.apply(action);
+        }
+    }
+
+    /// Draws this App's Note in its own window (#287), at the window's
+    /// root, as the frames of the guide show it; whether it stays open.
+    pub fn show_note_window(&mut self, ui: &mut Ui) -> Shown {
+        self.note_window_frame(ui, egui::ViewportClass::Root)
+    }
+
+    /// A frame of the Note window this App is (#287): the Note as its
+    /// dialog shows it, Keep on top above it, the dialogs it opens over
+    /// it. It closes, what was typed kept, by its cross, and as its Note
+    /// goes to the trash, is deleted or merged, here or elsewhere.
+    fn note_window_frame(&mut self, ui: &mut Ui, class: egui::ViewportClass) -> Shown {
+        let Some(note) = self.alone.as_ref().map(|a| a.note.clone()) else {
+            return Shown::Closed;
+        };
+        // What the main window or another did, a notification's Done,
+        // the clock.
+        let changed = self
+            .changes
+            .as_ref()
+            .map(|c| c.load(Ordering::SeqCst))
+            .is_some_and(|c| c != self.seen_changes)
+            || self.writes.load(Ordering::SeqCst) != self.seen_writes;
+        if changed || self.store.now() - self.read_at >= Duration::seconds(30) {
+            if let Some(c) = &self.changes {
+                self.seen_changes = c.load(Ordering::SeqCst);
+            }
+            self.seen_writes = self.writes.load(Ordering::SeqCst);
+            self.refresh();
+        }
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(30));
+        // Embedded, as in tests, the system has no cross of its own to
+        // click and the input is the main window's.
+        let native = class != egui::ViewportClass::EmbeddedWindow;
+        if native
+            && ui.input(|i| i.viewport().close_requested())
+            && let Some(alone) = &mut self.alone
+        {
+            alone.close_asked = true;
+        }
+        if self.alone.as_ref().is_some_and(|a| a.close_asked) {
+            // A dialog over the Note leaves as leaving it does (#275):
+            // saved, or asked about, the window staying for the answer.
+            if let Some(top) = self.top_dialog().filter(|t| *t != TopDialog::Note) {
+                self.apply(top.back());
+            }
+            let asking = self.top_dialog().is_some_and(|t| t != TopDialog::Note)
+                || matches!(self.dialog, Some(Dialog::Discard(_)));
+            if !asking {
+                if let Err(e) = self.leave_note() {
+                    self.error = Some(e.to_string());
+                }
+                return Shown::Closed;
+            }
+            if let Some(alone) = &mut self.alone {
+                alone.close_asked = false;
+            }
+            if native {
+                ui.ctx()
+                    .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            }
+        }
+        if self.note_window_gone(&note) {
+            return Shown::Closed;
+        }
+        let tones = theme::tones(ui.visuals());
+        let mut actions = Vec::new();
+        let typing = ui.ctx().text_edit_focused();
+        let top = self.top_dialog();
+        if self.dialog.is_none() && self.badge.is_none() && self.viewer.is_none() {
+            if self.table.is_some() {
+                // Back closes the table shown full screen.
+                let back = ui.input_mut(|i| {
+                    i.pointer.button_pressed(PointerButton::Extra1)
+                        || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+                });
+                if back {
+                    actions.push(Action::Table(table_view::Asked::Close));
+                }
+            } else if let Some(top) = top.filter(|t| *t != TopDialog::Note) {
+                // Back leads out of a dialog opened over the Note; over
+                // the Note itself it goes nowhere.
+                let back = ui.input_mut(|i| {
+                    i.pointer.button_pressed(PointerButton::Extra1)
+                        || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+                });
+                if back {
+                    actions.push(top.back());
+                }
+            } else if !typing
+                && ui.input_mut(|i| !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z))
+            {
+                // Ctrl+Z outside a text field, as in the main window (#268).
+                actions.push(Action::Undo);
+            }
+        } else if self.viewer.is_some() {
+            let back = ui.input_mut(|i| {
+                i.pointer.button_pressed(PointerButton::Extra1)
+                    | i.consume_key(Modifiers::ALT, Key::ArrowLeft)
+            });
+            if back {
+                actions.push(Action::ClosePhoto);
+            }
+        }
+        let t = self.t;
+        let (on_top, pin_works) = self
+            .alone
+            .as_ref()
+            .map_or((false, false), |a| (a.on_top, a.pin_works));
+        let frame = Frame::NONE
+            .fill(tones.background)
+            .inner_margin(Margin::same(16));
+        frame.show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            if self.announces_in() == Announcer::Note {
+                self.announcements(ui, tones, &mut actions);
+            }
+            // Over the others, where that can be asked (UI laws, "The
+            // window").
+            let text = ui.visuals().text_color();
+            let weak = ui.visuals().weak_text_color();
+            let mut kept = on_top && pin_works;
+            let label = RichText::new(t.note_window_keep_on_top()).color(text);
+            let pin = ui
+                .add_enabled_ui(pin_works, |ui| theme::checkbox(ui, &mut kept, label))
+                .inner;
+            if pin.clicked() && pin_works {
+                actions.push(Action::KeepOnTop(kept));
+            }
+            if !pin_works {
+                let why = t.note_window_keep_on_top_wayland();
+                ui.label(RichText::new(why).small().color(weak));
+            }
+            self.note_editor(ui, tones, &mut actions);
+        });
+        let ctx = ui.ctx().clone();
+        self.badge_dialog(&ctx, tones, &mut actions);
+        self.editor_dialog(&ctx, tones, &mut actions);
+        self.tally_page_dialog(&ctx, tones, &mut actions);
+        if !matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(&ctx, tones, &mut actions);
+        }
+        if let Some(table) = &mut self.table {
+            if let Some(ticking) = &self.view.table_ticking {
+                table.set_ticking(ticking.clone());
+            }
+            let asked = table.show(&ctx, &self.t, tones);
+            actions.extend(asked.into_iter().map(Action::Table));
+        }
+        if matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(&ctx, tones, &mut actions);
+        }
+        if let Some(viewer) = &mut self.viewer {
+            match media_view::photo_viewer(&ctx, &self.t, (&mut self.photos, &self.store), viewer) {
+                Some(Viewed::Close) => actions.push(Action::ClosePhoto),
+                Some(Viewed::Out(out)) => actions.push(Action::PhotoOut(viewer.hash.clone(), out)),
+                None => {}
+            }
+        }
+        read_text::menu(&ctx, &self.t);
+        if let Some(link) = text_marks_view::take_app_link(&ctx) {
+            actions.push(Action::FollowLink(link));
+        }
+        for action in actions {
+            // A place, a search, a link and the dialogs of what were
+            // views show in the main window.
+            match action {
+                Action::Select(_)
+                | Action::SearchFor(_)
+                | Action::FollowLink(_)
+                | Action::OpenPage(_)
+                | Action::PageInto(_)
+                | Action::NewNote
+                | Action::Back
+                | Action::Forward => self.for_main.push(action),
+                action => self.apply(action),
+            }
+        }
+        // Whatever else moved the list or opened such a dialog here.
+        if self.selection != Selection::SentItemsWaiting {
+            let to = std::mem::replace(&mut self.selection, Selection::SentItemsWaiting);
+            self.for_main.push(Action::Select(to));
+        }
+        for page in std::mem::take(&mut self.pages) {
+            self.for_main.push(Action::OpenPage(page));
+        }
+        if let Some(text) = self.copy.take() {
+            ctx.copy_text(text);
+        }
+        if let Some(url) = self.open_url.take() {
+            match &self.url_opener {
+                Some(opener) => opener(&url),
+                None => ctx.open_url(egui::OpenUrl::new_tab(url)),
+            }
+        }
+        // As large as it is, for the next one to open at: in the app's
+        // points, which the zoom enlarges as the window opens.
+        let size = match native {
+            true => ctx.viewport_rect().size(),
+            false => ui.min_rect().size(),
+        };
+        if let Some(alone) = &mut self.alone {
+            alone.size = Some(size);
+        }
+        // Another Note opened from this one shows in the main window's
+        // dialog; this one was left.
+        match self.selected_note.clone() {
+            Some(id) if id == note => {}
+            other => {
+                if let Some(id) = other {
+                    self.selected_note = None;
+                    self.for_main.push(Action::SelectNote(id));
+                }
+                return Shown::Closed;
+            }
+        }
+        if self.note_window_gone(&note) {
+            return Shown::Closed;
+        }
+        Shown::Open
+    }
+
+    /// Whether this Note window's Note is gone as last read (#287): in
+    /// the trash, deleted or merged, here or on another Device. What was
+    /// typed into it is kept first.
+    fn note_window_gone(&mut self, note: &str) -> bool {
+        let shown = self
+            .view
+            .detail
+            .as_ref()
+            .is_some_and(|(p, _)| p.note.id == note && !p.note.is_trashed());
+        if shown {
+            return false;
+        }
+        if let Err(e) = self.leave_note() {
+            self.error = Some(e.to_string());
+        }
+        true
     }
 
     fn places_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
@@ -10805,6 +11388,13 @@ impl App {
         // the window has.
         let size = window_sizes::note_dialog(self.note_kept, under.size());
         self.note_shown = Some(size);
+        // The Note a window of its own can show: not one in the trash.
+        let windowed = self
+            .view
+            .detail
+            .as_ref()
+            .filter(|(p, _)| !p.note.is_trashed())
+            .map(|(p, _)| p.note.id.clone());
         let frame = Frame::NONE
             .fill(tones.background)
             .corner_radius(theme::CARD_RADIUS)
@@ -10849,6 +11439,15 @@ impl App {
                                         if icon_button(ui, icons::CLOSE, t.close(), text).clicked()
                                         {
                                             actions.push(Action::CloseNote);
+                                        }
+                                        // Beside the list, in a window of
+                                        // its own (#287).
+                                        let open = t.note_window_open();
+                                        if let Some(id) = &windowed
+                                            && icon_button(ui, icons::OPEN_IN_NEW, open, text)
+                                                .clicked()
+                                        {
+                                            actions.push(Action::OpenWindow(id.clone()));
                                         }
                                     },
                                 );
@@ -12078,7 +12677,9 @@ impl App {
                     }
                     let code = note.text_format == text_format::CODE;
                     let field = EditedText {
-                        id: Id::new("note text"),
+                        // By its Note: another may show in a window of
+                        // its own meanwhile (#287).
+                        id: Id::new(("note text", &note.id)),
                         of: &note.id,
                         section: false,
                         stored: &note.text,
@@ -12317,7 +12918,7 @@ impl App {
                     // The format bar goes with the field (UI laws), as on
                     // the phone's "Add to Note": without ☐, which the
                     // Note's text puts in.
-                    let id = Id::new("amend");
+                    let id = Id::new(("amend", &note.id));
                     let focused = ui.memory(|m| m.has_focus(id));
                     // Its tables as grids, as in the Note's text (#257).
                     let unticked = BoxLook::default();
@@ -18988,12 +19589,12 @@ fn kinded_text(
         return;
     }
     // Enter in the name goes on at the start of the description.
-    if name_edit(ui, &t, (name, formatted, shown.boxes), actions) {
+    if name_edit(ui, &t, (name, &note.id), (formatted, shown.boxes), actions) {
         *editing = true;
         *focus = true;
         *select = Some((0, 0));
     }
-    let id = Id::new("note text");
+    let id = Id::new(("note text", &note.id));
     let open = *editing || ui.memory(|m| m.has_focus(id));
     if open {
         let field = EditedText {
@@ -19073,10 +19674,11 @@ fn kinded_text(
 fn name_edit(
     ui: &mut Ui,
     t: &L10n,
-    (name, formatted, boxes): (&mut String, bool, &BoxLook),
+    (name, of): (&mut String, &str),
+    (formatted, boxes): (bool, &BoxLook),
     actions: &mut Vec<Action>,
 ) -> bool {
-    let id = Id::new("note name");
+    let id = Id::new(("note name", of));
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let accent = ui.visuals().hyperlink_color;
@@ -19747,6 +20349,14 @@ fn note_card(
         let text = ui.visuals().text_color();
         if ui.button(RichText::new(t.edit()).color(text)).clicked() {
             picked = Some(Action::SelectNote(note.id.clone()));
+        }
+        // Beside the list (#287), for this card alone.
+        if !note.is_trashed()
+            && ui
+                .button(RichText::new(t.note_window_open()).color(text))
+                .clicked()
+        {
+            picked = Some(Action::OpenWindow(note.id.clone()));
         }
         // With the cards selected along, as the list makes it (#148).
         if look.changes

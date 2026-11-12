@@ -24,6 +24,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, Record keys beside the Settings' hotkey field takes the next keys pressed together as the hotkey, none of the app's own keys working meanwhile and Esc stopping it, while the field still takes the keys typed out.
 - On the phone, Add to home screen in a Tally card's ⋮ puts a shortcut on the home screen that opens the Tally's entry page directly, after the unlock behind the App Lock, and goes back to the home screen once the entry is saved; on the iPhone, Add to the app icon puts the Tally among the actions of the app icon's long press instead.
 - On the phone and the desktop, Open a Backup… on the Backups page, on the desktop also in the File menu, opens a Backup file with the passphrase or the recovery key and shows its Notes as a Pack's tree under its date, those from its Trash marked and on the phone those of a closed locked Area only once unlocked, and Add brings the ticked ones back as copies in new Areas without restoring the Backup or changing anything else.
+- On the desktop, "Open in its own window" in the Note dialog and a card's menu opens the Note in a window of its own beside the main window, one window per Note, for reading and editing, with "Keep on top" to keep it above all other windows (greyed on Wayland, which does not allow it).
 
 ### Changed
 

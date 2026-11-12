@@ -1225,6 +1225,21 @@ replace a law of Both apps where they say so. A desktop law marked
   New Tally page and the Session pages once something changed, and ask
   "Discard changes?" only about a change that can't be saved; Cancel
   leaves without saving.
+- **A Note can open in a window of its own** (#287): "Open in its own
+  window" beside the Note dialog's cross and in a card's ⋮ and
+  right-click menu opens it beside the main window, which stays usable,
+  for reading and editing as the dialog does. Several can be open, one
+  window per Note: opening it again brings its window forward, and the
+  Note dialog does not open a Note that has one. What is typed there is
+  kept as in the dialog; its cross saves as closing the dialog does, and
+  the Undo slot is the main window's. A Note going to the trash, deleted
+  or merged, here or on another Device, closes its window. The Note
+  windows close, saved, as the main window closes or hides into the
+  tray. **Each has "Keep on top" above the Note**, off as it opens and
+  kept while it is open: the window stays above all others. On Wayland,
+  which lets no app ask for that, it is greyed with the reason under
+  it. The last Note window closed gives the next one its size, a setting
+  of the Device (ADR 0008).
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics

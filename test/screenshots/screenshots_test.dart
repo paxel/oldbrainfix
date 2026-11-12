@@ -2545,6 +2545,12 @@ void main() {
             expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
           });
 
+          // The phone shows one Note at a time: its editor (#287).
+          boxFrame(desktop178, 'note-window', (tester) async {
+            await boilerEditor(tester);
+            expect(find.byKey(const ValueKey('note-badges')), findsOneWidget);
+          });
+
           boxFrame(desktop178, 'menu-bar', (tester) async {
             // A Profile of fixed keys: its short code is the same on
             // every run.
