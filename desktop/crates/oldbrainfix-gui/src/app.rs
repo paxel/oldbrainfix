@@ -1244,6 +1244,9 @@ enum Action {
     /// Asks where the Notes with these ids are filed (Note ▸ File into…,
     /// Ctrl+M, a card's right-click), together (#148).
     AskFileInto(Vec<String>),
+    /// The Settings' Record keys: starts recording the hotkey, or with
+    /// `false` stops it (#283).
+    RecordHotkey(bool),
     /// File into…'s answer (#272): the place picked, or the new one to
     /// make and file into.
     FileIntoPicked(Picked),
@@ -1870,6 +1873,8 @@ pub struct App {
     hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
     /// The hotkey as typed in the Settings.
     hotkey_text: String,
+    /// Whether the Settings record the hotkey from the keys pressed.
+    hotkey_recording: HotkeyRecording,
     /// The microphone, the speakers and the clipboard, where there are.
     recorder: Option<Box<dyn Recorder>>,
     player: Option<Box<dyn Player>>,
@@ -2335,6 +2340,7 @@ impl App {
             all_day_text: String::new(),
             hotkey: None,
             hotkey_text: String::new(),
+            hotkey_recording: HotkeyRecording::default(),
             recorder: None,
             player: None,
             playing: None,
@@ -4542,6 +4548,10 @@ impl App {
     /// into the tray and brings it back.
     pub fn set_shown(&mut self, shown: bool) {
         self.shown = shown;
+        // Hidden, it hears no keys to record (#283).
+        if !shown {
+            self.record_hotkey(false);
+        }
     }
 
     /// Whether what the window draws is seen: shown and not minimised.
@@ -5807,6 +5817,7 @@ impl App {
                 }
             }
             Action::AskFileInto(notes) => self.ask_file_into(Filing::Notes(notes))?,
+            Action::RecordHotkey(on) => self.record_hotkey(on),
             Action::FileIntoPicked(picked) => self.file_into_picked(picked)?,
             Action::FileIntoBack => {
                 if let Some(Dialog::FileInto { picker, .. }) = &mut self.dialog {
@@ -7165,6 +7176,77 @@ impl App {
         Ok(())
     }
 
+    /// Starts recording the hotkey in the Settings, the key held let go
+    /// meanwhile so that it reaches the window, or with `on` false stops
+    /// it (#283).
+    fn record_hotkey(&mut self, on: bool) {
+        if self.hotkey_recording.on == on {
+            return;
+        }
+        self.hotkey_recording.on = on;
+        if let Some(hotkey) = &self.hotkey {
+            hotkey.borrow_mut().pause(on);
+        }
+    }
+
+    /// While the Settings record the hotkey (#283), the keys pressed are
+    /// taken before anything else hears them, so none of the app's own
+    /// works: a chord is kept as the hotkey, Esc stops recording, any
+    /// other key waits for one. Hidden, minimised or left for another
+    /// window, the window hears no keys, and recording stops.
+    fn recorded_hotkey(&mut self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        if !self.hotkey_recording.on {
+            return;
+        }
+        let left = ui.input(|i| i.viewport().focused == Some(false));
+        if left || !self.drawn(ui.ctx()) {
+            self.record_hotkey(false);
+            return;
+        }
+        let mut cancelled = false;
+        let mut chord = None;
+        ui.input_mut(|i| {
+            let held = i.modifiers;
+            i.events.retain(|event| {
+                // Ctrl+C, Ctrl+X and Ctrl+V come as copy, cut and paste.
+                let pressed = match event {
+                    egui::Event::Key {
+                        key,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some((*key, *modifiers)),
+                    egui::Event::Copy => Some((Key::C, held)),
+                    egui::Event::Cut => Some((Key::X, held)),
+                    egui::Event::Paste(_) => Some((Key::V, held)),
+                    egui::Event::Key { .. } | egui::Event::Text(_) => None,
+                    _ => return true,
+                };
+                if let Some((key, modifiers)) = pressed
+                    && !cancelled
+                    && chord.is_none()
+                {
+                    if key == Key::Escape && modifiers.is_none() {
+                        cancelled = true;
+                    }
+                    chord = Chord::pressed(key, modifiers);
+                }
+                false
+            });
+        });
+        if cancelled || chord.is_some() {
+            self.record_hotkey(false);
+            ui.ctx().request_repaint();
+        }
+        if let Some(chord) = chord {
+            self.hotkey_text = chord.to_string();
+            let stored = DeviceSettings::new(&self.store).capture_hotkey().ok();
+            if stored.as_deref() != Some(self.hotkey_text.as_str()) {
+                actions.push(Action::Setting(Setting::Hotkey(chord.to_string())));
+            }
+        }
+    }
+
     /// Does what was asked of a Checklist, on a card or in the editor
     /// (#120).
     fn checklist_action(&mut self, asked: ChecklistAction) -> oldbrainfix_core::Result<()> {
@@ -7250,6 +7332,28 @@ impl App {
                 };
             }
             ChecklistAction::Removed(asked) => self.removed_lines(asked, false)?,
+            ChecklistAction::Drop(from, before) => {
+                // A new Line is stored first, and what was typed, so the
+                // drop lands among the Lines as shown (#283).
+                let Some(shown) = self.lines.keyed(from).map(|row| row.shown_id()) else {
+                    return Ok(());
+                };
+                let Some(id) = self.lines.stored_id(&self.store, &*self.wall, &shown)? else {
+                    return Ok(());
+                };
+                self.lines.keep(&self.store, &*self.wall)?;
+                let before = match before {
+                    Some(key) => match self.lines.keyed(key).and_then(|row| row.id.clone()) {
+                        Some(id) => Some(id),
+                        None => return Ok(()),
+                    },
+                    None => None,
+                };
+                let Some((list, line)) = self.line_of(&id)? else {
+                    return Ok(());
+                };
+                checklist_view::move_before(&self.store, &list, &line, before.as_deref())?;
+            }
         }
         Ok(())
     }
@@ -8688,6 +8792,8 @@ impl App {
         self.show_theme(ui.ctx());
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
+        // Recording the hotkey, the keys are its alone (#283).
+        self.recorded_hotkey(ui, &mut actions);
         // A notification's Done or a new minute changes what shows.
         let changed = self
             .changes
@@ -9150,6 +9256,11 @@ impl App {
         }
         for action in actions {
             self.apply(action);
+        }
+        // Once the Settings no longer show Record keys, recording stops
+        // (#283).
+        if !std::mem::take(&mut self.hotkey_recording.drawn) {
+            self.record_hotkey(false);
         }
         self.show_theme(ui.ctx());
         if let Some(text) = self.copy.take() {
@@ -13430,6 +13541,7 @@ impl App {
             .all_day_from()
             .unwrap_or(oldbrainfix_core::settings::DEFAULT_ALL_DAY_FROM);
         let hotkey_text = &mut self.hotkey_text;
+        let hotkey_recording = &mut self.hotkey_recording;
         let stored_hotkey = settings
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
@@ -13603,12 +13715,18 @@ impl App {
             let [capture] = settings_search::rows(
                 q,
                 Some(t.quick_capture_heading()),
-                [&[t.hotkey_label(), t.capture_command()]],
+                [&[t.hotkey_label(), t.hotkey_record(), t.capture_command()]],
             );
             if capture {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
+                    quick_capture_card(
+                        ui,
+                        &t,
+                        (hotkey_text, hotkey_recording),
+                        (&stored_hotkey, hotkey_status),
+                        actions,
+                    );
                 });
             }
             let rows = quick_note_rows(&t, &quick);
@@ -15581,15 +15699,23 @@ fn person_name(
     profile_view::display_name(t, name).to_string()
 }
 
+/// Whether the Settings record the hotkey from the keys pressed (#283),
+/// and whether its button was drawn since the keys were last read.
+#[derive(Debug, Default)]
+struct HotkeyRecording {
+    on: bool,
+    drawn: bool,
+}
+
 /// The Settings' card on the capture popup's hotkey and the
-/// `oldbrainfix capture` command: the chord as typed, and how the hotkey
-/// stands on this desktop.
+/// `oldbrainfix capture` command: the chord as typed, Record keys, which
+/// records it from the keys pressed (#283), and how the hotkey stands on
+/// this desktop.
 fn quick_capture_card(
     ui: &mut Ui,
     t: &L10n,
-    typed: &mut String,
-    stored: &str,
-    status: Option<hotkey::Status>,
+    (typed, recording): (&mut String, &mut HotkeyRecording),
+    (stored, status): (&str, Option<hotkey::Status>),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -15618,7 +15744,28 @@ fn quick_capture_card(
         {
             actions.push(Action::Setting(Setting::Hotkey(chord.to_string())));
         }
+        recording.drawn = true;
+        let label = if recording.on {
+            t.hotkey_recording()
+        } else {
+            t.hotkey_record()
+        };
+        let mut button = egui::Button::new(RichText::new(label).color(text));
+        if recording.on {
+            let ring = ui.visuals().selection.stroke.color;
+            button = button.stroke(egui::Stroke::new(2.0, ring));
+        }
+        let record = ui.add(button);
+        if record.clicked() {
+            actions.push(Action::RecordHotkey(!recording.on));
+        } else if recording.on && ui.input(|i| i.pointer.any_pressed()) && !record.hovered() {
+            // A click elsewhere stops it, as it leaves a field.
+            actions.push(Action::RecordHotkey(false));
+        }
     });
+    if recording.on {
+        ui.label(RichText::new(t.hotkey_recording_hint()).small().color(weak));
+    }
     let line = match (chord, status) {
         (None, _) => {
             ui.label(RichText::new(t.hotkey_invalid()).color(ui.visuals().error_fg_color));

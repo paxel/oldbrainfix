@@ -337,5 +337,9 @@
   "areaTopicsFold": "Themen von {area} einklappen",
   "areaTopicsUnfold": "Themen von {area} aufklappen",
   "areaMoveUp": "Nach oben verschieben",
-  "areaMoveDown": "Nach unten verschieben"
+  "areaMoveDown": "Nach unten verschieben",
+  "lineDrag": "Zum Verschieben ziehen: {line}",
+  "hotkeyRecord": "Tasten aufnehmen",
+  "hotkeyRecording": "Tasten drücken …",
+  "hotkeyRecordingHint": "Halte Strg, Alt oder beide und drücke einen Buchstaben, eine Ziffer, F1 bis F12 oder die Leertaste. Esc bricht ab."
 }

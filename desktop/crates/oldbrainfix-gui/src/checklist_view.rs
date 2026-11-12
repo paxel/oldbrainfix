@@ -15,7 +15,10 @@
 //! checked. "Show on the Agenda" and "Back to a plain Note" are badges of
 //! the Note dialog (#160). Delete asks nothing: the deleted Lines fold
 //! under "Removed Lines", each with Restore where this Device may change
-//! it, and Ctrl+Z brings the last one back (#268).
+//! it, and Ctrl+Z brings the last one back (#268). Alt+Up and Alt+Down
+//! in a Line's field move it as Move up and Move down do, and the handle
+//! beside its ⋮ drags it up or down within its group or the top level, a
+//! line showing the gap it goes into (#283).
 //!
 //! A Checklist with a Routine or Reminder (#121) shows on its card and in
 //! its editor as checked for the Occurrence it is on now, and on the
@@ -28,7 +31,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
+use egui::{Frame, Id, Key, KeyboardShortcut, Modifiers, Rect, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
     Checklist, Checklists, DeletedLine, Line, ListOnAgenda, Note, RoutineOccurrence, Sessions,
@@ -40,7 +43,7 @@ use crate::icons;
 use crate::l10n::L10n;
 use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::shopping_view;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
 /// of the Line above it, whether it shows checked and what shows dimmed
@@ -127,6 +130,86 @@ pub enum ChecklistAction {
     Menu(String),
     /// Something asked of "Removed Lines" (#268).
     Removed(RemovedAsk),
+    /// The Line of the typed row with this key dragged to just before
+    /// the row of the other key, or to the end of its group or the top
+    /// level (#283).
+    Drop(u64, Option<u64>),
+}
+
+/// What a Line's handle carries while it is dragged (#283): the id it
+/// shows under.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DraggedLine(pub String);
+
+/// A Line's row as drawn, for where a dragged Line goes (#283).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DragRow {
+    pub id: String,
+    pub in_group: bool,
+    pub rect: Rect,
+}
+
+/// Where a dragged Line goes when let go (#283): before the Line with
+/// this id, or with `None` at the end of its group or the top level; and
+/// the line that shows the gap.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineDrop {
+    pub before: Option<String>,
+    pub y: f32,
+    pub x: egui::Rangef,
+}
+
+/// Where the Line `dragged` of `rows`, drawn in their order, goes with
+/// the pointer at `pos` (#283): among the Lines of its own group, or at
+/// the top level with its group, into the gap above the first whose row
+/// lies with its middle below the pointer. In the gaps beside itself and
+/// away from its level it stays, and nothing is written.
+pub fn line_drop(rows: &[DragRow], dragged: &str, pos: egui::Pos2) -> Option<LineDrop> {
+    let at = rows.iter().position(|r| r.id == dragged)?;
+    let in_group = rows.get(at)?.in_group;
+    // The rows of its level, each with the rows of its group under it.
+    let mut blocks: Vec<(usize, Rect)> = Vec::new();
+    if in_group {
+        let start = rows.get(..at)?.iter().rposition(|r| !r.in_group)? + 1;
+        for (i, row) in rows.iter().enumerate().skip(start) {
+            if !row.in_group {
+                break;
+            }
+            blocks.push((i, row.rect));
+        }
+    } else {
+        for (i, row) in rows.iter().enumerate() {
+            match blocks.last_mut() {
+                Some((_, rect)) if row.in_group => *rect = rect.union(row.rect),
+                _ if row.in_group => {}
+                _ => blocks.push((i, row.rect)),
+            }
+        }
+    }
+    let from = blocks.iter().position(|(i, _)| *i == at)?;
+    let (first, last) = (blocks.first()?.1, blocks.last()?.1);
+    let level = first.union(last);
+    if !level.expand2(egui::vec2(20.0, 15.0)).contains(pos) {
+        return None;
+    }
+    // Over a Line's group, the gap after the group.
+    let middle = |i: usize| rows.get(i).map(|r| r.rect.center().y);
+    let slot = blocks
+        .iter()
+        .filter(|(i, _)| middle(*i).is_some_and(|y| y < pos.y))
+        .count();
+    if slot == from || slot == from + 1 {
+        return None;
+    }
+    let (before, y) = match blocks.get(slot) {
+        Some((i, rect)) => (Some(rows.get(*i)?.id.clone()), rect.top() - 1.0),
+        None => (None, last.bottom() + 1.0),
+    };
+    Some(LineDrop {
+        before,
+        y,
+        x: level.x_range(),
+    })
 }
 
 /// The local setting that keeps "Removed Lines" open, on this Device, as
@@ -456,6 +539,41 @@ pub fn move_down(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_co
     lists.indent(&line.id, true)
 }
 
+/// Moves `line`, dragged, to just before the Line `before` of its
+/// level, or to the end of its level: of its group, under it again, or of
+/// the list (#283). A Line not of its level stays.
+pub fn move_before(
+    store: &Store,
+    list: &Checklist,
+    line: &Line,
+    before: Option<&str>,
+) -> oldbrainfix_core::Result<()> {
+    let lists = Checklists::new(store);
+    let level = level(list, line);
+    if let Some(before) = before {
+        if before == line.id || !level.iter().any(|l| l.id == before) {
+            return Ok(());
+        }
+        return lists.move_line(&line.id, Some(before));
+    }
+    if !line.in_group() {
+        return lists.move_line(&line.id, None);
+    }
+    if level.last().is_some_and(|last| last.id == line.id) {
+        return Ok(());
+    }
+    // After the group's last Line, under it again.
+    let Some(last) = level
+        .last()
+        .and_then(|last| list.lines.iter().position(|l| l.id == last.id))
+    else {
+        return Ok(());
+    };
+    let after = list.lines.get(last + 1).map(|l| l.id.clone());
+    lists.move_line(&line.id, after.as_deref())?;
+    lists.indent(&line.id, true)
+}
+
 /// The label of a Line's ⋮.
 pub fn menu_label(t: &L10n, line: &str) -> String {
     format!("{}: {line}", t.more())
@@ -472,20 +590,50 @@ fn step_label(t: &L10n, step: LineStep) -> &'static str {
     }
 }
 
-/// The menu of a Line, from its ⋮ and a right-click on it: the step
-/// clicked.
+/// The keys that take a step while the cursor is in the Line (#283).
+fn step_keys(step: LineStep) -> Option<KeyboardShortcut> {
+    match step {
+        LineStep::Up => Some(KeyboardShortcut::new(Modifiers::ALT, Key::ArrowUp)),
+        LineStep::Down => Some(KeyboardShortcut::new(Modifiers::ALT, Key::ArrowDown)),
+        _ => None,
+    }
+}
+
+/// The menu of a Line, from its ⋮ and a right-click on it, Move up and
+/// Move down with their keys beside them: the step clicked.
 fn line_menu(ui: &mut Ui, t: &L10n, steps: &[LineStep]) -> Option<LineStep> {
     let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
     let mut picked = None;
     for step in steps {
-        if ui
-            .button(RichText::new(step_label(t, *step)).color(text))
-            .clicked()
-        {
+        let mut button = egui::Button::new(RichText::new(step_label(t, *step)).color(text));
+        if let Some(keys) = step_keys(*step) {
+            let keys = ui.ctx().format_shortcut(&keys);
+            button = button.shortcut_text(RichText::new(keys).color(weak));
+        }
+        if ui.add(button).clicked() {
             picked = Some(*step);
         }
     }
     picked
+}
+
+/// The handle a Line is dragged by (#283), beside its ⋮: the pointer a
+/// hand over it, what it carries once dragged.
+fn drag_handle(ui: &mut Ui, t: &L10n, line: &ShownLine, colour: egui::Color32) {
+    let label = t.line_drag(&line.text);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::drag());
+    resp.widget_info(|| WidgetInfo::labeled(egui::WidgetType::Other, true, &label));
+    theme::icon_button_back(ui, &resp, rect);
+    icons::paint(ui.painter(), rect.shrink(2.0), icons::DRAG_HANDLE, colour);
+    if resp.drag_started() {
+        egui::DragAndDrop::set_payload(ui.ctx(), DraggedLine(line.id.clone()));
+    }
+    if resp.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+    }
+    resp.on_hover_cursor(egui::CursorIcon::Grab)
+        .on_hover_text(label);
 }
 
 /// A Line's text, struck through and dimmed once checked.
@@ -569,17 +717,22 @@ pub type Trailing<'a, P> = &'a dyn Fn(&mut Ui, &ShownLine) -> Option<P>;
 /// The room a [`Trailing`] badge takes at a Line's end.
 const TRAILING_ROOM: f32 = 112.0;
 
+/// Where the rows drawn go, each as [`DragRow`], while the Lines with ⋮
+/// have a handle to drag them by (#283).
+pub type Drags<'a> = Option<&'a mut Vec<DragRow>>;
+
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
 /// and its text, or the field `field` draws for it; with `menus`, the
 /// Lines whose ids it holds have ⋮ and a right-click with the steps
-/// `steps` gives each. What is asked goes to `actions`.
+/// `steps` gives each, and with `drags` a handle beside ⋮ (#283). What
+/// is asked goes to `actions`.
 pub fn lines(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     (checks, on): (bool, Option<&RoutineOccurrence>),
-    (menus, field): (Option<LineMenus>, Option<FieldFor>),
+    (menus, field, drags): (Option<LineMenus>, Option<FieldFor>, Drags),
     actions: &mut Vec<ChecklistAction>,
 ) {
     let menu = |ui: &mut Ui, id: &str| menus.and_then(|(_, steps)| line_menu(ui, t, &steps(id)));
@@ -589,7 +742,7 @@ pub fn lines(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
         )
     });
-    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field, None)) {
+    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field, None), drags) {
         actions.push(match asked {
             LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),
             LineAsk::Menu(id, step) => ChecklistAction::Step(id, step),
@@ -608,14 +761,16 @@ const TO_MIDDLE: f32 = 5.0;
 /// its text, or the field `field` draws for it, and what shows under it;
 /// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
 /// takes the clicks, a right-click with the menu it draws; with
-/// `trailing`, what it draws at each Line's end, before ⋮. What is asked,
-/// in the order clicked.
+/// `trailing`, what it draws at each Line's end, before ⋮; with `drags`,
+/// the Lines with ⋮ have a handle beside it, and the rows go there
+/// (#283). What is asked, in the order clicked.
 pub fn line_rows<P>(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     checks: bool,
     (menus, mut field, trailing): (Option<MenuOf<P>>, Option<FieldFor>, Option<Trailing<P>>),
+    mut drags: Drags,
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
@@ -624,8 +779,9 @@ pub fn line_rows<P>(
     let gap = if field.is_some() { 0.0 } else { 4.0 };
     let top_down = egui::Layout::top_down(egui::Align::Min);
     ui.vertical(|ui| {
+        let handles = drags.is_some();
         grouped(ui, shown, gap, &mut |ui, line| {
-            ui.horizontal(|ui| {
+            let row = ui.horizontal(|ui| {
                 let toggled = ui
                     .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
                     .inner;
@@ -634,6 +790,11 @@ pub fn line_rows<P>(
                 }
                 let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
                 let reserved = if editable.is_some() { 32.0 } else { 0.0 }
+                    + if editable.is_some() && handles {
+                        28.0
+                    } else {
+                        0.0
+                    }
                     + if trailing.is_some() {
                         TRAILING_ROOM
                     } else {
@@ -686,6 +847,9 @@ pub fn line_rows<P>(
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let more =
                             icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak);
+                        if handles {
+                            drag_handle(ui, t, line, weak);
+                        }
                         (more, trailing.and_then(|trailing| trailing(ui, line)))
                     })
                     .inner;
@@ -697,6 +861,13 @@ pub fn line_rows<P>(
                     asked.push(LineAsk::Menu(line.id.clone(), step));
                 }
             });
+            if let Some(rows) = drags.as_deref_mut() {
+                rows.push(DragRow {
+                    id: line.id.clone(),
+                    in_group: line.in_group,
+                    rect: row.response.rect,
+                });
+            }
         });
     });
     asked
@@ -870,6 +1041,7 @@ pub fn section(
             .map(|(at, r)| (r.shown_id(), new_line_steps(&typed.rows, at)))
             .collect();
         let mut typing = Vec::new();
+        let mut drags = Vec::new();
         let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
             let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
                 return false;
@@ -900,10 +1072,26 @@ pub fn section(
             (t, tones),
             &rows,
             (shown.checks, list.on.as_ref()),
-            (Some((&menus, &steps)), Some(&mut field)),
+            (Some((&menus, &steps)), Some(&mut field), Some(&mut drags)),
             actions,
         );
-        actions.extend(typing.into_iter().map(ChecklistAction::Typed));
+        for asked in typing {
+            actions.push(match asked {
+                // Alt+Up and Alt+Down take the steps of its ⋮ (#283).
+                Typing::Move(key, up) => {
+                    let Some(id) = typed.keyed(key).map(TypedLine::shown_id) else {
+                        continue;
+                    };
+                    let step = if up { LineStep::Up } else { LineStep::Down };
+                    if !menus.contains(&id) || !steps(&id).contains(&step) {
+                        continue;
+                    }
+                    ChecklistAction::Step(id, step)
+                }
+                asked => ChecklistAction::Typed(asked),
+            });
+        }
+        line_drop_shown(ui, tones, typed, &drags, actions);
         // Show on the Agenda and Back to a plain Note are the Note
         // dialog's badges (#160).
         if shown.checks
@@ -918,6 +1106,53 @@ pub fn section(
         removed_lines(ui, t, note, &shown.removed, &mut removed);
         actions.extend(removed.into_iter().map(ChecklistAction::Removed));
     });
+}
+
+/// The drop of a Line dragged by its handle in the editor (#283): a line
+/// in the gap it would go into, and its move there once let go. An empty
+/// new Line is no place to go to.
+fn line_drop_shown(
+    ui: &Ui,
+    tones: Tones,
+    typed: &TypedLines,
+    drawn: &[DragRow],
+    actions: &mut Vec<ChecklistAction>,
+) {
+    let Some(dragged) = egui::DragAndDrop::payload::<DraggedLine>(ui.ctx()) else {
+        return;
+    };
+    let Some(pos) = ui.ctx().pointer_interact_pos() else {
+        return;
+    };
+    let rows: Vec<DragRow> = drawn
+        .iter()
+        .filter(|r| {
+            typed
+                .shown(&r.id)
+                .is_none_or(|row| row.id.is_some() || !row.typed().is_empty())
+        })
+        .cloned()
+        .collect();
+    let Some(drop) = line_drop(&rows, &dragged.0, pos) else {
+        return;
+    };
+    ui.painter()
+        .hline(drop.x, drop.y, egui::Stroke::new(2.0, tones.accent));
+    if !ui.input(|i| i.pointer.any_released()) {
+        return;
+    }
+    let key = |id: &str| typed.shown(id).map(|row| row.key);
+    let Some(from) = key(&dragged.0) else {
+        return;
+    };
+    match drop.before {
+        Some(before) => {
+            if let Some(before) = key(&before) {
+                actions.push(ChecklistAction::Drop(from, Some(before)));
+            }
+        }
+        None => actions.push(ChecklistAction::Drop(from, None)),
+    }
 }
 
 /// The Checklist entries of a card's menu as `menu` offers them: the
@@ -967,7 +1202,61 @@ pub fn preview(ui: &mut Ui, (t, tones): (&L10n, Tones), lines_sent: &[SentLine])
         (t, tones),
         &sent_lines(t, lines_sent),
         (false, None),
-        (None, None),
+        (None, None, None),
         &mut ignored,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Rows 20 high, one under the other, a Line of a group after "  ".
+    fn rows(texts: &[&str]) -> Vec<DragRow> {
+        texts
+            .iter()
+            .enumerate()
+            .map(|(i, text)| {
+                let top = i as f32 * 20.0;
+                let in_group = text.starts_with("  ");
+                let left = if in_group { 20.0 } else { 0.0 };
+                DragRow {
+                    id: text.trim().to_string(),
+                    in_group,
+                    rect: Rect::from_min_max(egui::pos2(left, top), egui::pos2(200.0, top + 20.0)),
+                }
+            })
+            .collect()
+    }
+
+    /// Where `dragged` goes let go at the height `y`: before which Line,
+    /// `Some(None)` at the end of its level, `None` nowhere.
+    fn goes(rows: &[DragRow], dragged: &str, y: f32) -> Option<Option<String>> {
+        line_drop(rows, dragged, egui::pos2(100.0, y)).map(|d| d.before)
+    }
+
+    #[test]
+    fn a_dragged_line_goes_into_a_gap_of_its_own_level() {
+        let list = rows(&["A", "  a1", "  a2", "B", "C"]);
+        // At the top, a Line with its group, the gaps between the Lines
+        // at the top.
+        assert_eq!(goes(&list, "C", 62.0), Some(Some("B".into())));
+        assert_eq!(goes(&list, "C", 2.0), Some(Some("A".into())));
+        assert_eq!(goes(&list, "A", 78.0), Some(Some("C".into())));
+        assert_eq!(goes(&list, "A", 98.0), Some(None));
+        // Over a group, the gap after it.
+        assert_eq!(goes(&list, "C", 35.0), Some(Some("B".into())));
+        // Within a group, among its Lines alone.
+        assert_eq!(goes(&list, "a2", 22.0), Some(Some("a1".into())));
+        assert_eq!(goes(&list, "a1", 58.0), Some(None));
+        assert_eq!(goes(&list, "a1", 90.0), None);
+        // Beside itself it stays.
+        assert_eq!(goes(&list, "B", 58.0), None);
+        assert_eq!(goes(&list, "B", 78.0), None);
+        assert_eq!(goes(&list, "A", 2.0), None);
+        // Away from the Lines too.
+        assert_eq!(goes(&list, "C", 300.0), None);
+        assert_eq!(line_drop(&list, "C", egui::pos2(500.0, 2.0)), None);
+        assert_eq!(goes(&list, "gone", 2.0), None);
+    }
 }

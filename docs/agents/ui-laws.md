@@ -1251,7 +1251,9 @@ replace a law of Both apps where they say so. A desktop law marked
   The sidebar's right-click stays, and keeps New Topic. Move up
   (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
   the person's own order (#280), for whoever is in it, greyed for a
-  Topic and at the ends, where the right-click leaves them out.
+  Topic and at the ends, where the right-click leaves them out; they
+  rest while a text field has the keyboard, so in a Checklist's Line
+  they move the Line instead (#283).
 - **The sidebar's Areas are dragged by their rows** (#280, Q676): a
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
@@ -1447,6 +1449,16 @@ replace a law of Both apps where they say so. A desktop law marked
 - On the desktop **Tab and Shift+Tab** put a Line under the Line above
   or back at the top, in place of the in and out buttons, and Up and
   Down move the cursor to the Line above and below.
+- **Alt+Up and Alt+Down move a Checklist's Line** the cursor is in
+  (#283, Q678), as ⋮ Move up and Move down do, which name the keys: a
+  Line of a group within its group, a Line at the top past the next one
+  with its group, the cursor staying in the Line; at an end nothing
+  moves. **A Line is dragged by its handle**, beside its ⋮ wherever ⋮
+  is, by the same rule: a line shows the gap within its group or the
+  top level it goes into; let go where it stands or away from its
+  level, it stays and nothing is written. Into a group and out stays
+  with Tab and Shift+Tab. A Shopping List's Lines keep the order they
+  were typed in, with no handle; Alt+Up and Alt+Down do nothing there.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,
@@ -1466,6 +1478,15 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Settings
 
+- **The hotkey is recorded by pressing it** (#283, Q679): Record keys
+  beside the Hotkey field reads "Press the keys…" and takes the next
+  chord pressed, Ctrl, Alt or both (Cmd on macOS) with a letter, a
+  digit, F1 to F12 or Space, as the hotkey, which goes into the field.
+  While it records every key is its alone, so none of the app's own
+  keys works and the hotkey held lets go of its key; another key waits
+  for a chord, and Esc, a click elsewhere or leaving the Settings stops
+  it, keeping the hotkey. The field stays for typing a chord, also one
+  with Super, which the window does not hear off macOS.
 - **The Settings dialog is a column of cards** (draft, #196): each card
   embossed as a Note's, its heading strong on top (This computer,
   Alarms, Nudges, Units, Agenda, History, Features, …), its settings

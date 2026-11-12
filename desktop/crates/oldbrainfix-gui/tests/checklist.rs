@@ -470,16 +470,16 @@ fn the_line_menu_moves_indents_and_deletes_without_asking() -> TestResult {
     let mut harness = window(&store, Some(&note));
     // At the top of the top level: no Move up, no indent.
     click(&mut harness, "More: Passport")?;
-    assert!(!shows(&harness, "Move up"));
+    assert!(!shows(&harness, "Move up Alt+Up"));
     assert!(!shows(&harness, "Put under the Line above"));
-    assert!(shows(&harness, "Move down"));
+    assert!(shows(&harness, "Move down Alt+Down"));
     harness.key_press(egui::Key::Escape);
     harness.run();
 
     // A parent moves with its group.
-    line_step(&mut harness, "Ticket", "Move up")?;
+    line_step(&mut harness, "Ticket", "Move up Alt+Up")?;
     assert_eq!(texts(&harness, &note)?, ["Ticket", "Passport", "  Charger"]);
-    line_step(&mut harness, "Ticket", "Move down")?;
+    line_step(&mut harness, "Ticket", "Move down Alt+Down")?;
     assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
 
     line_step(&mut harness, "Ticket", "Put under the Line above")?;
@@ -488,12 +488,12 @@ fn the_line_menu_moves_indents_and_deletes_without_asking() -> TestResult {
         ["Passport", "  Charger", "  Ticket"]
     );
     // Within its group, a Line stays on its level.
-    line_step(&mut harness, "Ticket", "Move up")?;
+    line_step(&mut harness, "Ticket", "Move up Alt+Up")?;
     assert_eq!(
         texts(&harness, &note)?,
         ["Passport", "  Ticket", "  Charger"]
     );
-    line_step(&mut harness, "Ticket", "Move down")?;
+    line_step(&mut harness, "Ticket", "Move down Alt+Down")?;
     assert_eq!(
         texts(&harness, &note)?,
         ["Passport", "  Charger", "  Ticket"]
@@ -540,7 +540,7 @@ fn a_line_just_typed_has_its_menu_once_it_holds_text_and_each_step_stores_it_fir
     assert!(!shows(&harness, "More: "));
     type_in(&mut harness, "Seat");
     assert_eq!(list(&harness, &note)?.count(), 3);
-    line_step(&mut harness, "Seat", "Move up")?;
+    line_step(&mut harness, "Seat", "Move up Alt+Up")?;
     assert_eq!(
         texts(&harness, &note)?,
         ["Passport", "  Charger", "Seat", "Ticket"]
@@ -847,5 +847,206 @@ fn a_sent_checklist_previews_its_lines_and_an_update_what_changes() -> TestResul
     drop_file(&mut harness, &update);
     assert!(shows(&harness, "Line: Ticket → Train ticket"));
     assert!(shows(&harness, "New Line: Water"));
+    Ok(())
+}
+
+/// Presses Alt with `key`.
+fn alt(harness: &mut Harness<'_, App>, key: egui::Key) {
+    harness.key_press_modifiers(egui::Modifiers::ALT, key);
+    harness.run();
+}
+
+#[test]
+fn alt_up_and_alt_down_move_the_line_with_the_cursor_on_its_level() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    // A Line at the top passes the next one with its group (#283).
+    into_line(&mut harness, "Ticket")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(texts(&harness, &note)?, ["Ticket", "Passport", "  Charger"]);
+    // The cursor stays in it, typing on where it was.
+    assert_eq!(focused(&harness).as_deref(), Some("Ticket"));
+    type_in(&mut harness, "s");
+    assert_eq!(focused(&harness).as_deref(), Some("Tickets"));
+    // At the top it stays, and so does the cursor.
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(texts(&harness, &note)?, ["Ticket", "Passport", "  Charger"]);
+    assert_eq!(focused(&harness).as_deref(), Some("Tickets"));
+    // A move keeps what was typed first.
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Tickets"]
+    );
+    // The only Line of a group stays in it; the cursor does not go up.
+    into_line(&mut harness, "Charger")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    alt(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Tickets"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Charger"));
+    // ⋮ names the keys.
+    click(&mut harness, "More: Passport")?;
+    assert!(shows(&harness, "Move down Alt+Down"));
+    Ok(())
+}
+
+#[test]
+fn in_a_line_alt_up_moves_the_line_and_not_the_area_shown() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let places = Places::new(&store);
+    places.add_area("Garden")?;
+    let travel = places
+        .areas()?
+        .into_iter()
+        .find(|a| a.name == "Travel")
+        .ok_or("Travel")?;
+    let mut app = App::new(store.clone(), "en");
+    app.select(Selection::Place(travel.id.clone()));
+    app.select_note(&note);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 2400.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    let order = |harness: &Harness<'_, App>| -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(
+            oldbrainfix_core::PersonSettings::new(harness.state().store())
+                .areas_in_order()?
+                .into_iter()
+                .map(|a| a.name)
+                .collect(),
+        )
+    };
+    let areas = order(&harness)?;
+    into_line(&mut harness, "Ticket")?;
+    alt(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(texts(&harness, &note)?, ["Ticket", "Passport", "  Charger"]);
+    assert_eq!(order(&harness)?, areas);
+    Ok(())
+}
+
+/// Presses at `from`, moves a little, then to `to`, and lets go there,
+/// as a hand drags.
+fn drag(harness: &mut Harness<'_, App>, from: egui::Pos2, to: egui::Pos2) {
+    harness.run_steps(50);
+    harness.drag_at(from);
+    harness.run();
+    harness.hover_at(from + egui::vec2(0.0, 8.0));
+    harness.run();
+    harness.hover_at(to);
+    harness.run();
+    harness.event(egui::Event::PointerButton {
+        pos: to,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+}
+
+/// The middle of the handle of the Line `text`.
+fn handle(
+    harness: &Harness<'_, App>,
+    text: &str,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let label = format!("Drag to move: {text}");
+    let node = harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?;
+    Ok(node.rect().center())
+}
+
+/// Just inside the top of the editor's row of the Line `text`, or with
+/// `under` just inside its bottom.
+fn edge(
+    harness: &Harness<'_, App>,
+    text: &str,
+    under: bool,
+) -> Result<egui::Pos2, Box<dyn std::error::Error>> {
+    let node = boxes(harness, text).pop().ok_or(format!("{text:?}"))?;
+    let rect = node.rect();
+    let y = if under {
+        rect.bottom() - 3.0
+    } else {
+        rect.top() + 3.0
+    };
+    Ok(egui::pos2(rect.right() + 40.0, y))
+}
+
+/// The packing Note with two Lines in Passport's group, a Checklist.
+fn with_group() -> Result<(Arc<Store>, String), Box<dyn std::error::Error>> {
+    let store = device(3, "Desk")?;
+    let travel = Places::new(&store).add_area("Travel")?;
+    let text = "Packing\nPassport\n  Charger\n  Adapter\nTicket\nMap";
+    let note = Notes::new(&store).capture(text, Some(&travel.id), None)?;
+    Checklists::new(&store).make(&note.id)?;
+    Ok((Arc::new(store), note.id))
+}
+
+#[test]
+fn a_line_is_dragged_by_its_handle_within_its_group_or_the_top_level() -> TestResult {
+    let (store, note) = with_group()?;
+    let mut harness = window(&store, Some(&note));
+    let start = ["Passport", "  Charger", "  Adapter", "Ticket", "Map"];
+    assert_eq!(texts(&harness, &note)?, start);
+    // One place up at the top, past Ticket (#283).
+    let (from, to) = (handle(&harness, "Map")?, edge(&harness, "Ticket", false)?);
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "  Adapter", "Map", "Ticket"]
+    );
+    // A Line with a group goes with it, to the end.
+    let (from, to) = (
+        handle(&harness, "Passport")?,
+        edge(&harness, "Ticket", true)?,
+    );
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Map", "Ticket", "Passport", "  Charger", "  Adapter"]
+    );
+    // Within its group, up and back to its end.
+    let (from, to) = (
+        handle(&harness, "Adapter")?,
+        edge(&harness, "Charger", false)?,
+    );
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Map", "Ticket", "Passport", "  Adapter", "  Charger"]
+    );
+    let (from, to) = (
+        handle(&harness, "Adapter")?,
+        edge(&harness, "Charger", true)?,
+    );
+    drag(&mut harness, from, to);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Map", "Ticket", "Passport", "  Charger", "  Adapter"]
+    );
+    // Out of its group, where it stands and away from the Lines, it
+    // stays.
+    let (from, to) = (handle(&harness, "Charger")?, edge(&harness, "Map", false)?);
+    drag(&mut harness, from, to);
+    let (from, to) = (handle(&harness, "Ticket")?, edge(&harness, "Ticket", true)?);
+    drag(&mut harness, from, to);
+    let from = handle(&harness, "Ticket")?;
+    drag(&mut harness, from, egui::pos2(from.x, 2300.0));
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Map", "Ticket", "Passport", "  Charger", "  Adapter"]
+    );
     Ok(())
 }

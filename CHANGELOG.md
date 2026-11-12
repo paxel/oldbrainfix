@@ -20,6 +20,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the Areas list and the sidebar keep your own order of the Areas, which a drag on the handle of an Area's row on the phone, a drag of the Area's row in the sidebar, Move up and Move down in the desktop's Area menu and right-click, and Alt+Up and Alt+Down change, the same on all of your Devices and in File into…, Area Locks, Link to… and Notes for the feedback; the others in a Shared Area keep their own order, and once an Area has been moved, a new Area goes to the end.
 - On the phone, a long press on the "+" of the Agenda or the lock screen opens the capture screen for text at once, without the fan, and a screen reader announces it with the button.
 - On the phone and the desktop, Settings has a search field at the top that shows only the settings whose name or detail line holds the words typed, under their section's heading, and says so when none does; on the desktop Ctrl+F puts the cursor into it while the Settings are open.
+- On the desktop, Alt+Up and Alt+Down move the Checklist Line the cursor is in one place within its group or the top level, as Move up and Move down in its ⋮ do, and a Line is dragged up or down by the handle beside its ⋮, a line showing where it goes.
+- On the desktop, Record keys beside the Settings' hotkey field takes the next keys pressed together as the hotkey, none of the app's own keys working meanwhile and Esc stopping it, while the field still takes the keys typed out.
 
 ### Changed
 

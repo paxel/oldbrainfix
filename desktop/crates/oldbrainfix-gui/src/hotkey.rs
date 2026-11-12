@@ -117,6 +117,22 @@ impl fmt::Display for Chord {
 }
 
 impl Chord {
+    /// The chord of `key` pressed with `modifiers` in the window, as the
+    /// Settings record it (#283): Ctrl, Alt, Shift and on macOS Cmd as
+    /// Super; `None` for a key no chord takes, or one without Ctrl, Alt
+    /// or Cmd. Off macOS the window hears no Super, so such a chord is
+    /// typed.
+    pub fn pressed(key: egui::Key, modifiers: egui::Modifiers) -> Option<Chord> {
+        let chord = Chord {
+            ctrl: modifiers.ctrl,
+            alt: modifiers.alt,
+            shift: modifiers.shift,
+            logo: modifiers.mac_cmd,
+            key: parse_key(key.name())?,
+        };
+        (chord.ctrl || chord.alt || chord.logo).then_some(chord)
+    }
+
     /// The chord as the XDG shortcuts specification writes a trigger,
     /// for the portal: "CTRL+ALT+n".
     pub fn portal_trigger(&self) -> String {
@@ -184,6 +200,10 @@ pub trait Control {
     fn status(&self) -> Status;
     /// Moves the hotkey to `chord`, where the app chooses the key.
     fn rebind(&mut self, chord: &Chord);
+    /// Lets the key go while the Settings record a new one, so that it
+    /// reaches the window, and with `false` takes it again (#283); the
+    /// desktop's key through the portal stays.
+    fn pause(&mut self, _paused: bool) {}
 }
 
 /// Which way to the hotkey this session offers.
@@ -304,6 +324,21 @@ impl Control for Hotkey {
             None => Status::Unavailable,
         };
         set(&self.status, to);
+    }
+
+    fn pause(&mut self, paused: bool) {
+        let Way::Grab {
+            manager,
+            held: Some(key),
+        } = &self.way
+        else {
+            return;
+        };
+        if paused {
+            drop(manager.unregister(*key));
+        } else if manager.register(*key).is_err() {
+            set(&self.status, Status::Taken);
+        }
     }
 }
 
@@ -453,6 +488,32 @@ mod tests {
         assert_eq!(key, Some(HotKey::new(Some(Modifiers::META), Code::Digit1)));
         let key = chord("Alt+F12").and_then(|c| c.hotkey());
         assert_eq!(key, Some(HotKey::new(Some(Modifiers::ALT), Code::F12)));
+    }
+
+    #[test]
+    fn a_chord_pressed_is_recorded_as_typed() {
+        use egui::{Key, Modifiers};
+        let pressed = |key, modifiers| Chord::pressed(key, modifiers).map(|c| c.to_string());
+        let ctrl_alt = Modifiers::CTRL | Modifiers::ALT;
+        assert_eq!(pressed(Key::K, ctrl_alt).as_deref(), Some("Ctrl+Alt+K"));
+        assert_eq!(
+            pressed(Key::F5, Modifiers::ALT | Modifiers::SHIFT).as_deref(),
+            Some("Alt+Shift+F5")
+        );
+        assert_eq!(
+            pressed(Key::Num7, Modifiers::CTRL).as_deref(),
+            Some("Ctrl+7")
+        );
+        assert_eq!(
+            pressed(Key::Space, Modifiers::MAC_CMD).as_deref(),
+            Some("Super+Space")
+        );
+        // A typing key, a key no chord takes, and Shift alone are none.
+        assert_eq!(pressed(Key::N, Modifiers::NONE), None);
+        assert_eq!(pressed(Key::N, Modifiers::SHIFT), None);
+        assert_eq!(pressed(Key::Escape, ctrl_alt), None);
+        assert_eq!(pressed(Key::ArrowUp, ctrl_alt), None);
+        assert_eq!(pressed(Key::F13, ctrl_alt), None);
     }
 
     fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {

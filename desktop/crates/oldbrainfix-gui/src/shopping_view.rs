@@ -382,6 +382,7 @@ pub fn section(
             &rows,
             shown.checks,
             (Some(menus), Some(&mut field), Some(&trailing)),
+            None,
         );
         for asked in asked {
             actions.push(match asked {

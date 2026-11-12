@@ -124,6 +124,9 @@ pub enum Typing {
     Join(u64),
     /// Tab, or with `false` Shift+Tab.
     Indent(u64, bool),
+    /// Alt+Up, or with `false` Alt+Down (#283): the list moves the Line
+    /// by its own steps, a Shopping List's not at all.
+    Move(u64, bool),
     /// The cursor left it.
     Store(u64),
 }
@@ -189,6 +192,11 @@ impl TypedLines {
     /// The row shown under `id`.
     pub fn shown(&self, id: &str) -> Option<&TypedLine> {
         self.rows.iter().find(|r| r.shown_id() == id)
+    }
+
+    /// The row `key`.
+    pub fn keyed(&self, key: u64) -> Option<&TypedLine> {
+        self.rows.iter().find(|r| r.key == key)
     }
 
     /// The Lines with ⋮, by the id they show under: `editable`, and the
@@ -562,6 +570,8 @@ impl TypedLines {
             Typing::Split(key, at) => self.split(store, wall, key, at),
             Typing::Join(key) => self.join(store, wall, key),
             Typing::Indent(key, under) => self.indent(store, key, under),
+            // A Checklist moves it as its ⋮ does (`checklist_view`).
+            Typing::Move(..) => Ok(()),
             Typing::Store(key) => match self.at(key) {
                 Some(at) => self.store_row(store, wall, at).map(|_| ()),
                 None => Ok(()),
@@ -947,7 +957,8 @@ pub fn field(
 }
 
 /// The keys a focused field takes before it: Enter, Backspace at its
-/// start, on a Checklist Tab and Shift+Tab, Up and Down.
+/// start, on a Checklist Tab and Shift+Tab, Alt+Up and Alt+Down, Up and
+/// Down.
 fn keys(
     ui: &mut Ui,
     lines: &mut TypedLines,
@@ -1001,6 +1012,15 @@ fn keys(
     if kind == FieldOf::Checklist && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Tab)) {
         asked.push(Typing::Indent(key, true));
         return;
+    }
+    // Alt+Up and Alt+Down move the Line (#283), taken before Up and Down,
+    // which take them with Alt too; where it cannot move, the cursor
+    // stays.
+    for (arrow, up) in [(Key::ArrowUp, true), (Key::ArrowDown, false)] {
+        if ui.input_mut(|i| i.consume_key(Modifiers::ALT, arrow)) {
+            asked.push(Typing::Move(key, up));
+            return;
+        }
     }
     for (arrow, next) in [(Key::ArrowUp, above), (Key::ArrowDown, below)] {
         if let Some(next) = next
