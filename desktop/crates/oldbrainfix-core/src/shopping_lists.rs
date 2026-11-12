@@ -309,6 +309,14 @@ pub struct ShoppingLine {
     pub order: Option<String>,
 }
 
+impl ShoppingLine {
+    /// Whether it is checked, struck or gone, since a moment on `day` by
+    /// `wall`.
+    pub fn checked_on(&self, day: Day, wall: &WallClock) -> bool {
+        self.checked_at.is_some_and(|at| Day::of(wall(at)) == day)
+    }
+}
+
 /// A Note whose Lines come back a while after they are checked
 /// (CONTEXT.md).
 #[derive(Debug, Clone, PartialEq)]
@@ -342,6 +350,24 @@ impl ShoppingList {
 
     pub fn struck(&self) -> Vec<&ShoppingLine> {
         self.lines.iter().filter(|l| l.struck).collect()
+    }
+
+    /// The Lines checked on `day` by `wall` that are still checked, struck
+    /// or gone, the one checked first first: what stays struck on the
+    /// Agenda for the day (#276).
+    pub fn checked_on(&self, day: Day, wall: &WallClock) -> Vec<&ShoppingLine> {
+        let mut checked: Vec<&ShoppingLine> = self
+            .lines
+            .iter()
+            .chain(&self.gone)
+            .filter(|l| l.checked_on(day, wall))
+            .collect();
+        checked.sort_by(|a, b| {
+            a.checked_at
+                .cmp(&b.checked_at)
+                .then_with(|| utf16_cmp(&a.id, &b.id))
+        });
+        checked
     }
 
     /// The Lines that came back by themselves at the start of `day`.
@@ -619,6 +645,18 @@ impl<'a> ShoppingLists<'a> {
     /// first. A list whose Lines are all struck or gone shows whatever the
     /// choice. Reading writes nothing.
     pub fn agenda_rows(&self, wall: &WallClock) -> Result<Vec<ShoppingAgendaRow>> {
+        self.agenda_rows_with(wall, false)
+    }
+
+    /// [`ShoppingLists::agenda_rows`]; with `checked_today` the Lines
+    /// checked today and still checked follow the open ones, struck for
+    /// the day ([`ShoppingList::checked_on`]), and a list with only those
+    /// shows too (#276). Reading writes nothing.
+    pub fn agenda_rows_with(
+        &self,
+        wall: &WallClock,
+        checked_today: bool,
+    ) -> Result<Vec<ShoppingAgendaRow>> {
         let notes = Notes::new(self.store);
         let standard =
             ShoppingOnAgenda::from_device(DeviceSettings::new(self.store).shopping_agenda()?);
@@ -646,12 +684,17 @@ impl<'a> ShoppingLists<'a> {
         });
         let ids: Vec<String> = shown.iter().map(|(n, _)| n.id.clone()).collect();
         let mut lists = self.of_notes(&ids, wall)?;
+        // The clock is read only when asked for.
+        let today = checked_today.then(|| Day::today(self.store.now(), wall));
         let mut out = Vec::new();
         for (note, shows) in shown {
             let Some(list) = lists.remove(&note.id) else {
                 continue;
             };
-            let lines: Vec<ShoppingLine> = list.open().into_iter().cloned().collect();
+            let mut lines: Vec<ShoppingLine> = list.open().into_iter().cloned().collect();
+            if let Some(day) = today {
+                lines.extend(list.checked_on(day, wall).into_iter().cloned());
+            }
             if !lines.is_empty() {
                 out.push(ShoppingAgendaRow { list, shows, lines });
             }
@@ -1110,7 +1153,7 @@ impl<'a> ShoppingLists<'a> {
     /// ([`Reappear::back_from`]), by `wall`, or until a time is set for one
     /// without; a Line Once is gone. A struck one stays as it is.
     pub fn check(&self, line_id: &str, wall: &WallClock) -> Result<()> {
-        let (list, line) = self.require_shown(line_id, wall)?;
+        let (list, line) = self.require_shown(line_id, wall, false)?;
         if !self.may_check(&list.note_id)? {
             return Err(Error::Invalid(format!(
                 "no role in the Shared Area of {}",
@@ -1126,17 +1169,17 @@ impl<'a> ShoppingLists<'a> {
             .map(drop)
     }
 
-    /// Brings the struck Line `line_id` back now, in its place. An open one
-    /// stays as it is.
+    /// Brings the struck or gone Line `line_id` back now, in its place, as
+    /// adding its name does. An open one stays as it is.
     pub fn uncheck(&self, line_id: &str, wall: &WallClock) -> Result<()> {
-        let (list, line) = self.require_shown(line_id, wall)?;
+        let (list, line) = self.require_shown(line_id, wall, true)?;
         if !self.may_check(&list.note_id)? {
             return Err(Error::Invalid(format!(
                 "no role in the Shared Area of {}",
                 list.note_id
             )));
         }
-        if !line.struck {
+        if !line.struck && !list.gone.iter().any(|l| l.id == line.id) {
             return Ok(());
         }
         self.store
@@ -1189,8 +1232,8 @@ impl<'a> ShoppingLists<'a> {
     }
 
     /// The fields of the Line `line_id` that shows in a Shopping List whose
-    /// Note is not in the trash.
-    fn require_line(&self, line_id: &str) -> Result<Fields> {
+    /// Note is not in the trash, or with `gone` one gone there.
+    fn require_line(&self, line_id: &str, gone: bool) -> Result<Fields> {
         let fields = self.store.current_fields(line_id)?;
         let note = fields.get(checklist_keys::NOTE).map(str::to_string);
         let making = match &note {
@@ -1208,7 +1251,7 @@ impl<'a> ShoppingLists<'a> {
             && fields.get(checklist_keys::MADE) == making.as_deref()
             && fields.get(checklist_keys::TRASHED).is_none()
             && !trashed
-            && !ShoppingLists::is_gone(&fields);
+            && (gone || !ShoppingLists::is_gone(&fields));
         if !shown {
             return Err(Error::Invalid(format!(
                 "not a Line of a Shopping List: {line_id}"
@@ -1218,24 +1261,33 @@ impl<'a> ShoppingLists<'a> {
     }
 
     fn require_editable(&self, line_id: &str) -> Result<Fields> {
-        let fields = self.require_line(line_id)?;
+        let fields = self.require_line(line_id, false)?;
         if !self.may_edit(line_id)? {
             return Err(Error::Invalid(format!("may not change {line_id}")));
         }
         Ok(fields)
     }
 
-    /// The Shopping List the shown Line `line_id` lies in, and the Line.
+    /// The Shopping List the shown Line `line_id` lies in, and the Line;
+    /// with `gone` a gone one too.
     fn require_shown(
         &self,
         line_id: &str,
         wall: &WallClock,
+        gone: bool,
     ) -> Result<(ShoppingList, ShoppingLine)> {
         let missing = || Error::Invalid(format!("not a Line of a Shopping List: {line_id}"));
-        let fields = self.require_line(line_id)?;
+        let fields = self.require_line(line_id, gone)?;
         let note = fields.get(checklist_keys::NOTE).ok_or_else(missing)?;
         let list = self.by_note(note, wall)?.ok_or_else(missing)?;
-        let line = list.line(line_id).cloned().ok_or_else(missing)?;
+        let line = list
+            .line(line_id)
+            .or_else(|| {
+                gone.then(|| list.gone.iter().find(|l| l.id == line_id))
+                    .flatten()
+            })
+            .cloned()
+            .ok_or_else(missing)?;
         Ok((list, line))
     }
 }
@@ -2456,6 +2508,66 @@ mod tests {
             })
             .map(|e| (e.device, e.value))
             .collect())
+    }
+
+    #[test]
+    fn asked_for_a_line_checked_today_stays_after_the_open_ones_for_the_day_struck_or_gone()
+    -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let lists = ShoppingLists::new(&ann);
+        let week = shopping(&ann, "Groceries\nMilk\nEggs\nTea", None)?;
+        lists.set_on_agenda(&week, ShoppingOnAgenda::Lines)?;
+        let eggs = id_of(&ann, &week, "Eggs")?;
+        let milk = id_of(&ann, &week, "Milk")?;
+        lists.set_reappear(&eggs, Reappear::Once)?;
+        lists.set_reappear(&milk, Reappear::After(1, ReappearUnit::Day))?;
+        lists.check(&eggs, &wall)?;
+        lists.check(&milk, &wall)?;
+        let today = || -> Made<Vec<String>> {
+            let mut out = Vec::new();
+            for row in lists.agenda_rows_with(&wall, true)? {
+                let open = row.list.open();
+                for line in &row.lines {
+                    let struck = if open.contains(&line) { "" } else { " x" };
+                    out.push(format!("{}{struck}", line.text));
+                }
+            }
+            Ok(out)
+        };
+        assert_eq!(agenda_rows(&ann)?, ["Groceries: Tea"], "unasked");
+        assert_eq!(today()?, ["Tea", "Eggs x", "Milk x"]);
+        lists.check(&id_of(&ann, &week, "Tea")?, &wall)?;
+        assert_eq!(today()?, ["Eggs x", "Milk x", "Tea x"], "none open");
+        // Gone Once, Eggs comes back by its box as by its name.
+        lists.uncheck(&eggs, &wall)?;
+        assert_eq!(today()?, ["Eggs", "Milk x", "Tea x"]);
+        lists.uncheck(&eggs, &wall)?;
+        assert_eq!(today()?, ["Eggs", "Milk x", "Tea x"], "open stays");
+        // Past midnight on the wall clock only Eggs is left; Milk is back.
+        clock.set(utc(5, 23, 30, 0)?);
+        assert_eq!(today()?, ["Milk", "Eggs"]);
+        // By when each was checked, not by its id.
+        let hardware = shopping(&ann, "Hardware\nNails\nGlue\nTape", None)?;
+        let mut ids: Vec<String> = ShoppingLists::new(&ann)
+            .by_note(&hardware, &wall)?
+            .ok_or("a Shopping List")?
+            .lines
+            .into_iter()
+            .map(|l| l.id)
+            .collect();
+        ids.sort_by(|a, b| utf16_cmp(b, a));
+        for id in &ids {
+            lists.check(id, &wall)?;
+        }
+        let rows = lists.agenda_rows_with(&wall, true)?;
+        let row = rows
+            .iter()
+            .find(|r| r.list.note_id == hardware)
+            .ok_or("its row")?;
+        let shown: Vec<&String> = row.lines.iter().map(|l| &l.id).collect();
+        assert_eq!(shown, ids.iter().collect::<Vec<_>>());
+        Ok(())
     }
 
     #[test]

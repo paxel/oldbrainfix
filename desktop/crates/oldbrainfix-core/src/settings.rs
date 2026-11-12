@@ -31,6 +31,7 @@ const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
+const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
 const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
 
@@ -359,6 +360,23 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF, &(!on).to_string())
     }
 
+    /// The Note id of the Shopping List a capture on this Device went into
+    /// last, at the top of the lists to pick from (#276); `None` for none.
+    /// It may name a list gone since.
+    pub fn last_shopping_list(&self) -> Result<Option<String>> {
+        Ok(self
+            .store
+            .local_setting(LAST_SHOPPING_LIST)?
+            .filter(|id| !id.is_empty()))
+    }
+
+    pub fn set_last_shopping_list(&self, note_id: Option<&str>) -> Result<()> {
+        match note_id {
+            Some(id) => self.store.set_local_setting(LAST_SHOPPING_LIST, id),
+            None => self.store.remove_local_setting(LAST_SHOPPING_LIST),
+        }
+    }
+
     /// When the desktop last showed what was due; `None` before the first
     /// time.
     pub fn last_fired(&self) -> Result<Option<DateTime<Utc>>> {
@@ -671,6 +689,21 @@ mod tests {
         );
         settings.set_quick_note_nudge_buttons_on(true)?;
         assert!(settings.quick_note_nudge_buttons_on()?);
+        // The Shopping List a capture went into last (#276).
+        assert_eq!(settings.last_shopping_list()?, None);
+        settings.set_last_shopping_list(Some("note:weekly"))?;
+        assert_eq!(
+            settings.last_shopping_list()?.as_deref(),
+            Some("note:weekly")
+        );
+        assert_eq!(
+            store.local_setting("lastShoppingList")?.as_deref(),
+            Some("note:weekly")
+        );
+        settings.set_last_shopping_list(None)?;
+        assert_eq!(settings.last_shopping_list()?, None);
+        store.set_local_setting("lastShoppingList", "")?;
+        assert_eq!(settings.last_shopping_list()?, None);
         settings.set_capture_hotkey("Super+Shift+K")?;
         assert_eq!(settings.capture_hotkey()?, "Super+Shift+K");
         let now = store.now();

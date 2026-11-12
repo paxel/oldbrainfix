@@ -27,3 +27,7 @@ Amended by #201: from when on an all-day Occurrence rings is a setting of each D
 Amended by #211: "Move a Note to the Trash when its one-time Reminder is done" belongs to the person, not the Device. It lies in the log as an Override does and is the same on all of their own Devices (ADR 0040).
 
 Amended by #197: Simple or Advanced is the second setting of the person, kept the same way and the same on all of their own Devices (ADR 0041).
+
+## The last Shopping List (#276)
+
+Amended by #276: the Shopping List a capture on a Device went into last is a setting of that Device (`lastShoppingList`, the list's Note id), put at the top of the lists Add to a Shopping List offers. An empty value reads as none, and it may name a list gone since, which the pick does not list. Capturing writes it; the user never sets it, so the AI port has no tool for it.

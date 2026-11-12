@@ -170,7 +170,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List, how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it), Sections, Transcripts of its recordings, Photo Texts, photos, Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -601,14 +601,14 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "set_shopping_agenda",
-            "Sets how a Shopping List shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (each open Line on a row of its own). A list with no open Line never shows.",
+            "Sets how a Shopping List shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (each open Line on a row of its own, and each Line checked today struck through on its row until the day ends, unless agendaHidesChecked). Otherwise a list with no open Line never shows.",
             false,
             json!({"agenda": {"enum": ["off", "count", "lines"], "type": "string"}, "id": id("Note")}),
             &["id", "agenda"],
         ),
         tool(
             "set_checklist_agenda",
-            "Sets how a Checklist without a Routine shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (its name with each open Line under it, the default). A list with no open Line never shows; a Checklist with a Routine shows as its Occurrence instead.",
+            "Sets how a Checklist without a Routine shows on the user's own Agenda, on their own Devices only: off (never), count (one row with the number of its open Lines) or lines (its name with each open Line under it, the default, and each Line checked today struck through in its place until the day ends, unless agendaHidesChecked). Otherwise a list with no open Line never shows; a Checklist with a Routine shows as its Occurrence instead.",
             false,
             json!({"agenda": {"enum": ["off", "count", "lines"], "type": "string"}, "id": id("Note")}),
             &["id", "agenda"],
@@ -1141,21 +1141,29 @@ impl Store {
                 None => Value::Null,
             },
             Some(_) => match ShoppingLists::new(self).by_note(note, wall)? {
-                Some(list) => Value::Array(
-                    list.lines
-                        .iter()
-                        .map(|l| {
-                            json!({
-                                "backOn": l.back_on.map(|d| d.to_string()),
-                                "checkedAt": l.checked_at.map(dart_iso),
-                                "id": l.id,
-                                "reappear": reappear_json(l.reappear),
-                                "struck": l.struck,
-                                "text": l.text,
+                Some(list) => {
+                    // A Line checked Once today stays struck on the Agenda
+                    // for the day (#276), so it shows here too.
+                    let today = Day::today(self.now(), wall);
+                    let gone = list.gone().iter().filter(|l| l.checked_on(today, wall));
+                    let shown = list.lines.iter().map(|l| (l, false));
+                    Value::Array(
+                        shown
+                            .chain(gone.map(|l| (l, true)))
+                            .map(|(l, gone)| {
+                                json!({
+                                    "backOn": l.back_on.map(|d| d.to_string()),
+                                    "checkedAt": l.checked_at.map(dart_iso),
+                                    "gone": gone,
+                                    "id": l.id,
+                                    "reappear": reappear_json(l.reappear),
+                                    "struck": l.struck || gone,
+                                    "text": l.text,
+                                })
                             })
-                        })
-                        .collect(),
-                ),
+                            .collect(),
+                    )
+                }
                 None => Value::Null,
             },
             None => Value::Null,
@@ -3076,6 +3084,44 @@ mod tests {
                 .drafts()
                 .is_empty()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_checked_once_today_reads_struck_and_gone_for_the_day() -> TestResult {
+        let store = store();
+        let shop = shopping_list(&store, "Shop\nMilk\nEggs")?;
+        let lists = ShoppingLists::new(&store);
+        let eggs = lists.by_note(&shop, &utc)?.ok_or("a list")?.lines[1]
+            .id
+            .clone();
+        lists.set_reappear(&eggs, Reappear::Once)?;
+        lists.check(&eggs, &utc)?;
+        let task = store.open_ai_task()?;
+        let lines = || -> Made<Vec<(Value, Value, Value)>> {
+            let read = json_of(&call(&store, &task, "read_note", &json!({"id": shop}))?)?;
+            Ok(read["lines"]
+                .as_array()
+                .ok_or("the Lines")?
+                .iter()
+                .map(|l| (l["text"].clone(), l["struck"].clone(), l["gone"].clone()))
+                .collect())
+        };
+        assert_eq!(
+            lines()?,
+            [
+                (json!("Milk"), json!(false), json!(false)),
+                (json!("Eggs"), json!(true), json!(true)),
+            ]
+        );
+        // Checked on a day before, it is gone from here too.
+        store.append(
+            &eggs,
+            checklist_keys::CHECKED,
+            Some("2025-12-31T10:00:00.000Z"),
+            None,
+        )?;
+        assert_eq!(lines()?, [(json!("Milk"), json!(false), json!(false))]);
         Ok(())
     }
 

@@ -152,6 +152,49 @@
     "note:0000000000000000000000000000000d": true,
     "note:00000000000000000000000000000016": false
   },
+  "checkedToday": [
+    {
+      "now": "2026-01-01T10:02:52.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 7,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000006",
+            "line:00000000000000000000000000000008",
+            "line:00000000000000000000000000000005"
+          ]
+        },
+        {
+          "note": "note:0000000000000000000000000000000d",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": [
+            "line:00000000000000000000000000000014",
+            "line:00000000000000000000000000000015"
+          ]
+        }
+      ]
+    },
+    {
+      "now": "2026-01-02T10:02:52.000Z",
+      "rows": [
+        {
+          "note": "note:00000000000000000000000000000001",
+          "open": 7,
+          "shows": "lines",
+          "checkedToday": []
+        },
+        {
+          "note": "note:0000000000000000000000000000000d",
+          "open": 1,
+          "shows": "lines",
+          "checkedToday": []
+        }
+      ]
+    }
+  ],
   "plain": {
     "note:00000000000000000000000000000001": "Packing\nMap\n✓ Passport\nTorch\n✓ Pegs\nSocks\n  Blue\n  Green\n  ✓ Red socks\nLast\nOdd",
     "note:0000000000000000000000000000000d": "Shop\nOat milk\n✓ Eggs\n  ✓ Free range"

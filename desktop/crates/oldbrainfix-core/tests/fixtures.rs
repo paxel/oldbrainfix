@@ -3683,6 +3683,29 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         })
         .collect();
     assert_eq!(json!(agenda), expected["agenda"], "{scenario}");
+    // On the day of the last write and the day after (#276).
+    let europe = frog_day(0);
+    let europe: &oldbrainfix_core::schedule::WallClock = &europe;
+    for moment in expected["checkedToday"].as_array().ok_or("checkedToday")? {
+        let now = moment["now"].as_str().ok_or("now")?;
+        let store = load(scenario, now)?;
+        let today = Day::today(parse_time(now)?, europe);
+        let rows: Vec<Value> = Checklists::new(&store)
+            .agenda_rows_with(Some(europe))?
+            .iter()
+            .map(|r| {
+                let l = &r.list;
+                let checked: Vec<&str> = l
+                    .lines
+                    .iter()
+                    .filter(|line| line.checked_on(today, europe))
+                    .map(|line| line.id.as_str())
+                    .collect();
+                json!({"note": l.note_id, "open": l.open_count(), "shows": r.shows.code(), "checkedToday": checked})
+            })
+            .collect();
+        assert_eq!(json!(rows), moment["rows"], "{scenario} at {now}");
+    }
     let mut shows = serde_json::Map::new();
     let mut applies = serde_json::Map::new();
     for id in &ids {
@@ -4025,6 +4048,25 @@ fn write_shopping_lists(store: &Store) -> Built {
     );
     store.append(&errand.id, &check, Some("2026-01-09T09:00:00.000Z"), None)?;
     notes.capture("Unsorted thought", None, None)?;
+    // Struck for the day (#276): a Line checked Once, gone, and Eggs, gone
+    // since the 1st, brought back by its box.
+    let rope = lists.add(&pantry, "Rope", &wall)?;
+    lists.set_reappear(&rope, Reappear::Once)?;
+    lists.check(&rope, &wall)?;
+    let eggs = lists
+        .by_note(&week, &wall)?
+        .ok_or("a Shopping List")?
+        .gone()
+        .iter()
+        .find(|l| l.text == "Eggs")
+        .ok_or("the gone Eggs")?
+        .id
+        .clone();
+    lists.uncheck(&eggs, &wall)?;
+    // Checked again last, it follows the others, though made first.
+    let yeast = line(&pantry, "Yeast")?;
+    lists.uncheck(&yeast, &wall)?;
+    lists.check(&yeast, &wall)?;
     Ok(())
 }
 
@@ -4127,8 +4169,16 @@ fn shopping_lists_of_come_to_what_the_dart_core_says(scenario: &str) -> TestResu
             })?;
             agenda.insert(old.unwrap_or("none").to_string(), rows);
         }
+        // The Lines checked today after the open ones (#276).
+        let checked_today = shopping_rows_json(&lists.agenda_rows_with(&wall, true)?);
         assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
-        at.push(json!({"now": now, "lists": shown, "plain": plain, "agenda": agenda}));
+        at.push(json!({
+            "now": now,
+            "lists": shown,
+            "plain": plain,
+            "agenda": agenda,
+            "checkedToday": checked_today,
+        }));
     }
     assert_eq!(json!(at), expected["at"]);
     let read_at = read_json(&dir.join("expected.json"))?;

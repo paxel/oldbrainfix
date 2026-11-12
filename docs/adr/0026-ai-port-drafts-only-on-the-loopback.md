@@ -91,3 +91,7 @@ Amended by #213: `list_notes` and `read_note` report the format of a Note's text
 ## Sets and Check fields (#264)
 
 Amended by #264 (ADR 0028): `read_note` reports a Tally's `bar` and `sets` and each field's `check` and `countsSets` instead of what it multiplies; `read_tally_entries` reports each entry's `sets`, a row of values per set, and what it counts per field, without factors. `make_tally` and the new `set_tally` take `bar` and `sets`, `add_tally_field` takes `check`; no tool sets `multiplies`. An AI Task may write `tally:bar`, `tally:sets` and a field's `kind`, no longer its `multiplies`.
+
+## Lines checked today (#276)
+
+Amended by #276 (ADR 0030): `read_note` lists a Shopping List's Lines checked Once today after its other Lines, `struck` and `gone`, as they stay struck on the Agenda until the day ends; every Line of a Shopping List carries `gone`. `set_shopping_agenda` and `set_checklist_agenda` say that a list shown as its Lines keeps those checked today struck on the Agenda for the day, unless the Device hides what is checked. No trust rule changed, and the Device's last Shopping List (ADR 0008) has no tool.

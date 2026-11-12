@@ -233,6 +233,11 @@ impl Line {
     pub fn in_group(&self) -> bool {
         self.parent.is_some()
     }
+
+    /// Whether it shows checked by a check made on `day` by `wall`.
+    pub fn checked_on(&self, day: Day, wall: &WallClock) -> bool {
+        self.checked && self.checked_at.is_some_and(|at| Day::of(wall(at)) == day)
+    }
 }
 
 /// An Occurrence of the Routine `routine_id`: one a Checklist is
@@ -832,6 +837,17 @@ impl<'a> Checklists<'a> {
     /// of a locked Area set to Masked as a row that tells nothing of it,
     /// as a Shopping List's. Reading writes nothing.
     pub fn agenda_rows(&self) -> Result<Vec<ChecklistAgendaRow>> {
+        self.agenda_rows_with(None)
+    }
+
+    /// [`Checklists::agenda_rows`]; with `checked_today`, the wall clock
+    /// today is read on, a list whose open Lines were all checked today
+    /// shows too, its Lines struck for the day (#276). Reading writes
+    /// nothing.
+    pub fn agenda_rows_with(
+        &self,
+        checked_today: Option<&WallClock>,
+    ) -> Result<Vec<ChecklistAgendaRow>> {
         let notes = Notes::new(self.store);
         let routines = Routines::new(self.store);
         let mut spawned = HashSet::new();
@@ -864,10 +880,17 @@ impl<'a> Checklists<'a> {
         });
         let ids: Vec<String> = shown.iter().map(|(n, _)| n.id.clone()).collect();
         let mut lists = self.of_notes(&ids)?;
+        // The clock is read only when asked for.
+        let today = checked_today.map(|wall| (Day::today(self.store.now(), wall), wall));
+        let listed = |list: &Checklist| {
+            list.open_count() > 0
+                || today
+                    .is_some_and(|(day, wall)| list.lines.iter().any(|l| l.checked_on(day, wall)))
+        };
         let mut out = Vec::new();
         for (note, shows) in shown {
             if let Some(list) = lists.remove(&note.id)
-                && list.open_count() > 0
+                && listed(&list)
             {
                 out.push(ChecklistAgendaRow { list, shows });
             }
@@ -2840,6 +2863,49 @@ pub(crate) mod tests {
         let count = ann.all_entries()?.len();
         lists.agenda_rows()?;
         assert_eq!(ann.all_entries()?.len(), count, "reading writes nothing");
+        Ok(())
+    }
+
+    #[test]
+    fn asked_for_a_list_whose_lines_were_all_checked_today_shows_for_the_day() -> TestResult {
+        use chrono::TimeZone;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicI64, Ordering as AtomicOrdering};
+        let at = |hour, minute| {
+            Utc.with_ymd_and_hms(2026, 3, 5, hour, minute, 0)
+                .single()
+                .map(|t| t.timestamp())
+                .ok_or("a moment")
+        };
+        let ticks = Arc::new(AtomicI64::new(at(21, 0)?));
+        let read = ticks.clone();
+        let clock: crate::Clock = Box::new(move || {
+            let n = read.fetch_add(1, AtomicOrdering::SeqCst) + 1;
+            DateTime::from_timestamp(n, 0).unwrap_or_default()
+        });
+        let store = Store::in_memory(clock, || Ok(SigningKey::from_seed([3; 32])))?;
+        OwnProfile::new(&store).apply_defaults("Cleo", None)?;
+        let wall: &WallClock = &|utc: DateTime<Utc>| (utc + Duration::hours(1)).naive_utc();
+        let trip = checklist(&store, "Trip\nTent\nTorch", None)?;
+        let lists = Checklists::new(&store);
+        lists.check(&id_of(&store, &trip, "Tent")?)?;
+        lists.check(&id_of(&store, &trip, "Torch")?)?;
+        let today = || -> Made<Vec<String>> {
+            let mut out = Vec::new();
+            for row in lists.agenda_rows_with(Some(wall))? {
+                let day = Day::today(store.now(), wall);
+                for line in row.list.lines.iter().filter(|l| l.checked_on(day, wall)) {
+                    out.push(line.text.clone());
+                }
+            }
+            Ok(out)
+        };
+        assert!(agenda_rows(&store)?.is_empty(), "unasked");
+        assert_eq!(today()?, ["Tent", "Torch"]);
+        // Past midnight on the wall clock it shows no more.
+        ticks.store(at(23, 30)?, AtomicOrdering::SeqCst);
+        assert!(today()?.is_empty());
+        assert!(lists.agenda_rows_with(Some(wall))?.is_empty());
         Ok(())
     }
 

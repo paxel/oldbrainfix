@@ -1358,7 +1358,9 @@ final _scenarios = <Scenario>[
         'with a choice no app writes; reappear times (#195) of days, weeks, '
         'a month from the 31st of January to the last of February and a '
         'year, none, which stays struck, and none given a day after its '
-        'check; an Unsorted Note beside them.',
+        'check; an Unsorted Note beside them; then a Line checked Once that '
+        'day, struck for the day on the Agenda, a gone one brought back by '
+        'its box and one checked again last (#276).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1497,6 +1499,23 @@ final _scenarios = <Scenario>[
         '2026-01-09T09:00:00.000Z',
       );
       notes.capture('Unsorted thought');
+      // Struck for the day (#276): a Line checked Once, gone, and Eggs,
+      // gone since the 1st, brought back by its box.
+      final rope = lists.add(pantry, 'Rope', wall);
+      lists
+        ..setReappear(rope, Reappear.once)
+        ..check(rope, wall);
+      final eggs = lists
+          .byNote(week, wall)!
+          .gone
+          .firstWhere((l) => l.text == 'Eggs')
+          .id;
+      lists.uncheck(eggs, wall);
+      // Checked again last, it follows the others, though made first.
+      final yeast = line(pantry, 'Yeast');
+      lists
+        ..uncheck(yeast, wall)
+        ..check(yeast, wall);
     },
   ),
   (
@@ -2531,6 +2550,11 @@ Map<String, Object?> _checklists(Store store) {
     ],
     'onAgenda': {for (final id in ids) id: lists.onAgenda(id).code},
     'mayShowOnAgenda': {for (final id in ids) id: lists.mayShowOnAgenda(id)},
+    // On the day of the last write and the day after (#276).
+    'checkedToday': [
+      for (final moment in [_tick, _tick.add(const Duration(days: 1))])
+        _checklistsCheckedToday(store, moment),
+    ],
     'plain': {
       for (final id in ids)
         if (lists.byNote(id) case final list?)
@@ -2597,6 +2621,33 @@ Map<String, Object?> _checklists(Store store) {
   };
 }
 
+/// The Checklists' Agenda rows of [store] with the Lines checked today, at
+/// [moment] on the European wall clock: each list, how it shows and the
+/// ids of its Lines checked that day (#276). Leaves the clock held as it
+/// was.
+Map<String, Object?> _checklistsCheckedToday(Store store, DateTime moment) {
+  final held = _held;
+  _held = moment;
+  final wall = _frogDay(0);
+  final today = Day.today(moment, wall);
+  final rows = [
+    for (final (:list, :shows) in Checklists(
+      store,
+    ).agendaRows(checkedToday: wall))
+      {
+        'note': list.noteId,
+        'open': list.openCount,
+        'shows': shows.code,
+        'checkedToday': [
+          for (final l in list.lines)
+            if (l.checkedOn(today, wall)) l.id,
+        ],
+      },
+  ];
+  _held = held;
+  return {'now': moment.toIso8601String(), 'rows': rows};
+}
+
 /// Today's Shopping List rows of [store] on UTC: each list, how it shows
 /// and its open Lines.
 List<Map<String, Object?>> _shoppingRows(Store store) => [
@@ -2656,6 +2707,7 @@ final _shoppingMoments = [
   DateTime.utc(2026, 1, 14, 23),
   DateTime.utc(2026, 1, 21, 23),
   DateTime.utc(2026, 1, 28, 23),
+  DateTime.utc(2026, 1, 31, 22, 59, 59),
   DateTime.utc(2026, 1, 31, 23),
   DateTime.utc(2026, 2, 2, 23),
   DateTime.utc(2026, 2, 27, 23),
@@ -2708,6 +2760,18 @@ Map<String, Object?> _shoppingLists(Store store) {
                   },
               ],
           },
+          // The Lines checked today after the open ones (#276).
+          'checkedToday': [
+            for (final (:list, :shows, :lines) in lists.agendaRows(
+              _frogDay(0),
+              checkedToday: true,
+            ))
+              {
+                'note': list.noteId,
+                'shows': shows.code,
+                'lines': [for (final l in lines) l.id],
+              },
+          ],
         };
       }(),
   ];
