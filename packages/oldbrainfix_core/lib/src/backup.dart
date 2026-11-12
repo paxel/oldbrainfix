@@ -1161,13 +1161,18 @@ int _handRoles(Store store, SigningKey old) {
 /// until they are added ([addBackupNotes]), so the file must stay where
 /// it is until then.
 class OpenedBackup {
-  /// Every Note of the Backup but those merged into another, those in its
-  /// trash among them, as [PackExport.packOfEverything] lists them; its
-  /// files without their bytes.
+  /// Every Note of the Backup but those merged into another and those
+  /// of a locked Area closed on this Device, those in its trash among
+  /// them, as [PackExport.packOfEverything] lists them; its files without
+  /// their bytes.
   final Pack pack;
 
   /// The indices in [pack] of the Notes that lay in the Backup's trash.
   final Set<int> trashed;
+
+  /// The locked Areas closed on this Device whose Notes in the Backup
+  /// were left out of [pack].
+  final Set<String> leftOut;
 
   /// When the Backup was made.
   final DateTime created;
@@ -1179,6 +1184,7 @@ class OpenedBackup {
   const OpenedBackup._(
     this.pack,
     this.trashed,
+    this.leftOut,
     this.created,
     this._path,
     this._line,
@@ -1194,13 +1200,17 @@ class OpenedBackup {
 /// person's own Devices and the roles of the Shared Areas count as they
 /// did there; its blobs are checked against their hashes and only their
 /// sizes kept. [shown] names the Areas as the app shows them, for their
-/// order. The same refusals as [restoreBackup]: a [BackupException] of
+/// order. The Notes of [closed], the locked Areas closed on this Device,
+/// stay out, as the app shows them nowhere then (ADR 0043); an Area of
+/// the Backup that is no Area here has no lock here. The same refusals
+/// as [restoreBackup]: a [BackupException] of
 /// [BackupProblem.notABackup], [BackupProblem.needsUpdate],
 /// [BackupProblem.wrongSecret] or [BackupProblem.damaged].
 Future<OpenedBackup> openBackupNotes(
   Store store,
   String path,
   Uint8List backupKey, {
+  Set<String> closed = const {},
   String Function(Area area)? shown,
 }) async {
   final (header, contentKey) = _opened(path, backupKey);
@@ -1231,13 +1241,15 @@ Future<OpenedBackup> openBackupNotes(
       }
       view.restoreOwnProfile(payload.profile, old: payload.old);
     });
-    final (:pack, :trashed) = view.packOfEverything(
+    final (:pack, :trashed, :leftOut) = view.packOfEverything(
+      closed: closed,
       shown: shown,
       sizeOf: (kind, hash) => sizes['$kind/$hash'],
     );
     return OpenedBackup._(
       pack,
       trashed,
+      leftOut,
       header.created,
       path,
       header.line,

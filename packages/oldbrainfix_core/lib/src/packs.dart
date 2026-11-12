@@ -1149,14 +1149,17 @@ extension PackExport on Store {
   /// The Pack of a Backup opened to take Notes back from it (#285): every
   /// Note this Store holds but those merged into another, those in the
   /// trash among them, each Area in the person's own order by [shown]
-  /// with its own Notes and then its Topics' Notes, then the Notes filed
-  /// into no Area, newest capture first, as [packOfAll] lists them; the
-  /// Tallies a Session picks from that are not among them after them.
-  /// The files' sizes come from [sizeOf], `photo` or `audio` and a hash
-  /// to the size of the bytes held, null for none; without it, from the
-  /// blobs here. [trashed] are the indices of the Notes that lay in the
-  /// trash.
-  ({Pack pack, Set<int> trashed}) packOfEverything({
+  /// with its own Notes and then its Topics' Notes, but those of
+  /// [closed], then the Notes filed into no Area, newest capture first,
+  /// as [packOfAll] lists them; the Tallies a Session picks from that are
+  /// not among them after them, but for those filed into an Area of
+  /// [closed]. The files' sizes come from [sizeOf], `photo` or `audio`
+  /// and a hash to the size of the bytes held, null for none; without
+  /// it, from the blobs here. [trashed] are the indices of the Notes that
+  /// lay in the trash, [leftOut] the Areas of [closed] whose Notes stayed
+  /// out.
+  ({Pack pack, Set<int> trashed, Set<String> leftOut}) packOfEverything({
+    Set<String> closed = const {},
     String Function(Area area)? shown,
     int? Function(String kind, String hash)? sizeOf,
   }) {
@@ -1170,12 +1173,16 @@ extension PackExport on Store {
       final byCapture = b.captured.compareTo(a.captured);
       return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
     });
-    final ids = [
-      for (final area in areasInOrder(shown: shown)) ...[
-        area.id,
-        for (final t in places.topics(area.id)) t.id,
-      ],
-    ];
+    final ids = <String>[];
+    final leftOut = <String>{};
+    for (final area in areasInOrder(shown: shown)) {
+      final here = [area.id, for (final t in places.topics(area.id)) t.id];
+      if (!closed.contains(area.id)) {
+        ids.addAll(here);
+      } else if (kept.any((n) => here.contains(n.place))) {
+        leftOut.add(area.id);
+      }
+    }
     final order = <Note>[];
     final pack = _packOfNotes(
       [
@@ -1185,7 +1192,7 @@ extension PackExport on Store {
         for (final n in kept)
           if (n.place == null) n,
       ],
-      const {},
+      closed,
       sizeOf: sizeOf,
       seen: order,
     );
@@ -1195,6 +1202,7 @@ extension PackExport on Store {
         for (final (i, n) in order.indexed)
           if (n.isTrashed) i,
       },
+      leftOut: leftOut,
     );
   }
 

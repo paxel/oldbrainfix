@@ -813,6 +813,80 @@ void main() {
       final opened = await openBackupNotes(store, path, ada.backupKey!);
       expect([for (final a in opened.pack.areas) a.name], ['Work', 'Health']);
     });
+
+    test('leaves out the Notes of a locked Area closed on this Device and '
+        'a Tally of it a Session picks, never those of an Area that is '
+        'none here', () async {
+      final ada = Store.inMemory(clock: ticking());
+      addTearDown(ada.close);
+      final places = Places(ada);
+      final notes = Notes(ada);
+      final diary = places.addArea('Diary');
+      final dreams = places.addTopic(diary.id, 'Dreams');
+      final health = places.addArea('Health');
+      notes.capture('Dear diary', place: diary.id);
+      notes.capture('Flying', place: dreams.id);
+      notes.trash(notes.capture('Torn page', place: diary.id).id);
+      final laps = notes.capture('Laps', place: diary.id);
+      Tallies(ada).addField(laps.id, name: 'Laps', target: 10);
+      final training = notes.capture('Training', place: health.id);
+      Sessions(ada).spawn(
+        training.id,
+        Schedule(start: Day(2026, 10, 1), times: [ClockTime(7, 0)]),
+        pool: [laps.id],
+        count: 1,
+        rule: SessionRule.least,
+      );
+      notes.trash(notes.capture('Old list', place: health.id).id);
+      notes.capture('Call the vet');
+      await setUpBackups(ada, passphrase, kdf: cheap);
+      final path = '${dir.path}/closed.$backupExtension';
+      await writeBackup(ada, path);
+      final key = ada.backupKey!;
+      List<String> texts(OpenedBackup o) => [
+        for (final n in o.pack.notes) n.text,
+      ];
+
+      // Its own Backup, the Diary closed here.
+      final shut = await openBackupNotes(ada, path, key, closed: {diary.id});
+      expect([for (final a in shut.pack.areas) a.name], ['Health']);
+      expect(texts(shut), ['Old list', 'Training', 'Call the vet']);
+      expect(shut.trashed, {0});
+      expect(shut.leftOut, {diary.id});
+      final open = await openBackupNotes(ada, path, key);
+      expect(
+        texts(open),
+        containsAll(['Dear diary', 'Flying', 'Torn page', 'Laps']),
+      );
+      expect(open.leftOut, isEmpty);
+      // An Area of this name here is another Area: nothing stays out.
+      final other = fresh('c');
+      addTearDown(other.close);
+      final mine = Places(other).addArea('Diary');
+      final elsewhere = await openBackupNotes(
+        other,
+        path,
+        key,
+        closed: {mine.id},
+      );
+      expect(texts(elsewhere), texts(open));
+      expect(elsewhere.leftOut, isEmpty);
+
+      // "Tick all" adds nothing of the Diary, nor the Session left with
+      // none of its pool, as a Pack's Session goes only with a Tally.
+      final added = await addBackupNotes(
+        ada,
+        shut,
+        shut.pack.allKeys(),
+        wallClock: wall,
+        suffix: 'Backup',
+        noArea: 'From a Backup',
+      );
+      expect(added.notes, 2);
+      final copies = [for (final id in added.areas) ...Notes(ada).inside(id)]
+          .map((n) => n.text);
+      expect(copies, unorderedEquals(['Old list', 'Call the vet']));
+    });
   });
 
   group('the Backup folder', () {

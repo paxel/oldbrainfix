@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/backup_notes_screen.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
@@ -170,6 +171,7 @@ void main() {
     FolderPlatform folders = const NoFolders(),
     PhotoPlatform? photos,
     PairingPlatform? pairing,
+    AppLock? lock,
   }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -190,7 +192,12 @@ void main() {
                 folders: folders,
                 child: BundleScope(
                   bundles: bundles,
-                  child: child ?? const SizedBox.shrink(),
+                  child: lock == null
+                      ? child ?? const SizedBox.shrink()
+                      : LockScope(
+                          lock: lock,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                 ),
               ),
             ),
@@ -836,6 +843,68 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BackupScreen), findsOneWidget);
       expect(File(picked).existsSync(), isFalse);
+    });
+
+    testWidgets('leaves out the Notes of a locked Area closed now and shows '
+        'them once it is unlocked', (tester) async {
+      // A Backup of this very Device, its Diary locked since.
+      final store = device();
+      final diary = Places(store).addArea('Diary');
+      Notes(store).capture('Dear diary', place: diary.id);
+      await setUpBackups(store, 'correct horse', derive: quickKey);
+      final path = '${dir.path}/own.$backupExtension';
+      await writeBackup(store, path);
+      store
+        ..setPin('1357', iterations: 10)
+        ..setAreaLocked(diary.id, true);
+      final lock = AppLock(store: store);
+      addTearDown(lock.dispose);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        lock: lock,
+      );
+      await openPicked(tester, copy(path));
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-passphrase')),
+        'correct horse',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(find.text('Already here'), findsOneWidget);
+      expect(find.text('Dear diary'), findsNothing);
+      expect(find.text('Diary'), findsNothing);
+      expect(
+        find.text(
+          'The Notes of a locked Area are left out until you unlock '
+          'it.',
+        ),
+        findsOneWidget,
+      );
+
+      // A wrong PIN shows nothing more.
+      final unlock = find.byKey(const ValueKey('backup-notes-unlock'));
+      await tester.tap(unlock);
+      await tester.pumpAndSettle();
+      expect(find.text('Show the Notes of locked Areas'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '0000');
+      await tester.tap(find.widgetWithText(TextButton, 'Unlock'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dear diary'), findsNothing);
+      expect(lock.isAreaClosed(diary.id), isTrue);
+
+      await tester.tap(unlock);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '1357');
+      await tester.tap(find.widgetWithText(TextButton, 'Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dear diary'), findsOneWidget);
+      expect(find.text('Already here'), findsOneWidget);
+      expect(unlock, findsNothing);
+      // Open on this page only: everywhere else it stays closed.
+      expect(lock.isAreaClosed(diary.id), isTrue);
     });
 
     testWidgets('a file changed after it was opened adds nothing and says '

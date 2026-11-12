@@ -7036,6 +7036,7 @@ fn packs_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
 fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResult {
     use oldbrainfix_core::backup::{Problem, add_notes, open_notes, read_header, unlock};
     use oldbrainfix_core::packs::item_keys;
+    use std::collections::HashSet;
     let dir = fixtures().join("backup-notes");
     let expected = read_json(&dir.join("expected.json"))?;
     let at = expected["opened"].as_str().ok_or("opened")?;
@@ -7057,7 +7058,7 @@ fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResul
 
     // Her Notes as the Device that made it read them, nothing kept here.
     let mark = ada.current_seq()?;
-    let opened = open_notes(&ada, &file, &key, |a| a.name.clone())?;
+    let opened = open_notes(&ada, &file, &key, &HashSet::new(), |a| a.name.clone())?;
     assert_eq!(ada.current_seq()?, mark);
     let tree: Vec<Value> = opened.pack.tree().iter().map(pack_item_json).collect();
     assert_eq!(Value::Array(tree), expected["tree"]);
@@ -7068,6 +7069,22 @@ fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResul
     assert_eq!(json!(texts), expected["texts"]);
     assert_eq!(json!(dart_iso(opened.created)), expected["created"]);
     assert_eq!(json!(opened.pack.backup_ticks()), expected["start"]);
+
+    // Her Health a locked Area closed on this Device: none of it shows.
+    let closed = &expected["closed"];
+    let areas: HashSet<String> = closed["areas"]
+        .as_array()
+        .ok_or("closed areas")?
+        .iter()
+        .filter_map(|a| a.as_str().map(str::to_string))
+        .collect();
+    let shut = open_notes(&ada, &file, &key, &areas, |a| a.name.clone())?;
+    let tree: Vec<Value> = shut.pack.tree().iter().map(pack_item_json).collect();
+    assert_eq!(Value::Array(tree), closed["tree"]);
+    assert_eq!(json!(shut.trashed), closed["trashed"]);
+    assert_eq!(json!(shut.left_out), closed["leftOut"]);
+    let texts: Vec<_> = shut.pack.notes.iter().map(|n| n.text.clone()).collect();
+    assert_eq!(json!(texts), closed["texts"]);
 
     // Some of them added back, their photo and recording from the Backup.
     let mut ticks = opened.pack.backup_ticks();
@@ -7109,11 +7126,13 @@ fn notes_are_taken_back_from_a_backup_as_the_dart_core_takes_them() -> TestResul
     };
     let refusal =
         |path: &std::path::Path, key: &[u8; 32]| -> Result<String, Box<dyn std::error::Error>> {
-            Ok(match open_notes(&ada, path, key, |a| a.name.clone()) {
-                Ok(_) => "opened".to_string(),
-                Err(oldbrainfix_core::Error::Backup(p)) => name(p).to_string(),
-                Err(e) => return Err(e.into()),
-            })
+            Ok(
+                match open_notes(&ada, path, key, &HashSet::new(), |a| a.name.clone()) {
+                    Ok(_) => "opened".to_string(),
+                    Err(oldbrainfix_core::Error::Backup(p)) => name(p).to_string(),
+                    Err(e) => return Err(e.into()),
+                },
+            )
         };
     let bytes = std::fs::read(&file)?;
     let line = String::from_utf8(header.line.clone())?;

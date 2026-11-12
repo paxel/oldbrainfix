@@ -9674,6 +9674,24 @@ abstract class AppLocalizations {
   /// **'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.'**
   String get backupNotesHint;
 
+  /// Over the tree of a Backup's Notes when the Notes of locked Areas that are closed now are not shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The Notes of a locked Area are left out until you unlock it.} other{The Notes of {count} locked Areas are left out until you unlock them.}}'**
+  String backupNotesLocked(int count);
+
+  /// Button under 'backupNotesLocked': asks for the PIN, opens those locked Areas and shows their Notes in the tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock and show them'**
+  String get backupNotesUnlock;
+
+  /// Title of the PIN or biometrics request behind 'backupNotesUnlock'.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the Notes of locked Areas'**
+  String get backupNotesUnlockTitle;
+
   /// Under a Note of a Backup's tree that lay in the Trash when the Backup was made.
   ///
   /// In en, this message translates to:

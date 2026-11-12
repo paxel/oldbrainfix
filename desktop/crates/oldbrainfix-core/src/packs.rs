@@ -805,6 +805,16 @@ pub type BytesOf<'a> = dyn Fn(&str, &str) -> Option<Vec<u8>> + 'a;
 /// held, none for none.
 pub type SizeOf<'a> = dyn Fn(&str, &str) -> Option<usize> + 'a;
 
+/// [`Store::pack_of_everything`]'s Pack, as the Dart core's record.
+#[derive(Debug, Clone)]
+pub struct EverythingPack {
+    pub pack: Pack,
+    /// The indices of the Notes that lay in the trash.
+    pub trashed: BTreeSet<usize>,
+    /// The Areas of `closed` whose Notes stayed out.
+    pub left_out: BTreeSet<String>,
+}
+
 fn routine_json(s: &Schedule) -> Value {
     let mut pairs = Vec::new();
     if let Some(rule) = &s.rule {
@@ -1481,17 +1491,18 @@ impl Store {
     /// the Dart core's `packOfEverything`: every Note this Store holds but
     /// those merged into another, those in the trash among them, each
     /// Area in the person's own order by `shown` with its own Notes and
-    /// then its Topics' Notes, then the Notes filed into no Area, newest
-    /// capture first, as [`Store::pack_of_all_by`] lists them; the Tallies
-    /// a Session picks from that are not among them after them. The
+    /// then its Topics' Notes, but those of `closed`, then the Notes filed
+    /// into no Area, newest capture first, as [`Store::pack_of_all_by`]
+    /// lists them; the Tallies a Session picks from that are not among
+    /// them after them, but for those filed into an Area of `closed`. The
     /// files' sizes come from `size_of`, `photo` or `audio` and a hash to
-    /// the size of the bytes held, none for none. Beside the Pack, the
-    /// indices of the Notes that lay in the trash.
+    /// the size of the bytes held, none for none.
     pub fn pack_of_everything(
         &self,
+        closed: &HashSet<String>,
         shown: impl Fn(&Area) -> String,
         size_of: &SizeOf,
-    ) -> Result<(Pack, BTreeSet<usize>)> {
+    ) -> Result<EverythingPack> {
         let places = Places::new(self);
         let notes = Notes::new(self);
         let mut kept = Vec::new();
@@ -1504,10 +1515,19 @@ impl Store {
         }
         kept.sort_by(|a, b| b.captured.cmp(&a.captured).then_with(|| a.id.cmp(&b.id)));
         let mut ids = Vec::new();
+        let mut left_out = BTreeSet::new();
         for area in PersonSettings::new(self).areas_in_order_by(shown)? {
             let topics = places.topics(&area.id)?;
-            ids.push(area.id);
-            ids.extend(topics.into_iter().map(|t| t.id));
+            let mut here = vec![area.id.clone()];
+            here.extend(topics.into_iter().map(|t| t.id));
+            if !closed.contains(&area.id) {
+                ids.extend(here);
+            } else if kept
+                .iter()
+                .any(|n| n.place.as_ref().is_some_and(|p| here.contains(p)))
+            {
+                left_out.insert(area.id);
+            }
         }
         let mut picked: Vec<Note> = ids
             .iter()
@@ -1518,14 +1538,18 @@ impl Store {
             .cloned()
             .collect();
         picked.extend(kept.iter().filter(|n| n.place.is_none()).cloned());
-        let (pack, order) = self.pack_of_notes_by(&picked, &HashSet::new(), size_of)?;
+        let (pack, order) = self.pack_of_notes_by(&picked, closed, size_of)?;
         let mut trashed = BTreeSet::new();
         for (i, id) in order.iter().enumerate() {
             if notes.by_id(id)?.is_some_and(|n| n.is_trashed()) {
                 trashed.insert(i);
             }
         }
-        Ok((pack, trashed))
+        Ok(EverythingPack {
+            pack,
+            trashed,
+            left_out,
+        })
     }
 
     /// The Pack of `picked`, in their order, and the Tallies their

@@ -5998,6 +5998,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wähl die Notizen aus, die zurückkommen. Jede kommt als Kopie in einen neuen Bereich, mit ihren Dateien; die Notizen auf diesem Gerät bleiben, wie sie sind.';
 
   @override
+  String backupNotesLocked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Die Notizen von $count gesperrten Bereichen fehlen, bis du sie entsperrst.',
+      one: 'Die Notizen eines gesperrten Bereichs fehlen, bis du ihn entsperrst.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNotesUnlock => 'Entsperren und zeigen';
+
+  @override
+  String get backupNotesUnlockTitle => 'Notizen gesperrter Bereiche zeigen';
+
+  @override
   String get backupNoteTrashed => 'Im Papierkorb';
 
   @override

@@ -455,9 +455,14 @@ replace a law of Both apps where they say so. A desktop law marked
   restoring refuses, announced at the top. Then the same page shows the
   Pack's tree under the Backup's date: no Note ticked, everything under
   each; a Note from the Backup's Trash says "In the Trash" under its
-  name, not by colour alone. "Untick all" goes back to that start, "Add"
-  is announced as a Pack's and closes the page; a failed Add leaves the
-  page open and the log as it was.
+  name, not by colour alone. The Notes of a locked Area closed now are
+  not in the tree; a line over it says so, never naming the Area, and
+  "Unlock and show them" asks for the PIN or biometrics and reads the
+  Backup again with their Notes, the ticks back at the start; the
+  Areas stay closed everywhere but on this page.
+  "Untick all" goes back to that start, "Add" is announced as a Pack's
+  and closes the page; a failed Add leaves the page open and the log as
+  it was.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.

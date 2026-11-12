@@ -1141,12 +1141,16 @@ fn hand_roles(store: &Store, old: &SigningKey) -> Result<usize> {
 /// ([`add_notes`]), so the file must stay where it is until then.
 #[derive(Clone)]
 pub struct OpenedBackup {
-    /// Every Note of the Backup but those merged into another, those in
-    /// its trash among them, as [`Store::pack_of_everything`] lists them;
-    /// its files without their bytes.
+    /// Every Note of the Backup but those merged into another and those
+    /// of a locked Area closed on this Device, those in its trash among
+    /// them, as [`Store::pack_of_everything`] lists them; its files
+    /// without their bytes.
     pub pack: Pack,
     /// The indices in `pack` of the Notes that lay in the Backup's trash.
     pub trashed: BTreeSet<usize>,
+    /// The locked Areas closed on this Device whose Notes in the Backup
+    /// were left out of `pack`.
+    pub left_out: BTreeSet<String>,
     /// When the Backup was made.
     pub created: DateTime<Utc>,
     path: PathBuf,
@@ -1160,6 +1164,7 @@ impl std::fmt::Debug for OpenedBackup {
         f.debug_struct("OpenedBackup")
             .field("pack", &self.pack)
             .field("trashed", &self.trashed)
+            .field("left_out", &self.left_out)
             .field("created", &self.created)
             .field("path", &self.path)
             .finish_non_exhaustive()
@@ -1174,13 +1179,18 @@ impl std::fmt::Debug for OpenedBackup {
 /// Profile and the keys it pinned, so the person's own Devices and the
 /// roles of the Shared Areas count as they did there; its blobs are
 /// checked against their hashes and only their sizes kept. `shown` names
-/// the Areas as the app shows them, for their order. The same refusals
-/// as [`restore`]: [`Problem::NotABackup`], [`Problem::NeedsUpdate`],
+/// the Areas as the app shows them, for their order. The Notes of
+/// `closed`, the locked Areas closed on this Device, stay out, as the app
+/// shows them nowhere then (ADR 0043); an Area of the Backup that is no
+/// Area here has no lock here, and the desktop, without Area Locks,
+/// hands in none. The same refusals as [`restore`]:
+/// [`Problem::NotABackup`], [`Problem::NeedsUpdate`],
 /// [`Problem::WrongSecret`] or [`Problem::Damaged`].
 pub fn open_notes(
     store: &Store,
     path: &Path,
     backup_key: &[u8; KEY_BYTES],
+    closed: &HashSet<String>,
     shown: impl Fn(&Area) -> String,
 ) -> Result<OpenedBackup> {
     let (header, content_key) = opened(path, backup_key)?;
@@ -1211,10 +1221,11 @@ pub fn open_notes(
         Ok(())
     })?;
     let size_of = |kind: &str, hash: &str| sizes.get(&format!("{kind}/{hash}")).copied();
-    let (pack, trashed) = view.pack_of_everything(shown, &size_of)?;
+    let everything = view.pack_of_everything(closed, shown, &size_of)?;
     Ok(OpenedBackup {
-        pack,
-        trashed,
+        pack: everything.pack,
+        trashed: everything.trashed,
+        left_out: everything.left_out,
         created: header.created,
         path: path.to_path_buf(),
         line: header.line,
@@ -2055,7 +2066,7 @@ mod tests {
         Notes::new(&store).capture("Already here", None, None)?;
         let seq = store.current_seq()?;
         let before = settings(&store)?;
-        let opened = open_notes(&store, &path, &key, by_name)?;
+        let opened = open_notes(&store, &path, &key, &HashSet::new(), by_name)?;
         assert_eq!(store.current_seq()?, seq);
         assert_eq!(settings(&store)?, before);
         assert!(held_blobs(&store)?.is_empty());
@@ -2068,9 +2079,9 @@ mod tests {
         assert_eq!(opened.trashed, BTreeSet::from([0]));
         // As the Device that made it reads it, files and sizes alike.
         let held = |kind: &str, hash: &str| old.blob(kind, hash).map(|b| b.len());
-        let (there, trashed) = old.pack_of_everything(by_name, &held)?;
-        assert_eq!(opened.pack.tree(), there.tree());
-        assert_eq!(opened.trashed, trashed);
+        let there = old.pack_of_everything(&HashSet::new(), by_name, &held)?;
+        assert_eq!(opened.pack.tree(), there.pack.tree());
+        assert_eq!(opened.trashed, there.trashed);
         let pills = opened.pack.notes.get(1).ok_or(damaged_err())?;
         assert_eq!(pills.photos.first().map(|p| p.size), Some(150_000));
         assert_eq!(pills.recordings.first().map(|a| a.size), Some(900));
@@ -2097,7 +2108,7 @@ mod tests {
         let store = device(dir.path(), "p", &held(20), 2)?;
         Places::new(&store).add_area("Doctor")?;
         let before = settings(&store)?;
-        let opened = open_notes(&store, &path, &key, by_name)?;
+        let opened = open_notes(&store, &path, &key, &HashSet::new(), by_name)?;
         let mut ticks = opened.pack.backup_ticks();
         for i in [0, 1] {
             ticks = opened.pack.tick(&ticks, &item_keys::note(i), true);
@@ -2155,7 +2166,7 @@ mod tests {
         let (_old, path, key) = with_notes(dir.path())?;
         let store = device(dir.path(), "r", &held(20), 2)?;
         assert!(refused(
-            open_notes(&store, &path, &[0; 32], by_name),
+            open_notes(&store, &path, &[0; 32], &HashSet::new(), by_name),
             Problem::WrongSecret
         ));
         let bytes = std::fs::read(&path)?;
@@ -2176,7 +2187,10 @@ mod tests {
             let file = dir.path().join(format!("r{n}.{EXTENSION}"));
             std::fs::write(&file, changed)?;
             assert!(
-                refused(open_notes(&store, &file, &key, by_name), want),
+                refused(
+                    open_notes(&store, &file, &key, &HashSet::new(), by_name),
+                    want
+                ),
                 "variant {n}"
             );
         }
@@ -2189,7 +2203,7 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let (old, path, key) = with_notes(dir.path())?;
         let store = device(dir.path(), "c", &held(20), 2)?;
-        let opened = open_notes(&store, &path, &key, by_name)?;
+        let opened = open_notes(&store, &path, &key, &HashSet::new(), by_name)?;
         // Another Backup of the same Device in its place.
         Notes::new(&old).capture("Written since", None, None)?;
         write_backup(&old, &path, &mut system_random)?;
@@ -2232,7 +2246,7 @@ mod tests {
         let path = dir.path().join(format!("crafted.{EXTENSION}"));
         std::fs::write(&path, file)?;
         assert!(refused(
-            open_notes(&store, &path, &backup_key, by_name),
+            open_notes(&store, &path, &backup_key, &HashSet::new(), by_name),
             Problem::Damaged
         ));
         Ok(())
@@ -2272,9 +2286,75 @@ mod tests {
         write_backup(&ada, &path, &mut system_random)?;
         let store = device(dir.path(), "w", &held(26), 2)?;
         let key = recovery::decode_code(&code).ok_or(damaged_err())?;
-        let opened = open_notes(&store, &path, &key, by_name)?;
+        let opened = open_notes(&store, &path, &key, &HashSet::new(), by_name)?;
         let names: Vec<&str> = opened.pack.areas.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, ["Work", "Health"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_notes_of_a_locked_area_closed_here_stay_out_but_not_of_one_that_is_none_here()
+    -> Result<()> {
+        use crate::sessions::{SessionRule, Sessions};
+        use crate::tallies::Tallies;
+        let dir = tempfile::tempdir()?;
+        let ada = device(dir.path(), "ada", &held(1), 1)?;
+        let places = Places::new(&ada);
+        let notes = Notes::new(&ada);
+        let diary = places.add_area("Diary")?;
+        let dreams = places.add_topic(&diary.id, "Dreams")?;
+        let health = places.add_area("Health")?;
+        notes.capture("Dear diary", Some(&diary.id), None)?;
+        notes.capture("Flying", Some(&dreams.id), None)?;
+        let torn = notes.capture("Torn page", Some(&diary.id), None)?;
+        notes.trash(&torn.id)?;
+        let laps = notes.capture("Laps", Some(&diary.id), None)?;
+        Tallies::new(&ada).add_field(&laps.id, "Laps", "", Some(10.0), None)?;
+        let training = notes.capture("Training", Some(&health.id), None)?;
+        let pool = std::slice::from_ref(&laps.id);
+        Sessions::new(&ada).make(&training.id, pool, 1, SessionRule::Least)?;
+        let old = notes.capture("Old list", Some(&health.id), None)?;
+        notes.trash(&old.id)?;
+        notes.capture("Call the vet", None, None)?;
+        let code = set_up(&ada, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("closed.{EXTENSION}"));
+        write_backup(&ada, &path, &mut system_random)?;
+        let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        let texts = |o: &OpenedBackup| -> Vec<String> {
+            o.pack.notes.iter().map(|n| n.text.clone()).collect()
+        };
+
+        // Its own Backup, the Diary closed here.
+        let closed = HashSet::from([diary.id.clone()]);
+        let shut = open_notes(&ada, &path, &key, &closed, by_name)?;
+        let names: Vec<&str> = shut.pack.areas.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["Health"]);
+        assert_eq!(texts(&shut), ["Old list", "Training", "Call the vet"]);
+        assert_eq!(shut.trashed, BTreeSet::from([0]));
+        assert_eq!(shut.left_out, BTreeSet::from([diary.id.clone()]));
+        let open = open_notes(&ada, &path, &key, &HashSet::new(), by_name)?;
+        for t in ["Dear diary", "Flying", "Torn page", "Laps"] {
+            assert!(texts(&open).iter().any(|n| n == t), "{t}");
+        }
+        assert!(open.left_out.is_empty());
+        // An Area of this name here is another Area: nothing stays out.
+        let other = device(dir.path(), "other", &held(2), 2)?;
+        let mine = Places::new(&other).add_area("Diary")?;
+        let elsewhere = open_notes(&other, &path, &key, &HashSet::from([mine.id]), by_name)?;
+        assert_eq!(texts(&elsewhere), texts(&open));
+        assert!(elsewhere.left_out.is_empty());
+
+        // "Tick all" adds nothing of the Diary, nor the Session left with
+        // none of its pool, as a Pack's Session goes only with a Tally.
+        let all = shut.pack.all_keys();
+        let added = add_notes(&ada, &shut, &all, &utc_wall, "Backup", "From a Backup")?;
+        assert_eq!(added.notes, 2);
+        let mut copies = Vec::new();
+        for area in &added.areas {
+            copies.extend(Notes::new(&ada).inside(area)?.into_iter().map(|n| n.text));
+        }
+        copies.sort();
+        assert_eq!(copies, ["Call the vet", "Old list"]);
         Ok(())
     }
 }

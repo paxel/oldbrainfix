@@ -168,6 +168,48 @@
   "trashed": [
     0
   ],
+  "closed": {
+    "areas": [
+      "area:00000000000000000000000000000001"
+    ],
+    "tree": [
+      {
+        "key": "a0",
+        "kind": "area",
+        "note": null,
+        "index": null,
+        "size": 0,
+        "children": [
+          {
+            "key": "n0",
+            "kind": "note",
+            "note": 0,
+            "index": null,
+            "size": 45,
+            "children": []
+          }
+        ]
+      },
+      {
+        "key": "n1",
+        "kind": "note",
+        "note": 1,
+        "index": null,
+        "size": 40,
+        "children": []
+      }
+    ],
+    "trashed": [
+      0
+    ],
+    "leftOut": [
+      "area:00000000000000000000000000000001"
+    ],
+    "texts": [
+      "Old list",
+      "Call the vet"
+    ]
+  },
   "areas": [
     "Work",
     "Health"

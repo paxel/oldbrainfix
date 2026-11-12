@@ -7503,6 +7503,15 @@ Future<void> _backupNotesFixture(Directory root) async {
             jsonEncode(there.trashed.toList())) {
       throw StateError('the notes fixture reads otherwise than its Device');
     }
+    // Her Health a locked Area closed on this Device: none of it shows.
+    final shut = await openBackupNotes(ada, file, key, closed: {health.id});
+    final closed = {
+      'areas': [health.id],
+      'tree': [for (final i in shut.pack.tree()) item(i)],
+      'trashed': shut.trashed.toList()..sort(),
+      'leftOut': shut.leftOut.toList()..sort(),
+      'texts': [for (final n in shut.pack.notes) n.text],
+    };
     List<String> sorted(Iterable<String> keys) => keys.toList()..sort();
     final texts = [for (final n in backup.pack.notes) n.text];
     final picked = [
@@ -7565,6 +7574,7 @@ Future<void> _backupNotesFixture(Directory root) async {
         'opened': opened.toIso8601String(),
         'tree': tree,
         'trashed': backup.trashed.toList()..sort(),
+        'closed': closed,
         'areas': [for (final a in backup.pack.areas) a.name],
         'texts': texts,
         'start': sorted(backup.pack.backupTicks()),
@@ -10171,8 +10181,9 @@ Future<void> main(List<String> args) async {
     'a day later, the photo and the recording removed, her log '
     '(`device.jsonl`) and keys (`settings.json`); the Backup opened with '
     'the passphrase and the recovery key, its tree with keys, kinds and '
-    'sizes, the Notes that lay in the trash, the keys ticked at the start, '
-    'then Training, Route, the Note in the trash and the one filed nowhere '
+    'sizes, the Notes that lay in the trash, the same with her Health a '
+    'locked Area closed on the Device (`closed`), the keys ticked at the '
+    'start, then Training, Route, the Note in the trash and the one filed nowhere '
     'ticked and added back (`added.jsonl`, ids counted from 0x1301), with '
     'the Areas made, the blobs she holds then, and the refusals of a wrong '
     'key, a later header, a flipped byte, a cut-off file and a file that '

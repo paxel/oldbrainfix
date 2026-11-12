@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'app_lock.dart';
 import 'backup_screen.dart' show isolatePassKey;
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
@@ -104,7 +106,10 @@ void _drop(String path) {
 /// Trash said to be there, none ticked but all under each. "Add" takes
 /// the ticked ones in as copies in new Areas, announced at the top as a
 /// Pack's are, and closes the page; the log is not touched otherwise.
-/// The copy of the file at [path] is the page's: it stays until the page
+/// The Notes of a locked Area closed now stay out of the tree until they
+/// are unlocked on the page, as a Pack exported leaves them out; the
+/// Area stays closed everywhere else. The
+/// copy of the file at [path] is the page's: it stays until the page
 /// closes, as "Add" reads the file again, and goes then.
 class BackupNotesScreen extends StatefulWidget {
   final Store store;
@@ -128,6 +133,12 @@ class BackupNotesScreen extends StatefulWidget {
 
 class _BackupNotesScreenState extends State<BackupNotesScreen> {
   OpenedBackup? _opened;
+
+  /// The key that opened it, to read it again once locked Areas open.
+  Uint8List? _key;
+
+  /// The locked Areas unlocked on this page, open here only.
+  final _unlocked = <String>{};
   Set<String> _ticks = const {};
   var _picked = false;
   var _busy = false;
@@ -146,19 +157,34 @@ class _BackupNotesScreenState extends State<BackupNotesScreen> {
     _picked = pack.picked(ticks).notes.isNotEmpty;
   }
 
-  Future<void> _open(String? passphrase, String? code) async {
+  /// The locked Areas closed now and not unlocked on this page, but
+  /// [unlocking]; their Notes stay out of the tree.
+  Set<String> _closedAreas(Set<String> unlocking) {
+    final lock = LockScope.of(context);
+    return {
+      for (final area in Places(widget.store).areas())
+        if ((lock?.isAreaClosed(area.id) ?? false) &&
+            !_unlocked.contains(area.id) &&
+            !unlocking.contains(area.id))
+          area.id,
+    };
+  }
+
+  /// Reads the Backup with the key [unlock] gives and shows its tree,
+  /// the locked Areas [unlocking] open on this page from then on,
+  /// nothing of a Note ticked; a failure leaves the page as it was.
+  Future<void> _open(
+    Future<Uint8List?> Function() unlock, {
+    Set<String> unlocking = const {},
+  }) async {
     final t = context.t;
+    final closed = _closedAreas(unlocking);
     setState(() => _busy = true);
     // Why it did not open, what to do, and the full text.
     (String, String, String)? failure;
     OpenedBackup? opened;
     try {
-      final key = await unlockBackup(
-        widget.header,
-        passphrase: passphrase,
-        recoveryCode: code,
-        derive: widget.derive,
-      );
+      final key = await unlock();
       if (key == null) {
         failure = (
           t.restoreWrong,
@@ -170,8 +196,10 @@ class _BackupNotesScreenState extends State<BackupNotesScreen> {
           widget.store,
           widget.path,
           key,
+          closed: closed,
           shown: (a) => areaName(t, a),
         );
+        _key = key;
       }
     } on BackupException catch (e) {
       final (cause, fix) = backupRefusal(
@@ -196,8 +224,25 @@ class _BackupNotesScreenState extends State<BackupNotesScreen> {
     setState(() {
       _busy = false;
       _opened = opened;
+      _unlocked.addAll(unlocking);
       _setTicks(pack, pack.backupTicks());
     });
+  }
+
+  /// "Unlock and show them": the PIN or biometrics, then the Backup read
+  /// again with the Notes of the locked Areas [opened] left out. They are
+  /// open on this page only: back on the Agenda they would not close.
+  Future<void> _unlockLeftOut(OpenedBackup opened) async {
+    final lock = LockScope.of(context);
+    final key = _key;
+    if (lock == null || key == null) return;
+    final ok = await confirmOwner(
+      context,
+      lock,
+      title: context.t.backupNotesUnlockTitle,
+    );
+    if (!ok || !mounted) return;
+    await _open(() async => key, unlocking: opened.leftOut);
   }
 
   Future<void> _add(OpenedBackup opened) async {
@@ -278,7 +323,16 @@ class _BackupNotesScreenState extends State<BackupNotesScreen> {
       busy: _busy,
       action: t.backupOpenStart,
       working: t.backupOpenWorking,
-      onUnlock: (passphrase, code) => unawaited(_open(passphrase, code)),
+      onUnlock: (passphrase, code) => unawaited(
+        _open(
+          () => unlockBackup(
+            widget.header,
+            passphrase: passphrase,
+            recoveryCode: code,
+            derive: widget.derive,
+          ),
+        ),
+      ),
     ),
   ];
 
@@ -294,6 +348,19 @@ class _BackupNotesScreenState extends State<BackupNotesScreen> {
       ),
       const SizedBox(height: 8),
       Text(t.backupNotesHint),
+      if (opened.leftOut.isNotEmpty && LockScope.of(context) != null) ...[
+        const SizedBox(height: 8),
+        Text(t.backupNotesLocked(opened.leftOut.length)),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const ValueKey('backup-notes-unlock'),
+            onPressed: _busy ? null : () => unawaited(_unlockLeftOut(opened)),
+            icon: const Icon(Icons.lock_open),
+            label: Text(t.backupNotesUnlock),
+          ),
+        ),
+      ],
       const SizedBox(height: 8),
       PackTreeView(
         pack: pack,

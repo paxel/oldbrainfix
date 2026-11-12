@@ -5927,6 +5927,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tick the Notes to take back. Each comes back as a copy in a new Area, with its files; the Notes on this Device stay as they are.';
 
   @override
+  String backupNotesLocked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'The Notes of $count locked Areas are left out until you unlock them.',
+      one: 'The Notes of a locked Area are left out until you unlock it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNotesUnlock => 'Unlock and show them';
+
+  @override
+  String get backupNotesUnlockTitle => 'Show the Notes of locked Areas';
+
+  @override
   String get backupNoteTrashed => 'In the Trash';
 
   @override
