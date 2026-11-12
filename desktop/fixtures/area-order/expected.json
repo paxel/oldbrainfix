@@ -1,0 +1,154 @@
+{
+  "now": "2026-01-02T10:00:43.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [
+    {
+      "id": "area:00000000000000000000000000000003",
+      "name": "Car",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000005",
+      "name": "Garden",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000002",
+      "name": "Home",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": [
+        {
+          "id": "topic:00000000000000000000000000000008",
+          "areaId": "area:00000000000000000000000000000002",
+          "name": "Kitchen",
+          "starter": null
+        }
+      ]
+    },
+    {
+      "id": "area:00000000000000000000000000000009",
+      "name": "Household",
+      "starter": "household",
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000007",
+      "name": "😀",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000006",
+      "name": "～",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Timesheet",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:07.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000004"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000004"
+  ],
+  "trashed": [],
+  "inside": {
+    "area:00000000000000000000000000000003": [],
+    "area:00000000000000000000000000000005": [],
+    "area:00000000000000000000000000000002": [],
+    "topic:00000000000000000000000000000008": [],
+    "area:00000000000000000000000000000009": [],
+    "area:00000000000000000000000000000007": [],
+    "area:00000000000000000000000000000006": []
+  },
+  "sections": {
+    "note:00000000000000000000000000000004": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Timesheet"
+    }
+  },
+  "search": {
+    "": [
+      "note:00000000000000000000000000000004"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000004"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [],
+    "milk #code": [],
+    "4711": []
+  },
+  "searchWithin": {
+    "area:00000000000000000000000000000003": [],
+    "area:00000000000000000000000000000005": [],
+    "area:00000000000000000000000000000002": [],
+    "topic:00000000000000000000000000000008": [],
+    "area:00000000000000000000000000000009": [],
+    "area:00000000000000000000000000000007": [],
+    "area:00000000000000000000000000000006": []
+  },
+  "conflicts": []
+}

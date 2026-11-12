@@ -95,3 +95,7 @@ Amended by #264 (ADR 0028): `read_note` reports a Tally's `bar` and `sets` and e
 ## Lines checked today (#276)
 
 Amended by #276 (ADR 0030): `read_note` lists a Shopping List's Lines checked Once today after its other Lines, `struck` and `gone`, as they stay struck on the Agenda until the day ends; every Line of a Shopping List carries `gone`. `set_shopping_agenda` and `set_checklist_agenda` say that a list shown as its Lines keeps those checked today struck on the Agenda for the day, unless the Device hides what is checked. No trust rule changed, and the Device's last Shopping List (ADR 0008) has no tool.
+
+## The Areas in the person's own order (#280)
+
+Amended by #280 (ADR 0040): `list_places` lists the Areas in the person's own order, as the apps show them; an Area drafted in the AI Task is missing from the order and comes after those in it, by name among the missing ones. The order is a setting of the person, and no tool writes a setting, so it is read only. No trust rule changed.

@@ -188,7 +188,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "list_places",
-            "Lists the Areas with their Topics, and whether each Area is shared and what this Device may do there.",
+            "Lists the Areas in the person's own order, a setting of the person kept on all of their own Devices that cannot be changed here (Areas missing from it, such as new ones, come last by name), with their Topics, and whether each Area is shared and what this Device may do there.",
             true,
             json!({}),
             &[],
@@ -1325,7 +1325,7 @@ impl Store {
             "list_places" => {
                 let places = Places::new(self);
                 let mut out = Vec::new();
-                for area in places.areas()? {
+                for area in PersonSettings::new(self).areas_in_order()? {
                     let topics: Vec<Value> = places
                         .topics(&area.id)?
                         .iter()
@@ -2533,6 +2533,34 @@ mod tests {
             json_of(&settings)?.pointer("/features"),
             Some(&json!("simple"))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_areas_list_in_the_persons_own_order_and_a_drafted_one_last() -> TestResult {
+        let store = store();
+        let places = Places::new(&store);
+        let work = places.add_area("Work")?.id;
+        let home = places.add_area("Home")?.id;
+        PersonSettings::new(&store).move_area(&work, 0)?;
+        let task = store.open_ai_task()?;
+        let added = call(&store, &task, "add_area", &json!({"name": "Attic"}))?;
+        assert!(!added.is_error, "{added:?}");
+        let listed = json_of(&call(&store, &task, "list_places", &json!({}))?)?;
+        let names: Vec<_> = listed
+            .as_array()
+            .ok_or("a list")?
+            .iter()
+            .filter_map(|a| a.get("name").and_then(Value::as_str))
+            .collect();
+        assert_eq!(names, ["Work", "Home", "Attic"]);
+        let ids: Vec<_> = PersonSettings::new(&store)
+            .areas_in_order()?
+            .into_iter()
+            .map(|a| a.id)
+            .take(2)
+            .collect();
+        assert_eq!(ids, [work, home]);
         Ok(())
     }
 

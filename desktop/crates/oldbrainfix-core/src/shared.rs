@@ -16,6 +16,7 @@ use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
 use crate::keys::{AreaKey, PERSONAL_SCOPE};
 use crate::notes::keys as note_keys;
+use crate::person_settings::PersonSettings;
 use crate::places::keys as place_keys;
 use crate::places::{Places, starter_id};
 use crate::routines::keys as routine_keys;
@@ -762,6 +763,8 @@ impl Store {
             return Ok(area.to_string());
         }
         self.batch(|| {
+            let settings = PersonSettings::new(self);
+            let before = settings.areas_in_order()?;
             let starter = self
                 .current(area, place_keys::STARTER)?
                 .map(|slug| starter_id(place_keys::TYPE_AREA, &slug));
@@ -770,6 +773,21 @@ impl Store {
             } else {
                 area.to_string()
             };
+            // A starter Area shared under a new id keeps its place in the
+            // person's own order (#280).
+            if id != area {
+                let moved: Vec<&str> = before
+                    .iter()
+                    .map(|a| {
+                        if a.id == area {
+                            id.as_str()
+                        } else {
+                            a.id.as_str()
+                        }
+                    })
+                    .collect();
+                settings.set_area_order(&moved)?;
+            }
             let me = self.device_id()?;
             // Without a Profile yet (only in tests) the Device stands for
             // it.

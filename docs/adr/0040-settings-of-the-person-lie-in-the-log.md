@@ -40,3 +40,13 @@ The cross-core fixture `done-trash` writes the same log from both cores.
 ## Simple or Advanced (ADR 0041)
 
 Amended by #197: the second setting of the person, Simple or Advanced, is the field `features` of the same entity, `simple` or `advanced`; never chosen and any other value read as Advanced (ADR 0041).
+
+## The Areas in the person's own order (#280)
+
+Amended by #280 (Q676 (a)): the user drags the Areas into an order of their own. It is the third setting of the person, so the other people of a Shared Area keep their own order. It is the field `areaOrder` of the same entity: a JSON list of Area ids, first to last, with no version. It is read from the log alone, by the user's own Devices' entries, the newest winning, as the other two settings are. An order another person's Device slips into the log changes nothing.
+
+Reading it (`areasInOrder`, `areas_in_order`) lists the Areas named in the order first, as it has them. Then come the Areas missing from it, by name, as the Areas are listed without an order: a new Area, or a Shared Area joined later. Ids that are no Area here, Topics among them, are skipped, as are repeats after the first and anything that is not a string. A value that is not a JSON list reads as no order, so all Areas show by name, as before.
+
+Moving an Area (`moveArea`, `move_area`) or setting the order (`setAreaOrder`, `set_area_order`) stores the whole order as shown. A later Area therefore goes to the end. Ids that are no Area here are dropped. An order equal to the one shown writes nothing, so nothing is stored while the user never moves an Area off its place by name. Moving an id that is no Area is refused. A starter Area shared under fresh ids (ADR 0013) keeps its place: sharing writes the order with the new id where the old one stood. `Places.areas`/`Places::areas` stay by name for everything that is not the Areas list: Packs, Imports, Backups and the transcript prompts.
+
+The cross-core fixture `area-order` writes the same log from both cores and reads the same order after each step.

@@ -478,6 +478,72 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'area-order',
+    about:
+        'The person\'s own order of the Areas (#280): by name with no order; '
+        'one moved to the front, and there again, which writes nothing; a '
+        'new Area going to the end, then two more, "～" and "😀", missing '
+        'from the order by name; one moved past the end; an order naming '
+        'only some, with an id that is no Area; a stored order with an id '
+        'that is no Area, a Topic, a number, null and a repeat; values no '
+        'app writes; an order dated back that loses; one moved on the '
+        'Areas by name; an Area deleted, its Note back to Unsorted; a '
+        'starter Area moved to the front and shared under a new id, keeping '
+        'its place. '
+        '`area_order.json` holds the Areas in order after each length of '
+        'the log.',
+    build: (store) {
+      final places = Places(store);
+      void read() => _areaOrderReads.add({
+        'entries': store.allEntries().length,
+        'areas': [for (final area in store.areasInOrder()) area.id],
+      });
+      void order(String value, {DateTime? date}) => store.append(
+        PersonSettingKeys.entity,
+        PersonSettingKeys.areaOrder,
+        value,
+        date: date,
+      );
+      final work = places.addArea('Work').id;
+      final home = places.addArea('Home').id;
+      final car = places.addArea('Car').id;
+      Notes(store).capture('Timesheet', place: work);
+      read();
+      store.moveArea(work, 0);
+      read();
+      store.moveArea(work, 0);
+      read();
+      places.addArea('Garden');
+      read();
+      final wave = places.addArea('～').id;
+      final smile = places.addArea('😀').id;
+      read();
+      store.moveArea(car, 99);
+      read();
+      store.setAreaOrder([smile, 'area:gone', home]);
+      read();
+      final topic = places.addTopic(home, 'Kitchen').id;
+      order(jsonEncode([wave, 'area:gone', topic, 7, null, wave, car]));
+      read();
+      for (final value in ['not json', '{"a":1}', '"$work"', '']) {
+        order(value);
+        read();
+      }
+      order(jsonEncode([car, work]), date: DateTime.utc(2025, 1, 1));
+      read();
+      store.moveArea(home, 1);
+      read();
+      places.deleteArea(work, NotesGo.unsorted);
+      read();
+      places.plantStarterSet({'household'});
+      final household = Places.starterId(PlaceKeys.typeArea, 'household');
+      store.moveArea(household, 0);
+      read();
+      store.share(household);
+      read();
+    },
+  ),
+  (
     name: 'help',
     about:
         'The help Notes (#180, ADR 0042): a fresh install makes Quick start, '
@@ -4290,6 +4356,9 @@ var _imported = <ImportSummary>[];
 
 /// What the `features` scenario read after each of its steps.
 final _featureReads = <Map<String, Object>>[];
+
+/// What the `area-order` scenario read after each of its steps.
+final _areaOrderReads = <Map<String, Object>>[];
 
 /// The ids each step of the `help` scenario made.
 final _helpMade = <List<String>>[];
@@ -9573,6 +9642,9 @@ Future<void> main(List<String> args) async {
     'choice (#219) and whether the choice applies to it.\n'
     '- `features/features.json`: whether the first entries of the '
     '`features` log, as many as each read gives, read as Advanced.\n'
+    '- `area-order/area_order.json`: the ids of the Areas in the person\'s '
+    'own order after the first entries of the `area-order` log, as many as '
+    'each read gives.\n'
     '- `help/help.json`: the ids of the help Notes each step of the `help` '
     'scenario made, in the order it made them.\n'
     '- `list-switch/kinds.json`: the kind of each Note of the '
@@ -10047,6 +10119,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/features.json'),
           '${_json.convert({'reads': _featureReads})}\n',
+        );
+      }
+      if (scenario.name == 'area-order') {
+        _write(
+          File('${out.path}/area_order.json'),
+          '${_json.convert({'reads': _areaOrderReads})}\n',
         );
       }
       if (scenario.name == 'help') {

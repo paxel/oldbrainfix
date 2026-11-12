@@ -7,8 +7,11 @@
 
 use std::collections::HashMap;
 
-use crate::Result;
+use serde_json::{Value, json};
+
+use crate::places::{Area, Places};
 use crate::store::Store;
+use crate::{Error, Result};
 
 /// Where the person's own settings lie in the log.
 pub mod keys {
@@ -26,6 +29,11 @@ pub mod keys {
     pub const FEATURES: &str = "features";
     pub const SIMPLE: &str = "simple";
     pub const ADVANCED: &str = "advanced";
+    /// The person's own order of the Areas (#280): a JSON list of Area
+    /// ids, first to last. Ids that are no Area here, repeats and
+    /// anything not a string are skipped; absent, null or anything not a
+    /// list reads as no order, so the Areas show by name.
+    pub const AREA_ORDER: &str = "areaOrder";
 }
 
 /// The person's own settings in the log.
@@ -85,6 +93,95 @@ impl<'a> PersonSettings<'a> {
     fn features(&self) -> Result<Option<String>> {
         self.store
             .own_current(keys::ENTITY, keys::FEATURES, &mut HashMap::new())
+    }
+
+    /// Every Area in the person's own order (#280), as the Areas list and
+    /// the sidebar show them: those in the stored order first, as it has
+    /// them, then the Areas missing from it (a new one, a Shared Area
+    /// joined later) by name, as [`Places::areas`] lists them. With no
+    /// order stored, all of them by name.
+    pub fn areas_in_order(&self) -> Result<Vec<Area>> {
+        let mut by_name: Vec<Option<Area>> = Places::new(self.store)
+            .areas()?
+            .into_iter()
+            .map(Some)
+            .collect();
+        let mut ordered = Vec::new();
+        for id in self.held_area_order()? {
+            let slot = by_name
+                .iter_mut()
+                .find(|a| a.as_ref().is_some_and(|a| a.id == id));
+            ordered.extend(slot.and_then(Option::take));
+        }
+        ordered.extend(by_name.into_iter().flatten());
+        Ok(ordered)
+    }
+
+    /// Puts the Area `area_id` at `index` of [`Self::areas_in_order`],
+    /// counted after it was taken out, for all of the user's own Devices.
+    /// An index past the end puts it last. The whole order is stored, so
+    /// a new Area goes to the end. Refused when `area_id` is no Area.
+    pub fn move_area(&self, area_id: &str, index: usize) -> Result<()> {
+        let mut ids = self.shown_area_ids()?;
+        let Some(at) = ids.iter().position(|id| id == area_id) else {
+            return Err(Error::Invalid(format!("not an Area: {area_id}")));
+        };
+        let id = ids.remove(at);
+        ids.insert(index.min(ids.len()), id);
+        self.store_area_order(&ids)
+    }
+
+    /// Puts the Areas in the order of `area_ids` for all of the user's
+    /// own Devices; the Areas it leaves out follow in the order they had.
+    /// Ids that are no Area are skipped.
+    pub fn set_area_order<S: AsRef<str>>(&self, area_ids: &[S]) -> Result<()> {
+        let shown = self.shown_area_ids()?;
+        let mut ids: Vec<String> = Vec::new();
+        for id in area_ids.iter().map(AsRef::as_ref) {
+            if shown.iter().any(|s| s == id) && !ids.iter().any(|i| i == id) {
+                ids.push(id.to_string());
+            }
+        }
+        for id in shown {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        self.store_area_order(&ids)
+    }
+
+    fn shown_area_ids(&self) -> Result<Vec<String>> {
+        Ok(self.areas_in_order()?.into_iter().map(|a| a.id).collect())
+    }
+
+    /// Stores `ids` as the order; the order already shown writes nothing.
+    fn store_area_order(&self, ids: &[String]) -> Result<()> {
+        if self.shown_area_ids()? == ids {
+            return Ok(());
+        }
+        let value = json!(ids).to_string();
+        self.store
+            .append(keys::ENTITY, keys::AREA_ORDER, Some(&value), None)
+            .map(drop)
+    }
+
+    /// The ids of the stored order, as written by the user's own Devices,
+    /// the newest such entry winning; empty when there is none or it is
+    /// not a list.
+    fn held_area_order(&self) -> Result<Vec<String>> {
+        let held = self
+            .store
+            .own_current(keys::ENTITY, keys::AREA_ORDER, &mut HashMap::new())?;
+        let Some(Ok(Value::Array(list))) = held.map(|v| serde_json::from_str::<Value>(&v)) else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .into_iter()
+            .filter_map(|v| match v {
+                Value::String(id) => Some(id),
+                _ => None,
+            })
+            .collect())
     }
 }
 
@@ -319,6 +416,189 @@ mod tests {
         let mut report = ImportReport::default();
         ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
         assert!(PersonSettings::new(&ann).advanced()?);
+        Ok(())
+    }
+
+    fn names(store: &Store) -> Made<Vec<String>> {
+        let areas = PersonSettings::new(store).areas_in_order()?;
+        Ok(areas.into_iter().map(|a| a.name).collect())
+    }
+
+    fn ids(store: &Store) -> Made<Vec<String>> {
+        let areas = PersonSettings::new(store).areas_in_order()?;
+        Ok(areas.into_iter().map(|a| a.id).collect())
+    }
+
+    /// Ann with the Areas Work, Home and Car, by their names.
+    fn three_areas() -> Made<(Store, String, String, String)> {
+        let ann = device(1, "Ann")?;
+        let places = Places::new(&ann);
+        let work = places.add_area("Work")?.id;
+        let home = places.add_area("Home")?.id;
+        let car = places.add_area("Car")?.id;
+        Ok((ann, work, home, car))
+    }
+
+    #[test]
+    fn areas_by_name_until_moved_and_the_same_place_again_writes_nothing() -> TestResult {
+        let (ann, work, home, car) = three_areas()?;
+        let settings = PersonSettings::new(&ann);
+        assert_eq!(names(&ann)?, ["Car", "Home", "Work"]);
+        settings.move_area(&work, 0)?;
+        assert_eq!(names(&ann)?, ["Work", "Car", "Home"]);
+        assert_eq!(
+            ann.current(keys::ENTITY, keys::AREA_ORDER)?,
+            Some(json!([work, car, home]).to_string())
+        );
+        let written = ann.all_entries()?.len();
+        settings.move_area(&work, 0)?;
+        settings.set_area_order(&[&work, &car])?;
+        assert_eq!(ann.all_entries()?.len(), written);
+        settings.move_area(&car, 99)?;
+        assert_eq!(names(&ann)?, ["Work", "Home", "Car"]);
+        let by_name: Vec<_> = Places::new(&ann)
+            .areas()?
+            .into_iter()
+            .map(|a| a.name)
+            .collect();
+        assert_eq!(by_name, ["Car", "Home", "Work"]);
+        Ok(())
+    }
+
+    #[test]
+    fn nothing_is_stored_while_the_order_stays_by_name() -> TestResult {
+        let (ann, _, home, car) = three_areas()?;
+        let settings = PersonSettings::new(&ann);
+        settings.move_area(&car, 0)?;
+        settings.set_area_order(&[&car, &home])?;
+        assert!(ann.logged_history(keys::ENTITY)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn new_areas_go_to_the_end_and_those_missing_from_the_order_by_name() -> TestResult {
+        let (ann, work, _, car) = three_areas()?;
+        let settings = PersonSettings::new(&ann);
+        let places = Places::new(&ann);
+        settings.move_area(&work, 0)?;
+        places.add_area("Garden")?;
+        assert_eq!(names(&ann)?, ["Work", "Car", "Home", "Garden"]);
+        let attic = places.add_area("Attic")?.id;
+        assert_eq!(names(&ann)?, ["Work", "Car", "Home", "Attic", "Garden"]);
+        settings.move_area(&attic, 1)?;
+        places.delete_area(&car, crate::NotesGo::Unsorted)?;
+        assert_eq!(names(&ann)?, ["Work", "Attic", "Home", "Garden"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_areas_left_out_of_a_new_order_keep_the_order_they_had() -> TestResult {
+        let (ann, work, home, _) = three_areas()?;
+        let settings = PersonSettings::new(&ann);
+        settings.move_area(&work, 0)?;
+        settings.set_area_order(&[home.as_str(), "area:gone", home.as_str()])?;
+        assert_eq!(names(&ann)?, ["Home", "Work", "Car"]);
+        Ok(())
+    }
+
+    #[test]
+    fn moving_what_is_no_area_is_refused() -> TestResult {
+        let (ann, _, home, _) = three_areas()?;
+        let settings = PersonSettings::new(&ann);
+        assert!(settings.move_area("area:gone", 0).is_err());
+        let topic = Places::new(&ann).add_topic(&home, "Garden")?;
+        assert!(settings.move_area(&topic.id, 0).is_err());
+        assert!(ann.logged_history(keys::ENTITY)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn ids_that_are_no_area_repeats_and_other_values_are_skipped() -> TestResult {
+        let (ann, work, home, _) = three_areas()?;
+        let topic = Places::new(&ann).add_topic(&home, "Garden")?.id;
+        let order = json!([work, "area:gone", topic, 7, null, work]).to_string();
+        ann.append(keys::ENTITY, keys::AREA_ORDER, Some(&order), None)?;
+        assert_eq!(names(&ann)?, ["Work", "Car", "Home"]);
+        for value in ["not json", r#"{"a":1}"#, r#""area:x""#, "", "null"] {
+            ann.append(keys::ENTITY, keys::AREA_ORDER, Some(value), None)?;
+            assert_eq!(names(&ann)?, ["Car", "Home", "Work"], "{value}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn an_area_order_dated_back_loses_to_the_newer_one() -> TestResult {
+        let (ann, work, home, _) = three_areas()?;
+        PersonSettings::new(&ann).move_area(&work, 0)?;
+        let old = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")?.to_utc();
+        let order = json!([home]).to_string();
+        ann.append(keys::ENTITY, keys::AREA_ORDER, Some(&order), Some(old))?;
+        assert_eq!(names(&ann)?, ["Work", "Car", "Home"]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_area_order_travels_between_own_devices() -> TestResult {
+        let (ann, work, home, _) = three_areas()?;
+        let desk = device(3, "Ann at the desk")?;
+        exchange(&desk, &ann, false)?;
+        remember(&ann, &desk, false)?;
+        remember(&desk, &ann, false)?;
+        PersonSettings::new(&ann).move_area(&work, 0)?;
+        exchange(&desk, &ann, false)?;
+        assert_eq!(names(&desk)?, ["Work", "Car", "Home"]);
+        PersonSettings::new(&desk).move_area(&home, 0)?;
+        exchange(&desk, &ann, false)?;
+        assert_eq!(names(&ann)?, ["Home", "Work", "Car"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_starter_area_keeps_its_place_when_it_is_shared() -> TestResult {
+        let (ann, ..) = three_areas()?;
+        let places = Places::new(&ann);
+        places.plant_starter_set(&["household"])?;
+        let house = places
+            .areas()?
+            .into_iter()
+            .find(|a| a.starter.as_deref() == Some("household"))
+            .ok_or("the starter Area")?;
+        PersonSettings::new(&ann).move_area(&house.id, 0)?;
+        let before = names(&ann)?;
+        let shared = ann.share(&house.id)?;
+        assert_ne!(shared, house.id);
+        assert_eq!(names(&ann)?, before);
+        assert_eq!(ids(&ann)?.first(), Some(&shared));
+        Ok(())
+    }
+
+    #[test]
+    fn the_order_of_the_areas_never_reaches_another_person() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let attic = Places::new(&ann).add_area("Attic")?.id;
+        PersonSettings::new(&ann).move_area(&attic, 99)?;
+        exchange(&ben, &ann, true)?;
+        assert!(ben.logged_history(keys::ENTITY)?.is_empty());
+        let bens = Places::new(&ben).add_area("Bike")?.id;
+        assert_eq!(ids(&ben)?, [bens.clone(), area.clone()]);
+        PersonSettings::new(&ben).move_area(&bens, 99)?;
+        exchange(&ben, &ann, true)?;
+        assert_eq!(ids(&ben)?, [area.clone(), bens]);
+        assert_eq!(ids(&ann)?, [area, attic]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_area_order_another_persons_device_wrote_counts_for_nothing() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let attic = Places::new(&ann).add_area("Attic")?.id;
+        exchange(&ben, &ann, true)?;
+        let order = json!([area, attic]).to_string();
+        let forged = ben.append(keys::ENTITY, keys::AREA_ORDER, Some(&order), None)?;
+        let mut report = ImportReport::default();
+        ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
+        assert!(ann.all_entries()?.iter().any(|e| e.id() == forged.id()));
+        assert_eq!(ids(&ann)?, [attic, area]);
         Ok(())
     }
 
