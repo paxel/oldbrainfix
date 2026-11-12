@@ -25,6 +25,7 @@ import 'src/crash_guard.dart';
 import 'src/drafts.dart';
 import 'src/folder_platform.dart';
 import 'src/help_notes.dart';
+import 'src/home_shortcuts.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -120,6 +121,7 @@ Future<void> _openAndRun(Directory dir) async {
       voice: AndroidVoice(),
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),
+      shortcuts: ChannelHomeShortcuts(),
       speech: AndroidSpeech(),
       ocr: const AndroidOcr(),
       calendar: const AndroidCalendar(),

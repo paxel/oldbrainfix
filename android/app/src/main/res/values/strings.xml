@@ -11,6 +11,8 @@
     <string name="capture_photo">Photo note</string>
     <string name="capture_all">Voice, text, photo</string>
     <string name="capture_widget_description">Opens Capture with one tap.</string>
+    <!-- A Tally's home-screen shortcut without a name (#284). -->
+    <string name="tally_shortcut">Tally</string>
     <string name="agenda_widget">Agenda</string>
     <string name="agenda_widget_description">The days the Agenda shows, with boxes to check off today.</string>
     <string name="agenda_widget_open_app">Open Old Brain Fix to see what\'s due today.</string>

@@ -31,6 +31,7 @@ import 'first_start_screen.dart';
 import 'folder_platform.dart';
 import 'frame_times.dart';
 import 'help_notes.dart';
+import 'home_shortcuts.dart';
 import 'home_pages.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
@@ -62,6 +63,7 @@ import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_runner.dart';
 import 'sync_screen.dart';
+import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
@@ -100,6 +102,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// The quick entry points asking for a capture screen; none when not
   /// given.
   final CaptureRequests requests;
+
+  /// A Tally's shortcuts on the home screen (#284); none when not given.
+  final HomeShortcuts shortcuts;
 
   /// Whisper and its model for Transcripts; none when not given.
   final SpeechPlatform speech;
@@ -185,6 +190,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.voice = const NoVoice(),
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
+    this.shortcuts = const NoHomeShortcuts(),
     this.speech = const NoSpeech(),
     this.ocr = const NoOcr(),
     this.calendar = const NoCalendar(),
@@ -404,9 +410,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                     onPick: _pickLink,
                                                     child: AlarmSyncScope(
                                                       alarms: _alarms,
-                                                      child:
-                                                          child ??
-                                                          const SizedBox.shrink(),
+                                                      child: HomeShortcutsScope(
+                                                        shortcuts:
+                                                            widget.shortcuts,
+                                                        child:
+                                                            child ??
+                                                            const SizedBox.shrink(),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -454,6 +464,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     lock: _lock,
     routes: _routes,
     requests: widget.requests,
+    shortcuts: widget.shortcuts,
     bundles: widget.bundles,
     profile: _profile,
     speech: _speechModel,
@@ -514,14 +525,15 @@ class RouteStack extends NavigatorObserver {
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, the Unsorted list when the Agenda widget's Unsorted
-/// count was and a pick's entry form when its pick was, and imports the bundles other apps opened with this one
+/// count was and a pick's entry form when its pick was, a Tally's entry
+/// page when its shortcut on the home screen was (#284), and imports the bundles other apps opened with this one
 /// and opens the Profile card links tapped in them.
 /// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
 /// again, while Capture and the full-screen alarm stay, and the Nudge
-/// screen, the Unsorted list and a pick's entry form wait for the
-/// unlock.
+/// screen, the Unsorted list, a pick's entry form and a Tally's entry
+/// page wait for the unlock.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -533,6 +545,7 @@ class _Home extends StatefulWidget {
   final AppLock lock;
   final RouteStack routes;
   final CaptureRequests requests;
+  final HomeShortcuts shortcuts;
   final BundlePlatform bundles;
   final OwnProfileModel profile;
   final SpeechModel speech;
@@ -553,6 +566,7 @@ class _Home extends StatefulWidget {
     required this.lock,
     required this.routes,
     required this.requests,
+    required this.shortcuts,
     required this.bundles,
     required this.profile,
     required this.speech,
@@ -612,6 +626,14 @@ class _HomeState extends State<_Home> {
   WidgetPick? _pickWaiting;
   OpenedOccurrence? _occurrenceWaiting;
 
+  /// The Note of the Tally whose shortcut was tapped while locked (#284).
+  String? _tallyWaiting;
+
+  /// Whether the user came from a Tally's shortcut and has not left the
+  /// app since: only then does closing its entry page go back.
+  var _fromShortcut = false;
+  late final StreamSubscription<void> _tallyAsked;
+
   /// Whether the bundles of the Changes Nudge are going out now.
   var _sendingChanges = false;
   var _conflictsWaiting = false;
@@ -628,6 +650,9 @@ class _HomeState extends State<_Home> {
     super.initState();
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
+    );
+    _tallyAsked = widget.shortcuts.arrived.listen(
+      (_) => unawaited(_tallyOpened()),
     );
     widget.profile.addListener(_profileMade);
     widget.alarms.addListener(_ringChanged);
@@ -648,6 +673,8 @@ class _HomeState extends State<_Home> {
       widget.autoSync.shown();
       // A bundle, Sent Item or Profile card file that opened the app.
       unawaited(_importOpened());
+      // A Tally's shortcut that opened the app (#284).
+      unawaited(_tallyOpened());
       unawaited(_autoBackupStart());
       // Past the first start already: what this version's help Notes
       // still owe (#180), an update's What's new among them.
@@ -697,6 +724,8 @@ class _HomeState extends State<_Home> {
   void _hidden() {
     // A sync out of sight is not announced; one after coming back is.
     _syncingSaid = true;
+    // Back later from anywhere else, the app stays when the page closes.
+    _fromShortcut = false;
     widget.lock.hidden();
     unawaited(widget.alarms.refresh());
     widget.autoSync.hidden();
@@ -780,6 +809,7 @@ class _HomeState extends State<_Home> {
     widget.autoSync.removeListener(_updatesNeeded);
     widget.autoSync.syncing.removeListener(_syncing);
     unawaited(_bundlesOpened.cancel());
+    unawaited(_tallyAsked.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
     super.dispose();
@@ -874,6 +904,10 @@ class _HomeState extends State<_Home> {
     if (_occurrenceWaiting case final opened?) {
       _occurrenceWaiting = null;
       unawaited(_openOccurrence(opened));
+    }
+    if (_tallyWaiting case final noteId?) {
+      _tallyWaiting = null;
+      unawaited(_openTally(noteId));
     }
   }
 
@@ -1061,6 +1095,54 @@ class _HomeState extends State<_Home> {
     }
     await openNote(context, widget.notes, widget.places, note);
     lock?.closeAreas();
+  }
+
+  /// Opens the entry page of the Tally whose shortcut on the home screen
+  /// was tapped (#284); behind the App Lock it waits for the unlock, as a
+  /// pick's entry form does.
+  Future<void> _tallyOpened() async {
+    final noteId = await widget.shortcuts.take();
+    if (noteId == null || !mounted) return;
+    _fromShortcut = true;
+    if (widget.lock.locked) {
+      _tallyWaiting = noteId;
+      return;
+    }
+    await _openTally(noteId);
+  }
+
+  /// Opens the entry page of the Tally of [noteId], its locked Area
+  /// first, and once it closes, saved or not, goes back to where the
+  /// user was, as long as they came from the shortcut and did not leave
+  /// the app meanwhile. A Tally deleted, in the trash or no longer this
+  /// Device's to add to opens only the app, and says so at the top.
+  Future<void> _openTally(String noteId) async {
+    final store = widget.store;
+    final note = widget.notes.byId(noteId);
+    if (note == null ||
+        note.isTrashed ||
+        !Tallies(store).isTally(noteId) ||
+        !store.mayWriteIn(noteId)) {
+      AnnouncementsScope.of(context)?.announce(context.t.tallyShortcutGone);
+      return;
+    }
+    final lock = LockScope.of(context);
+    final areaId = AreaLocks(store).lockedAreaOf(note);
+    if (areaId != null) {
+      final area = widget.places.areaById(areaId);
+      final open = await openLockedArea(
+        context,
+        lock,
+        areaId,
+        area == null ? '' : areaName(context.t, area),
+      );
+      if (!open || !mounted) return;
+    }
+    await addTallyEntry(context, widget.notes, noteId);
+    lock?.closeAreas();
+    if (!mounted || !_fromShortcut) return;
+    _fromShortcut = false;
+    await widget.shortcuts.leave();
   }
 
   /// Plants what the user kept of the Starter Set and keeps Simple or

@@ -5594,6 +5594,36 @@ abstract class AppLocalizations {
   /// **'Add entry'**
   String get addTallyEntry;
 
+  /// In a Tally card's menu on Android: puts a shortcut to the Tally's entry page on the home screen (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to home screen'**
+  String get addToHomeScreen;
+
+  /// In a Tally card's menu on the iPhone: puts the Tally's entry page among the actions of the app icon's long press (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to the app icon'**
+  String get addToHomeScreenIphone;
+
+  /// Announced when the phone's home screen cannot take a Tally's shortcut (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'This home screen takes no shortcuts.'**
+  String get tallyShortcutNotTaken;
+
+  /// Announced on the iPhone after Add to the app icon (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is in the app icon\'s menu: touch and hold the icon on the Home Screen.'**
+  String tallyShortcutOnIcon(String name);
+
+  /// Announced when a Tally's home-screen shortcut is tapped after the Tally was deleted or trashed (#284).
+  ///
+  /// In en, this message translates to:
+  /// **'This Tally is no longer there.'**
+  String get tallyShortcutGone;
+
   /// Makes a Note a Checklist: its first line stays its text, every other line becomes a Line (CONTEXT.md: Checklist, Line).
   ///
   /// In en, this message translates to:

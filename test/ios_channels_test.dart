@@ -14,6 +14,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/context_platform.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
+import 'package:oldbrainfix/src/home_shortcuts.dart';
 import 'package:oldbrainfix/src/location.dart';
 import 'package:oldbrainfix/src/lock_platform.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
@@ -53,6 +54,7 @@ const channels = [
   'pairing',
   'photos',
   'profile',
+  'shortcuts',
   'speech',
   'sync',
   'voice',
@@ -102,6 +104,7 @@ void main() {
         voice: AndroidVoice(),
         context: const AndroidContext(),
         requests: AndroidCaptureRequests(),
+        shortcuts: ChannelHomeShortcuts(),
         speech: AndroidSpeech(),
         ocr: const AndroidOcr(),
         calendar: const AndroidCalendar(),

@@ -11,8 +11,9 @@ import org.w3c.dom.Element
 /**
  * The manifest's "open with" filters: a Profile card file (#144) and a
  * Pack (#164) come in as a bundle or a Sent Item does, and no card link
- * opens the app. Clear-text traffic is off, and the one exported receiver
- * hears only the system's broadcasts (#235).
+ * opens the app. Clear-text traffic is off, the one exported receiver
+ * hears only the system's broadcasts (#235), and a Tally's shortcut lands
+ * where no other app reaches (#284).
  */
 class ManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
@@ -61,6 +62,16 @@ class ManifestTest {
             .single { it.getAttributeNS(android, "name") == ".AgendaWidgetService" }
         assertEquals("false", service.getAttributeNS(android, "exported"))
         assertEquals("android.permission.BIND_REMOTEVIEWS", service.getAttributeNS(android, "permission"))
+    }
+
+    @Test
+    fun aTallysShortcutLandsOnAnActivityNoOtherAppStarts() {
+        val entry = activity(".TallyEntryActivity")
+        assertEquals("false", entry.getAttributeNS(android, "exported"))
+        assertEquals("true", entry.getAttributeNS(android, "excludeFromRecents"))
+        assertEquals("true", entry.getAttributeNS(android, "noHistory"))
+        assertEquals("@android:style/Theme.NoDisplay", entry.getAttributeNS(android, "theme"))
+        assertTrue(elements(entry, "intent-filter").isEmpty())
     }
 
     @Test

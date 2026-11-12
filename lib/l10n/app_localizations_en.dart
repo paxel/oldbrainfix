@@ -3479,6 +3479,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addTallyEntry => 'Add entry';
 
   @override
+  String get addToHomeScreen => 'Add to home screen';
+
+  @override
+  String get addToHomeScreenIphone => 'Add to the app icon';
+
+  @override
+  String get tallyShortcutNotTaken => 'This home screen takes no shortcuts.';
+
+  @override
+  String tallyShortcutOnIcon(String name) {
+    return '$name is in the app icon\'s menu: touch and hold the icon on the Home Screen.';
+  }
+
+  @override
+  String get tallyShortcutGone => 'This Tally is no longer there.';
+
+  @override
   String get makeChecklist => 'Make it a Checklist';
 
   @override

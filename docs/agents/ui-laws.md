@@ -326,7 +326,9 @@ replace a law of Both apps where they say so. A desktop law marked
   selection change it, #182, #273).
 - **The detailed card's action row has a pencil** (#281), right before
   its ⋮: one tap opens the Note editor, as the long press and ⋮ ▸ Edit
-  do.
+  do. Where the card is too narrow for the whole row, as with Fat
+  fingers on a small phone, the pencil and ⋮ go onto a line of their own
+  under the other buttons, at the right, so no button is cut.
 - **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
   of the Note and of each Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183).
@@ -882,6 +884,24 @@ replace a law of Both apps where they say so. A desktop law marked
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **A Tally's shortcut opens its entry page directly** (#284): "Add to
+  home screen" in a Tally's card's ⋮, offered where this Device may add
+  entries to it, pins a shortcut named as the Tally (Android's own
+  prompt places it; "Private Tally" for one in a locked Area set to
+  Masked, the home screen being as public as the lock screen). On the
+  iPhone, where no app may place an icon, the entry reads "Add to the
+  app icon" and puts the Tally among the actions of the app icon's long
+  press, the newest four, said at the top. A tap opens the Tally's
+  entry page with no screen in between, over whatever the app showed;
+  as the Agenda widget's pick, it opens its locked Area first and,
+  behind the App Lock, after the unlock, since the page shows the
+  Tally's targets and latest values. Once the page closes, saved or
+  not, Android goes back to the home screen with the app kept as it
+  was, unless the user left the app between the tap and the page, or
+  while it was open; the iPhone, which lets no app leave itself, stays in the app
+  where it was. A Tally deleted, in the trash or no longer this
+  Device's to add to opens only the app, with "This Tally is no longer
+  there." at the top.
 - **On the iPhone a share waits for the app** (#241): iOS lets no Share
   extension open its app, so "Old Brain Fix" in the share sheet keeps
   the text, links, pictures or the app's own files and says so on a small

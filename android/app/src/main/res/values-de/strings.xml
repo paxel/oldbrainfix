@@ -8,6 +8,8 @@
     <string name="capture_photo">Fotonotiz</string>
     <string name="capture_all">Sprache, Text, Foto</string>
     <string name="capture_widget_description">Öffnet die Erfassung mit einem Tipp.</string>
+    <!-- A Tally's home-screen shortcut without a name (#284). -->
+    <string name="tally_shortcut">Strichliste</string>
     <string name="agenda_widget">Agenda</string>
     <string name="agenda_widget_description">Die Tage, die die Agenda zeigt, mit Kästchen zum Abhaken für heute.</string>
     <string name="agenda_widget_open_app">Öffne Old Brain Fix, um zu sehen, was heute ansteht.</string>

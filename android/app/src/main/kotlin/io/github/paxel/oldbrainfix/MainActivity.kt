@@ -43,6 +43,7 @@ class MainActivity : FlutterActivity() {
     private var voiceChannel: MethodChannel? = null
 
     private var captureChannel: MethodChannel? = null
+    private var shortcutsChannel: MethodChannel? = null
 
     /** The microphone and the player for voice Notes. */
     private val voice by lazy { Voice(this) }
@@ -147,6 +148,11 @@ class MainActivity : FlutterActivity() {
         CaptureModes.of(intent.action, intent.flags)?.let {
             captureRequested = it
             captureChannel?.invokeMethod("requested", null)
+        }
+        // A Tally's shortcut asked for its entry page while the app runs
+        // (#284); which one, TallyEntryActivity told already.
+        if (intent.action == TallyShortcuts.ACTION && tallyRequested != null) {
+            shortcutsChannel?.invokeMethod("requested", null)
         }
         if (!intent.getBooleanExtra(EXTRA_RING, false)) return
         showOverLockScreen(true)
@@ -493,6 +499,32 @@ class MainActivity : FlutterActivity() {
                     "take" -> {
                         result.success(captureRequested)
                         captureRequested = null
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        shortcutsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHORTCUTS_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "pinTally" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        val note = args["note"] as? String
+                        if (note.isNullOrEmpty()) {
+                            result.success(false)
+                        } else {
+                            result.success(TallyShortcuts.pin(this@MainActivity, note, args["label"] as? String ?: ""))
+                        }
+                    }
+                    "take" -> {
+                        result.success(tallyRequested)
+                        tallyRequested = null
+                    }
+                    // The entry page a shortcut opened closed: back to the
+                    // home screen, the app kept as it was behind it.
+                    "leave" -> {
+                        moveTaskToBack(true)
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -1055,6 +1087,7 @@ class MainActivity : FlutterActivity() {
         private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
         private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
         private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
+        private const val SHORTCUTS_CHANNEL = "io.github.paxel.oldbrainfix/shortcuts"
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
@@ -1124,6 +1157,18 @@ class MainActivity : FlutterActivity() {
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null
+
+        /** The Tally whose shortcut was tapped and whose entry page the app has not opened yet (#284). */
+        private var tallyRequested: String? = null
+
+        /**
+         * A Tally's shortcut asked for the entry page of the Tally of
+         * [note]: only [TallyEntryActivity] tells, in the app's own
+         * process, so no other app's intent opens one.
+         */
+        fun tallyAsked(note: String) {
+            tallyRequested = note
+        }
 
         /**
          * The full-screen alarm stopped: the app no longer shows over the

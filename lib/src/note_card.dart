@@ -10,6 +10,7 @@ import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
 import 'frogs_screen.dart' show FrogIcon;
+import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'ocr_platform.dart';
@@ -156,6 +157,11 @@ class NoteActions {
   /// Opens the entry page of the Note's Tally.
   final VoidCallback? onAddEntry;
 
+  /// Puts a shortcut to the entry page of the Note's Tally on the home
+  /// screen, on the iPhone into the app icon's menu (#284); offered, as
+  /// [onAddEntry], only for a Tally.
+  final VoidCallback? onAddToHome;
+
   /// What the menu offers of a Checklist (#120), read as the menu opens:
   /// whether the Note is one, and making it one, turning it back into a
   /// plain Note, unchecking all of its Lines and its "Show on the Agenda"
@@ -195,6 +201,7 @@ class NoteActions {
     this.isTally,
     this.onMakeTally,
     this.onAddEntry,
+    this.onAddToHome,
     this.checklist,
     this.addToShopping,
     this.showTicks,
@@ -695,7 +702,10 @@ class NoteCard extends StatelessWidget {
 /// language; the words show on a long press: file it, spawn one of
 /// [spawns] from it (a Routine, Reminder, Frog or Session), merge it, and
 /// at the end a pencil opening the editor and ⋮ for the rest with words. Each is left out when its callback is
-/// null. The card draws it, and so does a capture screen (#113).
+/// null. Where the card is too narrow for all of them, as with Fat
+/// fingers on a small phone (#224), the pencil and ⋮ go onto a line of
+/// their own under the others, each line at the right, so no button is
+/// cut. The card draws it, and so does a capture screen (#113).
 class NoteActionRow extends StatelessWidget {
   /// The Importance ⋮ marks.
   final Importance importance;
@@ -725,53 +735,64 @@ class NoteActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final actions = this.actions;
-    return Row(
+    return OverflowBar(
+      alignment: MainAxisAlignment.spaceBetween,
+      overflowAlignment: OverflowBarAlignment.end,
       children: [
-        if (onFile != null)
-          IconButton(
-            tooltip: t.fileInto,
-            onPressed: onFile,
-            icon: const Icon(Icons.drive_file_move_outline),
-          ),
-        if (onSchedule case final onSchedule? when spawns.isNotEmpty)
-          PopupMenuButton<Spawn>(
-            tooltip: t.routineOrReminder,
-            icon: const Icon(Icons.alarm_add_outlined),
-            onSelected: onSchedule,
-            itemBuilder: (_) => [
-              for (final spawn in offeredSpawns(
-                spawnsNow?.call() ?? spawns,
-                advanced: actions?.advanced ?? true,
-              ))
-                PopupMenuItem(
-                  value: spawn,
-                  child: Text(switch (spawn) {
-                    Spawn.routine => t.routine,
-                    Spawn.reminder => t.reminder,
-                    Spawn.frog => t.frog,
-                    Spawn.session => t.session,
-                  }),
-                ),
-            ],
-          ),
-        if (onMerge != null)
-          IconButton(
-            tooltip: t.mergeInto,
-            onPressed: onMerge,
-            icon: const Icon(Icons.call_merge),
-          ),
-        const Spacer(),
-        // The editor in one tap, beside the long press and ⋮ ▸ Edit
-        // (#281).
-        if (actions?.onEdit case final edit?)
-          IconButton(
-            key: const ValueKey('note-pencil'),
-            tooltip: t.edit,
-            onPressed: edit,
-            icon: const Icon(Icons.edit_outlined),
-          ),
-        if (actions != null)
-          _MoreButton(importance: importance, actions: actions),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onFile != null)
+              IconButton(
+                tooltip: t.fileInto,
+                onPressed: onFile,
+                icon: const Icon(Icons.drive_file_move_outline),
+              ),
+            if (onSchedule case final onSchedule? when spawns.isNotEmpty)
+              PopupMenuButton<Spawn>(
+                tooltip: t.routineOrReminder,
+                icon: const Icon(Icons.alarm_add_outlined),
+                onSelected: onSchedule,
+                itemBuilder: (_) => [
+                  for (final spawn in offeredSpawns(
+                    spawnsNow?.call() ?? spawns,
+                    advanced: actions?.advanced ?? true,
+                  ))
+                    PopupMenuItem(
+                      value: spawn,
+                      child: Text(switch (spawn) {
+                        Spawn.routine => t.routine,
+                        Spawn.reminder => t.reminder,
+                        Spawn.frog => t.frog,
+                        Spawn.session => t.session,
+                      }),
+                    ),
+                ],
+              ),
+            if (onMerge != null)
+              IconButton(
+                tooltip: t.mergeInto,
+                onPressed: onMerge,
+                icon: const Icon(Icons.call_merge),
+              ),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The editor in one tap, beside the long press and ⋮ ▸ Edit
+            // (#281).
+            if (actions?.onEdit case final edit?)
+              IconButton(
+                key: const ValueKey('note-pencil'),
+                tooltip: t.edit,
+                onPressed: edit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            if (actions != null)
+              _MoreButton(importance: importance, actions: actions),
+          ],
+        ),
       ],
     );
   }
@@ -790,8 +811,8 @@ List<Spawn> offeredSpawns(List<Spawn> spawns, {required bool advanced}) => [
 /// Merge into… (#189, #281), then, for a Note being captured, its Importance as radio
 /// buttons, the one it has marked, then Show ticks while it has boxes, then
 /// "Share…", which opens a small menu at the button of sending, sharing,
-/// copying its text and exporting it as a Pack (#281), then removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" of
-/// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
+/// copying its text and exporting it as a Pack (#281), then removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" and
+/// "Add to home screen" (#284) of a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
 /// switch, a Shopping List's three choices as radio buttons) and "Uncheck
 /// all" (a Checklist's) and "Back to a plain Note", removing a photo or recording while its
@@ -975,6 +996,14 @@ class _MoreButton extends StatelessWidget {
           if (tally == true)
             if (actions.onAddEntry case final add?)
               item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
+          if (tally == true)
+            if (actions.onAddToHome case final home?)
+              item(
+                'note-add-to-home',
+                Icons.add_to_home_screen,
+                t.addToHomeScreenHere,
+                home,
+              ),
           // A Checklist or Shopping List is no Tally, and a Tally neither.
           if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)

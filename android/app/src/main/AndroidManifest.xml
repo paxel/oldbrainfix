@@ -188,6 +188,16 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.NoDisplay" />
+        <!-- A Tally's shortcut on the home screen (#284): hands the Tally
+             over to MainActivity, which opens its entry page. Not
+             exported: the launcher starts a pinned shortcut as the app
+             itself, and no other app may open an entry page. -->
+        <activity
+            android:name=".TallyEntryActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
         <!-- Quick Settings tiles for voice, text and photo Capture. On the
              lock screen Android asks to unlock first. -->
         <service

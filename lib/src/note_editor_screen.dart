@@ -16,6 +16,7 @@ import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
 import 'frogs_screen.dart';
+import 'home_shortcuts.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'location.dart';
@@ -356,6 +357,14 @@ NoteActions noteActions(
         : null,
     onAddEntry: placed.amends
         ? () => then(addTallyEntry(context, notes, id))
+        : null,
+    // Where the phone can have one, for a Tally entries may be added to
+    // (#284).
+    onAddToHome:
+        placed.amends &&
+            !placed.note.isTrashed &&
+            HomeShortcutsScope.of(context).available
+        ? () => unawaited(addTallyToHome(context, notes, id))
         : null,
     checklist: () {
       final lists = Checklists(notes.store);

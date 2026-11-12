@@ -3517,6 +3517,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addTallyEntry => 'Eintrag hinzufügen';
 
   @override
+  String get addToHomeScreen => 'Zum Startbildschirm hinzufügen';
+
+  @override
+  String get addToHomeScreenIphone => 'Zum App-Symbol hinzufügen';
+
+  @override
+  String get tallyShortcutNotTaken =>
+      'Dieser Startbildschirm nimmt keine Verknüpfungen an.';
+
+  @override
+  String tallyShortcutOnIcon(String name) {
+    return '$name steht im Menü des App-Symbols: das Symbol auf dem Home-Bildschirm gedrückt halten.';
+  }
+
+  @override
+  String get tallyShortcutGone => 'Diese Strichliste gibt es nicht mehr.';
+
+  @override
   String get makeChecklist => 'Zur Checkliste machen';
 
   @override
