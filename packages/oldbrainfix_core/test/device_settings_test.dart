@@ -108,6 +108,29 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('File into… keeps the last three places filed into, latest first', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.recentlyFiledInto, isEmpty);
+    store
+      ..filedInto('a')
+      ..filedInto('b')
+      ..filedInto('c');
+    expect(store.recentlyFiledInto, ['c', 'b', 'a']);
+    store.filedInto('a');
+    expect(store.recentlyFiledInto, ['a', 'c', 'b'], reason: 'once, moved up');
+    store.filedInto('d');
+    expect(store.recentlyFiledInto, ['d', 'a', 'c'], reason: 'b forgotten');
+    expect(store.localSetting('recentlyFiledInto'), '["d","a","c"]');
+    store.setLocalSetting('recentlyFiledInto', '["x",7,"x","y","z","w"]');
+    expect(store.recentlyFiledInto, ['x', 'y', 'z']);
+    store.setLocalSetting('recentlyFiledInto', 'not json');
+    expect(store.recentlyFiledInto, isEmpty);
+    store.filedInto('e');
+    expect(store.recentlyFiledInto, ['e']);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the alarm setup is offered until this Device has walked it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

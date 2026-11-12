@@ -66,6 +66,10 @@ extension DeviceSettings on Store {
   static const _unitSystem = 'unitSystem';
   static const _shoppingAgenda = 'shoppingAgenda';
   static const _quickNoteNudgeButtonsOff = 'quickNoteNudgeButtonsOff';
+  static const _recentlyFiledInto = 'recentlyFiledInto';
+
+  /// How many places filed into File into… shows at its top (#272).
+  static const recentPlacesKept = 3;
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -287,6 +291,35 @@ extension DeviceSettings on Store {
 
   set quickNoteNudgeButtonsOn(bool on) =>
       setLocalSetting(_quickNoteNudgeButtonsOff, '${!on}');
+
+  /// The ids of the Areas and Topics this Device last filed into, the
+  /// latest first, at most [recentPlacesKept] (#272). They may name a
+  /// place deleted since; File into… shows only those it lists.
+  List<String> get recentlyFiledInto {
+    try {
+      if (jsonDecode(localSetting(_recentlyFiledInto) ?? '[]')
+          case final List<Object?> ids) {
+        return [
+          ...{...ids.whereType<String>()},
+        ].take(recentPlacesKept).toList();
+      }
+    } on FormatException {
+      // A broken setting names none.
+    }
+    return [];
+  }
+
+  /// Puts [placeId] first among [recentlyFiledInto], once, and forgets
+  /// the oldest beyond [recentPlacesKept].
+  void filedInto(String placeId) => setLocalSetting(
+    _recentlyFiledInto,
+    jsonEncode(
+      [
+        placeId,
+        ...recentlyFiledInto.where((id) => id != placeId),
+      ].take(recentPlacesKept).toList(),
+    ),
+  );
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.

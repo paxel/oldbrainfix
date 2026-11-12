@@ -32,6 +32,10 @@ const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const THEME: &str = "theme";
+const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
+
+/// How many places filed into File into… shows at its top (#272).
+pub const RECENT_PLACES_KEPT: usize = 3;
 
 /// Which theme this Device shows: the system's, or a fixed one, as the
 /// Dart core's `ThemeChoice`.
@@ -473,6 +477,38 @@ impl<'a> DeviceSettings<'a> {
         self.store
             .set_local_setting(PLAYBACK_SPEED, &speed_text(speed))
     }
+
+    /// The ids of the Areas and Topics this Device last filed into, the
+    /// latest first, at most [`RECENT_PLACES_KEPT`] (#272). They may name
+    /// a place deleted since; File into… shows only those it lists.
+    pub fn recently_filed_into(&self) -> Result<Vec<String>> {
+        let kept = self.store.local_setting(RECENTLY_FILED_INTO)?;
+        let ids = match kept.as_deref().map(serde_json::from_str) {
+            Some(Ok(serde_json::Value::Array(ids))) => ids,
+            _ => return Ok(Vec::new()),
+        };
+        let mut recent: Vec<String> = Vec::new();
+        for id in ids.iter().filter_map(serde_json::Value::as_str) {
+            if recent.len() < RECENT_PLACES_KEPT && !recent.iter().any(|r| r == id) {
+                recent.push(id.to_owned());
+            }
+        }
+        Ok(recent)
+    }
+
+    /// Puts `place_id` first among [`Self::recently_filed_into`], once,
+    /// and forgets the oldest beyond [`RECENT_PLACES_KEPT`].
+    pub fn filed_into(&self, place_id: &str) -> Result<()> {
+        let mut recent = vec![place_id.to_owned()];
+        recent.extend(
+            self.recently_filed_into()?
+                .into_iter()
+                .filter(|id| id != place_id),
+        );
+        recent.truncate(RECENT_PLACES_KEPT);
+        let json = serde_json::to_string(&recent).map_err(|e| Error::Invalid(e.to_string()))?;
+        self.store.set_local_setting(RECENTLY_FILED_INTO, &json)
+    }
 }
 
 #[cfg(test)]
@@ -718,6 +754,41 @@ mod tests {
             assert_eq!(settings.playback_speed()?, 1.0, "{kept}");
             assert_eq!(settings.chosen_playback_speed()?, None, "{kept}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn file_into_keeps_the_last_three_places_filed_into_latest_first() -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        assert!(settings.recently_filed_into()?.is_empty());
+        for id in ["a", "b", "c"] {
+            settings.filed_into(id)?;
+        }
+        assert_eq!(settings.recently_filed_into()?, ["c", "b", "a"]);
+        settings.filed_into("a")?;
+        assert_eq!(
+            settings.recently_filed_into()?,
+            ["a", "c", "b"],
+            "once, moved up"
+        );
+        settings.filed_into("d")?;
+        assert_eq!(
+            settings.recently_filed_into()?,
+            ["d", "a", "c"],
+            "b forgotten"
+        );
+        assert_eq!(
+            store.local_setting(RECENTLY_FILED_INTO)?.as_deref(),
+            Some(r#"["d","a","c"]"#)
+        );
+        store.set_local_setting(RECENTLY_FILED_INTO, r#"["x",7,"x","y","z","w"]"#)?;
+        assert_eq!(settings.recently_filed_into()?, ["x", "y", "z"]);
+        store.set_local_setting(RECENTLY_FILED_INTO, "not json")?;
+        assert!(settings.recently_filed_into()?.is_empty());
+        settings.filed_into("e")?;
+        assert_eq!(settings.recently_filed_into()?, ["e"]);
+        assert!(store.all_entries()?.is_empty(), "settings are never logged");
         Ok(())
     }
 }
